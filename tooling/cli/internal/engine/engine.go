@@ -535,10 +535,10 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	}
 	// A publish or a deploy states which commit it ships. Where Git does not
 	// manage the workspace root there is none, so a run that executes stops
-	// here, before any hook, job or remote call.
+	// here, before any hook, job or remote call. A selected command whose
+	// extension is not installed is reported instead (reportRepositoryRefusal).
 	if err := requireRepository(req); err != nil {
-		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
-		return SessionResult{ExitCode: ExitError}, err
+		return SessionResult{ExitCode: ExitError}, reportRepositoryRefusal(req, err)
 	}
 
 	// Hook verbosity is resolved once, here, from the flags as parsed. The run

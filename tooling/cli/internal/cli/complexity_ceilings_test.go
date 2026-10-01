@@ -84,8 +84,14 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  23,
-		funcs:  146,
-		why: "RAISED 145→146 (one source-state answer per run): newRunCacheManager builds the run's " +
+		funcs:  148,
+		why: "RAISED 146→148 (a missing extension before the repository refusal): " +
+			"reportRepositoryRefusal reports a selected command whose extension is not installed " +
+			"with the missing-extension guard's own message instead of the refusal, because that " +
+			"install is the first remedy; discoverDeclaredExtensions resolves the extensions for " +
+			"that question before any hook, as startHostedRemoteCache does, and only for a " +
+			"workspace that declares a registry extension. Run gains no branch; files stay at 23. " +
+			"RAISED 145→146 (one source-state answer per run): newRunCacheManager builds the run's " +
 			"one cache manager out of run, carrying the cache-verification store override with it, " +
 			"and records the workspace root as managed when this run's own tree-state capture " +
 			"succeeded, so no execution key and no version stamp of the run asks git again. run " +

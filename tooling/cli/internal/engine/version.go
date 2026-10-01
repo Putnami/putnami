@@ -5,6 +5,7 @@ import (
 	"os"
 	"slices"
 
+	internalextension "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
@@ -77,6 +78,54 @@ func requireRepository(req *Request) error {
 		return nil
 	}
 	return nil
+}
+
+// reportRepositoryRefusal prints why a run requireRepository refused stops, and
+// returns the error the run ends with.
+//
+// A selected command that no loaded extension declares, while an extension the
+// workspace declares is not installed, cannot run in any directory: installing
+// that extension is the first thing to do, and the repository matters only
+// once the command can run. That run reports the missing extension with the
+// missing-extension guard's own message (buildPlan) and no refusal line. Every
+// other run prints the one-line refusal. Either way it stops before any hook,
+// job or remote call. A command a loaded extension declares but no selected
+// project activates gets the refusal: telling it apart needs the plan, which
+// this run never builds.
+func reportRepositoryRefusal(req *Request, refusal error) error {
+	if discovered := discoverDeclaredExtensions(req); discovered != nil {
+		missing := missingRegistryExtensions(req.Config, discovered.Extensions)
+		if len(missing) > 0 && len(selectedCommandsWithoutJobs(req.Commands, nil, discovered.Extensions)) > 0 {
+			reportMissingExtensions(missing, discovered.Skipped, "")
+			reportUnservedSDDCommands(req.Commands, discovered.Extensions)
+			return nil
+		}
+	}
+	iox.Fprintf(os.Stderr, "putnami: %v\n", refusal)
+	return refusal
+}
+
+// discoverDeclaredExtensions resolves the extensions of a workspace that
+// declares a registry extension, the only kind that can be missing. It returns
+// nil for any other workspace, and when the workspace or its extensions cannot
+// be read: the refusal then stands.
+func discoverDeclaredExtensions(req *Request) *internalextension.DiscoveryResult {
+	if len(missingRegistryExtensions(req.Config, nil)) == 0 {
+		return nil
+	}
+	ws, err := workspace.Load(req.WorkspaceRoot)
+	if err != nil {
+		return nil
+	}
+	projectPaths := make([]string, len(ws.Projects))
+	for i, project := range ws.Projects {
+		projectPaths[i] = project.Path
+	}
+	discovered, err := internalextension.DiscoverExtensionsDetailed(req.WorkspaceRoot, req.Config, projectPaths)
+	if err != nil {
+		return nil
+	}
+	return discovered
 }
 
 // newRunCacheManager builds the run's one cache manager, honoring a

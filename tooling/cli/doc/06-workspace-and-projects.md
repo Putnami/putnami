@@ -446,7 +446,7 @@ If no baseline can be resolved, `--impacted` falls back to all projects and says
 
 Bare job commands that auto-select impacted projects resolve the same trunk (`origin/HEAD`, `origin/main`, local `main`/`master`), so explicit `--impacted` and bare auto-selection can no longer disagree about what a feature branch is measured against.
 
-A workspace root Git does not manage has no history to compare: no `git` program is on `PATH`, or the root is outside every repository. There a bare job command selects every project and says `all projects (no git repository)`, and a named project needs no Git. `--impacted`, and `--baseline` on a job command that names no target, refuse with one line that names Git and the command to run, as do `version`, a `publish` or a `deploy` that executes. A `--baseline` beside named projects or `--all` changes no selection, inside a repository or outside one, so it is not refused. Any other Git failure keeps its own message.
+A workspace root Git does not manage has no history to compare: no `git` program is on `PATH`, or the root is outside every repository. There a bare job command selects every project and says `all projects (no git repository)`, and a named project needs no Git. `--impacted`, and `--baseline` on a job command that names no target, refuse with one line that names Git and the command to run, as do `version`, a `publish` or a `deploy` that executes. A `publish` or `deploy` whose extension is not installed reports the missing extension instead, since installing it comes first. A `--baseline` beside named projects or `--all` changes no selection, inside a repository or outside one, so it is not refused. Any other Git failure keeps its own message.
 
 ### Edge Cases
 

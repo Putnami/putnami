@@ -27,7 +27,7 @@
     },
     {
       "id": "git-history-is-refused-in-one-line",
-      "text": "At a root Git does not manage, --impacted, --baseline on a job command that names no target, version, and a publish or deploy that executes refuse with exactly one line: what needs git history, whether the git program or the repository is missing, and the command to run. A --baseline beside named projects or --all changes no selection, inside a repository or outside one, so it is not refused. A run that only previews its plan is not refused. A git failure inside a repository keeps its own detail."
+      "text": "At a root Git does not manage, --impacted, --baseline on a job command that names no target, version, and a publish or deploy that executes refuse in one line: what needs git history, whether the git program or the repository is missing, and the command to run. A --baseline beside named projects or --all changes no selection, so it is not refused. A missing extension of the command is reported instead. A run that only previews its plan is not refused. A git failure inside a repository keeps its own detail."
     }
   ],
   "decisions": [

@@ -177,6 +177,108 @@ func TestRun_PublishAndDeployOutsideARepositoryNameGit(t *testing.T) {
 	}
 }
 
+// shippingWorkspace writes a workspace at a root git discovery cannot escape.
+// Its local extension serves build, and publish too when servesPublish is set,
+// with a task that records each run in the returned runs file. declareCloud
+// adds the registry extension @putnami/cloud, which is never installed.
+func shippingWorkspace(t *testing.T, servesPublish, declareCloud bool) (root, runs string) {
+	t.Helper()
+	root = rootWithoutRepository(t)
+	tools := t.TempDir()
+	runs = filepath.Join(tools, "runs")
+	script := filepath.Join(tools, "ship.sh")
+	write := func(path string, data []byte, mode os.FileMode) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(script, []byte("#!/bin/sh\necho run >> \"$1\"\n"), 0o755)
+	manifest := extensionproto.Manifest{
+		Name: "@test/ship", Version: "1.0.0", CLIContract: 4,
+		Commands: map[string]extensionproto.CommandDefinition{
+			"build": {Run: []extensionproto.PipelineStep{{ID: "build", Task: "ship"}}},
+		},
+		Tasks: map[string]extensionproto.TaskDefinition{
+			"ship": {Kind: "command", Command: script, Args: []string{runs}, Cwd: "{projectRoot}"},
+		},
+	}
+	if servesPublish {
+		manifest.Commands["publish"] = extensionproto.CommandDefinition{Run: []extensionproto.PipelineStep{{ID: "publish", Task: "ship"}}}
+	}
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	extensions := `"/extension"`
+	if declareCloud {
+		extensions += `,"@putnami/cloud"`
+	}
+	write(filepath.Join(root, "putnami.workspace.json"), []byte(`{"name":"ship","includes":["app","extension"],"extensions":[`+extensions+`]}`), 0o644)
+	write(filepath.Join(root, "app", "putnami.json"), []byte(`{"name":"app","extensions":["/extension"]}`), 0o644)
+	write(filepath.Join(root, "extension", "putnami.json"), []byte(`{"name":"@test/ship"}`), 0o644)
+	write(filepath.Join(root, "extension", "putnami.extension.json"), data, 0o644)
+	workspace.InvalidateLoadCache(root)
+	return root, runs
+}
+
+// A publish whose own extension is not installed reports that extension first:
+// it cannot run in any directory, and the repository matters only once it can.
+// With its extension present, the refusal stands, also beside a missing
+// extension the command does not need. Either way no hook and no job runs.
+func TestRun_PublishOutsideARepositoryReportsAMissingExtensionFirst(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-without-git", "git-history-is-refused-in-one-line",
+		"publish-and-deploy-outside-a-repository-name-git")
+	requireSh(t)
+	for _, tc := range []struct {
+		name                        string
+		servesPublish, declareCloud bool
+		wantMissing                 bool
+	}{
+		{name: "its extension is missing", declareCloud: true, wantMissing: true},
+		{name: "every extension is present", servesPublish: true},
+		{name: "an extension it does not need is missing", servesPublish: true, declareCloud: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, runs := shippingWorkspace(t, tc.servesPublish, tc.declareCloud)
+			hookRuns := filepath.Join(t.TempDir(), "hook-runs")
+			var result SessionResult
+			var err error
+			stderr := captureStderr(t, func() {
+				result, err = New().Run(context.Background(), Request{
+					WorkspaceRoot: root, Config: workspacepb.Load(root), Commands: []string{"publish"},
+					Global: GlobalFlags{All: true, Projects: "*"}, Stdout: io.Discard,
+					Hooks: &workspacepb.HooksConfig{CLI: &workspacepb.HookPhaseConfig{
+						Before: []string{"echo ran >> " + shPath(hookRuns)},
+					}},
+				}, discardEvents{})
+			})
+			if result.ExitCode != ExitError {
+				t.Fatalf("Run = exit %d, %v (stderr %q), want %d", result.ExitCode, err, stderr, ExitError)
+			}
+			if tc.wantMissing {
+				if err != nil || !strings.Contains(stderr, "@putnami/cloud") ||
+					strings.Count(stderr, "run `putnami install`") != 1 || strings.Contains(stderr, "needs git history") {
+					t.Fatalf("Run = %v, stderr %q, want the missing @putnami/cloud with one install hint and no refusal", err, stderr)
+				}
+			} else {
+				if !errors.Is(err, git.ErrNotRepository) {
+					t.Fatalf("Run = %v, want the refusal for a missing repository", err)
+				}
+				oneLineRefusal(t, stderr, "publish", root)
+			}
+			for what, path := range map[string]string{"a before hook": hookRuns, "a job": runs} {
+				if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+					t.Errorf("%s ran before the run stopped", what)
+				}
+			}
+		})
+	}
+}
+
 // The refusal belongs to the commands that ship a commit. Every other command
 // runs where Git does not manage the root, and the guard asks git nothing for it.
 func TestRequireRepository(t *testing.T) {
