@@ -18,8 +18,11 @@ func printAutoProjectSelectionNote(w io.Writer, note autoProjectSelectionNote, c
 	switch note.mode {
 	case workspace.AutoSelectionAll:
 		detail := "all projects"
-		if note.reason == workspace.AutoSelectionReasonFirstBuild {
+		switch note.reason {
+		case workspace.AutoSelectionReasonFirstBuild:
 			detail = "all projects (first build on " + note.branch + ")"
+		case workspace.AutoSelectionReasonNoRepository:
+			detail = "all projects (no git repository)"
 		}
 		iox.Fprintf(w, "  · %s — %s\n", detail, projectCountSummary(count))
 	case workspace.AutoSelectionImpacted:

@@ -84,8 +84,25 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  23,
-		funcs:  144,
-		why: "RAISED 141→144 (ADR 0055 part 4): a hosted `build` whose first-use bootstrap " +
+		funcs:  148,
+		why: "RAISED 146→148 (a missing extension before the repository refusal): " +
+			"reportRepositoryRefusal reports a selected command whose extension is not installed " +
+			"with the missing-extension guard's own message instead of the refusal, because that " +
+			"install is the first remedy; discoverDeclaredExtensions resolves the extensions for " +
+			"that question before any hook, as startHostedRemoteCache does, and only for a " +
+			"workspace that declares a registry extension. Run gains no branch; files stay at 23. " +
+			"RAISED 145→146 (one source-state answer per run): newRunCacheManager builds the run's " +
+			"one cache manager out of run, carrying the cache-verification store override with it, " +
+			"and records the workspace root as managed when this run's own tree-state capture " +
+			"succeeded, so no execution key and no version stamp of the run asks git again. run " +
+			"loses a branch; files stay at 23. " +
+			"RAISED 144→145 (a workspace Git does not manage): requireRepository refuses a " +
+			"`publish` or a `deploy` that executes at a root with no repository, before any hook, " +
+			"and asks git only when the tree-state capture found no commit. impactedFailureEndsRun " +
+			"takes the --impacted-strict case of selectProjects in place and adds the same refusal " +
+			"for --impacted, so the selection stage gains no branch. Both print one line that names " +
+			"git and add no stage; files stay at 23. " +
+			"RAISED 141→144 (ADR 0055 part 4): a hosted `build` whose first-use bootstrap " +
 			"runs an install must start its cache provider after the install's credentialed " +
 			"workspace-fetch and before the install's first repository code, and the run that follows " +
 			"must read the remote cache through that provider instead of starting a second one after " +
@@ -511,7 +528,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "cache",
 		prefix: "internal/store/",
 		files:  33,
-		funcs:  273,
+		funcs:  275,
 		why: "internal/store: the content-addressed local cache — entries, task entries, CAS, " +
 			"leases, GC, generations and the remote bridge. Cache-key completeness and atomicity " +
 			"under concurrency are the two invariants this repository has been burned by most " +
@@ -652,7 +669,18 @@ var complexityCeilings = []complexityCeiling{
 			"RAISED, from 33/272 to 33/273, with no new file. leaseNow is the one " +
 			"clock the lease code reads: time.Now in production, a clock a test freezes so a lease " +
 			"test that is not about expiry cannot see its lease expire on a loaded host. It reads " +
-			"no entry and writes none",
+			"no entry and writes none. " +
+			"RAISED, from 33/273 to 33/274, with no new file. SourceState names, once per " +
+			"workspace root for the life of the manager, whether Git manages that root, for " +
+			"CacheKey.SourceState. The key writes the field only where Git does not manage the root, " +
+			"so no key computed inside a repository moves and no key of a root without one equals " +
+			"it. It makes keys MORE complete: such a root is stamped with no source binding, the " +
+			"stamp is not a declared input of the tasks that read it, and without the field an " +
+			"output built in one state would serve the other. It reads no entry and writes none. " +
+			"RAISED, from 33/274 to 33/275, with no new file. RecordManagedRoot records a root a git " +
+			"command of the run already answered for, so SourceState answers it without a process; " +
+			"it never replaces an answer the manager holds, so one invocation keeps one answer per " +
+			"root. It reads no entry and writes none",
 	},
 	{
 		unit:   "output",

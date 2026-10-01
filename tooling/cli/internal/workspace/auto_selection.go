@@ -10,12 +10,22 @@ import (
 // ResolveAutoSelection chooses the default project selection for a bare
 // putnami <jobs> invocation. Explicit --all, --impacted, targets, and "." are
 // handled by the CLI before this resolver is called.
+//
+// Where Git does not manage the workspace root there is no branch and no
+// baseline, so the selection is every project. Any other git failure is an
+// error: a repository that cannot name its branch must not widen silently.
 func ResolveAutoSelection(ws *Workspace, commands []string, lastBuild LastBuildLookup) (AutoSelection, error) {
 	if ws == nil {
 		return AutoSelection{}, fmt.Errorf("workspace is nil")
 	}
 	branch, err := git.CurrentBranch(ws.Root)
 	if err != nil {
+		if git.Unmanaged(ws.Root) != nil {
+			return AutoSelection{
+				Mode:   AutoSelectionAll,
+				Reason: AutoSelectionReasonNoRepository,
+			}, nil
+		}
 		return AutoSelection{}, fmt.Errorf("resolve current branch: %w", err)
 	}
 

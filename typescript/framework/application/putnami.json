@@ -6,7 +6,11 @@
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
   "options": {
     "test": {
-      "filePatterns": ["../../../protocols/clientcontract/fixtures/**", "../../../protocols/clientcontract/schemas/**"]
+      "filePatterns": [
+        "../../../protocols/capabilities/fixtures/v2/equivalence/**",
+        "../../../protocols/clientcontract/fixtures/**",
+        "../../../protocols/clientcontract/schemas/**"
+      ]
     },
     "package": {
       "npm": true

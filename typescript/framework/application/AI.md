@@ -400,8 +400,15 @@ supplies static route/OpenAPI/proto and discoverer metadata; OpenAPI/proto
 entries are retained only when their actual artifacts exist. A complete legacy
 stamp without source bindings emits only a protocol-v1 activation manifest and
 no feature evidence, preserving bundled loader/config behavior across a rolling
-CLI upgrade without inventing v2 provenance. Partial or malformed binding
-metadata fails closed.
+CLI upgrade without inventing v2 provenance.
+
+A stamp whose packages all carry `sourceBindingUnavailable: true` with an empty
+`sourceBinding` comes from a workspace root Git does not manage. It means the
+build makes no source claim: the producer emits the same v2 manifest as for a
+bound stamp, writes no feature evidence, and removes stale scratch evidence.
+Partial or malformed binding metadata still fails closed: a marked package that
+carries a binding, a mix of marked and bound packages, an unmarked package
+without a valid binding, and a package without `sourceRoot`.
 
 ### Native feature authoring
 

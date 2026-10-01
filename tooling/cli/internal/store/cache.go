@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
 
 // CacheManager integrates the LocalStore with job execution to provide
@@ -22,6 +24,8 @@ type CacheManager struct {
 	fileHashMu         sync.Mutex
 	extraFileHashCache map[string]string // memoizes extra-file hashes: sorted NUL-joined paths → hash
 	extraFileHashMu    sync.Mutex
+	sourceStates       map[string]string // memoizes SourceState: workspace root → state
+	sourceStateMu      sync.Mutex
 }
 
 // NewCacheManager creates a CacheManager backed by the given store.
@@ -196,6 +200,15 @@ type CacheKey struct {
 	// every Linux and macOS key keeps its address.
 	OSClass string
 
+	// SourceState names what the workspace root can say about its own source:
+	// SourceStateUnmanaged where Git does not manage it, empty inside a
+	// repository. The scheduler stamps no source binding in the first state, so
+	// an emitter writes its manifest without feature evidence there; an entry
+	// stored in one state must never serve the other, in either direction. The
+	// hash omits the field when it is empty, so every key computed inside a
+	// repository keeps its address.
+	SourceState string
+
 	// Task is the task name (e.g., "build~transpile").
 	Task string
 
@@ -325,6 +338,12 @@ func (k *CacheKey) ComputeHashUsing(cm *CacheManager) (string, error) {
 	if k.OSClass != "" {
 		writeField(h, "osClass")
 		writeField(h, k.OSClass)
+	}
+	// Same shape: absent inside a repository, so those keys are unchanged, and
+	// present where Git does not manage the root, so no such key equals one.
+	if k.SourceState != "" {
+		writeField(h, "sourceState")
+		writeField(h, k.SourceState)
 	}
 	writeField(h, k.Task)
 	writeField(h, k.TaskContractDigest)
@@ -649,6 +668,61 @@ func BuildCacheKey(
 		ConfigScope:                   cachePolicy.ConfigScope,
 		UpstreamHashes:                upstreamHashes,
 	}
+}
+
+// SourceStateUnmanaged is the CacheKey.SourceState of a workspace root Git does
+// not manage: no git program is on PATH, or the root is outside every
+// repository.
+const SourceStateUnmanaged = "unmanaged"
+
+// SourceState returns the CacheKey.SourceState of workspaceRoot. It is the one
+// answer of the manager's invocation: the execution keys and the scheduler's
+// version stamp both read it, so an output stamped with no source claim is
+// never stored under a key computed inside a repository. Git is asked at most
+// once per root for the life of the manager, and not at all for a root
+// RecordManagedRoot named. The lock is held while Git answers, so concurrent
+// callers wait for that answer instead of asking again.
+//
+// A git failure that is neither a missing program nor a missing repository
+// reads as managed: the git commands that follow fail with their own detail.
+// A nil manager has no answer to share and asks Git on every call.
+func (cm *CacheManager) SourceState(workspaceRoot string) string {
+	root := filepath.Clean(workspaceRoot)
+	if cm != nil {
+		cm.sourceStateMu.Lock()
+		defer cm.sourceStateMu.Unlock()
+		if state, ok := cm.sourceStates[root]; ok {
+			return state
+		}
+	}
+	state := ""
+	if gitutil.Unmanaged(root) != nil {
+		state = SourceStateUnmanaged
+	}
+	if cm != nil {
+		if cm.sourceStates == nil {
+			cm.sourceStates = make(map[string]string)
+		}
+		cm.sourceStates[root] = state
+	}
+	return state
+}
+
+// RecordManagedRoot records that Git manages workspaceRoot, learned from a git
+// command that already succeeded there, so SourceState answers for it without
+// starting a git process. An answer the manager already holds is kept: one
+// invocation has one answer per root.
+func (cm *CacheManager) RecordManagedRoot(workspaceRoot string) {
+	root := filepath.Clean(workspaceRoot)
+	cm.sourceStateMu.Lock()
+	defer cm.sourceStateMu.Unlock()
+	if _, ok := cm.sourceStates[root]; ok {
+		return
+	}
+	if cm.sourceStates == nil {
+		cm.sourceStates = make(map[string]string)
+	}
+	cm.sourceStates[root] = ""
 }
 
 // OSClassWindows is the CacheKey.OSClass value of every Windows host.

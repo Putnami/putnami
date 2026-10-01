@@ -136,8 +136,15 @@ A complete scheduler stamp from before `sourceRoot`/`sourceBinding` existed is
 treated as a no-publication compatibility boundary: describe removes stale
 generated Go capability/evidence artifacts and succeeds without emitting v2.
 This lets a hosted runner plan with the previous CLI while compiling the newer
-framework. Partially upgraded, unavailable, or malformed source metadata still
-fails closed.
+framework.
+
+A stamp whose packages all carry `sourceBindingUnavailable: true` with an empty
+`sourceBinding` comes from a workspace root Git does not manage. It means the
+build makes no source claim: describe emits the same capability manifest as for
+a bound stamp, writes no feature evidence, and removes stale scratch evidence.
+Partially upgraded or malformed source metadata still fails closed: a marked
+package that carries a binding, a mix of marked and bound packages, an unmarked
+package without a valid binding, and a package without `sourceRoot`.
 
 ### Native feature authoring
 

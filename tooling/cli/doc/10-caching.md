@@ -76,6 +76,7 @@ A cache key is a SHA-256 hash composed of:
 ```
 v2                          ← format version (for compatibility)
 + extension name            ← e.g., "@putnami/typescript"
++ source state              ← "unmanaged" where Git does not manage the workspace root, absent inside a repository
 + task name                 ← e.g., "build~transpile"
 + project name              ← e.g., "my-app"
 + workspace version         ← from putnami.workspace.json
@@ -1208,6 +1209,16 @@ When a task's own input globs reach the stamp (TypeScript lint's `**/*.json`
 does), it is hashed with `buildTime` blanked: the build time describes the
 invocation, not the tree, and hashing it would let a run invalidate the very key
 it was computed under.
+
+A workspace root Git does not manage has no source binding: no `git` program is
+on `PATH`, or the root is outside every repository. The scheduler stamps each
+capability package there with an empty `sourceBinding` and
+`sourceBindingUnavailable: true`, and the capability producers emit their
+manifest without feature evidence. The stamp is not a declared input of those
+tasks, so the key itself carries the state: every task key of such a root
+includes a `sourceState` marker, and an entry built in one state never serves
+the other. A key computed inside a repository carries no marker and keeps its
+address. A publication's selection fingerprint never carries the marker.
 
 #### The stamp is a shared document
 

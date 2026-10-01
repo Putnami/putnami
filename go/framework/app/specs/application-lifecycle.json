@@ -35,9 +35,14 @@
     {
       "id": "darc-runtime-evidence",
       "text": "A reference refuses a fact its import does not name, and a registered darc component contributes exactly one describe-owned capability row per import and mode, carrying the declared contract verbatim in deterministic bytes. The row is evidence and never authority: emitting it cannot create a cross-domain permission."
+    },
+    {
+      "id": "no-source-claim",
+      "text": "A scheduler stamp whose capability packages all carry sourceBindingUnavailable with an empty sourceBinding and a sourceRoot makes no source claim: describe emits the capability manifest bytes it emits for a bound stamp, writes no feature evidence, and removes stale scratch evidence. A marked package that carries a binding, a mix of marked and bound packages, an unmarked package without a valid binding, and a package without sourceRoot are refused."
     }
   ],
   "decisions": [
-    "go/framework/app/doc/adr/0001-phase-major-lifecycle.md"
+    "go/framework/app/doc/adr/0001-phase-major-lifecycle.md",
+    "protocols/features/doc/adr/0004-an-unavailable-binding-is-no-source-claim.md"
   ]
 }

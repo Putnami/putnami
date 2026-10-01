@@ -10,9 +10,15 @@ import (
 // carries neither the whole commit history nor, usually, the tags, so the
 // version of a line cannot be derived from it: the answer would be a plausible
 // number computed from the fraction of history that happened to be fetched.
+//
+// Where Git does not manage repoRoot there is no history at all, and the error
+// is the one-line UnmanagedError naming what to run.
 func IsShallow(repoRoot string) (bool, error) {
 	output, err := run(repoRoot, "rev-parse", "--is-shallow-repository")
 	if err != nil {
+		if unmanaged := Unmanaged(repoRoot); unmanaged != nil {
+			return false, fmt.Errorf("version and publish need git history: %w", unmanaged)
+		}
 		return false, fmt.Errorf("read repository depth: %w", err)
 	}
 	return strings.TrimSpace(output) == "true", nil

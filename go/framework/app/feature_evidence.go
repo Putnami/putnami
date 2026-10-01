@@ -118,6 +118,12 @@ func buildFeatureEvidenceDocument(projectRoot string, root *Module, manifest *pr
 	if len(mappings) == 0 {
 		return nil, nil
 	}
+	// A record states which source produced it. A build that makes no source
+	// claim has nothing to state, so it writes no evidence, and the readers
+	// report the project's evidence as unavailable.
+	if inventory.makesNoSourceClaim(manifest.Project) {
+		return nil, nil
+	}
 	binding, err := inventory.bindingForOwner(manifest.Project)
 	if err != nil {
 		return nil, err

@@ -328,6 +328,14 @@ func newScheduler(
 	if cache != nil && !cfg.NoCache {
 		s.cacheStats = &CacheStats{}
 	}
+	if cache != nil {
+		// The stamp's marker reads the answer every execution key of the run
+		// reads, so an output stamped with no source claim is never stored
+		// under a key computed as inside a repository.
+		s.capabilitySourceBindings.isUnmanaged = func(repoRoot string) bool {
+			return workspaceSourceState(cache, repoRoot) == store.SourceStateUnmanaged
+		}
+	}
 	if ws != nil {
 		s.outputLocks = newTaskOutputLocks(
 			ws.Root,

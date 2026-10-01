@@ -69,6 +69,8 @@ func TestRunOpeningSchedulerEventNamesPersistedPlanBeforeTasks(t *testing.T) {
 				},
 				"tasks":{"mark":{"kind":"command","command":`+taskCommand(t, fixtureproc.Program{Record: filepath.Join(root, "tasks.log")})+`,"cache":false}}
 			}`, 0o644)
+			// A publish executes only where Git manages the root.
+			runCLISelectionGit(t, root, "init")
 			workspace.InvalidateLoadCache(root)
 			hooks, ran := hookRecorder(t)
 			var sessionID string
