@@ -334,6 +334,30 @@ func TestPublishImageProjectPreservesNestedGenericRegistryPrecedence(t *testing.
 	}
 }
 
+// A dry-run package may write no manifest: the dry-run publish that follows it
+// succeeds and pushes nothing. Without --dry-run the missing manifest still
+// fails.
+func TestPublish_DryRunSucceedsWhenPackageAssembledNoImage(t *testing.T) {
+	t.Setenv("DOCKER_REGISTRY", "")
+	ctx := &pctx.Context{
+		WorkspaceRoot: t.TempDir(),
+		Project:       pctx.Project{Name: "team/app", Path: "proj"},
+	}
+
+	status, data, err := Publish(ctx, jsonl.New(), []string{"--dry-run"})
+	if err != nil || status != "OK" {
+		t.Fatalf("dry run without a manifest: status = %q, err = %v, want OK", status, err)
+	}
+	if data["dryRun"] != true || data["refs"] != nil {
+		t.Fatalf("dry run without a manifest listed refs: %+v", data)
+	}
+
+	status, _, err = Publish(ctx, jsonl.New(), nil)
+	if err == nil || status != "FAILED" {
+		t.Fatalf("publish without a manifest: status = %q, err = %v, want FAILED", status, err)
+	}
+}
+
 func TestPublishClearsStaleOwnedEvidenceBeforeDryRunAndFailure(t *testing.T) {
 	digest := "sha256:" + strings.Repeat("a", 64)
 	for _, tc := range []struct {
