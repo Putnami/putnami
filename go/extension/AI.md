@@ -112,10 +112,10 @@ Build auto-compiles all `cmd/*/main.go` targets. Serve auto-detects the right en
 
 ## Templates
 
-| Template     | Description                                                         |
-| ------------ | ------------------------------------------------------------------- |
-| `go-library` | Go module with an exported function and a test                      |
-| `go-server`  | HTTP server on the Go framework (`app`, `http`, `config`, `logger`) |
+| Template     | Description                                                                     |
+| ------------ | ------------------------------------------------------------------------------- |
+| `go-library` | Go module with an exported function and a test                                  |
+| `go-server`  | HTTP server on the Go framework (`app`, `http`, `config`, `logger`, `platform`) |
 
 Create a project: `putnami projects create my-api --template go-server`
 

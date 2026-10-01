@@ -140,6 +140,23 @@
           }
         },
         {
+          "id": "self-mounting",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-plugin-added-to-an-application-answers-on-its-server",
+              "an-explicit-registration-is-never-repeated",
+              "configuring-again-registers-the-endpoints-once",
+              "an-application-without-a-server-fails-configure",
+              "an-application-with-several-servers-fails-configure"
+            ]
+          }
+        },
+        {
           "id": "version-fallback",
           "stage": "coded",
           "evidenceKinds": [

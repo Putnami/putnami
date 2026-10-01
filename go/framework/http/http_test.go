@@ -1458,6 +1458,7 @@ func (h *healthyPlugin) CheckHealth(_ context.Context) error { return h.err }
 func TestHealthPlugin_AutoDiscovers_HealthChecker(t *testing.T) {
 	hp := NewHealthPlugin()
 	root := app.NewModule("root")
+	root.Use(NewServerPlugin(ServerConfig{}))
 	root.Use(hp)
 	root.Use(&healthyPlugin{name: "db", err: nil})
 
@@ -1491,6 +1492,7 @@ func TestHealthPlugin_AutoDiscovery_PreservesAddChecker(t *testing.T) {
 	hp.AddChecker("db", func(_ context.Context) error { return fmt.Errorf("explicit wins") })
 
 	root := app.NewModule("root")
+	root.Use(NewServerPlugin(ServerConfig{}))
 	root.Use(hp)
 	// Auto-discovered probe of the same name should NOT overwrite the explicit one.
 	root.Use(&healthyPlugin{name: "db", err: nil})
@@ -1511,6 +1513,7 @@ func TestHealthPlugin_AutoDiscovery_PreservesAddChecker(t *testing.T) {
 func TestHealthPlugin_AutoDiscovery_DegradedFromChildModule(t *testing.T) {
 	hp := NewHealthPlugin()
 	root := app.NewModule("root")
+	root.Use(NewServerPlugin(ServerConfig{}))
 	root.Use(hp)
 
 	child := app.NewModule("sub")
@@ -1538,6 +1541,7 @@ func TestHealthPlugin_Configure_FromNestedModule_WalksToRoot(t *testing.T) {
 	// still sees siblings under the root via owner.Root().CollectPlugins().
 	hp := NewHealthPlugin()
 	root := app.NewModule("root")
+	root.Use(NewServerPlugin(ServerConfig{}))
 	root.Use(&healthyPlugin{name: "db", err: nil})
 
 	child := app.NewModule("api")
@@ -1576,6 +1580,8 @@ func TestHealthPlugin_DiscoversContributionFromLaterConfiguredPlugin(t *testing.
 	// discovery ran inline in HealthPlugin.Configure and missed contributions
 	// made by plugins configured afterwards.
 	hp := NewHealthPlugin()
+	// The test calls the handler itself, so the application needs no server.
+	handler := hp.Handler()
 	a := app.New("t")
 	a.Use(hp)                                       // configured first
 	a.Use(&contributingPlugin{probe: "late-probe"}) // contributes during its Configure, after hp
@@ -1585,7 +1591,7 @@ func TestHealthPlugin_DiscoversContributionFromLaterConfiguredPlugin(t *testing.
 	}
 
 	req := httptest.NewRequest("GET", "/_/health", nil)
-	resp := hp.Handler()(NewContext(httptest.NewRecorder(), req))
+	resp := handler(NewContext(httptest.NewRecorder(), req))
 	body, _ := resp.BodyBytes()
 	if !strings.Contains(string(body), `"late-probe":"ok"`) {
 		t.Errorf("probe contributed after the aggregator's Configure should still be discovered: %s", body)

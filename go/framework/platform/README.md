@@ -29,7 +29,6 @@ server := http.NewServerPlugin(http.ServerConfig{Port: 8080})
 platformPlugin := platform.NewPlugin(platform.Config{
     Version: platform.VersionInfo{Name: "my-service", Version: "1.0.0"},
 })
-platformPlugin.RegisterOn(server)
 
 a := app.New("my-service").
     Use(server).
@@ -37,6 +36,13 @@ a := app.New("my-service").
     Use(database.NewPlugin(database.PluginConfig{ /* … */ }))
 a.ListenAndServe()
 ```
+
+`Use(platformPlugin)` is the only wiring step. When the application configures,
+the plugin mounts its endpoints on the application's single `http.ServerPlugin`,
+in any plugin order. An application that holds no server, or several, fails
+configure with an error that names `RegisterOn`. Call
+`platformPlugin.RegisterOn(server)` before the application configures to choose
+the server yourself.
 
 Hitting `GET /healthz` now returns:
 
@@ -216,13 +222,12 @@ a.Use(server).Use(http.NewHealthPlugin())
 
 // after
 platformPlugin := platform.NewPlugin(platform.Config{Prefix: "/_"})  // keep /_ namespace
-platformPlugin.RegisterOn(server)
 a.Use(server).Use(platformPlugin)
 ```
 
 `/_/health` becomes `/_/healthz`, and you also get `/_/livez`, `/_/readyz`, and `/_/version`. Drop the `Prefix` to migrate to plain root paths (`/healthz`, `/livez`, …) — the Kubernetes default.
 
-`http.HealthPlugin` continues to work; nothing forces you to migrate. But don't mount both — they overlap on probe registration and you'll get inconsistent behaviour.
+`http.HealthPlugin` continues to work; nothing forces you to migrate. Both plugins can share one server: each discovers the same `app.HealthChecker` probes and reports them on its own route. The `go-server` starter composes both, because `putnami qualify` and deployment probes wait on `/readyz`.
 
 ## Support and contract
 
@@ -235,9 +240,12 @@ every pre-1.0 minor.
 
 The [platform endpoints specification](specs/platform-endpoints.json) defines the
 contract, backed by [discover probes on the request path, validate their names at
-start](doc/adr/0001-probe-discovery-happens-on-the-request-path.md).
+start](doc/adr/0001-probe-discovery-happens-on-the-request-path.md) and [a route
+plugin mounts itself on the application's single
+server](../http/doc/adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md).
 
 Regression evidence covers [endpoint mounting, lifecycle state, probe discovery,
 bounded probes, required probes, redaction, and protocol
-conformance](plugin_test.go) and [version resolution and build-info
+conformance](plugin_test.go), [the plugin mounting itself on the application's
+server](plugin_mount_test.go), and [version resolution and build-info
 fallback](version_test.go).

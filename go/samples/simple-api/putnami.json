@@ -10,7 +10,8 @@
     "/go/framework/errors",
     "/go/framework/http",
     "/go/framework/inject",
-    "/go/framework/logger"
+    "/go/framework/logger",
+    "/go/framework/platform"
   ],
   "options": {
     "test": {

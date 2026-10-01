@@ -4,6 +4,20 @@
   "routes": [
     {
       "match": "exact",
+      "path": "/_/health",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "migrations-feature",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/healthz",
       "methods": [
         "GET",
@@ -73,5 +87,5 @@
       }
     }
   ],
-  "digest": "sha256:69d9189869e2f3a59ae5bae354b0f988d39686b75355bf6022e602af568cba78"
+  "digest": "sha256:73e0d3b4c3ad3b3d42e3b4ea75d4862a688c4b1e0b9e48595412dac34d72b0be"
 }

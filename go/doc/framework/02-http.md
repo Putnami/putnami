@@ -399,13 +399,12 @@ For new code, use [`go.putnami.dev/platform`](./19-platform-endpoints.md) — it
 The `http` package's legacy health plugin remains available for a single liveness endpoint at `/_/health`:
 
 ```go
-health := fhttp.NewHealthPlugin()
-health.RegisterOn(server)
-
 a := app.New("my-service")
 a.Module.Use(server)
-a.Module.Use(health)
+a.Module.Use(fhttp.NewHealthPlugin())
 ```
+
+Adding the plugin is the only wiring step: when the application configures, the plugin registers `GET /_/health` on the application's single server. An application that holds no server, or several, fails configure with an error that names `RegisterOn`. Call `health.RegisterOn(server)` before the application configures to choose the server, or mount `health.Handler()` on a route of your own.
 
 Returns `200 {"status":"ok"}` when ready and `503 {"status":"unavailable"}` during startup or shutdown. It also auto-discovers `app.HealthChecker` implementations and reports their state under a `checks` map — but it has no readiness, version, or pprof surface. Prefer the platform plugin unless you specifically need to keep the `/_/health` path.
 

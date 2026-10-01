@@ -252,7 +252,7 @@ var undeclaredProbes = []struct {
 	{method: http.MethodDelete, path: telemetry.PathLogs, workloadStatus: http.StatusNotFound},
 	{method: http.MethodPost, path: aggregatePath, bearer: true, workloadStatus: http.StatusNotFound},
 	{method: http.MethodGet, path: "/_/health", workloadStatus: http.StatusNotFound,
-		note: "the health plugin is registered on the app but never mounted on the server, so no health route exists to declare"},
+		note: "the workload composes no health plugin, so no health route exists to declare"},
 	{method: http.MethodGet, path: "/", workloadStatus: http.StatusNotFound},
 
 	// The framework synthesizes a preflight answer for a known path with no

@@ -148,6 +148,12 @@ a.Module.Use(fhttp.NewHealthPlugin())
 a.Module.Use(NewMetricsPlugin())
 ```
 
+A plugin that answers routes mounts itself. The health plugin above registers
+`GET /_/health` on the application's single HTTP server during `Configure`, and
+the platform plugin and the events plugin under push delivery follow the same
+rule. An application that holds no server, or several, fails configure with an
+error that names `RegisterOn`, the call that chooses the server.
+
 ## Lifecycle phases
 
 The runtime lifecycle is phase-major: every module completes a phase before the

@@ -122,6 +122,33 @@ func NewServerPlugin(config ServerConfig) *ServerPlugin {
 // Name returns the plugin name.
 func (p *ServerPlugin) Name() string { return "http" }
 
+// SingleServer returns the one ServerPlugin of the module tree owner belongs
+// to. A plugin that contributes routes calls it from Configure to mount itself
+// when the application passed it no server with RegisterOn. plugin is the name
+// of the calling plugin.
+//
+// A tree that holds no ServerPlugin returns a CodeNoServer error, and a tree
+// that holds several returns a CodeAmbiguousServer error. Both messages name
+// plugin and RegisterOn, the call that chooses a server explicitly.
+func SingleServer(owner *app.Module, plugin string) (*ServerPlugin, error) {
+	var servers []*ServerPlugin
+	if owner != nil {
+		servers = app.Collect[*ServerPlugin](owner.Root())
+	}
+	switch len(servers) {
+	case 1:
+		return servers[0], nil
+	case 0:
+		return nil, errors.Newf(CodeNoServer,
+			"the %s plugin has no HTTP server to mount its routes on: add an http.ServerPlugin to the application, or call RegisterOn(server)",
+			plugin)
+	default:
+		return nil, errors.Newf(CodeAmbiguousServer,
+			"the %s plugin finds %d HTTP servers in the application: call RegisterOn(server) to choose one",
+			plugin, len(servers))
+	}
+}
+
 // Route registers a handler for the given method and path.
 // handler can be a Handler (func(*Context) *Response) or an *InjectedHandler from http.Inject().
 func (p *ServerPlugin) Route(method, path string, handler any, opts ...RouteOption) *ServerPlugin {

@@ -22,7 +22,7 @@ Each language extension ships its own templates:
 | `typescript-web` | `@putnami/typescript` | React SSR web app: file-routed pages, a shared layout, error and not-found boundaries, a loader/action pair, and one client-side island |
 | `typescript-server` | `@putnami/typescript` | HTTP server with `@putnami/application`, file-based API routing with declared query/body input, and tests |
 | `typescript-library` | `@putnami/typescript` | TypeScript library with a public entry point and a test that imports through it |
-| `go-server` | `@putnami/go` | HTTP server on the Putnami Go framework (`app`, `http`, `config`, `logger`): typed port configuration, recovery/request-id/logging middleware, a JSON route, health, and a handler test |
+| `go-server` | `@putnami/go` | HTTP server on the Putnami Go framework (`app`, `http`, `config`, `logger`, `platform`): typed port configuration, recovery/request-id/logging middleware, a JSON route, the operational endpoints (`/livez`, `/healthz`, `/readyz`, `/version`, `/_/health`), and a handler test |
 | `go-library` | `@putnami/go` | Go library with an exported function and a test |
 | `python-server` | `@putnami/python` | Experimental FastAPI server with uvicorn and tests; explicit opt-in, no Go/TypeScript parity |
 | `python-library` | `@putnami/python` | Experimental Python library with importable module and tests; explicit opt-in, no Go/TypeScript parity |

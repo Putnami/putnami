@@ -489,12 +489,20 @@ best := http.NegotiateContentType(ctx.Accept(), []string{"application/json", "te
 The `HealthPlugin` provides a liveness/readiness endpoint at `/_/health`. It returns 200 when the application is running and 503 during startup or shutdown:
 
 ```go
-health := http.NewHealthPlugin()
-health.RegisterOn(server)
-
 application := app.New("my-app")
 application.Use(server)
-application.Use(health)
+application.Use(http.NewHealthPlugin())
+```
+
+Adding the plugin is the only wiring step. When the application configures, the plugin registers `GET /_/health` on the application's single server, in any plugin order. An application that holds no server, or several, fails configure with an error that names `RegisterOn`.
+
+To choose the server, call `RegisterOn` before the application configures. To serve the probe on another path, take the handler: the plugin then registers no route.
+
+```go
+health := http.NewHealthPlugin()
+health.RegisterOn(adminServer)              // choose the server
+// or
+server.GET("/status", health.Handler())     // choose the route
 ```
 
 Exclude the health endpoint from logging to reduce noise:
@@ -532,6 +540,8 @@ The package defines typed error codes for structured error handling:
 | `http.listen` | Server failed to bind to the address |
 | `http.body` | Error reading or closing the request body |
 | `http.scope` | Error creating or closing a DI scope |
+| `http.no_server` | A plugin that mounts itself finds no `ServerPlugin` in the application |
+| `http.ambiguous_server` | A plugin that mounts itself finds several `ServerPlugin`s in the application |
 
 ## Best Practices
 
@@ -548,7 +558,9 @@ The package defines typed error codes for structured error handling:
 
 See the [HTTP services specification](../specs/http-services.json), the
 [request-scope ADR](adr/0001-request-scope-follows-the-response.md), the
-[bounded-resource ADR](adr/0002-framework-owned-bounds.md), and [support
+[bounded-resource ADR](adr/0002-framework-owned-bounds.md), the
+[route-plugin ADR](adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md),
+and [support
 evidence](../README.md#support-and-contract). The package is stable and
 maintained, with the workspace's [pre-1.0 migration
 policy](../../../../RELEASE.md), not strict compatibility between every `0.x`

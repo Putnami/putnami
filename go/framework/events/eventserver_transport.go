@@ -578,8 +578,8 @@ func waitForEventServerRetry(ctx context.Context, delay time.Duration) error {
 }
 
 // Subscribe fails closed: managed Event Server transport is a publisher only.
-// Push delivery remains owned by RegisterOn; existing direct pull/stream
-// transports are unchanged.
+// Push delivery remains owned by the plugin's receiver route; existing direct
+// pull/stream transports are unchanged.
 func (t *EventServerTransport) Subscribe(*HandlerDefinition) error {
 	return errors.New(CodeEventsEventServerUnsupported, "Event Server publisher transport does not support subscriptions")
 }

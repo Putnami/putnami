@@ -15,7 +15,6 @@ import (
 
 	"go.putnami.dev/app"
 	"go.putnami.dev/config"
-	phttp "go.putnami.dev/http"
 	"go.putnami.dev/logger"
 	protocaps "go.putnami.dev/protocol/capabilities"
 	ptelemetry "go.putnami.dev/telemetry"
@@ -141,7 +140,6 @@ func main() {
 	a.Use(contracts)
 
 	a.Use(newServer(cfg, emitter, aggregate))
-	a.Use(phttp.NewHealthPlugin())
 	if closer != nil {
 		a.Use(closer)
 	}

@@ -48,6 +48,24 @@
           }
         },
         {
+          "id": "health-mounting",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-handler-taken-by-the-caller-is-not-mounted-again",
+              "a-health-plugin-added-to-an-application-answers-on-its-server",
+              "an-application-with-several-servers-fails-configure",
+              "an-application-without-a-server-fails-configure",
+              "an-explicit-registration-is-never-repeated",
+              "configuring-again-registers-the-route-once",
+              "the-described-route-inventory-carries-the-health-route-once",
+              "the-mounted-route-answers-503-until-the-application-starts"
+            ]
+          }
+        },
+        {
           "id": "method-fallbacks",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
