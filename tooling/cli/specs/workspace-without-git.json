@@ -15,11 +15,11 @@
   "requirements": [
     {
       "id": "no-source-claim",
-      "text": "The scheduler stamps every capability package of a root Git does not manage with an empty sourceBinding, sourceBindingUnavailable true, and its sourceRoot, and asks Git once for the whole closure. A binding that fails inside a repository is stamped empty with the marker unset. Inside a repository the stamp carries the binding Git's enumeration yields, and Git is never asked whether it manages the root."
+      "text": "The scheduler stamps every capability package of a root Git does not manage with an empty sourceBinding, sourceBindingUnavailable true, and its sourceRoot, and asks Git once for the whole closure. A binding that fails inside a repository is stamped empty with the marker unset. Inside a repository the stamp carries the binding Git's enumeration yields. A build at a root Git does not manage, with or without a git program, succeeds, writes its session, and its next identical build hits the local cache."
     },
     {
       "id": "source-state-keys-the-cache",
-      "text": "Every execution cache key of a root Git does not manage carries a sourceState marker; a key computed inside a repository carries none and keeps its address. The two states of one task never share a key, in either direction, and the state reaches every downstream key through the upstream fold. A publication's selection fingerprint carries no marker."
+      "text": "Every execution cache key of a root Git does not manage carries a sourceState marker; a key computed inside a repository carries none and keeps its address. The two states of one task never share a key, in either direction, and the state reaches every downstream key through the upstream fold. A run's keys and version stamp share one answer to whether Git manages the root, asked at most once, and not when the run's own tree-state capture succeeded. A publication's selection fingerprint carries no marker."
     },
     {
       "id": "bare-run-covers-every-project",
@@ -27,7 +27,7 @@
     },
     {
       "id": "git-history-is-refused-in-one-line",
-      "text": "At a root Git does not manage, --impacted, --baseline, version, and a publish or deploy that executes refuse with exactly one line: what needs git history, whether the git program or the repository is missing, and the command to run. A run that only previews its plan is not refused. A git failure inside a repository keeps its own detail."
+      "text": "At a root Git does not manage, --impacted, --baseline on a job command that names no target, version, and a publish or deploy that executes refuse with exactly one line: what needs git history, whether the git program or the repository is missing, and the command to run. A --baseline beside named projects or --all changes no selection, inside a repository or outside one, so it is not refused. A run that only previews its plan is not refused. A git failure inside a repository keeps its own detail."
     }
   ],
   "decisions": [

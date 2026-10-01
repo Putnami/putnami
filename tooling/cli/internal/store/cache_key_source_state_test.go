@@ -92,3 +92,40 @@ func TestCacheManager_SourceState(t *testing.T) {
 		t.Fatalf("a new manager kept the previous state: %q", got)
 	}
 }
+
+// A root a git command already answered for needs no second question: once
+// RecordManagedRoot names it, SourceState answers empty without starting git.
+// It never replaces an answer the manager holds, and a nil manager, which holds
+// none, asks Git on every call.
+func TestCacheManager_RecordManagedRoot(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-without-git", "source-state-keys-the-cache",
+		"the-key-and-the-stamp-read-one-answer")
+	parent := t.TempDir()
+	t.Setenv("GIT_CEILING_DIRECTORIES", parent)
+	plain := filepath.Join(parent, "plain")
+	if err := os.MkdirAll(plain, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// No git program: any question SourceState asks answers unmanaged.
+	t.Setenv("PATH", t.TempDir())
+
+	recorded := NewCacheManager(nil)
+	recorded.RecordManagedRoot(plain + string(filepath.Separator))
+	if got := recorded.SourceState(plain); got != "" {
+		t.Fatalf("SourceState of a recorded root = %q, want empty without asking git", got)
+	}
+
+	held := NewCacheManager(nil)
+	if got := held.SourceState(plain); got != SourceStateUnmanaged {
+		t.Fatalf("SourceState(plain directory) = %q, want %q", got, SourceStateUnmanaged)
+	}
+	held.RecordManagedRoot(plain)
+	if got := held.SourceState(plain); got != SourceStateUnmanaged {
+		t.Fatalf("RecordManagedRoot replaced the held answer: %q", got)
+	}
+
+	var none *CacheManager
+	if got := none.SourceState(plain); got != SourceStateUnmanaged {
+		t.Fatalf("a nil manager's SourceState = %q, want %q", got, SourceStateUnmanaged)
+	}
+}

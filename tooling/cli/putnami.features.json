@@ -2887,7 +2887,8 @@
             "checks": [
               "stamps-outside-a-repository-make-no-source-claim",
               "a-binding-failure-inside-a-repository-is-not-marked-unavailable",
-              "bindings-inside-a-repository-are-unchanged"
+              "bindings-inside-a-repository-are-unchanged",
+              "a-build-outside-a-repository-runs-end-to-end"
             ]
           }
         },
@@ -2899,7 +2900,8 @@
             "kind": "acceptance",
             "checks": [
               "an-unmanaged-root-adds-only-its-marker-to-the-key",
-              "execution-keys-separate-the-two-source-states"
+              "execution-keys-separate-the-two-source-states",
+              "the-key-and-the-stamp-read-one-answer"
             ]
           }
         },

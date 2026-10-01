@@ -8,6 +8,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -76,6 +77,26 @@ func requireRepository(req *Request) error {
 		return nil
 	}
 	return nil
+}
+
+// newRunCacheManager builds the run's one cache manager, honoring a
+// cache-verification store override.
+//
+// A tree state this run captured is git answering inside the workspace root,
+// so the manager starts out knowing Git manages the root: no execution key and
+// no version stamp of the run asks Git again. A portable request carries the
+// tree state its submitter captured, which proves nothing about the root it
+// runs in, so that root is asked like any other.
+func newRunCacheManager(req *Request, ws *workspace.Workspace) *store.CacheManager {
+	var storeRootOverride string
+	if req.CacheVerification != nil {
+		storeRootOverride = req.CacheVerification.StoreRoot
+	}
+	cache := jobs.NewRunCacheManager(req.WorkspaceRoot, storeRootOverride)
+	if req.VersionSnapshot != nil && req.Portable == nil {
+		cache.RecordManagedRoot(ws.Root)
+	}
+	return cache
 }
 
 // runVersions resolves the per-line versions once, before the plan can key or

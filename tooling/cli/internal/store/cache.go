@@ -675,24 +675,54 @@ func BuildCacheKey(
 // repository.
 const SourceStateUnmanaged = "unmanaged"
 
-// SourceState returns the CacheKey.SourceState of workspaceRoot. Git is asked
-// once per root for the life of the manager, so every key of one invocation
-// agrees and a run inside a repository pays one git process for all of them.
+// SourceState returns the CacheKey.SourceState of workspaceRoot. It is the one
+// answer of the manager's invocation: the execution keys and the scheduler's
+// version stamp both read it, so an output stamped with no source claim is
+// never stored under a key computed inside a repository. Git is asked at most
+// once per root for the life of the manager, and not at all for a root
+// RecordManagedRoot named. The lock is held while Git answers, so concurrent
+// callers wait for that answer instead of asking again.
+//
+// A git failure that is neither a missing program nor a missing repository
+// reads as managed: the git commands that follow fail with their own detail.
+// A nil manager has no answer to share and asks Git on every call.
 func (cm *CacheManager) SourceState(workspaceRoot string) string {
-	cm.sourceStateMu.Lock()
-	defer cm.sourceStateMu.Unlock()
-	if state, ok := cm.sourceStates[workspaceRoot]; ok {
-		return state
+	root := filepath.Clean(workspaceRoot)
+	if cm != nil {
+		cm.sourceStateMu.Lock()
+		defer cm.sourceStateMu.Unlock()
+		if state, ok := cm.sourceStates[root]; ok {
+			return state
+		}
 	}
 	state := ""
-	if gitutil.Unmanaged(workspaceRoot) != nil {
+	if gitutil.Unmanaged(root) != nil {
 		state = SourceStateUnmanaged
+	}
+	if cm != nil {
+		if cm.sourceStates == nil {
+			cm.sourceStates = make(map[string]string)
+		}
+		cm.sourceStates[root] = state
+	}
+	return state
+}
+
+// RecordManagedRoot records that Git manages workspaceRoot, learned from a git
+// command that already succeeded there, so SourceState answers for it without
+// starting a git process. An answer the manager already holds is kept: one
+// invocation has one answer per root.
+func (cm *CacheManager) RecordManagedRoot(workspaceRoot string) {
+	root := filepath.Clean(workspaceRoot)
+	cm.sourceStateMu.Lock()
+	defer cm.sourceStateMu.Unlock()
+	if _, ok := cm.sourceStates[root]; ok {
+		return
 	}
 	if cm.sourceStates == nil {
 		cm.sourceStates = make(map[string]string)
 	}
-	cm.sourceStates[workspaceRoot] = state
-	return state
+	cm.sourceStates[root] = ""
 }
 
 // OSClassWindows is the CacheKey.OSClass value of every Windows host.

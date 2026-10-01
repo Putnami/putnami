@@ -673,10 +673,11 @@ func keyFilePatterns(
 // it to key a job the way another host would.
 var hostOSClass = func(osClass string) string { return osClass }
 
-// workspaceSourceState is the source state computeJobCacheHashWith keys with:
-// store.SourceStateUnmanaged where Git does not manage the workspace root, and
-// empty inside a repository. Tests replace it to key a job the way a root in
-// the other state would.
+// workspaceSourceState is the source state computeJobCacheHashWith keys with,
+// and the one the scheduler's version stamp marks: store.SourceStateUnmanaged
+// where Git does not manage the workspace root, and empty inside a repository.
+// Both read the run's cache manager, so they share one answer. Tests replace it
+// to key a job the way a root in the other state would.
 var workspaceSourceState = func(cache *store.CacheManager, workspaceRoot string) string {
 	return cache.SourceState(workspaceRoot)
 }

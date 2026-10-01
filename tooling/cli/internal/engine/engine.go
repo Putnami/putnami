@@ -680,11 +680,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// makes them share one memoized file-hash pass over the tree instead of
 	// walking it twice. Under --no-cache it is still built — the memo is not a
 	// cache of results — and execute drops it before anything consumes it as one.
-	var storeRootOverride string
-	if req.CacheVerification != nil {
-		storeRootOverride = req.CacheVerification.StoreRoot
-	}
-	cacheManager := jobs.NewRunCacheManager(req.WorkspaceRoot, storeRootOverride)
+	cacheManager := newRunCacheManager(req, ws)
 
 	// Phase 3: build the execution plan. The alias adapter narrows the extension
 	// set here and only here, so `putnami <group> <sub>` still plans exactly the

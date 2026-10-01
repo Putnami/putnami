@@ -443,7 +443,9 @@ type capabilitySourceBindingMemo struct {
 	resolve   func(repoRoot, projectRoot string) (binding string, spawnedProcesses int, err error)
 	// unmanaged answers, per repository root, whether Git manages it. It is
 	// asked once, after the first binding failure, and holds for the run: a
-	// root does not gain or lose its repository between two tasks.
+	// root does not gain or lose its repository between two tasks. The
+	// scheduler's memo asks the run's cache manager, which every execution key
+	// reads too (newScheduler); a memo without one asks Git.
 	unmanaged   map[string]bool
 	isUnmanaged func(repoRoot string) bool
 }

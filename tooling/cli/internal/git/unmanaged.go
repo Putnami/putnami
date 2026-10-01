@@ -39,10 +39,12 @@ func (e *UnmanagedError) Unwrap() error { return e.Cause }
 // outside every repository.
 //
 // It also returns nil when the probe fails for any other reason — a corrupt
-// repository, a refused ownership check, a timeout — because those are git
-// failures the caller already holds with their own detail, and reporting them
-// as "no repository" would hide the real cause. So a caller asks only after a
-// git command failed, and keeps its original error when the answer is nil.
+// repository, a refused ownership check, a timeout — because reporting those as
+// "no repository" would hide the real cause. A caller that asks after a git
+// command failed keeps that command's error when the answer is nil. A caller
+// that asks before any git command, as a run's cache-key source state does
+// when the run captured no tree state, reads nil as "Git manages dir": the git
+// commands that follow fail with their own detail.
 func Unmanaged(dir string) error {
 	if _, err := exec.LookPath("git"); err != nil {
 		return &UnmanagedError{Dir: dir, Cause: ErrNoProgram}

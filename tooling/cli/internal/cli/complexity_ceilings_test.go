@@ -84,8 +84,13 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  23,
-		funcs:  145,
-		why: "RAISED 144→145 (a workspace Git does not manage): requireRepository refuses a " +
+		funcs:  146,
+		why: "RAISED 145→146 (one source-state answer per run): newRunCacheManager builds the run's " +
+			"one cache manager out of run, carrying the cache-verification store override with it, " +
+			"and records the workspace root as managed when this run's own tree-state capture " +
+			"succeeded, so no execution key and no version stamp of the run asks git again. run " +
+			"loses a branch; files stay at 23. " +
+			"RAISED 144→145 (a workspace Git does not manage): requireRepository refuses a " +
 			"`publish` or a `deploy` that executes at a root with no repository, before any hook, " +
 			"and asks git only when the tree-state capture found no commit. impactedFailureEndsRun " +
 			"takes the --impacted-strict case of selectProjects in place and adds the same refusal " +
@@ -517,7 +522,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "cache",
 		prefix: "internal/store/",
 		files:  33,
-		funcs:  274,
+		funcs:  275,
 		why: "internal/store: the content-addressed local cache — entries, task entries, CAS, " +
 			"leases, GC, generations and the remote bridge. Cache-key completeness and atomicity " +
 			"under concurrency are the two invariants this repository has been burned by most " +
@@ -665,7 +670,11 @@ var complexityCeilings = []complexityCeiling{
 			"so no key computed inside a repository moves and no key of a root without one equals " +
 			"it. It makes keys MORE complete: such a root is stamped with no source binding, the " +
 			"stamp is not a declared input of the tasks that read it, and without the field an " +
-			"output built in one state would serve the other. It reads no entry and writes none",
+			"output built in one state would serve the other. It reads no entry and writes none. " +
+			"RAISED, from 33/274 to 33/275, with no new file. RecordManagedRoot records a root a git " +
+			"command of the run already answered for, so SourceState answers it without a process; " +
+			"it never replaces an answer the manager holds, so one invocation keeps one answer per " +
+			"root. It reads no entry and writes none",
 	},
 	{
 		unit:   "output",
