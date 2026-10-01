@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 )
 
@@ -29,10 +30,12 @@ const stableChannel = "stable"
 // deps-upgrade job under the same name.
 const initChannelJobOption = "putnami-channel"
 
-// channelToken matches a channel name that is safe in a registry URL, in an
-// `<artifact>@<channel>` reference and in a file name: a letter or a digit,
-// then letters, digits, ".", "_" and "-", 128 characters at most.
-var channelToken = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
+// portableChannel matches the channel alphabet every ecosystem accepts
+// (extensionproto.PortableChannelPattern): a lowercase letter or a digit, then
+// lowercase letters, digits, ".", "_" and "-", 64 characters at most. A name
+// in it goes unchanged into a registry query, a module proxy path and an
+// `<artifact>@<channel>` reference.
+var portableChannel = regexp.MustCompile(extensionproto.PortableChannelPattern)
 
 // versionTag matches a semantic version, with or without a leading v, and
 // whatever pre-release or build suffix follows it.
@@ -58,8 +61,8 @@ type initChannel struct {
 	origin string
 }
 
-// selected is the channel to hand to a resolution, or "" for latestChannel:
-// a run on latest sends the requests a run without a channel sends.
+// selected is the channel to hand to a resolution: "" for latestChannel,
+// which a resolution reads when it is handed none.
 func (c initChannel) selected() string {
 	if c.name == latestChannel {
 		return ""
@@ -70,9 +73,9 @@ func (c initChannel) selected() string {
 // resolveInitChannel returns the channel an init run resolves on: --channel,
 // else PUTNAMI_CHANNEL, else the channel the running CLI was installed from,
 // else latest. An empty PUTNAMI_CHANNEL chooses nothing. A flag or a variable
-// that names no channel, an unsafe name or an exact version is a usage error,
-// so nothing is written for it. executableName is the file name the running
-// executable resolves to.
+// that names no channel, a name outside the portable alphabet or an exact
+// version is a usage error, so nothing is written for it. executableName is
+// the file name the running executable resolves to.
 func resolveInitChannel(flags initFlags, getenv func(string) string, executableName string) (initChannel, error) {
 	if flags.channelSet {
 		name, err := channelName(flags.channel, initChannelFromFlag)
@@ -105,9 +108,9 @@ func channelName(value, source string) (string, error) {
 	case versionTag.MatchString(name):
 		return "", cmderr.Usagef("invalid channel %q from %s: init resolves on a channel, not on an exact version, "+
 			"because the release lines do not share one version", name, source)
-	case !channelToken.MatchString(name):
-		return "", cmderr.Usagef("invalid channel %q from %s: a channel name starts with a letter or a digit "+
-			"and holds only letters, digits, \".\", \"_\" and \"-\", 128 characters at most", name, source)
+	case !portableChannel.MatchString(name):
+		return "", cmderr.Usagef("invalid channel %q from %s: a channel name starts with a lowercase letter or a digit "+
+			"and holds only lowercase letters, digits, \".\", \"_\" and \"-\", 64 characters at most", name, source)
 	}
 	if name == stableChannel {
 		return latestChannel, nil
@@ -120,11 +123,11 @@ func channelName(value, source string) (string, error) {
 //
 // The installers place the CLI as putnami-<variant>-<tag> and point `putnami`
 // at it, so the name the executable resolves to is the record of the channel
-// it came from. <tag> is a channel unless it is a semantic version, which a
-// version install and `putnami upgrade` write, a source-<revision> build, or
-// dev, the name of a local build. On Windows the active putnami.exe is a copy
-// of the installed file, not a link to it: the name is lost and no record
-// applies.
+// it came from. <tag> is a channel when it is in the portable alphabet and is
+// not a semantic version, which a version install and `putnami upgrade` write,
+// a source-<revision> build, or dev, the name of a local build. On Windows the
+// active putnami.exe is a copy of the installed file, not a link to it: the
+// name is lost and no record applies.
 func installRecordChannel(executableName, goos string) string {
 	name := executableName
 	if goos == "windows" && len(name) > 4 && strings.EqualFold(name[len(name)-4:], ".exe") {
@@ -135,7 +138,7 @@ func installRecordChannel(executableName, goos string) string {
 		return ""
 	}
 	tag := match[1]
-	if !channelToken.MatchString(tag) || versionTag.MatchString(tag) {
+	if !portableChannel.MatchString(tag) || versionTag.MatchString(tag) {
 		return ""
 	}
 	if tag == "dev" || strings.HasPrefix(tag, "source-") {

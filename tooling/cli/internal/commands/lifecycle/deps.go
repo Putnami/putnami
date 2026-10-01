@@ -167,8 +167,7 @@ type LifecycleEnv struct {
 
 // installParams is the job options of the workspace fetch and installers: the
 // channel of an init that resolves on one, as the option `putnami upgrade`
-// hands the deps-upgrade job, else none. A run without a channel sends the
-// request it sends without this member, so its jobs see no new option.
+// hands the deps-upgrade job, else none.
 func (e LifecycleEnv) installParams() map[string]any {
 	if e.channel == "" {
 		return nil

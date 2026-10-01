@@ -46,14 +46,17 @@ workspace `init` creates does not remember it.**
 an exact version: the version lines do not share a version, so one version
 cannot name a release set.
 
-A channel name is a safe token: it starts with a letter or a digit and holds
-only letters, digits, `.`, `_` and `-`, 128 characters at most. `init` refuses
-an empty name, any other shape, and a semantic version (with or without a
-leading `v`) with a usage error. It refuses before it writes a file or sends a
-request, and before it reports that the directory is already a workspace. The
-name goes unchanged into a registry query, a module proxy path and an
-`<artifact>@<channel>` reference, so the token rule is what keeps it from
-changing any of them.
+A channel name is in the portable channel alphabet, the one every ecosystem
+accepts (`PortableChannelPattern` of the extension protocol,
+`^[a-z0-9][a-z0-9._-]{0,63}$`): it starts with a lowercase letter or a digit
+and holds only lowercase letters, digits, `.`, `_` and `-`, 64 characters at
+most. `init` refuses an empty name, a name outside that alphabet, and a
+semantic version (with or without a leading `v`) with a usage error. It refuses
+before it writes a file or sends a request, and before it reports that the
+directory is already a workspace. The name goes unchanged into a registry
+query, a module proxy path and an `<artifact>@<channel>` reference. The
+alphabet holds no uppercase letter, so the Go version query carries the name
+without case encoding, byte for byte the path the Go extension asks.
 
 ### 2. The install record
 
@@ -64,7 +67,8 @@ for. No file is added: a separate record would go stale the first time
 `putnami upgrade` replaces the binary, and the name is rewritten by the same
 step that replaces it.
 
-`<tag>` is a channel unless it is:
+`<tag>` is a channel when it is in the portable channel alphabet, unless it
+is:
 
 | Tag | Written by | Record |
 |---|---|---|

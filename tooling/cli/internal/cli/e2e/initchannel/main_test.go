@@ -13,8 +13,8 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 )
 
-// TestMain runs the tests, or, when the fixture Go extension's runtime execs
-// the test binary, that runtime.
+// TestMain runs the tests, or, when the runtime of a fixture language
+// extension execs the test binary, that runtime.
 func TestMain(m *testing.M) {
 	if os.Getenv(fixtureRuntimeEnv) != "" {
 		os.Exit(runFixtureRuntime(os.Args[1:]))

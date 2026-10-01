@@ -263,7 +263,7 @@ putnami workspace describe      # Show workspace details
 
 1. `--channel <name>`.
 2. `PUTNAMI_CHANNEL`, when it is not empty.
-3. The channel the running CLI was installed from: the `<tag>` of the installed file `putnami-<variant>-<tag>`, when that tag is a channel. A tag that is a version, a `source-…` build or `dev` is no channel. On Windows the active `putnami.exe` is a copy with no tag, so this step never applies there.
+3. The channel the running CLI was installed from: the `<tag>` of the installed file `putnami-<variant>-<tag>`, when that tag is a channel. A tag that is a version, a `source-…` build, `dev` or a name outside the channel alphabet is no channel. On Windows the active `putnami.exe` is a copy with no tag, so this step never applies there.
 4. `latest`.
 
 ```bash
@@ -271,7 +271,7 @@ putnami init --project my-app --channel canary
 PUTNAMI_CHANNEL=tooling-v0.4.0 putnami init --project my-app
 ```
 
-`stable` reads `latest`. A channel name starts with a letter or a digit and holds only letters, digits, `.`, `_` and `-`. `init` refuses any other name, an empty one and an exact version before it writes anything: the release lines do not share one version, so a version cannot name a release set.
+`stable` reads `latest`. A channel name starts with a lowercase letter or a digit and holds only lowercase letters, digits, `.`, `_` and `-`, 64 characters at most: the alphabet every registry accepts. `init` refuses any other name, an empty one and an exact version before it writes anything: the release lines do not share one version, so a version cannot name a release set.
 
 On a channel other than `latest`, `init` prints the channel and what chose it, and every step reads that channel:
 

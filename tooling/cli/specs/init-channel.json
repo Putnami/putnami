@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "one-channel-choice",
-      "text": "putnami init resolves on one channel: --channel, else PUTNAMI_CHANNEL, else the install record, else latest; stable reads latest. The install record is the tag of the name the running executable resolves to, putnami-<variant>-<tag>, unless it is a semantic version, a source build or dev. Any other name, such as the active putnami.exe on Windows, records nothing. An empty name, an unsafe channel token and an exact version are usage errors raised before init writes or requests anything."
+      "text": "putnami init resolves on one channel: --channel, else PUTNAMI_CHANNEL, else the install record, else latest; stable reads latest. The install record is the tag of the name the running executable resolves to, putnami-<variant>-<tag>, unless it is a semantic version, a source build or dev. Any other name, such as the active putnami.exe on Windows, records nothing. An empty name, a name outside the portable channel alphabet and an exact version are usage errors raised before init writes or requests anything."
     },
     {
       "id": "every-resolution-reads-the-channel",

@@ -104,8 +104,7 @@ func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, bunBin stri
 	// Seed catalog entries for any catalog:-referenced @putnami/* package so a
 	// freshly scaffolded catalog-first workspace installs before its first
 	// `putnami upgrade --deps`. A seed on a channel the caller chose fails the
-	// install when it fails: going on would let bun resolve the starter on
-	// another channel, or stop on the missing entry without naming the channel.
+	// install when it fails.
 	if err := ensureWorkspaceCatalog(ctx, emit); err != nil {
 		if catalogSeedChannel(ctx) != defaultCatalogSeedChannel {
 			return fmt.Errorf("seed the workspace catalog: %w", err)

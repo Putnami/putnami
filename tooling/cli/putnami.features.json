@@ -2744,6 +2744,7 @@
             "checks": [
               "every-stage-of-init-receives-the-channel",
               "the-installers-receive-the-channel-as-a-job-option",
+              "the-typescript-installer-receives-the-channel-and-its-registries",
               "the-go-framework-version-is-the-one-the-channel-names",
               "a-missing-channel-fails-instead-of-resolving-latest",
               "the-fallback-template-install-resolves-on-the-channel",

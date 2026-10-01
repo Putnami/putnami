@@ -114,15 +114,16 @@ func TestResolveInitChannelPrecedence(t *testing.T) {
 	}
 
 	if got := (initChannel{name: "latest", origin: initChannelFromFlag}).selected(); got != "" {
-		t.Fatalf("latest selects %q, want no channel: a run on latest sends the requests a run without a channel sends", got)
+		t.Fatalf("latest selects %q, want no channel: latest is handed to a resolution as no channel", got)
 	}
 	if got := (initChannel{name: "canary"}).selected(); got != "canary" {
 		t.Fatalf("canary selects %q, want canary", got)
 	}
 }
 
-// A flag or a variable that names no channel, a name that is not a safe
-// channel token, and an exact version are usage errors that name the source.
+// A flag or a variable that names no channel, a name outside the portable
+// channel alphabet, and an exact version are usage errors that name the
+// source. An uppercase name and a name over 64 characters are outside it.
 func TestResolveInitChannelRefusesUnsafeNamesAndVersions(t *testing.T) {
 	spectest.Proves(t, "cli/init-channel", "one-channel-choice", "an-unsafe-name-or-a-version-is-refused-before-anything-is-written")
 	refused := []struct {
@@ -141,7 +142,9 @@ func TestResolveInitChannelRefusesUnsafeNamesAndVersions(t *testing.T) {
 		{"canary&channel=latest", "invalid channel"},
 		{"canary%2f", "invalid channel"},
 		{"canäry", "invalid channel"},
-		{strings.Repeat("c", 129), "invalid channel"},
+		{"Preview_2", "holds only lowercase letters"},
+		{"CANARY", "starts with a lowercase letter or a digit"},
+		{strings.Repeat("c", 65), "64 characters at most"},
 		{"1.2.3", "not on an exact version"},
 		{"v1.2.3", "not on an exact version"},
 		{"0.1.0-feb66161", "not on an exact version"},
@@ -167,7 +170,7 @@ func TestResolveInitChannelRefusesUnsafeNamesAndVersions(t *testing.T) {
 		})
 	}
 
-	accepted := []string{"canary", "latest", candidateChannel, "tooling-v0.4.0-rc.1", "typescript-v1.2.3", "Preview_2", "a", strings.Repeat("c", 128)}
+	accepted := []string{"canary", "latest", candidateChannel, "tooling-v0.4.0-rc.1", "typescript-v1.2.3", "preview_2", "a", strings.Repeat("c", 64)}
 	for _, value := range accepted {
 		got, err := resolveInitChannel(initFlags{channel: value, channelSet: true}, func(string) string { return "" }, "putnami")
 		if err != nil || got.name != value {
@@ -204,6 +207,9 @@ func TestInstallRecordChannel(t *testing.T) {
 		{"putnami-go-", "linux", ""},
 		{"putnami-rust-canary", "linux", ""},
 		{"putnami-go-can ary", "linux", ""},
+		// A tag outside the portable channel alphabet is no channel.
+		{"putnami-go-Canary", "linux", ""},
+		{"putnami-go-" + strings.Repeat("c", 65), "linux", ""},
 		{"xputnami-go-canary", "linux", ""},
 		{"lifecycle.test", "linux", ""},
 		{"", "linux", ""},
@@ -494,8 +500,7 @@ func TestWorkspaceInitRefusesAnInvalidChannelBeforeWritingAnything(t *testing.T)
 
 // The workspace installers receive the channel as a job option, the way
 // `putnami upgrade` hands its target to the deps-upgrade job, and so does the
-// fetch a hosted run starts with. An install with no channel sends the
-// requests it sends without one.
+// fetch a hosted run starts with. An install with no channel sends no option.
 func TestDepsInstallHandsTheChannelToTheInstallers(t *testing.T) {
 	spectest.Proves(t, "cli/init-channel", "every-resolution-reads-the-channel", "the-installers-receive-the-channel-as-a-job-option")
 	tests := []struct {

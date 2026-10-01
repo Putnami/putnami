@@ -375,7 +375,9 @@ func matchGoImport(tags []goImportTag, module string) (goImportTag, error) {
 
 // goProxyChannelEndpoint is the module proxy path that answers channel for
 // module: /@latest for an empty channel or latest, which orders by publication
-// time, and the Go version query /@v/<channel>.info for any other channel.
+// time, and the Go version query /@v/<channel>.info for any other channel. A
+// channel is in the portable alphabet, which holds no uppercase letter, so the
+// path carries it unencoded, byte for byte the path the Go extension asks.
 func goProxyChannelEndpoint(module, channel string) string {
 	escaped := escapeGoModulePath(module)
 	if channel == "" || channel == latestChannel {
