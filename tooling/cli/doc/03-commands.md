@@ -259,6 +259,32 @@ putnami workspace describe      # Show workspace details
 
 `init` can also scaffold a starter project with `--project <name>`. Use `--project-path <path>` to place that project somewhere other than the default `<project-name>` (at workspace root).
 
+`init` resolves the extensions, the template and the starter's dependencies on one release channel. It takes the first of:
+
+1. `--channel <name>`.
+2. `PUTNAMI_CHANNEL`, when it is not empty.
+3. The channel the running CLI was installed from: the `<tag>` of the installed file `putnami-<variant>-<tag>`, when that tag is a channel. A tag that is a version, a `source-…` build, `dev` or a name outside the channel alphabet is no channel. On Windows the active `putnami.exe` is a copy with no tag, so this step never applies there.
+4. `latest`.
+
+```bash
+putnami init --project my-app --channel canary
+PUTNAMI_CHANNEL=tooling-v0.4.0 putnami init --project my-app
+```
+
+`stable` reads `latest`. A channel name starts with a lowercase letter or a digit and holds only lowercase letters, digits, `.`, `_` and `-`, 64 characters at most: the alphabet every registry accepts. `init` refuses any other name, an empty one and an exact version before it writes anything: the release lines do not share one version, so a version cannot name a release set.
+
+On a channel other than `latest`, `init` prints the channel and what chose it, and every step reads that channel:
+
+| Step | What `init` asks |
+|---|---|
+| Extension, agent-content extension, template | The put registry's `download?channel=<channel>` |
+| TypeScript starter | The version the npm dist-tag `<channel>` names for each `@putnami/*` package it seeds in the workspace catalog |
+| Go starter | The version the Go version query `@v/<channel>.info` names for `go.putnami.dev/app` |
+
+A channel that names no release for one of them fails the run; `init` does not fall back to `latest`. The Go starter renders one version for its four framework modules, so a channel must publish all four at the version it names for `go.putnami.dev/app`. A tagged publish does.
+
+The channel is a target of that run only. `putnami.workspace.json` keeps bare extension and template names, `putnami.lock.json` records the exact versions, and the TypeScript workspace catalog gets the exact versions the channel names, never the channel name. `putnami install` reads the lock afterwards, and `putnami upgrade` still follows `latest` by default. See [ADR 0056](adr/0056-init-resolves-on-one-channel.md).
+
 `init` declares the selected starter's agent-content extension (`@putnami/contributor` for every built-in starter) in `extensions`, opts into its content with `extension:<name>` in `agentArtifacts`, installs that extension, and materializes its content. When the extension cannot be installed, both declarations stay and `init` names `putnami install` as the next step. A starter that opts into nothing adds nothing — there is no flag that turns agent workflows on, because the declaration in `putnami.workspace.json` is the only opt-in. `init --force` on a workspace that already opted in keeps those declarations rather than rewriting them away. See [Agent Workflows](18-agent-workflows.md#lifecycle-init-install-upgrade).
 
 `workspace describe` shows the workspace name, version, project count, extension count, and configuration summary. Supports `--output=jsonl`.

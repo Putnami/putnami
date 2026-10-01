@@ -267,19 +267,21 @@ putnami init
 Initialize a new workspace
 
 Usage:
-  putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--force]
+  putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 
 Command Flags:
   --workspace <name>           Workspace name override
   --extension <ts|go|py>       Default extension to install
   --project <name>             Create an initial project
   --project-path <path>        Workspace-relative path for the initial project
+  --channel <channel>          Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)
   --force                      Reinitialize an existing workspace
 
 Examples:
   putnami init
   putnami init --project my-app
   putnami init --project my-app --project-path apps/my-app
+  putnami init --project my-app --channel canary
 
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
@@ -1815,19 +1817,21 @@ putnami workspace init
 Initialize a new workspace
 
 Usage:
-  putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--force]
+  putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 
 Command Flags:
   --workspace <name>           Workspace name override
   --extension <ts|go|py>       Default extension to install
   --project <name>             Create an initial project
   --project-path <path>        Workspace-relative path for the initial project
+  --channel <channel>          Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)
   --force                      Reinitialize an existing workspace
 
 Examples:
   putnami init
   putnami init --project my-app
   putnami init --project my-app --project-path apps/my-app
+  putnami init --project my-app --channel canary
 
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help

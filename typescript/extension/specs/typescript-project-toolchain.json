@@ -33,7 +33,7 @@
     },
     {
       "id": "catalog-seeding",
-      "text": "Workspace install seeds a catalog entry for every @putnami/* dependency a member references through the catalog: protocol and that the referenced catalog is missing, selects the named catalog when one was requested, leaves existing entries alone, and preserves the root manifest's top-level key order."
+      "text": "Workspace install seeds a missing catalog entry for every @putnami/* dependency a member references through the catalog: protocol, selects the named catalog when one was requested, leaves existing entries alone, and preserves the root manifest's top-level key order. The seed is the latest dist-tag, with no registry request, unless the putnami-channel job option names another channel: it is then the exact version that channel's dist-tag names, and a package the channel does not name fails the install."
     },
     {
       "id": "serve-entrypoint",

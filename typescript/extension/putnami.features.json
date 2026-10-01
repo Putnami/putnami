@@ -84,7 +84,10 @@
               "a-requested-named-catalog-is-selected",
               "an-existing-entry-is-left-alone",
               "the-root-manifest-top-level-key-order-is-preserved",
-              "no-catalog-references-seeds-nothing"
+              "no-catalog-references-seeds-nothing",
+              "a-channel-seeds-its-exact-dist-tag-version",
+              "a-channel-never-falls-back-to-latest",
+              "latest-seeds-the-latest-dist-tag-without-a-request"
             ]
           }
         },

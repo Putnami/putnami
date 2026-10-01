@@ -42,7 +42,8 @@ const smokeRunOKLine = "smoke: OK - channel 'latest' passes irm install -> TypeS
 
 // smokeWindowsEnvironment is what the Windows smoke sets for every program it
 // runs, in place of the shell smoke's smokeExpectedEnvironment: Git's long
-// paths are on (decision D-W8), through the command-line configuration.
+// paths are on (decision D-W8), through the command-line configuration, and
+// init resolves on the channel the smoke was started on (PUTNAMI_CHANNEL).
 var smokeWindowsEnvironment = map[string]string{
 	"GIT_CONFIG_COUNT":           "1",
 	"GIT_CONFIG_KEY_0":           "core.longpaths",
@@ -52,6 +53,7 @@ var smokeWindowsEnvironment = map[string]string{
 	"PUTNAMI_TELEMETRY_ENDPOINT": "",
 	"DO_NOT_TRACK":               "1",
 	"PUTNAMI_VERSION":            "latest",
+	"PUTNAMI_CHANNEL":            "latest",
 }
 
 // smokeEnvironmentProblem names the first variable of the smoke's neutral
@@ -258,6 +260,8 @@ func newSmokeHost(t *testing.T, server *ps1Registry, prerequisites ...string) (*
 	for _, name := range smokeNeutralEnvironment {
 		h.set(name, "leaked-"+name)
 	}
+	// The smoke replaces a channel the caller exported with its own.
+	h.set("PUTNAMI_CHANNEL", "leaked-PUTNAMI_CHANNEL")
 	return h, server
 }
 

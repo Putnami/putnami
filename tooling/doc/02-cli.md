@@ -96,6 +96,7 @@ These built-in commands manage workspace infrastructure:
 - `putnami workspace init` — Initialize a new workspace in the current directory
   - `--project <name>` — Scaffold an initial project
   - `--project-path <path>` — Custom path for the initial project
+  - `--channel <name>` — Resolve the extensions, the template and the starter's dependencies on one release channel (default: `PUTNAMI_CHANNEL`, then the channel the CLI was installed from, then `latest`). See [`workspace`](../cli/doc/03-commands.md#workspace)
 - `putnami workspace describe` — Show workspace configuration
 - `putnami init` — Alias for `workspace init`
 

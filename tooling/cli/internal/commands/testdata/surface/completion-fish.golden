@@ -218,6 +218,7 @@ complete -c putnami -n '__putnami_seen_path extensions list' -l 'user' -d 'List 
 complete -c putnami -n '__putnami_seen_path extensions remove' -l 'user' -d 'Remove the extension from the user scope (~/.putnami/user) instead of the workspace'
 complete -c putnami -n '__putnami_seen_path help' -l 'man' -d 'Render the full reference as a man page'
 complete -c putnami -n '__putnami_seen_path help' -l 'markdown' -d 'Render the full reference as Markdown'
+complete -c putnami -n '__putnami_seen_path init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
 complete -c putnami -n '__putnami_seen_path init' -l 'extension' -d 'Default extension to install' -r
 complete -c putnami -n '__putnami_seen_path init' -l 'force' -d 'Reinitialize an existing workspace'
 complete -c putnami -n '__putnami_seen_path init' -l 'project' -d 'Create an initial project' -r
@@ -275,6 +276,7 @@ complete -c putnami -n '__putnami_seen_path version tag' -l 'push' -d 'Push the 
 complete -c putnami -n '__putnami_seen_path version tag' -l 'scope' -d 'The version line to release, by its scope path (required when the workspace declares several)' -r
 complete -c putnami -n '__putnami_seen_path version tag' -l 'yes' -d 'Skip the confirmation and create the release commit and tag'
 complete -c putnami -n '__putnami_seen_path version use' -l 'global' -d 'Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)'
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'extension' -d 'Default extension to install' -a 'go py ts' -r
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'force' -d 'Reinitialize an existing workspace'
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'project' -d 'Create an initial project' -r

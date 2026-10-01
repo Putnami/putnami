@@ -451,18 +451,20 @@ var catalog = []Command{
 		Path:        "workspace init",
 		Kind:        KindStructured,
 		Description: "Initialize a new workspace",
-		Usage:       "putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--force]",
+		Usage:       "putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]",
 		Flags: []Flag{
 			{Long: "--workspace", Type: FlagValue, ValueName: "<name>", Description: "Workspace name override"},
 			{Long: "--extension", Type: FlagValue, ValueName: "<ts|go|py>", Description: "Default extension to install"},
 			{Long: "--project", Type: FlagValue, ValueName: "<name>", Description: "Create an initial project"},
 			{Long: "--project-path", Type: FlagValue, ValueName: "<path>", Description: "Workspace-relative path for the initial project"},
+			{Long: "--channel", Type: FlagValue, ValueName: "<channel>", Description: "Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)"},
 			{Long: "--force", Description: "Reinitialize an existing workspace"},
 		},
 		Examples: []string{
 			"putnami init",
 			"putnami init --project my-app",
 			"putnami init --project my-app --project-path apps/my-app",
+			"putnami init --project my-app --channel canary",
 		},
 		Related: []string{"extensions install", "deps install", "context generate"},
 		Workspace: WorkspaceNeed{

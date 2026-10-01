@@ -730,6 +730,9 @@ func TestAppRun_HelpForStructuredSubcommand(t *testing.T) {
 	if !strings.Contains(output, "--project-path <path>") {
 		t.Error("expected workspace init flag in help output")
 	}
+	if !strings.Contains(output, "--channel <channel>") {
+		t.Error("expected the workspace init channel flag in help output")
+	}
 }
 
 func TestAppRun_HelpCommandForStructuredSubcommand(t *testing.T) {

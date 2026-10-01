@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -102,8 +103,12 @@ func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, bunBin stri
 
 	// Seed catalog entries for any catalog:-referenced @putnami/* package so a
 	// freshly scaffolded catalog-first workspace installs before its first
-	// `putnami upgrade --deps`.
+	// `putnami upgrade --deps`. A seed on a channel the caller chose fails the
+	// install when it fails.
 	if err := ensureWorkspaceCatalog(ctx, emit); err != nil {
+		if catalogSeedChannel(ctx) != defaultCatalogSeedChannel {
+			return fmt.Errorf("seed the workspace catalog: %w", err)
+		}
 		emit.Log("warn", "failed to ensure workspace catalog: "+err.Error())
 	}
 
@@ -479,14 +484,36 @@ func workspaceBiomeConfig(extensionContent []byte) ([]byte, error) {
 	return append(content, '\n'), nil
 }
 
+// defaultCatalogSeedChannel is the channel a catalog seed reads when the
+// caller chose none.
+const defaultCatalogSeedChannel = "latest"
+
+// catalogSeedChannel is the channel the caller chose for this install through
+// the putnami-channel job option, the option deps-upgrade reads its channel
+// from. `putnami init` sets it when it resolves on a channel other than
+// latest. Absent, empty and stable all read latest.
+func catalogSeedChannel(ctx *pctx.Context) string {
+	channel := strings.TrimSpace(ctx.Params.String("putnami-channel", "putnamiChannel"))
+	if channel == "" || channel == "stable" {
+		return defaultCatalogSeedChannel
+	}
+	return channel
+}
+
 // ensureWorkspaceCatalog seeds the workspace catalog with any @putnami/* package
 // that a member references through the "catalog:" protocol but that is missing
 // from the referenced catalog. Bun fails the install when a catalog dependency
 // has no catalog entry, so this keeps freshly scaffolded catalog-first packages
-// installable before the first `putnami upgrade --deps`. Missing entries are
-// seeded with the "latest" dist-tag; deps-upgrade later pins them to the
-// resolved release. Existing catalog entries (including non-Putnami ones such as
-// react) are never touched.
+// installable before the first `putnami upgrade --deps`. Existing catalog
+// entries (including non-Putnami ones such as react) are never touched.
+//
+// On latest, a missing entry is seeded with the "latest" dist-tag; deps-upgrade
+// later pins it to the resolved release. On any other channel
+// (catalogSeedChannel), a missing entry is seeded with the exact version the
+// channel's dist-tag names for that package on the registry the workspace
+// declares, never with the channel name: the workspace then installs that
+// release and follows no channel. A package the channel does not name fails
+// the seed, and nothing is written; the seed never reads latest instead.
 func ensureWorkspaceCatalog(ctx *pctx.Context, emit *jsonl.Emitter) error {
 	refs := collectCatalogPutnamiRefs(ctx.WorkspaceRoot)
 	if len(refs) == 0 {
@@ -500,25 +527,68 @@ func ensureWorkspaceCatalog(ctx *pctx.Context, emit *jsonl.Emitter) error {
 	}
 	cats := parseCatalogModel(pkg)
 
-	var added []string
+	var missing []catalogPutnamiRef
 	for _, ref := range refs {
 		if _, ok := cats.lookupIn(ref.catalog, ref.name); !ok {
-			cats.addToCatalog(ref.catalog, ref.name, "latest")
-			added = append(added, ref.label())
+			missing = append(missing, ref)
 		}
 	}
-	if len(added) == 0 {
+	if len(missing) == 0 {
 		return nil
 	}
 
+	channel := catalogSeedChannel(ctx)
+	seeds, err := catalogSeedVersions(ctx, emit, missing, channel)
+	if err != nil {
+		return err
+	}
+
+	added := make([]string, 0, len(missing))
+	for _, ref := range missing {
+		cats.addToCatalog(ref.catalog, ref.name, seeds[ref.name])
+		added = append(added, ref.label()+"@"+seeds[ref.name])
+	}
 	sort.Strings(added)
-	for _, name := range added {
-		emit.Log("info", "seeding workspace catalog entry: "+name+"@latest")
+	for _, entry := range added {
+		emit.Log("info", "seeding workspace catalog entry: "+entry)
 	}
 	if err := cats.writeBack(pkg); err != nil {
 		return err
 	}
 	return writeRootManifest(pkgPath, pkg, order)
+}
+
+// catalogSeedVersions returns the catalog entry to seed for each missing
+// package: the "latest" dist-tag on latest, and on any other channel the exact
+// version the channel's dist-tag names for the package
+// (resolvePutnamiNPMVersion). The channel lookup reads the registry before the
+// install refreshes the user's credential, so it refreshes it first, as
+// deps-upgrade does before its own lookup.
+func catalogSeedVersions(ctx *pctx.Context, emit *jsonl.Emitter, missing []catalogPutnamiRef, channel string) (map[string]string, error) {
+	seeds := make(map[string]string, len(missing))
+	if channel == defaultCatalogSeedChannel {
+		for _, ref := range missing {
+			seeds[ref.name] = defaultCatalogSeedChannel
+		}
+		return seeds, nil
+	}
+
+	declared, err := npmRegistriesFrom(ctx.Params)
+	if err != nil {
+		return nil, err
+	}
+	refreshPutnamiNpmCredential(ctx, emit)
+	for _, ref := range missing {
+		if _, ok := seeds[ref.name]; ok {
+			continue
+		}
+		version, err := resolvePutnamiNPMVersion(context.Background(), ctx.WorkspaceRoot, declared, ref.name, channel)
+		if err != nil {
+			return nil, err
+		}
+		seeds[ref.name] = version
+	}
+	return seeds, nil
 }
 
 type catalogPutnamiRef struct {

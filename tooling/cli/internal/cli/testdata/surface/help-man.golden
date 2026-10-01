@@ -534,7 +534,7 @@ Initialize a new workspace.
 .PP
 .B Usage:
 .br
-putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--force]
+putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 .TP
 .B --workspace
 Workspace name override.
@@ -547,6 +547,9 @@ Create an initial project.
 .TP
 .B --project-path
 Workspace-relative path for the initial project.
+.TP
+.B --channel
+Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest).
 .TP
 .B --force
 Reinitialize an existing workspace.

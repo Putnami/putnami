@@ -92,8 +92,11 @@ satisfied is either fixed or waived through the
    `SMOKE_DIAGNOSTICS_DIR` on failure. Each fetches its public installer
    (`install.sh`, or `install.ps1` on Windows), executes the exact TypeScript
    init/serve path, verifies generated locks/config/MCP state, and requires
-   typed readiness, a real HTTP response, and graceful shutdown. The Windows
-   host has no Docker, so `putnami compose` is not smoked there. A failed or
+   typed readiness, a real HTTP response, and graceful shutdown. Each hands
+   `<channel>` to `init` as `PUTNAMI_CHANNEL`, so the extensions, the template
+   and the starter's dependencies come from the candidate's release set, not
+   from `latest`; `<channel>` is a channel name, never an exact version. The
+   Windows host has no Docker, so `putnami compose` is not smoked there. A failed or
    missing runner blocks promotion and is escalated to the release owner. If
    the execution plane is not configured or is unavailable, the release owner
    runs the same five candidate jobs manually: four Unix runners and one
