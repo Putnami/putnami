@@ -9,6 +9,9 @@ import "os"
 // InstallLockedGo runs the verified install of the Go release the lock pins.
 func (j *Job) InstallLockedGo(requested string) (string, bool) { return j.installLockedGo(requested) }
 
+// IsPlainGoRelease reports whether version is a Go release name.
+func IsPlainGoRelease(version string) bool { return isPlainGoRelease(version) }
+
 // SetTrap replaces the job's signal trap.
 func (j *Job) SetTrap(trap *Trap) { j.trap = trap }
 

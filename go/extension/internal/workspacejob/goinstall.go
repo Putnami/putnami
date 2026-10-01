@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -113,7 +114,9 @@ func goInstallComplete(version string) func(dir string) bool {
 // so one of them downloads and the others return its install.
 //
 // The release is the lock's, not the workspace's requested minimum: it must
-// satisfy the request, and a lock that pins an older release is refused.
+// satisfy the request, and a lock that pins an older release is refused. The
+// release names a directory every workspace of the machine shares, so a lock
+// version that is not a Go release name is refused before any path is built.
 func (j *Job) installLockedGo(requested string) (string, bool) {
 	lockPath := filepath.Join(j.WorkspaceRoot, LockFileName)
 	lock, err := ReadGoLock(lockPath)
@@ -129,6 +132,13 @@ func (j *Job) installLockedGo(requested string) (string, bool) {
 		return "", false
 	}
 	version := lock.Version
+	if !isPlainGoRelease(version) {
+		j.Emit.Log("info", "Installing Go "+version+"...")
+		j.Emit.Diagnostic("error", fmt.Sprintf(
+			"Cannot install Go %q: %s pins a version that is not a Go release name such as 1.25.7",
+			version, LockFileName), lockPath, 0)
+		return "", false
+	}
 	if requested != "" && !GoVersionSatisfies(version, requested) {
 		j.Emit.Log("info", "Installing Go "+requested+"...")
 		j.Emit.Diagnostic("error", fmt.Sprintf(
@@ -200,4 +210,15 @@ func (j *Job) downloadGo(lock GoLock, dest, binary string, complete func(string)
 		j.Emit.Diagnostic("error", fmt.Sprintf("Failed to download Go %s from %s: %v", lock.Version, pin.URL, err), "", 0)
 	}
 	return false
+}
+
+// goReleasePattern matches the name of a Go release as a lock pins it:
+// MAJOR.MINOR or MAJOR.MINOR.PATCH, or MAJOR.MINOR followed by rc or beta and
+// a number.
+var goReleasePattern = regexp.MustCompile(`^[0-9]+\.[0-9]+(\.[0-9]+|(rc|beta)[0-9]+)?$`)
+
+// isPlainGoRelease reports whether version is the name of a Go release, so it
+// can name an install directory without leaving the toolchain root.
+func isPlainGoRelease(version string) bool {
+	return goReleasePattern.MatchString(version)
 }

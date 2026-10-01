@@ -331,7 +331,7 @@ func TestProvisionBun_AMatchingBunOnPathStartsNoDownload(t *testing.T) {
 	})
 }
 
-// A lock that pins another release than the bun on PATH no longer stops the
+// A lock that pins another release than the bun on PATH does not stop the
 // job: the pinned release is installed under the Putnami home, from the lock's
 // source, and the job runs with it. A second workspace of the machine starts
 // no download.

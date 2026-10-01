@@ -350,7 +350,6 @@ func shapeBunInstall(stage, archiveDir, program string) error {
 	if err := os.Rename(extracted, installed); err != nil {
 		return err
 	}
-	//nolint:gosec // G302: the installed file is a program, and every user of the machine may run it.
 	if err := os.Chmod(installed, 0o755); err != nil {
 		return err
 	}

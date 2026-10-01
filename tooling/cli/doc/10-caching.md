@@ -1365,11 +1365,11 @@ with `bun install --frozen-lockfile`.
 A Bun that `@putnami/typescript` installed under the Putnami home keeps its
 package cache under its own install,
 `~/.putnami/toolchains/bun/bun-<version>/install/cache`, and writes nothing to
-`~/.bun`. `putnami cache gc` bounds each of those caches with the same budget
-and grace period. `PUTNAMI_BUN_CACHE_DIR` or `BUN_INSTALL_CACHE_DIR` names one
+`~/.bun`. `putnami cache gc` bounds each of those caches separately, with the
+budget and grace period below: each installed release has its own 10 GiB. `PUTNAMI_BUN_CACHE_DIR` or `BUN_INSTALL_CACHE_DIR` names one
 directory for every Bun.
 
-The package cache has a separate **10 GiB machine-wide budget**, enforced by the
+Each package cache directory has a separate **10 GiB budget**, enforced by the
 extension's `cache-gc` command — run explicitly with `putnami cache gc`, or
 started for you at most once an hour in a detached process so directory walks
 never sit on a foreground cache-hit path. The collector evicts the oldest

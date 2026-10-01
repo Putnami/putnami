@@ -31,8 +31,9 @@ Windows, run the PowerShell equivalent in
 [Install on Windows](#install-on-windows). It needs
 Bash, `curl`, `tar`, a SHA-256 tool (`sha256sum` or `shasum`), network access to
 the public site/registry, and network access to the public package registry
-(`https://npm.putnami.dev`) used by `bun install`. No directory has to be on
-`PATH` beforehand.
+(`https://npm.putnami.dev`) used by `bun install`. The first run also reaches
+`github.com` and `api.github.com` for Bun, and `go.dev` for a Go project. No
+directory has to be on `PATH` beforehand.
 
 Bun is not a prerequisite. `putnami init` uses a Bun the machine already holds
 when it fits. Otherwise `@putnami/typescript` installs Bun at

@@ -72,8 +72,9 @@ the glibc archive on Linux. On a musl host such as Alpine, put the musl build of
 the release on `PATH`; the install refuses to download there.
 
 A hosted run downloads no Bun: `workspace-fetch` and `workspace-install` run the
-Bun the runner holds, at one of the three places above, and fail with a message
-that names the release when there is none.
+Bun found at one of the places above, a Bun that Putnami installed earlier
+under the Putnami home included, and fail with a message that names the release
+when there is none.
 
 ## Behavior
 

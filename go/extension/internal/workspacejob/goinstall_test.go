@@ -605,3 +605,36 @@ func TestResolveGoBinaryKeepsTheSourceCredentialsOutOfTheTranscript(t *testing.T
 		})
 	}
 }
+
+// A lock whose Go version is not a release name installs nothing: the version
+// names a directory every workspace of the machine shares, so it must not
+// lead outside the toolchain root.
+func TestALockGoVersionThatIsNotAReleaseNameInstallsNothing(t *testing.T) {
+	for _, version := range []string{"1.24.0/../../../x", "../1.25.7", "1.25.7/x", "", "1.25.7-custom"} {
+		archive := hostArchive(t, goDistribution())
+		server, requests := distributionServer(t, archive, http.StatusOK)
+		ws := jobtest.RealTempDir(t)
+		writeLock(t, ws, map[string]any{
+			"version":     version,
+			"integrities": map[string]string{hostPlatform(): digest(archive)},
+			"source":      server.URL + "/dl",
+		})
+		putnamiHome := jobtest.RealTempDir(t)
+		j, rec, _ := shellFreeJobAt(t, ws, putnamiHome)
+		if j.ResolveGoBinary() {
+			t.Fatalf("version %q: ResolveGoBinary succeeded:\n%s", version, rec.Transcript())
+		}
+		if got := requests.Load(); got != 0 {
+			t.Fatalf("version %q: %d download request(s), want none", version, got)
+		}
+		entries, _ := os.ReadDir(putnamiHome)
+		if len(entries) != 0 {
+			t.Fatalf("version %q: the Putnami home holds %v, want nothing", version, entries)
+		}
+	}
+	for _, version := range []string{"1.25.7", "1.26", "1.26rc1", "1.26beta2"} {
+		if !workspacejob.IsPlainGoRelease(version) {
+			t.Errorf("IsPlainGoRelease(%q) = false, want true", version)
+		}
+	}
+}
