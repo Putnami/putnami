@@ -80,6 +80,13 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	// is not read at all.
 	dockerManifest, err := pkgmeta.ReadDockerManifest(wsRoot, projectPath)
 	if err != nil {
+		// A dry-run package may plan the image without assembling it, and then it
+		// writes no manifest. The dry-run publish has no candidate to list: it
+		// says so and pushes nothing, as every other dry-run exit does.
+		if common.DryRun && errors.Is(err, fs.ErrNotExist) {
+			emit.Summary("Dry run: package assembled no Docker image for " + ctx.Project.Name + ", so no ref is listed")
+			return "OK", map[string]any{"dryRun": true}, nil
+		}
 		emit.Diagnostic("error", "Docker manifest not found: "+err.Error(), "", 0)
 		return "FAILED", nil, fmt.Errorf("read docker manifest: %w", err)
 	}
