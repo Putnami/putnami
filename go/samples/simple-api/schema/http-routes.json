@@ -45,7 +45,63 @@
         "package": "go.putnami.dev/http",
         "sourceKind": "manual"
       }
+    },
+    {
+      "match": "exact",
+      "path": "/healthz",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/livez",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/readyz",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/version",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
     }
   ],
-  "digest": "sha256:bcb59b566600cc77191ae79e0146a1d03306493d4d09a3ba231fa178e5ad8cc8"
+  "digest": "sha256:7b9fdc4e10c596a5e98d271fb3f70dd3951c0c62076e8b4f06464f9a65794dc2"
 }

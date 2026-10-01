@@ -1,7 +1,7 @@
 // Simple API demonstrates a minimal Go application using the Putnami framework.
 //
 // This is the recommended starting point -- no dependency injection, no events,
-// just HTTP handlers with middleware and a health check.
+// just HTTP handlers with middleware and the operational endpoints.
 package main
 
 import (
@@ -10,6 +10,7 @@ import (
 	"go.putnami.dev/app"
 	"go.putnami.dev/http"
 	"go.putnami.dev/logger"
+	"go.putnami.dev/platform"
 )
 
 func main() {
@@ -21,14 +22,15 @@ func main() {
 }
 
 // newApp composes the application and returns it with its HTTP server. The
-// health plugin answers GET /_/health on that server.
+// platform plugin answers /livez, /healthz, /readyz and /version on that
+// server, and the health plugin answers GET /_/health.
 func newApp() (*app.Application, *http.ServerPlugin) {
 	server := http.NewServerPlugin(http.ServerConfig{Port: 8080})
 
 	server.Use(http.Recovery())
 	server.Use(http.RequestID())
 	server.Use(http.Logging(http.LoggerOptions{
-		Exclude: []string{"/_/health"},
+		Exclude: []string{"/_/health", "/livez", "/healthz", "/readyz"},
 	}))
 
 	server.GET("/greetings", listGreetings)
@@ -38,6 +40,7 @@ func newApp() (*app.Application, *http.ServerPlugin) {
 
 	a := app.New("simple-api")
 	a.Use(server)
+	a.Use(platform.NewPlugin(platform.Config{}))
 	a.Use(http.NewHealthPlugin())
 	return a, server
 }

@@ -23,11 +23,12 @@ func TestHealthEndpoint(t *testing.T) {
 		}
 	})
 
-	rr := httptest.NewRecorder()
-	server.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/_/health", nil))
-
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("GET /_/health returned wrong status code: got %v want %v, body %s", status, http.StatusOK, rr.Body)
+	for _, path := range []string{"/_/health", "/livez", "/healthz", "/readyz", "/version"} {
+		rr := httptest.NewRecorder()
+		server.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, path, nil))
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("GET %s returned wrong status code: got %v want %v, body %s", path, status, http.StatusOK, rr.Body)
+		}
 	}
 }
 

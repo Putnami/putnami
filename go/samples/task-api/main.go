@@ -118,12 +118,9 @@ func main() {
 		Exclude: []string{"/healthz", "/livez", "/readyz"},
 	}))
 
-	// Operational surface: /healthz, /livez, /readyz, /version. For a service
-	// that wants the full platform probe set, this is a richer alternative to
-	// the single-endpoint http.NewHealthPlugin() (/_/health) used by the
-	// simple-api starter — both are supported. Use, below, adds the plugin to
-	// the application: it mounts the routes on the application's server and
-	// aggregates readiness probes.
+	// Operational surface: /healthz, /livez, /readyz, /version. Use, below,
+	// adds the plugin to the application: it mounts the routes on the
+	// application's server and aggregates readiness probes.
 	platformPlugin := platform.NewPlugin(platform.Config{
 		Version: platform.VersionInfo{Name: "tasks-api", Version: "1.0.0"},
 	})

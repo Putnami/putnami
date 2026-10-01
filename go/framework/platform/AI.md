@@ -84,8 +84,9 @@ after a bounded grace period even when a probe ignores cancellation.
 
 `http.NewHealthPlugin()` mounts a single `GET /_/health`. The platform plugin is
 the richer alternative, not a superset wrapper. Both can share one server: each
-discovers the same `app.HealthChecker` probes and reports them on its own route,
-so a service usually needs only one.
+discovers the same `app.HealthChecker` probes and reports them on its own route.
+The `go-server` starter composes both: `putnami qualify` and deployment probes
+wait on `/readyz`, and `/_/health` serves clients that probe it.
 
 ## Maintained contract
 

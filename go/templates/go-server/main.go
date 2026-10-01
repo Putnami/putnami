@@ -7,6 +7,7 @@ import (
 	pconfig "go.putnami.dev/config"
 	"go.putnami.dev/http"
 	"go.putnami.dev/logger"
+	"go.putnami.dev/platform"
 )
 
 type ServerConfig struct {
@@ -30,7 +31,8 @@ func main() {
 }
 
 // newApp composes the application and returns it with its HTTP server. The
-// health plugin answers GET /_/health on that server.
+// platform plugin answers /livez, /healthz, /readyz and /version on that
+// server, and the health plugin answers GET /_/health.
 func newApp(cfg ServerConfig) (*app.Application, *http.ServerPlugin) {
 	server := http.NewServerPlugin(http.ServerConfig{Port: cfg.Port})
 	server.Use(http.Recovery())
@@ -43,6 +45,7 @@ func newApp(cfg ServerConfig) (*app.Application, *http.ServerPlugin) {
 
 	a := app.New("server")
 	a.Use(server)
+	a.Use(platform.NewPlugin(platform.Config{}))
 	a.Use(http.NewHealthPlugin())
 	return a, server
 }

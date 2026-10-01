@@ -1,7 +1,7 @@
 # Go Simple API Example
 
 The smallest useful Putnami Go service: an HTTP server, three middleware, four
-routes, and a health endpoint. No dependency injection, no events, no
+routes, and the operational endpoints. No dependency injection, no events, no
 configuration loading — start here, then read
 [`task-api`](../task-api) for the fuller composition and
 [`service-to-service`](../service-to-service) for typed clients.
@@ -12,6 +12,8 @@ Modules used:
 - [`http`](../../framework/http) — server, router, middleware, responses, and
   the single-endpoint health plugin
 - [`logger`](../../framework/logger) — structured logging
+- [`platform`](../../framework/platform) — `/livez`, `/healthz`, `/readyz` and
+  `/version`
 
 ## Running
 
@@ -28,6 +30,7 @@ cd go/samples/simple-api && go run .
 
 ```bash
 curl -s localhost:3802/_/health
+curl -s localhost:3802/readyz
 curl -s -XPOST localhost:3802/greetings -d '{"message":"hello"}'
 curl -s localhost:3802/greetings
 curl -s localhost:3802/greetings/greet-1
@@ -43,6 +46,7 @@ curl -s -XDELETE localhost:3802/greetings/greet-1 -o /dev/null -w '%{http_code}\
 | `GET`    | `/greetings/{id}`   | Get a greeting by ID   |
 | `DELETE` | `/greetings/{id}`   | Delete a greeting      |
 | `GET`    | `/_/health`         | Liveness (`http.NewHealthPlugin`) |
+| `GET`    | `/livez`, `/healthz`, `/readyz`, `/version` | Operational endpoints (`platform.NewPlugin`) |
 
 `HEAD` falls back to the `GET` handler, which is why the described route
 inventory lists it alongside `GET`.
@@ -53,7 +57,7 @@ inventory lists it alongside `GET`.
 server.Use(http.Recovery())   // a handler panic becomes 500, not a crash
 server.Use(http.RequestID())  // X-Request-ID in, propagated out, bridged into logs
 server.Use(http.Logging(http.LoggerOptions{
-    Exclude: []string{"/_/health"}, // keep the probe out of the access log
+    Exclude: []string{"/_/health", "/livez", "/healthz", "/readyz"}, // keep probes out of the access log
 }))
 ```
 
@@ -63,12 +67,12 @@ before the first request.
 ## Health plugin versus platform endpoints
 
 `a.Use(http.NewHealthPlugin())` mounts one liveness route at `/_/health` on the
-application's server. A service that
-needs the full operational surface — `/livez`, `/healthz`, `/readyz`, `/version` —
-uses [`go.putnami.dev/platform`](../../framework/platform) instead, as
-[`task-api`](../task-api) does. Both can share one server, as
-[`migrations-feature`](../migrations-feature) shows: each discovers the same
-probes and reports them on its own route.
+application's server. `a.Use(platform.NewPlugin(platform.Config{}))` mounts the
+full operational surface — `/livez`, `/healthz`, `/readyz`, `/version` — on the
+same server. This sample composes both: each discovers the same probes and
+reports them on its own route. `putnami qualify` and deployment probes wait on
+`/readyz`, so a service needs the platform plugin to be qualified; the health
+plugin serves clients that probe `/_/health`.
 
 ## Verifying
 

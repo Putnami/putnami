@@ -23,6 +23,7 @@
         "../../framework/inject/**",
         "../../framework/logger/**",
         "../../framework/migration/**",
+        "../../framework/platform/**",
         "../../../protocols/capabilities/**",
         "../../../protocols/config/**",
         "../../../protocols/database/**",
@@ -33,6 +34,7 @@
         "../../../protocols/identity/**",
         "../../../protocols/infra/**",
         "../../../protocols/migration/**",
+        "../../../protocols/platform/**",
         "../../../protocols/runtime/**",
         "../../../protocols/storage/**"
       ]
