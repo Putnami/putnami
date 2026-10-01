@@ -728,6 +728,7 @@ func nextLines(output string) []string {
 // A shell that cannot reach the command reads the PATH line as its first next
 // step; a shell that already reaches it reads no PATH line at all.
 func TestInstallFooterStartsWithThePathLineOnlyWhenTheCommandIsNotReachable(t *testing.T) {
+	spectest.Proves(t, "cli/first-use-path", "pasted-block-reaches-the-command", "the-footer-starts-with-the-path-line-only-when-the-command-is-not-reachable")
 	requireBash(t)
 	server, _ := defaultRegistry(t)
 

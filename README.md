@@ -187,9 +187,11 @@ templates. Contributors to this repository work on macOS or Linux, because
 
 Each release runs the Quick Start commands on all five supported targets, with
 an empty home, config, and cache and no credentials, and sends a real HTTP
-request to the generated starter. That check does not cover other shells,
-offline installs, production deployment, or long-term source compatibility of
-the generated app. Digest verification proves the bytes match what the registry
+request to the generated starter. On Linux, each release also pastes the Quick
+Start block into an image that holds Bash, `curl`, `tar` and a SHA-256 tool and
+nothing else, then runs `putnami lint,test,build` and the Go starter there.
+Those checks do not cover other shells, offline installs, production
+deployment, or long-term source compatibility of the generated app. Digest verification proves the bytes match what the registry
 advertises; it is not artifact signing. The details are in
 [The release smoke](tooling/cli/doc/22-installing-the-cli.md#the-release-smoke).
 

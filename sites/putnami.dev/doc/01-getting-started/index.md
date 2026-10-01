@@ -124,12 +124,18 @@ preinstalled CLI or extensions. `init` creates and validates:
 HTTP request successfully, and shutdown must complete within the gate's bound.
 Open the local URL printed by `putnami serve`.
 
+On Linux, the gate also pastes the block above, as printed, into an image that
+holds Bash, `curl`, `tar` and a SHA-256 tool and nothing else. There it requires
+HTTP 200 from every page of the starter and exit status 0 from
+`putnami lint,test,build webapp`. It then requires the same from a Go starter:
+`putnami init --project api --extension go`, `putnami serve api` and
+`putnami lint,test,build api`.
+
 This guarantee is deliberately narrow. It does not promise support for every
 shell or Linux distribution, Windows on `arm64`, other architectures, offline
 installation, proxy-specific configuration, production deployment, or stable
-source details in every future generated app. Go and experimental Python
-starters remain available through their framework guides, but they are not the
-golden path gated here. The checksum proves the bytes match the
+source details in every future generated app. The Go starter is gated on Linux
+only, and the experimental Python starter is not gated. The checksum proves the bytes match the
 public registry's digest; artifact signing is a separate, non-goal mechanism.
 
 Experimental Python requires an explicit workspace opt-in after initialization:

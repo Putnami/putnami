@@ -746,6 +746,7 @@ That host does not exist between runs, so `latest` has no nightly Windows job:
 | `smoke-check-release.sh <candidate-channel>` | `darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64` | Blocks promotion; page the release owner with the failing leg and artifacts. |
 | `smoke-check-release.ps1 <candidate-channel>` | `windows/amd64` | Blocks promotion, like the four Unix runners. |
 | `smoke-check-release.sh latest` (default installer URL) | the four Unix runners | Nightly public monitor; page the release owner and stop the next release until triaged. |
+| `smoke-first-use.sh <candidate-channel>` | `linux/amd64`, `linux/arm64`, with Docker | Blocks promotion. See [The first-use smoke](#the-first-use-smoke). |
 
 The Windows host has no Docker, so the smoke does not run `putnami compose`
 there.
@@ -809,6 +810,55 @@ CLI's tests use them:
 | `SMOKE_STARTUP_TIMEOUT` | 180 | Seconds to wait for serve readiness. |
 | `SMOKE_DIAGNOSTICS_DIR` | unset | Persist bounded failure evidence for CI upload. |
 | `SMOKE_RUN_COMMAND` | unset | Add the `run` leg for this command. See [The run scenario](#the-run-scenario). |
+
+### The first-use smoke
+
+[`tooling/cli/scripts/smoke-first-use.sh`](../scripts/smoke-first-use.sh) proves
+that the documents list every prerequisite. `smoke-check-release.sh` runs each
+command on its own, on a runner that already holds Bun and Git. The first-use
+smoke runs the block a reader pastes, on a machine that holds only what the
+installer needs:
+
+```bash
+tooling/cli/scripts/smoke-first-use.sh canary
+tooling/cli/scripts/smoke-first-use.sh                          # public latest
+SMOKE_FIRST_USE_MODE=host tooling/cli/scripts/smoke-first-use.sh  # no Docker
+tooling/cli/scripts/smoke-first-use.sh --print-block            # the block it runs
+```
+
+It reads the first `bash` block of the
+[getting-started page](../../../sites/putnami.dev/doc/01-getting-started/index.md)
+and builds an image from `ubuntu:24.04` that adds `curl` and its certificates.
+The base image brings Bash, `tar` and `sha256sum`. The block runs there as
+printed, as a non-root user, from an empty directory. The smoke adds two things
+around it: `PUTNAMI_OUTPUT=jsonl`, so `putnami serve` reports its port, and a
+shell that stops at the first command that fails.
+
+| Leg | What must hold |
+|---|---|
+| `block` | The page has a `bash` block that installs with the documented line and ends with `putnami serve <project>`. Run as printed, it reaches the typed ready event. |
+| `bare` | The machine holds Bash, `curl`, `tar` and a SHA-256 tool. The image holds no `bun`, `git`, `node` or `go`, the user is not root, and no `PATH` directory is writable. |
+| `pages` + `stop` | `/`, `/about` and `/guestbook` each answer HTTP 200 with a body. One `TERM` stops the starter within 20 seconds and the listener closes. |
+| `check` | `putnami lint,test,build <project>` exits 0, in a shell that holds only the `export` lines of the block. |
+| `go-init`, `go-serve`, `go-pages`, `go-stop`, `go-check` | In a second directory, `putnami init --project api --extension go` and `putnami lint,test,build api` exit 0, and `/` of `putnami serve api` answers HTTP 200. |
+| `home` | `~/.bun` does not exist. Bun and Go are under `~/.putnami/toolchains`. No workspace holds a copy of Go. |
+
+A channel other than `latest` reaches the installer and the CLI as
+`PUTNAMI_VERSION`, with `PUTNAMI_NO_RELAUNCH=1`, as in the release smoke. Every
+failure prints `::error::<leg> leg: …` with the last 200 lines of the leg's log.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SMOKE_FIRST_USE_MODE` | `image` | `host` runs the legs on this machine, with an empty home and `PATH` reduced to the system directories. It prints the tools the host holds instead of refusing them. |
+| `SMOKE_FIRST_USE_IMAGE` | `ubuntu:24.04` | Base image, Debian family. |
+| `SMOKE_FIRST_USE_PAGE` | the getting-started page | Page the block is read from. |
+| `SMOKE_FIRST_USE_PATH` | `/usr/bin:/bin:/usr/sbin:/sbin` | `PATH` of the legs in host mode. |
+| `SMOKE_INSTALL_URL` | unset | Replaces the documented installer URL in the block. |
+| `SMOKE_STARTUP_TIMEOUT` | 900 | Seconds to wait for each ready event. |
+| `PUTNAMI_REGISTRY_URL` | `https://put.putnami.dev` | Point at a local registry. |
+
+The smoke does not run on Windows, and it does not repeat the trust checks of
+the release smoke.
 
 ### The run scenario
 
@@ -956,6 +1006,11 @@ map is served the same way: removing an entry is a pull request against
 | The smoke hands its channel to `init` as `PUTNAMI_CHANNEL`, whatever the caller's environment holds, and keeps the public `init` command line | `TestSmokeHandsTheCandidateChannelToInit`, `TestSmokeScriptExportsTheChannelForInit`, `internal/installscript/smoke_ps1_test.go` — `TestSmokePS1HandsItsChannelToInit` |
 | The smoke fails a release with no digest, a wrong digest, a stale stamp, a 404 channel, or an escalating installer | `TestSmokeFailsTheReleaseWhenNoDigestIsAdvertised`, `…WhenTheAdvertisedDigestDoesNotMatch`, `…OnAStaleStamp`, `…WhenTheChannelIs404`, `…WhenTheInstallerEscalates` |
 | A binary that cannot report its version still fails the release *by name*, rather than killing the smoke silently through `pipefail` | `TestSmokeNamesTheStampLegWhenTheBinaryCannotReportItsVersion` |
+| The first-use smoke runs the documented block as printed, then the checks and the Go path, and requires the toolchains under the Putnami home | `internal/installscript/first_use_smoke_test.go` — `TestFirstUseSmokeRunsTheDocumentedBlockThenTheChecksAndTheGoPath`, `TestFirstUseSmokeSelectsACandidateChannelThroughTheEnvironment` |
+| The first-use smoke fails under the leg that broke: a failed command of the block, a page that is not 200, a failed check, a failed Go command, a toolchain outside the Putnami home | `TestFirstUseSmokeFailsUnderTheLegThatBroke` |
+| The first-use smoke reads the first `bash` block of the page and refuses a page whose block does not install and then serve | `TestFirstUseSmokeReadsTheFirstBashBlockOfThePage` |
+| The bare image adds only `curl` and its certificates, runs as a non-root user and shares no host state; an image that holds `bun`, `git`, `node` or `go`, or a writable `PATH` directory, is refused | `TestFirstUseSmokeBuildsAnImageThatHoldsOnlyWhatTheInstallerNeeds`, `TestFirstUseSmokeRefusesAnImageThatIsNotBare` |
+| The README and the getting-started page print the block the first-use smoke runs | `tooling/cli-documents/first_use_block_test.go` — `TestTheFirstUseSmokeRunsTheBlockTheReadmeAndTheGettingStartedPagePrint` |
 | The smoke's `run` leg passes a command that leaves its directory untouched, and fails one that writes there, exits non-zero, or has an invalid name | `TestSmokeRunsTheOptionalRunScenarioInAnUntouchedDirectory`, `TestSmokeFailsTheRunScenarioWhenTheCommandWritesIntoTheCallerDirectory`, `TestSmokeFailsTheRunScenarioWhenTheCommandFails`, `TestSmokeRejectsAnInvalidRunCommandBeforeFetchingTheChannel` |
 | The Windows smoke has the same `run` leg, with the same inputs, checks and error texts, and runs the one-liner as script text | `internal/installscript/smoke_ps1_test.go`; on Windows, `smoke_ps1_windows_test.go` — `TestWindowsSmokePS1RunsTheOptionalRunLegInAnUntouchedDirectory`, `TestWindowsSmokePS1FailsTheRunLegWhenTheCommandWritesIntoTheCallerDirectory`, `TestWindowsSmokePS1FailsTheRunLegWhenTheCommandFails`, `TestWindowsSmokePS1RejectsAnInvalidRunCommandBeforeAnyRequest` |
 | The run form resolves, pins, then runs the command in the caller's directory: the command's output alone on stdout, the installer's on stderr, no footer, stdin never the pipe, the directory untouched | `internal/installscript/run_command_test.go` — `TestRunResolvesPinsAndRunsTheCommandInTheCallerDirectory`, `TestRunWorksWhenPipedIntoBash` |

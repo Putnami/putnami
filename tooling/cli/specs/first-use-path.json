@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/first-use-path",
+  "outcomes": [
+    "A new user on macOS or Linux pastes the block of the getting-started page into a default shell and gets a served starter, without creating a directory, editing a profile or opening a second terminal",
+    "Each release proves that block, putnami lint,test,build on the starter and the Go path on a machine that holds Bash, curl, tar and a SHA-256 tool and nothing else",
+    "A release that needs a tool the documents do not list fails the smoke under a named leg"
+  ],
+  "nonGoals": [
+    "Windows, where smoke-check-release.ps1 proves the PowerShell block on a host with its own prerequisites",
+    "The trust checks of the installer and the generated workspace state, which smoke-check-release.sh proves on the four Unix runners",
+    "Shells other than Bash, Linux distributions outside the Debian family, and installs behind a proxy or without a network"
+  ],
+  "requirements": [
+    {
+      "id": "pasted-block-reaches-the-command",
+      "text": "The documented block is the installer line, export PATH=\"$HOME/.putnami/bin:$PATH\", putnami init --project webapp --extension ts and putnami serve webapp. When the shell that ran install.sh cannot reach putnami, the installer's footer prints the export PATH line for its install directory as the first line under Next, before putnami --help. When that shell reaches putnami, the footer prints no PATH line."
+    },
+    {
+      "id": "first-use-smoke-machine",
+      "text": "scripts/smoke-first-use.sh reads the first fenced bash block of the getting-started page. It refuses a page without one, or a block that does not install with the documented installer line and end with putnami serve <project>. It builds an image that adds only curl and its certificates to the base image and runs its legs there as a non-root user. It refuses an image that holds bun, git, node or go, or a PATH directory the user can write to. Without Docker it names SMOKE_FIRST_USE_MODE=host."
+    },
+    {
+      "id": "first-use-smoke-legs",
+      "text": "The smoke runs the block as printed, in a shell that stops at the first failed command. It requires HTTP 200 from /, /about and /guestbook, then exit status 0 from putnami lint,test,build on the starter and from init and lint,test,build of a Go api, whose / answers 200. It fails when ~/.bun exists, when Bun or Go is missing under the Putnami home, or when a workspace holds a copy of Go. A channel other than latest is passed as PUTNAMI_VERSION. Every failure names its leg and exits non-zero."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0012-install-trust-and-release-smoke.md"
+  ]
+}
