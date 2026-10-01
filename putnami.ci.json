@@ -50,12 +50,6 @@
   },
   "rules": [
     {
-      "pullRequests": true,
-      "publish": [
-        "pr-{number}"
-      ]
-    },
-    {
       "branches": "main",
       "publish": [
         "canary"
