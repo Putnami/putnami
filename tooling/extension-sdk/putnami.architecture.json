@@ -99,6 +99,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
           "producerProject": "/protocols/infra"
         },
         {

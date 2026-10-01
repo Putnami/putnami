@@ -1,33 +1,25 @@
 package publish
 
 import (
-	"bytes"
 	"cmp"
-	"crypto/sha256"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
-	"time"
-
-	"golang.org/x/mod/module"
 
 	"go.putnami.dev/go/extension/internal/releaseplan"
 	"go.putnami.dev/go/extension/internal/toolchain"
 	extproto "go.putnami.dev/protocol/extension"
-	gomod "go.putnami.dev/protocol/gomod"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/gomodpublish"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/privatebroker"
 	"go.putnami.dev/sdk/extension/registrycred"
 )
 
-const maxGoRegistryResponseBytes = 1 << 20
+const maxGoRegistryResponseBytes = gomodpublish.MaxResponseBytes
 
 // privateGoRegistryURLEnv is the loopback publication broker a native
 // publication run exports for the Go module registry (see privatebroker).
@@ -284,49 +276,11 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 // Publisher credentials have a dedicated token seam and must never travel in a
 // repository-owned URL.
 func validateGoRegistryURL(raw string) (string, error) {
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || u.Opaque != "" || u.Host == "" || u.Hostname() == "" {
-		return "", fmt.Errorf("go registry URL must be an absolute HTTP(S) URL without credentials")
-	}
-	if u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return "", fmt.Errorf("go registry URL must be an absolute HTTP(S) URL without credentials, query, or fragment")
-	}
-	u.Scheme = strings.ToLower(u.Scheme)
-	switch u.Scheme {
-	case "https":
-	case "http":
-		hostname := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
-		ip := net.ParseIP(hostname)
-		loopback := hostname == "localhost" || strings.HasSuffix(hostname, ".localhost") || (ip != nil && ip.IsLoopback())
-		if !loopback {
-			return "", fmt.Errorf("go registry URL must use HTTPS (HTTP is allowed only for loopback)")
-		}
-	default:
-		return "", fmt.Errorf("go registry URL must use HTTP(S)")
-	}
-	u.Path = strings.TrimRight(u.Path, "/")
-	return u.String(), nil
+	return gomodpublish.ValidateRegistryURL(raw)
 }
 
 func newGoRegistryHTTPClient() (*http.Client, error) {
-	baseTransport, ok := http.DefaultTransport.(*http.Transport)
-	if !ok {
-		return nil, fmt.Errorf("go registry transport is unavailable")
-	}
-	transport := baseTransport.Clone()
-	// Registry leases are bound to the configured origin. Do not let ambient
-	// HTTP(S)_PROXY configuration become another recipient of the bearer.
-	transport.Proxy = nil
-	return &http.Client{
-		Timeout:   5 * time.Minute,
-		Transport: transport,
-		// Registry writes and their immutable verification stay bound to the
-		// configured authority. Following a redirect could move a publisher
-		// bearer or publication decision to a different endpoint.
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}, nil
+	return gomodpublish.NewHTTPClient()
 }
 
 // resolveGoPublishToken resolves the bearer in priority order: the
@@ -357,194 +311,27 @@ func uploadZipBlob(client *http.Client, emit *jsonl.Emitter, registryURL, token,
 		emit.Diagnostic("error", "Failed to read zip: "+err.Error(), "", 0)
 		return "", err
 	}
-	localDigest := fmt.Sprintf("sha256:%x", sha256.Sum256(zipData))
-
-	uploadURL := registryURL + gomod.BlobUploadPath(modulePath)
-	req, err := http.NewRequest("POST", uploadURL, bytes.NewReader(zipData))
-	if err != nil {
-		emit.Diagnostic("error", "Failed to create blob upload request: "+err.Error(), "", 0)
-		return "", err
-	}
-	req.Header.Set("Content-Type", gomod.BlobContentType)
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	resp, err := client.Do(req) //nolint:gosec // registryURL is validated from explicit publish configuration
-	if err != nil {
-		emit.Diagnostic("error", "Blob upload failed: "+err.Error(), "", 0)
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	body, err := readBoundedGoRegistryResponse(resp.Body)
-	if err != nil {
-		emit.Diagnostic("error", "Invalid blob upload response: "+err.Error(), "", 0)
-		return "", err
-	}
-	if resp.StatusCode != http.StatusCreated {
-		emit.Diagnostic("error", fmt.Sprintf("Blob upload returned %d", resp.StatusCode), "", 0)
-		return "", fmt.Errorf("blob upload returned %d", resp.StatusCode)
-	}
-
-	result, diagnostics := gomod.ParseAndValidateBlobUploadResponse(body)
-	if result == nil || len(diagnostics) > 0 {
-		// The registry response is untrusted and can reflect the publisher's
-		// Authorization value in the digest field. Keep protocol diagnostics out
-		// of both the returned error and machine-readable logs.
-		err := fmt.Errorf("invalid blob upload response")
-		emit.Diagnostic("error", err.Error(), "", 0)
-		return "", err
-	}
-	if result.Digest != localDigest {
-		err := fmt.Errorf("registry blob digest does not match uploaded zip digest")
-		emit.Diagnostic("error", err.Error(), "", 0)
-		return "", err
-	}
-	emit.Log("info", fmt.Sprintf("Uploaded blob (%d bytes)", len(zipData)))
-	return result.Digest, nil
+	return gomodpublish.UploadZip(context.Background(), client, emit, registryURL, token, modulePath, zipData)
 }
 
 // publishVersion publishes the module version via the gomod-write version PUT
-// and reports whether the registry already held that exact version.
-//
-// No dist tag is sent. A channel is not a publish input any more: the
-// release-set coordinator advances every channel it names, once, after every
-// selected member has a verified digest, so publishing one Go module never
-// moves a registry marker on its own.
+// and reports whether the registry already held that exact version. No dist
+// tag is sent: the release-set coordinator advances every channel it names,
+// once, after every selected member has a verified digest.
 func publishVersion(client *http.Client, emit *jsonl.Emitter, registryURL, token, modulePath, version, goMod, zipDigest string, allowExisting bool) (reused bool, err error) {
-	payload, _ := json.Marshal(gomod.PublishVersionRequest{
-		GoMod:     goMod,
-		ZipDigest: zipDigest,
-	})
-
-	publishURL := registryURL + gomod.VersionPath(modulePath, version)
-	req, err := http.NewRequest("PUT", publishURL, bytes.NewReader(payload))
-	if err != nil {
-		emit.Diagnostic("error", "Failed to create publish request: "+err.Error(), "", 0)
-		return false, err
-	}
-	req.Header.Set("Content-Type", gomod.VersionContentType)
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	resp, err := client.Do(req) //nolint:gosec // registryURL is validated from explicit publish configuration
-	if err != nil {
-		emit.Diagnostic("error", "Publish request failed: "+err.Error(), "", 0)
-		return false, err
-	}
-	defer resp.Body.Close()
-
-	if _, err := readBoundedGoRegistryResponse(resp.Body); err != nil {
-		emit.Diagnostic("error", "Invalid publish response: "+err.Error(), "", 0)
-		return false, err
-	}
-	if resp.StatusCode != http.StatusCreated && !(allowExisting && resp.StatusCode == http.StatusConflict) {
-		emit.Diagnostic("error", fmt.Sprintf("Publish returned %d", resp.StatusCode), "", 0)
-		return false, fmt.Errorf("publish returned %d", resp.StatusCode)
-	}
-	if resp.StatusCode == http.StatusConflict {
-		// The version is immutable, so a conflict is only a REUSE once the bytes
-		// the registry serves hash to the zip this run built. verifyPublishedZip
-		// and verifyPublishedMod run next against exactly that expectation, and
-		// a mismatch fails the job instead of reporting a member for artifacts
-		// nobody in this run produced.
-		emit.Log("info", fmt.Sprintf("Module %s@%s already exists; verifying immutable registry bytes", modulePath, version))
-		return true, nil
-	}
-	emit.Log("info", fmt.Sprintf("Published %s@%s", modulePath, version))
-	return false, nil
-}
-
-func readBoundedGoRegistryResponse(body io.Reader) ([]byte, error) {
-	data, err := io.ReadAll(io.LimitReader(body, maxGoRegistryResponseBytes+1))
-	if err != nil {
-		return nil, err
-	}
-	if len(data) > maxGoRegistryResponseBytes {
-		return nil, fmt.Errorf("registry response exceeds %d bytes", maxGoRegistryResponseBytes)
-	}
-	return data, nil
+	return gomodpublish.PublishVersion(context.Background(), client, emit, registryURL, token, modulePath, version, []byte(goMod), zipDigest, allowExisting)
 }
 
 // verifyPublishedZip downloads the immutable standard Go proxy artifact and
-// hashes the exact bytes served to consumers. A blob-upload response alone is
-// not sufficient proof: the version projection could point at different bytes.
+// hashes the exact bytes served to consumers.
 func verifyPublishedZip(client *http.Client, registryURL, token, modulePath, version, wantDigest string) error {
-	escapedPath, err := module.EscapePath(modulePath)
-	if err != nil {
-		return fmt.Errorf("escape module path: %w", err)
-	}
-	escapedVersion, err := module.EscapeVersion(version)
-	if err != nil {
-		return fmt.Errorf("escape module version: %w", err)
-	}
-	verifyURL := registryURL + "/" + escapedPath + "/@v/" + escapedVersion + ".zip"
-	req, err := http.NewRequest("GET", verifyURL, nil)
-	if err != nil {
-		return err
-	}
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	resp, err := client.Do(req) //nolint:gosec // registryURL is explicit publish configuration
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		return fmt.Errorf("module zip download returned %d", resp.StatusCode)
-	}
-	hash := sha256.New()
-	if _, err := io.Copy(hash, resp.Body); err != nil {
-		return fmt.Errorf("hash downloaded module zip: %w", err)
-	}
-	gotDigest := fmt.Sprintf("sha256:%x", hash.Sum(nil))
-	if gotDigest != wantDigest {
-		return fmt.Errorf("downloaded module zip digest %q does not match uploaded digest %q", gotDigest, wantDigest)
-	}
-	return nil
+	return gomodpublish.VerifyZip(context.Background(), client, registryURL, token, modulePath, version, wantDigest)
 }
 
 // verifyPublishedMod compares the standard Go proxy .mod projection byte for
-// byte with the file submitted in the version PUT. The zip digest cannot prove
-// this independently served dependency metadata, especially on a 409 retry.
+// byte with the file submitted in the version PUT.
 func verifyPublishedMod(client *http.Client, registryURL, token, modulePath, version string, want []byte) error {
-	escapedPath, err := module.EscapePath(modulePath)
-	if err != nil {
-		return fmt.Errorf("escape module path: %w", err)
-	}
-	escapedVersion, err := module.EscapeVersion(version)
-	if err != nil {
-		return fmt.Errorf("escape module version: %w", err)
-	}
-	verifyURL := registryURL + "/" + escapedPath + "/@v/" + escapedVersion + ".mod"
-	req, err := http.NewRequest("GET", verifyURL, nil)
-	if err != nil {
-		return err
-	}
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	resp, err := client.Do(req) //nolint:gosec // registryURL is explicit publish configuration
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		return fmt.Errorf("go.mod download returned %d", resp.StatusCode)
-	}
-	got, err := io.ReadAll(io.LimitReader(resp.Body, int64(len(want))+1))
-	if err != nil {
-		return fmt.Errorf("read downloaded go.mod: %w", err)
-	}
-	if !bytes.Equal(got, want) {
-		return fmt.Errorf("downloaded go.mod does not match submitted bytes")
-	}
-	return nil
+	return gomodpublish.VerifyMod(context.Background(), client, registryURL, token, modulePath, version, want)
 }
 
 // hostFromURL returns the URL host (including any explicit port), used to key the

@@ -165,6 +165,39 @@ than inheriting the project's identity. It states the `ecosystem`, the
 field this build does not know would otherwise be truncated silently out of the
 release set.
 
+## Publication outbox
+
+A publication job does not upload. It packs each managed member's artifacts
+into the private directory the engine names in `PUTNAMI_PUBLICATION_OUTBOX`
+(`PublicationOutboxEnv`) and writes the `outbox.json` descriptor
+(`PublicationOutbox`) at its root, last. The engine reads the descriptor after
+the job exits, re-hashes every artifact, and uploads with a bearer the job never
+holds ([SDK ADR 0004](../../tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md)).
+Members that a route does not manage publish themselves and are not listed.
+
+| Field | Meaning |
+|---|---|
+| `protocolVersion` | `1` (`PublicationOutboxVersion`). |
+| `members` | At most 64 (`MaxPublicationOutboxMembers`). An empty list states that the job packed none. |
+| `members[].ecosystem` | `npm`, `go` or `oci`. The member carries exactly the block of that name. |
+| `members[].coordinate`, `.version`, `.project` | The release-set member's coordinate and version, and the project the plan assigns it to. |
+| `npm.tarball`, `npm.manifest` | The packed archive (at most 256 MiB) and the staged `package.json` the PUT carries. |
+| `go.zip`, `go.mod`, `go.info` | The module zip (at most 500 MiB), its `go.mod`, and its `.info` document. |
+| `oci.layout`, `oci.repository`, `oci.digest`, `oci.tags` | The OCI image layout directory, the repository as registry host plus coordinate, the expected manifest digest, and up to 16 tags. |
+
+Each file is `{path, digest, size}`: a path relative to the outbox root, the
+`sha256:` digest of its bytes, and its size, at least 1 byte and within the
+ecosystem's cap. An npm member carries no access level and no dist-tag, and no
+member carries a registry endpoint for npm or Go: the engine resolves them.
+
+`ParsePublicationOutbox` is strict: the document is at most 256 KiB of UTF-8
+(`MaxPublicationOutboxBytes`), with no unknown, duplicate, case-folded or null
+member and no trailing data. `ValidOutboxPath` refuses an empty, absolute,
+unclean or parent segment, a backslash, a colon, a control character, and
+`outbox.json`; two paths may not be equal or nest. `ResolveOutboxPath` walks a
+path from the outbox root and refuses a symbolic link at any step. Diagnostic
+code: `invalid-publication-outbox`.
+
 ## Producers and consumers
 
 **Producers** — every extension that ships a `putnami.extension.json`:
@@ -263,13 +296,21 @@ only the dependent command. Re-package an authored extension, or run
   overlap, path escapes, effect conflicts, pipeline cycles, reserved global-flag
   shadows, finalizer misuse, unresolved schema refs, workspace-adapter errors,
   and ecosystem-profile errors.
+- Publication outbox: [`schemas/publication-outbox.json`](schemas/publication-outbox.json),
+  held against the Go types by `TestOutboxSchemaTracksTheGoTypes`, with
+  [`fixtures/publication-outbox/valid/`](fixtures/publication-outbox/valid) — 3
+  descriptors — and
+  [`fixtures/publication-outbox/invalid/`](fixtures/publication-outbox/invalid) —
+  34 counter-examples covering unknown, duplicate and null members, escaping and
+  overlapping paths, digests, caps, and repository and tag rules.
 - Golden: [`testdata/task_digests.golden.json`](testdata/task_digests.golden.json)
   pins task-contract digests, so a change to how a contract hashes is visible as
   a golden diff rather than as a silent cache-key shift.
 - Tests: `conformance_test.go` (fixture corpus and version anchor),
   `determinism_test.go`, `manifest_matrix_test.go` (the executable `cliContract`
   compatibility matrix), `ecosystem_test.go` (the profile corpus and its
-  fixture→code table), and `adaptation_ratchet_test.go`.
+  fixture→code table), `publication_outbox_test.go` (the outbox corpus, bounds
+  and symbolic-link refusal), and `adaptation_ratchet_test.go`.
 
 ## Support status, owner, and evidence
 

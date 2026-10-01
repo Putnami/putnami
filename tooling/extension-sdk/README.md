@@ -30,6 +30,8 @@ for the SDK library.
 - Temporary directories that outlive a killed creator by at most one run (`scratch`): the next creator removes what a dead one left
 - Digest-pinned archive installs (`pinnedarchive`): download, SHA-256 verification against the pin, link-free `.tar.gz`/`.zip` extraction, and an atomic publish under a `filelock` lock
 - Reproducible, link-free `.tar.gz` packaging without a `cp` or `tar` process (`treearchive`)
+- Publication outbox (`publicationoutbox`): a job writes its packed artifacts and `outbox.json` under `PUTNAMI_PUBLICATION_OUTBOX`; the engine reads each artifact once and refuses a size or digest the descriptor does not state ([ADR 0004](doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md))
+- Registry uploaders that take the bearer as an argument and send it only to the registry they were given: the managed npm PUT (`npmpublish`), the gomod-write upload (`gomodpublish`), and `oci.PushLayout`; each reuses a version already published at the same digest
 - Spec-verification fragment merge (`specreport`): the shared adapter half of the executable-spec gate — bounded fragment reads, project attribution, strict-wire validation, and the reserved `putnami-feature-verification` report artifact
 
 ## Lifecycle primitives

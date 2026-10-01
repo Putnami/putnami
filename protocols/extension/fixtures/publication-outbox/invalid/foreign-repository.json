@@ -1,0 +1,19 @@
+{
+  "protocolVersion": 1,
+  "members": [
+    {
+      "ecosystem": "oci",
+      "coordinate": "acme/app",
+      "version": "1.4.0",
+      "project": "/go/app",
+      "oci": {
+        "layout": "oci/app",
+        "repository": "oci.acme.dev/other/app",
+        "digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "tags": [
+          "1.4.0"
+        ]
+      }
+    }
+  ]
+}

@@ -327,6 +327,23 @@
               "the-staged-content-is-verified-byte-for-byte"
             ]
           }
+        },
+        {
+          "id": "publication-outbox",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-descriptor-is-strict-and-bounded",
+              "every-path-stays-inside-the-outbox",
+              "the-engine-uploads-only-bytes-whose-digest-it-verified",
+              "an-upload-reuses-a-version-at-the-same-digest",
+              "the-bearer-reaches-only-its-registry-and-no-error"
+            ]
+          }
         }
       ]
     }

@@ -136,6 +136,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
           "producerProject": "/protocols/infra"
         },
         {

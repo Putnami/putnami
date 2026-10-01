@@ -164,7 +164,7 @@ func PushContentWithDigest(emit *jsonl.Emitter, wsRoot, dockerDir, layout, local
 			emit.PhaseEnd("docker-push", "failed")
 			return "", fmt.Errorf("parse content ref: %w", err)
 		}
-		digest, err := pushLayoutImage(ref, img, keychain, transport)
+		digest, err := pushLayoutImage(context.Background(), ref, img, keychain, transport)
 		if err != nil {
 			err = WrapAuthError(err, credHint)
 			emit.Diagnostic("error", fmt.Sprintf("Failed to push %s: %v", contentRef, err), "", 0)
@@ -198,7 +198,7 @@ func PushContentWithDigest(emit *jsonl.Emitter, wsRoot, dockerDir, layout, local
 // returns the manifest digest. It is remote.Write without the manifest HEAD
 // remote.Write always sends first: every blob goes through one Pusher, so the
 // registry handshake happens once and a shared blob is uploaded once.
-func pushLayoutImage(ref name.Reference, img v1.Image, keychain authn.Keychain, transport http.RoundTripper) (string, error) {
+func pushLayoutImage(ctx context.Context, ref name.Reference, img v1.Image, keychain authn.Keychain, transport http.RoundTripper) (string, error) {
 	digest, err := img.Digest()
 	if err != nil {
 		return "", fmt.Errorf("computing manifest digest: %w", err)
@@ -223,7 +223,6 @@ func pushLayoutImage(ref name.Reference, img v1.Image, keychain authn.Keychain, 
 	if err != nil {
 		return "", err
 	}
-	ctx := context.Background()
 	var uploads errgroup.Group
 	uploads.SetLimit(layoutUploadJobs)
 	for _, blob := range blobs {

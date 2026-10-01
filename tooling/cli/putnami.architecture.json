@@ -173,6 +173,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
           "producerProject": "/protocols/http-routes"
         },
         {
@@ -314,6 +319,11 @@
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/gomod"
         },
         {
           "kind": "project-dependency",

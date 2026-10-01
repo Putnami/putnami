@@ -24,6 +24,7 @@ replace (
 	go.putnami.dev/protocol/events => ../../protocols/events
 	go.putnami.dev/protocol/extension => ../../protocols/extension
 	go.putnami.dev/protocol/features => ../../protocols/features
+	go.putnami.dev/protocol/gomod => ../../protocols/gomod
 	go.putnami.dev/protocol/infra => ../../protocols/infra
 	go.putnami.dev/protocol/job => ../../protocols/job
 	go.putnami.dev/protocol/oci => ../../protocols/oci

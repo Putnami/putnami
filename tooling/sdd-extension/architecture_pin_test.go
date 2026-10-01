@@ -100,6 +100,7 @@ func authoredSDDDomain() *arch.Builder {
 				arch.Bind("/tooling/sdd-extension", "/protocols/events"),
 				arch.Bind("/tooling/sdd-extension", "/protocols/extension"),
 				arch.Bind("/tooling/sdd-extension", "/protocols/features"),
+				arch.Bind("/tooling/sdd-extension", "/protocols/gomod"),
 				arch.Bind("/tooling/sdd-extension", "/protocols/infra"),
 				arch.Bind("/tooling/sdd-extension", "/protocols/job"),
 				arch.Bind("/tooling/sdd-extension", "/protocols/oci"),
