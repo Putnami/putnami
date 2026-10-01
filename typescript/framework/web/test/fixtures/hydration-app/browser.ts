@@ -25,8 +25,8 @@ export interface HydrationReport {
 
 const PAGE = '[data-testid="page"]';
 const HYDRATION_TIMEOUT_MS = 5000;
-/** A boundary React still waits for: its content is not in place yet. */
-const PENDING_BOUNDARY = '<!--$?-->';
+/** A boundary a script moves into place at the next animation frame. */
+const QUEUED_BOUNDARY = '<!--$~-->';
 
 const [url, htmlFile, clientEntry, nonce] = process.argv.slice(2);
 if (!url || !htmlFile || !clientEntry || !nonce) {
@@ -71,9 +71,9 @@ const root = document.getElementById('root');
 if (!root) {
   throw new Error('the server document has no #root');
 }
-// The document is complete, so every boundary a script can move is in place
-// once the scripts settle.
-await waitFor(() => !root.innerHTML.includes(PENDING_BOUNDARY));
+// A script that ran queues its boundary for the next animation frame. The
+// server HTML is read once no boundary is queued.
+await waitFor(() => !root.innerHTML.includes(QUEUED_BOUNDARY));
 const countMarkers = () => root.innerHTML.match(/<!--\$[?!~]?-->/g)?.length ?? 0;
 const serverHtml = root.innerHTML;
 const serverPage = root.querySelector(PAGE);
