@@ -21,6 +21,7 @@ The gated first use is exactly:
 
 ```bash
 curl -fsSL https://putnami.dev/install.sh | bash
+export PATH="$HOME/.putnami/bin:$PATH"
 putnami init --project webapp --extension ts
 putnami serve webapp
 ```
@@ -30,25 +31,25 @@ Windows, run the PowerShell equivalent in
 [Install on Windows](#install-on-windows). It needs
 Bash, `curl`, `tar`, a SHA-256 tool (`sha256sum` or `shasum`), Bun v1.4.0 or later
 for the TypeScript init/serve path, network access to the public site/registry,
-network access to the public package registry (`https://npm.putnami.dev`) used by
-`bun install`, and a user-writable path target already named in the parent
-shell's `PATH`. The last condition is normally `~/.local/bin`, `~/bin`, the
-install directory, or a writable `/usr/local/bin`; either home-directory
-candidate is created when `PATH` names it but the neutral home does not contain
-it yet.
+and network access to the public package registry (`https://npm.putnami.dev`)
+used by `bun install`. No directory has to be on `PATH` beforehand.
 
 The first command installs the newest stable CLI into `~/.putnami/bin`, links it
-into that path target, installs shell completions, and registers Putnami with an
+into a user-writable directory that `PATH` already names when there is one
+(`~/.local/bin`, `~/bin`, or a writable `/usr/local/bin`), installs shell
+completions, and registers Putnami with an
 installed Claude Code or Codex host through that host's official `mcp add`
 command. For an existing Putnami workspace, that is the whole technical setup:
 open the project in either host and ask for the work. `putnami init` remains the
 explicit step that creates a new workspace and its product intent.
 
-A pipe-to-shell child
-cannot mutate its parent shell: when none of those targets is in `PATH`, the
-installer prints the additional export the user must run, but that environment
-is outside the exact three-command guarantee. Once you have a CLI, you never
-need the script again — `putnami upgrade --global` replaces it.
+A pipe-to-shell child cannot change its parent shell. The second line of the
+block, `export PATH="$HOME/.putnami/bin:$PATH"`, is what makes `putnami`
+reachable in a shell where `PATH` names none of those directories; it changes
+nothing in a shell that already reaches the command. The block assumes the
+default install directory: with `--install-dir <dir>`, export that directory
+instead. Once you have a CLI, you never need the script again —
+`putnami upgrade --global` replaces it.
 
 ## Claude Code and Codex registration
 
@@ -525,6 +526,10 @@ The installer tries three things in order, then reports what actually resolves.
    re-running the installer never duplicates it. The installer does not rewrite
    your dotfiles.
 
+   The same line is the first command under `Next:` at the end of the output,
+   before `putnami --help`. In the two other cases `Next:` carries no `PATH`
+   line.
+
 Whatever happened, the last thing the installer says about discovery is what
 `putnami` resolves to right now, compared by inode so a versioned symlink counts:
 
@@ -937,6 +942,8 @@ map is served the same way: removing an entry is a pull request against
 | `--no-agent-hosts` and `PUTNAMI_NO_AGENT_HOSTS` skip every host call and still install the CLI | `TestInstallSkipsAgentHostsWhenDeclined` |
 | A reformatted Codex answer is still recognized as Putnami's own definition | `TestInstallRecognizesAReformattedCodexDefinitionAsItsOwn` |
 | The three discovery routes, missing user-path creation, and the idempotent profile append | `TestInstallLinksIntoAWritablePathDirectoryWithoutSudo`, `TestInstallCreatesMissingUserPathDirectoryForSameShellDiscovery`, `TestInstallPrintsAndRecordsThePathLineWhenNothingIsLinkable`, `TestInstallReportsAnInstallDirectoryAlreadyOnPath` |
+| `Next:` starts with the `PATH` line when the shell does not reach the command, and carries none when it does | `TestInstallFooterStartsWithThePathLineOnlyWhenTheCommandIsNotReachable` |
+| `README.md` and the getting-started page print the same first-use block, and it carries the `PATH` line | `sites/putnami.dev/test/docs-sources.test.ts` (`keeps the root and public getting-started commands identical`) |
 | `--variant` and an exact `--version` still produce the versioned layout | `TestInstallHonorsVariantAndExactVersion` |
 | The script runs when piped into `bash -s --` | `TestInstallRunsWhenPipedIntoBash` |
 | Piped output is greppable — no ANSI escapes | `TestInstallOutputCarriesNoEscapeSequencesWhenPiped` |

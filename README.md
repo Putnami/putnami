@@ -14,6 +14,7 @@ On macOS or Linux, on `amd64` or `arm64`, from an empty directory:
 
 ```bash
 curl -fsSL https://putnami.dev/install.sh | bash
+export PATH="$HOME/.putnami/bin:$PATH"
 putnami init --project webapp --extension ts
 putnami serve webapp
 ```
