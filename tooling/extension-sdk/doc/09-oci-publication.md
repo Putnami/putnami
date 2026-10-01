@@ -31,6 +31,31 @@ projection remains the release's responsibility. The existing Docker
 publication path's version-tag behavior remains separate from this native
 image path.
 
+## Dry run
+
+A dry-run image publication pushes nothing and asks the registry one question
+per image: does it already hold this reference. It sends one manifest HEAD,
+through the registry client and the keychain of a real push, and emits one
+`member-probe` event:
+
+| State | When |
+|-------|------|
+| `absent` | The registry answers 404. |
+| `identical` | The registry holds the manifest digest package assembled. The real publish reuses it. |
+| `conflict` | The registry holds another digest, or package assembled no image to compare. |
+| `unverified` | The registry cannot be reached, refuses the request, or answers outside the protocol. |
+
+A workload image is asked at its version tag, an image project at its digest.
+When package assembled no image and the invocation carries a release-set plan,
+the plan's selected OCI members of the project supply the coordinate and the
+version. The event marks an answer obtained without a credential as anonymous.
+The task succeeds whatever the answer; the orchestrator fails the dry run on
+`conflict` and `unverified`. A `member-probe` event is never publication
+evidence.
+
+The `dry-run-member-probe` requirement covers this contract, and the probe of
+a put archive (`memberprobe.ProbeArchive`).
+
 The existing `oci-publish-by-digest` requirement covers this contract. Its
 `image-member-matches-native-plan` check binds emitted evidence to the planned
 member, and `image-private-publish-writes-only-digest` checks the private

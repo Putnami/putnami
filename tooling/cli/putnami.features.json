@@ -2934,6 +2934,46 @@
           }
         }
       ]
+    },
+    {
+      "id": "cli/publish-dry-run-probe",
+      "type": "feature",
+      "name": "Publish dry-run registry probe",
+      "outcome": "A user learns from one publish --dry-run which planned members a registry would refuse, before any member is written",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "one-pass-verdict",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-conflict-fails-and-is-named",
+              "every-conflict-is-named",
+              "unverified-fails",
+              "all-absent-passes",
+              "identical-is-reported-as-reused",
+              "no-plan-still-aggregates",
+              "unreadable-probe-fails"
+            ]
+          }
+        },
+        {
+          "id": "plan-coverage",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "unprobed-member-is-a-warning",
+              "probe-version-must-match-the-plan",
+              "anonymous-absent-is-a-warning"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

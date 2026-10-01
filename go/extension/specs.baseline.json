@@ -8,6 +8,7 @@
     "go/go-project-toolchain#committed-client-drift",
     "go/go-project-toolchain#contract-canonicalization-preserves-declared-order",
     "go/go-project-toolchain#declared-compile-matrix",
+    "go/go-project-toolchain#dry-run-registry-probe",
     "go/go-project-toolchain#explicit-entrypoint",
     "go/go-project-toolchain#generation-opt-out",
     "go/go-project-toolchain#generation-path-safety",

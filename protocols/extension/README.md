@@ -152,7 +152,7 @@ declares neither `ecosystems` nor `uses`.
 
 Diagnostic codes: `invalid-ecosystem-profile`, `duplicate-ecosystem-profile`,
 `unknown-ecosystem-use`, `ecosystem-use-of-own-profile`,
-`invalid-published-member`.
+`invalid-published-member`, `invalid-member-probe`.
 
 **The `published-member` event.** A publish job emits one `PublishedMember`
 (`PublishedMemberEventKind`) per artifact it produced — a project may produce
@@ -164,6 +164,31 @@ than inheriting the project's identity. It states the `ecosystem`, the
 `ParsePublishedMember` is strict: an unknown field is a rejection, because a
 field this build does not know would otherwise be truncated silently out of the
 release set.
+
+**The `member-probe` event.** A publish job that runs under `--dry-run` emits
+one `MemberProbe` (`MemberProbeEventKind`) per member it would publish. It
+states what the registry answered when asked, with a read-only request, whether
+it already holds the member at that version:
+
+| Field | Meaning |
+|-------|---------|
+| `ecosystem`, `coordinate`, `version` | The member the real publish would write. |
+| `platform` | Optional `os/arch`, for a member published as one artifact per platform. |
+| `registry` | The endpoint asked, without credential, query or fragment. |
+| `state` | `absent`, `identical`, `conflict` or `unverified`. |
+| `artifactDigest` | Optional digest of the local artifact (`sha256:` plus 64 lowercase hex characters). |
+| `registryDigest` | Optional digest the registry serves, in the same form. |
+| `reason` | Required for `conflict` and `unverified`. |
+| `anonymous` | Optional. True when the request carried no credential. |
+
+`absent` means the registry does not hold the version. `identical` means it
+holds it with the digest of the local artifact, and requires both digests.
+`conflict` means it holds it with another digest, or the dry run has no local
+artifact to compare with. `unverified` means the registry gave no usable
+answer. `ParseMemberProbe` is strict and `ValidateMemberProbe` closes the
+`state` vocabulary: an unknown field or state is a rejection, because a verdict
+this build cannot read must not be dropped silently. A `member-probe` is never
+publication evidence.
 
 ## Producers and consumers
 

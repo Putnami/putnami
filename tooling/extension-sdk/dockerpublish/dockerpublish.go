@@ -82,9 +82,12 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	if err != nil {
 		// A dry-run package may plan the image without assembling it, and then it
 		// writes no manifest. The dry-run publish has no candidate to list: it
-		// says so and pushes nothing, as every other dry-run exit does.
+		// says so and pushes nothing, as every other dry-run exit does. The
+		// release-set plan still names the member, so the registry is asked about
+		// the planned coordinate and version.
 		if common.DryRun && errors.Is(err, fs.ErrNotExist) {
 			emit.Summary("Dry run: package assembled no Docker image for " + ctx.Project.Name + ", so no ref is listed")
+			probePlannedImageMembers(ctx, emit, dockerRegistry)
 			return "OK", map[string]any{"dryRun": true}, nil
 		}
 		emit.Diagnostic("error", "Docker manifest not found: "+err.Error(), "", 0)
@@ -163,6 +166,13 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 			emit.Info("  - " + ref)
 		}
 		emitPublishedDocker(emit, qualifiedImage, version, runtime.PublishRecord{DryRun: true})
+		// The version is the one tag this publisher writes, so it is the one
+		// reference the registry is asked about. An empty registry pushes
+		// nothing and is asked nothing.
+		emitImageProbe(emit, imageProbe{
+			host: regHost, repository: qualifiedImage, version: version, ref: versionRef,
+			digest: contentDigest, keychain: keychain, transport: route.transport,
+		})
 		return "OK", map[string]any{"dryRun": true, "imageName": imageName, "refs": allRefs, "contentTag": contentTag}, nil
 	}
 
@@ -484,6 +494,13 @@ func publishImmutableImageProject(ctx *pctx.Context, emit *jsonl.Emitter, dryRun
 
 	if dryRun {
 		emit.Summary("Dry run: would publish and verify immutable image " + immutableRef)
+		// An image project is addressed by its digest, so the registry is asked
+		// about that digest: it either holds these exact bytes or it does not.
+		token, _ := registrycred.ResolveToken(credentialHost)
+		emitImageProbe(emit, imageProbe{
+			host: target.Host, repository: target.Repository, version: memberVersion, ref: immutableRef,
+			digest: manifest.Digest, keychain: oci.NewRegistryKeychain(target.Host, token), transport: privateTransport,
+		})
 		return "OK", map[string]any{
 			"dryRun": true, "image": immutableRef, "image_digest": manifest.Digest,
 			"contentHash": manifest.ContentHash, "version": manifest.Version,

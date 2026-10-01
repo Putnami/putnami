@@ -148,6 +148,10 @@
       "text": "Every Go module publication, new or reused, reports one published member with the digest the registry served back, and writes no dist tag."
     },
     {
+      "id": "dry-run-registry-probe",
+      "text": "A dry-run Go module publication asks the registry, with one GET of the proxy zip and no write, whether it already serves the module at the version the real publish would write, and emits one member-probe event: absent, identical when the served zip equals the staged zip, conflict when it differs or no zip is staged, unverified when the registry cannot answer. A bearer is sent only when one resolved. Without a release-set plan, the go channel record names the module and version when no module is staged."
+    },
+    {
       "id": "resolved-dependency-documentation",
       "text": "The putnami.go_docs MCP tool returns AI.md only from the exact module cmd/go selects for the requested project, including go.work and local replacements, with the selected package, version, source kind, path and content digest. Resolution is bounded, offline and read-only; absent cached bytes, ambiguous projects, escaping symlinks and unversioned extension-carried copies produce an explicit unavailable result rather than documentation for a different module version."
     },

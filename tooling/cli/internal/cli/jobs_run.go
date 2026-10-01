@@ -75,7 +75,9 @@ func terminalRequest(parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc 
 // every publisher prints the artifact set it WOULD push (npm, Go module,
 // docker) and the published-artifacts summary renders it, so executing is
 // strictly more informative than the DAG preview — with zero registry side
-// effects.
+// effects. A dry run only reads: each publisher asks its registry whether the
+// member already exists at the planned version, and the engine fails the run
+// on the answers once every job has ended (jobs.MemberProbeReport).
 //
 // Three deliberate scope decisions:
 //   - Exactly the single-command form. A mixed list (`build,publish`) keeps

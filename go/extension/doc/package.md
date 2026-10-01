@@ -242,12 +242,34 @@ download`.
 Go publication is currently private under every release-set selection. A
 plan coordinates immutable versions and digests; it is not
 an authority for visibility. The publisher never asks for `promote`, never
-calls the `/release` operation, never performs an anonymous read, and the closed
+calls the `/release` operation, never performs an anonymous read when it
+publishes, and the closed
 `gomod-write/v1` PUT has no repository-controlled visibility field. A future
 public release requires a separate explicit server-owned attestation contract;
 a command, channel, manifest or release-set plan cannot forge it. The command
 coordinator releases the private channel only after every selected artifact
 has verified successfully.
+
+`putnami publish --go --dry-run` uploads nothing and asks the registry one
+question: does it already serve this module at this version. The publisher
+sends one GET of the proxy zip (`/<module>/@v/<version>.zip`) through the same
+HTTP client as a real publication, and emits one `member-probe` event:
+
+| State | When |
+|-------|------|
+| `absent` | The registry answers 404 or 410. |
+| `identical` | The served zip has the SHA-256 of the staged zip. The real publish reuses it. |
+| `conflict` | The served zip differs, or the dry run staged no zip to compare. |
+| `unverified` | The registry cannot be reached, refuses the request, or answers outside the protocol. |
+
+The request carries a bearer only when an explicit token or the credential seam
+yields one; otherwise it is anonymous and the event says so. The dry run
+requests no publish lease. Under a release-set plan the module and version come
+from the plan and no zip is staged, so a version the registry already serves is
+a `conflict`. Without a plan they come from the staged module, or from the `go`
+channel record when the dry-run package staged none. The task succeeds whatever
+the answer; the CLI fails the run on `conflict` and `unverified`
+(see [Publish and `--dry-run`](../../../tooling/cli/doc/03-commands.md#registry-checks)).
 
 On a linked developer checkout, the publisher obtains its write credential only
 after reading the staged module coordinate. It asks `@putnami/cloud` for a

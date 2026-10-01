@@ -129,6 +129,11 @@ events against the plan to build the snapshot it releases, so the members —
 including the `oci` images — are the proof, and a same-session deploy takes its
 workload contract from the released set rather than from a private side channel.
 
+A publisher that runs under `--dry-run` publishes nothing and reports one
+`member-probe` artifact event per member instead: what the registry answered
+when asked whether it already holds the member at that version. A
+`member-probe` is never a `published-member`.
+
 ## Compatibility
 
 Within a version, the envelope is **additive**: `additionalProperties` is true,

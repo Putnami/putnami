@@ -146,3 +146,30 @@ func TestDropUndryableSideEffectJobs_InertOutsideExecutingDryRun(t *testing.T) {
 		t.Fatal("an alias dry-run must not be filtered: the alias gates the param on its own flag surface")
 	}
 }
+
+// TestPublishFinalizers_ProbeReportOnlyUnderAnExecutingDryRunPublish pins when
+// a publish session reads its registry probes: only when its jobs receive the
+// dry-run parameter. A preview executes no job, and a real publish emits no
+// probe. Without a release-set plan the release-set commit is absent, so the
+// probe report is the session's only publish finalizer.
+func TestPublishFinalizers_ProbeReportOnlyUnderAnExecutingDryRunPublish(t *testing.T) {
+	t.Parallel()
+	dryRun := executingDryRunRequest()
+	dryRun.Commands = []string{"publish"}
+	preview := &Request{Commands: []string{"publish"}}
+	preview.Global.DryRun = true
+	for name, test := range map[string]struct {
+		req    *Request
+		probes bool
+	}{
+		"executing dry-run publish": {req: dryRun, probes: true},
+		"dry-run preview":           {req: preview},
+		"real publish":              {req: &Request{Commands: []string{"publish"}}},
+	} {
+		finalizers := publishFinalizers(context.Background(), test.req, nil)
+		if len(finalizers) != 1 || (finalizers[0] != nil) != test.probes {
+			t.Errorf("%s: publishFinalizers = %d finalizer(s), probe report present = %v, want %v",
+				name, len(finalizers), len(finalizers) == 1 && finalizers[0] != nil, test.probes)
+		}
+	}
+}

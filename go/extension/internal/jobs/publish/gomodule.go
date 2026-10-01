@@ -129,6 +129,9 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 			"registry": "go", "version": version, "dryRun": true,
 			"digestVerified": false,
 		})
+		// No zip exists to compare, so a version the registry already serves is
+		// reported as a conflict.
+		probeGoModule(ctx.Params, emit, route, registryURL, modulePath, version, "")
 		return "OK", map[string]any{"dryRun": true, "modulePath": modulePath, "version": version}, nil
 	}
 
@@ -142,7 +145,7 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		return "SKIP", nil, nil
 	}
 
-	moduleMeta, err := pkgmeta.ReadGoModuleMetadata(wsRoot, projectPath)
+	moduleMeta, err := stagedGoModule(channels, wsRoot, projectPath, dryRun)
 	if err != nil {
 		emit.Diagnostic("error", "Go module metadata not found: "+err.Error(), "", 0)
 		return "FAILED", nil, fmt.Errorf("read go module metadata: %w", err)
@@ -177,6 +180,7 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 			"registry": "go", "version": version, "dryRun": true,
 			"digestVerified": false,
 		})
+		probeGoModule(ctx.Params, emit, route, registryURL, modulePath, version, moduleMeta.ZipPath)
 		return "OK", map[string]any{"dryRun": true, "modulePath": modulePath, "version": version}, nil
 	}
 

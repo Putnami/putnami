@@ -20,6 +20,9 @@
     "package": {
       "archives": true
     },
+    "test": {
+      "filePatterns": ["cmd/putnami-ts/testdata/recorded/**"]
+    },
     "publish": {
       "archives": true
     },

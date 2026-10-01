@@ -1,0 +1,30 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/publish-dry-run-probe",
+  "outcomes": [
+    "A user learns from one publish --dry-run which planned members a registry would refuse, before any member is written",
+    "Every conflict of a release shows in one pass, each naming the member, the registry and the version",
+    "A dry run that could not ask a registry fails with the reason instead of passing",
+    "A member a registry already holds with the same content is reported as reused, not as a conflict"
+  ],
+  "nonGoals": [
+    "Knowing a registry protocol: each publisher asks its own registry, and the CLI only aggregates the records they emit",
+    "Writing to a registry, requesting a publish lease, or requiring a publish credential for a public member",
+    "Proving that a private member is absent from an answer obtained without a credential",
+    "Probing during a plan-only preview: --plan and a plan-only --dry-run execute no job"
+  ],
+  "requirements": [
+    {
+      "id": "one-pass-verdict",
+      "text": "An executing publish --dry-run reads every member-probe event of its jobs through the strict protocol reader, with or without a release-set plan. It prints one report: each conflict and each unverified probe with its member, registry, version and reason, each identical member as reused, and a count of absent members. The run fails once, naming every conflict and unverified probe, and also fails on a probe the reader refuses. Absent and identical probes pass."
+    },
+    {
+      "id": "plan-coverage",
+      "text": "With a release-set plan, each selected member no probe speaks about is reported as not probed, with its publisher and publish step: a warning, never a failure, never silent. A probe whose version differs from the planned member's version is rejected and fails the run. An absent answer obtained without a credential produces one warning for the run, because a registry answers such a request for a private member as it does for a missing one."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0056-a-publish-dry-run-asks-each-registry.md"
+  ]
+}

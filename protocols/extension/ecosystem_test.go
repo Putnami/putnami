@@ -200,6 +200,93 @@ func TestPublishedMemberIsStrict(t *testing.T) {
 	}
 }
 
+// TestMemberProbeIsStrict pins the dry-run probe's parse and validation
+// contract: an unknown field or state is a rejection, each state carries the
+// digest evidence it claims, and the registry endpoint carries no credential.
+func TestMemberProbeIsStrict(t *testing.T) {
+	const local = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+	const remote = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	base := `"ecosystem":"npm","coordinate":"@acme/widget","version":"1.2.3","registry":"https://registry.example.test"`
+
+	for name, raw := range map[string]string{
+		"absent":            `{` + base + `,"state":"absent"}`,
+		"absent anonymous":  `{` + base + `,"state":"absent","artifactDigest":"` + local + `","anonymous":true}`,
+		"identical":         `{` + base + `,"state":"identical","artifactDigest":"` + local + `","registryDigest":"` + local + `"}`,
+		"conflict":          `{` + base + `,"state":"conflict","artifactDigest":"` + local + `","registryDigest":"` + remote + `","reason":"digests differ"}`,
+		"conflict no local": `{` + base + `,"state":"conflict","reason":"the dry run built no artifact to compare"}`,
+		"unverified":        `{` + base + `,"state":"unverified","reason":"connection refused"}`,
+		"bare host": `{"ecosystem":"oci","coordinate":"acme/api","version":"1.2.3","registry":"registry.example.test:5000",` +
+			`"state":"absent"}`,
+		"one platform": `{` + base + `,"state":"absent","platform":"linux/arm64"}`,
+	} {
+		t.Run("valid "+name, func(t *testing.T) {
+			probe, diags := ParseMemberProbe([]byte(raw))
+			if len(diags) != 0 {
+				t.Fatalf("parse: %v", diags)
+			}
+			if diags := ValidateMemberProbe(probe); len(diags) != 0 {
+				t.Fatalf("valid probe reported %v", diags)
+			}
+		})
+	}
+
+	if _, diags := ParseMemberProbe([]byte(`{` + base + `,"state":"absent","tag":"latest"}`)); !hasCode(diags, "invalid-member-probe") {
+		t.Fatalf("an unknown field was accepted: %v", diags)
+	}
+
+	for name, tc := range map[string]struct {
+		raw   string
+		field string
+	}{
+		"bad ecosystem": {`{"ecosystem":"NPM","coordinate":"c","version":"1","registry":"r","state":"absent"}`, "ecosystem"},
+		"no coordinate": {`{"ecosystem":"npm","coordinate":"","version":"1","registry":"r","state":"absent"}`, "coordinate"},
+		"no version":    {`{"ecosystem":"npm","coordinate":"c","version":"","registry":"r","state":"absent"}`, "version"},
+		"no registry":   {`{"ecosystem":"npm","coordinate":"c","version":"1","state":"absent"}`, "registry"},
+		"registry user info": {
+			`{"ecosystem":"npm","coordinate":"c","version":"1","registry":"https://user:secret@r.test","state":"absent"}`, "registry",
+		},
+		"registry query": {
+			`{"ecosystem":"npm","coordinate":"c","version":"1","registry":"https://r.test/?token=secret","state":"absent"}`, "registry",
+		},
+		"bare host user info": {
+			`{"ecosystem":"oci","coordinate":"c","version":"1","registry":"user:secret@r.test","state":"absent"}`, "registry",
+		},
+		"bad platform":              {`{` + base + `,"state":"absent","platform":"linux"}`, "platform"},
+		"unknown state":             {`{` + base + `,"state":"present"}`, "state"},
+		"no state":                  {`{` + base + `}`, "state"},
+		"short digest":              {`{` + base + `,"state":"absent","artifactDigest":"sha256:abc"}`, "artifactDigest"},
+		"short registry digest":     {`{` + base + `,"state":"unverified","reason":"r","registryDigest":"deadbeef"}`, "registryDigest"},
+		"absent with a held digest": {`{` + base + `,"state":"absent","registryDigest":"` + remote + `"}`, "registryDigest"},
+		"identical without digests": {`{` + base + `,"state":"identical"}`, "registryDigest"},
+		"identical with other digest": {
+			`{` + base + `,"state":"identical","artifactDigest":"` + local + `","registryDigest":"` + remote + `"}`, "registryDigest",
+		},
+		"conflict with equal digests": {
+			`{` + base + `,"state":"conflict","artifactDigest":"` + local + `","registryDigest":"` + local + `","reason":"r"}`, "registryDigest",
+		},
+		"conflict without reason":   {`{` + base + `,"state":"conflict","registryDigest":"` + remote + `"}`, "reason"},
+		"unverified without reason": {`{` + base + `,"state":"unverified","reason":"  "}`, "reason"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			parsed, diags := ParseMemberProbe([]byte(tc.raw))
+			if len(diags) != 0 {
+				t.Fatalf("parse: %v", diags)
+			}
+			diags = ValidateMemberProbe(parsed)
+			if len(diags) != 1 || diags[0].Code != "invalid-member-probe" || diags[0].Field != tc.field {
+				t.Fatalf("diagnostics = %v, want one invalid-member-probe on %q", diags, tc.field)
+			}
+			if strings.Contains(diags[0].Message, "secret") {
+				t.Fatalf("diagnostic %q repeats the credential it rejects", diags[0].Message)
+			}
+		})
+	}
+
+	if !hasCode(ValidateMemberProbe(nil), "invalid-member-probe") {
+		t.Fatal("a nil probe must be reported, not panic")
+	}
+}
+
 // ecosystemInvalidFixtureCodes maps each ecosystem counter-example to the exact
 // diagnostic codes it must produce, in order. This module has no central
 // fixture→code table, so the profile corpus carries its own: a new

@@ -199,6 +199,20 @@
           }
         },
         {
+          "id": "dry-run-registry-probe",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-module-probe-is-read-only",
+              "unplanned-dry-run-probes-without-a-staged-module"
+            ]
+          }
+        },
+        {
           "id": "merged-config-survives-a-cache-hit",
           "stage": "coded",
           "evidenceKinds": [

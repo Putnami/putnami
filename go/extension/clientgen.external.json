@@ -71,6 +71,23 @@
         "go/extension/internal/jobs/publish/publish_test.go"
       ],
       "reason": "Uploads a module zip and its metadata to a Go module registry over the module proxy protocol."
+    },
+    {
+      "authority": "Go module proxy protocol (go.dev/ref/mod#goproxy-protocol): the /@v/<version>.zip endpoint",
+      "adapter": "go/extension/internal/jobs/publish/member_probe.go",
+      "callsites": [
+        {
+          "path": "go/extension/internal/jobs/publish/member_probe.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "2ceaa12f9c1112b0e293722a4f5921913becd541381ecfba7486c49800087b0a"
+        }
+      ],
+      "owner": "@putnami/go",
+      "tests": [
+        "go/extension/internal/jobs/publish/member_probe_test.go"
+      ],
+      "reason": "Asks a Go module registry, with one GET of the module zip, whether it already serves the version a dry-run publish would write."
     }
   ]
 }

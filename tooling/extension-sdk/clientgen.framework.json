@@ -1,0 +1,45 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "putnami-extension-sdk",
+      "status": "pending-provider-contract",
+      "adapter": "tooling/extension-sdk/memberprobe/archive.go",
+      "callsites": [
+        {
+          "path": "tooling/extension-sdk/memberprobe/archive.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "5e3780da2c2f2aedbd5529c79e74fb7b15e4f13ddcde1fcd7a25c80ef2fbe7ba"
+        }
+      ],
+      "owner": "putnami-extension-sdk",
+      "tests": [
+        "tooling/extension-sdk/memberprobe/archive_test.go"
+      ],
+      "reason": "Asks the put registry, with one HEAD of the archive download route, whether it already holds an archive a dry-run publish would write. First-party Putnami service; the wire contract lives in protocols/distribution and no provider declares a client for it yet.",
+      "operations": [
+        "distribution.download"
+      ],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    },
+    {
+      "runtime": "putnami-extension-sdk",
+      "status": "transport-primitive",
+      "adapter": "tooling/extension-sdk/memberprobe/memberprobe.go",
+      "callsites": [
+        {
+          "path": "tooling/extension-sdk/memberprobe/memberprobe.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "c9ea42fcfa6a2407f96cacf8436a4110cbf86dc8f159a35dab598a18d112777b"
+        }
+      ],
+      "owner": "putnami-extension-sdk",
+      "tests": [
+        "tooling/extension-sdk/memberprobe/archive_test.go"
+      ],
+      "reason": "Builds the HTTP client a registry probe sends its read-only requests with: no ambient proxy and no redirect followed. The caller supplies the registry endpoint and speaks that registry's protocol."
+    }
+  ]
+}

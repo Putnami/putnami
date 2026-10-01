@@ -429,6 +429,20 @@
           }
         },
         {
+          "id": "dry-run-registry-probe",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "managed-npm-probe-is-read-only",
+              "unmanaged-npm-probe-asks-through-npm"
+            ]
+          }
+        },
+        {
           "id": "upgrade-table-shows-source-revision",
           "stage": "coded",
           "evidenceKinds": [

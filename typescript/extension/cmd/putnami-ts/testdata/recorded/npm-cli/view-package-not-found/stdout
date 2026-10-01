@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "E404",
+    "summary": "Not Found - GET https://registry.npmjs.org/@putnami-probe-test%2fnothing - Not found",
+    "detail": "\n '@putnami-probe-test/nothing@1.0.0' is not in this registry.\n\nNote that you can also install from a\ntarball, folder, http url, or git url."
+  }
+}

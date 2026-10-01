@@ -213,10 +213,18 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 			// Preserve the legacy/full event contract outside managed release sets.
 			emitPublished(emit, "npm", packageName, version, true)
 		}
+		// The dry run's one question to the registry: does it already hold this
+		// version. It reads only, and a missing credential never fails it.
+		probeNPMPackage(emit, npmDryRun{
+			managed: managedReleaseSet, wsRoot: wsRoot, projectPath: projectPath, npmDir: npmDir,
+			packageName: packageName, version: version, registry: registry,
+			endpoint: publishEndpoint, credentialHost: credentialHost, authEnv: npmAuthEnv,
+		})
 		return "OK", map[string]any{"dryRun": true, "version": version}, nil
 	}
 
-	// Ask Cloud only after dry-run has returned without requesting credentials.
+	// Ask Cloud for the publication credential. The dry run above asks the same
+	// seam, only to read, and never fails on its answer.
 	// The seam carries the registry HOST and nothing else: the cloud owns what
 	// authority the credential grants, so no package coordinate or action name
 	// crosses it. A managed host with no credential fails closed; only the

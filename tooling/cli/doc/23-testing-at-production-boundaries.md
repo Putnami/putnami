@@ -52,6 +52,10 @@ only for a condition the real command has, such as the first-use install that
 | --- | --- |
 | Put registry responses | `tooling/cli/testdata/recorded/put-registry/` |
 | `registry-token` exchanges | `tooling/extension-sdk/registrycred/testdata/recorded/registry-token/` |
+| Put registry answers to a dry-run archive probe | `tooling/extension-sdk/memberprobe/testdata/recorded/put-registry/` |
+| Go registry answers to a dry-run module probe | `go/extension/internal/jobs/publish/testdata/recorded/go-registry/` |
+| npm registry answers to a dry-run tarball probe | `typescript/extension/cmd/putnami-ts/testdata/recorded/npm-registry/` |
+| `npm view` and `npm config get` exchanges | `typescript/extension/cmd/putnami-ts/testdata/recorded/npm-cli/` |
 
 Each directory has a `README.md` with one row per recording: the request or
 command that produced it, the date, and every redaction.
