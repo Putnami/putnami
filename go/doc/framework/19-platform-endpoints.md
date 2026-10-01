@@ -166,7 +166,7 @@ platformPlugin := platform.NewPlugin(platform.Config{Prefix: "/_"}) // keep /_ n
 a.Use(server).Use(platformPlugin)
 ```
 
-`/_/health` becomes `/_/healthz`, and you also get `/_/livez`, `/_/readyz`, `/_/version`. Drop the `Prefix` for plain k8s-style paths (`/healthz`, `/livez`, …). Don't add both — they overlap on probe registration.
+`/_/health` becomes `/_/healthz`, and you also get `/_/livez`, `/_/readyz`, `/_/version`. Drop the `Prefix` for plain k8s-style paths (`/healthz`, `/livez`, …). Both plugins can share one server: each discovers the same probes and reports them on its own route, so a service usually needs only one.
 ## Support and contract
 
 `go.putnami.dev/platform` is `stable` in the workspace support catalog. Its

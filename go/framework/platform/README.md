@@ -227,7 +227,7 @@ a.Use(server).Use(platformPlugin)
 
 `/_/health` becomes `/_/healthz`, and you also get `/_/livez`, `/_/readyz`, and `/_/version`. Drop the `Prefix` to migrate to plain root paths (`/healthz`, `/livez`, …) — the Kubernetes default.
 
-`http.HealthPlugin` continues to work; nothing forces you to migrate. But don't add both — they overlap on probe registration and you'll get inconsistent behaviour.
+`http.HealthPlugin` continues to work; nothing forces you to migrate. Both plugins can share one server: each discovers the same `app.HealthChecker` probes and reports them on its own route, so a service usually needs only one.
 
 ## Support and contract
 

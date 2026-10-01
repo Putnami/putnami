@@ -258,8 +258,8 @@ func TestPushPlugin_ConfigDocumentSelectsPush(t *testing.T) {
 		p := Events(PluginConfig{Transport: &recordingTransport{}})
 		// The code sets pull delivery, so RegisterOn registers nothing yet.
 		p.RegisterOn(chosen)
-		if status := postPush(t, phttp.NewServerPlugin(phttp.ServerConfig{})); status != http.StatusNotFound {
-			t.Fatalf("an empty server answers %d on the receiver path, want 404", status)
+		if status := postPush(t, chosen); status != http.StatusNotFound {
+			t.Fatalf("the chosen server answers %d on the receiver path before configure, want 404", status)
 		}
 
 		a := app.New("document-push-explicit")

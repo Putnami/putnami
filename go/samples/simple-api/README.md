@@ -66,8 +66,9 @@ before the first request.
 application's server. A service that
 needs the full operational surface — `/livez`, `/healthz`, `/readyz`, `/version` —
 uses [`go.putnami.dev/platform`](../../framework/platform) instead, as
-[`task-api`](../task-api) does. Mount one or the other, never both: they overlap
-on probe registration.
+[`task-api`](../task-api) does. Both can share one server, as
+[`migrations-feature`](../migrations-feature) shows: each discovers the same
+probes and reports them on its own route.
 
 ## Verifying
 
