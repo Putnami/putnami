@@ -773,6 +773,80 @@ func TestRunGeneratesConfigSchemaArtifact(t *testing.T) {
 	}
 }
 
+// A release tag or a workspace bump moves the stable version. The committed
+// schema/config.json must not follow it, or every build after a tag rewrites a
+// tracked file: it carries the version the project declares, or "0.0.0". The
+// .gen fallback is per-run output and keeps the stable version.
+func TestCommittedConfigSchemaDoesNotCarryTheWorkspaceVersion(t *testing.T) {
+	configSrc := "package main\n\n" +
+		"import pconfig \"go.putnami.dev/config\"\n\n" +
+		"type ServerCfg struct {\n" +
+		"\tPort int `json:\"port\" default:\"8080\" env:\"PORT\"`\n" +
+		"}\n\n" +
+		"var ServerConfig = pconfig.Config[ServerCfg](\"cacheServer\")\n"
+	readVersion := func(t *testing.T, path string) string {
+		t.Helper()
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading %s: %v", path, err)
+		}
+		var schema struct {
+			Version string `json:"version"`
+		}
+		if err := json.Unmarshal(data, &schema); err != nil {
+			t.Fatalf("parsing %s: %v", path, err)
+		}
+		return schema.Version
+	}
+	for _, tc := range []struct {
+		name        string
+		projectJSON string
+		want        string
+	}{
+		{name: "no declared version", want: "0.0.0"},
+		{name: "declared version", projectJSON: `{"name":"test-project","version":"3.4.5"}`, want: "3.4.5"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := newTestContext(t)
+			ctx.Version = &pctx.Version{Base: "1.2.3", Full: "1.2.3-abc-deadbeef"}
+			root := ctx.Project.FullPath
+			if err := os.WriteFile(filepath.Join(root, "config.go"), []byte(configSrc), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if tc.projectJSON != "" {
+				if err := os.WriteFile(filepath.Join(root, "putnami.json"), []byte(tc.projectJSON), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			committed := filepath.Join(root, "schema", "config.json")
+
+			// build-generate commits the schema of a project with no describe phase.
+			_, _, _ = Run(ctx, jsonl.New(), nil)
+			if got := readVersion(t, committed); got != tc.want {
+				t.Fatalf("build-generate stamped the committed schema with %q, want %q", got, tc.want)
+			}
+
+			// describe commits it for an app, and stages the fallback otherwise.
+			genDir := filepath.Join(root, ".gen")
+			if err := os.MkdirAll(genDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := mergeDependencyConfigSchema(ctx, root, genDir, true); err != nil {
+				t.Fatalf("mergeDependencyConfigSchema: %v", err)
+			}
+			if got := readVersion(t, committed); got != tc.want {
+				t.Fatalf("describe stamped the committed schema with %q, want %q", got, tc.want)
+			}
+			if err := mergeDependencyConfigSchema(ctx, root, genDir, false); err != nil {
+				t.Fatalf("mergeDependencyConfigSchema: %v", err)
+			}
+			if got := readVersion(t, filepath.Join(genDir, "config-schema.json")); got != "1.2.3" {
+				t.Fatalf("the .gen fallback carries %q, want the stable version 1.2.3", got)
+			}
+		})
+	}
+}
+
 // sentinel error reused across cases; declared at package scope so both the
 // stubVisitor and the assertion can reference it.
 var errBoom = &boomError{}

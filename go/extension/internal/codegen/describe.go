@@ -369,7 +369,7 @@ func mergeDependencyConfigSchema(ctx *pctx.Context, projectPath, genDir string, 
 	if !commit {
 		outputPath = configextract.FallbackOutputPath
 	}
-	_, _, err = configextract.MergeDependencyBlocks(projectPath, ctx.Project.Name, stableVersion(ctx), outputPath, depBlocks)
+	_, _, err = configextract.MergeDependencyBlocks(projectPath, ctx.Project.Name, configSchemaVersion(ctx, projectPath, outputPath), outputPath, depBlocks)
 	return err
 }
 
