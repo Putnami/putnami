@@ -14,16 +14,22 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/registrycred"
+	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
 func runWorkspaceInstall(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
-	bunBin, err := resolveBunBin()
+	force := ctx.Params.Bool("force", false)
+	hosted := registrycred.OfflineDependencies()
+
+	// A hosted run downloads no toolchain: it runs the bun the runner holds.
+	mode := toolchain.BunInstall
+	if hosted {
+		mode = toolchain.BunFind
+	}
+	bunBin, err := provisionBunBin(ctx, emit, mode, nil)
 	if err != nil {
 		return "FAILED", nil, err
 	}
-
-	force := ctx.Params.Bool("force", false)
-	hosted := registrycred.OfflineDependencies()
 
 	// A hosted run installs the committed manifests as they are: it writes no
 	// file the repository commits, and workspace-fetch downloaded for these.
@@ -181,14 +187,10 @@ func ensureWorkspacePackageManager(ctx *pctx.Context, emit *jsonl.Emitter, bunBi
 	if _, declared := pkg["packageManager"]; declared {
 		return nil
 	}
-	result, err := runBunWithTimeout("bun --version", bunBin, []string{"--version"}, ctx.WorkspaceRoot, bunVersionTimeout)
+	version, err := bunVersion(bunBin, ctx.WorkspaceRoot)
 	if err != nil {
 		return err
 	}
-	if !result.Success {
-		return fmt.Errorf("bun --version exited with code %d: %s", result.ExitCode, strings.TrimSpace(result.Stderr))
-	}
-	version := strings.TrimSpace(result.Stdout)
 	if !isPlainReleaseVersion(version) {
 		emit.Log("warn", fmt.Sprintf("bun %q is not a release version: package.json declares no packageManager, so the lock pins no bun", version))
 		return nil
@@ -208,21 +210,7 @@ func ensureWorkspacePackageManager(ctx *pctx.Context, emit *jsonl.Emitter, bunBi
 // isPlainReleaseVersion reports whether version is MAJOR.MINOR.PATCH with
 // decimal parts and no prerelease or build suffix.
 func isPlainReleaseVersion(version string) bool {
-	parts := strings.Split(version, ".")
-	if len(parts) != 3 {
-		return false
-	}
-	for _, part := range parts {
-		if part == "" {
-			return false
-		}
-		for _, r := range part {
-			if r < '0' || r > '9' {
-				return false
-			}
-		}
-	}
-	return true
+	return toolchain.IsPlainBunRelease(version)
 }
 
 // ensureWorkspaceDevDeps reads workspaceDevDependencies from the extension

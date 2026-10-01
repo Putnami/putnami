@@ -212,6 +212,89 @@ func TestResolveBunCacheRoot(t *testing.T) {
 	}
 }
 
+// A Bun release that Putnami installed keeps its package cache under its
+// install, toolchains/bun/bun-<version>/install/cache in the Putnami home. gc
+// bounds each of those caches with the budget of Bun's native cache, and
+// touches nothing else under the toolchains directory.
+func TestRun_GCBoundsTheCacheOfEveryInstalledBun(t *testing.T) {
+	home := t.TempDir()
+	toolchains := filepath.Join(home, "toolchains", "bun")
+	caches := []string{
+		filepath.Join(toolchains, "bun-1.4.0", "install", "cache"),
+		filepath.Join(toolchains, "bun-1.5.0", "install", "cache"),
+	}
+	for _, cache := range caches {
+		for _, name := range []string{"a@1", "b@1", "c@1"} {
+			writeBunPackage(t, filepath.Join(cache, name), 72*time.Hour)
+		}
+	}
+	program := filepath.Join(toolchains, "bun-1.4.0", "bin", "bun")
+	writeFile(t, program, 10, 72*time.Hour)
+	stray := filepath.Join(toolchains, "notes", "install", "cache", "a@1")
+	writeBunPackage(t, stray, 72*time.Hour)
+
+	env := envFunc(map[string]string{
+		"PUTNAMI_HOME":                home,
+		"PUTNAMI_BUN_CACHE_DIR":       filepath.Join(t.TempDir(), "native"),
+		"PUTNAMI_BUN_CACHE_MAX_BYTES": "250",
+		"PUTNAMI_BUN_CACHE_GC_GRACE":  "1h",
+	})
+	if got := installedBunCacheRoots(env); len(got) != 2 || got[0] != caches[0] || got[1] != caches[1] {
+		t.Fatalf("installedBunCacheRoots = %v, want %v", got, caches)
+	}
+
+	var out bytes.Buffer
+	if err := Run(PhaseGC, "", env, &out); err != nil {
+		t.Fatal(err)
+	}
+	// Each cache holds three packages over a budget of two and a half: gc
+	// evicts one package of each.
+	if freed := summaryFreed(t, out.Bytes()); freed != 2*bunPackageBytes {
+		t.Errorf("freed = %d, want %d: one package of each installed Bun's cache", freed, 2*bunPackageBytes)
+	}
+	for _, cache := range caches {
+		packages := 0
+		for _, name := range []string{"a@1", "b@1", "c@1"} {
+			if _, err := os.Stat(filepath.Join(cache, name, "package.json")); err == nil {
+				packages++
+			}
+		}
+		if packages != 2 {
+			t.Errorf("%s holds %d packages after gc, want 2", cache, packages)
+		}
+	}
+	for _, kept := range []string{program, filepath.Join(stray, "package.json")} {
+		if _, err := os.Stat(kept); err != nil {
+			t.Errorf("gc removed %s: %v", kept, err)
+		}
+	}
+}
+
+// Without a Putnami home and without a workspace root there is no install to
+// look for, and a home that holds no Bun lists none.
+func TestInstalledBunCacheRoots_WithoutAnInstall(t *testing.T) {
+	if got := installedBunCacheRoots(nil); got != nil {
+		t.Errorf("no environment = %v, want none", got)
+	}
+	if got := installedBunCacheRoots(envFunc(nil)); got != nil {
+		t.Errorf("empty environment = %v, want none", got)
+	}
+	if got := installedBunCacheRoots(envFunc(map[string]string{"PUTNAMI_HOME": t.TempDir()})); got != nil {
+		t.Errorf("a home without Bun = %v, want none", got)
+	}
+
+	// With no home, the Putnami home is .putnami under the workspace root.
+	workspace := t.TempDir()
+	cache := filepath.Join(workspace, ".putnami", "toolchains", "bun", "bun-1.4.0", "install", "cache")
+	if err := os.MkdirAll(cache, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got := installedBunCacheRoots(envFunc(map[string]string{"PUTNAMI_WORKSPACE_ROOT": workspace}))
+	if len(got) != 1 || got[0] != cache {
+		t.Errorf("workspace home = %v, want [%s]", got, cache)
+	}
+}
+
 // TestGCBunCache_EvictsOldestPackages is the collector's core contract.
 func TestGCBunCache_EvictsOldestPackages(t *testing.T) {
 	root := t.TempDir()

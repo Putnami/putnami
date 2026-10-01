@@ -203,6 +203,38 @@ func TestResolvedGeneratorsUseDeclaredTypeScriptRuntimeAndGoOnlyNeedsNone(t *tes
 	}
 }
 
+// The emitter's Bun keeps its transpiler cache under its install when Putnami
+// installed it, so that such a Bun writes nothing under the user's home
+// directory. A Bun the host holds, and an explicit setting, are left alone.
+func TestTypeScriptEmitterKeepsTheTranspilerCacheOfAnInstalledBunUnderItsInstall(t *testing.T) {
+	const cacheEnv = "BUN_RUNTIME_TRANSPILER_CACHE_PATH"
+	install := filepath.Join(t.TempDir(), ".putnami", "toolchains", "bun", "bun-1.4.0")
+	hostInstall := filepath.Join(t.TempDir(), ".bun")
+
+	got := typescriptEmitterEnvironment([]string{"PATH=/usr/bin", "BUN_INSTALL=" + install})
+	if value, want := environmentValue(got, cacheEnv), filepath.Join(install, "install", "cache", "@t@"); value != want {
+		t.Errorf("transpiler cache of an installed Bun = %q, want %q", value, want)
+	}
+	if value := environmentValue(got, "BUN_INSTALL"); value != install {
+		t.Errorf("BUN_INSTALL = %q, want it unchanged at %q", value, install)
+	}
+
+	for name, environment := range map[string][]string{
+		"a host Bun":          {"PATH=/usr/bin", "BUN_INSTALL=" + hostInstall},
+		"no BUN_INSTALL":      {"PATH=/usr/bin"},
+		"an explicit setting": {"BUN_INSTALL=" + install, cacheEnv + "=/explicit/cache"},
+	} {
+		before := environmentValue(environment, cacheEnv)
+		got := typescriptEmitterEnvironment(environment)
+		if value := environmentValue(got, cacheEnv); value != before {
+			t.Errorf("%s: transpiler cache = %q, want it left at %q", name, value, before)
+		}
+		if len(got) != len(environment) {
+			t.Errorf("%s: environment grew from %d to %d entries", name, len(environment), len(got))
+		}
+	}
+}
+
 func writeExecutableFixture(t *testing.T, root, name, label string) string {
 	t.Helper()
 	if err := os.MkdirAll(root, 0o755); err != nil {

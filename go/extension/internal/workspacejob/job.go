@@ -105,10 +105,25 @@ func (j *Job) UserAgent() string {
 }
 
 // ExtensionStateRoot is the workspace directory the script called the
-// extension root: the managed Go installs and the last-resort cache live
-// under it.
+// extension root: the last-resort cache lives under it, and so does a Go
+// release installed inside the workspace (workspaceGoRoot).
 func (j *Job) ExtensionStateRoot() string {
 	return filepath.Join(j.WorkspaceRoot, ".putnami", "extensions", "@putnami-go")
+}
+
+// GoToolchainRoot is the directory the managed Go releases are installed in,
+// one go-<version> directory each, shared by every workspace of the machine:
+// toolchains/go under the Putnami home (toolchain.ResolveGoToolchainRoot).
+func (j *Job) GoToolchainRoot() string {
+	return toolchain.ResolveGoToolchainRoot(j.Env.Get, j.WorkspaceRoot)
+}
+
+// workspaceGoRoot is the directory inside the workspace that holds Go
+// releases, one go-<version> directory each. The job installs none there; it
+// runs one it finds there when the Putnami home holds no install of that
+// release.
+func (j *Job) workspaceGoRoot() string {
+	return filepath.Join(j.ExtensionStateRoot(), "libs")
 }
 
 // GoCacheRoot is the machine-global Go cache root, resolved exactly as every

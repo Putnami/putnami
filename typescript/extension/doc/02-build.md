@@ -261,6 +261,8 @@ Output is written to `output/lib/`.
 
 Invokes `tsc` to generate TypeScript declaration files (`.d.ts` + `.d.ts.map`).
 
+`tsc` starts through `bun x tsc`. On a host with a `node` on `PATH`, Bun runs `tsc` with that `node`, which type-checks faster and with less memory than Bun. On a host without one, Bun runs `tsc` itself. The build never needs Node.js, and Putnami never installs it.
+
 TSC is called with:
 - `--declaration --emitDeclarationOnly --declarationMap`
 - `--strict true --target esnext --module esnext`

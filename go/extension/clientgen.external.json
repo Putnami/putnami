@@ -71,23 +71,6 @@
         "go/extension/internal/jobs/publish/publish_test.go"
       ],
       "reason": "Uploads a module zip and its metadata to a Go module registry over the module proxy protocol."
-    },
-    {
-      "authority": "HTTP GET of the archive URL putnami.lock.json pins (RFC 9110), with the URL's userinfo sent as Basic authentication (RFC 7617) to that URL's scheme and host only",
-      "adapter": "go/extension/internal/workspacejob/goinstall.go",
-      "callsites": [
-        {
-          "path": "go/extension/internal/workspacejob/goinstall.go",
-          "transport": "http",
-          "symbol": "http.Client",
-          "fingerprint": "0f30e3c887db424279765174920a81cf8cf944c36364af394ac3f41e1deb0413"
-        }
-      ],
-      "owner": "@putnami/go",
-      "tests": [
-        "go/extension/internal/workspacejob/goinstall_test.go"
-      ],
-      "reason": "Supplies the transport pinnedarchive downloads the Go toolchain with when the lock's source URL carries credentials, so the job logs and reports the URL without them. The upstream is a static file host, not a Putnami provider, so no provider declaration can generate this client."
     }
   ]
 }

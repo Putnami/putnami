@@ -14,6 +14,7 @@ On macOS or Linux, on `amd64` or `arm64`, from an empty directory:
 
 ```bash
 curl -fsSL https://putnami.dev/install.sh | bash
+export PATH="$HOME/.putnami/bin:$PATH"
 putnami init --project webapp --extension ts
 putnami serve webapp
 ```
@@ -29,7 +30,8 @@ putnami serve webapp
 Open the local URL that `putnami serve` prints. You are running the full system
 locally.
 
-The TypeScript starter needs Bun v1.4.0 or later. Windows also needs Git for
+You do not install Bun: Putnami installs Bun under `~/.putnami` for the
+TypeScript starter when the machine holds none that fits. Windows needs Git for
 Windows, Win32 long paths enabled, and Docker Desktop for `putnami compose`;
 `putnami doctor` checks the long-path settings. The installer verifies each
 download against the digest the registry advertises, refuses what it cannot
@@ -186,9 +188,11 @@ templates. Contributors to this repository work on macOS or Linux, because
 
 Each release runs the Quick Start commands on all five supported targets, with
 an empty home, config, and cache and no credentials, and sends a real HTTP
-request to the generated starter. That check does not cover other shells,
-offline installs, production deployment, or long-term source compatibility of
-the generated app. Digest verification proves the bytes match what the registry
+request to the generated starter. On Linux, each release also pastes the Quick
+Start block into an image that holds Bash, `curl`, `tar` and a SHA-256 tool and
+nothing else, then runs `putnami lint,test,build` and the Go starter there.
+Those checks do not cover other shells, offline installs, production
+deployment, or long-term source compatibility of the generated app. Digest verification proves the bytes match what the registry
 advertises; it is not artifact signing. The details are in
 [The release smoke](tooling/cli/doc/22-installing-the-cli.md#the-release-smoke).
 

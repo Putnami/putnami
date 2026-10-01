@@ -398,6 +398,116 @@ func TestPutnamiwStaleness_ConsumerWorkspaceRunsPin(t *testing.T) {
 	}
 }
 
+// ─── Bun's package cache ─────────────────────────────────────────────────────
+
+// The wrapper names Bun's package cache for the CLI only on a machine that
+// holds a Bun of its own: bun on PATH, or .bun in the home directory. On a
+// machine with neither it exports no cache directory and creates none, so the
+// Bun that Putnami installs under the Putnami home keeps its cache under its
+// install and nothing is written to .bun in the home directory. An explicit
+// cache directory is exported as it is.
+func TestPutnamiwBunCache_FollowsTheBunOfTheMachine(t *testing.T) {
+	sentinel := "#!/usr/bin/env bash\n" +
+		"echo \"BUN_CACHE=${BUN_INSTALL_CACHE_DIR:-<unset>}\"\n" +
+		"echo \"PUTNAMI_BUN_CACHE=${PUTNAMI_BUN_CACHE_DIR:-<unset>}\"\n"
+	// The system directories hold bash and the tools the wrapper calls, and on
+	// a machine prepared for these tests no bun.
+	const systemPath = "/usr/bin:/bin"
+
+	run := func(t *testing.T, prepare func(home, stubBin string) []string) (home, cache, putnamiCache string) {
+		t.Helper()
+		repo, _ := sourceRepo(t)
+		if err := os.RemoveAll(filepath.Join(repo, "tooling")); err != nil {
+			t.Fatal(err)
+		}
+		_, target := installPin(t, repo)
+		writeExec(t, target, sentinel)
+
+		root := filepath.Dir(repo)
+		home = filepath.Join(root, "userhome")
+		stubBin := filepath.Join(root, "tools")
+		for _, dir := range []string{home, stubBin} {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		env := []string{
+			"HOME=" + home,
+			"PUTNAMI_HOME=" + filepath.Join(home, ".putnami"),
+			"PATH=" + stubBin + string(os.PathListSeparator) + systemPath,
+		}
+		env = append(env, prepare(home, stubBin)...)
+		out, code := runIn(t, repo, env, "ping")
+		if code != 0 {
+			t.Fatalf("the wrapper failed (%d):\n%s", code, out)
+		}
+		return home, sentinelField(t, out, "BUN_CACHE"), sentinelField(t, out, "PUTNAMI_BUN_CACHE")
+	}
+	dirExists := func(path string) bool {
+		info, err := os.Stat(path)
+		return err == nil && info.IsDir()
+	}
+
+	t.Run("a machine with no bun", func(t *testing.T) {
+		for _, dir := range filepath.SplitList(systemPath) {
+			if _, err := os.Stat(filepath.Join(dir, "bun")); err == nil {
+				t.Skipf("%s holds a bun", dir)
+			}
+		}
+		home, cache, putnamiCache := run(t, func(string, string) []string { return nil })
+		if cache != "<unset>" || putnamiCache != "<unset>" {
+			t.Errorf("BUN_INSTALL_CACHE_DIR = %q, PUTNAMI_BUN_CACHE_DIR = %q; want neither exported", cache, putnamiCache)
+		}
+		if _, err := os.Lstat(filepath.Join(home, ".bun")); !os.IsNotExist(err) {
+			t.Errorf("the wrapper created .bun in the home directory: %v", err)
+		}
+	})
+
+	t.Run("bun on PATH", func(t *testing.T) {
+		home, cache, putnamiCache := run(t, func(_, stubBin string) []string {
+			writeExec(t, filepath.Join(stubBin, "bun"), "#!/usr/bin/env bash\necho 1.4.0\n")
+			return nil
+		})
+		want := filepath.Join(home, ".bun", "install", "cache")
+		if cache != want || putnamiCache != want {
+			t.Errorf("BUN_INSTALL_CACHE_DIR = %q, PUTNAMI_BUN_CACHE_DIR = %q; want %q for both", cache, putnamiCache, want)
+		}
+		if !dirExists(want) {
+			t.Errorf("the wrapper did not create %s", want)
+		}
+	})
+
+	t.Run("a bun home directory", func(t *testing.T) {
+		home, cache, putnamiCache := run(t, func(home, _ string) []string {
+			if err := os.MkdirAll(filepath.Join(home, ".bun"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			return nil
+		})
+		want := filepath.Join(home, ".bun", "install", "cache")
+		if cache != want || putnamiCache != want {
+			t.Errorf("BUN_INSTALL_CACHE_DIR = %q, PUTNAMI_BUN_CACHE_DIR = %q; want %q for both", cache, putnamiCache, want)
+		}
+	})
+
+	t.Run("an explicit cache directory", func(t *testing.T) {
+		var explicit string
+		home, cache, putnamiCache := run(t, func(home, _ string) []string {
+			explicit = filepath.Join(home, "elsewhere", "bun-cache")
+			return []string{"BUN_INSTALL_CACHE_DIR=" + explicit}
+		})
+		if cache != explicit || putnamiCache != explicit {
+			t.Errorf("BUN_INSTALL_CACHE_DIR = %q, PUTNAMI_BUN_CACHE_DIR = %q; want %q for both", cache, putnamiCache, explicit)
+		}
+		if !dirExists(explicit) {
+			t.Errorf("the wrapper did not create %s", explicit)
+		}
+		if _, err := os.Lstat(filepath.Join(home, ".bun")); !os.IsNotExist(err) {
+			t.Errorf("the wrapper created .bun in the home directory: %v", err)
+		}
+	})
+}
+
 // ─── content-keyed from-source build cache ───────────────────────────────────
 //
 // In a git work tree the wrapper keys its build on the CONTENT of the sources it

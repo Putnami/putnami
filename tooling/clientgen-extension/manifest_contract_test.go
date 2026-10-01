@@ -233,6 +233,30 @@ func TestTaskEffectTable(t *testing.T) {
 	}
 }
 
+// The TypeScript emitter runs with the bun the workspace lock pins. A host that
+// holds no bun of that release gets it from `putnami install`, which puts it
+// under the Putnami home: the emitter toolchain lists that install after the
+// host's own locations, so the emitter runs on a host where nobody installed
+// Bun.
+func TestTypeScriptEmitterResolvesTheBunUnderThePutnamiHome(t *testing.T) {
+	spectest.Proves(t, clientgenFeature, "portable-emitter-resolution",
+		"the-typescript-emitter-resolves-the-bun-under-the-putnami-home")
+	manifest := loadExtensionManifest(t)
+	emitter, declared := manifest.Runtime.Toolchains["typescriptEmitter"]
+	if !declared || emitter.Lock != "bun" {
+		t.Fatalf("typescriptEmitter = %+v (declared %t), want a toolchain that resolves the bun lock", emitter, declared)
+	}
+	want := []proto.RuntimeToolchainCandidate{
+		{From: proto.RuntimeToolchainCandidatePath, Path: "bun"},
+		{From: proto.RuntimeToolchainCandidateEnvironment, Environment: "BUN_INSTALL", Path: "bin/bun"},
+		{From: proto.RuntimeToolchainCandidateHome, Path: ".bun/bin/bun"},
+		{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/bun/bun-{version}/bin/bun"},
+	}
+	if !reflect.DeepEqual(emitter.Candidates, want) {
+		t.Fatalf("typescriptEmitter candidates = %+v, want %+v", emitter.Candidates, want)
+	}
+}
+
 // TestOnlyTheAdoptionCommandWritesAuthoredSources pins where source mutation
 // is allowed to live. Generation writes generated clients, never the authored
 // sources it reads, so neither mutatesSources nor the project-scoped "sources"

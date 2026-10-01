@@ -709,6 +709,60 @@ func TestInstallPrintsAndRecordsThePathLineWhenNothingIsLinkable(t *testing.T) {
 	e.assertNeverEscalated(t)
 }
 
+// nextLines returns the commands the installer prints under "Next:", in order.
+func nextLines(output string) []string {
+	_, after, found := strings.Cut(output, "\nNext:\n")
+	if !found {
+		return nil
+	}
+	var lines []string
+	for _, line := range strings.Split(after, "\n") {
+		if strings.TrimSpace(line) == "" {
+			break
+		}
+		lines = append(lines, strings.TrimSpace(line))
+	}
+	return lines
+}
+
+// A shell that cannot reach the command reads the PATH line as its first next
+// step; a shell that already reaches it reads no PATH line at all.
+func TestInstallFooterStartsWithThePathLineOnlyWhenTheCommandIsNotReachable(t *testing.T) {
+	spectest.Proves(t, "cli/first-use-path", "pasted-block-reaches-the-command", "the-footer-starts-with-the-path-line-only-when-the-command-is-not-reachable")
+	requireBash(t)
+	server, _ := defaultRegistry(t)
+
+	unreachable := newEnv(t).set("PUTNAMI_REGISTRY_URL", server.URL)
+	res := unreachable.run(t, "--install-dir", unreachable.installDir)
+	if res.exitCode != 0 {
+		t.Fatalf("install failed (exit %d):\n%s", res.exitCode, res.output)
+	}
+	exportLine := fmt.Sprintf("export PATH=\"%s:$PATH\"", unreachable.installDir)
+	next := nextLines(res.output)
+	if len(next) < 2 || next[0] != exportLine || next[1] != "putnami --help" {
+		t.Fatalf("Next: lines = %q, want %q then %q first:\n%s", next, exportLine, "putnami --help", res.output)
+	}
+
+	reachable := newEnv(t).set("PUTNAMI_REGISTRY_URL", server.URL)
+	if err := os.MkdirAll(reachable.installDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	reachable.prependPath(reachable.installDir)
+	res = reachable.run(t, "--install-dir", reachable.installDir)
+	if res.exitCode != 0 {
+		t.Fatalf("install failed (exit %d):\n%s", res.exitCode, res.output)
+	}
+	next = nextLines(res.output)
+	if len(next) == 0 || next[0] != "putnami --help" {
+		t.Fatalf("Next: lines = %q, want %q first:\n%s", next, "putnami --help", res.output)
+	}
+	for _, line := range next {
+		if strings.Contains(line, "PATH") {
+			t.Fatalf("Next: gives a PATH line to a shell that already reaches the command: %q", line)
+		}
+	}
+}
+
 func TestInstallReportsAnInstallDirectoryAlreadyOnPath(t *testing.T) {
 	requireBash(t)
 	server, _ := defaultRegistry(t)

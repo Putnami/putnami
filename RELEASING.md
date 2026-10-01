@@ -96,8 +96,13 @@ satisfied is either fixed or waived through the
    `<channel>` to `init` as `PUTNAMI_CHANNEL`, so the extensions, the template
    and the starter's dependencies come from the candidate's release set, not
    from `latest`; `<channel>` is a channel name, never an exact version. The
-   Windows host has no Docker, so `putnami compose` is not smoked there. A failed or
-   missing runner blocks promotion and is escalated to the release owner. If
+   Windows host has no Docker, so `putnami compose` is not smoked there. The
+   plane also runs `tooling/cli/scripts/smoke-first-use.sh <channel>` on
+   `linux/amd64` and `linux/arm64` runners with Docker: it pastes the
+   documented block into an image that holds Bash, `curl`, `tar` and a SHA-256
+   tool and nothing else, then runs `putnami lint,test,build` and the Go path.
+   A failed or missing runner blocks promotion and is escalated to the release
+   owner. If
    the execution plane is not configured or is unavailable, the release owner
    runs the same five candidate jobs manually: four Unix runners and one
    Windows host; one host is not a substitute. Any configured plane also runs

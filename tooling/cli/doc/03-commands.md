@@ -629,7 +629,7 @@ putnami cache gc                    # GC global build, Go, Bun, and binary store
 putnami cache verify --impacted     # Audit deterministic keys, artifacts, writes, and restores
 ```
 
-Build-cache data lives in the machine-global per-repo store at `~/.putnami/store/<repo-id>/`, shared across all worktrees of the repo (override with `PUTNAMI_STORE_DIR`). Go compiler/modules at `~/.putnami/cache/go` and Bun downloads at `~/.bun/install/cache` are shared across **all repositories and worktrees**. `cache clean` therefore clears the build cache for every worktree of the current repo; `cache gc` enforces the separate build, Go, Bun, and artifact-store budgets. Running with `--no-cache` skips Putnami action-cache lookups but still uses the native Go and Bun caches; `--no-cache-projects <selector>` skips them for the named projects and their planned dependents only, so the rest of the selection’s dependency closure keeps its cache. A task that failed is cached too: a re-run with unchanged inputs replays the same failure, with its original output, instead of executing it again — `--retry-failed` forces that one task to run while every other cache hit is kept, and `--no-cache` suppresses the replay without removing the record: only a run in which the task passes at the same key does that, whatever its cache policy or selection. See [Caching](10-caching.md) for the full model.
+Build-cache data lives in the machine-global per-repo store at `~/.putnami/store/<repo-id>/`, shared across all worktrees of the repo (override with `PUTNAMI_STORE_DIR`). Go compiler/modules at `~/.putnami/cache/go` and Bun downloads at `~/.bun/install/cache` (for a Bun that Putnami installed, `install/cache` under `~/.putnami/toolchains/bun/bun-<version>`) are shared across **all repositories and worktrees**. `cache clean` therefore clears the build cache for every worktree of the current repo; `cache gc` enforces the separate build, Go, Bun, and artifact-store budgets. Running with `--no-cache` skips Putnami action-cache lookups but still uses the native Go and Bun caches; `--no-cache-projects <selector>` skips them for the named projects and their planned dependents only, so the rest of the selection’s dependency closure keeps its cache. A task that failed is cached too: a re-run with unchanged inputs replays the same failure, with its original output, instead of executing it again — `--retry-failed` forces that one task to run while every other cache hit is kept, and `--no-cache` suppresses the replay without removing the record: only a run in which the task passes at the same key does that, whatever its cache policy or selection. See [Caching](10-caching.md) for the full model.
 
 `cache verify` runs the selected projects' `lint`, `test`, and `build` tasks in
 detached temporary worktrees and isolated stores. It requires a clean worktree
@@ -1294,8 +1294,8 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
   fails the install: run `putnami install` without the flag and commit the
   lock.
 - **Toolchains come from outside the workspace.** With the flag, the CLI starts
-  no toolchain candidate that resolves inside the workspace, such as the Go
-  release the Go extension installs under `.putnami/extensions`, and no step
+  no toolchain candidate that resolves inside the workspace, such as a Go
+  release the workspace holds under `.putnami/extensions`, and no step
   installs one. The runner provides the pinned Go and bun on its `PATH`, in
   `GOROOT`, or in the Putnami home.
 - **No process starts with the credential after repository code.** Once a

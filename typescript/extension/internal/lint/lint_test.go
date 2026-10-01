@@ -518,3 +518,61 @@ func TestBiomeRunsPassTheShimArgumentCheck(t *testing.T) {
 		t.Errorf("checked %d command lines, want %d", checked, len(runs))
 	}
 }
+
+// TestBiomeRunsStartTheLauncherCommand pins that every biome run starts the
+// program and the arguments biomeCommand returns, and that a biome with no
+// command starts nothing.
+func TestBiomeRunsStartTheLauncherCommand(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "no-node-on-the-host", "a-missing-platform-package-starts-the-launcher-with-bun")
+	originalCommand := biomeCommand
+	t.Cleanup(func() { biomeCommand = originalCommand })
+	noBun := errors.New("bun not found")
+	biomeCommand = func(bin string, args []string) (string, []string, error) {
+		if bin == "launcher-without-bun" {
+			return "", nil, noBun
+		}
+		return "/task/bun", append([]string{bin}, args...), nil
+	}
+	var started [][]string
+	restore := SetExecRunForTesting(func(name string, args []string, _ ...exec.Option) (*exec.Result, error) {
+		started = append(started, append([]string{name}, args...))
+		return &exec.Result{Success: true, Stdout: emptyBiomeJSON}, nil
+	})
+	t.Cleanup(restore)
+
+	projectDir := t.TempDir()
+	runs := map[string]func(biome string) error{
+		"lint": func(biome string) error {
+			_, _, err := Check(biome, projectDir, "/config", false, 0, "")
+			return err
+		},
+		"check": func(biome string) error {
+			_, _, err := CheckAll(biome, projectDir, "/config", 0, "")
+			return err
+		},
+		"format": func(biome string) error {
+			_, _, err := Format(biome, projectDir, "/config", false)
+			return err
+		},
+	}
+	for subcommand, run := range runs {
+		started = nil
+		if err := run("/workspace/node_modules/.bin/biome"); err != nil {
+			t.Fatalf("%s: %v", subcommand, err)
+		}
+		if len(started) != 1 || len(started[0]) < 3 {
+			t.Fatalf("%s: started %v, want one command", subcommand, started)
+		}
+		if got := started[0][:3]; got[0] != "/task/bun" || got[1] != "/workspace/node_modules/.bin/biome" || got[2] != subcommand {
+			t.Errorf("%s: started %v, want bun, the launcher, then the biome arguments", subcommand, started[0])
+		}
+
+		started = nil
+		if err := run("launcher-without-bun"); !errors.Is(err, noBun) {
+			t.Errorf("%s: err = %v, want the failed bun resolution", subcommand, err)
+		}
+		if len(started) != 0 {
+			t.Errorf("%s: started %v with no bun to start the launcher", subcommand, started)
+		}
+	}
+}

@@ -138,7 +138,7 @@ func CurrentGoBinary() string {
 //
 //  1. the caller's explicit GOROOT/bin/go;
 //  2. the first go executable on PATH;
-//  3. the legacy workspace-managed Go installed by workspace-install;
+//  3. a Go release installed inside the workspace, through its bin/go link;
 //  4. a Go binary under the resolved extension root;
 //  5. a Go binary under the workspace's stable extension root.
 //
@@ -258,8 +258,8 @@ func resolveGoOn(goos string, in GoResolution) (string, error) {
 		if binary, ok := tryPath(legacy); ok {
 			return binary, nil
 		}
-		// Windows has no bin/go link to the last managed install, so the
-		// managed installs themselves are the candidates there.
+		// A Windows workspace has no bin/go link, so the Go releases
+		// installed inside it are the candidates there.
 		if goos == "windows" {
 			for _, binary := range managedGoInstalls(workspaceRoot, binaryName) {
 				if binary, ok := tryPath(binary); ok {
@@ -289,14 +289,14 @@ func resolveGoOn(goos string, in GoResolution) (string, error) {
 	}
 }
 
-// managedGoLibs is the directory under workspaceRoot where `putnami install`
-// keeps the Go releases it manages, one libs/go-<version> directory each.
+// managedGoLibs is the directory under workspaceRoot that holds the Go
+// releases installed inside the workspace, one go-<version> directory each.
 func managedGoLibs(workspaceRoot string) string {
 	return filepath.Join(workspaceRoot, ".putnami", "extensions", "@putnami-go", "libs")
 }
 
 // managedGoInstalls returns the go commands, named binaryName, of the Go
-// releases `putnami install` manages under workspaceRoot, newest release first.
+// releases installed inside workspaceRoot, newest release first.
 func managedGoInstalls(workspaceRoot, binaryName string) []string {
 	libs := managedGoLibs(workspaceRoot)
 	entries, err := os.ReadDir(libs)

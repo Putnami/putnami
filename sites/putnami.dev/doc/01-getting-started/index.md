@@ -12,28 +12,36 @@ Use this page to get the CLI and workspace in place. If you already know the lan
 
 ## Run the verified first-use path
 
-From an empty directory, run these three commands in the same shell:
+From an empty directory, paste this block into your shell:
 
 ```bash
 curl -fsSL https://putnami.dev/install.sh | bash
+export PATH="$HOME/.putnami/bin:$PATH"
 putnami init --project webapp --extension ts
 putnami serve webapp
 ```
+
+The second line makes `putnami` reachable in the shell you are in. It changes
+nothing when the command is already reachable.
 
 Supported platforms are macOS and Linux, on `amd64` or `arm64`, and Windows on
 `amd64`, which has its own installer, below. Anything else stops with an error
 naming what it detected, rather than installing a binary that cannot run.
 
-Prerequisites are Bash, `curl`, `tar`, either `sha256sum` or `shasum`, Bun v1.4.0
-or later for the TypeScript init/serve path, network access to `putnami.dev` and
-the public artifact registry, network access to the public package registry
-(`https://npm.putnami.dev`) used by `bun install`, and a standard user-writable
-directory already named by `PATH`
-(`~/.local/bin`, `~/bin`, the install directory, or a writable
-`/usr/local/bin`). The home-directory candidate may be absent: the installer
-creates it. That `PATH` prerequisite is what makes the second command
-discoverable immediately; a script running as the child of a pipe cannot mutate
-its parent shell.
+Prerequisites are Bash, `curl`, `tar`, either `sha256sum` or `shasum`, network
+access to `putnami.dev` and the public artifact registry, and network access to
+the public package registry (`https://npm.putnami.dev`) used by `bun install`.
+The first run also downloads the toolchains it needs: Bun from `github.com`,
+with its release read from `api.github.com`, and, for a Go project, Go from
+`go.dev`.
+No directory has to be on `PATH` beforehand: a script running as the child of a
+pipe cannot change its parent shell, so the block sets `PATH` itself.
+
+Bun is not a prerequisite. `putnami init` uses a Bun the machine already holds
+when it fits. Otherwise Putnami installs Bun at
+`~/.putnami/toolchains/bun/bun-<version>/bin/bun`, from `github.com`, and
+refuses an archive whose SHA-256 is not the expected one. It writes nothing to
+`~/.bun` or to a directory on `PATH`.
 
 **What the installer does, and does not do**
 
@@ -52,8 +60,9 @@ its parent shell.
   export PATH="$HOME/.putnami/bin:$PATH"
   ```
 
-  and appends it to your shell startup file for future shells. The last line it
-  prints is which `putnami` your shell now runs, so you never have to guess.
+  It appends that line to your shell startup file for future shells, and
+  repeats it as the first command under `Next:`. It also says which `putnami`
+  your shell now runs, so you never have to guess.
 
 Install a specific version with
 `curl -fsSL https://putnami.dev/install.sh | bash -s -- --version 1.2.3`.
@@ -64,7 +73,9 @@ install script is only needed once per machine.
 ### On Windows
 
 On Windows 10 version 1803 or later, or Windows 11, on `amd64`, open a
-PowerShell window and type the same path:
+PowerShell window and type the same path. The installer runs inside that
+window and adds the install directory to its `PATH`, so the block needs no
+extra line:
 
 ```powershell
 irm https://putnami.dev/install.ps1 | iex
@@ -98,7 +109,6 @@ Windows needs a few more things:
 - **Long paths.** Enable `LongPathsEnabled` in Windows and set
   `git config --global core.longpaths true`. `putnami doctor` checks both and
   prints the command for each.
-- **Bun v1.4.0 or later**, on `PATH` or where Bun's own installer puts it.
 - **Docker Desktop**, only for `putnami compose`.
 
 Prefer not to run an install script?
@@ -121,12 +131,18 @@ preinstalled CLI or extensions. `init` creates and validates:
 HTTP request successfully, and shutdown must complete within the gate's bound.
 Open the local URL printed by `putnami serve`.
 
+On Linux, the gate also pastes the block above, as printed, into an image that
+holds Bash, `curl`, `tar` and a SHA-256 tool and nothing else. There it requires
+HTTP 200 from every page of the starter and exit status 0 from
+`putnami lint,test,build webapp`. It then requires the same from a Go starter:
+`putnami init --project api --extension go`, `putnami serve api` and
+`putnami lint,test,build api`.
+
 This guarantee is deliberately narrow. It does not promise support for every
 shell or Linux distribution, Windows on `arm64`, other architectures, offline
 installation, proxy-specific configuration, production deployment, or stable
-source details in every future generated app. Go and experimental Python
-starters remain available through their framework guides, but they are not the
-three-command golden path gated here. The checksum proves the bytes match the
+source details in every future generated app. The Go starter is gated on Linux
+only, and the experimental Python starter is not gated. The checksum proves the bytes match the
 public registry's digest; artifact signing is a separate, non-goal mechanism.
 
 Experimental Python requires an explicit workspace opt-in after initialization:

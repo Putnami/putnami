@@ -16,12 +16,14 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"go.putnami.dev/go/extension/internal/workspacejob"
 	"go.putnami.dev/go/extension/internal/workspacejob/jobtest"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/pinnedarchive"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 )
@@ -139,14 +141,23 @@ func hostPlatform() string { return runtime.GOOS + "/" + runtime.GOARCH }
 
 // shellFreeJob is a job whose PATH holds only traps: every shell and every
 // tool the former script used fails the test when started, and no go command
-// can be found, so the job has to install the one the lock pins.
+// can be found, so the job has to install the one the lock pins. Its Putnami
+// home is its own, and empty.
 func shellFreeJob(t *testing.T, ws string) (*workspacejob.Job, *jobtest.Recorder, *jobtest.Fakes) {
+	t.Helper()
+	return shellFreeJobAt(t, ws, jobtest.RealTempDir(t))
+}
+
+// shellFreeJobAt is shellFreeJob with putnamiHome as the job's Putnami home,
+// so several jobs, of one workspace or of several, share the Go installed
+// there as the jobs of one machine do.
+func shellFreeJobAt(t *testing.T, ws, putnamiHome string) (*workspacejob.Job, *jobtest.Recorder, *jobtest.Fakes) {
 	t.Helper()
 	fakes := jobtest.NewFakes(t)
 	env := append([]string{
 		"PATH=" + fakes.Dir,
 		"HOME=" + t.TempDir(),
-		"PUTNAMI_HOME=" + t.TempDir(),
+		"PUTNAMI_HOME=" + putnamiHome,
 		"PUTNAMI_GO_CACHE_DIR=" + t.TempDir(),
 	}, fakes.Environ()...)
 	rec := &jobtest.Recorder{}
@@ -161,10 +172,12 @@ func shellFreeJob(t *testing.T, ws string) (*workspacejob.Job, *jobtest.Recorder
 
 // TestResolveGoBinaryInstallsTheLockedGoWithoutAShell is the acceptance case
 // for the toolchain half of `putnami install`: with no go command anywhere,
-// the job downloads the archive the lock names, verifies its SHA-256, unpacks
-// it and links bin/go, and starts no shell, no curl, no tar and no unzip on
-// the way.
+// the job downloads the archive the lock names, verifies its SHA-256 and
+// unpacks it under the Putnami home, writes no Go into the workspace, and
+// starts no shell, no curl, no tar and no unzip on the way.
 func TestResolveGoBinaryInstallsTheLockedGoWithoutAShell(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "managed-go-is-shared",
+		"the-pinned-go-installs-under-the-putnami-home")
 	archive := hostArchive(t, goDistribution())
 	server, requests := distributionServer(t, archive, http.StatusOK)
 	ws := jobtest.RealTempDir(t)
@@ -175,12 +188,18 @@ func TestResolveGoBinaryInstallsTheLockedGoWithoutAShell(t *testing.T) {
 		"source":      server.URL + "/dl",
 	})
 
-	j, rec, fakes := shellFreeJob(t, ws)
+	putnamiHome := jobtest.RealTempDir(t)
+	j, rec, fakes := shellFreeJobAt(t, ws, putnamiHome)
 	if !j.ResolveGoBinary() {
 		t.Fatalf("ResolveGoBinary failed:\n%s", rec.Transcript())
 	}
-	stateRoot := j.ExtensionStateRoot()
-	binary := workspacejob.ManagedGoBinary(stateRoot, lockedGo)
+	// The install is where the extension manifest's putnami-home candidate
+	// looks: toolchains/go/go-<version> under the Putnami home.
+	root := filepath.Join(putnamiHome, "toolchains", "go")
+	if got := j.GoToolchainRoot(); got != root {
+		t.Fatalf("GoToolchainRoot = %q, want %q", got, root)
+	}
+	binary := filepath.Join(root, "go-"+lockedGo, "go", "bin", pkgmeta.ExecutableName(runtime.GOOS, "go"))
 	if j.GoBinary != binary {
 		t.Fatalf("GoBinary = %q, want the locked install %q", j.GoBinary, binary)
 	}
@@ -201,28 +220,22 @@ func TestResolveGoBinaryInstallsTheLockedGoWithoutAShell(t *testing.T) {
 	if got := requests.Load(); got != 1 {
 		t.Fatalf("archive requests = %d, want 1", got)
 	}
-	if !workspacejob.GoInstallComplete(lockedGo)(workspacejob.ManagedGoDir(stateRoot, lockedGo)) {
+	if !workspacejob.GoInstallComplete(lockedGo)(workspacejob.ManagedGoDir(root, lockedGo)) {
 		t.Fatal("the managed install is not complete")
 	}
-	// Windows gets no link: the toolchain resolver finds the install under
-	// libs/ there.
-	link := filepath.Join(stateRoot, "bin", pkgmeta.ExecutableName(runtime.GOOS, "go"))
-	if runtime.GOOS == "windows" {
-		if _, err := os.Lstat(link); !errors.Is(err, os.ErrNotExist) {
-			t.Fatalf("bin/go.exe exists on Windows: %v", err)
-		}
-	} else if target, err := os.Readlink(link); err != nil {
-		t.Fatalf("bin/go was not linked: %v", err)
-	} else if target != binary {
-		t.Fatalf("bin/go links to %q, want %q", target, binary)
+	// The install directory and the lock file that guards it are all the
+	// install leaves in the Putnami home, and it leaves nothing in the
+	// workspace: no Go release, and no link to one.
+	if got, want := entryNames(t, root), []string{"go-" + lockedGo, "go-" + lockedGo + ".lock"}; !slices.Equal(got, want) {
+		t.Fatalf("%s holds %v, want %v", root, got, want)
 	}
-	if staged, _ := filepath.Glob(link + ".tmp.*"); len(staged) != 0 {
-		t.Fatalf("staged links were left behind: %v", staged)
+	if _, err := os.Lstat(filepath.Join(ws, ".putnami")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("the install wrote into the workspace: %v under %s", findEntries(t, ws, "go-"+lockedGo), ws)
 	}
 
 	// A managed go runs from its own GOROOT, ahead of any other go.
 	j.SetupGoEnv("")
-	goRoot := filepath.Join(workspacejob.ManagedGoDir(stateRoot, lockedGo), "go")
+	goRoot := filepath.Join(workspacejob.ManagedGoDir(root, lockedGo), "go")
 	if got := j.Env.Get("GOROOT"); got != goRoot {
 		t.Fatalf("GOROOT = %q, want %q", got, goRoot)
 	}
@@ -231,7 +244,7 @@ func TestResolveGoBinaryInstallsTheLockedGoWithoutAShell(t *testing.T) {
 	}
 
 	// The next job finds the complete install and downloads nothing.
-	again, rec2, _ := shellFreeJob(t, ws)
+	again, rec2, _ := shellFreeJobAt(t, ws, putnamiHome)
 	if !again.ResolveGoBinary() || again.GoBinary != binary {
 		t.Fatalf("second ResolveGoBinary = %q:\n%s", again.GoBinary, rec2.Transcript())
 	}
@@ -340,7 +353,7 @@ func TestResolveGoBinaryRefusesAnUnverifiedToolchain(t *testing.T) {
 				writeLock(t, ws, tc.lock(server.URL))
 			}
 
-			j, rec, fakes := shellFreeJob(t, ws)
+			j, rec, fakes := shellFreeJobAt(t, ws, filepath.Join(parent, "home"))
 			if j.ResolveGoBinary() {
 				t.Fatalf("an unverified toolchain was accepted: %q\n%s", j.GoBinary, rec.Transcript())
 			}
@@ -352,21 +365,17 @@ func TestResolveGoBinaryRefusesAnUnverifiedToolchain(t *testing.T) {
 			if got := requests.Load(); got != tc.requests {
 				t.Errorf("archive requests = %d, want %d", got, tc.requests)
 			}
-			stateRoot := j.ExtensionStateRoot()
-			for _, version := range []string{lockedGo, "1.98.3", "1.99.0"} {
-				if _, err := os.Stat(workspacejob.ManagedGoDir(stateRoot, version)); !errors.Is(err, os.ErrNotExist) {
-					t.Errorf("a refused install left %s behind: %v", workspacejob.ManagedGoDir(stateRoot, version), err)
+			for _, root := range []string{j.GoToolchainRoot(), j.WorkspaceGoRoot()} {
+				for _, version := range []string{lockedGo, "1.98.3", "1.99.0"} {
+					if _, err := os.Stat(workspacejob.ManagedGoDir(root, version)); !errors.Is(err, os.ErrNotExist) {
+						t.Errorf("a refused install left %s behind: %v", workspacejob.ManagedGoDir(root, version), err)
+					}
 				}
-			}
-			if _, err := os.Lstat(filepath.Join(stateRoot, "bin", pkgmeta.ExecutableName(runtime.GOOS, "go"))); !errors.Is(err, os.ErrNotExist) {
-				t.Errorf("a refused install linked bin/go: %v", err)
 			}
 			// The unsafe entry resolves, from the install directory or the
 			// staging directory beside it, to "escaped" beside both; no entry of
-			// that name may appear anywhere under the test's root.
-			if _, err := os.Lstat(filepath.Join(filepath.Dir(workspacejob.ManagedGoDir(stateRoot, lockedGo)), "escaped")); !errors.Is(err, os.ErrNotExist) {
-				t.Errorf("an archive entry escaped the install directory: %v", err)
-			}
+			// that name may appear anywhere under the test's root, which holds
+			// the workspace and the Putnami home.
 			if escaped := findEntries(t, parent, "escaped"); len(escaped) != 0 {
 				t.Errorf("an archive entry escaped the install directory: %v", escaped)
 			}
@@ -445,6 +454,9 @@ func TestReadGoLock(t *testing.T) {
 		{"no version", `{"toolchains":{"go":{"integrities":{}}}}`, "", "pins no Go version"},
 		{"malformed entry", `{"toolchains":{"go":{"version":3}}}`, "", "parse toolchains.go"},
 		{"malformed lock", `{`, "", "parse "},
+		{"path in the version", `{"toolchains":{"go":{"version":"1.25.7/../../../../opt/x"}}}`, "", "not a Go release name"},
+		{"parent in the version", `{"toolchains":{"go":{"version":"../1.25.7"}}}`, "", "not a Go release name"},
+		{"suffix in the version", `{"toolchains":{"go":{"version":"1.25.7-custom"}}}`, "", "not a Go release name"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := os.WriteFile(path, []byte(tc.document), 0o644); err != nil {
@@ -465,6 +477,20 @@ func TestReadGoLock(t *testing.T) {
 	if _, err := workspacejob.ReadGoLock(filepath.Join(dir, "missing.json")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("ReadGoLock(missing) = %v", err)
 	}
+}
+
+// entryNames returns the sorted names of the entries of dir.
+func entryNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read %s: %v", dir, err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	return names
 }
 
 // findEntries returns the paths under root of the entries named name.
@@ -580,5 +606,38 @@ func TestResolveGoBinaryKeepsTheSourceCredentialsOutOfTheTranscript(t *testing.T
 				t.Error("the credentials were sent to the host a redirect led to")
 			}
 		})
+	}
+}
+
+// A lock whose Go version is not a release name installs nothing: the version
+// names a directory every workspace of the machine shares, so it must not
+// lead outside the toolchain root.
+func TestALockGoVersionThatIsNotAReleaseNameInstallsNothing(t *testing.T) {
+	for _, version := range []string{"1.24.0/../../../x", "../1.25.7", "1.25.7/x", "", "1.25.7-custom"} {
+		archive := hostArchive(t, goDistribution())
+		server, requests := distributionServer(t, archive, http.StatusOK)
+		ws := jobtest.RealTempDir(t)
+		writeLock(t, ws, map[string]any{
+			"version":     version,
+			"integrities": map[string]string{hostPlatform(): digest(archive)},
+			"source":      server.URL + "/dl",
+		})
+		putnamiHome := jobtest.RealTempDir(t)
+		j, rec, _ := shellFreeJobAt(t, ws, putnamiHome)
+		if j.ResolveGoBinary() {
+			t.Fatalf("version %q: ResolveGoBinary succeeded:\n%s", version, rec.Transcript())
+		}
+		if got := requests.Load(); got != 0 {
+			t.Fatalf("version %q: %d download request(s), want none", version, got)
+		}
+		entries, _ := os.ReadDir(putnamiHome)
+		if len(entries) != 0 {
+			t.Fatalf("version %q: the Putnami home holds %v, want nothing", version, entries)
+		}
+	}
+	for _, version := range []string{"1.25.7", "1.26", "1.26rc1", "1.26beta2"} {
+		if !workspacejob.IsPlainGoRelease(version) {
+			t.Errorf("IsPlainGoRelease(%q) = false, want true", version)
+		}
 	}
 }

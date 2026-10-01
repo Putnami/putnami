@@ -13,14 +13,19 @@ import (
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/typescript/extension/internal/errs"
+	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
-// failBunResolution forces resolveBunBin to error for the duration of a test.
+// failBunResolution forces resolveBunBin and provisionBunBin to error for the
+// duration of a test.
 func failBunResolution(t *testing.T) {
 	t.Helper()
-	orig := resolveBunBin
-	t.Cleanup(func() { resolveBunBin = orig })
+	orig, origProvision := resolveBunBin, provisionBunBin
+	t.Cleanup(func() { resolveBunBin, provisionBunBin = orig, origProvision })
 	resolveBunBin = func() (string, error) { return "", errors.New("bun not found") }
+	provisionBunBin = func(*pctx.Context, *jsonl.Emitter, toolchain.BunMode, func(string) string) (string, error) {
+		return "", errors.New("bun not found")
+	}
 }
 
 // setupTranspileProject creates a project whose package.json exposes a real

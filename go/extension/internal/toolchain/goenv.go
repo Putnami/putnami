@@ -518,7 +518,7 @@ func managedGoRootOn(goos, goBinary string, env []string) string {
 }
 
 // isManagedGoInstall reports whether binary is the go command, named
-// binaryName, of a Go release `putnami install` manages under workspaceRoot:
+// binaryName, of a Go release installed inside workspaceRoot:
 // libs/go-<version>/go/bin/<binaryName>.
 func isManagedGoInstall(workspaceRoot, binary, binaryName string) bool {
 	rel, err := filepath.Rel(managedGoLibs(workspaceRoot), binary)

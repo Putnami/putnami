@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/registrycred"
+	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
 const unitFetchBearer = "pkt_unit_fetch_bearer"
@@ -637,9 +638,11 @@ func TestRunWorkspaceFetch_RunsNoBunFromTheWorkspace(t *testing.T) {
 		"workspace-fetch-runs-no-bun-from-the-workspace")
 	ctx := fetchUnitWorkspace(t)
 	committed := filepath.Join(ctx.WorkspaceRoot, "node_modules", ".bin", "bun")
-	orig := resolveBunBin
-	t.Cleanup(func() { resolveBunBin = orig })
-	resolveBunBin = func() (string, error) { return committed, nil }
+	orig := provisionBunBin
+	t.Cleanup(func() { provisionBunBin = orig })
+	provisionBunBin = func(*pctx.Context, *jsonl.Emitter, toolchain.BunMode, func(string) string) (string, error) {
+		return committed, nil
+	}
 	var events []string
 	handCredential(t, nil, &events)
 	mockAllExec(t, func(_ string, args []string, _ ...exec.Option) (*exec.Result, error) {

@@ -460,6 +460,47 @@ func TestInstallReplacesAnIncompleteDestinationAndStaleStaging(t *testing.T) {
 	}
 }
 
+// A destination can have a writer that does not take the install lock. When
+// that writer publishes a complete destination while Install downloads, the
+// destination is kept as published, since programs may already run from it,
+// and Install reports that it installed nothing.
+func TestInstallKeepsADestinationPublishedDuringTheDownload(t *testing.T) {
+	data := tarGzArchive(t, goLayout()...)
+	parent := t.TempDir()
+	dest := filepath.Join(parent, "go-1.99.0")
+	marker := filepath.Join(dest, "go", "published-by-another-writer")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// The other writer publishes the whole directory with one rename.
+		other := filepath.Join(parent, ".stage.other")
+		if err := os.MkdirAll(filepath.Join(other, "go", "bin"), 0o755); err != nil {
+			t.Error(err)
+		}
+		if err := os.WriteFile(filepath.Join(other, "go", "bin", "go"), []byte("#!/bin/sh\necho go\n"), 0o755); err != nil {
+			t.Error(err)
+		}
+		if err := os.WriteFile(filepath.Join(other, "go", filepath.Base(marker)), nil, 0o644); err != nil {
+			t.Error(err)
+		}
+		if err := os.Rename(other, dest); err != nil {
+			t.Error(err)
+		}
+		_, _ = w.Write(data)
+	}))
+	t.Cleanup(server.Close)
+
+	installed, err := Install(context.Background(), Pin{URL: server.URL, SHA256: sha(data), Format: TarGz}, dest,
+		Options{Complete: goComplete})
+	if err != nil || installed {
+		t.Fatalf("Install = (%v, %v), want (false, nil): the destination is another writer's", installed, err)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("the destination another writer published was replaced: %v", err)
+	}
+	if names := siblings(t, parent); len(names) != 2 {
+		t.Fatalf("siblings after install = %v, want the destination and its lock", names)
+	}
+}
+
 func TestConcurrentInstallersDownloadOnce(t *testing.T) {
 	data := tarGzArchive(t, goLayout()...)
 	server, requests := archiveServer(t, data)
@@ -554,5 +595,160 @@ func TestInstallRefusesInvalidPins(t *testing.T) {
 	_, err := Install(context.Background(), Pin{URL: server.URL, SHA256: digest, Format: TarGz}, filepath.Join(t.TempDir(), "go"), Options{})
 	if err == nil || !strings.Contains(err.Error(), "HTTP 404") {
 		t.Fatalf("Install from a 404: err = %v, want HTTP 404", err)
+	}
+}
+
+// An archive that nests its content under a directory of its own is shaped by
+// Prepare before Complete judges it, so the published destination holds the
+// install layout and never the archive's.
+func TestInstallPreparesTheStagingDirectoryBeforeItIsJudged(t *testing.T) {
+	data := zipArchive(t,
+		archiveEntry{name: "bun-linux-x64/", typeflag: tar.TypeDir, mode: 0o755},
+		archiveEntry{name: "bun-linux-x64/bun", body: "#!/bin/sh\necho bun\n", mode: 0o755},
+	)
+	server, _ := archiveServer(t, data)
+	parent := t.TempDir()
+	dest := filepath.Join(parent, "bun-1.99.0")
+	complete := func(dir string) bool {
+		info, err := os.Stat(filepath.Join(dir, "bin", "bun"))
+		return err == nil && info.Mode().IsRegular()
+	}
+	var prepared []string
+	prepare := func(stage string) error {
+		prepared = append(prepared, stage)
+		if err := os.Rename(filepath.Join(stage, "bun-linux-x64"), filepath.Join(stage, "bin")); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	installed, err := Install(context.Background(), Pin{URL: server.URL, SHA256: sha(data), Format: Zip}, dest,
+		Options{Complete: complete, Prepare: prepare})
+	if err != nil || !installed {
+		t.Fatalf("Install = (%v, %v), want (true, nil)", installed, err)
+	}
+	if len(prepared) != 1 || filepath.Dir(prepared[0]) != parent || prepared[0] == dest {
+		t.Fatalf("Prepare ran on %v, want once on a staging directory beside %s", prepared, dest)
+	}
+	if !complete(dest) {
+		t.Fatalf("%s does not hold bin/bun", dest)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "bun-linux-x64")); !os.IsNotExist(err) {
+		t.Fatalf("the archive's own directory was published (stat error %v)", err)
+	}
+
+	// A complete destination is returned as is: Prepare shapes an extraction,
+	// never an install.
+	installed, err = Install(context.Background(), Pin{URL: server.URL, SHA256: sha(data), Format: Zip}, dest,
+		Options{Complete: complete, Prepare: prepare})
+	if err != nil || installed || len(prepared) != 1 {
+		t.Fatalf("second Install = (%v, %v) after %d Prepare calls, want (false, nil) and one call", installed, err, len(prepared))
+	}
+}
+
+// A Prepare that fails refuses the install: nothing is published and no
+// staging directory is left beside the destination.
+func TestInstallPublishesNothingWhenPrepareFails(t *testing.T) {
+	data := zipArchive(t, archiveEntry{name: "bun-linux-x64/bun", body: "bun", mode: 0o755})
+	server, _ := archiveServer(t, data)
+	parent := t.TempDir()
+	dest := filepath.Join(parent, "bun-1.99.0")
+	refusal := errors.New("the archive holds no bun")
+
+	installed, err := Install(context.Background(), Pin{URL: server.URL, SHA256: sha(data), Format: Zip}, dest,
+		Options{Prepare: func(string) error { return refusal }})
+	if installed || !errors.Is(err, ErrIncomplete) || !errors.Is(err, refusal) {
+		t.Fatalf("Install = (%v, %v), want ErrIncomplete wrapping the Prepare error", installed, err)
+	}
+	if names := siblings(t, parent); len(names) != 1 || names[0] != "bun-1.99.0.lock" {
+		t.Fatalf("siblings after the refusal = %v, want the lock file only", names)
+	}
+}
+
+// A pin whose URL carries userinfo is downloaded with it as basic
+// authentication, and the pin WithoutCredentials returns no longer names it:
+// neither a caller's log line nor an error of Install can repeat the secret.
+// The credentials go to the URL's scheme and host only, a redirect elsewhere
+// gets none.
+func TestWithoutCredentialsKeepsTheUserinfoOutOfThePinAndOffOtherHosts(t *testing.T) {
+	const user, secret = "mirror-user", "s3cr3t-token"
+	data := zipArchive(t, archiveEntry{name: "bin/bun", body: "bun", mode: 0o755})
+
+	var elsewhereAuthorized atomic.Bool
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			elsewhereAuthorized.Store(true)
+		}
+		_, _ = w.Write(data)
+	}))
+	t.Cleanup(elsewhere.Close)
+
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotUser, gotSecret, ok := r.BasicAuth()
+		if !ok || gotUser != user || gotSecret != secret {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if r.URL.Path == "/redirect.zip" {
+			http.Redirect(w, r, elsewhere.URL+"/bun.zip", http.StatusFound)
+			return
+		}
+		_, _ = w.Write(data)
+	}))
+	t.Cleanup(origin.Close)
+	host := strings.TrimPrefix(origin.URL, "http://")
+
+	pin, client, err := WithoutCredentials(Pin{URL: "http://" + user + ":" + secret + "@" + host + "/bun.zip", SHA256: sha(data), Format: Zip})
+	if err != nil || client == nil {
+		t.Fatalf("WithoutCredentials = (%v, %v), want a client", client, err)
+	}
+	if pin.URL != origin.URL+"/bun.zip" {
+		t.Fatalf("pin.URL = %q, want %q", pin.URL, origin.URL+"/bun.zip")
+	}
+	dest := filepath.Join(t.TempDir(), "bun-1.99.0")
+	if installed, err := Install(context.Background(), pin, dest, Options{Client: client}); err != nil || !installed {
+		t.Fatalf("Install with the credentials = (%v, %v), want (true, nil)", installed, err)
+	}
+
+	// A wrong password is refused by the origin; the error names the URL
+	// without it.
+	wrong, wrongClient, err := WithoutCredentials(Pin{URL: "http://" + user + ":wrong-" + secret + "@" + host + "/bun.zip", SHA256: sha(data), Format: Zip})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Install(context.Background(), wrong, filepath.Join(t.TempDir(), "bun-1.99.0"), Options{Client: wrongClient})
+	if err == nil || strings.Contains(err.Error(), secret) || strings.Contains(err.Error(), user) {
+		t.Fatalf("Install with a refused password: err = %v, want an error that names no credential", err)
+	}
+
+	// The redirect target is another host: it gets no Authorization header.
+	redirected, redirectClient, err := WithoutCredentials(Pin{URL: "http://" + user + ":" + secret + "@" + host + "/redirect.zip", SHA256: sha(data), Format: Zip})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if installed, err := Install(context.Background(), redirected, filepath.Join(t.TempDir(), "bun-1.99.0"), Options{Client: redirectClient}); err != nil || !installed {
+		t.Fatalf("Install through a redirect = (%v, %v), want (true, nil)", installed, err)
+	}
+	if elsewhereAuthorized.Load() {
+		t.Fatal("the credentials were sent to the host a redirect led to")
+	}
+}
+
+// A URL without userinfo keeps the default client, and one that does not
+// parse is refused without being repeated, since it may hold credentials.
+func TestWithoutCredentialsLeavesAPlainPinAndRefusesAnUnparsableOne(t *testing.T) {
+	plain := Pin{URL: "https://example.test/bun.zip", SHA256: strings.Repeat("a", 64), Format: Zip}
+	pin, client, err := WithoutCredentials(plain)
+	if err != nil || client != nil || pin != plain {
+		t.Fatalf("WithoutCredentials(plain) = (%+v, %v, %v), want the pin unchanged and no client", pin, client, err)
+	}
+
+	const secret = "s3cr3t-token"
+	pin, client, err = WithoutCredentials(Pin{URL: "https://user:" + secret + "@exa mple.test/%zz", SHA256: strings.Repeat("a", 64), Format: Zip})
+	if err == nil || client != nil || pin != (Pin{}) {
+		t.Fatalf("WithoutCredentials(unparsable) = (%+v, %v, %v), want an error and nothing else", pin, client, err)
+	}
+	if strings.Contains(err.Error(), secret) {
+		t.Fatalf("the error repeats the URL: %v", err)
 	}
 }

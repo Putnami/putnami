@@ -217,6 +217,22 @@
           }
         },
         {
+          "id": "no-node-on-the-host",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "lint-starts-the-native-biome-of-the-platform-package",
+              "a-musl-host-starts-the-musl-biome",
+              "a-missing-platform-package-starts-the-launcher-with-bun",
+              "lint-test-build-and-serve-run-with-no-node-on-path"
+            ]
+          }
+        },
+        {
           "id": "workspace-biome-default",
           "stage": "coded",
           "evidenceKinds": [
@@ -244,6 +260,30 @@
               "a-fresh-workspace-declares-the-bun-it-installs-with",
               "an-existing-package-manager-is-kept",
               "a-bun-that-is-not-a-release-is-not-declared"
+            ]
+          }
+        },
+        {
+          "id": "bun-under-the-putnami-home",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-refused-archive-leaves-no-bun-on-disk",
+              "a-matching-bun-on-path-starts-no-download",
+              "a-pinned-release-is-installed-when-the-path-bun-differs",
+              "no-network-and-no-bun-fails-with-one-message",
+              "windows-installs-from-the-windows-archive",
+              "nothing-declared-installs-the-default-release",
+              "two-workspaces-leave-one-install",
+              "a-hosted-run-installs-no-bun",
+              "an-installed-bun-keeps-its-files-under-its-install",
+              "the-install-is-a-task-runtime-candidate",
+              "workspace-install-runs-the-bun-it-installed",
+              "hosted-jobs-download-no-bun"
             ]
           }
         },

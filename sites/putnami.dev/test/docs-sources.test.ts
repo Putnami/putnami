@@ -107,18 +107,28 @@ describe('published documentation sources', () => {
 describe('public install to serve golden path', () => {
   const commands = [
     'curl -fsSL https://putnami.dev/install.sh | bash',
+    'export PATH="$HOME/.putnami/bin:$PATH"',
     'putnami init --project webapp --extension ts',
     'putnami serve webapp',
   ].join('\n');
 
+  /** The first fenced `bash` block of a markdown document: the block a reader pastes. */
+  function firstBashBlock(markdown: string): string {
+    return /```bash\n([\s\S]*?)\n```/.exec(markdown)?.[1] ?? '';
+  }
+
   it('keeps the root and public getting-started commands identical', () => {
     const rootReadme = readFileSync(joinPath(WORKSPACE_ROOT, 'README.md'), 'utf8');
     const gettingStarted = readFileSync(joinPath(PROJECT_ROOT, 'doc/01-getting-started/index.md'), 'utf8');
-    expect(rootReadme).toContain(commands);
-    expect(gettingStarted).toContain(commands);
+    expect(firstBashBlock(rootReadme)).toBe(commands);
+    expect(firstBashBlock(gettingStarted)).toBe(commands);
     expect(gettingStarted).toContain('macOS and Linux, on `amd64` or `arm64`');
-    expect(rootReadme).toContain('Bun v1.4.0 or later');
-    expect(gettingStarted).toContain('Bun v1.4.0');
+    // Bun is not a prerequisite: Putnami installs it under the Putnami home.
+    for (const document of [rootReadme, gettingStarted]) {
+      expect(document).not.toMatch(/Bun v\d/);
+      expect(document).toContain('installs Bun');
+    }
+    expect(gettingStarted).toContain('~/.putnami/toolchains/bun/bun-<version>/bin/bun');
     expect(gettingStarted).toContain('https://npm.putnami.dev');
     expect(gettingStarted).toContain('.npmrc');
     expect(gettingStarted).toContain('This guarantee is deliberately narrow');
@@ -127,7 +137,7 @@ describe('public install to serve golden path', () => {
   it('shows the same init and serve argv in the homepage and web-app guide', () => {
     const hero = readFileSync(joinPath(PROJECT_ROOT, 'src/components/hero-terminal.tsx'), 'utf8');
     const guide = readFileSync(joinPath(PROJECT_ROOT, 'doc/03-how-to/01-build-a-web-app.md'), 'utf8');
-    for (const command of commands.split('\n').slice(1)) {
+    for (const command of commands.split('\n').filter((line) => line.startsWith('putnami '))) {
       expect(hero).toContain(command);
       expect(guide).toContain(command);
     }

@@ -5,7 +5,9 @@
 //     the warm declaration mirror introduced with the warm mirror. Per-worktree, written by
 //     this extension, meaningless to anyone else.
 //   - Bun's machine-global PACKAGE cache: downloaded tarballs, extracted package
-//     trees and registry metadata, shared by every repository on the host.
+//     trees and registry metadata, shared by every repository on the host. A
+//     Bun release that Putnami installed under the Putnami home keeps its own
+//     package cache under its install, and gc bounds each of those too.
 //
 // Core now knows only that this extension declares the reserved `cache-clean`
 // and `cache-gc` commands.
@@ -31,6 +33,7 @@ import (
 	"time"
 
 	"go.putnami.dev/sdk/extension/cachepolicy"
+	"go.putnami.dev/sdk/extension/putnamihome"
 )
 
 const (
@@ -69,6 +72,12 @@ const (
 	// extensionCacheRootEnv is the generic per-extension machine root the C5
 	// contract provides. Used only when Bun's own location cannot be resolved.
 	extensionCacheRootEnv = "PUTNAMI_EXTENSION_CACHE_ROOT"
+
+	// workspaceRootEnv names the workspace root, under which the Putnami home
+	// is when the environment names none.
+	workspaceRootEnv = "PUTNAMI_WORKSPACE_ROOT"
+	// bunToolchainName names Bun in the toolchains subtree of a Putnami home.
+	bunToolchainName = "bun"
 )
 
 // Run executes one cache phase and writes the freed-bytes summary event to out.
@@ -87,7 +96,14 @@ func Run(phase, scratchRoot string, getenv func(string) string, out io.Writer) e
 		if scratchRoot != "" {
 			freed += gcScratch(filepath.Join(scratchRoot, scratchSubdir), resolveScratchGrace(getenv))
 		}
-		freed += gcBunCache(resolveBunCacheRoot(getenv), resolveBunOptions(getenv))
+		opts := resolveBunOptions(getenv)
+		primary := resolveBunCacheRoot(getenv)
+		freed += gcBunCache(primary, opts)
+		for _, root := range installedBunCacheRoots(getenv) {
+			if root != primary {
+				freed += gcBunCache(root, opts)
+			}
+		}
 	}
 	return cachepolicy.WriteSummary(out, freed)
 }
@@ -152,6 +168,36 @@ func resolveBunCacheRoot(getenv func(string) string) string {
 		return filepath.Join(extensionCache, "bun")
 	}
 	return ""
+}
+
+// installedBunCacheRoots returns the package cache of every Bun release that
+// Putnami installed under the Putnami home, in name order.
+//
+// Such a Bun runs with BUN_INSTALL set to its install directory,
+// toolchains/bun/bun-<version>, and keeps its package cache at install/cache in
+// it unless one of the cache overrides names another directory. Each of those
+// caches is bounded like Bun's native one, with the same budget and grace.
+func installedBunCacheRoots(getenv func(string) string) []string {
+	if getenv == nil {
+		return nil
+	}
+	workspaceRoot := strings.TrimSpace(getenv(workspaceRootEnv))
+	if workspaceRoot == "" && putnamihome.Resolve(getenv) == "" {
+		return nil
+	}
+	toolchains := putnamihome.ToolchainRoot(getenv, workspaceRoot, bunToolchainName)
+	entries, err := os.ReadDir(toolchains)
+	if err != nil {
+		return nil
+	}
+	var roots []string
+	for _, entry := range entries {
+		install := filepath.Join(toolchains, entry.Name())
+		if entry.IsDir() && putnamihome.IsToolchainInstall(install, bunToolchainName) {
+			roots = append(roots, filepath.Join(install, "install", "cache"))
+		}
+	}
+	return roots
 }
 
 func resolveScratchGrace(getenv func(string) string) time.Duration {

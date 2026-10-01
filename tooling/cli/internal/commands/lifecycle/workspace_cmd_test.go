@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -255,6 +256,90 @@ func TestWorkspaceInitRecordsToolchainPinsAfterItsLastInstall(t *testing.T) {
 				t.Fatalf("init did not finish:\n%s", output)
 			}
 		})
+	}
+}
+
+// TestWorkspaceInitListsTheProjectOnce: the project create that init runs lists
+// the project in the workspace config. Init then lists it once, in the config
+// and in the root package.json workspaces, and that holds when the dependency
+// install that follows fails and leaves the files as init wrote them.
+func TestWorkspaceInitListsTheProjectOnce(t *testing.T) {
+	spectest.Proves(t, "cli/first-use-path", "init-lists-members-once", "init-lists-the-created-project-once")
+	dir := t.TempDir()
+	failure := stubWorkspaceInitStages(t, "dependencies", 2)
+	t.Chdir(dir)
+	createInitProject = func(_ context.Context, wsRoot string, _ *wsproto.Config, _ []string, _ bool, _ LifecycleEnv) error {
+		// What the project create leaves: the project on disk, and listed in
+		// the workspace config.
+		if err := os.MkdirAll(filepath.Join(wsRoot, "webapp"), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(wsRoot, "webapp", "package.json"), []byte(`{"name":"webapp"}`), 0o644); err != nil {
+			return err
+		}
+		return updateConfigMembership(wsRoot, nil, []string{"webapp"})
+	}
+
+	_, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), "", []string{"--workspace", "test-ws", "--project", "webapp", "--extension", "ts"}, LifecycleEnv{})
+	})
+	if !errors.Is(err, failure) {
+		t.Fatalf("WorkspaceInit = %v, want the failure of the dependency install after the project create", err)
+	}
+
+	var manifest struct {
+		Workspaces []string `json:"workspaces"`
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(manifest.Workspaces, []string{"webapp"}) {
+		t.Errorf("package.json workspaces = %v, want webapp once", manifest.Workspaces)
+	}
+	if includes := wsproto.Load(dir).Includes; !slices.Equal(includes, []string{"webapp"}) {
+		t.Errorf("workspace includes = %v, want webapp once", includes)
+	}
+}
+
+// TestWorkspaceInitWritesAnEmptyWorkspacesList: a workspace whose projects hold
+// no package.json, such as one created for Go, gets an empty workspaces array
+// in its root package.json, never null.
+func TestWorkspaceInitWritesAnEmptyWorkspacesList(t *testing.T) {
+	spectest.Proves(t, "cli/first-use-path", "init-lists-members-once", "init-writes-an-empty-workspaces-list-not-null")
+	dir := t.TempDir()
+	stubWorkspaceInitStages(t, "", 0)
+	t.Chdir(dir)
+	createInitProject = func(_ context.Context, wsRoot string, _ *wsproto.Config, _ []string, _ bool, _ LifecycleEnv) error {
+		if err := os.MkdirAll(filepath.Join(wsRoot, "api"), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(wsRoot, "api", "go.mod"), []byte("module example.test/api\n"), 0o644); err != nil {
+			return err
+		}
+		return updateConfigMembership(wsRoot, nil, []string{"api"})
+	}
+
+	output, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), "", []string{"--workspace", "test-ws", "--project", "api", "--extension", "go"}, LifecycleEnv{})
+	})
+	if err != nil {
+		t.Fatalf("WorkspaceInit: %v\n%s", err, output)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest map[string]json.RawMessage
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if got := string(manifest["workspaces"]); got != "[]" {
+		t.Errorf("package.json workspaces = %s, want []\n%s", got, data)
 	}
 }
 

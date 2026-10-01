@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -468,8 +469,7 @@ func initializeProject(
 	}
 
 	wsCfg = wsproto.Load(cwd)
-	projects := append(wsCfg.Includes, projectPath) //nolint:gocritic // intentionally creating new slice
-	sort.Strings(projects)
+	projects := membersWith(wsCfg.Includes, projectPath)
 	if err := updateConfigMembership(cwd, nil, projects); err != nil {
 		return protocolcli.WithNext(
 			fmt.Errorf("register project %s in workspace config: %w", flags.project, err),
@@ -488,6 +488,15 @@ func initializeProject(
 		)
 	}
 	return nil
+}
+
+// membersWith returns the sorted members of a workspace with projectPath among
+// them, each listed once. The project create that precedes it already lists the
+// project in the workspace config, so projectPath is usually a member already.
+func membersWith(members []string, projectPath string) []string {
+	projects := append(slices.Clone(members), projectPath)
+	slices.Sort(projects)
+	return slices.Compact(projects)
 }
 
 // installInitAgentContent installs the extension the starter opts into, on
@@ -618,7 +627,8 @@ func readWorkspaceConfigAt(dir string) *wsproto.Config {
 }
 
 // scaffoldPackageJSONWorkspaces writes the root package.json "workspaces" array
-// for a workspace `putnami init` just created.
+// for a workspace `putnami init` just created: the sorted projects that hold a
+// package.json, each once, and an empty array when there is none.
 //
 // This is a SCAFFOLDING write, and it is the only npm-shaped manifest edit left
 // in core. It survives slice C4b's deletion of the workspaces-array writer from
@@ -637,15 +647,18 @@ func scaffoldPackageJSONWorkspaces(wsRoot string, projects []string) error {
 		return err
 	}
 
-	// Filter to projects that have a package.json (TS/JS projects).
-	var workspaces []string
+	// Filter to projects that have a package.json (TS/JS projects). The list
+	// is never nil: a workspace with no such project gets an empty array, which
+	// is the value every reader of the field accepts, and not null.
+	workspaces := []string{}
 	for _, p := range projects {
 		projPkgPath := filepath.Join(wsRoot, p, "package.json")
 		if _, err := os.Stat(projPkgPath); err == nil {
 			workspaces = append(workspaces, p)
 		}
 	}
-	sort.Strings(workspaces)
+	slices.Sort(workspaces)
+	workspaces = slices.Compact(workspaces)
 
 	raw.Set("workspaces", workspaces)
 	return jsonutil.WriteFile(pkgPath, raw)
