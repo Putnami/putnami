@@ -195,6 +195,7 @@ The protocol packages live in [`protocols`](https://github.com/putnami/putnami/t
 Next:
 
 - [Support status](/docs/support) — what each package and protocol publicly commits to
+- [What is free](/docs/concepts/what-is-free)
 - [CLI telemetry and your rights](/docs/concepts/cli-telemetry)
 - [Remote cache trust](/docs/concepts/remote-cache-trust)
 - [Getting Started](/docs/getting-started)
