@@ -11,8 +11,9 @@
 > It is polyglot by design: Go and TypeScript ship today, and every boundary
 > between languages is a tested contract.
 
-**Status:** 0.2.0, released 2026-10-01, is the first public release, after 11
-months of private development. The repository history starts at that release.
+**Status:** 0.2.0, released 2026-10-01, is the first public release, after
+years of private development and use. The repository history starts at that
+release.
 A failure in the [supported core](#supported-core) is a bug, and we fix it:
 [report it](https://github.com/putnami/putnami/issues/new?template=bug_report.md).
 This repository is free, and stays free. See [What is free](#what-is-free).
