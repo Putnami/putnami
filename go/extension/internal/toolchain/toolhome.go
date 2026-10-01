@@ -50,11 +50,8 @@ func ResolveGoToolHomeRoot(lookup func(string) string) string {
 	if lookup == nil {
 		return ""
 	}
-	if putnamiHome := strings.TrimSpace(lookup(PutnamiHomeEnv)); putnamiHome != "" {
+	if putnamiHome := ResolvePutnamiHome(lookup); putnamiHome != "" {
 		return filepath.Join(putnamiHome, GoToolHomeDirName, GoToolHomeEcosystem)
-	}
-	if home := strings.TrimSpace(lookup(homeEnvName())); home != "" {
-		return filepath.Join(home, ".putnami", GoToolHomeDirName, GoToolHomeEcosystem)
 	}
 	if extensionCache := strings.TrimSpace(lookup(ExtensionCacheRootEnv)); extensionCache != "" {
 		return filepath.Join(extensionCache, GoToolHomeEcosystem, GoToolHomeDirName)

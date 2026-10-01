@@ -691,6 +691,23 @@
               "build-tidy-keys-on-the-offline-signal"
             ]
           }
+        },
+        {
+          "id": "managed-go-is-shared",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-pinned-go-installs-under-the-putnami-home",
+              "a-second-workspace-downloads-nothing",
+              "installs-that-start-together-leave-one-complete-install",
+              "a-go-inside-the-workspace-runs-without-a-download",
+              "workspace-fetch-runs-no-managed-go-inside-the-workspace"
+            ]
+          }
         }
       ]
     }

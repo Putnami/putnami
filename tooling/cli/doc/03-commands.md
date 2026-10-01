@@ -1294,8 +1294,8 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
   fails the install: run `putnami install` without the flag and commit the
   lock.
 - **Toolchains come from outside the workspace.** With the flag, the CLI starts
-  no toolchain candidate that resolves inside the workspace, such as the Go
-  release the Go extension installs under `.putnami/extensions`, and no step
+  no toolchain candidate that resolves inside the workspace, such as a Go
+  release the workspace holds under `.putnami/extensions`, and no step
   installs one. The runner provides the pinned Go and bun on its `PATH`, in
   `GOROOT`, or in the Putnami home.
 - **No process starts with the credential after repository code.** Once a

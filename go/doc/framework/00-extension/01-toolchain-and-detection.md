@@ -24,7 +24,8 @@ The extension resolves Go in this order:
 1. workspace `go.work` directive
 2. project `go.mod` directive
 3. compatible Go from `PATH`
-4. managed download under `.putnami/extensions/@putnami-go/`
+4. managed install under `~/.putnami/toolchains/go/go-<version>/`, shared by
+   every workspace of the machine
 5. latest stable Go when no version is pinned
 
 `GOCACHE` and `GOMODCACHE` are shared at `~/.putnami/cache/go` across every

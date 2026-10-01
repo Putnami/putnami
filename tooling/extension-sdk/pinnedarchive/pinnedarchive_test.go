@@ -460,6 +460,47 @@ func TestInstallReplacesAnIncompleteDestinationAndStaleStaging(t *testing.T) {
 	}
 }
 
+// A destination can have a writer that does not take the install lock. When
+// that writer publishes a complete destination while Install downloads, the
+// destination is kept as published, since programs may already run from it,
+// and Install reports that it installed nothing.
+func TestInstallKeepsADestinationPublishedDuringTheDownload(t *testing.T) {
+	data := tarGzArchive(t, goLayout()...)
+	parent := t.TempDir()
+	dest := filepath.Join(parent, "go-1.99.0")
+	marker := filepath.Join(dest, "go", "published-by-another-writer")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// The other writer publishes the whole directory with one rename.
+		other := filepath.Join(parent, ".stage.other")
+		if err := os.MkdirAll(filepath.Join(other, "go", "bin"), 0o755); err != nil {
+			t.Error(err)
+		}
+		if err := os.WriteFile(filepath.Join(other, "go", "bin", "go"), []byte("#!/bin/sh\necho go\n"), 0o755); err != nil {
+			t.Error(err)
+		}
+		if err := os.WriteFile(filepath.Join(other, "go", filepath.Base(marker)), nil, 0o644); err != nil {
+			t.Error(err)
+		}
+		if err := os.Rename(other, dest); err != nil {
+			t.Error(err)
+		}
+		_, _ = w.Write(data)
+	}))
+	t.Cleanup(server.Close)
+
+	installed, err := Install(context.Background(), Pin{URL: server.URL, SHA256: sha(data), Format: TarGz}, dest,
+		Options{Complete: goComplete})
+	if err != nil || installed {
+		t.Fatalf("Install = (%v, %v), want (false, nil): the destination is another writer's", installed, err)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("the destination another writer published was replaced: %v", err)
+	}
+	if names := siblings(t, parent); len(names) != 2 {
+		t.Fatalf("siblings after install = %v, want the destination and its lock", names)
+	}
+}
+
 func TestConcurrentInstallersDownloadOnce(t *testing.T) {
 	data := tarGzArchive(t, goLayout()...)
 	server, requests := archiveServer(t, data)

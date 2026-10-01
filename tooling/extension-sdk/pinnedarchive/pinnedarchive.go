@@ -17,6 +17,12 @@
 // exclusive filelock lock on "<dest>.lock", which is never removed. A reader
 // that does not take the lock sees either no destination or a complete one,
 // because the destination only ever appears through the final rename.
+//
+// A destination may have a writer that does not take the lock, such as a
+// bootstrap script that publishes the same directory. Install removes only a
+// destination that is not a complete install: one such a writer publishes
+// while Install downloads and extracts is kept, and Install reports that it
+// installed nothing.
 package pinnedarchive
 
 import (
@@ -121,7 +127,8 @@ const DefaultTimeout = 10 * time.Minute
 
 // Install makes dest hold the content of the archive pin names and reports
 // whether this call installed it. A complete dest is returned as is, without
-// any network access. dest's parent directory is created when missing.
+// any network access, and one that becomes complete before this call
+// publishes is kept. dest's parent directory is created when missing.
 func Install(ctx context.Context, pin Pin, dest string, opts Options) (installed bool, err error) {
 	digest, err := checkPin(pin)
 	if err != nil {
@@ -183,6 +190,11 @@ func Install(ctx context.Context, pin Pin, dest string, opts Options) (installed
 		return false, fmt.Errorf("%w: %s", ErrIncomplete, pin.URL)
 	}
 
+	// A writer that does not take the lock may have published dest since the
+	// check above. Programs may already run from a complete dest, so it is kept.
+	if complete(dest) {
+		return false, nil
+	}
 	if _, statErr := os.Lstat(dest); statErr == nil {
 		if err := os.RemoveAll(dest); err != nil {
 			return false, fmt.Errorf("remove the incomplete %s: %w", dest, err)

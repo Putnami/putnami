@@ -105,8 +105,14 @@ func goInstallComplete(version string) func(dir string) bool {
 
 // installLockedGo installs the Go release the workspace lock pins and returns
 // its go command. The archive is downloaded only when its SHA-256 is pinned
-// for this platform, and it is refused unless it matches, so a managed Go is
-// always the exact bytes the lock names.
+// for this platform, and it is refused unless it matches, so the Go this job
+// installs is always the exact bytes the lock names.
+//
+// The release is installed under GoToolchainRoot, once for every workspace of
+// the machine that pins it: a complete install there is returned without a
+// download, and installers that start together, from one workspace or from
+// several, exclude each other on the lock file beside the install directory,
+// so one of them downloads and the others return its install.
 //
 // The release is the lock's, not the workspace's requested minimum: it must
 // satisfy the request, and a lock that pins an older release is refused.
@@ -134,22 +140,25 @@ func (j *Job) installLockedGo(requested string) (string, bool) {
 		return "", false
 	}
 
-	dest := managedGoDir(j.ExtensionStateRoot(), version)
-	binary := managedGoBinary(j.ExtensionStateRoot(), version)
+	root := j.GoToolchainRoot()
+	dest := managedGoDir(root, version)
+	binary := managedGoBinary(root, version)
 	complete := goInstallComplete(version)
 	if complete(dest) {
 		return binary, true
 	}
 
 	j.Emit.Log("info", "Installing Go "+version+"...")
-	if !j.downloadGo(lock, dest, complete) {
+	if !j.downloadGo(lock, dest, binary, complete) {
 		j.Emit.Diagnostic("error", "Failed to install Go "+version+".", "", 0)
 		return "", false
 	}
 	return binary, true
 }
 
-func (j *Job) downloadGo(lock GoLock, dest string, complete func(string) bool) bool {
+// downloadGo makes dest hold the Go release lock pins, whose go command is
+// binary, and reports whether it does. It emits the reason when it does not.
+func (j *Job) downloadGo(lock GoLock, dest, binary string, complete func(string) bool) bool {
 	pin := GoArchivePin(lock, runtime.GOOS, runtime.GOARCH)
 	platform := runtime.GOOS + "/" + runtime.GOARCH
 	if strings.TrimSpace(pin.SHA256) == "" {
@@ -176,7 +185,6 @@ func (j *Job) downloadGo(lock GoLock, dest string, complete func(string) bool) b
 	j.trap.check()
 	switch {
 	case err == nil:
-		linkManagedGo(j.ExtensionStateRoot(), managedGoBinary(j.ExtensionStateRoot(), lock.Version))
 		j.Emit.Log("info", "Go "+lock.Version+" installed successfully")
 		return true
 	case errors.Is(err, pinnedarchive.ErrNoDigest):
@@ -187,8 +195,7 @@ func (j *Job) downloadGo(lock GoLock, dest string, complete func(string) bool) b
 		j.Emit.Diagnostic("error", fmt.Sprintf(
 			"Refusing Go %s from %s: %v", lock.Version, pin.URL, err), filepath.Join(j.WorkspaceRoot, LockFileName), 0)
 	case errors.Is(err, pinnedarchive.ErrIncomplete):
-		j.Emit.Diagnostic("error", "Go binary not found at "+managedGoBinary(j.ExtensionStateRoot(), lock.Version)+
-			" after extraction", "", 0)
+		j.Emit.Diagnostic("error", "Go binary not found at "+binary+" after extraction", "", 0)
 	case errors.Is(err, pinnedarchive.ErrUnsafeEntry), errors.Is(err, pinnedarchive.ErrTooLarge):
 		j.Emit.Diagnostic("error", "Failed to extract Go archive: "+err.Error(), "", 0)
 	default:

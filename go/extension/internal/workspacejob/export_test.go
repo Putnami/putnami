@@ -40,6 +40,10 @@ var ManagedGoBinary = managedGoBinary
 // ManagedGoDir is the directory of a managed install.
 var ManagedGoDir = managedGoDir
 
+// WorkspaceGoRoot is the directory inside the workspace that holds Go
+// releases.
+func (j *Job) WorkspaceGoRoot() string { return j.workspaceGoRoot() }
+
 // AppendCommaValue and RemoveCommaValue edit a comma-separated variable.
 var (
 	AppendCommaValue = appendCommaValue

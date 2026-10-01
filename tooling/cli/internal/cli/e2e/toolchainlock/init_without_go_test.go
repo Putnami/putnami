@@ -63,6 +63,10 @@ const (
 // → the extension's task. The registry, the Go release index and download, and
 // the Go framework proxy are local servers, so nothing reaches the network.
 //
+// The Go is installed once for the machine, under the Putnami home, and the
+// workspace holds no copy: a second workspace that init sets up on the same
+// machine runs the same install and downloads no archive.
+//
 // The extension is a fixture whose workspace-install does what @putnami/go's
 // does for these steps: it installs nothing while nothing declares Go, and
 // installs the release the lock pins, verified, where its candidates look.
@@ -79,7 +83,11 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	}
 	t.Chdir(wsRoot)
 	hometest.Temp(t)
-	t.Setenv("PUTNAMI_HOME", t.TempDir())
+	putnamiHome, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PUTNAMI_HOME", putnamiHome)
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(t.TempDir(), "artifacts"))
 	t.Setenv("PUTNAMI_WORKSPACE_BOOTSTRAPPED", "")
@@ -184,7 +192,12 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 		!strings.Contains(string(data), "go.putnami.dev/app "+initFrameworkVersion) {
 		t.Fatalf("app/go.mod = %q, %v; want the framework release the local proxy lists", data, err)
 	}
-	managedGo := filepath.Join(wsRoot, ".putnami", "extensions", "@putnami-go", "libs", "go-"+initGoRelease, "go", "bin", "go")
+	// The Go is where the putnami-home candidate looks, and the workspace
+	// holds no Go release of its own.
+	managedGo := filepath.Join(putnamiHome, "toolchains", "go", "go-"+initGoRelease, "go", "bin", "go")
+	if _, err := os.Lstat(filepath.Join(wsRoot, ".putnami", "extensions", "@putnami-go")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("the install left a Go release inside the workspace: %v", err)
+	}
 	wantCalls := []string{
 		"work use ./app|" + managedGo,
 		"work edit -go=" + initGoRelease + "|" + managedGo,
@@ -212,6 +225,35 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	}
 	if got := goDownloads.Load(); got != 1 {
 		t.Fatalf("the build downloaded the Go archive again: %d downloads", got)
+	}
+
+	// A second workspace on the machine pins the same release: every
+	// workspace-install of its init finds the install of the first one, no
+	// archive is downloaded, and its go commands run with that install.
+	secondRoot, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(secondRoot)
+	transcript = clitest.CaptureStdoutStderr(t, func() {
+		initErr = lifecycle.WorkspaceInit(context.Background(), "",
+			[]string{"--workspace", "go-ws-2", "--extension", "go", "--project", "app"}, env)
+	})
+	if initErr != nil {
+		t.Fatalf("putnami init --extension go --project app in a second workspace: %v\n%s", initErr, transcript)
+	}
+	if got, want := fixtureRuns(t, records, "install"), []string{"installed", "present", "present", "present"}; !slices.Equal(got, want) {
+		t.Fatalf("workspace-install runs = %v, want %v: the second workspace finds the installed Go\n%s", got, want, transcript)
+	}
+	if got := goDownloads.Load(); got != 1 {
+		t.Fatalf("the second workspace downloaded the Go archive: %d downloads, want the one of the first", got)
+	}
+	if _, err := os.Lstat(filepath.Join(secondRoot, ".putnami", "extensions", "@putnami-go")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("the second workspace holds a Go release of its own: %v", err)
+	}
+	if got := readLines(t, goCalls); !slices.Equal(got, append(wantCalls, wantCalls...)) {
+		t.Fatalf("go calls =\n%s\nwant those of the first workspace twice, with the same installed Go:\n%s",
+			strings.Join(got, "\n"), strings.Join(wantCalls, "\n"))
 	}
 	if unexpected := registry.unexpected(); len(unexpected) > 0 {
 		t.Fatalf("the registry was asked for artifacts the fixture does not serve: %v", unexpected)
@@ -277,8 +319,9 @@ func (r *fixtureRegistry) unexpected() []string {
 
 // goExtensionArchive is the fixture @putnami/go: its runtime execs the test
 // binary as the extension (runGoExtensionFixture), and its run toolchain
-// resolves the Go the lock pins from PATH or from the install inside the
-// workspace, the candidates @putnami/go declares for a host without Go.
+// resolves the Go the lock pins from PATH, from the install under the Putnami
+// home, or from a copy inside the workspace, the candidates @putnami/go
+// declares for a host without Go.
 func goExtensionArchive(t *testing.T, records string) []byte {
 	t.Helper()
 	testBinary, err := os.Executable()
@@ -296,6 +339,7 @@ func goExtensionArchive(t *testing.T, records string) []byte {
         "lock": "go",
         "candidates": [
           {"from": "path", "path": "go"},
+          {"from": "putnami-home", "path": "toolchains/go/go-{version}/go/bin/go"},
           {"from": "environment", "environment": "PUTNAMI_WORKSPACE_ROOT", "path": ".putnami/extensions/@putnami-go/libs/go-{version}/go/bin/go"}
         ],
         "probe": {"args": ["env", "GOVERSION"], "expect": "go{version}"},
@@ -465,9 +509,9 @@ func runGoExtensionFixture(args []string) int {
 }
 
 // installPinnedGoFixture installs the Go the workspace lock pins where the
-// fixture's candidates look, after checking the downloaded archive against the
-// pinned SHA-256. Without a pin it installs nothing while nothing declares Go,
-// and fails once go.work does.
+// fixture's putnami-home candidate looks, after checking the downloaded
+// archive against the pinned SHA-256. Without a pin it installs nothing while
+// nothing declares Go, and fails once go.work does.
 func installPinnedGoFixture(root string) (string, error) {
 	lock, err := lockfile.ReadLockFile(root)
 	if err != nil {
@@ -484,7 +528,11 @@ func installPinnedGoFixture(root string) (string, error) {
 		}
 		return "nothing-declared", nil
 	}
-	dir := filepath.Join(root, ".putnami", "extensions", "@putnami-go", "libs", "go-"+pin.Version)
+	putnamiHome := os.Getenv("PUTNAMI_HOME")
+	if putnamiHome == "" {
+		return "", errors.New("the job environment names no PUTNAMI_HOME")
+	}
+	dir := filepath.Join(putnamiHome, "toolchains", "go", "go-"+pin.Version)
 	if _, err := os.Stat(filepath.Join(dir, "go", "bin", "go")); err == nil {
 		return "present", nil
 	}

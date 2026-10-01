@@ -200,13 +200,33 @@ See [build.md](./build.md) for all build options.
 
 ## Toolchain Management
 
-`putnami install` provisions a workspace-managed Go toolchain when the machine
-does not already provide a compatible one. Native extension jobs consider
-compiler candidates in this order:
+`putnami install` installs the Go release the workspace pins when the machine
+does not already provide it. The install lives in the Putnami home, once for
+the machine, and every workspace that pins the release runs it.
 
-1. An executable `GOROOT/bin/go` explicitly supplied by the caller
+Before a task starts, the CLI selects the Go the task runs with. It takes the
+first of these that reports the pinned release:
+
+1. `GOROOT/bin/go`, when the caller sets `GOROOT`
+2. `go` on `PATH`
+3. The install in the Putnami home,
+   `~/.putnami/toolchains/go/go-{version}/go/bin/go`
+4. A copy inside the workspace,
+   `.putnami/extensions/@putnami-go/libs/go-{version}/go/bin/go`
+
+The CLI then sets `GOROOT` to the selected release and puts its `bin`
+directory first on the task's `PATH`.
+
+`putnami install` writes no copy at the location of item 4. A workspace that
+holds one from an earlier Putnami release keeps running it, without a download,
+while the Putnami home holds no install of that release. This candidate is
+deprecated and stays for one release.
+
+Native extension jobs then consider compiler candidates in this order:
+
+1. An executable `GOROOT/bin/go`, which the CLI sets as described above
 2. An executable `go` on `PATH`
-3. The workspace-install compatibility path
+3. A Go release inside the workspace, through the link
    `.putnami/extensions/@putnami-go/bin/go`; on Windows, which has no such
    link, each release under `.putnami/extensions/@putnami-go/libs/`, newest
    first
@@ -223,14 +243,14 @@ skipped instead of masking the mismatch through an implicit toolchain download.
 
 This selection happens inside the prepared extension runtime; build, test,
 lint, serve, run, code generation, and publish smoke-test subprocesses all use
-the same selected compiler. When the compiler is workspace-managed, its real
-`GOROOT/bin` is also placed first on the child `PATH`.
+the same selected compiler. When the compiler is a release inside the
+workspace, its real `GOROOT/bin` is also placed first on the child `PATH`.
 
 Jobs do not download a missing compiler on demand. If none of the locations
 above contains a compatible executable Go binary, the error lists every
 incompatible candidate and its reported local version. Run `putnami install`
-to provision the workspace toolchain (or install a sufficiently new Go
-system-wide) and retry.
+to install the pinned release (or install a sufficiently new Go system-wide)
+and retry.
 
 **Install-time version resolution:** the workspace asks for a minimum Go
 version, read from the `go.work` directive at the workspace root, else from the
@@ -248,13 +268,30 @@ credentials, such as `https://user:token@mirror.example/go.zip`, appears in the
 job output without them, and the credentials go only to that URL's scheme and
 host, after a redirect too.
 
-Go is installed to
-`.putnami/extensions/@putnami-go/libs/go-{version}/` and shared across the
-workspace, with the compatibility symlink above pointing at the selected
-installation. On Windows `putnami install` creates no link, so the workspace
-does not depend on the symbolic-link privilege: the resolver reads the
-installations under `libs/` directly. If Go is already in PATH at the pinned
-release, the system installation is used and nothing is downloaded.
+Go is installed to `~/.putnami/toolchains/go/go-{version}/`, where the Go
+distribution is the `go` directory. `PUTNAMI_HOME` relocates `~/.putnami`; when
+neither `PUTNAMI_HOME` nor a home directory is set, the Putnami home is
+`.putnami` under the workspace root. The layout under the Putnami home is
+`toolchains/<name>/<name>-<version>/`.
+
+The install is shared by every workspace of the machine:
+
+- A second workspace that pins the same release downloads nothing and adds no
+  copy.
+- Installs that start at the same time, from one workspace or from several,
+  leave one complete install. They exclude each other on the lock file
+  `toolchains/go/go-{version}.lock`, beside the install directory: one
+  downloads, the others wait and use its install.
+- `putnami install` writes no Go release and no `bin/go` link into the
+  workspace.
+
+If Go is already in PATH at the pinned release, the system installation is
+used and nothing is downloaded.
+
+On a hosted run, `workspace-fetch` runs no program inside the workspace. When
+the Putnami home is `.putnami` under the workspace root, it does not run the Go
+installed there: the runner provides the pinned Go on `PATH`, in `GOROOT`, or
+in a Putnami home outside the workspace.
 
 A workspace that declares no Go yet (no Go member, no `go.work`, no root
 `go.mod` and no Go pin) on a host with no `go` skips the Go phase of

@@ -49,11 +49,8 @@ func ResolveGoCacheRoot(lookup func(string) string) string {
 	if dir := strings.TrimSpace(lookup(GoCacheDirEnv)); dir != "" {
 		return dir
 	}
-	if putnamiHome := strings.TrimSpace(lookup(PutnamiHomeEnv)); putnamiHome != "" {
+	if putnamiHome := ResolvePutnamiHome(lookup); putnamiHome != "" {
 		return filepath.Join(putnamiHome, "cache", "go")
-	}
-	if home := strings.TrimSpace(lookup(homeEnvName())); home != "" {
-		return filepath.Join(home, ".putnami", "cache", "go")
 	}
 	if extensionCache := strings.TrimSpace(lookup(ExtensionCacheRootEnv)); extensionCache != "" {
 		return filepath.Join(extensionCache, "go")
