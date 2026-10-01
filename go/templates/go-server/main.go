@@ -37,7 +37,9 @@ func newApp(cfg ServerConfig) (*app.Application, *http.ServerPlugin) {
 	server := http.NewServerPlugin(http.ServerConfig{Port: cfg.Port})
 	server.Use(http.Recovery())
 	server.Use(http.RequestID())
-	server.Use(http.Logging(http.LoggerOptions{}))
+	server.Use(http.Logging(http.LoggerOptions{
+		Exclude: []string{"/_/health", "/livez", "/healthz", "/readyz"}, // keep probes out of the access log
+	}))
 
 	server.GET("/", func(ctx *http.Context) *http.Response {
 		return http.JSON(map[string]string{"Hello": "World"})
