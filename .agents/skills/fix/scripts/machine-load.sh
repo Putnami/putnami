@@ -31,4 +31,5 @@ fi
 
 case "$load" in '' | *[!0-9.]*) exit 2 ;; esac
 case "$cpus" in '' | *[!0-9]* | 0) exit 2 ;; esac
-awk -v load="$load" -v cpus="$cpus" 'BEGIN { printf "%.2f\n", load / cpus }'
+# gawk reserves `load`, so the awk variables carry other names.
+awk -v avg="$load" -v cpus="$cpus" 'BEGIN { printf "%.2f\n", avg / cpus }'

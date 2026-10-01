@@ -536,7 +536,7 @@ elif [ "$DRAFT_STAGE" = false ] && [ -z "$VERIFICATION_FILE" ]; then
     CI_GATE=true
   elif [ "$GATE_MODE" = auto ] && [ "$CI_CHECKS" != "[]" ] && [ "$DRAFT" = false ]; then
     LOAD_RATIO="$(bash "$(dirname "$TREE_FINGERPRINT")/machine-load.sh" 2>/dev/null || true)"
-    if [ -n "$LOAD_RATIO" ] && awk -v load="$LOAD_RATIO" -v limit="$CI_LOAD" 'BEGIN { exit !(load > limit) }'; then
+    if [ -n "$LOAD_RATIO" ] && awk -v ratio="$LOAD_RATIO" -v limit="$CI_LOAD" 'BEGIN { exit !(ratio > limit) }'; then
       echo "finalize-pr: machine load $LOAD_RATIO is above $CI_LOAD; the hosted checks gate this change instead of a local run" >&2
       CI_GATE=true
     fi
