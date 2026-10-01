@@ -28,6 +28,11 @@
 # git reports as untouched. The command must be listed in the command map
 # published next to the installer and must not wait for input.
 #
+# The channel is one choice for the whole path: the installer installs the CLI
+# from it (PUTNAMI_VERSION), and init resolves the extensions, the template and
+# the starter's dependencies on it (PUTNAMI_CHANNEL). The init command line
+# stays the public one.
+#
 # Usage:   smoke-check-release.sh [channel]   (default channel: latest)
 # Env:
 #   PUTNAMI_REGISTRY_URL  registry base   (default https://put.putnami.dev)
@@ -253,6 +258,9 @@ export PUTNAMI_ARTIFACT_DIR="$workdir/artifacts"
 export PUTNAMI_NO_RELAUNCH=1
 export PUTNAMI_REGISTRY_URL="$base"
 export PUTNAMI_VERSION="$channel"
+# init resolves on the channel under test: a candidate smoke uses only the
+# candidate's release set.
+export PUTNAMI_CHANNEL="$channel"
 export PUTNAMI_CACHE_URL=""
 export PUTNAMI_CACHE_TOKEN=""
 export PUTNAMI_CLOUD_TOKEN=""

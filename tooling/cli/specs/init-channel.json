@@ -1,0 +1,41 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/init-channel",
+  "outcomes": [
+    "A user who runs putnami init on a release channel gets a workspace whose extensions, template and starter dependencies all come from that channel",
+    "A release candidate is smoke-tested on its own immutable channel, whatever latest names and even while latest is empty",
+    "The workspace init creates pins no channel: its lock records exact versions, and putnami upgrade follows latest by default"
+  ],
+  "nonGoals": [
+    "Choosing an exact version: the release lines do not share one version, so one version cannot name a release set",
+    "Recording the install channel in a file: the name of the installed binary is the record, and putnami upgrade renames it",
+    "Resolving a release set through a provider: each registry resolves the channel natively",
+    "Changing putnami upgrade, putnami install or projects create run on its own"
+  ],
+  "requirements": [
+    {
+      "id": "one-channel-choice",
+      "text": "putnami init resolves on one channel: --channel, else PUTNAMI_CHANNEL, else the install record, else latest; stable reads latest. The install record is the tag of the name the running executable resolves to, putnami-<variant>-<tag>, unless it is a semantic version, a source build or dev. Any other name, such as the active putnami.exe on Windows, records nothing. An empty name, an unsafe channel token and an exact version are usage errors raised before init writes or requests anything."
+    },
+    {
+      "id": "every-resolution-reads-the-channel",
+      "text": "On a channel other than latest, every resolution of the run reads that channel and none reads latest: both extensions, the template, the template install project creation falls back to, the Go framework version (@v/<channel>.info where @latest is asked), and the workspace installers, which receive the putnami-channel job option. A channel that names no release fails the run instead of resolving latest. Init passes while latest names an older release set and while latest is empty."
+    },
+    {
+      "id": "no-choice-is-unchanged",
+      "text": "Without a channel choice and without an install record, and on latest, init sends the requests it sent before it took a channel: bare artifact names, @latest for the Go framework, and no putnami-channel option."
+    },
+    {
+      "id": "the-workspace-pins-no-channel",
+      "text": "The channel is a target of the init run only. putnami.workspace.json keeps bare artifact names, putnami.lock.json records the exact version, the digest and a version-pinned source of each artifact, and neither file names the channel. putnami upgrade reads neither PUTNAMI_CHANNEL nor the install record, and follows latest by default."
+    },
+    {
+      "id": "release-smokes-hand-the-channel-to-init",
+      "text": "smoke-check-release.sh and smoke-check-release.ps1 export the channel they are started on as PUTNAMI_CHANNEL, after they clear every PUTNAMI_ variable and before the init leg, so the init command line stays the public one and a value the caller exported never reaches it."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0056-init-resolves-on-one-channel.md"
+  ]
+}

@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 var smokeNeutralEnvironment = []string{
@@ -144,7 +146,19 @@ func runSmokeWithInstallerURL(t *testing.T, registryURL, installerURL, diagnosti
 
 func runSmokeFrom(t *testing.T, registryURL, installerURL, diagnosticsDir, launchDir string, extra ...string) result {
 	t.Helper()
-	cmd := exec.Command("bash", smokeScriptPath(t), "latest")
+	return runSmokeOnChannel(t, "latest", registryURL, installerURL, diagnosticsDir, launchDir, extra...)
+}
+
+// smokeChannelEnv tells the stub CLI which channel the smoke was started on,
+// so the stub can require that the smoke handed it that channel. The smoke
+// clears every PUTNAMI_ variable and keeps this one.
+const smokeChannelEnv = "SMOKE_TEST_CHANNEL"
+
+// runSmokeOnChannel runs the smoke against channel. The caller's
+// PUTNAMI_CHANNEL reaches the smoke, which must replace it with channel.
+func runSmokeOnChannel(t *testing.T, channel, registryURL, installerURL, diagnosticsDir, launchDir string, extra ...string) result {
+	t.Helper()
+	cmd := exec.Command("bash", smokeScriptPath(t), channel)
 	cmd.Dir = launchDir
 	smokePath := os.Getenv("SMOKE_TEST_PATH")
 	if smokePath == "" {
@@ -167,6 +181,8 @@ func runSmokeFrom(t *testing.T, registryURL, installerURL, diagnosticsDir, launc
 		// default retry budget spends 50s proving it.
 		"SMOKE_RETRIES=1",
 		"SMOKE_STARTUP_TIMEOUT=5",
+		smokeChannelEnv + "=" + channel,
+		"PUTNAMI_CHANNEL=" + os.Getenv("PUTNAMI_CHANNEL"),
 	}
 	for _, name := range smokeNeutralEnvironment {
 		cmd.Env = append(cmd.Env, name+"="+os.Getenv(name))
@@ -301,6 +317,11 @@ func TestSmokeCLIHelperProcess(t *testing.T) {
 		if got := os.Getenv(name); got != want {
 			t.Fatalf("golden-path helper environment %s = %q, want %q", name, got, want)
 		}
+	}
+	// The smoke hands every command the channel it was started on: init reads
+	// it, and a value the caller exported never reaches the golden path.
+	if got, want := os.Getenv("PUTNAMI_CHANNEL"), os.Getenv(smokeChannelEnv); got != want {
+		t.Fatalf("golden-path helper received PUTNAMI_CHANNEL %q, want the smoke's channel %q", got, want)
 	}
 	if shell := filepath.Base(os.Getenv("SHELL")); shell != "bash" {
 		t.Fatalf("golden-path helper received SHELL %q, want resolved Bash", os.Getenv("SHELL"))
@@ -501,6 +522,8 @@ func TestSmokeRunsExactTypeScriptGoldenPathThroughHTTPAndCleanStop(t *testing.T)
 	for name := range smokeExpectedEnvironment {
 		t.Setenv(name, "must-not-reach-golden-path")
 	}
+	// A latest smoke hands init latest, whatever the caller exported.
+	t.Setenv("PUTNAMI_CHANNEL", "must-not-reach-golden-path")
 	body := fullGoldenPathStub(t)
 	server := newRegistry(t, registryOptions{
 		body:      body,
@@ -528,6 +551,70 @@ func TestSmokeRunsExactTypeScriptGoldenPathThroughHTTPAndCleanStop(t *testing.T)
 	// The run leg is opt-in through SMOKE_RUN_COMMAND.
 	if res.contains("?run=") || res.contains("→ run ") {
 		t.Fatalf("the run leg ran without SMOKE_RUN_COMMAND:\n%s", res.output)
+	}
+}
+
+// smokeCandidateChannel is the immutable channel of a release candidate, as a
+// tagged publish names it.
+const smokeCandidateChannel = "tooling-v0.4.0"
+
+// A candidate smoke hands its channel to init explicitly: the stub CLI, which
+// accepts only the public argv, sees PUTNAMI_CHANNEL equal to the candidate
+// channel on every command, in place of the value the caller exported. The
+// init command line stays the public one, and the installer and the channel
+// leg ask the registry for the same channel.
+func TestSmokeHandsTheCandidateChannelToInit(t *testing.T) {
+	spectest.Proves(t, "cli/init-channel", "release-smokes-hand-the-channel-to-init", "the-shell-smoke-hands-its-channel-to-init")
+	requireBash(t)
+	t.Setenv("GO_WANT_SMOKE_CLI_HELPER", "1")
+	t.Setenv("PUTNAMI_CHANNEL", "must-not-reach-golden-path")
+	body := fullGoldenPathStub(t)
+	server := newRegistry(t, registryOptions{
+		body:      body,
+		integrity: "sha256:" + sha256Hex(body),
+		resolved:  stubVersion,
+	})
+
+	res := runSmokeOnChannel(t, smokeCandidateChannel, server.URL, server.URL+"/install.sh", "", t.TempDir())
+	if res.exitCode != 0 {
+		t.Fatalf("the golden path on %s failed (exit %d):\n%s", smokeCandidateChannel, res.exitCode, res.output)
+	}
+	for _, want := range []string{
+		"smoke: putnami init --project webapp --extension ts",
+		"channel '" + smokeCandidateChannel + "'",
+		"HTTP → clean stop",
+	} {
+		if !res.contains(want) {
+			t.Fatalf("the golden path on %s did not report %q:\n%s", smokeCandidateChannel, want, res.output)
+		}
+	}
+}
+
+// The smoke exports the channel for init after it clears every PUTNAMI_
+// variable and before the init leg, next to the variable that selects the
+// channel for the installer, and the init command line carries no channel.
+func TestSmokeScriptExportsTheChannelForInit(t *testing.T) {
+	spectest.Proves(t, "cli/init-channel", "release-smokes-hand-the-channel-to-init", "the-shell-smoke-hands-its-channel-to-init")
+	script, err := os.ReadFile(smokeScriptPath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(script)
+	cleared := strings.Index(text, `for putnami_env_name in "${!PUTNAMI_@}"; do`)
+	installer := strings.Index(text, `export PUTNAMI_VERSION="$channel"`)
+	exported := strings.Index(text, `export PUTNAMI_CHANNEL="$channel"`)
+	initLeg := strings.Index(text, "putnami init --project webapp --extension ts </dev/null")
+	if cleared < 0 || installer < 0 || exported < 0 || initLeg < 0 {
+		t.Fatalf("release smoke misses a pinned line: clear %d, PUTNAMI_VERSION %d, PUTNAMI_CHANNEL %d, init %d", cleared, installer, exported, initLeg)
+	}
+	if cleared >= exported || exported >= initLeg {
+		t.Fatalf("release smoke exports PUTNAMI_CHANNEL at %d, want it after the PUTNAMI_ clear at %d and before the init leg at %d", exported, cleared, initLeg)
+	}
+	if strings.Count(text, "PUTNAMI_CHANNEL=") != 1 {
+		t.Fatalf("release smoke sets PUTNAMI_CHANNEL %d times, want once", strings.Count(text, "PUTNAMI_CHANNEL="))
+	}
+	if strings.Contains(text, "putnami init --channel") || strings.Contains(text, "--extension ts --channel") {
+		t.Fatal("release smoke passes the channel on the init command line; the public command takes it from PUTNAMI_CHANNEL")
 	}
 }
 

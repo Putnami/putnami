@@ -337,6 +337,7 @@ _putnami_flags_for() {
             ;;
         'init')
             reply=(
+                '--channel[Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)]:channel:'
                 '--extension[Default extension to install]:ts|go|py:'
                 '--force[Reinitialize an existing workspace]'
                 '--project[Create an initial project]:name:'
@@ -482,6 +483,7 @@ _putnami_flags_for() {
             ;;
         'workspace init')
             reply=(
+                '--channel[Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)]:channel:'
                 '--extension[Default extension to install]:ts|go|py:'
                 '--force[Reinitialize an existing workspace]'
                 '--project[Create an initial project]:name:'

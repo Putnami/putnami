@@ -152,6 +152,12 @@ func TestPrintSubcommandHelp_IncludesStructuredFlags(t *testing.T) {
 	if !strings.Contains(output, "putnami init --project my-app --project-path apps/my-app") {
 		t.Error("expected workspace init example")
 	}
+	if !strings.Contains(output, "--channel <channel>") {
+		t.Error("expected --channel in structured help")
+	}
+	if !strings.Contains(output, "putnami init --project my-app --channel canary") {
+		t.Error("expected workspace init channel example")
+	}
 	if !strings.Contains(output, "Global Options:") {
 		t.Error("expected global options in structured help")
 	}

@@ -242,6 +242,15 @@ commit other than `HEAD`: the tag it creates names the checked-out commit.
 | `<tag>` | The immutable channel a tagged publish created, in the portable encoding (`ts/v0.3.0` becomes `ts-v0.3.0`); it never moves again |
 | `<version>` | An exact release, e.g. `0.1.0-20260902173000-8e6fb533` |
 
+`putnami upgrade` follows `latest` unless `--channel`, `--release` or
+`--version` names another target. `putnami init` resolves on one channel too:
+`--channel`, then `PUTNAMI_CHANNEL`, then the channel the running CLI was
+installed from, then `latest`. It takes a channel, not an exact version, and
+the workspace it creates records exact versions in its lock and no channel, so
+the next `putnami upgrade` of that workspace follows `latest` again. See
+[`workspace`](03-commands.md#workspace) and
+[ADR 0056](adr/0056-init-resolves-on-one-channel.md).
+
 After a candidate is published, any configured external release execution plane
 runs `tooling/cli/scripts/smoke-check-release.sh <channel>` on the four supported
 macOS/Linux × amd64/arm64 targets, and its PowerShell port
@@ -256,7 +265,9 @@ is configured or restored.
 
 The smoke runs the exact `curl` install, TypeScript `init`, and `serve` commands
 against isolated home/config/cache/store/workspace state with credentials
-cleared. It verifies the selected executable and stamp, generated workspace,
+cleared. It exports `PUTNAMI_CHANNEL=<channel>` for `init`, so the workspace
+is resolved from the release set of the channel under test rather than from
+`latest`. It verifies the selected executable and stamp, generated workspace,
 locks, extension and MCP registration, typed readiness, a real successful HTTP
 response, and graceful shutdown. Any failing leg prints bounded diagnostics;
 an automated run sets `SMOKE_DIAGNOSTICS_DIR` to retain the artifact bundle.
@@ -543,3 +554,11 @@ Binaries follow the pattern `putnami-{variant}-{version}`:
 
 - `putnami-go-dev` — local Go build
 - `putnami-go-1.2.0` — installed Go release v1.2.0
+- `putnami-go-canary` — Go CLI installed from the `canary` channel
+
+The installer names the binary after what the install asked for: a channel or a
+version. That name is the only record of the channel an install came from, and
+`putnami init` reads it as its default channel. A name whose last part is a
+version, `dev` or `source-<revision>` records no channel. Neither does the
+plain `putnami` an `--install-dir` install writes, nor the `putnami.exe` copy
+on Windows.

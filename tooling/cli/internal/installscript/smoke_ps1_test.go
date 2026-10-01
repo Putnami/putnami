@@ -243,6 +243,7 @@ func TestSmokePS1NeutralizesWhatTheShellSmokeNeutralizes(t *testing.T) {
 		"Set-SmokeEnv 'PUTNAMI_NO_RELAUNCH' '1'",
 		"Set-SmokeEnv 'PUTNAMI_REGISTRY_URL' $Base",
 		"Set-SmokeEnv 'PUTNAMI_VERSION' $Channel",
+		"Set-SmokeEnv 'PUTNAMI_CHANNEL' $Channel",
 		"Set-SmokeEnv 'GIT_CONFIG_NOSYSTEM' '1'",
 		// Decision D-W7: the CLI's home is USERPROFILE on Windows.
 		"Set-SmokeEnv 'USERPROFILE' $smokeHome",
@@ -264,6 +265,36 @@ func TestSmokePS1NeutralizesWhatTheShellSmokeNeutralizes(t *testing.T) {
 	}
 	if !strings.Contains(src, "$env:PUTNAMI_SMOKE_CHILD -ne '1'") {
 		t.Fatal("smoke-check-release.ps1 must run in a child PowerShell, so the caller's session keeps its environment")
+	}
+}
+
+// The Windows smoke hands its channel to init the way the shell smoke does:
+// PUTNAMI_CHANNEL, set after every PUTNAMI_ variable is cleared and before the
+// init leg, with the public init command line. On Windows the variable is the
+// only hand-off: the active putnami.exe is a copy whose name records no
+// channel.
+func TestSmokePS1HandsItsChannelToInit(t *testing.T) {
+	spectest.Proves(t, "cli/init-channel", "release-smokes-hand-the-channel-to-init", "the-powershell-smoke-hands-its-channel-to-init")
+	sh := readSmokeSh(t)
+	if !strings.Contains(sh, `export PUTNAMI_CHANNEL="$channel"`) {
+		t.Fatal("smoke-check-release.sh no longer exports PUTNAMI_CHANNEL; update the Windows port with it")
+	}
+	body := smokePS1Body(t, "Invoke-Smoke")
+	cleared := strings.Index(body, "if ($name -match '^PUTNAMI_') { Set-SmokeEnv $name '' }")
+	exported := strings.Index(body, "Set-SmokeEnv 'PUTNAMI_CHANNEL' $Channel")
+	initLeg := strings.Index(body, "smoke: putnami init --project webapp --extension ts")
+	if cleared < 0 || exported < 0 || initLeg < 0 {
+		t.Fatalf("smoke-check-release.ps1 misses a pinned line: clear %d, PUTNAMI_CHANNEL %d, init %d", cleared, exported, initLeg)
+	}
+	if cleared >= exported || exported >= initLeg {
+		t.Fatalf("smoke-check-release.ps1 sets PUTNAMI_CHANNEL at %d, want it after the PUTNAMI_ clear at %d and before the init leg at %d", exported, cleared, initLeg)
+	}
+	src := readSmokePS1(t)
+	if strings.Count(src, "'PUTNAMI_CHANNEL'") != 1 {
+		t.Fatalf("smoke-check-release.ps1 sets PUTNAMI_CHANNEL %d times, want once", strings.Count(src, "'PUTNAMI_CHANNEL'"))
+	}
+	if strings.Contains(src, "--channel") {
+		t.Fatal("smoke-check-release.ps1 passes the channel on a command line; the public init command takes it from PUTNAMI_CHANNEL")
 	}
 }
 

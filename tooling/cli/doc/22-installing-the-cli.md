@@ -763,13 +763,24 @@ variables cleared. It pins `SHELL` to the Bash that runs the gate so completion
 and profile behavior cannot vary with the runner's login shell. No ambient state
 can make a broken release look healthy.
 
+The smoke hands the same channel to `init`: once it has cleared every
+`PUTNAMI_` variable, it exports `PUTNAMI_CHANNEL=<channel>`. `init` then
+resolves the extensions, the template and the starter's dependencies on the
+candidate channel, so a candidate run uses the candidate's release set while
+`latest` names an older one or nothing. The `init` command line stays the public
+one, with no `--channel` flag, and a `latest` run sends the requests it sent
+without the variable. The smoke does not rely on the channel the CLI was
+installed from: on Windows the active `putnami.exe` is a copy whose name carries
+no channel. The argument is a channel; `init` refuses an exact version. See
+[ADR 0056](adr/0056-init-resolves-on-one-channel.md).
+
 | Leg | What must hold | Regression guarded against |
 |---|---|---|
 | `channel` | `GET /putnami/cli/download` returns 200, an `X-Resolved-Version`, and a SHA-256 that describes the bytes streamed. | An earlier release skipped upload, or advertised a digest for the wrong bytes. |
 | `install` | The public installer URL installs from that channel, reports `Integrity verified`, never takes the unverified path, and invokes no `sudo`/`doas`/`pkexec`/`run0`. | The installer escalated privileges, or reported "verified" without checking. |
 | `discovery` | `command -v putnami` resolves, inside the smoke's workdir. | The installer escalated privileges, or reported "verified" without checking. |
 | `prerequisites` + `platform` + `stamp` | The actual runner has Bun v1.4.0 or later; the installed path is executable, hashes to the selected host asset, executes on that runner, and reports the resolved version. | A stale cross-compile cache hit shipped a binary with the wrong embedded version stamp. |
-| `init` | The exact TypeScript command creates readable workspace/project state, extension/template locks, dependency lock/config, the assistant guidance block in `AGENTS.md`/`CLAUDE.md`, and a `.mcp.json` that registers the `putnami` MCP server. Root `.npmrc` maps `@putnami` to the public registry and contains no auth directive; no generated config/package manifest names the private cloud dependency; an installed-CLI build plan validates the generated graph. | Init reported success after a required setup step actually failed. |
+| `init` | With `PUTNAMI_CHANNEL` set to the smoke's channel, the exact TypeScript command creates readable workspace/project state, extension/template locks, dependency lock/config, the assistant guidance block in `AGENTS.md`/`CLAUDE.md`, and a `.mcp.json` that registers the `putnami` MCP server. Root `.npmrc` maps `@putnami` to the public registry and contains no auth directive; no generated config/package manifest names the private cloud dependency; an installed-CLI build plan validates the generated graph. | Init reported success after a required setup step actually failed. |
 | `serve` + `http` | The exact serve command emits canonical nested v2 typed readiness on an OS-assigned port and answers one non-empty explicit 2xx HTTP response. | Init reported success after a required setup step actually failed. |
 | `shutdown` | The CLI and starter exit within the graceful budget without the hard fallback, and the ready URL becomes unreachable. | The CLI or starter failed to exit within the graceful budget. |
 | `run` (only with `SMOKE_RUN_COMMAND`) | The run form installs, pins, and runs the command with exit status 0, escalates nothing, and leaves the directory it ran in untouched. | [The run scenario](#the-run-scenario) |
@@ -935,6 +946,7 @@ map is served the same way: removing an entry is a pull request against
 | The smoke installs through `install.sh`, discovers the command, and checks the stamp | `internal/installscript/smoke_script_test.go` — `TestSmokeInstallsThroughTheInstallerAndDiscoversTheCommand` |
 | The exact TypeScript init/serve argv, generated-state assertions, typed readiness, real HTTP response, and graceful stop all execute | `TestSmokeRunsExactTypeScriptGoldenPathThroughHTTPAndCleanStop` |
 | Failure artifacts are opt-in and bounded | `TestSmokeCapturesOnlyBoundedOptInFailureDiagnostics` |
+| The smoke hands its channel to `init` as `PUTNAMI_CHANNEL`, whatever the caller's environment holds, and keeps the public `init` command line | `TestSmokeHandsTheCandidateChannelToInit`, `TestSmokeScriptExportsTheChannelForInit`, `internal/installscript/smoke_ps1_test.go` — `TestSmokePS1HandsItsChannelToInit` |
 | The smoke fails a release with no digest, a wrong digest, a stale stamp, a 404 channel, or an escalating installer | `TestSmokeFailsTheReleaseWhenNoDigestIsAdvertised`, `…WhenTheAdvertisedDigestDoesNotMatch`, `…OnAStaleStamp`, `…WhenTheChannelIs404`, `…WhenTheInstallerEscalates` |
 | A binary that cannot report its version still fails the release *by name*, rather than killing the smoke silently through `pipefail` | `TestSmokeNamesTheStampLegWhenTheBinaryCannotReportItsVersion` |
 | The smoke's `run` leg passes a command that leaves its directory untouched, and fails one that writes there, exits non-zero, or has an invalid name | `TestSmokeRunsTheOptionalRunScenarioInAnUntouchedDirectory`, `TestSmokeFailsTheRunScenarioWhenTheCommandWritesIntoTheCallerDirectory`, `TestSmokeFailsTheRunScenarioWhenTheCommandFails`, `TestSmokeRejectsAnInvalidRunCommandBeforeFetchingTheChannel` |

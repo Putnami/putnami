@@ -158,6 +158,22 @@ type LifecycleEnv struct {
 	// fetched records that Install already ran the hosted fetch and
 	// BeforeRepositoryCode, so DepsInstall runs neither again.
 	fetched bool
+	// channel is the release channel `putnami init` resolves on when it is not
+	// latest; every other command leaves it empty. The workspace installers
+	// receive it as a job option (installParams), and the project create of
+	// init resolves its template and its Go framework version on it.
+	channel string
+}
+
+// installParams is the job options of the workspace fetch and installers: the
+// channel of an init that resolves on one, as the option `putnami upgrade`
+// hands the deps-upgrade job, else none. A run without a channel sends the
+// request it sends without this member, so its jobs see no new option.
+func (e LifecycleEnv) installParams() map[string]any {
+	if e.channel == "" {
+		return nil
+	}
+	return map[string]any{initChannelJobOption: e.channel}
 }
 
 // out returns the caller's human stream, defaulting to os.Stdout.
@@ -202,6 +218,7 @@ func DepsInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config, filter
 		WorkspaceRoot: wsRoot,
 		Config:        cfg,
 		Job:           "workspace-install",
+		Params:        env.installParams(),
 		FilterTag:     filterTag,
 		ExcludeTag:    excludeTag,
 		Display:       env.Display,
@@ -236,6 +253,7 @@ func depsFetch(ctx context.Context, wsRoot string, cfg *wsproto.Config, filterTa
 		WorkspaceRoot: wsRoot,
 		Config:        cfg,
 		Job:           extensionproto.WorkspaceFetchCommand,
+		Params:        env.installParams(),
 		FilterTag:     filterTag,
 		ExcludeTag:    excludeTag,
 		Display:       env.Display,

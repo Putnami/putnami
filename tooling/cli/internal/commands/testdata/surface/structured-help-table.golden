@@ -187,15 +187,17 @@ example: putnami infra plan
 example: putnami infra plan --output=jsonl
 ═══ init ═══
 description: Initialize a new workspace
-usage: putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--force]
+usage: putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 flag: --workspace | <name> | Workspace name override
 flag: --extension | <ts|go|py> | Default extension to install
 flag: --project | <name> | Create an initial project
 flag: --project-path | <path> | Workspace-relative path for the initial project
+flag: --channel | <channel> | Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)
 flag: --force |  | Reinitialize an existing workspace
 example: putnami init
 example: putnami init --project my-app
 example: putnami init --project my-app --project-path apps/my-app
+example: putnami init --project my-app --channel canary
 ═══ install ═══
 description: Run workspace-level installation: extensions, templates (if configured), and dependencies
 usage: putnami install [--latest]
@@ -443,12 +445,14 @@ example: putnami workspace describe
 example: putnami workspace describe --output=jsonl
 ═══ workspace init ═══
 description: Initialize a new workspace
-usage: putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--force]
+usage: putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 flag: --workspace | <name> | Workspace name override
 flag: --extension | <ts|go|py> | Default extension to install
 flag: --project | <name> | Create an initial project
 flag: --project-path | <path> | Workspace-relative path for the initial project
+flag: --channel | <channel> | Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)
 flag: --force |  | Reinitialize an existing workspace
 example: putnami init
 example: putnami init --project my-app
 example: putnami init --project my-app --project-path apps/my-app
+example: putnami init --project my-app --channel canary

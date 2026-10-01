@@ -29,8 +29,9 @@ type createFlags struct {
 // ProjectsCreate scaffolds a new project from an extension template. A template
 // that renders the Go framework version gets the one the module proxies name
 // (resolveGoFrameworkVersion), and create fails before it writes anything when
-// none answers. verbose names the proxy that answered. env runs the workspace
-// installers when a Go project needs a go
+// none answers. The create `putnami init` runs asks them for the version of
+// the channel init chose (resolveGoFrameworkVersionOn). verbose names the proxy
+// that answered. env runs the workspace installers when a Go project needs a go
 // command the host does not have yet. When those installers fail but still
 // leave a go, the project is set up and kept, and create exits non-zero naming
 // the command that finishes the install, as `init --project` does. When go mod
@@ -89,7 +90,9 @@ func createProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config,
 	// If not found locally, try installing it
 	if foundTemplate == nil {
 		iox.Fprintf(os.Stdout, "  Template %q not found locally, attempting install…\n", flags.template)
-		if installErr := extensions.TemplatesInstall(ctx, wsRoot, cfg, []string{flags.template}, ""); installErr == nil {
+		// The create of an init that chose a channel installs on that channel;
+		// any other create installs as the workspace configures the template.
+		if installErr := extensions.TemplatesInstall(ctx, wsRoot, cfg, []string{channelArtifact(flags.template, env.channel)}, ""); installErr == nil {
 			// Re-discover after install
 			templates, _ = template.DiscoverTemplates(wsRoot, projectPaths)
 			foundTemplate = template.FindByName(templates, flags.template)
@@ -133,7 +136,7 @@ func createProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config,
 		if message := refreshGoFrameworkCredential(ctx, wsRoot, os.Getenv); message != "" && verbose {
 			iox.Fprintf(os.Stdout, "  %s\n", message)
 		}
-		version, proxy, err := resolveGoFrameworkVersion(ctx, http.DefaultClient, os.Getenv)
+		version, proxy, err := resolveGoFrameworkVersionOn(ctx, http.DefaultClient, os.Getenv, env.channel)
 		if err != nil {
 			return createdProject{}, protocolcli.WithNext(err, projectsCreateCommand(name, flags, projectPath))
 		}

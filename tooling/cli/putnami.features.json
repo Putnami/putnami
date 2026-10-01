@@ -2712,6 +2712,84 @@
           }
         }
       ]
+    },
+    {
+      "id": "cli/init-channel",
+      "type": "feature",
+      "name": "Init resolves on one channel",
+      "outcome": "A user who runs putnami init on a release channel gets a workspace whose extensions, template and starter dependencies all come from that channel, and the workspace it creates pins no channel",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "one-channel-choice",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-flag-wins-over-the-variable-and-the-install-record",
+              "the-install-record-is-the-channel-in-the-installed-name",
+              "init-defaults-to-the-install-record",
+              "an-unsafe-name-or-a-version-is-refused-before-anything-is-written"
+            ]
+          }
+        },
+        {
+          "id": "every-resolution-reads-the-channel",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-stage-of-init-receives-the-channel",
+              "the-installers-receive-the-channel-as-a-job-option",
+              "the-go-framework-version-is-the-one-the-channel-names",
+              "a-missing-channel-fails-instead-of-resolving-latest",
+              "the-fallback-template-install-resolves-on-the-channel",
+              "a-candidate-channel-resolves-only-its-release-set-while-latest-is-older",
+              "a-candidate-channel-resolves-while-latest-is-empty"
+            ]
+          }
+        },
+        {
+          "id": "no-choice-is-unchanged",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "no-choice-hands-every-stage-bare-names-and-no-option",
+              "no-choice-asks-every-registry-for-latest"
+            ]
+          }
+        },
+        {
+          "id": "the-workspace-pins-no-channel",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-config-keeps-bare-names-and-the-lock-records-exact-versions",
+              "upgrade-follows-latest-by-default",
+              "upgrade-in-the-new-workspace-asks-for-latest"
+            ]
+          }
+        },
+        {
+          "id": "release-smokes-hand-the-channel-to-init",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-shell-smoke-hands-its-channel-to-init",
+              "the-powershell-smoke-hands-its-channel-to-init"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

@@ -136,7 +136,7 @@ _putnami_flags_for() {
         'extensions list') printf '%s\n' '--user' ;;
         'extensions remove') printf '%s\n' '--user' ;;
         'help') printf '%s\n' '--man --markdown' ;;
-        'init') printf '%s\n' '--extension --force --project --project-path --workspace' ;;
+        'init') printf '%s\n' '--channel --extension --force --project --project-path --workspace' ;;
         'install') printf '%s\n' '--latest' ;;
         'migrate agent-content') printf '%s\n' '--apply --check --rollback' ;;
         'migrate vnext') printf '%s\n' '--apply --check' ;;
@@ -158,7 +158,7 @@ _putnami_flags_for() {
         'version list') printf '%s\n' '--global' ;;
         'version tag') printf '%s\n' '--dry-run --push --scope --yes' ;;
         'version use') printf '%s\n' '--global' ;;
-        'workspace init') printf '%s\n' '--extension --force --project --project-path --workspace' ;;
+        'workspace init') printf '%s\n' '--channel --extension --force --project --project-path --workspace' ;;
     esac
 }
 

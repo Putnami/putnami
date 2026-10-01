@@ -80,12 +80,26 @@ type initFlags struct {
 	project     string
 	projectPath string
 	extension   string
+	// channel is the value of --channel, and channelSet reports that the flag
+	// was given: a flag with no value is a usage error, not an absent flag.
+	channel    string
+	channelSet bool
 }
 
 func parseInitFlags(args []string) initFlags {
 	f := initFlags{extension: "ts"}
 	for i := 0; i < len(args); i++ {
+		if value, ok := strings.CutPrefix(args[i], initChannelFlag+"="); ok {
+			f.channel, f.channelSet = value, true
+			continue
+		}
 		switch args[i] {
+		case initChannelFlag:
+			f.channelSet = true
+			if i+1 < len(args) {
+				f.channel = args[i+1]
+				i++
+			}
 		case "--force":
 			f.force = true
 		case "--workspace":
@@ -156,19 +170,49 @@ AGENTS.md tells coding agents how to work in this workspace.
 `
 }
 
+// resolveInitRequest validates what an init run was asked for before anything
+// is written: the starter extension, the project placement and the channel.
+func resolveInitRequest(flags initFlags) (initExtensionConfig, initChannel, error) {
+	extConfig, ok := initExtensions[flags.extension]
+	if !ok {
+		return initExtensionConfig{}, initChannel{}, cmderr.Usagef("unknown extension %q (choose: ts, go, py)", flags.extension)
+	}
+	if flags.projectPath != "" && flags.project == "" {
+		return initExtensionConfig{}, initChannel{}, cmderr.Usagef("--project-path requires --project")
+	}
+	channel, err := resolveInitChannel(flags, os.Getenv, runningCLIName())
+	if err != nil {
+		return initExtensionConfig{}, initChannel{}, err
+	}
+	return extConfig, channel, nil
+}
+
+// printInitChannel names the channel an init run resolves on and what chose
+// it. A run on latest prints nothing, as a run without a channel choice does.
+func printInitChannel(channel initChannel) {
+	if name := channel.selected(); name != "" {
+		iox.Fprintf(os.Stdout, "  Channel: %s (%s)\n", name, channel.origin)
+	}
+}
+
 // WorkspaceInit creates a new workspace, installs an extension, and optionally
 // scaffolds a project. It mirrors the onboarding DX of the TypeScript CLI.
+//
+// One channel drives every resolution of the run: the extensions, the template
+// and the starter's dependencies (resolveInitChannel). The channel is a target
+// of this run only. The workspace config keeps bare artifact names, the lock
+// records the exact versions the channel resolved, and no later command reads
+// the channel back.
 func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env LifecycleEnv) error {
 	flags := parseInitFlags(args)
 
-	// Validate extension choice
-	extConfig, ok := initExtensions[flags.extension]
-	if !ok {
-		return cmderr.Usagef("unknown extension %q (choose: ts, go, py)", flags.extension)
+	extConfig, channel, err := resolveInitRequest(flags)
+	if err != nil {
+		return err
 	}
-	if flags.projectPath != "" && flags.project == "" {
-		return cmderr.Usagef("--project-path requires --project")
-	}
+	// Every installer and the project create of this run read the channel from
+	// env, so no step resolves on another one.
+	env.channel = channel.selected()
 
 	projectPath := ""
 	if flags.project != "" {
@@ -199,6 +243,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 
 	// --- Phase 1: Initialize workspace ---
 	iox.Fprintf(os.Stdout, "  → Initializing workspace…\n")
+	printInitChannel(channel)
 
 	// Init git repo if git is available and no .git exists
 	if _, err := exec.LookPath("git"); err == nil {
@@ -299,7 +344,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	// Reload config from disk (now that putnami.workspace.json exists)
 	wsCfg := wsproto.Load(cwd)
 
-	if err := installExtension(ctx, cwd, wsCfg, []string{extConfig.packageName}, ""); err != nil {
+	if err := installExtension(ctx, cwd, wsCfg, []string{channelArtifact(extConfig.packageName, env.channel)}, ""); err != nil {
 		return protocolcli.WithNext(
 			fmt.Errorf("install extension %s: %w", extConfig.packageName, err),
 			"putnami extensions install",
@@ -320,7 +365,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	if len(cfg.AgentArtifacts) > 0 {
 		iox.Fprintln(os.Stdout)
 		iox.Fprintf(os.Stdout, "  → Installing agent content…\n")
-		if err := installInitAgentContent(ctx, cwd, wsCfg, extConfig); err != nil {
+		if err := installInitAgentContent(ctx, cwd, wsCfg, extConfig, env.channel); err != nil {
 			// Reported, not fatal. The declarations are written and the
 			// content's extension is either unpinned or its content unwritten,
 			// so nothing is half-installed; `putnami install` installs and
@@ -392,7 +437,7 @@ func initializeProject(
 	iox.Fprintf(os.Stdout, "  → Installing template…\n")
 
 	wsCfg := wsproto.Load(cwd)
-	if err := installInitTemplate(ctx, cwd, wsCfg, []string{extConfig.template}, ""); err != nil {
+	if err := installInitTemplate(ctx, cwd, wsCfg, []string{channelArtifact(extConfig.template, env.channel)}, ""); err != nil {
 		return protocolcli.WithNext(
 			fmt.Errorf("install template %s: %w", extConfig.template, err),
 			"putnami templates install",
@@ -445,11 +490,12 @@ func initializeProject(
 	return nil
 }
 
-// installInitAgentContent installs the extension the starter opts into, then
-// materializes the agent content every opt-in selects.
-func installInitAgentContent(ctx context.Context, cwd string, wsCfg *wsproto.Config, extConfig initExtensionConfig) error {
+// installInitAgentContent installs the extension the starter opts into, on
+// channel when init chose one, then materializes the agent content every
+// opt-in selects from the release the lock pins.
+func installInitAgentContent(ctx context.Context, cwd string, wsCfg *wsproto.Config, extConfig initExtensionConfig, channel string) error {
 	if extConfig.agentContent != "" {
-		if err := installExtension(ctx, cwd, wsCfg, []string{extConfig.agentContent}, ""); err != nil {
+		if err := installExtension(ctx, cwd, wsCfg, []string{channelArtifact(extConfig.agentContent, channel)}, ""); err != nil {
 			return fmt.Errorf("install extension %s: %w", extConfig.agentContent, err)
 		}
 	}

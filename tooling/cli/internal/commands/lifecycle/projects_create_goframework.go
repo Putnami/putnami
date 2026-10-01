@@ -92,34 +92,56 @@ func refreshGoFrameworkCredential(ctx context.Context, wsRoot string, getenv fun
 // project requires, and the source that named it, in a form that carries no
 // user information (resolveModuleLatest).
 func resolveGoFrameworkVersion(ctx context.Context, client *http.Client, getenv func(string) string) (version, source string, err error) {
-	version, source, err = resolveModuleLatest(ctx, client, getenv, goFrameworkModule)
+	return resolveGoFrameworkVersionOn(ctx, client, getenv, "")
+}
+
+// resolveGoFrameworkVersionOn is resolveGoFrameworkVersion for the channel
+// `putnami init` chose: the version the channel names for go.putnami.dev/app,
+// asked of the same proxies and origin. An empty channel is latest. The
+// template requires every framework module at that one version, so a channel
+// that names different versions for them resolves the version of
+// go.putnami.dev/app for all of them.
+func resolveGoFrameworkVersionOn(ctx context.Context, client *http.Client, getenv func(string) string, channel string) (version, source string, err error) {
+	version, source, err = resolveModuleChannel(ctx, client, getenv, goFrameworkModule, channel)
 	if err != nil {
+		if channel != "" && channel != latestChannel {
+			return "", "", fmt.Errorf("resolve the version of %s on channel %s: %w", goFrameworkModule, channel, err)
+		}
 		return "", "", fmt.Errorf("resolve the version of %s: %w", goFrameworkModule, err)
 	}
 	return version, source, nil
 }
 
 // resolveModuleLatest returns module's newest version and the source that
-// named it, the way the go command reaches the module: through the proxies of
-// the effective GOPROXY in order, or from the module's origin ("direct") for a
-// module GONOPROXY (or, when that is unset, GOPRIVATE) matches. getenv reads
-// the environment the go command runs in; the go env file fills what it leaves
-// unset, and Go's default applies after both. A proxy that answers 404 or 410
-// passes the query on; any other failure does only after a "|".
+// named it (resolveModuleChannel on latest).
+func resolveModuleLatest(ctx context.Context, client *http.Client, getenv func(string) string, module string) (version, source string, err error) {
+	return resolveModuleChannel(ctx, client, getenv, module, "")
+}
+
+// resolveModuleChannel returns the version channel names for module and the
+// source that named it, the way the go command reaches the module: through
+// the proxies of the effective GOPROXY in order, or from the module's origin
+// ("direct") for a module GONOPROXY (or, when that is unset, GOPRIVATE)
+// matches. getenv reads the environment the go command runs in; the go env
+// file fills what it leaves unset, and Go's default applies after both. A
+// proxy that answers 404 or 410 passes the query on; any other failure does
+// only after a "|".
 //
-// It asks each proxy for the module's @latest version, the endpoint the Go
-// extension resolves a module's newest publication from: the highest version
-// of @v/list is not the newest one for commit-stamped pre-releases (ADR 0018),
-// and a public proxy can list a version it no longer serves. The origin is
-// read through its go-import meta tag, and only a "mod" tag, which names a
-// module proxy, is followed (queryModuleOrigin).
+// An empty channel, or latest, asks each proxy for the module's @latest
+// version, the endpoint the Go extension resolves a module's newest
+// publication from: the highest version of @v/list is not the newest one for
+// commit-stamped pre-releases (ADR 0018), and a public proxy can list a
+// version it no longer serves. Any other channel asks for @v/<channel>.info,
+// the Go version query the Go extension resolves a channel with (ADR 0020).
+// The origin is read through its go-import meta tag, and only a "mod" tag,
+// which names a module proxy, is followed (queryModuleOrigin).
 //
 // A request gets the credentials the go command would send it: the user
 // information of its URL, and over https the netrc entry for its host
 // (addGoProxyCredentials). No credential is ever printed. It fails naming every
 // source it asked and the setting that fixes the lookup; it never returns a
-// placeholder version.
-func resolveModuleLatest(ctx context.Context, client *http.Client, getenv func(string) string, module string) (version, source string, err error) {
+// placeholder version, and it never answers a channel with latest.
+func resolveModuleChannel(ctx context.Context, client *http.Client, getenv func(string) string, module, channel string) (version, source string, err error) {
 	lookup := goEnvLookup(getenv)
 	noProxy := lookup("GONOPROXY")
 	if noProxy == "" {
@@ -142,7 +164,7 @@ func resolveModuleLatest(ctx context.Context, client *http.Client, getenv func(s
 			asked = append(asked, "off: GOPROXY=off disables module downloads")
 			return "", "", moduleLookupError(module, asked, private)
 		case "direct":
-			version, origin, err := queryModuleOrigin(ctx, client, module, lookup, getenv)
+			version, origin, err := queryModuleOrigin(ctx, client, module, channel, lookup, getenv)
 			if err == nil {
 				return version, "direct (" + origin + ")", nil
 			}
@@ -150,7 +172,7 @@ func resolveModuleLatest(ctx context.Context, client *http.Client, getenv func(s
 			return "", "", moduleLookupError(module, asked, private)
 		}
 		display := redactedProxyURL(entry.url)
-		version, err := queryGoProxyLatest(ctx, client, entry.url, module, lookup, getenv)
+		version, err := queryGoProxyChannel(ctx, client, entry.url, module, channel, lookup, getenv)
 		if err == nil {
 			return version, display, nil
 		}
@@ -177,13 +199,13 @@ func moduleLookupError(module string, asked []string, private bool) error {
 	return fmt.Errorf("no module source answered:\n  - %s\n%s", strings.Join(asked, "\n  - "), fix)
 }
 
-// queryModuleOrigin resolves module's newest version from its origin the way
-// the go command's "direct" does for a module served by a module proxy: it
-// reads the go-import meta tag that covers module and asks the module proxy a
-// "mod" tag names for the module's @latest version. It reads no version
-// control repository; a tag of another kind fails naming it. The origin it
-// returns carries no user information.
-func queryModuleOrigin(ctx context.Context, client *http.Client, module string, lookup, getenv func(string) string) (version, origin string, err error) {
+// queryModuleOrigin resolves the version channel names for module from its
+// origin the way the go command's "direct" does for a module served by a
+// module proxy: it reads the go-import meta tag that covers module and asks
+// the module proxy a "mod" tag names (queryGoProxyChannel). It reads no
+// version control repository; a tag of another kind fails naming it. The
+// origin it returns carries no user information.
+func queryModuleOrigin(ctx context.Context, client *http.Client, module, channel string, lookup, getenv func(string) string) (version, origin string, err error) {
 	tag, err := fetchGoImportTag(ctx, client, module, module, lookup, getenv)
 	if err != nil {
 		return "", "", err
@@ -207,7 +229,7 @@ func queryModuleOrigin(ctx context.Context, client *http.Client, module string, 
 		return "", "", fmt.Errorf("the go-import tag of %s names a module proxy that is not an https URL", module)
 	}
 	origin = redactedProxyURL(tag.repoRoot)
-	version, err = queryGoProxyLatest(ctx, client, tag.repoRoot, module, lookup, getenv)
+	version, err = queryGoProxyChannel(ctx, client, tag.repoRoot, module, channel, lookup, getenv)
 	if err != nil {
 		return "", "", fmt.Errorf("%s: %w", origin, err)
 	}
@@ -351,16 +373,28 @@ func matchGoImport(tags []goImportTag, module string) (goImportTag, error) {
 	return tags[match], nil
 }
 
-// queryGoProxyLatest asks the module proxy at base for module's @latest
-// version, over the module proxy protocol. lookup reads the Go settings and
-// getenv the environment, for the credentials the proxy gets.
-func queryGoProxyLatest(ctx context.Context, client *http.Client, base, module string, lookup, getenv func(string) string) (string, error) {
+// goProxyChannelEndpoint is the module proxy path that answers channel for
+// module: /@latest for an empty channel or latest, which orders by publication
+// time, and the Go version query /@v/<channel>.info for any other channel.
+func goProxyChannelEndpoint(module, channel string) string {
+	escaped := escapeGoModulePath(module)
+	if channel == "" || channel == latestChannel {
+		return "/" + escaped + "/@latest"
+	}
+	return "/" + escaped + "/@v/" + channel + ".info"
+}
+
+// queryGoProxyChannel asks the module proxy at base for the version channel
+// names for module (goProxyChannelEndpoint), over the module proxy protocol.
+// lookup reads the Go settings and getenv the environment, for the
+// credentials the proxy gets.
+func queryGoProxyChannel(ctx context.Context, client *http.Client, base, module, channel string, lookup, getenv func(string) string) (string, error) {
 	parsed, err := url.Parse(base)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
 		return "", errors.New("not an http or https URL; this lookup asks no other kind of proxy")
 	}
 	endpoint := *parsed
-	endpoint.Path = strings.TrimSuffix(parsed.Path, "/") + "/" + escapeGoModulePath(module) + "/@latest"
+	endpoint.Path = strings.TrimSuffix(parsed.Path, "/") + goProxyChannelEndpoint(module, channel)
 	endpoint.RawPath = ""
 	shown := "GET " + redactedProxyURL(endpoint.String())
 

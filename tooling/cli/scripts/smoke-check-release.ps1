@@ -19,6 +19,13 @@
 # directory git reports as untouched. The command must be listed in the command
 # map published next to the installer and must not wait for input.
 #
+# The channel is one choice for the whole path: the installer installs the CLI
+# from it (PUTNAMI_VERSION), and init resolves the extensions, the template and
+# the starter's dependencies on it (PUTNAMI_CHANNEL). The init command line
+# stays the public one. The active putnami.exe is a copy of the installed
+# binary, so its name records no channel: the variable is the only thing that
+# hands the channel to init on Windows.
+#
 # Usage:   powershell -NoProfile -ExecutionPolicy Bypass -File smoke-check-release.ps1 [channel]
 #          (default channel: latest)
 # Env:
@@ -737,6 +744,9 @@ function Invoke-Smoke {
     Set-SmokeEnv 'PUTNAMI_NO_RELAUNCH' '1'
     Set-SmokeEnv 'PUTNAMI_REGISTRY_URL' $Base
     Set-SmokeEnv 'PUTNAMI_VERSION' $Channel
+    # init resolves on the channel under test: a candidate smoke uses only the
+    # candidate's release set.
+    Set-SmokeEnv 'PUTNAMI_CHANNEL' $Channel
     Set-SmokeEnv 'PUTNAMI_TELEMETRY' 'off'
     Set-SmokeEnv 'DO_NOT_TRACK' '1'
     foreach ($name in @(
