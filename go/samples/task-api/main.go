@@ -121,12 +121,12 @@ func main() {
 	// Operational surface: /healthz, /livez, /readyz, /version. For a service
 	// that wants the full platform probe set, this is a richer alternative to
 	// the single-endpoint http.NewHealthPlugin() (/_/health) used by the
-	// simple-api starter — both are supported. RegisterOn mounts the routes; Use
-	// wires the plugin into the lifecycle so it aggregates readiness probes.
+	// simple-api starter — both are supported. Use, below, adds the plugin to
+	// the application: it mounts the routes on the application's server and
+	// aggregates readiness probes.
 	platformPlugin := platform.NewPlugin(platform.Config{
 		Version: platform.VersionInfo{Name: "tasks-api", Version: "1.0.0"},
 	})
-	platformPlugin.RegisterOn(server)
 
 	// Native feature composition. This is the sole functional declaration;
 	// routes, injected services, publications, and subscriptions are derived

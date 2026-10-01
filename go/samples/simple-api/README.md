@@ -62,7 +62,8 @@ before the first request.
 
 ## Health plugin versus platform endpoints
 
-`http.NewHealthPlugin()` mounts one liveness route at `/_/health`. A service that
+`a.Use(http.NewHealthPlugin())` mounts one liveness route at `/_/health` on the
+application's server. A service that
 needs the full operational surface — `/livez`, `/healthz`, `/readyz`, `/version` —
 uses [`go.putnami.dev/platform`](../../framework/platform) instead, as
 [`task-api`](../task-api) does. Mount one or the other, never both: they overlap

@@ -32,7 +32,6 @@ func main() {
     ops := platform.NewPlugin(platform.Config{
         Version: platform.VersionInfo{Name: "my-service", Version: "1.0.0"},
     })
-    ops.RegisterOn(server)
 
     a := app.New("my-service")
     a.Use(server)
@@ -43,11 +42,17 @@ func main() {
 }
 ```
 
-Two calls, two jobs:
+`Use(ops)` does two jobs:
 
-- `RegisterOn(server)` mounts the routes. Without it nothing is reachable.
-- `Use(ops)` wires the lifecycle. Without it `/healthz` and `/readyz` stay
-  `unavailable`, because the running flag is set from `Start`.
+- It mounts the routes. When the application configures, the plugin registers
+  its endpoints on the application's single `http.ServerPlugin`, in any plugin
+  order.
+- It wires the lifecycle. `/healthz` and `/readyz` answer `unavailable` until
+  `Start` sets the running flag.
+
+An application that holds no server, or several, fails configure with an error
+that names `RegisterOn`. Call `ops.RegisterOn(server)` before the application
+configures to choose the server; the plugin then registers nothing more.
 
 Then:
 

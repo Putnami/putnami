@@ -304,7 +304,7 @@ func TestHealthzAndReadyz_UnavailableAfterStop(t *testing.T) {
 func TestHealthz_AutoDiscoversHealthChecker(t *testing.T) {
 	spectest.Proves(t, "go/platform-endpoints", "deferred-discovery", "a-health-probe-is-discovered-on-the-first-aggregate-request")
 	p := NewPlugin(Config{})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&fakeHealthPlugin{name: "db", err: nil})
 
@@ -326,7 +326,7 @@ func TestHealthz_AutoDiscoversHealthChecker(t *testing.T) {
 func TestHealthz_DegradedWhenProbeFails(t *testing.T) {
 	spectest.Proves(t, "go/platform-endpoints", "lifecycle-state", "health-is-degraded-with-per-probe-detail-when-a-probe-fails")
 	p := NewPlugin(Config{})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&fakeHealthPlugin{name: "db", err: fmt.Errorf("conn refused")})
 	root.Use(&fakeHealthPlugin{name: "cache", err: nil})
@@ -347,7 +347,7 @@ func TestHealthz_RedactProbeErrors(t *testing.T) {
 	spectest.Proves(t, "go/platform-endpoints", "error-redaction", "a-failing-probe-reports-a-generic-message-when-redaction-is-enabled")
 	const secret = "dial tcp 10.0.2.5:5432: connect: connection refused"
 	p := NewPlugin(Config{RedactProbeErrors: true})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&fakeHealthPlugin{name: "db", err: fmt.Errorf("%s", secret)})
 	root.Use(&fakeHealthPlugin{name: "cache", err: nil})
@@ -386,7 +386,7 @@ func TestHealthz_RedactedFailure_LogsStructuredFieldsWithTrace(t *testing.T) {
 	p := NewPlugin(Config{RedactProbeErrors: true})
 	p.log = logger.New("platform", logger.LevelDebug, sink)
 
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&fakeHealthPlugin{name: "db", err: fmt.Errorf("connection refused")})
 	if err := p.Configure(context.Background(), root); err != nil {
@@ -439,7 +439,7 @@ func TestHealthz_AbandonedProbe_LogsStructuredFieldsWithTrace(t *testing.T) {
 	p.log = logger.New("platform", logger.LevelDebug, sink)
 
 	stubborn := &stubbornHealthPlugin{name: "stubborn", delay: 2 * time.Second, started: make(chan struct{})}
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(stubborn)
 	if err := p.Configure(context.Background(), root); err != nil {
@@ -481,7 +481,7 @@ func TestHealthz_AbandonedProbe_LogsStructuredFieldsWithTrace(t *testing.T) {
 func TestHealthz_ProbeMetrics_RecordsOutcomesAndAggregate(t *testing.T) {
 	mx := &fakeProbeMetrics{}
 	p := NewPlugin(Config{ProbeMetrics: mx})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&fakeHealthPlugin{name: "db", err: fmt.Errorf("down")})
 	root.Use(&fakeHealthPlugin{name: "cache", err: nil})
@@ -528,7 +528,7 @@ func TestHealthz_ProbeMetrics_RecordsOutcomesAndAggregate(t *testing.T) {
 func TestReadyz_ProbeMetrics_TaggedReadiness(t *testing.T) {
 	mx := &fakeProbeMetrics{}
 	p := NewPlugin(Config{ProbeMetrics: mx})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&fakeReadyPlugin{name: "warm", err: nil})
 	if err := p.Configure(context.Background(), root); err != nil {
@@ -559,7 +559,7 @@ func TestHealthz_ProbeMetrics_TimeoutOutcome(t *testing.T) {
 	mx := &fakeProbeMetrics{}
 	p := NewPlugin(Config{ProbeTimeout: 50 * time.Millisecond, ProbeMetrics: mx})
 	stubborn := &stubbornHealthPlugin{name: "stubborn", delay: 2 * time.Second, started: make(chan struct{})}
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(stubborn)
 	if err := p.Configure(context.Background(), root); err != nil {
@@ -586,7 +586,7 @@ func TestHealthz_ProbeMetrics_TimeoutOutcome(t *testing.T) {
 // and the endpoint responds without a metrics sink installed.
 func TestHealthz_NilProbeMetrics_NoPanic(t *testing.T) {
 	p := NewPlugin(Config{}) // ProbeMetrics nil
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&fakeHealthPlugin{name: "db", err: nil})
 	if err := p.Configure(context.Background(), root); err != nil {
@@ -611,7 +611,7 @@ func TestHealthz_ParallelProbes_PerProbeTimeout(t *testing.T) {
 	slow := &slowHealthPlugin{name: "slow", delay: 2 * time.Second}
 	fast := &fakeHealthPlugin{name: "fast", err: nil}
 
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(slow)
 	root.Use(fast)
@@ -652,7 +652,7 @@ func TestHealthz_NonCooperativeProbe_DoesNotStall(t *testing.T) {
 	stubborn := &stubbornHealthPlugin{name: "stubborn", delay: 2 * time.Second, started: make(chan struct{})}
 	fast := &fakeHealthPlugin{name: "fast", err: nil}
 
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(stubborn)
 	root.Use(fast)
@@ -713,7 +713,7 @@ func TestHealthz_ExplicitAddChecker_WinsOverAutoDiscovery(t *testing.T) {
 		t.Fatalf("AddHealthChecker: %v", err)
 	}
 
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	// Auto-discovered probe of the same name must not overwrite.
 	root.Use(&fakeHealthPlugin{name: "db", err: nil})
@@ -752,7 +752,7 @@ func TestAddReadinessChecker_RejectsInvalidName(t *testing.T) {
 func TestStart_RejectsDiscoveredInvalidProbeName(t *testing.T) {
 	spectest.Proves(t, "go/platform-endpoints", "probe-names", "a-discovered-probe-with-an-invalid-name-fails-start")
 	p := NewPlugin(Config{})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	// A plugin whose Name() is non-conforming would emit an envelope that fails
 	// the protocol's own validator; Start must reject it rather than serve it.
@@ -794,7 +794,7 @@ func TestReadyz_503_BeforeStart(t *testing.T) {
 func TestReadyz_AutoDiscoversReadinessChecker(t *testing.T) {
 	spectest.Proves(t, "go/platform-endpoints", "deferred-discovery", "a-readiness-probe-is-discovered-on-the-first-aggregate-request")
 	p := NewPlugin(Config{})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&fakeReadyPlugin{name: "leader-elect", err: nil})
 
@@ -811,7 +811,7 @@ func TestReadyz_AutoDiscoversReadinessChecker(t *testing.T) {
 func TestReadyz_DegradedWhenProbeFails(t *testing.T) {
 	spectest.Proves(t, "go/platform-endpoints", "lifecycle-state", "readiness-is-degraded-with-per-probe-detail-when-a-probe-fails")
 	p := NewPlugin(Config{})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&fakeReadyPlugin{name: "warm", err: fmt.Errorf("loading")})
 
@@ -829,7 +829,7 @@ func TestReadyz_DegradedWhenProbeFails(t *testing.T) {
 // A plugin implementing both interfaces contributes to both endpoints.
 func TestPlugin_BothInterfaces_ContributesToBothEndpoints(t *testing.T) {
 	p := NewPlugin(Config{})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&bothPlugin{name: "deps", hErr: nil, rErr: fmt.Errorf("warmup")})
 
@@ -857,7 +857,7 @@ func TestPlugin_BothInterfaces_ContributesToBothEndpoints(t *testing.T) {
 func TestReadyz_MissingRequiredProbe_Degraded(t *testing.T) {
 	spectest.Proves(t, "go/platform-endpoints", "required-probes", "a-missing-required-probe-makes-readiness-degraded")
 	p := NewPlugin(Config{Required: []string{"leader-elect"}})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	_ = p.Configure(context.Background(), root)
 	_ = p.Start(context.Background(), nil)
@@ -892,7 +892,7 @@ func TestReadyz_MissingRequiredProbe_Degraded(t *testing.T) {
 func TestReadyz_RequiredProbe_Registered_RunsNormally(t *testing.T) {
 	spectest.Proves(t, "go/platform-endpoints", "required-probes", "a-registered-required-probe-runs-normally")
 	p := NewPlugin(Config{Required: []string{"leader-elect"}})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&fakeReadyPlugin{name: "leader-elect", err: nil})
 	_ = p.Configure(context.Background(), root)
@@ -910,7 +910,7 @@ func TestReadyz_RequiredProbe_Registered_RunsNormally(t *testing.T) {
 func TestReadyz_MissingRequired_AlongsidePassingProbe(t *testing.T) {
 	spectest.Proves(t, "go/platform-endpoints", "required-probes", "a-missing-required-probe-is-reported-alongside-a-passing-one")
 	p := NewPlugin(Config{Required: []string{"leader-elect"}})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&fakeReadyPlugin{name: "warm", err: nil})
 	_ = p.Configure(context.Background(), root)
@@ -929,7 +929,7 @@ func TestReadyz_MissingRequired_AlongsidePassingProbe(t *testing.T) {
 func TestHealthz_IgnoresRequired(t *testing.T) {
 	spectest.Proves(t, "go/platform-endpoints", "required-probes", "health-ignores-the-required-list")
 	p := NewPlugin(Config{Required: []string{"leader-elect"}})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	_ = p.Configure(context.Background(), root)
 	_ = p.Start(context.Background(), nil)
@@ -952,7 +952,7 @@ func TestConfigure_FromNestedModule_WalksToRoot(t *testing.T) {
 	// Platform plugin registered in a child module still sees siblings
 	// of the root via owner.Root().CollectPlugins().
 	p := NewPlugin(Config{})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(&fakeHealthPlugin{name: "db", err: nil})
 
 	child := app.NewModule("api")
@@ -988,6 +988,9 @@ func TestHealthz_DiscoversContributionFromLaterConfiguredPlugin(t *testing.T) {
 	// inline in Configure and missed contributions made by plugins configured
 	// afterwards.
 	p := NewPlugin(Config{})
+	// The test invokes the handler itself: the plugin mounts on a server kept
+	// outside the application, so the application starts no listener.
+	p.RegisterOn(http.NewServerPlugin(http.ServerConfig{}))
 	a := app.New("t")
 	a.Use(p)                                        // configured first
 	a.Use(&contributingPlugin{probe: "late-probe"}) // contributes during its Configure, after p
@@ -1084,7 +1087,7 @@ func TestConformance_HealthzEnvelopeMatchesProtocol(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			p := NewPlugin(Config{})
-			root := app.NewModule("root")
+			root := rootWithServer()
 			root.Use(p)
 			c.setup(p, root)
 
@@ -1113,7 +1116,7 @@ func TestConformance_HealthzEnvelopeMatchesProtocol(t *testing.T) {
 // of the healthz conformance test — identical shape rules apply.
 func TestConformance_ReadyzEnvelopeMatchesProtocol(t *testing.T) {
 	p := NewPlugin(Config{})
-	root := app.NewModule("root")
+	root := rootWithServer()
 	root.Use(p)
 	root.Use(&fakeReadyPlugin{name: "warm", err: fmt.Errorf("loading")})
 	_ = p.Configure(context.Background(), root)

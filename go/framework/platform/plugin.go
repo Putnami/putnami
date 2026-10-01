@@ -16,6 +16,10 @@
 //	        Version: platform.VersionInfo{Name: "my-service"},
 //	    }))
 //
+// The platform plugin mounts its endpoints on the application's single
+// http.ServerPlugin while the application configures. An application that
+// holds several servers chooses one with Plugin.RegisterOn.
+//
 // The database plugin implements app.HealthChecker, so /healthz reports
 // pool connectivity without any extra wiring. Any other plugin that
 // satisfies app.HealthChecker (liveness) or app.ReadinessChecker
@@ -228,15 +232,22 @@ func probeKindFor(which checkerSet) ProbeKind {
 // Plugin mounts the standard operational endpoints on an http server
 // and aggregates probes contributed by other plugins.
 //
+// A plugin added to an application mounts itself: during Configure it
+// registers its endpoints on the application's single http.ServerPlugin.
+// RegisterOn chooses the server instead, for an application that holds
+// several or keeps its server outside the module tree.
+//
 // The probe maps are guarded by mu: AddHealthChecker / AddReadinessChecker
 // and the one-shot auto-discovery write under mu.Lock(); the /healthz and
 // /readyz request paths read under mu.RLock(). The lifecycle contract is
 // still "register before Start," but the lock makes accidental post-Start
 // registration safe rather than a data race.
 type Plugin struct {
-	cfg               Config
-	prefix            string
-	ready             atomic.Bool
+	cfg    Config
+	prefix string
+	ready  atomic.Bool
+	// mounted is set once RegisterOn has registered the endpoints on a server.
+	mounted           atomic.Bool
 	mu                sync.RWMutex
 	healthCheckers    map[string]HealthCheckFunc
 	readinessCheckers map[string]HealthCheckFunc
@@ -245,9 +256,10 @@ type Plugin struct {
 	log               *logger.Logger
 }
 
-// NewPlugin creates a new platform plugin with the given config. The
-// returned plugin must be registered on an *http.ServerPlugin via
-// RegisterOn for the endpoints to be reachable.
+// NewPlugin creates a new platform plugin with the given config. Add the
+// returned plugin to the application with Use: it mounts its endpoints on the
+// application's single *http.ServerPlugin during Configure, unless RegisterOn
+// mounted them first.
 func NewPlugin(cfg Config) *Plugin {
 	return &Plugin{
 		cfg:               cfg,
@@ -303,10 +315,25 @@ func (p *Plugin) AddReadinessChecker(name string, checker HealthCheckFunc) error
 // would be invisible to a platform plugin configured before it. Deferring
 // to the request path makes the order irrelevant — by the time any probe
 // is served, every plugin has finished configuring.
+//
+// Configure also mounts the plugin when RegisterOn did not: it registers the
+// endpoints on the single http.ServerPlugin of the owner's module tree. A tree
+// with no server, or with several, fails with the http.SingleServer error. A
+// mounted plugin is left as it is, so configuring again registers nothing. A
+// nil owner has no module tree: nothing is captured and nothing is mounted.
 func (p *Plugin) Configure(_ context.Context, owner *app.Module) error {
-	if owner != nil {
-		p.root = owner.Root()
+	if owner == nil {
+		return nil
 	}
+	p.root = owner.Root()
+	if p.mounted.Load() {
+		return nil
+	}
+	server, err := http.SingleServer(owner, p.Name())
+	if err != nil {
+		return err
+	}
+	p.RegisterOn(server)
 	return nil
 }
 
@@ -379,11 +406,11 @@ func (p *Plugin) Stop(_ context.Context, _ *app.Module) error {
 	return nil
 }
 
-// RegisterOn mounts the platform endpoints on the given http server
-// plugin. Call this after constructing both plugins and before
-// app.ListenAndServe so route registration happens before the http
-// server's Start phase.
+// RegisterOn mounts the platform endpoints on server and marks the plugin
+// mounted. Call it before the application configures to choose the server;
+// without it, Configure mounts the plugin on the application's single server.
 func (p *Plugin) RegisterOn(server *http.ServerPlugin) {
+	p.mounted.Store(true)
 	server.GET(p.prefix+protocol.PathLivez, p.livezHandler())
 	server.GET(p.prefix+protocol.PathHealthz, p.healthzHandler())
 	server.GET(p.prefix+protocol.PathReadyz, p.readyzHandler())

@@ -40,13 +40,6 @@ func BuildApp() *app.Application {
 	// The feature's business read: it answers from the migrated database.
 	server.GET(iam.UsersPath, http.Inject(iam.ListUsers))
 
-	// The operational surface: /livez, /healthz, /readyz and /version.
-	// Deployment probes and `putnami qualify` wait on /readyz before any
-	// business request; the database plugin's probe is discovered and reported
-	// on /healthz.
-	ops := platform.NewPlugin(platform.Config{})
-	ops.RegisterOn(server)
-
 	a := app.New("migrations-feature")
 	a.Use(database.NewPlugin(database.PluginConfig{
 		// Naming the datasource declared in infra/requirements.json lets a
@@ -65,7 +58,12 @@ func BuildApp() *app.Application {
 	}))
 	a.Use(iam.New())
 	a.Use(server)
-	a.Use(ops)
+	// The operational surface: /livez, /healthz, /readyz and /version, mounted
+	// on the server above. Deployment probes and `putnami qualify` wait on
+	// /readyz before any business request; the database plugin's probe is
+	// discovered and reported on /healthz.
+	a.Use(platform.NewPlugin(platform.Config{}))
+	// The single-endpoint probe, GET /_/health, mounted on the same server.
 	a.Use(http.NewHealthPlugin())
 
 	return a

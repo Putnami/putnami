@@ -4,6 +4,20 @@
   "routes": [
     {
       "match": "exact",
+      "path": "/_/health",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/greetings",
       "methods": [
         "GET",
@@ -33,5 +47,5 @@
       }
     }
   ],
-  "digest": "sha256:def173ba066baaef200f9221739932722da11c1bf0fb6fe9f60c329ac75f033f"
+  "digest": "sha256:bcb59b566600cc77191ae79e0146a1d03306493d4d09a3ba231fa178e5ad8cc8"
 }

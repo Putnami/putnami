@@ -286,6 +286,10 @@ func (p *Plugin) OpenAPISpecJSON() ([]byte, error) {
 }
 
 // RegisterOn registers the spec-serving endpoint on an HTTP server plugin.
+// Serving the document is the caller's explicit choice: the plugin never
+// mounts the route by itself, because the route is unauthenticated and the
+// document discloses the API's security model. Without RegisterOn the plugin
+// still renders the document for Describe and for SpecSource.
 func (p *Plugin) RegisterOn(server *phttp.ServerPlugin) {
 	server.GET(p.opts.Route, p.handler())
 }

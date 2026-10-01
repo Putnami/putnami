@@ -143,7 +143,7 @@ The same canonical bytes are consumed by `@putnami/events`; do not maintain a Go
 
 ## Push Delivery (serverless)
 
-`Delivery: events.DeliveryPush` lets handlers run on a scale-to-zero workload: instead of a long-lived pull/stream loop, the provider POSTs each event to a receiver route. Mount it on the HTTP server before serving (mirrors `platform.Plugin.RegisterOn`):
+`Delivery: events.DeliveryPush` lets handlers run on a scale-to-zero workload: instead of a long-lived pull/stream loop, the provider POSTs each event to a receiver route. The plugin mounts that route on the application's single HTTP server when the application configures (the same rule as `platform.Plugin`):
 
 ```go
 ev := events.Events(events.PluginConfig{
@@ -156,13 +156,18 @@ ev := events.Events(events.PluginConfig{
     },
 })
 server := http.NewServerPlugin(http.ServerConfig{Port: 8080})
-ev.RegisterOn(server) // registers POST /_putnami/events/{subscription} in push mode; no-op otherwise
+
+a := app.New("my-service")
+a.Use(server)
+a.Use(ev) // push delivery: registers POST /_putnami/events/{subscription} on server
 ```
+
+The plugin mounts the receiver after it resolves the `events` config, so a deployment that sets `events.delivery: push` mounts it too, with the resolved issuer, key set, and audience. A push application that holds no server, or several, fails configure with an error that names `RegisterOn`. Call `ev.RegisterOn(server)` before the application configures to choose the server: when the delivery set in code is push it registers the route at once from the push configuration set in code; otherwise it records the server and the plugin mounts the receiver on it at configure. Pull and stream delivery need no server.
 
 The receiver verifies the pusher's OIDC token fail-closed (JWKS signature, issuer, audience) and a **service-account-email allowlist**, then dispatches the decoded envelope. The HTTP status encodes the ack: `2xx` ack, `4xx` dead-letter, `5xx` retry — so handlers must be idempotent. Caller-supplied `auth.*` attributes are stripped before dispatch; the pusher identity never becomes a carried end-user identity. `delivery` travels into the infra requirement so the deployer provisions a push subscription. Pull/stream modes are unchanged.
 
 During first-deploy bootstrap, resolved config may set `events.push.enabled:
-false`. `RegisterOn` still mounts the receiver, but it returns a retryable `503`
+false`. The plugin still mounts the receiver, but it returns a retryable `503`
 and never invokes a handler. Omitting `enabled` preserves the existing enabled
 push behavior.
 

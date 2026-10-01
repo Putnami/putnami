@@ -260,11 +260,24 @@ into your application alongside the HTTP server. See the
 The health plugin provides a liveness endpoint:
 
 ```go
-health := http.NewHealthPlugin()
-a.Module.Use(health)
-// Registers GET /_/health
+a.Use(server)
+a.Use(http.NewHealthPlugin())
+// Registers GET /_/health on the application's server
 // Returns 200 {"status":"ok"} when running, 503 {"status":"unavailable"} otherwise
 ```
+
+Adding the plugin to the application is the only wiring step. When the
+application configures, the plugin registers `GET /_/health` on the
+application's single `ServerPlugin`, in any plugin order. An application that
+holds no server, or several, fails configure with an error that names
+`RegisterOn`.
+
+Two calls replace the default mount. Make either one before the application
+configures:
+
+- `health.RegisterOn(server)` registers the route on the server you choose.
+- `health.Handler()` returns the handler, which you mount on a route of your
+  own. The plugin then registers no route.
 
 ### Dependency probes
 
@@ -303,9 +316,11 @@ Before v1.0.0, a minor `0.x` release may still contain a breaking change; the
 documentation rather than strict compatibility between every pre-1.0 minor.
 
 The [HTTP services specification](specs/http-services.json) defines the contract,
-backed by two durable decisions: [the request scope follows the
-response](doc/adr/0001-request-scope-follows-the-response.md) and [every long-lived
-resource carries a framework-owned bound](doc/adr/0002-framework-owned-bounds.md).
+backed by three durable decisions: [the request scope follows the
+response](doc/adr/0001-request-scope-follows-the-response.md), [every long-lived
+resource carries a framework-owned bound](doc/adr/0002-framework-owned-bounds.md),
+and [a route plugin mounts itself on the application's single
+server](doc/adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md).
 
 `ServerConfig` resolves its own defaults, so a directly constructed config behaves
 exactly like one loaded through `go.putnami.dev/config`. In particular an unset
@@ -313,7 +328,8 @@ exactly like one loaded through `go.putnami.dev/config`. In particular an unset
 negative value to drain under the caller's context alone.
 
 Regression evidence covers [routing, middleware, responses, negotiation, and the
-health plugin](http_test.go), [route registration and the OPTIONS
+health plugin](http_test.go), [the health plugin mounting itself on the
+application's server](health_mount_test.go), [route registration and the OPTIONS
 fallback](server_test.go), [graceful shutdown and default
 resolution](server_shutdown_test.go), [the request-scope transaction
 boundary](scope_boundary_test.go), [dependency injection into

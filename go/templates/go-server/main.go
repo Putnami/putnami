@@ -22,6 +22,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	a, _ := newApp(cfg)
+	if err := a.ListenAndServe(); err != nil {
+		logger.Default().Error("application failed", err)
+		os.Exit(1)
+	}
+}
+
+// newApp composes the application and returns it with its HTTP server. The
+// health plugin answers GET /_/health on that server.
+func newApp(cfg ServerConfig) (*app.Application, *http.ServerPlugin) {
 	server := http.NewServerPlugin(http.ServerConfig{Port: cfg.Port})
 	server.Use(http.Recovery())
 	server.Use(http.RequestID())
@@ -34,9 +44,5 @@ func main() {
 	a := app.New("server")
 	a.Use(server)
 	a.Use(http.NewHealthPlugin())
-
-	if err := a.ListenAndServe(); err != nil {
-		logger.Default().Error("application failed", err)
-		os.Exit(1)
-	}
+	return a, server
 }

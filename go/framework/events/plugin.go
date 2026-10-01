@@ -11,6 +11,7 @@ import (
 	"go.putnami.dev/app"
 	pconfig "go.putnami.dev/config"
 	"go.putnami.dev/errors"
+	phttp "go.putnami.dev/http"
 	"go.putnami.dev/inject"
 	protocaps "go.putnami.dev/protocol/capabilities"
 	protoevents "go.putnami.dev/protocol/events"
@@ -68,8 +69,9 @@ type PluginConfig struct {
 	Publishes []string
 	// Delivery selects how handlers receive events: pull (the default) or
 	// stream hold a long-lived process; push registers an HTTP receiver route
-	// (RegisterOn) and the provider POSTs each event to it, so the workload can
-	// scale to zero. In push mode the broker/transport pull loop is not started.
+	// on the application's HTTP server and the provider POSTs each event to it,
+	// so the workload can scale to zero. In push mode the broker/transport pull
+	// loop is not started.
 	Delivery DeliveryMode
 	// Push configures OIDC verification for the push receiver; used only when
 	// Delivery is push.
@@ -102,6 +104,12 @@ type Plugin struct {
 	// pushRoundRobin holds per-topic round-robin counters for competing
 	// distribution in push delivery (topic → *atomic.Uint64).
 	pushRoundRobin sync.Map
+
+	// pushServer is the server RegisterOn named, and pushMounted records that
+	// the push receiver route is registered. RegisterOn and Configure write
+	// both while the application is wired, before it serves.
+	pushServer  *phttp.ServerPlugin
+	pushMounted bool
 }
 
 // Events creates an events app plugin.
@@ -317,10 +325,14 @@ func (p *Plugin) overlayConfigDoc(doc configDoc) error {
 }
 
 // Configure resolves the events config block (overlaying the document onto the
-// code-constructed PluginConfig) and then selects and registers the event
-// transport.
-func (p *Plugin) Configure(ctx context.Context, _ *app.Module) error {
+// code-constructed PluginConfig), mounts the push receiver when the resolved
+// delivery is push and no route is registered yet, and then selects and
+// registers the event transport.
+func (p *Plugin) Configure(ctx context.Context, owner *app.Module) error {
 	if err := p.applyResolvedConfig(ctx); err != nil {
+		return err
+	}
+	if err := p.mountPushReceiver(owner); err != nil {
 		return err
 	}
 	if p.config.Transport != nil {
@@ -353,9 +365,9 @@ func (p *Plugin) Configure(ctx context.Context, _ *app.Module) error {
 	}
 	SetTransport(p.transport)
 	if p.deliveryProfile() == DeliveryPush {
-		// Push delivery: the receiver route (RegisterOn) owns delivery. Do not
-		// subscribe handlers to the transport, so it never double-delivers; the
-		// transport stays available for publishing.
+		// Push delivery: the receiver route owns delivery. Do not subscribe
+		// handlers to the transport, so it never double-delivers; the transport
+		// stays available for publishing.
 		return nil
 	}
 	for _, handler := range p.handlers {

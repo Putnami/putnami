@@ -283,4 +283,7 @@ The durable delivery contract is [`go/event-delivery`](specs/event-delivery.json
 At-least-once retry and terminal outcomes are recorded in
 [ADR 0001](doc/adr/0001-at-least-once-retry-and-terminal-outcomes.md) and protected
 by [`events_test.go`](events_test.go), [`adapter_transports_test.go`](adapter_transports_test.go),
-and [`push_receiver_test.go`](push_receiver_test.go).
+and [`push_receiver_test.go`](push_receiver_test.go). Under push delivery the
+plugin mounts its receiver on the application's single HTTP server, as the
+[route plugin ADR](../http/doc/adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md)
+records; [`push_mount_test.go`](push_mount_test.go) protects it.

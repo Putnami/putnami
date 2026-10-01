@@ -318,7 +318,8 @@ fanout := events.NewRedisPubSubTransport(events.RedisPubSubTransportConfig{
 
 Use `EventServerTransport` for managed workload publishing through the canonical
 `POST /events/publish` boundary. It is publish-only; push delivery continues to
-use `Plugin.RegisterOn`, and existing pull/stream transports are unchanged.
+use the receiver route the plugin mounts, and existing pull/stream transports
+are unchanged.
 
 ```go
 transport, err := events.NewEventServerTransport(events.EventServerTransportConfig{

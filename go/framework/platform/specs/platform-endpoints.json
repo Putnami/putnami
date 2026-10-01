@@ -20,6 +20,10 @@
       "text": "The plugin mounts liveness, health, readiness, and version paths under the configured prefix, and mounts profiling handlers only when the workload enables them explicitly."
     },
     {
+      "id": "self-mounting",
+      "text": "A platform plugin added to an application mounts its endpoints on the application's single server when the application configures, in any plugin order, and mounts them once however often the application configures. An application that holds no server, or several, fails configure with an error that names RegisterOn. A plugin mounted through RegisterOn registers nothing more."
+    },
+    {
       "id": "liveness-is-trivial",
       "text": "The liveness path runs no probes and consults no running flag, so it answers success whenever the process can serve a request and never causes a restart because a dependency is slow."
     },
@@ -53,6 +57,7 @@
     }
   ],
   "decisions": [
+    "go/framework/http/doc/adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md",
     "go/framework/platform/doc/adr/0001-probe-discovery-happens-on-the-request-path.md"
   ]
 }

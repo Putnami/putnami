@@ -17,13 +17,14 @@ server := http.NewServerPlugin(http.ServerConfig{Port: 8080})
 platformPlugin := platform.NewPlugin(platform.Config{
     Version: platform.VersionInfo{Name: "my-service", Version: "1.0.0"},
 })
-platformPlugin.RegisterOn(server)
 
 a := app.New("my-service").
     Use(server).
     Use(platformPlugin)
 a.ListenAndServe()
 ```
+
+`Use(platformPlugin)` is the only wiring step. When the application configures, the plugin mounts its endpoints on the application's single `http.ServerPlugin`, in any plugin order. An application that holds no server, or several, fails configure with an error that names `RegisterOn`. Call `platformPlugin.RegisterOn(server)` before the application configures to choose the server.
 
 ## Endpoints
 
@@ -162,11 +163,10 @@ a.Use(server).Use(http.NewHealthPlugin())
 
 // after
 platformPlugin := platform.NewPlugin(platform.Config{Prefix: "/_"}) // keep /_ namespace
-platformPlugin.RegisterOn(server)
 a.Use(server).Use(platformPlugin)
 ```
 
-`/_/health` becomes `/_/healthz`, and you also get `/_/livez`, `/_/readyz`, `/_/version`. Drop the `Prefix` for plain k8s-style paths (`/healthz`, `/livez`, …). Don't mount both — they overlap on probe registration.
+`/_/health` becomes `/_/healthz`, and you also get `/_/livez`, `/_/readyz`, `/_/version`. Drop the `Prefix` for plain k8s-style paths (`/healthz`, `/livez`, …). Don't add both — they overlap on probe registration.
 ## Support and contract
 
 `go.putnami.dev/platform` is `stable` in the workspace support catalog. Its

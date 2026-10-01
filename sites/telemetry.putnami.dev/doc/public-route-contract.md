@@ -84,10 +84,9 @@ to the registered pattern, and the route-scoped identity resolver and guard key
 off that pattern, so an anonymous `GET /v1/cli-usage/aggregate/` is refused
 exactly like the declared path. Both facts are pinned by tests.
 
-The workload registers `http.NewHealthPlugin()` on the app but never calls
-`RegisterOn(server)`, so no `/_/health` route is mounted and none is declared.
-The artifact is correct as-is; a health route would have to be mounted, and
-described, before it could be declared.
+The workload composes no health plugin, so no `/_/health` route is mounted and
+none is declared. Adding `http.NewHealthPlugin()` to the application mounts the
+route and describes it; the artifact and this contract must then declare it.
 
 ## Blockers
 
