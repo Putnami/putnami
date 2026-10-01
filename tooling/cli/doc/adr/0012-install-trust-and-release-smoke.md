@@ -153,6 +153,27 @@ The framework ships the map empty; an extension owner adds an entry by pull
 request. The smoke's opt-in `run` leg (`SMOKE_RUN_COMMAND`) runs the run form in
 a fresh directory and requires exit 0 and an untouched directory.
 
+### 7. The first-use smoke runs the documented block on a bare machine
+
+The smoke of section 5 runs each command on its own, on a runner that already
+holds Bun and Git. It cannot see a document that names too few prerequisites, or
+a block that fails when pasted. `smoke-first-use.sh` closes that gap:
+
+- It reads the first `bash` block of the getting-started page and runs it as
+  printed. `SMOKE_INSTALL_URL` may replace only the installer URL in it.
+- It runs in an image that adds `curl` and its certificates to a base image that
+  holds Bash, `tar` and `sha256sum`, as a non-root user with no writable `PATH`
+  directory. It refuses an image that holds `bun`, `git`, `node` or `go`.
+- It then runs `putnami lint,test,build` on the starter, and the Go path: `init`,
+  `serve` and `lint,test,build` for `api`.
+- It fails when a toolchain Putnami installed is outside the Putnami home.
+
+It is a separate script because `smoke-check-release.ps1` mirrors the legs and
+inputs of `smoke-check-release.sh`, and an image has no Windows counterpart. The
+release plane runs it on Linux; `SMOKE_FIRST_USE_MODE=host` runs the same legs on
+macOS with an empty home and a reduced `PATH`, where the host's own tools are
+printed, not refused.
+
 ## Consequences
 
 - The public install path and `putnami upgrade` read the same headers, normalize

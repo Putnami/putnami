@@ -96,6 +96,11 @@ NO_AGENT_HOSTS="${PUTNAMI_NO_AGENT_HOSTS:-}"
 # the stack.
 TEMP_DIR=""
 
+# The line that makes the command reachable in the shell that ran the
+# installer, or "" when that shell already reaches it. The footer prints it
+# first: a script running as the child of a pipe cannot change its parent's PATH.
+PATH_LINE_TO_RUN=""
+
 # Colors, off unless the stream the installer's messages go to (file descriptor
 # $1) is a terminal, or when NO_COLOR is set. A piped or redirected run is what
 # CI, the release smoke, and the installer's own tests read; an escape sequence
@@ -736,6 +741,7 @@ configure_shell_path() {
     echo ""
     print_warning "${BINARY_NAME} is not on your PATH yet. Run this now, in this shell:"
     printf '  %b%s%b\n' "$CYAN" "$path_line" "$NC"
+    PATH_LINE_TO_RUN="$path_line"
 
     local rc=0
     append_once "$profile" "$path_line" "$path_line" || rc=$?
@@ -1219,6 +1225,9 @@ print_footer() {
     echo -e "${SPARKLE} ${BOLD}${GREEN}Done${NC}"
     echo ""
     echo -e "${BOLD}Next:${NC}"
+    if [[ -n "$PATH_LINE_TO_RUN" ]]; then
+        printf '  %b%s%b\n' "$CYAN" "$PATH_LINE_TO_RUN" "$NC"
+    fi
     echo -e "  ${CYAN}putnami --help${NC}"
     echo -e "  ${CYAN}putnami init${NC}"
     echo ""

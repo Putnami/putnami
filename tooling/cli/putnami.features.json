@@ -1567,6 +1567,24 @@
               "deps-prune-edits-every-module-and-names-deps-install-when-the-go-install-fails"
             ]
           }
+        },
+        {
+          "id": "go-pin-reuses-the-machine-record",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-recorded-go-release-pins-without-a-request",
+              "an-invalid-record-is-ignored-and-replaced",
+              "an-unwritable-home-still-pins",
+              "the-lock-holds-the-same-bytes-from-the-record-and-from-the-index",
+              "pins-that-start-together-leave-one-complete-record",
+              "a-second-init-makes-no-request-to-the-release-index"
+            ]
+          }
         }
       ]
     },
@@ -1944,7 +1962,8 @@
             "kind": "acceptance",
             "checks": [
               "a-mismatching-ambient-binary-is-never-substituted",
-              "an-optional-mismatch-publishes-an-empty-binding"
+              "an-optional-mismatch-publishes-an-empty-binding",
+              "a-first-party-bun-runtime-resolves-the-install-under-the-putnami-home"
             ]
           }
         },
@@ -2793,6 +2812,65 @@
       ]
     },
     {
+      "id": "cli/first-use-path",
+      "type": "feature",
+      "name": "First-use path on a bare machine",
+      "outcome": "A new user on macOS or Linux pastes the documented block into a shell that holds only Bash, curl, tar and a SHA-256 tool, and gets a served starter; each release proves that block, the checks and the Go path in an image that holds nothing else",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "pasted-block-reaches-the-command",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-footer-starts-with-the-path-line-only-when-the-command-is-not-reachable"
+            ]
+          }
+        },
+        {
+          "id": "first-use-smoke-machine",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-block-is-the-first-bash-block-of-the-page",
+              "the-image-holds-only-what-the-installer-needs",
+              "the-smoke-refuses-an-image-that-is-not-bare"
+            ]
+          }
+        },
+        {
+          "id": "first-use-smoke-legs",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-smoke-runs-the-documented-block-then-the-checks-and-the-go-path",
+              "a-candidate-channel-is-selected-through-the-environment",
+              "the-smoke-fails-under-the-leg-that-broke"
+            ]
+          }
+        },
+        {
+          "id": "init-lists-members-once",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-lists-the-created-project-once",
+              "init-writes-an-empty-workspaces-list-not-null"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "cli/provider-publication",
       "type": "feature",
       "name": "Publication through providers",
@@ -2826,6 +2904,71 @@
               "a-publishing-request-without-the-block-is-refused-before-any-provider",
               "a-request-without-the-block-enables-no-publish-purpose",
               "a-gate-only-request-plans-no-publish-job"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/workspace-without-git",
+      "type": "feature",
+      "name": "Workspace without git",
+      "outcome": "A user builds, tests and serves a workspace in a directory Git does not manage, and every command that needs git history refuses in one line that names git and the command to run",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "no-source-claim",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "stamps-outside-a-repository-make-no-source-claim",
+              "a-binding-failure-inside-a-repository-is-not-marked-unavailable",
+              "bindings-inside-a-repository-are-unchanged",
+              "a-build-outside-a-repository-runs-end-to-end"
+            ]
+          }
+        },
+        {
+          "id": "source-state-keys-the-cache",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unmanaged-root-adds-only-its-marker-to-the-key",
+              "execution-keys-separate-the-two-source-states",
+              "the-key-and-the-stamp-read-one-answer"
+            ]
+          }
+        },
+        {
+          "id": "bare-run-covers-every-project",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bare-run-outside-a-repository-selects-every-project",
+              "a-named-project-outside-a-repository-needs-no-git",
+              "another-git-failure-still-fails-the-selection"
+            ]
+          }
+        },
+        {
+          "id": "git-history-is-refused-in-one-line",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "impacted-and-baseline-outside-a-repository-name-git",
+              "publish-and-deploy-outside-a-repository-name-git",
+              "version-outside-a-repository-names-git",
+              "a-missing-repository-and-a-missing-program-are-told-apart",
+              "another-git-failure-keeps-its-detail"
             ]
           }
         }

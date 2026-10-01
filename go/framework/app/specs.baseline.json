@@ -4,6 +4,7 @@
   "executableRequirements": [
     "go/application-lifecycle#darc-runtime-evidence",
     "go/application-lifecycle#describe",
+    "go/application-lifecycle#no-source-claim",
     "go/application-lifecycle#phase-order",
     "go/application-lifecycle#shutdown",
     "go/application-lifecycle#startup-failure"

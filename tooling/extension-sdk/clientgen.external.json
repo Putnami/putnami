@@ -97,7 +97,7 @@
       "reason": "Resolves a tag to its manifest digest against an OCI registry."
     },
     {
-      "authority": "HTTP GET of the archive URL a lock pins with its SHA-256 digest (RFC 9110); the Go binary distributions at go.dev/dl are the first consumer",
+      "authority": "HTTP GET of the archive URL a lock pins with its SHA-256 digest (RFC 9110), with the URL's userinfo sent as Basic authentication (RFC 7617) to that URL's scheme and host only; the Go binary distributions at go.dev/dl and the Bun release archives at github.com/oven-sh/bun are the consumers",
       "adapter": "tooling/extension-sdk/pinnedarchive/pinnedarchive.go",
       "callsites": [
         {
@@ -109,15 +109,21 @@
         {
           "path": "tooling/extension-sdk/pinnedarchive/pinnedarchive.go",
           "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "6f9ce875a0d1c119736c466650ab332f5edef5ac8d232808e9633e1bd30247bd"
+        },
+        {
+          "path": "tooling/extension-sdk/pinnedarchive/pinnedarchive.go",
+          "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "a4df64ee8c8b0498429834484c9a13e9e993a6e93ace499046a95801b6db06a7"
+          "fingerprint": "a7e2290585b9f90788c2393936c0512fed5f8cf6fe5eab73bb771a0aa27f7e2b"
         }
       ],
       "owner": "putnami-extension-sdk",
       "tests": [
         "tooling/extension-sdk/pinnedarchive/pinnedarchive_test.go"
       ],
-      "reason": "Downloads a toolchain archive from the URL putnami.lock.json pins and refuses it unless its SHA-256 matches. The upstream is a static file host, not a Putnami provider, so no provider declaration can generate this client."
+      "reason": "Downloads a toolchain archive from the URL putnami.lock.json pins, or from the URL an extension ships a digest for, and refuses it unless its SHA-256 matches. When the URL carries credentials, the client sends them as Basic authentication so the caller logs and reports the URL without them. The upstream is a static file host, not a Putnami provider, so no provider declaration can generate this client."
     }
   ]
 }

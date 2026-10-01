@@ -54,13 +54,14 @@ func TestResolveGoBinaryAcceptsOnlyTheLockedGo(t *testing.T) {
 					"source":      server.URL + "/dl",
 				})
 			}
-			j, rec, fakes := shellFreeJob(t, ws)
+			putnamiHome := jobtest.RealTempDir(t)
+			j, rec, fakes := shellFreeJobAt(t, ws, putnamiHome)
 			pathGo := fakes.GoRelease(t, filepath.Join(fakes.Dir, pkgmeta.ExecutableName(runtime.GOOS, "go")), tc.pathGo)
 
 			if !j.ResolveGoBinary() {
 				t.Fatalf("ResolveGoBinary failed:\n%s", rec.Transcript())
 			}
-			want := workspacejob.ManagedGoBinary(j.ExtensionStateRoot(), lockedGo)
+			want := workspacejob.ManagedGoBinary(j.GoToolchainRoot(), lockedGo)
 			if tc.wantPath {
 				want = pathGo
 			}
@@ -75,7 +76,7 @@ func TestResolveGoBinaryAcceptsOnlyTheLockedGo(t *testing.T) {
 			}
 
 			// The next job finds the pinned install without a download.
-			again, rec2, fakes2 := shellFreeJob(t, ws)
+			again, rec2, fakes2 := shellFreeJobAt(t, ws, putnamiHome)
 			fakes2.GoRelease(t, filepath.Join(fakes2.Dir, pkgmeta.ExecutableName(runtime.GOOS, "go")), tc.pathGo)
 			if !again.FindGoBinary() {
 				t.Fatalf("FindGoBinary found no go:\n%s", rec2.Transcript())

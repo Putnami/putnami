@@ -6,6 +6,7 @@ require (
 	go.putnami.dev/app v0.0.1
 	go.putnami.dev/http v0.0.1
 	go.putnami.dev/logger v0.0.1
+	go.putnami.dev/platform v0.0.1
 	go.putnami.dev/protocol/capabilities v0.0.0
 )
 
@@ -23,6 +24,7 @@ require (
 	go.putnami.dev/protocol/identity v0.0.0 // indirect
 	go.putnami.dev/protocol/infra v0.0.0 // indirect
 	go.putnami.dev/protocol/migration v0.0.0 // indirect
+	go.putnami.dev/protocol/platform v0.0.0 // indirect
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -34,6 +36,7 @@ replace (
 	go.putnami.dev/http => ../../framework/http
 	go.putnami.dev/inject => ../../framework/inject
 	go.putnami.dev/logger => ../../framework/logger
+	go.putnami.dev/platform => ../../framework/platform
 	go.putnami.dev/schema => ../../framework/schema
 )
 
@@ -66,5 +69,7 @@ replace go.putnami.dev/protocol/http-routes => ../../../protocols/http-routes
 replace go.putnami.dev/protocol/runtime => ../../../protocols/runtime
 
 replace go.putnami.dev/protocol/features => ../../../protocols/features
+
+replace go.putnami.dev/protocol/platform => ../../../protocols/platform
 
 replace go.putnami.dev/protocol/architecture => ../../../protocols/architecture

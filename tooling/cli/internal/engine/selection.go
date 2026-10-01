@@ -76,8 +76,7 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 		selection, err := workspace.ImpactedSelectionForBaselineWithTasks(
 			ws, req.Global.Baseline, workspace.NewTaskIndex(ws, extensions))
 		switch {
-		case err != nil && req.Global.ImpactedStrict:
-			iox.Fprintf(os.Stderr, "putnami: --impacted failed: %v\n", err)
+		case err != nil && impactedFailureEndsRun(req, ws.Root, err):
 			return nil, ExitError
 		case err != nil:
 			// Fallback to all — FilterProjects below uses ws.Projects
@@ -403,6 +402,23 @@ func resolveNoCacheProjects(req *Request, ws *workspace.Workspace) int {
 	return ExitSuccess
 }
 
+// impactedFailureEndsRun reports whether a failed impact analysis ends the
+// run, and prints why. It always does where Git does not manage the workspace
+// root: the fallback to every project widens a run whose baseline git could
+// not resolve, and there is no repository to resolve one in. Inside a
+// repository it does under --impacted-strict only.
+func impactedFailureEndsRun(req *Request, wsRoot string, err error) bool {
+	if unmanaged := git.Unmanaged(wsRoot); unmanaged != nil {
+		iox.Fprintf(os.Stderr, "putnami: --impacted needs git history: %v\n", unmanaged)
+		return true
+	}
+	if req.Global.ImpactedStrict {
+		iox.Fprintf(os.Stderr, "putnami: --impacted failed: %v\n", err)
+		return true
+	}
+	return false
+}
+
 func applyBareProjectSelection(req *Request, ws *workspace.Workspace, extensions []*extension.ExtensionDescription) (autoProjectSelectionNote, int) {
 	if !isBareProjectSelection(req) {
 		return autoProjectSelectionNote{}, ExitSuccess
@@ -461,6 +477,14 @@ func applyBareProjectSelection(req *Request, ws *workspace.Workspace, extensions
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: resolve default project selection: %v\n", err)
 		return autoProjectSelectionNote{}, ExitError
+	}
+	// A bare run covers every project where Git does not manage the root, but a
+	// baseline the caller named is a comparison, and there is nothing to compare.
+	if selection.Reason == workspace.AutoSelectionReasonNoRepository && strings.TrimSpace(req.Global.Baseline) != "" {
+		if unmanaged := git.Unmanaged(ws.Root); unmanaged != nil {
+			iox.Fprintf(os.Stderr, "putnami: --baseline needs git history: %v\n", unmanaged)
+			return autoProjectSelectionNote{}, ExitError
+		}
 	}
 
 	note := autoProjectSelectionNote{

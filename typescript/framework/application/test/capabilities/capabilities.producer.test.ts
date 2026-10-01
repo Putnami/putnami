@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Config, type ConfigContributor, getRegisteredConfigDefinitions } from '@putnami/runtime';
 import type { MigrationContributor, MigrationSource } from '@putnami/migration';
+import { specTest } from '@putnami/runtime/spectest';
 import { application } from '../../src/application';
 import { runGenerate, runPostGenerate } from '../../src/application/app-build';
 import type { Plugin } from '../../src/application/module.types';
@@ -38,6 +39,19 @@ function evidencePath(root: string): string {
 }
 
 const SOURCE_BINDING = `source-v1:sha256:${'0'.repeat(64)}`;
+
+/**
+ * Stamps and the manifest they produce, shared with the Go emitter's tests so
+ * both runtimes read the same bytes and are held to the same bytes.
+ */
+const EQUIVALENCE_FIXTURES = join(import.meta.dir, '../../../../../protocols/capabilities/fixtures/v2/equivalence');
+
+/** Seed `.gen/version.json` with a shared stamp, as the scheduler does before generation. */
+function stampedProducer(root: string, stamp: string) {
+  mkdirSync(join(root, '.gen'), { recursive: true });
+  writeFileSync(join(root, '.gen', 'version.json'), readFileSync(join(EQUIVALENCE_FIXTURES, stamp)));
+  return createCapabilitiesProducer({ projectRoot: root, registeredConfigDefinitions: () => [] });
+}
 
 /**
  * Stamp the declaration site a real application would capture.
@@ -749,6 +763,17 @@ describe('capabilities producer', () => {
           { package: 'example/workload', version: '2.0.0', evidencePath: 'package.json' },
         ],
       },
+      {
+        label: 'unavailable-without-source-root',
+        packages: [
+          {
+            package: 'example/workload',
+            version: '1.0.0',
+            evidencePath: 'package.json',
+            sourceBindingUnavailable: true,
+          },
+        ],
+      },
     ];
     for (const { label, packages } of cases) {
       const root = projectRoot(`scheduler-${label}`);
@@ -767,6 +792,152 @@ describe('capabilities producer', () => {
     const producer = createCapabilitiesProducer({ projectRoot: root });
     await expect(producer.postGenerate?.(application(), {})).rejects.toThrow(/capabilityPackages must be an array/);
   });
+
+  specTest(
+    'emits the bound manifest bytes for a stamp whose source binding is unavailable',
+    {
+      feature: 'typescript/application-lifecycle',
+      requirement: 'no-source-claim',
+      check: 'an-unavailable-binding-emits-the-bound-manifest-bytes',
+    },
+    async () => {
+      const golden = readFileSync(join(EQUIVALENCE_FIXTURES, 'no-source-claim.golden.json'), 'utf8');
+      for (const stamp of ['no-source-claim.unavailable.version.json', 'no-source-claim.bound.version.json']) {
+        const root = projectRoot(`unavailable-binding-${stamp}`);
+        const producer = stampedProducer(root, stamp);
+        const result = await producer.postGenerate?.(application(), {});
+        expect(result?.assets).toEqual({ 'schema/capabilities.json': manifestPath(root) });
+        expect(readFileSync(manifestPath(root), 'utf8')).toBe(golden);
+        expect(existsSync(evidencePath(root))).toBe(false);
+      }
+    },
+  );
+
+  specTest(
+    'writes no feature evidence for a proven feature whose source binding is unavailable',
+    {
+      feature: 'typescript/application-lifecycle',
+      requirement: 'no-source-claim',
+      check: 'an-unavailable-binding-writes-no-feature-evidence',
+    },
+    async () => {
+      const describe = async (unavailable: boolean): Promise<{ root: string; manifest: string }> => {
+        const root = projectRoot(`unavailable-binding-proof-${unavailable}`);
+        writeAuthoredFeatures(root);
+        // A previous build inside a repository left evidence in the scratch tree.
+        mkdirSync(join(root, '.gen', 'schema', 'feature-evidence'), { recursive: true });
+        writeFileSync(evidencePath(root), 'stale\n');
+        const producer = createCapabilitiesProducer({
+          projectRoot: root,
+          project: 'feature-evidence-proof',
+          capabilityPackages: [
+            {
+              package: 'feature-evidence-proof',
+              version: '0.1.0',
+              evidencePath: 'package.json',
+              sourceRoot: '.',
+              ...(unavailable
+                ? { sourceBinding: '', sourceBindingUnavailable: true }
+                : { sourceBinding: SOURCE_BINDING }),
+            },
+          ],
+          registeredConfigDefinitions: () => [],
+        });
+        const migration: Plugin & MigrationContributor = {
+          migrationSources: () => [
+            { kind: 'sql', namespace: 'iam', infraDatabase: () => ({ name: 'default', engine: 'postgres' }) },
+          ],
+        };
+        const app = application()
+          .feature({
+            id: 'capabilities/typescript-evidence',
+            name: 'TypeScript capability evidence',
+            outcome: 'A build proves a feature requirement from an exact capability contribution',
+            owner: 'capabilities',
+            proves: [
+              { requirement: 'implementation', contribution: { kind: 'migration', subkind: 'sql', key: 'iam' } },
+            ],
+          })
+          .use(migration);
+        stampDeclarationSite(app);
+        const result = await producer.postGenerate?.(app, {});
+        expect(Object.keys(result?.assets ?? {}).includes('schema/feature-evidence/typescript-framework.json')).toBe(
+          !unavailable,
+        );
+        return { root, manifest: readFileSync(manifestPath(root), 'utf8') };
+      };
+
+      const bound = await describe(false);
+      const unbound = await describe(true);
+      expect(existsSync(evidencePath(bound.root))).toBe(true);
+      expect(existsSync(evidencePath(unbound.root))).toBe(false);
+      expect(unbound.manifest).toBe(bound.manifest);
+    },
+  );
+
+  specTest(
+    'refuses every stamp that marks a source binding unavailable in a malformed way',
+    {
+      feature: 'typescript/application-lifecycle',
+      requirement: 'no-source-claim',
+      check: 'a-malformed-unavailable-binding-is-refused',
+    },
+    async () => {
+      const entry = { package: 'example/workload', version: '1.0.0', evidencePath: 'package.json', sourceRoot: '.' };
+      const dependency = {
+        package: 'example/dependency',
+        version: '1.0.0',
+        evidencePath: 'libs/dependency/package.json',
+        sourceRoot: 'libs/dependency',
+      };
+      const cases: Array<{ label: string; packages: unknown; message: string }> = [
+        {
+          label: 'unavailable-with-binding',
+          packages: [{ ...entry, sourceBinding: SOURCE_BINDING, sourceBindingUnavailable: true }],
+          message: 'capability package "example/workload" carries a source-v1 binding it marks unavailable',
+        },
+        {
+          label: 'available-with-empty-binding',
+          packages: [{ ...entry, sourceBinding: '', sourceBindingUnavailable: false }],
+          message: 'capability package "example/workload" has no available source-v1 binding',
+        },
+        {
+          label: 'absent-marker-with-empty-binding',
+          packages: [{ ...entry, sourceBinding: '' }],
+          message: 'capability package "example/workload" has no available source-v1 binding',
+        },
+        {
+          label: 'absent-marker-with-invalid-binding',
+          packages: [{ ...entry, sourceBinding: 'source-v1:sha256:nothex' }],
+          message: 'capability package "example/workload" has no available source-v1 binding',
+        },
+        {
+          label: 'mixed',
+          packages: [
+            { ...entry, sourceBinding: '', sourceBindingUnavailable: true },
+            { ...dependency, sourceBinding: SOURCE_BINDING },
+          ],
+          message: 'capabilityPackages mixes available and unavailable source-v1 bindings',
+        },
+        {
+          label: 'non-boolean-marker',
+          packages: [{ ...entry, sourceBinding: '', sourceBindingUnavailable: 'true' }],
+          message: 'capabilityPackages[0] is incomplete or malformed',
+        },
+      ];
+      for (const { label, packages, message } of cases) {
+        const root = projectRoot(`unavailable-binding-${label}`);
+        const producer = createCapabilitiesProducer({
+          projectRoot: root,
+          project: 'example/workload',
+          capabilityPackages: packages as never,
+          registeredConfigDefinitions: () => [],
+        });
+        await expect(producer.postGenerate?.(application(), {})).rejects.toThrow(message);
+        expect(existsSync(manifestPath(root))).toBe(false);
+      }
+    },
+  );
 
   it('ignores runtime.json in .gen/infra, which the CLI writes and which is not a sidecar', async () => {
     const root = projectRoot('infra-runtime-json');

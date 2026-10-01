@@ -996,6 +996,8 @@ func TestExtensionAliasPlanSelection_NoInheritance(t *testing.T) {
 
 func writeWorkspaceAliasFixture(t *testing.T, wsRoot string) {
 	t.Helper()
+	// The fixture's command is deploy, which a root Git does not manage refuses.
+	runAliasGit(t, wsRoot, "init")
 
 	wsManifest := `{
   "name": "fixture-ws",

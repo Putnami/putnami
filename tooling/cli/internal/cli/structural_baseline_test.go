@@ -137,7 +137,7 @@ var structuralPins = []structuralPin{
 		name:  "test-only newScheduler constructions",
 		token: "newScheduler(",
 		scope: testFiles,
-		want:  59,
+		want:  60,
 		why: "all in internal/jobs/*_test.go, exercising the scheduler directly. Pinned separately " +
 			"so they can never inflate the production count above. An earlier change removes the inferred " +
 			"capture lifecycle but retains its supported scheduler coverage under explicit task " +
@@ -190,7 +190,10 @@ var structuralPins = []structuralPin{
 			"its cases through ONE fixture method, because \"a second session waits for the holder and " +
 			"observes its complete output\" is a property of two real schedulers dispatching into one " +
 			"workspace and of nothing smaller; the lock's own cases drive the manager directly and " +
-			"never call newScheduler",
+			"never call newScheduler. 59\u219260 is source_state_test.go's one-answer case: \"the version " +
+			"stamp's marker and every execution key of a run read one answer\" is a property of " +
+			"newScheduler wiring the stamp's memo to the run's cache manager, which a Scheduler " +
+			"literal skips, and of nothing smaller; its four cases share ONE construction site",
 	},
 	{
 		name:  "production jobs.Plan call sites",

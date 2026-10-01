@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -27,6 +28,30 @@ func buildTestServer(t *testing.T) *httptest.Server {
 	server.DELETE("/greetings/{id}", deleteGreeting)
 
 	return server.TestServer()
+}
+
+// TestHealthEndpoint starts the application main serves and requests every
+// operational route through its server.
+func TestHealthEndpoint(t *testing.T) {
+	t.Setenv("PORT", "0")
+	a, server := newApp()
+	a.Run(func(context.Context) error { return nil })
+	if err := a.Start(context.Background()); err != nil {
+		t.Fatalf("start the application: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := a.Stop(context.Background()); err != nil {
+			t.Errorf("stop the application: %v", err)
+		}
+	})
+
+	for _, path := range []string{"/_/health", "/livez", "/healthz", "/readyz", "/version"} {
+		rr := httptest.NewRecorder()
+		server.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, path, nil))
+		if rr.Code != http.StatusOK {
+			t.Errorf("GET %s = %d %s, want 200", path, rr.Code, rr.Body)
+		}
+	}
 }
 
 func doReq(t *testing.T, ts *httptest.Server, method, path, body string) *http.Response {

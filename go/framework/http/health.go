@@ -19,6 +19,12 @@ type HealthCheckFunc func(ctx context.Context) error
 // It exposes GET /_/health which returns 200 when the application is ready
 // and 503 during startup or shutdown.
 //
+// A plugin added to an application mounts itself: during Configure it
+// registers GET /_/health on the application's single ServerPlugin. RegisterOn
+// chooses the server instead, for an application that holds several or keeps
+// its server outside the module tree. A caller that takes Handler mounts the
+// handler on its own route, and the plugin then registers nothing.
+//
 // Probes come from two sources:
 //
 //   - AddChecker registers a named callback explicitly (use for ad-hoc
@@ -30,7 +36,10 @@ type HealthCheckFunc func(ctx context.Context) error
 //     the preferred path for any probe whose state lives inside a plugin
 //     (database pools, cache clients, upstream service clients).
 type HealthPlugin struct {
-	ready        atomic.Bool
+	ready atomic.Bool
+	// mounted is set once the handler has a route: RegisterOn registered it, or
+	// a caller took it with Handler.
+	mounted      atomic.Bool
 	checkers     map[string]HealthCheckFunc
 	root         *app.Module
 	discoverOnce sync.Once
@@ -66,10 +75,25 @@ func (p *HealthPlugin) AddChecker(name string, checker HealthCheckFunc) {
 // Configure would be invisible to a HealthPlugin configured before it.
 // Deferring to the request path makes the order irrelevant — by the time
 // any probe is served, every plugin has finished configuring.
+//
+// Configure also mounts the plugin when nothing mounted it: it registers the
+// health endpoint on the single ServerPlugin of the owner's module tree. A
+// tree with no server, or with several, fails with the SingleServer error. A
+// mounted plugin is left as it is, so configuring again registers nothing. A
+// nil owner has no module tree: nothing is captured and nothing is mounted.
 func (p *HealthPlugin) Configure(_ context.Context, owner *app.Module) error {
-	if owner != nil {
-		p.root = owner.Root()
+	if owner == nil {
+		return nil
 	}
+	p.root = owner.Root()
+	if p.mounted.Load() {
+		return nil
+	}
+	server, err := SingleServer(owner, p.Name())
+	if err != nil {
+		return err
+	}
+	p.RegisterOn(server)
 	return nil
 }
 
@@ -104,8 +128,11 @@ func (p *HealthPlugin) Stop(_ context.Context, _ *app.Module) error {
 	return nil
 }
 
-// Handler returns the health check HTTP handler.
+// Handler returns the health check HTTP handler. The caller mounts it on a
+// route of its own, so the plugin counts as mounted and Configure registers
+// no route.
 func (p *HealthPlugin) Handler() Handler {
+	p.mounted.Store(true)
 	return func(ctx *Context) *Response {
 		if !p.ready.Load() {
 			return JSONStatus(503, map[string]string{"status": "unavailable"})
@@ -149,7 +176,9 @@ func (p *HealthPlugin) Handler() Handler {
 	}
 }
 
-// RegisterOn registers the health endpoint on a server plugin.
+// RegisterOn registers the health endpoint on server and marks the plugin
+// mounted. Call it before the application configures to choose the server;
+// without it, Configure mounts the plugin on the application's single server.
 func (p *HealthPlugin) RegisterOn(server *ServerPlugin) {
 	server.GET("/_/health", p.Handler())
 }

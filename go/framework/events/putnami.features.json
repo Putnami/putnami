@@ -43,6 +43,23 @@
           }
         },
         {
+          "id": "push-receiver-mounting",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-push-application-with-several-servers-fails-configure",
+              "a-push-application-without-a-server-fails-configure",
+              "a-push-plugin-added-to-an-application-mounts-the-secured-receiver",
+              "configuring-again-mounts-the-receiver-once",
+              "pull-and-stream-delivery-need-no-server",
+              "push-selected-by-the-events-config-mounts-the-receiver",
+              "registeron-chooses-the-server-and-is-never-repeated"
+            ]
+          }
+        },
+        {
           "id": "retry-boundary",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

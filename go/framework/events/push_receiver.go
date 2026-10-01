@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.putnami.dev/app"
 	"go.putnami.dev/errors"
 	phttp "go.putnami.dev/http"
 	protoevents "go.putnami.dev/protocol/events"
@@ -17,9 +18,9 @@ import (
 // go.putnami.dev/protocol/events vocabulary:
 //
 //   - pull / stream hold a long-lived process that pulls or streams events.
-//   - push has the provider POST each event to the receiver route mounted by
-//     RegisterOn, so a scale-to-zero workload can receive events. An HTTP 2xx
-//     acknowledges delivery.
+//   - push has the provider POST each event to the receiver route the plugin
+//     mounts on the application's HTTP server, so a scale-to-zero workload can
+//     receive events. An HTTP 2xx acknowledges delivery.
 type DeliveryMode = protoevents.DeliveryProfile
 
 // Delivery modes.
@@ -67,21 +68,56 @@ type PushConfig struct {
 	AllowInsecure bool `json:"allowInsecure"`
 }
 
-// RegisterOn mounts the push receiver route on server when the plugin is
-// configured for push delivery; it is a no-op for pull/stream. The application
-// author calls it after constructing both the events plugin and the HTTP server
-// plugin and before ListenAndServe, mirroring platform.Plugin.RegisterOn —
-// events takes no compile-time dependency on a running HTTP server, so the
-// caller owns the wiring order.
+// RegisterOn chooses server as the HTTP server of the push receiver. Call it
+// before the application configures. Without it, Configure mounts the receiver
+// on the application's single server.
+//
+// When the delivery set in code is push, RegisterOn registers the receiver
+// route at once, from the push configuration set in code. For pull and stream
+// it registers nothing and records server: Configure mounts the receiver on it
+// when the resolved events config selects push.
 //
 // The route is secured fail-closed: security.JWKSJWT verifies the pusher's OIDC
 // token (signature via JWKS, issuer, audience) and a service-account-email
 // allowlist guard authorizes it. The pusher identity is used only for admission
 // and never becomes a carried end-user identity.
 func (p *Plugin) RegisterOn(server *phttp.ServerPlugin) {
+	p.pushServer = server
 	if p.deliveryProfile() != DeliveryPush {
 		return
 	}
+	p.registerPushReceiver(server)
+}
+
+// mountPushReceiver mounts the push receiver from Configure, once the events
+// config is resolved. It registers nothing for pull and stream delivery, and
+// nothing when the route is already registered. Otherwise it registers the
+// route on the server RegisterOn named, or on the single HTTP server of the
+// owner's module tree; a tree with no server, or with several, fails with the
+// http SingleServer error. A nil owner has no module tree to search.
+func (p *Plugin) mountPushReceiver(owner *app.Module) error {
+	if p.deliveryProfile() != DeliveryPush || p.pushMounted {
+		return nil
+	}
+	server := p.pushServer
+	if server == nil {
+		if owner == nil {
+			return nil
+		}
+		found, err := phttp.SingleServer(owner, p.Name())
+		if err != nil {
+			return err
+		}
+		server = found
+	}
+	p.registerPushReceiver(server)
+	return nil
+}
+
+// registerPushReceiver registers the receiver route on server: the secured
+// handler, or the retryable 503 handler while push admission is disabled.
+func (p *Plugin) registerPushReceiver(server *phttp.ServerPlugin) {
+	p.pushMounted = true
 	if !p.pushEnabled() {
 		server.POST(pushReceiverPath, p.handleDisabledPush)
 		return
@@ -158,7 +194,7 @@ func (p *Plugin) allowPusher(user *phttp.Claims, _ *phttp.Context) bool {
 //	5xx  retry (transient: a handler failed)
 //
 // Push delivery is at-least-once, so handlers must be idempotent. Authentication
-// runs in the middleware chain (RegisterOn) before this handler.
+// runs in the middleware chain (securedPushHandler) before this handler.
 func (p *Plugin) handlePush(ctx *phttp.Context) *phttp.Response {
 	var wrapper protoevents.PushEnvelope
 	if err := ctx.Body(&wrapper); err != nil {

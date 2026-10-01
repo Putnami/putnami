@@ -76,6 +76,7 @@ A cache key is a SHA-256 hash composed of:
 ```
 v2                          ← format version (for compatibility)
 + extension name            ← e.g., "@putnami/typescript"
++ source state              ← "unmanaged" where Git does not manage the workspace root, absent inside a repository
 + task name                 ← e.g., "build~transpile"
 + project name              ← e.g., "my-app"
 + workspace version         ← from putnami.workspace.json
@@ -1209,6 +1210,16 @@ does), it is hashed with `buildTime` blanked: the build time describes the
 invocation, not the tree, and hashing it would let a run invalidate the very key
 it was computed under.
 
+A workspace root Git does not manage has no source binding: no `git` program is
+on `PATH`, or the root is outside every repository. The scheduler stamps each
+capability package there with an empty `sourceBinding` and
+`sourceBindingUnavailable: true`, and the capability producers emit their
+manifest without feature evidence. The stamp is not a declared input of those
+tasks, so the key itself carries the state: every task key of such a root
+includes a `sourceState` marker, and an entry built in one state never serves
+the other. A key computed inside a repository carries no marker and keeps its
+address. A publication's selection fingerprint never carries the marker.
+
 #### The stamp is a shared document
 
 The scheduler owns exactly the identity fields — `name`, `version`, `suffix`,
@@ -1362,7 +1373,14 @@ worktrees share downloaded bytes, while their mutable dependency trees remain
 isolated. In CI, persist `~/.bun/install/cache` and reconstruct `node_modules`
 with `bun install --frozen-lockfile`.
 
-The package cache has a separate **10 GiB machine-wide budget**, enforced by the
+A Bun that `@putnami/typescript` installed under the Putnami home keeps its
+package cache under its own install,
+`~/.putnami/toolchains/bun/bun-<version>/install/cache`, and writes nothing to
+`~/.bun`. `putnami cache gc` bounds each of those caches separately, with the
+budget and grace period below: each installed release has its own 10 GiB. `PUTNAMI_BUN_CACHE_DIR` or `BUN_INSTALL_CACHE_DIR` names one
+directory for every Bun.
+
+Each package cache directory has a separate **10 GiB budget**, enforced by the
 extension's `cache-gc` command — run explicitly with `putnami cache gc`, or
 started for you at most once an hour in a detached process so directory walks
 never sit on a foreground cache-hit path. The collector evicts the oldest
@@ -1397,7 +1415,7 @@ hits wrongly.
 | Variable | Effect | Default |
 |----------|--------|---------|
 | `PUTNAMI_BUN_CACHE_DIR` | Putnami override for the shared Bun cache root; translated into `BUN_INSTALL_CACHE_DIR` by the TypeScript extension. | Bun's `BUN_INSTALL_CACHE_DIR`, then `~/.bun/install/cache`, then `$PUTNAMI_EXTENSION_CACHE_ROOT/bun` |
-| `BUN_INSTALL_CACHE_DIR` | Bun's native cache-root override. | `~/.bun/install/cache` |
+| `BUN_INSTALL_CACHE_DIR` | Bun's native cache-root override. | `~/.bun/install/cache` for a Bun of the machine; `install/cache` under its install for a Bun that Putnami installed |
 | `PUTNAMI_BUN_CACHE_MAX_BYTES` | Package/metadata byte budget across all repos and worktrees. | 10 GiB |
 | `PUTNAMI_BUN_CACHE_GC_GRACE` | How new a downloaded entry must be to be spared. Go duration. | 24h |
 | `PUTNAMI_TS_CACHE_GC_GRACE` | How recently a `ts-types` scratch entry under `.putnami/cache` must have been modified to survive `putnami cache gc`. Go duration. | 336h (14 days) |
@@ -1419,6 +1437,7 @@ Separate from the per-repo build cache above, the CLI keeps a **flat, machine-gl
 ├── locks/<digest>.lock              # per-digest computation ownership; pruned with its entry
 └── .lock                            # advisory lock: admits (shared) vs GC (exclusive)
 ~/.putnami/toolchains/go/go-<ver>/   # one managed Go toolchain per machine (NOT garbage-collected; see below)
+~/.putnami/toolchains/go/go-<ver>.pin.json  # the lock entry go.dev published for that release; a pin reads it and makes no request
 ```
 
 Extension/template entries under `sha256/` are keyed by the **bare-hex SHA-256 of the download archive**. CLI entries under `cli/` are keyed by the **bare-hex SHA-256 of the executable bytes**; the launcher accepts the current raw registry binary payload and legacy gzip+tar payloads, but always verifies the extracted executable against the digest recorded in `putnami.lock.json` (`cli.integrities[os/arch]`). Each worktree keeps a stable symlink (`.putnami/bin/extensions/<name>`) pointing at the shared digest directory.
@@ -1490,7 +1509,7 @@ Only content that is genuinely repo- or branch-specific stays out of the shared 
 
 The artifact store has its own collector, separate from the build store's. It **never evicts an entry a workspace links to**, whatever its age: every command registers its workspace under `roots/`, and GC keeps each entry that a registered workspace's `.putnami/bin/putnami` or `.putnami/bin/<kind>/<name>` link resolves to. A root whose workspace no longer exists is pruned, and what it alone kept then ages out normally. Every other entry — whole directories under `sha256/`, and the CLI blobs under `cli/` and `cli-source/` — is evicted by recency: **wall-clock** idle past `PUTNAMI_ARTIFACT_MAX_IDLE`, then oldest-first to get under `PUTNAMI_ARTIFACT_MAX_BYTES`, protected by a grace window and an under-lock recency re-check (a worktree that just linked a binary, or a `./putnamiw` that just touched the CLI blob, is spared). Eviction is **self-healing**: a still-needed extension/template or compiled-extension digest re-materializes on that worktree's next command, and an evicted CLI blob is re-downloaded (or, in a source workspace, rebuilt) by the next `./putnamiw`. The whole pass holds the store's exclusive lock, so it never races an in-flight install or compilation — a genuine lock-acquisition failure aborts the pass rather than deleting unprotected. It runs opportunistically after builds (throttled, non-blocking) and explicitly via `putnami cache gc`; `putnami cache clean --all` clears it.
 
-The managed Go toolchain (`~/.putnami/toolchains`) is a **separate** root and is *not* reclaimed by this GC or by `cache clean` — there is typically one directory per Go minor version and deleting one in use would break a concurrent build. Reclaim it by removing that directory directly (a missing toolchain is re-downloaded on the next build).
+The managed Go toolchain (`~/.putnami/toolchains`) is a **separate** root and is *not* reclaimed by this GC or by `cache clean` — there is typically one directory per Go minor version and deleting one in use would break a concurrent build. Reclaim it by removing that directory directly (a missing toolchain is re-downloaded on the next build). The pin record beside it, `go-<ver>.pin.json`, is under 1 KiB and is not reclaimed either; after you delete it, the next pin of that release asks go.dev again.
 
 | Variable | Effect | Default |
 |----------|--------|---------|

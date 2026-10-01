@@ -15,6 +15,9 @@ const (
 	AutoSelectionReasonFirstBuild AutoSelectionReason = "first-build"
 	AutoSelectionReasonLastBuild  AutoSelectionReason = "last-build"
 	AutoSelectionReasonTrunk      AutoSelectionReason = "trunk"
+	// AutoSelectionReasonNoRepository is a workspace root Git does not manage:
+	// there is no baseline to compare with, so the run covers every project.
+	AutoSelectionReasonNoRepository AutoSelectionReason = "no-repository"
 )
 
 // LastBuildLookup returns the last fully successful build SHA for a branch and

@@ -499,8 +499,17 @@ func TestToolchainMetadataFetchRejectsOversizedResponse(t *testing.T) {
 	}
 }
 
+// withToolchainTestHome gives the test a Putnami home of its own. A Go pin
+// reads and writes a pin record there, so a record one test writes never
+// answers another test.
+func withToolchainTestHome(t *testing.T) {
+	t.Helper()
+	t.Setenv("PUTNAMI_HOME", t.TempDir())
+}
+
 func withToolchainTestClient(t *testing.T, client *http.Client) {
 	t.Helper()
+	withToolchainTestHome(t)
 	old := toolchainHTTPClient
 	toolchainHTTPClient = client
 	t.Cleanup(func() { toolchainHTTPClient = old })
@@ -521,6 +530,7 @@ func withToolchainMaxMetadataBytes(t *testing.T, limit int64) {
 
 func withToolchainTestEndpoints(t *testing.T, base string) {
 	t.Helper()
+	withToolchainTestHome(t)
 	oldGoDownloads, oldGoSource := goDownloadsURL, goSourceURL
 	oldBunAPI, oldBunRelease := bunReleaseAPIURL, bunReleaseURL
 	goDownloadsURL = base + "/go"

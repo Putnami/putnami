@@ -4,6 +4,20 @@
   "routes": [
     {
       "match": "exact",
+      "path": "/_/health",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/greetings",
       "methods": [
         "GET",
@@ -31,7 +45,63 @@
         "package": "go.putnami.dev/http",
         "sourceKind": "manual"
       }
+    },
+    {
+      "match": "exact",
+      "path": "/healthz",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/livez",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/readyz",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/version",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
     }
   ],
-  "digest": "sha256:def173ba066baaef200f9221739932722da11c1bf0fb6fe9f60c329ac75f033f"
+  "digest": "sha256:7b9fdc4e10c596a5e98d271fb3f70dd3951c0c62076e8b4f06464f9a65794dc2"
 }

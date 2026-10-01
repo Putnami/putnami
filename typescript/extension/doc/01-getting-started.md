@@ -12,8 +12,11 @@
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) v1.4.0 or higher
 - A Putnami workspace (created with `putnami init`)
+
+You do not install Bun. `putnami install` uses a Bun the machine already holds
+when it fits, and installs one under the Putnami home otherwise. See
+[Workspace install](./08-workspace-install.md#which-bun-runs).
 
 ## Installation
 

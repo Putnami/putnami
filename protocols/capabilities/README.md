@@ -256,6 +256,9 @@ at least one diagnostic. The frozen v1 corpus remains in those directories
 unchanged. V2 parity and invalid cases live under [`fixtures/v2/`](fixtures/v2),
 including the Go/TypeScript canonical golden at
 [`fixtures/v2/equivalence/capabilities-v2.golden.json`](fixtures/v2/equivalence/capabilities-v2.golden.json).
+The `no-source-claim.*` files beside it are two scheduler stamps of one
+workload, one bound and one with an unavailable binding, and the one manifest
+both emitters produce from either.
 This corpus is the cross-language contract — `conformance_test.go` runs it
 through the Go parser and validator, and the TypeScript emitter reads the same
 files by relative path. [`conformance/`](conformance/README.md) additionally

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities-v2.json",
+  "protocolVersion": 2,
+  "project": "example/workload",
+  "packages": [
+    {
+      "identity": {
+        "ownerProject": "example/workload",
+        "kind": "package",
+        "key": "example/workload"
+      },
+      "package": "example/workload",
+      "provenance": {
+        "project": "example/workload",
+        "package": "example/workload",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ]
+}

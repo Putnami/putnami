@@ -61,10 +61,15 @@
     {
       "id": "route-loader-activation",
       "text": "Every api() plugin that scans a route folder (a scanPath or autoScan on), every StaticPlugin without skipLoading, and every events() plugin that scans a handler folder exports its generated loader under its own key: <family>-loader for the first in module-tree registration order, <family>-<n>-loader for the others. The packaged entrypoint registers each key and each plugin resolves only its own, so a packaged workload serves every instance. A plugin that owns no loader resolves none."
+    },
+    {
+      "id": "no-source-claim",
+      "text": "A scheduler stamp whose capability packages all carry sourceBindingUnavailable with an empty sourceBinding and a sourceRoot makes no source claim: build() emits the capability manifest bytes it emits for a bound stamp, writes no feature evidence, and removes stale scratch evidence. A marked package that carries a binding, a mix of marked and bound packages, an unmarked package without a valid binding, and a package without sourceRoot are refused, with the wording the Go producer uses."
     }
   ],
   "decisions": [
     "typescript/framework/application/doc/adr/0001-build-and-runtime-are-disjoint-phases.md",
-    "typescript/framework/application/doc/adr/0006-a-scanned-api-finds-its-packaged-loader-by-composition-slot.md"
+    "typescript/framework/application/doc/adr/0006-a-scanned-api-finds-its-packaged-loader-by-composition-slot.md",
+    "protocols/features/doc/adr/0004-an-unavailable-binding-is-no-source-claim.md"
   ]
 }

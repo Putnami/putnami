@@ -83,7 +83,7 @@ const (
 | `inject` | `inject.not_registered`, `inject.circular_dependency`, `inject.scope_violation`, `inject.container_closed`, `inject.duplicate_provider`, `inject.requirement_not_met`, `inject.validation`, `inject.type_mismatch`, `inject.factory_failed`, `inject.illegal_state` |
 | `app` | `app.already_running`, `app.configure`, `app.register`, `app.start`, `app.stop`, `app.invoke`, `app.runner` |
 | `sql` | `db.connection`, `db.query`, `db.migration`, `db.transaction` |
-| `http` | `http.listen`, `http.body`, `http.scope` |
+| `http` | `http.listen`, `http.body`, `http.scope`, `http.no_server`, `http.ambiguous_server` |
 | `grpc` | `grpc.listen`, `grpc.scope`, `grpc.panic` |
 | `storage` | `storage.read`, `storage.write`, `storage.delete`, `storage.list`, `storage.not_found`, `storage.request`, `storage.failed` |
 | `client` | `client.circuit_open`, `client.request`, `client.response`, `client.transport` |

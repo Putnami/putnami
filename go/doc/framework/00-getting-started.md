@@ -8,7 +8,7 @@ This path starts with the workspace template, then moves into the Go framework p
 
 | You need... | Template | What you get |
 |-------------|----------|--------------|
-| An HTTP service | `go-server` | Service entry point, health endpoint, tests, Dockerfile |
+| An HTTP service | `go-server` | Service entry point, operational endpoints (`/readyz`, `/version`, `/_/health`), tests |
 | A shared Go package | `go-library` | Go module, exported function, tests, workspace wiring |
 
 If you are starting from an empty directory:

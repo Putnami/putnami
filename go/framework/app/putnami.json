@@ -10,6 +10,9 @@
     "jobs": ["serve"]
   },
   "options": {
+    "test": {
+      "filePatterns": ["../../../protocols/capabilities/fixtures/v2/equivalence/**"]
+    },
     "publish": {
       "archives": false
     },

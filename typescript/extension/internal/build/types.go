@@ -17,6 +17,10 @@ import (
 
 // buildTscArgs builds the tsc command args for type declaration generation.
 //
+// tsc starts through "bun x tsc", without --bun: Bun runs it with the node on
+// PATH when the host has one, which type-checks faster and with less memory,
+// and runs it itself otherwise. Node.js is never required.
+//
 // When tsBuildInfoFile is non-empty, incremental compilation is enabled: tsc
 // records per-file build state in that file so a later run re-type-checks and
 // re-emits only the changed delta. Both flags are omitted when it is empty (no

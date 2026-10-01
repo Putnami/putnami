@@ -16,17 +16,18 @@ server := http.NewServerPlugin(http.ServerConfig{Port: 8080})
 ops := platform.NewPlugin(platform.Config{
     Version: platform.VersionInfo{Name: "my-service", Version: "1.0.0"},
 })
-ops.RegisterOn(server) // mounts the routes
 
 a := app.New("my-service")
 a.Use(server)
-a.Use(ops) // wires the lifecycle so probes aggregate
+a.Use(ops) // mounts the routes on the server and wires the lifecycle
 a.ListenAndServe()
 ```
 
-`RegisterOn` mounts the routes; `Use` wires the lifecycle. Both are required:
-without `RegisterOn` nothing is reachable, and without `Use` the aggregates never
-flip to running.
+`Use` is the only wiring step. At configure, the plugin mounts its routes on the
+application's single `http.ServerPlugin`, in any plugin order. An application
+with no server, or with several, fails configure with an error that names
+`RegisterOn`. Call `ops.RegisterOn(server)` before the application configures to
+choose the server; the plugin then registers nothing more.
 
 ## Endpoints
 
@@ -43,7 +44,7 @@ flip to running.
 ## Surface
 
 - `platform.NewPlugin(platform.Config{…}) *Plugin` — constructor
-- `platform.Plugin.RegisterOn(*http.ServerPlugin)` — mounts the routes
+- `platform.Plugin.RegisterOn(*http.ServerPlugin)` — mounts the routes on a server you choose; optional when the application holds exactly one server
 - `platform.Plugin.AddHealthChecker(name string, fn HealthCheckFunc) error` — explicit liveness probe; rejects a name outside `^[a-z0-9][a-z0-9_./-]{0,63}$`
 - `platform.Plugin.AddReadinessChecker(name string, fn HealthCheckFunc) error` — explicit readiness probe
 - `platform.VersionInfo` — alias of the platform protocol's version payload
@@ -82,8 +83,10 @@ after a bounded grace period even when a probe ignores cancellation.
 ## Relationship to `http.HealthPlugin`
 
 `http.NewHealthPlugin()` mounts a single `GET /_/health`. The platform plugin is
-the richer alternative, not a superset wrapper — mount one or the other, never
-both, since they overlap on probe registration.
+the richer alternative, not a superset wrapper. Both can share one server: each
+discovers the same `app.HealthChecker` probes and reports them on its own route.
+The `go-server` starter composes both: `putnami qualify` and deployment probes
+wait on `/readyz`, and `/_/health` serves clients that probe it.
 
 ## Maintained contract
 

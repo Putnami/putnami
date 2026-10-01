@@ -62,7 +62,7 @@ putnami serve api-gateway
 
 ## Toolchain Management
 
-Go is auto-managed. If the `go` binary in PATH is not the release `putnami.lock.json` pins, the extension downloads, verifies and caches the pinned release. Without a pin, the workspace's Go version is a minimum, read from:
+Go is auto-managed. If the `go` binary in PATH is not the release `putnami.lock.json` pins, the extension downloads and verifies the pinned release, and installs it once for the machine under `~/.putnami/toolchains/go/go-<version>/`. Every workspace that pins the release runs that install. Without a pin, the workspace's Go version is a minimum, read from:
 
 1. `go.work` directive at workspace root
 2. `go.mod` in the project directory

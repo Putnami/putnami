@@ -9,6 +9,9 @@ import "os"
 // InstallLockedGo runs the verified install of the Go release the lock pins.
 func (j *Job) InstallLockedGo(requested string) (string, bool) { return j.installLockedGo(requested) }
 
+// IsPlainGoRelease reports whether version is a Go release name.
+func IsPlainGoRelease(version string) bool { return isPlainGoRelease(version) }
+
 // SetTrap replaces the job's signal trap.
 func (j *Job) SetTrap(trap *Trap) { j.trap = trap }
 
@@ -39,6 +42,10 @@ var ManagedGoBinary = managedGoBinary
 
 // ManagedGoDir is the directory of a managed install.
 var ManagedGoDir = managedGoDir
+
+// WorkspaceGoRoot is the directory inside the workspace that holds Go
+// releases.
+func (j *Job) WorkspaceGoRoot() string { return j.workspaceGoRoot() }
 
 // AppendCommaValue and RemoveCommaValue edit a comma-separated variable.
 var (

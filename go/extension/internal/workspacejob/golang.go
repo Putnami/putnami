@@ -283,13 +283,14 @@ func (j *Job) findGoBinary(requested string) string {
 	}
 
 	if requested != "" {
-		if pinned := managedGoBinary(j.ExtensionStateRoot(), requested); isExecutable(pinned) && j.admits(pinned) {
-			return pinned
+		if managed := j.installedGo(requested); managed != "" {
+			return managed
 		}
 	}
 
-	// bin/go links to the last managed install (linkManagedGo). It is the
-	// fallback when no install matches the requested version by name.
+	// bin/go under the extension state root links to a Go release installed
+	// inside the workspace. It is the fallback when no install matches the
+	// requested version by name.
 	if managed := filepath.Join(j.ExtensionStateRoot(), "bin", pkgmeta.ExecutableName(runtime.GOOS, "go")); isExecutable(managed) && j.admits(managed) {
 		if version := j.goBinaryVersion(managed, ""); requested == "" || version == requested {
 			return managed
@@ -326,19 +327,29 @@ func (j *Job) findPinnedGo(version string) string {
 		}
 		j.Emit.Log("info", "System Go "+shown+" is not the Go "+version+" the workspace lock pins; using managed Go")
 	}
-	if pinned := managedGoBinary(j.ExtensionStateRoot(), version); isExecutable(pinned) && j.admits(pinned) {
-		return pinned
+	return j.installedGo(version)
+}
+
+// installedGo returns the go command of the managed install of Go version
+// that the job may run, or "": the install in the Putnami home
+// (GoToolchainRoot), else the one inside the workspace (workspaceGoRoot).
+func (j *Job) installedGo(version string) string {
+	for _, root := range []string{j.GoToolchainRoot(), j.workspaceGoRoot()} {
+		if binary := managedGoBinary(root, version); isExecutable(binary) && j.admits(binary) {
+			return binary
+		}
 	}
 	return ""
 }
 
 // OnlyProgramsOutsideTheWorkspace makes the job find no program inside the
 // workspace tree: LookPath skips a PATH entry that resolves into it, and Go
-// selection skips the managed installs, which live in it. workspace-fetch
-// calls it before it selects a go command. A program the repository commits
-// into its own tree is repository code, and that job runs while it holds the
-// read credential. The go command then comes from the engine's toolchain
-// store or the runner's PATH.
+// selection skips a managed install that lies in it, which one in a Putnami
+// home under the workspace root does. workspace-fetch calls it before it
+// selects a go command. A program the repository commits into its own tree is
+// repository code, and that job runs while it holds the read credential. The
+// go command then comes from the Putnami home outside the workspace or from
+// the runner's PATH.
 func (j *Job) OnlyProgramsOutsideTheWorkspace() {
 	j.outsideWorkspaceOnly = true
 }
@@ -381,14 +392,27 @@ func resolveExisting(path string) string {
 	}
 }
 
-// managedGoBinary is where a managed install of Go version keeps its go
-// command.
-func managedGoBinary(stateRoot, version string) string {
-	return filepath.Join(managedGoDir(stateRoot, version), "go", "bin", pkgmeta.ExecutableName(runtime.GOOS, "go"))
+// managedGoBinary is where the managed install of Go version under root keeps
+// its go command.
+func managedGoBinary(root, version string) string {
+	return filepath.Join(managedGoDir(root, version), "go", "bin", pkgmeta.ExecutableName(runtime.GOOS, "go"))
 }
 
-func managedGoDir(stateRoot, version string) string {
-	return filepath.Join(stateRoot, "libs", "go-"+version)
+// managedGoDir is the directory of the managed install of Go version under
+// root. The Go distribution it holds is its go directory.
+func managedGoDir(root, version string) string {
+	return filepath.Join(root, "go-"+version)
+}
+
+// isManagedGo reports whether the go command at binary belongs to a managed
+// install: one under the extension state root of a workspace, or one under
+// GoToolchainRoot.
+func (j *Job) isManagedGo(binary string) bool {
+	if strings.Contains(filepath.ToSlash(binary), ".putnami/extensions/") {
+		return true
+	}
+	rel, err := filepath.Rel(resolveExisting(j.GoToolchainRoot()), resolveExisting(binary))
+	return err == nil && filepath.IsLocal(rel) && rel != "."
 }
 
 // SetupGoEnv exports the Go environment every command of the job runs with:
@@ -473,7 +497,7 @@ func (j *Job) setupGoEnv(originHost string) {
 	}
 
 	// A managed go command runs from its own GOROOT, ahead of any other go.
-	if strings.Contains(filepath.ToSlash(j.GoBinary), ".putnami/extensions/") {
+	if j.isManagedGo(j.GoBinary) {
 		actual := j.GoBinary
 		if info, err := os.Lstat(actual); err == nil && info.Mode()&os.ModeSymlink != 0 {
 			if resolved, err := filepath.EvalSymlinks(actual); err == nil {

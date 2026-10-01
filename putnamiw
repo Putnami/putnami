@@ -53,18 +53,26 @@ mkdir -p "$GOCACHE" "$GOMODCACHE"
 # materialize dependencies from it with clonefiles/hardlinks. Preserve Bun's
 # official location (and its own override) while exporting a Putnami-owned name
 # so the CLI, extension jobs, GC, and CI all agree on the exact same root.
+#
+# A machine that holds no Bun of its own (no bun on PATH and no $HOME/.bun) gets
+# no default: the Bun that Putnami installs under $PUTNAMI_HOME keeps its cache
+# under its own install directory, and nothing is written to $HOME/.bun.
 if [ -z "${PUTNAMI_BUN_CACHE_DIR:-}" ]; then
   if [ -n "${BUN_INSTALL_CACHE_DIR:-}" ]; then
     PUTNAMI_BUN_CACHE_DIR="$BUN_INSTALL_CACHE_DIR"
   elif [ -n "${HOME:-}" ]; then
-    PUTNAMI_BUN_CACHE_DIR="$HOME/.bun/install/cache"
+    if command -v bun >/dev/null 2>&1 || [ -d "$HOME/.bun" ]; then
+      PUTNAMI_BUN_CACHE_DIR="$HOME/.bun/install/cache"
+    fi
   else
     PUTNAMI_BUN_CACHE_DIR="$SCRIPT_DIR/.putnami/extensions/@putnami-typescript/cache"
   fi
 fi
-export PUTNAMI_BUN_CACHE_DIR
-export BUN_INSTALL_CACHE_DIR="$PUTNAMI_BUN_CACHE_DIR"
-mkdir -p "$BUN_INSTALL_CACHE_DIR"
+if [ -n "${PUTNAMI_BUN_CACHE_DIR:-}" ]; then
+  export PUTNAMI_BUN_CACHE_DIR
+  export BUN_INSTALL_CACHE_DIR="$PUTNAMI_BUN_CACHE_DIR"
+  mkdir -p "$BUN_INSTALL_CACHE_DIR"
+fi
 
 CLI_BINARY="$SCRIPT_DIR/.putnami/bin/putnami"
 # Provenance marker: present iff $CLI_BINARY is a from-source build (written by

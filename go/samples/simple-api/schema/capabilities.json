@@ -47,6 +47,26 @@
       "identity": {
         "ownerProject": "go.putnami.dev/examples/simple-api",
         "kind": "lifecycle",
+        "subkind": "starter",
+        "key": "platform"
+      },
+      "name": "platform",
+      "phase": "starter",
+      "provenance": {
+        "project": "go.putnami.dev/examples/simple-api",
+        "package": "go.putnami.dev/platform",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/platform.(*Plugin).Start"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/simple-api",
+        "kind": "lifecycle",
         "subkind": "stopper",
         "key": "health"
       },
@@ -82,6 +102,26 @@
           "symbol": "go.putnami.dev/http.(*ServerPlugin).Stop"
         }
       }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/simple-api",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "platform"
+      },
+      "name": "platform",
+      "phase": "stopper",
+      "provenance": {
+        "project": "go.putnami.dev/examples/simple-api",
+        "package": "go.putnami.dev/platform",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/platform.(*Plugin).Stop"
+        }
+      }
     }
   ],
   "packages": [
@@ -112,6 +152,23 @@
       "provenance": {
         "project": "go.putnami.dev/http",
         "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/platform",
+        "kind": "package",
+        "key": "go.putnami.dev/platform"
+      },
+      "package": "go.putnami.dev/platform",
+      "provenance": {
+        "project": "go.putnami.dev/platform",
+        "package": "go.putnami.dev/platform",
         "sourceKind": "framework",
         "declaration": {
           "root": "project",

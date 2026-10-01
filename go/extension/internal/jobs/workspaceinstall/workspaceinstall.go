@@ -237,8 +237,9 @@ func execute(j *workspacejob.Job, force bool, contextOrigin string, members []st
 // finds, since installing one downloads it.
 func (w *install) selectGo() bool {
 	if w.mode == modeFetch {
-		// A managed install lives in the workspace tree, which this job does
-		// not run programs from, so it installs none.
+		// A hosted run installs no Go, and this job runs no program from the
+		// workspace tree: it selects a go command the runner already holds
+		// outside the workspace.
 		if w.FindGoBinary() {
 			return true
 		}

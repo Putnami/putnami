@@ -233,8 +233,10 @@ func TestRunWithConfigHooks_HookOptOutDiscardsTelemetry(t *testing.T) {
 			`printf '%s\n' '{"enabled":false}' > "$HOME/.putnami-telemetry.json"`,
 		}},
 	}}
-	if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil); code != ExitError {
-		t.Fatalf("runTerminalSession exit code = %d, want %d", code, ExitError)
+	// The root holds no project and no repository, so the bare run selects
+	// every project, finds none, and ends as a usage error after the hook ran.
+	if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil); code != ExitUsage {
+		t.Fatalf("runTerminalSession exit code = %d, want %d", code, ExitUsage)
 	}
 
 	events, err := telemetry.Show()

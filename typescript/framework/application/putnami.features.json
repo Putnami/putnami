@@ -116,6 +116,19 @@
           }
         },
         {
+          "id": "no-source-claim",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-malformed-unavailable-binding-is-refused",
+              "an-unavailable-binding-emits-the-bound-manifest-bytes",
+              "an-unavailable-binding-writes-no-feature-evidence"
+            ]
+          }
+        },
+        {
           "id": "phase-order",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

@@ -186,6 +186,10 @@
     {
       "id": "hosted-run-dependencies",
       "text": "On a hosted run, workspace-fetch is the one Go job given the registry credential. It reads it from the engine's descriptor before starting any process, runs no program from the workspace tree, and gives it only to downloading go commands, as a 0600 NETRC with GOAUTH=netrc removed after each one, on failure and on a signal. Every job with the offline signal runs go with GOPROXY=off, GONOPROXY=none and -mod=readonly and writes no credential; without the signal, go commands are unchanged."
+    },
+    {
+      "id": "managed-go-is-shared",
+      "text": "The Go release the workspace lock pins is installed once per machine, in toolchains/go/go-<version> under the Putnami home, the path the putnami-home candidate names, and never into the workspace. A second workspace that pins it downloads nothing, and installs that start together leave one complete install, guarded by the lock file beside it. A copy under a workspace's extension state root runs without a download while the Putnami home holds none. workspace-fetch runs no managed Go inside the workspace."
     }
   ],
   "decisions": [

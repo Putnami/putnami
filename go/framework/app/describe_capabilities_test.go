@@ -171,10 +171,25 @@ func testSourceBinding(label string) string {
 
 func writeVersionStamp(t *testing.T, outDir string, extra ...generatedCapabilityPackage) {
 	t.Helper()
-	stamp := generatedVersionInfo{Name: capabilityProofProject, CapabilityPackages: append([]generatedCapabilityPackage{
+	writeVersionStampPackages(t, outDir, append([]generatedCapabilityPackage{
 		{Package: capabilityProofProject, Version: "0.1.0", SourceRoot: "go/samples/capabilities-proof", EvidencePath: "go/samples/capabilities-proof/putnami.json", SourceBinding: testSourceBinding("workload")},
 		{Package: "go.putnami.dev/app", Version: "1.4.0", SourceRoot: "go/framework/app", EvidencePath: "go/framework/app/putnami.json", SourceBinding: testSourceBinding("app")},
-	}, extra...)}
+	}, extra...))
+}
+
+// writeVersionStampWithoutSourceClaim writes the stamp the scheduler produces
+// for the same two packages where Git does not manage the workspace root.
+func writeVersionStampWithoutSourceClaim(t *testing.T, outDir string) {
+	t.Helper()
+	writeVersionStampPackages(t, outDir, []generatedCapabilityPackage{
+		{Package: capabilityProofProject, Version: "0.1.0", SourceRoot: "go/samples/capabilities-proof", EvidencePath: "go/samples/capabilities-proof/putnami.json", SourceBindingUnavailable: true},
+		{Package: "go.putnami.dev/app", Version: "1.4.0", SourceRoot: "go/framework/app", EvidencePath: "go/framework/app/putnami.json", SourceBindingUnavailable: true},
+	})
+}
+
+func writeVersionStampPackages(t *testing.T, outDir string, packages []generatedCapabilityPackage) {
+	t.Helper()
+	stamp := generatedVersionInfo{Name: capabilityProofProject, CapabilityPackages: packages}
 	data, err := json.Marshal(stamp)
 	if err != nil {
 		t.Fatal(err)
@@ -1103,7 +1118,7 @@ func TestMalformedSchedulerMetadataFailsClosed(t *testing.T) {
 	bad := [][]generatedCapabilityPackage{
 		{}, {{Package: "example/workload", Version: "1.0.0"}},
 		{{Package: "example/workload", Version: "workspace:*", SourceRoot: ".", EvidencePath: "putnami.json", SourceBinding: testSourceBinding("x")}},
-		{{Package: "example/workload", Version: "1.0.0", SourceRoot: ".", EvidencePath: "putnami.json", SourceBindingUnavailable: true}},
+		{{Package: "example/workload", Version: "1.0.0", EvidencePath: "putnami.json", SourceBindingUnavailable: true}},
 		{{Package: "example/workload", Version: "1.0.0", SourceRoot: "../escape", EvidencePath: "putnami.json", SourceBinding: testSourceBinding("x")}},
 	}
 	for i, packages := range bad {
@@ -1117,6 +1132,138 @@ func TestMalformedSchedulerMetadataFailsClosed(t *testing.T) {
 	}
 	if err := New("x").Describe(out, nil); err == nil || !strings.Contains(err.Error(), "scheduler metadata") {
 		t.Fatalf("malformed stamp error = %v", err)
+	}
+}
+
+// equivalenceFixture reads one of the stamps and manifests the TypeScript
+// emitter's tests read too, so both runtimes are fed and held to the same bytes.
+func equivalenceFixture(t *testing.T, name string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "protocols", "capabilities", "fixtures", "v2", "equivalence", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+// TestDescribeEmitsTheBoundManifestForAnUnavailableSourceBinding pins the
+// accepted half of the rule: a stamp whose binding is unavailable produces the
+// manifest a bound stamp produces, byte for byte, and no evidence.
+func TestDescribeEmitsTheBoundManifestForAnUnavailableSourceBinding(t *testing.T) {
+	spectest.Proves(t, "go/application-lifecycle", "no-source-claim",
+		"an-unavailable-binding-emits-the-bound-manifest-bytes")
+	golden := equivalenceFixture(t, "no-source-claim.golden.json")
+	for _, stamp := range []string{"no-source-claim.unavailable.version.json", "no-source-claim.bound.version.json"} {
+		out := t.TempDir()
+		if err := os.WriteFile(filepath.Join(out, "version.json"), equivalenceFixture(t, stamp), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := New("x").Describe(out, nil); err != nil {
+			t.Fatalf("%s: Describe: %v", stamp, err)
+		}
+		manifest, err := os.ReadFile(filepath.Join(out, "schema", protocaps.ManifestFilename))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(manifest, golden) {
+			t.Errorf("%s: manifest differs from the shared golden:\n--- got ---\n%s\n--- want ---\n%s", stamp, manifest, golden)
+		}
+		if _, err := os.Stat(filepath.Join(out, "schema", "feature-evidence", featureEvidenceFilename)); !os.IsNotExist(err) {
+			t.Errorf("%s: an app that proves nothing wrote evidence: %v", stamp, err)
+		}
+	}
+}
+
+// TestDescribeWritesNoFeatureEvidenceForAnUnavailableSourceBinding describes
+// one app that proves a requirement under both stamps. The bound build writes
+// evidence. The build that makes no source claim writes the same manifest,
+// writes no evidence, and removes the evidence an earlier build left behind.
+func TestDescribeWritesNoFeatureEvidenceForAnUnavailableSourceBinding(t *testing.T) {
+	spectest.Proves(t, "go/application-lifecycle", "no-source-claim",
+		"an-unavailable-binding-writes-no-feature-evidence")
+	bound, _, _ := describeCapabilityArtifacts(t)
+
+	out := t.TempDir()
+	writeVersionStampWithoutSourceClaim(t, out)
+	evidencePath := filepath.Join(out, "schema", "feature-evidence", featureEvidenceFilename)
+	if err := os.MkdirAll(filepath.Dir(evidencePath), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(evidencePath, []byte("stale"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a, _ := buildCapabilityApp()
+	if err := a.Describe(out, nil); err != nil {
+		t.Fatalf("Describe: %v", err)
+	}
+	manifest, err := os.ReadFile(filepath.Join(out, "schema", protocaps.ManifestFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(manifest, bound) {
+		t.Errorf("the manifest moved with the binding:\n--- unavailable ---\n%s\n--- bound ---\n%s", manifest, bound)
+	}
+	if _, err := os.Stat(evidencePath); !os.IsNotExist(err) {
+		t.Errorf("a build that makes no source claim left feature evidence: %v", err)
+	}
+}
+
+// TestUnavailableSourceBindingShapeIsStrict pins the refused half of the rule,
+// with the wording the TypeScript emitter uses for the same stamps.
+func TestUnavailableSourceBindingShapeIsStrict(t *testing.T) {
+	spectest.Proves(t, "go/application-lifecycle", "no-source-claim",
+		"a-malformed-unavailable-binding-is-refused")
+	entry := generatedCapabilityPackage{Package: "example/workload", Version: "1.0.0", EvidencePath: "package.json", SourceRoot: "."}
+	dependency := generatedCapabilityPackage{Package: "example/dependency", Version: "1.0.0", EvidencePath: "libs/dependency/package.json", SourceRoot: "libs/dependency", SourceBinding: testSourceBinding("dependency")}
+	with := func(binding string, unavailable bool) generatedCapabilityPackage {
+		pkg := entry
+		pkg.SourceBinding, pkg.SourceBindingUnavailable = binding, unavailable
+		return pkg
+	}
+	for name, tc := range map[string]struct {
+		packages []generatedCapabilityPackage
+		message  string
+	}{
+		"unavailable with a binding": {
+			[]generatedCapabilityPackage{with(testSourceBinding("x"), true)},
+			`capability package "example/workload" carries a source-v1 binding it marks unavailable`,
+		},
+		"available with an empty binding": {
+			[]generatedCapabilityPackage{with("", false)},
+			`capability package "example/workload" has no available source-v1 binding`,
+		},
+		"available with an invalid binding": {
+			[]generatedCapabilityPackage{with("source-v1:sha256:nothex", false)},
+			`capability package "example/workload" has no available source-v1 binding`,
+		},
+		"mixed": {
+			[]generatedCapabilityPackage{with("", true), dependency},
+			`capabilityPackages mixes available and unavailable source-v1 bindings`,
+		},
+		"unavailable without a source root": {
+			[]generatedCapabilityPackage{{Package: "example/workload", Version: "1.0.0", EvidencePath: "package.json", SourceBindingUnavailable: true}},
+			`capabilityPackages[0] is incomplete or malformed`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := newCapabilityInventory("example/workload", tc.packages)
+			if err == nil || err.Error() != tc.message {
+				t.Fatalf("error = %v, want %q", err, tc.message)
+			}
+		})
+	}
+
+	// A marker that is not a boolean never decodes into the stamp at all.
+	out := t.TempDir()
+	stamp := `{"name":"example/workload","capabilityPackages":[{"package":"example/workload","version":"1.0.0","evidencePath":"package.json","sourceRoot":".","sourceBinding":"","sourceBindingUnavailable":"true"}]}`
+	if err := os.WriteFile(filepath.Join(out, "version.json"), []byte(stamp), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := New("x").Describe(out, nil); err == nil {
+		t.Fatal("a non-boolean sourceBindingUnavailable was accepted")
+	}
+	if _, err := os.Stat(filepath.Join(out, "schema", protocaps.ManifestFilename)); !os.IsNotExist(err) {
+		t.Fatalf("a refused stamp left a manifest: %v", err)
 	}
 }
 

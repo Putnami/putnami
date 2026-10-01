@@ -112,9 +112,13 @@ export interface CapabilityPackageStamp {
   evidencePath: string;
   /** Workspace-relative root whose exact contents produced this package. */
   sourceRoot?: string;
-  /** Required source-v1 binding for Capability Manifest v2 publication. */
+  /** source-v1 binding of sourceRoot; empty only when sourceBindingUnavailable is true. */
   sourceBinding?: string;
-  /** True when the scheduler could not compute sourceBinding. */
+  /**
+   * True when Git does not manage the workspace root: the build makes no source
+   * claim. The manifest is the one a bound stamp produces, byte for byte, and no
+   * feature evidence is written. Every entry of one stamp carries it or none does.
+   */
   sourceBindingUnavailable?: boolean;
   capabilityManifestPath?: string;
 }
@@ -414,6 +418,7 @@ function buildPackageInventory(
   if (packages !== undefined && (!Array.isArray(packages) || packages.length === 0)) {
     throw new Error('capabilityPackages must be a non-empty array when scheduler metadata is present');
   }
+  let unavailable = 0;
   for (const [index, rawMetadata] of (packages ?? []).entries()) {
     if (typeof rawMetadata !== 'object' || rawMetadata === null || Array.isArray(rawMetadata)) {
       throw new Error(`capabilityPackages[${index}] must be an object`);
@@ -427,9 +432,7 @@ function buildPackageInventory(
       !hasSourceMetadata ||
       typeof metadata.sourceRoot !== 'string' ||
       !metadata.sourceRoot.trim() ||
-      typeof metadata.sourceBinding !== 'string' ||
-      !SOURCE_BINDING_PATTERN.test(metadata.sourceBinding) ||
-      metadata.sourceBindingUnavailable === true ||
+      (metadata.sourceBinding !== undefined && typeof metadata.sourceBinding !== 'string') ||
       (metadata.sourceBindingUnavailable !== undefined && typeof metadata.sourceBindingUnavailable !== 'boolean');
     const unknownKeys = Object.keys(metadata).filter(
       (key) =>
@@ -458,7 +461,7 @@ function buildPackageInventory(
       throw new Error(`capabilityPackages[${index}] is incomplete or malformed`);
     }
     const sourceRoot = metadata.sourceRoot as string;
-    const sourceBinding = metadata.sourceBinding as string;
+    const sourceBinding = metadata.sourceBinding ?? '';
     if (
       !canonicalWorkspaceRelativePath(sourceRoot, true) ||
       !canonicalWorkspaceRelativePath(metadata.evidencePath, false)
@@ -466,6 +469,16 @@ function buildPackageInventory(
       throw new Error(
         `capabilityPackages[${index}] sourceRoot/evidencePath is not a canonical contained workspace-relative path`,
       );
+    }
+    if (metadata.sourceBindingUnavailable === true) {
+      if (sourceBinding !== '') {
+        throw new Error(
+          `capability package ${JSON.stringify(metadata.package)} carries a source-v1 binding it marks unavailable`,
+        );
+      }
+      unavailable++;
+    } else if (!SOURCE_BINDING_PATTERN.test(sourceBinding)) {
+      throw new Error(`capability package ${JSON.stringify(metadata.package)} has no available source-v1 binding`);
     }
     if (!isResolvedVersion(metadata.version)) {
       throw new Error(
@@ -494,6 +507,9 @@ function buildPackageInventory(
       continue;
     }
     byPackage.set(metadata.package, normalized);
+  }
+  if (unavailable !== 0 && unavailable !== packages?.length) {
+    throw new Error('capabilityPackages mixes available and unavailable source-v1 bindings');
   }
   if (packages !== undefined && !byPackage.has(project)) {
     throw new Error(`capabilityPackages is missing the workload package ${JSON.stringify(project)}`);
@@ -1488,6 +1504,11 @@ function buildFeatureEvidenceDocument(
 ): FeatureEvidenceDocument | undefined {
   const mappings = collectFeatureProofMappings(owner);
   if (mappings.length === 0) return undefined;
+  // A record states which source produced it. A build that makes no source
+  // claim has nothing to state, so it writes no evidence, and the readers
+  // report the project's evidence as unavailable.
+  const source = packageMetadata(inventory, manifest.project);
+  if (source.sourceBindingUnavailable === true) return undefined;
 
   const contributions: ContributionIdentity[] = [];
   for (const entries of [
@@ -1509,7 +1530,7 @@ function buildFeatureEvidenceDocument(
     source: {
       root: 'project',
       ownerProject: manifest.project,
-      binding: packageMetadata(inventory, manifest.project).sourceBinding,
+      binding: source.sourceBinding,
     },
     authored: readAuthoredFeatureManifest(projectRoot),
     contributions,

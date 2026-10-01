@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -725,6 +726,137 @@ func TestSchedulerCapabilitySourceBindingSnapshotInvalidatedAroundRestore(t *tes
 				t.Fatalf("shared refreshed snapshot: %+v, processes=%d", other, spawned)
 			}
 		})
+	}
+}
+
+// sourceClaimWorkspace is a workspace of three projects in one dependency
+// chain, each with one source file, at a root with no repository.
+func sourceClaimWorkspace(t *testing.T) (*workspace.Workspace, []*workspace.Project) {
+	t.Helper()
+	ws := makeExecutorTestWorkspace(t)
+	projects := []*workspace.Project{
+		{ID: "/apps/workload", Name: "workload", Path: "apps/workload", Dependencies: []string{"feature"}},
+		{ID: "/libs/feature", Name: "feature", Path: "libs/feature", Dependencies: []string{"framework"}},
+		{ID: "/libs/framework", Name: "framework", Path: "libs/framework"},
+	}
+	for _, project := range projects {
+		writeFileAt(t, filepath.Join(ws.Root, project.Path, "source.go"), "package fixture\n")
+	}
+	ws.Projects = projects
+	return ws, projects
+}
+
+// A root Git does not manage has no source-v1 binding, so every package of the
+// closure is stamped with an empty binding and the unavailable marker, and its
+// source root stays stamped. Git is asked once for the whole closure.
+func TestCapabilityPackageStamps_OutsideARepositoryMakeNoSourceClaim(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-without-git", "no-source-claim",
+		"stamps-outside-a-repository-make-no-source-claim")
+	ws, projects := sourceClaimWorkspace(t)
+	// Git discovery stops above the root, so the answer does not depend on
+	// where the temporary directory lives.
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(ws.Root))
+
+	memo := newCapabilitySourceBindingMemo()
+	resolved := 0
+	resolve := memo.resolve
+	memo.resolve = func(repoRoot, projectRoot string) (string, int, error) {
+		resolved++
+		return resolve(repoRoot, projectRoot)
+	}
+	probed := 0
+	isUnmanaged := memo.isUnmanaged
+	memo.isUnmanaged = func(repoRoot string) bool {
+		probed++
+		return isUnmanaged(repoRoot)
+	}
+
+	stamps := capabilityPackageStamps(ws, rootLineVersions(&JobContextVersion{Base: "0.0.0"}), projects[0], memo, nil)
+	if len(stamps) != len(projects) {
+		t.Fatalf("stamps = %+v, want one per project of the closure", stamps)
+	}
+	for _, stamp := range stamps {
+		if !stamp.SourceBindingUnavailable || stamp.SourceBinding != "" {
+			t.Errorf("stamp for %s = %+v, want no binding and the unavailable marker", stamp.Package, stamp)
+		}
+		if stamp.SourceRoot == "" {
+			t.Errorf("stamp for %s lost its source root: %+v", stamp.Package, stamp)
+		}
+	}
+	if resolved != 1 || probed != 1 {
+		t.Fatalf("binding attempts = %d, repository probes = %d, want one of each for the whole closure", resolved, probed)
+	}
+}
+
+// The unavailable marker means "Git does not manage this root" and nothing
+// else. A binding that fails inside a repository is stamped empty with the
+// marker unset, which is the shape every emitter refuses.
+func TestCapabilityPackageStamps_ABindingFailureInsideARepositoryIsNotMarkedUnavailable(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-without-git", "no-source-claim",
+		"a-binding-failure-inside-a-repository-is-not-marked-unavailable")
+	ws, projects := sourceClaimWorkspace(t)
+	runVersionsGit(t, ws.Root, "init")
+
+	memo := newCapabilitySourceBindingMemo()
+	memo.resolve = func(string, string) (string, int, error) {
+		return "source-v1:sha256:partial", 1, fmt.Errorf("unmerged index entry")
+	}
+	probed := 0
+	isUnmanaged := memo.isUnmanaged
+	memo.isUnmanaged = func(repoRoot string) bool {
+		probed++
+		return isUnmanaged(repoRoot)
+	}
+
+	stamps := capabilityPackageStamps(ws, rootLineVersions(&JobContextVersion{Base: "0.0.0"}), projects[0], memo, nil)
+	if len(stamps) != len(projects) {
+		t.Fatalf("stamps = %+v, want one per project of the closure", stamps)
+	}
+	for _, stamp := range stamps {
+		if stamp.SourceBindingUnavailable || stamp.SourceBinding != "" {
+			t.Errorf("stamp for %s = %+v, want an empty binding with the marker unset", stamp.Package, stamp)
+		}
+	}
+	if probed != 1 {
+		t.Fatalf("repository probes = %d, want 1 for the whole closure", probed)
+	}
+}
+
+// Inside a repository the stamp carries exactly the binding Git's enumeration
+// yields for the project root, the marker stays unset, and Git is never asked
+// whether it manages the root.
+func TestCapabilityPackageStamps_InsideARepositoryCarryTheSourceBinding(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-without-git", "no-source-claim",
+		"bindings-inside-a-repository-are-unchanged")
+	ws, projects := sourceClaimWorkspace(t)
+	runVersionsGit(t, ws.Root, "init")
+
+	memo := newCapabilitySourceBindingMemo()
+	memo.isUnmanaged = func(repoRoot string) bool {
+		t.Errorf("asked whether Git manages %s although every binding resolved", repoRoot)
+		return false
+	}
+
+	spawned := 0
+	stamps := capabilityPackageStamps(ws, rootLineVersions(&JobContextVersion{Base: "0.0.0"}), projects[0], memo, &spawned)
+	if len(stamps) != len(projects) {
+		t.Fatalf("stamps = %+v, want one per project of the closure", stamps)
+	}
+	byName := make(map[string]*workspace.Project, len(projects))
+	for _, project := range projects {
+		byName[project.Name] = project
+	}
+	for _, stamp := range stamps {
+		want, _, err := putnamigit.ProjectSourceBindingMeasured(ws.Root, filepath.Join(ws.Root, byName[stamp.Package].Path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if stamp.SourceBindingUnavailable || stamp.SourceBinding != want {
+			t.Errorf("stamp for %s = %+v, want the binding %s", stamp.Package, stamp, want)
+		}
+	}
+	if spawned != 2 {
+		t.Fatalf("git processes = %d, want the 2 of one repository enumeration", spawned)
 	}
 }
 

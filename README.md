@@ -6,7 +6,17 @@
 </h1>
 
 > **Build systems, not apps.**
-> Putnami is a system-first framework for polyglot teams where code, tooling, and environments stay aligned from local development to production.
+> Putnami is designed for your teams and their coding agents to build and run a
+> multi-service system in one repository, and to keep it working as both grow.
+> It is polyglot by design: Go and TypeScript ship today, and every boundary
+> between languages is a tested contract.
+
+**Status:** 0.2.0, released 2026-10-01, is the first public release, after
+years of private development and use. The repository history starts at that
+release.
+A failure in the [supported core](#supported-core) is a bug, and we fix it:
+[report it](https://github.com/putnami/putnami/issues/new?template=bug_report.md).
+This repository is free, and stays free. See [What is free](#what-is-free).
 
 ## Quick Start
 
@@ -14,6 +24,7 @@ On macOS or Linux, on `amd64` or `arm64`, from an empty directory:
 
 ```bash
 curl -fsSL https://putnami.dev/install.sh | bash
+export PATH="$HOME/.putnami/bin:$PATH"
 putnami init --project webapp --extension ts
 putnami serve webapp
 ```
@@ -29,7 +40,8 @@ putnami serve webapp
 Open the local URL that `putnami serve` prints. You are running the full system
 locally.
 
-The TypeScript starter needs Bun v1.4.0 or later. Windows also needs Git for
+You do not install Bun: Putnami installs Bun under `~/.putnami` for the
+TypeScript starter when the machine holds none that fits. Windows needs Git for
 Windows, Win32 long paths enabled, and Docker Desktop for `putnami compose`;
 `putnami doctor` checks the long-path settings. The installer verifies each
 download against the digest the registry advertises, refuses what it cannot
@@ -44,43 +56,71 @@ rest of the first run.
 
 ## What Putnami Is
 
-Putnami is an opinionated system that defines how applications are built,
-executed, and operated. It removes drift between:
+Putnami is one toolchain and one set of application frameworks for a system
+made of several services in several languages. One CLI builds, tests, lints,
+and runs every project in the repository. It knows which projects a change
+affects, checks only those, and reports every result as data that a person or a
+coding agent can act on.
 
-- code and runtime behavior;
-- local, preview, and production environments;
-- human workflows and automation.
+### What is different
 
-If something cannot be reasoned about, reviewed, or automated, Putnami treats it
-as a design failure.
+- **Contracts between languages.** Every boundary in the system, such as HTTP
+  routes, configuration, events, or migrations, is a small versioned protocol
+  with a JSON schema, a set of fixtures, and conformance tests. The CLI, the Go
+  framework, and the TypeScript framework are tested against the same fixtures,
+  so the languages cannot drift apart silently. The protocols live in
+  [`protocols/`](protocols).
+- **Built for coding agents.** Every workspace ships an MCP server, which
+  exposes the workspace to an agent as typed tools. An agent can list projects,
+  compute what a change affects and why, find the owner of a file, run lint,
+  test, and build, and read each failure as `file:line:col` with a severity and
+  a code. One tool changes anything, it supports a dry run, and it refuses jobs
+  that reach external systems. The lint refuses a skipped test that has no
+  stated reason, so an agent cannot fix a test by turning it off. See
+  [Agents](https://putnami.dev/docs/agents).
+- **Polyglot by design.** A language is an extension, built with the
+  [extension SDK](tooling/extension-sdk), and every boundary is a
+  language-neutral protocol. Go and TypeScript are supported today, and Python
+  is experimental. A new language plugs into the same contracts.
 
-Most stacks optimize for local productivity and defer system concerns to
-"later". Later arrives as brittle deployments, hidden performance costs, and
-operational guesswork. Putnami makes different tradeoffs:
+### Designed to scale with teams and agents
 
-| Common approach | Putnami |
-|---|---|
-| Deploy an app | Deploy a system |
-| Monorepo as build optimization | Monorepo as architecture |
-| Configuration everywhere | Convention with explicit escape hatches |
-| Observability added later | Observable by construction |
-| Automation as an afterthought | Automation as a first-class user |
+More contributors and more agents mean more changes at once. Putnami keeps each
+one bounded: a change is checked against exactly the projects it affects, every
+result is data rather than a log to interpret, and an agent acts through one
+tool that declares what it touches. Decisions live in versioned files that bind
+every contributor, human or agent, and `putnami validate` enforces the ones a
+machine can check.
+
+Putnami is built this way. This repository is one workspace of 155 projects in
+three languages, changed by people and coding agents through the same gates.
+The repository of Putnami Cloud builds, tests, and deploys through Putnami on
+every merge to `main`.
+
+### When to pick something else
+
+- You only need build caching for an existing repository: use Nx, Turborepo,
+  or moon. Putnami also provides application frameworks and conventions, which
+  you do not need for that.
+- You have an existing repository: today Putnami starts new workspaces.
+  Migrating a repository, or running Putnami next to your current tooling, is
+  the next path we explore.
+  [Tell us your stack](https://github.com/putnami/putnami/issues/new?template=share-your-stack.md)
+  so we build the path that helps you.
+- You ship one service and never plan to delegate its operation: the structure
+  costs more than it returns. Reach for something lighter.
+
+[Why Putnami](https://putnami.dev/docs/why) states what Putnami is not, what its
+constraints cost you, and where it is today.
 
 ### The stack
 
-Each layer has one responsibility:
-
-- **Workspace**: the root unit Putnami operates on. It groups projects and
-  extensions across languages in one monorepo.
-- **Runtime**: runs application code through a language extension, with one CLI
-  workflow for every language.
-- **Framework**: patterns for building applications: web, API, auth,
-  persistence.
-- **Platform**: runs the system outside your machine, from a container image you
-  deploy anywhere.
-
-Language extensions exist for TypeScript and Go, plus an experimental one for
-Python. PostgreSQL is the supported database.
+| Layer | What it does | Status today |
+|---|---|---|
+| **Workspace** | Groups projects and extensions across languages in one repository. | Supported |
+| **Runtime** | Runs application code through a language extension, with one CLI workflow for every language. | Supported for Go and TypeScript; Python is experimental |
+| **Framework** | Web, API, auth, persistence, events, storage, and validation. PostgreSQL is the supported database. | Supported for Go and TypeScript; no Python framework yet |
+| **Platform** | Runs the system outside your machine. | Today: a container image that you deploy anywhere. Next: managed environments, branch previews, and `putnami deploy`; see [Product Direction](#product-direction) |
 
 ## Principles
 
@@ -186,9 +226,11 @@ templates. Contributors to this repository work on macOS or Linux, because
 
 Each release runs the Quick Start commands on all five supported targets, with
 an empty home, config, and cache and no credentials, and sends a real HTTP
-request to the generated starter. That check does not cover other shells,
-offline installs, production deployment, or long-term source compatibility of
-the generated app. Digest verification proves the bytes match what the registry
+request to the generated starter. On Linux, each release also pastes the Quick
+Start block into an image that holds Bash, `curl`, `tar` and a SHA-256 tool and
+nothing else, then runs `putnami lint,test,build` and the Go starter there.
+Those checks do not cover other shells, offline installs, production
+deployment, or long-term source compatibility of the generated app. Digest verification proves the bytes match what the registry
 advertises; it is not artifact signing. The details are in
 [The release smoke](tooling/cli/doc/22-installing-the-cli.md#the-release-smoke).
 
@@ -220,9 +262,24 @@ earlier releases.
 ### Licensing
 
 The first public release is licensed under [FSL-1.1-MIT](LICENSE.md), not MIT.
-The license file and its future-license terms control. We intend to publish
-v1.0.0 under the MIT License; that intent does not change the license that
-applies today.
+In plain terms: you can use Putnami for any purpose, including commercial
+production and services you deliver to clients, except offering a commercial
+product that competes with Putnami. Each release becomes MIT-licensed two years
+after its publication, and nobody can revoke that. The license file and its
+future-license terms control; this summary does not replace them. We intend to
+publish v1.0.0 under the MIT License; that intent does not change the license
+that applies today.
+
+### What is free
+
+This repository is free and stays free: the CLI, the language extensions, the
+frameworks, the protocols, and the templates. With it alone, you build, test,
+and package a system, and you work on it with coding agents. The container
+image it produces runs anywhere you deploy containers.
+
+Putnami Cloud will offer hosted services on top of it. The offers are not
+published yet; [putnami.com](https://putnami.com) will describe them. The
+details are in [What is free](https://putnami.dev/docs/concepts/what-is-free).
 
 ### Who decides
 
@@ -243,6 +300,10 @@ first public-release promise above.
   full system, isolated data, and automatic cleanup.
 - **Production deploy**: `putnami deploy` ships deterministic builds with
   zero-downtime rollout, fast rollback, and the same system you tested locally.
+- **More languages**: mobile (iOS and Android) and Rust, as language
+  extensions that implement the same protocols.
+- **Existing repositories**: migrating a repository to Putnami, and running
+  Putnami next to existing tooling.
 
 ## Telemetry
 

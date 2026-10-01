@@ -7,4 +7,5 @@ require (
 	go.putnami.dev/config <%= goFrameworkVersion %>
 	go.putnami.dev/http <%= goFrameworkVersion %>
 	go.putnami.dev/logger <%= goFrameworkVersion %>
+	go.putnami.dev/platform <%= goFrameworkVersion %>
 )

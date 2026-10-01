@@ -89,7 +89,7 @@ startup before HTTP traffic is served:
 ```
 
 The server mounts the platform endpoints (`/livez`, `/healthz`, `/readyz`,
-`/version`) and one business route, `GET /users`, which lists users from the
+`/version`), the single-endpoint probe `/_/health`, and one business route, `GET /users`, which lists users from the
 `iam_users` table the migrations create. To prove the server boots against a
 fresh database, applies its migrations and answers that route, compose it and
 run its derived smoke in one command:

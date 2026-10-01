@@ -5,14 +5,23 @@ import (
 	"path/filepath"
 )
 
-// ResolveBiome finds the biome binary.
-// Resolution: project node_modules/.bin/ → workspace node_modules/.bin/ → PATH.
+// ResolveBiome finds the file that starts biome for a project. In the nearest
+// node_modules directory, from the project up to the workspace, that is the
+// native executable of the platform package installed for the host
+// (@biomejs/cli-<os>-<arch>, with a -musl suffix on a musl host), else the
+// launcher in node_modules/.bin; then a biome on PATH. The launcher is a
+// JavaScript file: Command starts what this returns.
 func ResolveBiome(projectRoot, workspaceRoot string) (string, error) {
-	p := resolveBinary("biome", projectRoot, workspaceRoot)
-	if p == "" {
+	return resolveBiomeOn(hostPlatform(), projectRoot, workspaceRoot)
+}
+
+// resolveBiomeOn is ResolveBiome for a process that runs on p.
+func resolveBiomeOn(p platform, projectRoot, workspaceRoot string) (string, error) {
+	path := resolveBinary("biome", projectRoot, workspaceRoot, p)
+	if path == "" {
 		return "", fmt.Errorf("biome not found: install @biomejs/biome as a devDependency")
 	}
-	return p, nil
+	return path, nil
 }
 
 // ResolveBiomeConfig resolves the biome configuration file.

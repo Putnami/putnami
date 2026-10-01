@@ -20,14 +20,13 @@ server.Use(http.Recovery())
 server.Use(http.RequestID())
 server.Use(http.Logging(http.LoggerOptions{Exclude: []string{"/healthz", "/livez", "/readyz"}}))
 
-platformPlugin := platform.NewPlugin(platform.Config{})
-platformPlugin.RegisterOn(server)
-
 a := app.New("my-service")
 a.Use(server)
-a.Use(platformPlugin) // GET /healthz /livez /readyz /version
+a.Use(platform.NewPlugin(platform.Config{})) // GET /healthz /livez /readyz /version
 a.ListenAndServe()
 ```
+
+A health plugin (`http.NewHealthPlugin()`) or a platform plugin added with `a.Use` mounts its routes on the application's single `ServerPlugin` at configure. No server, or several, fails configure with an error that names `RegisterOn`; call `RegisterOn(server)` before configure to choose the server. `http.SingleServer(owner, pluginName)` is the lookup a plugin of your own uses for the same rule.
 
 > Prefer `go.putnami.dev/platform` for new code — it mounts `/healthz`, `/livez`, `/readyz`, `/version`, and (opt-in) `/debug/pprof/*` and auto-discovers `app.HealthChecker` / `app.ReadinessChecker` probes. `http.NewHealthPlugin()` is still supported (it now auto-discovers `HealthChecker` too) and exposes `/_/health`, but it covers only liveness.
 
@@ -222,7 +221,8 @@ See `go.putnami.dev/api` (and its `AI.md`) for the full builder reference.
 This public package is `stable` in the workspace [support
 catalog](../../../putnami.support.json). Its behavior is defined by the [HTTP
 services specification](specs/http-services.json), the [request-scope
-ADR](doc/adr/0001-request-scope-follows-the-response.md), and the [bounded-resource
-ADR](doc/adr/0002-framework-owned-bounds.md). Before v1.0, follow the workspace
+ADR](doc/adr/0001-request-scope-follows-the-response.md), the [bounded-resource
+ADR](doc/adr/0002-framework-owned-bounds.md), and the [route-plugin
+ADR](doc/adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md). Before v1.0, follow the workspace
 [migration-based compatibility policy](../../../RELEASE.md); do not infer strict
 compatibility between every `0.x` minor.

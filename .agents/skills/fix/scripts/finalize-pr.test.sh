@@ -700,7 +700,10 @@ jq -r '.proposal.body' "$TEST_DIR/status.json" >"$TEST_DIR/published-body.md"
 [ "$(jq -r '.reviews[0].commit' "$TEST_DIR/status.json")" = "$(git -C "$TEST_DIR/work" rev-parse HEAD)" ]
 last_review() { tail -1 "$TEST_DIR/state/review-requests" | jq -r '.body'; }
 last_review >"$TEST_DIR/verification.md"
-grep -Fxq -- "- \`example.txt\`" "$TEST_DIR/verification.md"
+if grep -Fq -- "example.txt" "$TEST_DIR/verification.md"; then
+  echo "finalize-pr test: the verification comment lists files the proposal diff already shows" >&2
+  exit 1
+fi
 grep -Fq -- "pass for test/project test/other, then once with --impacted" "$TEST_DIR/verification.md"
 grep -Fq -- "local proof (passed): real harness observed the expected behavior" "$TEST_DIR/verification.md"
 # The task moved to the policy's delivered state, through the contract.
@@ -847,14 +850,9 @@ merged_output="$(finalize --title "fix(test): portable finalizer" --body-file "$
   --project test/project)"
 [ "$(sed -n 's/^PROPOSAL_REF=//p' <<<"$merged_output")" = "$PROPOSAL" ]
 [ "$(git --git-dir="$TEST_DIR/origin.git" rev-parse refs/heads/fix/portable)" = "$(git -C "$TEST_DIR/work" rev-parse HEAD)" ]
-# The republished proposal follows the pushed head; the upstream file the merge
-# brought in is not part of this change.
+# The republished proposal follows the pushed head.
 collab proposals status "$(jq -cn --argjson ref "$PROPOSAL" '{ref: $ref}')" >"$TEST_DIR/status.json"
 [ "$(jq -r '.proposal.change.headCommit' "$TEST_DIR/status.json")" = "$(git -C "$TEST_DIR/work" rev-parse HEAD)" ]
-if last_review | grep -Fq 'upstream.txt'; then
-  echo "finalize-pr test: the proposal lists a file the base already had" >&2
-  exit 1
-fi
 
 # An uncertain write stops the helper: it names the read that reconciles it,
 # never repeats the write, and never moves the task on an unknown outcome.

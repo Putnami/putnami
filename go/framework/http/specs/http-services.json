@@ -6,7 +6,8 @@
     "A service registers routes and middleware once and serves them through a single trie router",
     "Every request runs inside its own dependency scope whose transactional work is reconciled with the response the client actually receives",
     "A long-lived connection, a stalled reader, and a shutdown are each bounded by a timeout the framework owns",
-    "A supervising tool learns the address the server actually bound from the record the server already logs"
+    "A supervising tool learns the address the server actually bound from the record the server already logs",
+    "A health plugin added to an application answers on the application's server without a second wiring step"
   ],
   "nonGoals": [
     "Terminating TLS: the server listens in cleartext and expects a TLS-terminating proxy in front of it",
@@ -54,12 +55,17 @@
     {
       "id": "upgrade-admitted-wires",
       "text": "A stream route may admit on the upgrade. Its security and validation chain runs on the upgrade request and refuses with an HTTP response before any socket exists. The route speaks exactly its declared subprotocol, or none: another offer, or no offer when one is declared, is refused with 400, and every admitted socket reaches the wire's own driver, never the raw stream or SSE. A binary message is written under the same bound as text."
+    },
+    {
+      "id": "health-mounting",
+      "text": "A health plugin added to an application registers GET /_/health on the application's single server when the application configures, in any plugin order, and registers it once however often the application configures. The route answers 503 until the application starts. An application that holds no server, or several, fails configure with an error that names RegisterOn. A plugin the caller mounted, through RegisterOn or by taking its handler, registers nothing more."
     }
   ],
   "decisions": [
     "go/framework/api/doc/adr/0011-streamed-octets-carry-their-own-media-type.md",
     "go/framework/http/doc/adr/0001-request-scope-follows-the-response.md",
     "go/framework/http/doc/adr/0002-framework-owned-bounds.md",
+    "go/framework/http/doc/adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md",
     "protocols/clientcontract/doc/adr/0010-a-provider-owned-websocket-wire-is-declared-not-inferred.md"
   ]
 }

@@ -41,7 +41,18 @@ func TestMain(m *testing.M) {
 		os.Exit(answerRegistryTokenAsFakeCLI(token))
 	}
 	os.Unsetenv(extension.PrivatePutRegistryURLEnv)
-	os.Exit(m.Run())
+	// A Go pin reads and writes a pin record under the Putnami home. The
+	// process runs in a home of its own, so no test reads the records of the
+	// host or leaves one there.
+	home, err := os.MkdirTemp("", "putnami-versioncmd-home-")
+	if err != nil {
+		_, _ = os.Stderr.WriteString("create the test Putnami home: " + err.Error() + "\n")
+		os.Exit(1)
+	}
+	os.Setenv("PUTNAMI_HOME", home)
+	code := m.Run()
+	os.RemoveAll(home)
+	os.Exit(code)
 }
 
 // answerVersionAsFakeCLI prints reports the way a CLI run directly prints its
