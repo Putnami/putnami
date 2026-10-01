@@ -58,7 +58,7 @@
   ],
   "envs": {
     "prod": {
-      "channel": "canary",
+      "channel": "latest",
       "workloads": [
         {
           "select": [
