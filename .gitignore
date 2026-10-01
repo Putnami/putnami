@@ -82,7 +82,10 @@ samples/bun.lock
 /typescript/samples/10-service-to-service/clients/ts/.gen/
 
 # BEGIN PUTNAMI AUDIT MANAGED
-# Local audit attestations and parallel fleet-run state.
+# Local audit attestations and parallel fleet-run state, written by the audit
+# skill of @putnami/intelligence.
+.putnami/audit/
+# Written by audit copies that the retired Cloud audit installer placed.
 .AI/audit/attestations/
 .audit-runs/
 # END PUTNAMI AUDIT MANAGED
