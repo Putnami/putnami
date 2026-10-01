@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,11 @@ import (
 // leaves the request on its native credentials. An answer with ok false is a
 // refusal: a bounded machine code the engine reports as the failure reason,
 // never a fallback.
+//
+// A session whose initialize negotiates CapabilityPublicationV1 also carries
+// the publication ops resolve, open and release (publication.go,
+// doc/adr/0003-publication-ops-behind-a-negotiated-capability.md). A session
+// that did not negotiate it refuses them.
 const (
 	// CredentialProviderCommand is the reserved extension command that serves
 	// credential-provider/v1. Two loaded extensions declaring it is an error.
@@ -43,6 +49,9 @@ const (
 	// CapabilityCredentialV1 must be echoed at initialize by a provider that
 	// answers the credential op described here.
 	CapabilityCredentialV1 = "credential-v1" // #nosec G101 -- capability name, not a credential
+	// CapabilityPublicationV1 is offered by the engine and echoed by a
+	// provider that serves the resolve, open and release ops.
+	CapabilityPublicationV1 = "publication-v1"
 
 	// PurposeRead is the credential an engine uses to read from a registry:
 	// archive and package downloads.
@@ -50,8 +59,12 @@ const (
 	// PurposePublish is the credential an engine uses to write to a registry.
 	PurposePublish = "publish"
 
-	// MaxCredentialLineBytes bounds one request or response line.
+	// MaxCredentialLineBytes bounds one request or response line of a
+	// credential-v1 op: initialize, credential or shutdown.
 	MaxCredentialLineBytes = 64 << 10
+	// MaxPublicationLineBytes bounds one request or response line of a
+	// publication-v1 op: resolve, open or release.
+	MaxPublicationLineBytes = 8 << 20
 	// MaxCredentialHosts bounds the hosts one credential names.
 	MaxCredentialHosts = 64
 	// MaxCredentialHostBytes bounds one hosts entry: a 253-byte name and a port.
@@ -103,15 +116,108 @@ const (
 	CredentialOpCredential CredentialOp = "credential"
 	// CredentialOpShutdown ends the session; the provider exits after answering.
 	CredentialOpShutdown CredentialOp = "shutdown"
+
+	// CredentialOpResolve asks for the heads of channels: ResolveParams,
+	// answered by ResolveResult. It needs CapabilityPublicationV1.
+	CredentialOpResolve CredentialOp = "resolve"
+	// CredentialOpOpen opens one publication plan in the session: OpenParams,
+	// answered by OpenResult. It needs CapabilityPublicationV1.
+	CredentialOpOpen CredentialOp = "open"
+	// CredentialOpRelease releases the opened plan's set: ReleaseParams,
+	// answered by ReleaseResult. It needs CapabilityPublicationV1.
+	CredentialOpRelease CredentialOp = "release"
 )
 
-// Valid reports whether op is a credential-provider/v1 method.
+// Valid reports whether op is a credential-provider method: a credential-v1
+// op or a publication-v1 op.
 func (op CredentialOp) Valid() bool {
+	return op.Capability() != ""
+}
+
+// Capability returns the capability that defines op: CapabilityCredentialV1
+// for initialize, credential and shutdown, CapabilityPublicationV1 for
+// resolve, open and release, and "" for any other name.
+func (op CredentialOp) Capability() string {
 	switch op {
 	case CredentialOpInitialize, CredentialOpCredential, CredentialOpShutdown:
+		return CapabilityCredentialV1
+	case CredentialOpResolve, CredentialOpOpen, CredentialOpRelease:
+		return CapabilityPublicationV1
+	}
+	return ""
+}
+
+// Allowed reports whether op may be sent in a session that negotiated the
+// capabilities negotiated: a credential-v1 op always, a publication-v1 op
+// only when negotiated names CapabilityPublicationV1.
+func (op CredentialOp) Allowed(negotiated []string) bool {
+	switch op.Capability() {
+	case CapabilityCredentialV1:
 		return true
+	case CapabilityPublicationV1:
+		return slices.Contains(negotiated, CapabilityPublicationV1)
 	}
 	return false
+}
+
+// MaxLineBytes bounds one request or response line of op:
+// MaxCredentialLineBytes for a credential-v1 op, MaxPublicationLineBytes for a
+// publication-v1 op, 0 for an unknown op.
+func (op CredentialOp) MaxLineBytes() int {
+	return op.bounds().maxBytes
+}
+
+func (op CredentialOp) bounds() lineBounds {
+	switch op.Capability() {
+	case CapabilityCredentialV1:
+		return credentialBounds
+	case CapabilityPublicationV1:
+		return publicationBounds
+	}
+	return lineBounds{}
+}
+
+// delegatedMember names the payload member of op's request and of its answer
+// that carries a distribution/release-set/v2 document, "" when none does.
+func (op CredentialOp) delegatedMember(answer bool) string {
+	switch op {
+	case CredentialOpResolve, CredentialOpRelease:
+		if answer {
+			return "response"
+		}
+		return "request"
+	}
+	return ""
+}
+
+// admits checks a scanned line of size bytes against op's own bounds and
+// delegation.
+func (op CredentialOp) admits(size int, scan jsonScan, answer bool) error {
+	bounds := op.bounds()
+	if size > bounds.maxBytes {
+		return fmt.Errorf("registry: a %s line exceeds %d bytes", op, bounds.maxBytes)
+	}
+	if scan.depth > bounds.maxDepth {
+		return fmt.Errorf("registry: invalid credential JSON: nesting exceeds %d levels", bounds.maxDepth)
+	}
+	if scan.delegatedNull && op.delegatedMember(answer) == "" {
+		return errors.New("registry: invalid credential JSON: null is not permitted")
+	}
+	return nil
+}
+
+// NegotiatedCapabilities returns the capabilities of a session: those the
+// initialize request offered that its answer echoes, in offered order. A
+// capability the answer names without the request offering it is not
+// negotiated.
+func NegotiatedCapabilities(offered, echoed []string) []string {
+	negotiated := make([]string, 0, len(offered))
+	for _, capability := range offered {
+		if slices.Contains(echoed, capability) && !slices.Contains(negotiated, capability) {
+			negotiated = append(negotiated, capability)
+		}
+	}
+	return negotiated
 }
 
 // ValidPurpose reports whether purpose is a credential-provider/v1 purpose.
@@ -128,7 +234,8 @@ type CredentialRequest struct {
 	// Op is the method to invoke.
 	Op CredentialOp `json:"op"`
 	// Payload is the op body: CredentialInitializeParams for initialize,
-	// CredentialParams for credential, absent for shutdown.
+	// CredentialParams for credential, absent for shutdown, ResolveParams,
+	// OpenParams or ReleaseParams for resolve, open or release.
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
@@ -152,7 +259,8 @@ type CredentialResponse struct {
 	// Error is the refusal when OK is false.
 	Error *CredentialRefusal `json:"error,omitempty"`
 	// Payload is the op result when OK is true: CredentialInitializeResult for
-	// initialize, CredentialResult for credential, absent or {} for shutdown.
+	// initialize, CredentialResult for credential, absent or {} for shutdown,
+	// ResolveResult, OpenResult or ReleaseResult for resolve, open or release.
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
@@ -425,9 +533,24 @@ func validCapabilities(capabilities []string) error {
 	return nil
 }
 
-// ParseCredentialRequest strictly decodes one request line and its payload.
+// ParseCredentialRequest strictly decodes one request line and its payload in
+// a session that negotiated no capability beyond credential-v1: a
+// publication-v1 op is refused.
 func ParseCredentialRequest(line []byte) (*CredentialRequest, error) {
-	if err := strictLine(line); err != nil {
+	return ParseNegotiatedCredentialRequest(line, nil)
+}
+
+// ParseNegotiatedCredentialRequest strictly decodes one request line and its
+// payload in a session that negotiated the capabilities negotiated
+// (NegotiatedCapabilities). An op the session did not negotiate is refused,
+// and the line is held to its op's size and nesting bounds.
+func ParseNegotiatedCredentialRequest(line []byte, negotiated []string) (*CredentialRequest, error) {
+	bounds, delegated := credentialBounds, [][]string(nil)
+	if slices.Contains(negotiated, CapabilityPublicationV1) {
+		bounds, delegated = publicationBounds, [][]string{{"payload", "request"}}
+	}
+	scan, err := strictScan(line, bounds, delegated)
+	if err != nil {
 		return nil, err
 	}
 	var request CredentialRequest
@@ -436,6 +559,12 @@ func ParseCredentialRequest(line []byte) (*CredentialRequest, error) {
 	}
 	if request.ProtocolVersion != CredentialProtocolVersion || request.ID <= 0 || !request.Op.Valid() {
 		return nil, errors.New("registry: invalid credential request envelope")
+	}
+	if !request.Op.Allowed(negotiated) {
+		return nil, fmt.Errorf("registry: op %s needs the %s capability, which the session did not negotiate", request.Op, request.Op.Capability())
+	}
+	if err := request.Op.admits(len(line), scan, false); err != nil {
+		return nil, err
 	}
 	switch request.Op {
 	case CredentialOpInitialize:
@@ -450,21 +579,51 @@ func ParseCredentialRequest(line []byte) (*CredentialRequest, error) {
 		if len(request.Payload) != 0 {
 			return nil, errors.New("registry: a shutdown request carries no payload")
 		}
+	case CredentialOpResolve:
+		if _, err := ParseResolveParams(request.Payload); err != nil {
+			return nil, err
+		}
+	case CredentialOpOpen:
+		if _, err := ParseOpenParams(request.Payload); err != nil {
+			return nil, err
+		}
+	case CredentialOpRelease:
+		if _, err := ParseReleaseParams(request.Payload); err != nil {
+			return nil, err
+		}
 	}
 	return &request, nil
 }
 
 // ParseCredentialResponse strictly decodes one response line answering op,
-// including its payload or refusal.
+// including its payload or refusal, in a session that negotiated no
+// capability beyond credential-v1: an answer to a publication-v1 op is
+// refused.
 func ParseCredentialResponse(line []byte, op CredentialOp) (*CredentialResponse, error) {
-	if err := strictLine(line); err != nil {
+	return ParseNegotiatedCredentialResponse(line, op, nil)
+}
+
+// ParseNegotiatedCredentialResponse strictly decodes one response line
+// answering op, including its payload or refusal, in a session that
+// negotiated the capabilities negotiated. An answer to an op the session did
+// not negotiate is refused, and the line is held to op's size and nesting
+// bounds.
+func ParseNegotiatedCredentialResponse(line []byte, op CredentialOp, negotiated []string) (*CredentialResponse, error) {
+	if !op.Valid() || !op.Allowed(negotiated) {
+		return nil, errors.New("registry: invalid credential response envelope")
+	}
+	var delegated [][]string
+	if member := op.delegatedMember(true); member != "" {
+		delegated = [][]string{{"payload", member}}
+	}
+	if _, err := strictScan(line, op.bounds(), delegated); err != nil {
 		return nil, err
 	}
 	var response CredentialResponse
 	if err := strictDecode(line, &response, "protocolVersion", "id", "ok"); err != nil {
 		return nil, err
 	}
-	if response.ProtocolVersion != CredentialProtocolVersion || response.ID <= 0 || !op.Valid() {
+	if response.ProtocolVersion != CredentialProtocolVersion || response.ID <= 0 {
 		return nil, errors.New("registry: invalid credential response envelope")
 	}
 	if !response.OK {
@@ -494,6 +653,18 @@ func ParseCredentialResponse(line []byte, op CredentialOp) (*CredentialResponse,
 			if err := strictDecode(response.Payload, &empty); err != nil {
 				return nil, errors.New("registry: a shutdown answer carries no payload or {}")
 			}
+		}
+	case CredentialOpResolve:
+		if _, err := ParseResolveResult(response.Payload); err != nil {
+			return nil, err
+		}
+	case CredentialOpOpen:
+		if _, err := ParseOpenResult(response.Payload); err != nil {
+			return nil, err
+		}
+	case CredentialOpRelease:
+		if _, err := ParseReleaseResult(response.Payload); err != nil {
+			return nil, err
 		}
 	}
 	return &response, nil

@@ -13,11 +13,20 @@ import (
 	"testing"
 	"time"
 	"unicode"
+
+	distribution "go.putnami.dev/protocol/distribution"
+	runtimeproto "go.putnami.dev/protocol/runtime"
 )
 
-// TestCredentialFixtures runs every fixture through the Go validator: valid
-// lines parse and re-encode byte for byte, invalid lines are refused. A
-// response fixture names the op it answers: response-<op>-<case>.json.
+// everyCapability is the negotiation of a session that offered and echoed
+// every capability this package defines.
+var everyCapability = []string{CapabilityCredentialV1, CapabilityPublicationV1}
+
+// TestCredentialFixtures runs every fixture through the Go validator, in a
+// session that negotiated every capability: valid lines parse and re-encode
+// byte for byte, a publication-v1 payload included, and invalid lines are
+// refused. A response fixture names the op it answers:
+// response-<op>-<case>.json.
 func TestCredentialFixtures(t *testing.T) {
 	t.Parallel()
 	for _, validity := range []string{"valid", "invalid"} {
@@ -35,16 +44,27 @@ func TestCredentialFixtures(t *testing.T) {
 				}
 				line := bytes.TrimSuffix(data, []byte("\n"))
 				var decoded any
+				var op CredentialOp
+				var payload json.RawMessage
+				answer := false
 				switch {
 				case strings.HasPrefix(name, "request-"):
-					decoded, err = ParseCredentialRequest(line)
+					var request *CredentialRequest
+					request, err = ParseNegotiatedCredentialRequest(line, everyCapability)
+					if request != nil {
+						decoded, op, payload = request, request.Op, request.Payload
+					}
 				case strings.HasPrefix(name, "response-"):
-					op := CredentialOp(strings.SplitN(strings.TrimPrefix(name, "response-"), "-", 2)[0])
+					op = CredentialOp(strings.SplitN(strings.TrimPrefix(name, "response-"), "-", 2)[0])
 					op = CredentialOp(strings.TrimSuffix(string(op), ".json"))
 					if !op.Valid() {
 						t.Fatalf("fixture %s names no op", name)
 					}
-					decoded, err = ParseCredentialResponse(line, op)
+					var response *CredentialResponse
+					response, err = ParseNegotiatedCredentialResponse(line, op, everyCapability)
+					if response != nil {
+						decoded, payload, answer = response, response.Payload, true
+					}
 				default:
 					t.Fatalf("fixture %s is neither a request nor a response", name)
 				}
@@ -64,9 +84,42 @@ func TestCredentialFixtures(t *testing.T) {
 				if !bytes.Equal(encoded, line) {
 					t.Fatalf("fixture is not the canonical encoding:\n%s\n%s", line, encoded)
 				}
+				if op.Capability() != CapabilityPublicationV1 || len(payload) == 0 {
+					return
+				}
+				typed, err := parsePublicationPayload(op, answer, payload)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if encoded, err = json.Marshal(typed); err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(encoded, payload) {
+					t.Fatalf("payload is not the canonical encoding of its type:\n%s\n%s", payload, encoded)
+				}
 			})
 		}
 	}
+}
+
+// parsePublicationPayload decodes the payload of a publication-v1 request, or
+// of its answer, into its type.
+func parsePublicationPayload(op CredentialOp, answer bool, payload json.RawMessage) (any, error) {
+	switch {
+	case op == CredentialOpResolve && answer:
+		return ParseResolveResult(payload)
+	case op == CredentialOpResolve:
+		return ParseResolveParams(payload)
+	case op == CredentialOpOpen && answer:
+		return ParseOpenResult(payload)
+	case op == CredentialOpOpen:
+		return ParseOpenParams(payload)
+	case op == CredentialOpRelease && answer:
+		return ParseReleaseResult(payload)
+	case op == CredentialOpRelease:
+		return ParseReleaseParams(payload)
+	}
+	return nil, fmt.Errorf("%s is not a publication-v1 op", op)
 }
 
 // TestCredentialSchemaTracksWireShape keeps the JSON Schema and the Go
@@ -84,10 +137,15 @@ func TestCredentialSchemaTracksWireShape(t *testing.T) {
 		Pattern   string   `json:"pattern"`
 		MinLength int      `json:"minLength"`
 		MaxLength int      `json:"maxLength"`
+		MinItems  int      `json:"minItems"`
 		MaxItems  int      `json:"maxItems"`
+		Minimum   int      `json:"minimum"`
+		Maximum   int      `json:"maximum"`
+		Ref       string   `json:"$ref"`
 		Items     struct {
 			Pattern   string `json:"pattern"`
 			MaxLength int    `json:"maxLength"`
+			Ref       string `json:"$ref"`
 		} `json:"items"`
 	}
 	type definition struct {
@@ -95,6 +153,8 @@ func TestCredentialSchemaTracksWireShape(t *testing.T) {
 		Required             []string            `json:"required"`
 		Properties           map[string]property `json:"properties"`
 		Pattern              string              `json:"pattern"`
+		MinLength            int                 `json:"minLength"`
+		MaxLength            int                 `json:"maxLength"`
 		MaxItems             int                 `json:"maxItems"`
 		Items                struct {
 			Pattern string `json:"pattern"`
@@ -118,6 +178,19 @@ func TestCredentialSchemaTracksWireShape(t *testing.T) {
 		"credentialResult": {CredentialResult{}, ""},
 		"credential":       {Credential{}, "bearer,expiresAt,hosts"},
 		"refusal":          {CredentialRefusal{}, "code"},
+		"resolveParams":    {ResolveParams{}, "request"},
+		"resolveResult":    {ResolveResult{}, "response"},
+		"openParams":       {OpenParams{}, "plan,ancestry"},
+		"openResult":       {OpenResult{}, "planDigest"},
+		"releaseParams":    {ReleaseParams{}, "planDigest,request,ancestry,evidence"},
+		"releaseResult":    {ReleaseResult{}, "response"},
+		"plan":             {PublicationPlan{}, "protocolVersion,namespace,sourceRevision,channels,members,planDigest"},
+		"planMember":       {PublicationPlanMember{}, "ecosystem,coordinate,version,sourceRevision,selectionFingerprint"},
+		"ancestry":         {PublicationAncestry{}, "sourceRevision,snapshotCommits,channels"},
+		"channelAncestry":  {PublicationChannelAncestry{}, "name,ancestor"},
+		"evidence":         {PublicationEvidence{}, "images,members"},
+		"imageEvidence":    {runtimeproto.ReleaseSetPublishedImage{}, "project,digest"},
+		"memberEvidence":   {PublicationMemberEvidence{}, "project,ecosystem,coordinate,version,digest,publisher,command,step"},
 	}
 	for name, object := range objects {
 		def, ok := schema.Definitions[name]
@@ -139,9 +212,49 @@ func TestCredentialSchemaTracksWireShape(t *testing.T) {
 			t.Errorf("%s: protocolVersion const diverged", name)
 		}
 	}
-	ops := []string{string(CredentialOpInitialize), string(CredentialOpCredential), string(CredentialOpShutdown)}
+	ops := []string{string(CredentialOpInitialize), string(CredentialOpCredential), string(CredentialOpShutdown), string(CredentialOpResolve), string(CredentialOpOpen), string(CredentialOpRelease)}
 	if got := strings.Join(schema.Definitions["request"].Properties["op"].Enum, ","); got != strings.Join(ops, ",") {
 		t.Errorf("op enum = %s", got)
+	}
+	for _, op := range ops {
+		if !CredentialOp(op).Valid() {
+			t.Errorf("schema op %s is not a Go op", op)
+		}
+	}
+	grammars := map[string]string{
+		"digest":         PlanDigestPattern,
+		"sourceRevision": SourceRevisionPattern,
+		"channel":        distribution.ChannelPattern,
+		"ecosystem":      distribution.EcosystemPattern,
+	}
+	for name, pattern := range grammars {
+		if schema.Definitions[name].Pattern != pattern {
+			t.Errorf("%s grammar = %s, want %s", name, schema.Definitions[name].Pattern, pattern)
+		}
+	}
+	for name, limit := range map[string]int{"coordinate": distribution.MaxCoordinateBytes, "version": distribution.MaxVersionBytes, "routeName": MaxEvidenceTextBytes} {
+		if def := schema.Definitions[name]; def.MinLength != 1 || def.MaxLength != limit || def.Pattern != noControlCharactersPattern {
+			t.Errorf("%s bounds or text rule diverged", name)
+		}
+	}
+	plan := schema.Definitions["plan"].Properties
+	if *plan["protocolVersion"].Const != PublicationPlanProtocolVersion || plan["members"].MaxItems != distribution.MaxMembers || plan["channels"].MinItems != 1 || plan["channels"].MaxItems != distribution.MaxChannelsPerRelease {
+		t.Error("plan version or bounds diverged")
+	}
+	if plan["namespace"].MaxLength != distribution.MaxNamespaceBytes {
+		t.Error("plan namespace bound diverged")
+	}
+	ancestry := schema.Definitions["ancestry"].Properties
+	if ancestry["snapshotCommits"].Minimum != 1 || ancestry["snapshotCommits"].Maximum != MaxAncestrySnapshotCommits || ancestry["channels"].MaxItems != distribution.MaxChannelsPerRelease {
+		t.Error("ancestry bounds diverged")
+	}
+	if schema.Definitions["evidence"].Properties["members"].MaxItems != distribution.MaxMembers {
+		t.Error("evidence member bound diverged")
+	}
+	for _, name := range []string{"imageEvidence", "memberEvidence"} {
+		if project := schema.Definitions[name].Properties["project"]; project.MinLength != 1 || project.MaxLength != MaxEvidenceProjectBytes {
+			t.Errorf("%s project bound diverged", name)
+		}
 	}
 	if got := strings.Join(schema.Definitions["credentialParams"].Properties["purpose"].Enum, ","); got != PurposeRead+","+PurposePublish {
 		t.Errorf("purpose enum = %s", got)
@@ -157,8 +270,7 @@ func TestCredentialSchemaTracksWireShape(t *testing.T) {
 	if refusal["code"].Pattern != RefusalCodePattern || refusal["message"].MaxLength != MaxRefusalMessageBytes {
 		t.Error("refusal grammar or bound diverged")
 	}
-	const noControlCharacters = `^[^\x00-\x1f\x7f]*$`
-	if refusal["message"].Pattern != noControlCharacters || schema.Definitions["initializeResult"].Properties["providerName"].Pattern != noControlCharacters {
+	if refusal["message"].Pattern != noControlCharactersPattern || schema.Definitions["initializeResult"].Properties["providerName"].Pattern != noControlCharactersPattern {
 		t.Error("the message and providerName text rule diverged from boundedText")
 	}
 	capabilities := schema.Definitions["capabilities"]
@@ -173,6 +285,9 @@ func TestCredentialSchemaTracksWireShape(t *testing.T) {
 		t.Error("runCredential grammar or bounds diverged")
 	}
 }
+
+// noControlCharactersPattern is the schema spelling of the boundedText rule.
+const noControlCharactersPattern = `^[^\x00-\x1f\x7f]*$`
 
 // TestRunCredentialPatternIsValidBearer proves the schema grammar and the Go
 // rule refuse the same characters: every rune unicode.IsSpace reports, and no

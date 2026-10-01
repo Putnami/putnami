@@ -24,6 +24,20 @@ var schemaOnlyInexpressible = map[string]string{
 	"response-credential-host-port-range.json":           "a port between 1 and 65535",
 	"response-credential-refusal-long-utf8-message.json": "a refusal message of at most 512 bytes",
 	"response-credential-unsorted-hosts.json":            "sorted hosts",
+	"request-resolve-invalid-channel.json":               "distribution/release-set/v2 documents",
+	"request-release-null-in-request.json":               "distribution/release-set/v2 documents",
+	"response-release-unknown-outcome.json":              "distribution/release-set/v2 documents",
+	"response-resolve-release-form.json":                 "the payload shape of a response, which depends on the op of the request it answers",
+	"request-open-digest-mismatch.json":                  "a planDigest equal to the digest of the plan",
+	"request-open-unsorted-members.json":                 "plan members unique, in (ecosystem, coordinate) order",
+	"request-open-member-source-mismatch.json":           "that share the plan's sourceRevision",
+	"request-open-immutable-channel-not-listed.json":     "an immutableChannel listed in channels",
+	"request-open-ancestry-channel-order.json":           "ancestry channels that name the plan's or the release's channels in order",
+	"request-release-ancestry-channel-mismatch.json":     "ancestry channels that name the plan's or the release's channels in order",
+	"request-open-ancestry-source-mismatch.json":         "read from the plan's sourceRevision",
+	"request-open-own-head-not-ancestor.json":            "ancestor true when headSourceRevision equals sourceRevision",
+	"request-release-head-for-empty-channel.json":        "no headSourceRevision for a release channel expected to have no head",
+	"request-release-unsorted-images.json":               "evidence images unique, in project order",
 }
 
 // TestCredentialFixturesAgainstTheSchema evaluates every fixture against
@@ -239,9 +253,13 @@ func (e *schemaEvaluator) text(keyword string, argument any, value string) bool 
 }
 
 func (e *schemaEvaluator) number(keyword string, argument any, value json.Number) bool {
-	if keyword == "minimum" {
+	switch keyword {
+	case "minimum":
 		number, err := value.Float64()
 		return err == nil && number >= schemaNumber(argument)
+	case "maximum":
+		number, err := value.Float64()
+		return err == nil && number <= schemaNumber(argument)
 	}
 	return e.known(keyword)
 }
@@ -251,7 +269,7 @@ func (e *schemaEvaluator) number(keyword string, argument any, value json.Number
 func (e *schemaEvaluator) known(keyword string) bool {
 	switch keyword {
 	case "required", "properties", "additionalProperties", "minItems", "maxItems", "uniqueItems", "items",
-		"minLength", "maxLength", "pattern", "minimum":
+		"minLength", "maxLength", "pattern", "minimum", "maximum":
 		return true
 	}
 	e.t.Fatalf("the schema uses %q, which this evaluator does not implement", keyword)
