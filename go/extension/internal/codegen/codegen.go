@@ -9,6 +9,7 @@
 package codegen
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -232,7 +233,7 @@ func run(ctx *pctx.Context, emit *jsonl.Emitter, mode string, clear bool) (*Gene
 	if artifact, ok, err := configextract.WriteArtifacts(
 		projectPath,
 		ctx.Project.Name,
-		stableVersion(ctx),
+		configSchemaVersion(ctx, projectPath, configSchemaOutput),
 		configSchemaOutput,
 	); err != nil {
 		syncRequirements()
@@ -543,6 +544,18 @@ func declaredProjectVersion(projectPath string) string {
 		return ""
 	}
 	return strings.TrimSpace(declared.Version)
+}
+
+// configSchemaVersion is the version stamped into the config schema written at
+// outputPath. The committed schema/config.json is a tracked file, so it carries
+// the version the project declares for itself, or "0.0.0": a release tag or a
+// workspace bump must not rewrite it. The .gen fallback is per-run output and
+// carries the stable version.
+func configSchemaVersion(ctx *pctx.Context, projectPath, outputPath string) string {
+	if outputPath == configextract.DefaultOutputPath {
+		return cmp.Or(declaredProjectVersion(projectPath), "0.0.0")
+	}
+	return stableVersion(ctx)
 }
 
 // stableVersion returns the workspace's stable base version — the part
