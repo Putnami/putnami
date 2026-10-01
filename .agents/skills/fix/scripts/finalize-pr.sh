@@ -692,22 +692,8 @@ if [ "$BODY_BYTES" -gt 65536 ]; then
 fi
 
 # The verification record is a comment on the proposal, never part of the
-# commit message. The file list is what the branch changes against its base,
-# so a resumed run that passes no --file describes the same change.
-FILE_LINES=""
-FILE_COUNT=0
-while IFS= read -r file; do
-  [ -z "$file" ] && continue
-  FILE_COUNT=$((FILE_COUNT + 1))
-  if [ "$FILE_COUNT" -le 100 ]; then
-    FILE_LINES="${FILE_LINES}
-- \`$file\`"
-  fi
-done < <(git diff --name-only "$REVISION_BASE...HEAD")
-if [ "$FILE_COUNT" -gt 100 ]; then
-  FILE_LINES="${FILE_LINES}
-- and $((FILE_COUNT - 100)) more"
-fi
+# commit message. It names the gate and the proof, not the files: the proposal
+# diff already lists them.
 GATE_DESCRIPTION=""
 if [ "$DRAFT_STAGE" = false ]; then
   GATE_DESCRIPTION="lint, test, build, validate pass for ${PROJECTS[*]}, then once with --impacted"
@@ -866,8 +852,6 @@ fi
 
 if [ "$DRAFT_STAGE" = false ]; then
   VERIFICATION="Verification of $HEAD_COMMIT
-
-Files modified:${FILE_LINES}
 
 - ordinary gate: $GATE_DESCRIPTION
 - local proof ($PROOF_STATUS): $PROOF"

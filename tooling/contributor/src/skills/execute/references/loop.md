@@ -189,8 +189,8 @@ Rewrite it whole whenever a push changes what the proposal does; a body that
 describes an earlier state of the branch is a review finding. The finalizer
 adds the task reference line, joins the lines of each paragraph because the
 host wraps the squash message itself, refuses a heading or a body over the
-policy's `publication.bodyMaxBytes`, and posts the verification record (files,
-gate, proof) as a proposal comment instead.
+policy's `publication.bodyMaxBytes`, and posts the verification record (gate,
+proof) as a proposal comment instead.
 
 No commit message, proposal, comment, code comment or document names an agent:
 no `Co-Authored-By` trailer for a model, no "Generated with" line, no model
