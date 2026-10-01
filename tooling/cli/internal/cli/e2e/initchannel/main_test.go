@@ -14,7 +14,7 @@ import (
 )
 
 // TestMain runs the tests, or, when the runtime of a fixture language
-// extension execs the test binary, that runtime.
+// extension execs the test binary, its workspace-install job.
 func TestMain(m *testing.M) {
 	if os.Getenv(fixtureRuntimeEnv) != "" {
 		os.Exit(runFixtureRuntime(os.Args[1:]))

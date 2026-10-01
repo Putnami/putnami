@@ -31,14 +31,10 @@ import (
 )
 
 const (
-	// fixtureRuntimeEnv makes the test binary run as the runtime of a fixture
-	// language extension; its value is the directory the runtime records its
-	// runs in.
+	// fixtureRuntimeEnv makes the test binary run the workspace-install job of
+	// a fixture language extension; its value is the directory the job records
+	// its runs in.
 	fixtureRuntimeEnv = "PUTNAMI_INITCHANNEL_FIXTURE"
-	// fixtureExtensionEnv and fixtureVersionEnv are the extension name and the
-	// version the fixture runtime reports.
-	fixtureExtensionEnv = "PUTNAMI_INITCHANNEL_FIXTURE_EXTENSION"
-	fixtureVersionEnv   = "PUTNAMI_INITCHANNEL_FIXTURE_VERSION"
 
 	// candidateChannel is the immutable channel a tagged publish creates for a
 	// release candidate.
@@ -653,12 +649,25 @@ func (p *moduleProxy) asked() []string {
 	return slices.Clone(p.paths)
 }
 
-// extensionArchive is the fixture language extension name at version: its
-// runtime execs the test binary as the extension (runFixtureRuntime), and its
-// workspace-install records the channel option and the registries it received.
+// extensionArchive is the fixture language extension name at version. Its
+// runtime is a shell script: it prints the runtime-info document of name at
+// version itself, execs the test binary for workspace-install
+// (runFixtureRuntime), which records the channel option and the registries it
+// received, and exits 0 for any other invocation.
 func extensionArchive(t *testing.T, records, name, version string) []byte {
 	t.Helper()
 	testBinary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := json.Marshal(runtimeproto.Info{
+		Extension:       name,
+		Version:         version,
+		Platform:        runtime.GOOS + "/" + runtime.GOARCH,
+		CLIContract:     protocolcli.CurrentContract,
+		RuntimeProtocol: runtimeproto.MaxKnownProtocolVersion,
+		RuntimeABI:      runtimeproto.RuntimeABIVersion,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -685,15 +694,25 @@ func extensionArchive(t *testing.T, records, name, version string) []byte {
   }
 }`
 	runtimeScript := "#!/bin/sh\n" +
-		fixtureRuntimeEnv + "='" + records + "'\n" +
-		fixtureExtensionEnv + "='" + name + "'\n" +
-		fixtureVersionEnv + "='" + version + "'\n" +
-		"export " + fixtureRuntimeEnv + " " + fixtureExtensionEnv + " " + fixtureVersionEnv + "\n" +
-		"exec '" + testBinary + "' \"$@\"\n"
+		"if [ \"$1\" = \"__putnami\" ] && [ \"$2\" = \"runtime-info\" ]; then\n" +
+		"  printf '%s\\n' " + shellQuote(string(info)) + "\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" != \"workspace-install\" ]; then\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		fixtureRuntimeEnv + "=" + shellQuote(records) + "\n" +
+		"export " + fixtureRuntimeEnv + "\n" +
+		"exec " + shellQuote(testBinary) + " \"$@\"\n"
 	return tarGz(t, []tarEntry{
 		{name: "bin/runtime", mode: 0o755, content: runtimeScript},
 		{name: "putnami.extension.json", mode: 0o644, content: manifest},
 	})
+}
+
+// shellQuote quotes value as one POSIX shell word.
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }
 
 // templateArchive is the fixture go-server template at version. It renders the
@@ -790,20 +809,15 @@ func readLines(t *testing.T, file string) []string {
 	return strings.Split(strings.TrimSpace(string(data)), "\n")
 }
 
-// runFixtureRuntime is the runtime of a fixture language extension, run by the
-// test binary under fixtureRuntimeEnv. It answers the runtime handshake, and
-// on workspace-install it records two members of the job context it was
-// handed: the putnami-channel option, and the registries as JSON. It records
-// "none" for a member the context does not carry.
+// runFixtureRuntime is the workspace-install job of a fixture language
+// extension, run by the test binary under fixtureRuntimeEnv. It records two
+// members of the job context it was handed: the putnami-channel option, and
+// the registries as JSON. It records "none" for a member the context does not
+// carry.
 func runFixtureRuntime(args []string) int {
-	if len(args) >= 2 && args[0] == "__putnami" && args[1] == "runtime-info" {
-		fmt.Printf(`{"extension":%q,"version":%q,"platform":%q,"cliContract":%d,"runtimeProtocol":%d,"runtimeABI":%d}`+"\n",
-			os.Getenv(fixtureExtensionEnv), os.Getenv(fixtureVersionEnv), runtime.GOOS+"/"+runtime.GOARCH, protocolcli.CurrentContract,
-			runtimeproto.MaxKnownProtocolVersion, runtimeproto.RuntimeABIVersion)
-		return 0
-	}
 	if len(args) == 0 || args[0] != "workspace-install" {
-		return 0
+		fmt.Fprintf(os.Stderr, "the fixture runtime runs workspace-install only, got %q\n", args)
+		return 1
 	}
 	contextFile := ""
 	for i := 1; i+1 < len(args); i++ {
