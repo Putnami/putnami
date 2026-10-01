@@ -60,6 +60,13 @@ type VersionInfo struct {
 // and stays an error on both sides. Widening this stamp to invent entries for
 // external packages would fabricate exactly the source roots and bindings that
 // contract exists to keep honest.
+//
+// SourceBindingUnavailable is true exactly when Git does not manage the
+// workspace root — no git program, or no repository — and it means the build
+// makes no source claim: SourceBinding is empty and the emitter writes its
+// manifest without feature evidence. A binding that failed inside a repository
+// is not that state: it leaves SourceBinding empty with the marker unset, which
+// every emitter refuses.
 type CapabilityPackageStamp struct {
 	Package                  string `json:"package"`
 	Version                  string `json:"version"`
@@ -424,19 +431,29 @@ func capabilityRoot(ws *workspace.Workspace, project *workspace.Project) string 
 type capabilitySourceBindingResult struct {
 	binding string
 	err     error
+	// unmanaged is true when the binding is absent because Git does not manage
+	// the repository root. It is the only failure stamped as unavailable.
+	unmanaged bool
 }
 
 type capabilitySourceBindingMemo struct {
 	results map[string]capabilitySourceBindingResult
-	// The scheduler's versionFilesMu serializes both maps and invalidation.
+	// The scheduler's versionFilesMu serializes every map and invalidation.
 	snapshots map[string]*putnamigit.SourceBindingSnapshot
 	resolve   func(repoRoot, projectRoot string) (binding string, spawnedProcesses int, err error)
+	// unmanaged answers, per repository root, whether Git manages it. It is
+	// asked once, after the first binding failure, and holds for the run: a
+	// root does not gain or lose its repository between two tasks.
+	unmanaged   map[string]bool
+	isUnmanaged func(repoRoot string) bool
 }
 
 func newCapabilitySourceBindingMemo() *capabilitySourceBindingMemo {
 	memo := &capabilitySourceBindingMemo{
-		results:   make(map[string]capabilitySourceBindingResult),
-		snapshots: make(map[string]*putnamigit.SourceBindingSnapshot),
+		results:     make(map[string]capabilitySourceBindingResult),
+		snapshots:   make(map[string]*putnamigit.SourceBindingSnapshot),
+		unmanaged:   make(map[string]bool),
+		isUnmanaged: func(repoRoot string) bool { return putnamigit.Unmanaged(repoRoot) != nil },
 	}
 	memo.resolve = func(repoRoot, projectRoot string) (string, int, error) {
 		key := filepath.Clean(repoRoot)
@@ -466,8 +483,23 @@ func (memo *capabilitySourceBindingMemo) sourceBinding(
 		return result, 0
 	}
 	result := capabilitySourceBindingResult{}
+	repoKey := filepath.Clean(repoRoot)
+	if memo.unmanaged[repoKey] {
+		result.unmanaged = true
+		memo.results[key] = result
+		return result, 0
+	}
 	var spawnedProcesses int
 	result.binding, spawnedProcesses, result.err = memo.resolve(repoRoot, projectRoot)
+	if result.err != nil {
+		unmanaged, known := memo.unmanaged[repoKey]
+		if !known {
+			unmanaged = memo.isUnmanaged(repoRoot)
+			memo.unmanaged[repoKey] = unmanaged
+			spawnedProcesses++
+		}
+		result.binding, result.unmanaged = "", unmanaged
+	}
 	memo.results[key] = result
 	return result, spawnedProcesses
 }
@@ -603,23 +635,16 @@ func capabilityPackageStamps(
 			EvidencePath: filepath.ToSlash(evidence),
 			SourceRoot:   filepath.ToSlash(candidate.Path),
 		}
-		candidateRoot := candidate.Path
+		repoRoot, candidateRoot := candidate.Path, candidate.Path
 		if ws != nil {
-			candidateRoot = filepath.Join(ws.Root, candidate.Path)
-			result, spawned := sourceBindings.sourceBinding(ws.Root, candidateRoot)
-			if spawnedProcesses != nil {
-				*spawnedProcesses += spawned
-			}
-			stamp.SourceBinding = result.binding
-			stamp.SourceBindingUnavailable = result.err != nil
-		} else {
-			result, spawned := sourceBindings.sourceBinding(candidateRoot, candidateRoot)
-			if spawnedProcesses != nil {
-				*spawnedProcesses += spawned
-			}
-			stamp.SourceBinding = result.binding
-			stamp.SourceBindingUnavailable = result.err != nil
+			repoRoot, candidateRoot = ws.Root, filepath.Join(ws.Root, candidate.Path)
 		}
+		result, spawned := sourceBindings.sourceBinding(repoRoot, candidateRoot)
+		if spawnedProcesses != nil {
+			*spawnedProcesses += spawned
+		}
+		stamp.SourceBinding = result.binding
+		stamp.SourceBindingUnavailable = result.unmanaged
 		if candidate.Name != project.Name {
 			dependencyManifest := filepath.Join(candidate.Path, "schema", "capabilities.json")
 			if ws != nil {

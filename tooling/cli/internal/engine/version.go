@@ -3,6 +3,7 @@ package engine
 import (
 	"fmt"
 	"os"
+	"slices"
 
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -47,6 +48,34 @@ func captureVersionSnapshot(wsRoot string) (*git.VersionInfo, error) {
 		return nil, fmt.Errorf("read the version of the commit %s binds this run to: %w", git.SourceRevisionEnv, err)
 	}
 	return nil, nil
+}
+
+// gitHistoryCommands are the commands that ship a commit: each refuses a
+// workspace root Git does not manage.
+var gitHistoryCommands = []string{"publish", "deploy"}
+
+// requireRepository returns the one-line refusal when the run includes a
+// command that ships a commit and Git does not manage the workspace root.
+//
+// It asks git only when the tree-state capture found no commit and the run
+// includes such a command, so every other run starts no extra process. A run
+// that only previews its plan ships nothing and is not refused. The executing
+// side of a portable request is exempt: the submitter resolved its versions,
+// and the snapshot it runs in carries no repository.
+func requireRepository(req *Request) error {
+	if req.VersionSnapshot != nil || req.Portable != nil || req.Global.Plan || req.previewsOnly() {
+		return nil
+	}
+	for _, command := range gitHistoryCommands {
+		if !slices.Contains(req.Commands, command) {
+			continue
+		}
+		if unmanaged := git.Unmanaged(req.WorkspaceRoot); unmanaged != nil {
+			return fmt.Errorf("%s needs git history: %w", command, unmanaged)
+		}
+		return nil
+	}
+	return nil
 }
 
 // runVersions resolves the per-line versions once, before the plan can key or

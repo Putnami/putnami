@@ -533,6 +533,13 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 		}
 		req.VersionSnapshot = snapshot
 	}
+	// A publish or a deploy states which commit it ships. Where Git does not
+	// manage the workspace root there is none, so a run that executes stops
+	// here, before any hook, job or remote call.
+	if err := requireRepository(req); err != nil {
+		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
+		return SessionResult{ExitCode: ExitError}, err
+	}
 
 	// Hook verbosity is resolved once, here, from the flags as parsed. The run
 	// stages layer env/config overrides onto Global later (applyEnvOverrides);

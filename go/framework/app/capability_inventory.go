@@ -26,8 +26,14 @@ import (
 // scheduler could bind. A contributor that lives in a published module the
 // workload consumes has no such entry and never will; capability_modules.go
 // resolves it from this binary's own module graph and marks the synthetic entry
-// external, which is the only state in which SourceRoot, EvidencePath, and
-// SourceBinding are legitimately empty.
+// external, which is the only state in which SourceRoot and EvidencePath are
+// legitimately empty.
+//
+// SourceBindingUnavailable with an empty SourceBinding is the scheduler saying
+// Git does not manage the workspace root: the build makes no source claim. The
+// manifest is the one a bound stamp produces, byte for byte, and no feature
+// evidence is written. The marker is a fact about the root, so every entry of
+// one stamp carries it or none does.
 type generatedCapabilityPackage struct {
 	Package                  string `json:"package"`
 	Version                  string `json:"version"`
@@ -115,6 +121,7 @@ func newCapabilityInventory(project string, packages []generatedCapabilityPackag
 	if packages != nil && len(packages) == 0 {
 		return nil, fmt.Errorf("capabilityPackages must be non-empty when scheduler metadata is present")
 	}
+	unavailable := 0
 	for index, pkg := range packages {
 		if strings.TrimSpace(pkg.Package) == "" || strings.TrimSpace(pkg.Version) == "" || strings.TrimSpace(pkg.EvidencePath) == "" || strings.TrimSpace(pkg.SourceRoot) == "" {
 			return nil, fmt.Errorf("capabilityPackages[%d] is incomplete or malformed", index)
@@ -122,7 +129,12 @@ func newCapabilityInventory(project string, packages []generatedCapabilityPackag
 		if !canonicalWorkspaceRelativePath(pkg.SourceRoot, true) || !canonicalWorkspaceRelativePath(pkg.EvidencePath, false) {
 			return nil, fmt.Errorf("capabilityPackages[%d] sourceRoot/evidencePath is not a canonical contained workspace-relative path", index)
 		}
-		if pkg.SourceBindingUnavailable || !validCapabilitySourceBinding(pkg.SourceBinding) {
+		switch {
+		case pkg.SourceBindingUnavailable && pkg.SourceBinding != "":
+			return nil, fmt.Errorf("capability package %q carries a source-v1 binding it marks unavailable", pkg.Package)
+		case pkg.SourceBindingUnavailable:
+			unavailable++
+		case !validCapabilitySourceBinding(pkg.SourceBinding):
 			return nil, fmt.Errorf("capability package %q has no available source-v1 binding", pkg.Package)
 		}
 		if !isResolvedCapabilityVersion(pkg.Version) {
@@ -138,6 +150,9 @@ func newCapabilityInventory(project string, packages []generatedCapabilityPackag
 			continue
 		}
 		inv.packages[pkg.Package] = pkg
+	}
+	if unavailable != 0 && unavailable != len(packages) {
+		return nil, fmt.Errorf("capabilityPackages mixes available and unavailable source-v1 bindings")
 	}
 	if packages != nil {
 		if _, ok := inv.packages[project]; !ok {
@@ -393,6 +408,13 @@ func declarationPathForPackage(file string, owner generatedCapabilityPackage) (s
 		return "", fmt.Errorf("derived declaration path %q is not canonical", rel)
 	}
 	return rel, nil
+}
+
+// makesNoSourceClaim reports whether the scheduler stamped owner with an
+// unavailable binding. Evidence binds a record to source, so there is none to
+// write for it.
+func (inv *capabilityInventory) makesNoSourceClaim(owner string) bool {
+	return inv.packages[owner].SourceBindingUnavailable
 }
 
 func (inv *capabilityInventory) bindingForOwner(owner string) (string, error) {

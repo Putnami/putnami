@@ -692,6 +692,28 @@ dirty authored/source change changes the binding immediately; regenerating the
 outputs does not. Dependency aggregation copies provenance without persisting a
 binding; the index snapshot records the computed value separately.
 
+A root that Git does not manage has no `source-v1` binding. That is a root
+with no Git program on `PATH`, or a root outside every Git repository. No
+other input set stands in for it: an implementation must not walk the file
+system to compute one, because without Git it cannot tell an ignored file from
+an input.
+
+- The scheduler stamps each capability package of such a root with an empty
+  `sourceBinding`, `sourceBindingUnavailable: true`, and its `sourceRoot`. It
+  stamps the marker for no other reason: a binding that fails inside a
+  repository stays an error.
+- A producer that reads the marker makes no source claim. It emits the same
+  Capability Manifest bytes as for a bound root, writes no feature evidence
+  document, and removes one a previous build left in its scratch output. The
+  marker is all or none across one stamp; a marked package that also carries a
+  binding, or a mix of marked and bound packages, is malformed.
+- A reader has no evidence document for such a build, so it reports the
+  evidence as unavailable with `capabilities.source_binding_unavailable` or
+  `features.source_binding_unavailable`. It never treats the absence as a
+  current binding.
+- A publication or deployment needs the commit it ships, so it refuses such a
+  root and names Git.
+
 A repository evaluation revision is separate metadata. A live snapshot records
 `{kind: "worktree", head: "git:<full-object-id>" | null}` and per-root source
 bindings; `sourceDirty` is true exactly when any root binding differs from the

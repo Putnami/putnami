@@ -201,6 +201,8 @@ const (
 	AutoSelectionReasonFirstBuild = model.AutoSelectionReasonFirstBuild
 	AutoSelectionReasonLastBuild  = model.AutoSelectionReasonLastBuild
 	AutoSelectionReasonTrunk      = model.AutoSelectionReasonTrunk
+
+	AutoSelectionReasonNoRepository = model.AutoSelectionReasonNoRepository
 )
 
 // --- Lowercase spellings kept for this package's own call sites ---

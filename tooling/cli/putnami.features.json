@@ -2869,6 +2869,69 @@
           }
         }
       ]
+    },
+    {
+      "id": "cli/workspace-without-git",
+      "type": "feature",
+      "name": "Workspace without git",
+      "outcome": "A user builds, tests and serves a workspace in a directory Git does not manage, and every command that needs git history refuses in one line that names git and the command to run",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "no-source-claim",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "stamps-outside-a-repository-make-no-source-claim",
+              "a-binding-failure-inside-a-repository-is-not-marked-unavailable",
+              "bindings-inside-a-repository-are-unchanged"
+            ]
+          }
+        },
+        {
+          "id": "source-state-keys-the-cache",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unmanaged-root-adds-only-its-marker-to-the-key",
+              "execution-keys-separate-the-two-source-states"
+            ]
+          }
+        },
+        {
+          "id": "bare-run-covers-every-project",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bare-run-outside-a-repository-selects-every-project",
+              "a-named-project-outside-a-repository-needs-no-git",
+              "another-git-failure-still-fails-the-selection"
+            ]
+          }
+        },
+        {
+          "id": "git-history-is-refused-in-one-line",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "impacted-and-baseline-outside-a-repository-name-git",
+              "publish-and-deploy-outside-a-repository-name-git",
+              "version-outside-a-repository-names-git",
+              "a-missing-repository-and-a-missing-program-are-told-apart",
+              "another-git-failure-keeps-its-detail"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

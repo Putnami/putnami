@@ -126,8 +126,9 @@ func TestRun_CapturesCloudCapabilityBeforeRepositoryHooks(t *testing.T) {
 			Hooks:         hooks,
 		}, nil)
 	})
-	if result.ExitCode != ExitError {
-		t.Fatalf("workspace-less run exit code = %d, want %d", result.ExitCode, ExitError)
+	// The root holds no project, so the run ends as a usage error after the hook.
+	if result.ExitCode != ExitUsage {
+		t.Fatalf("workspace-less run exit code = %d, want %d", result.ExitCode, ExitUsage)
 	}
 	data, err := os.ReadFile(observed)
 	if err != nil {
@@ -159,17 +160,17 @@ func TestRun_FailingBeforeHookAbortsBeforeTheLifecycle(t *testing.T) {
 }
 
 func TestRun_AfterHookFailureOnlyDowngradesSuccess(t *testing.T) {
-	// The run itself already failed (no workspace), so a failing after-hook must
-	// not overwrite its code.
+	// The run itself already failed (no project to select), so a failing
+	// after-hook must not overwrite its code.
 	hooks, _ := hookRecorder(t)
 	hooks.CLI.After = []string{"false"}
-	if code := runWithHooks(t, hooks).ExitCode; code != ExitError {
-		t.Fatalf("exit code = %d, want the run's own %d", code, ExitError)
+	if code := runWithHooks(t, hooks).ExitCode; code != ExitUsage {
+		t.Fatalf("exit code = %d, want the run's own %d", code, ExitUsage)
 	}
 
 	// And with no hooks at all, nothing runs and the code is untouched.
-	if code := runWithHooks(t, nil).ExitCode; code != ExitError {
-		t.Fatalf("exit code without hooks = %d, want %d", code, ExitError)
+	if code := runWithHooks(t, nil).ExitCode; code != ExitUsage {
+		t.Fatalf("exit code without hooks = %d, want %d", code, ExitUsage)
 	}
 }
 

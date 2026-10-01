@@ -156,6 +156,9 @@ func newExecuteFixture(t *testing.T, opts ...func(*executeFixture)) *executeFixt
 func TestSelectProjects_ImpactedNonStrictFallbackSelectsAll(t *testing.T) {
 	t.Parallel()
 	wsRoot := t.TempDir()
+	// A repository whose baseline git cannot resolve: the fallback belongs to
+	// that case, and a root with no repository is refused instead.
+	initCLISelectionGitRepo(t, wsRoot)
 	projects := []*workspace.Project{
 		{ID: "/app", Name: "app", Path: "app"},
 		{ID: "/lib", Name: "lib", Path: "lib"},
@@ -163,6 +166,7 @@ func TestSelectProjects_ImpactedNonStrictFallbackSelectsAll(t *testing.T) {
 	ws := workspace.NewWorkspace(wsRoot, &workspacepb.Config{}, projects)
 	req := &Request{Config: &workspacepb.Config{}}
 	req.Global.Impacted = true
+	req.Global.Baseline = "no-such-ref"
 	req.Global.Projects = "[impacted]"
 
 	selected, code := selectProjects(req, ws)

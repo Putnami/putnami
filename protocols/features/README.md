@@ -424,6 +424,12 @@ excluded from the source binding, so committing generated output never
 invalidates the record that produced it; any other source change does, and the
 resolver reports the committed record stale rather than rebinding it.
 
+A workspace root Git does not manage has no `source-v1` binding. A producer
+there makes no source claim: it emits its capability manifest and no generated
+evidence document, and a reader reports the evidence as unavailable with
+`features.source_binding_unavailable` ([ADR
+0004](doc/adr/0004-an-unavailable-binding-is-no-source-claim.md)).
+
 ## Specs and durable decisions
 
 A spec is the prose half of spec-driven development: what a change is for, what

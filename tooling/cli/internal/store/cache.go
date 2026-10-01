@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
 
 // CacheManager integrates the LocalStore with job execution to provide
@@ -22,6 +24,8 @@ type CacheManager struct {
 	fileHashMu         sync.Mutex
 	extraFileHashCache map[string]string // memoizes extra-file hashes: sorted NUL-joined paths → hash
 	extraFileHashMu    sync.Mutex
+	sourceStates       map[string]string // memoizes SourceState: workspace root → state
+	sourceStateMu      sync.Mutex
 }
 
 // NewCacheManager creates a CacheManager backed by the given store.
@@ -196,6 +200,15 @@ type CacheKey struct {
 	// every Linux and macOS key keeps its address.
 	OSClass string
 
+	// SourceState names what the workspace root can say about its own source:
+	// SourceStateUnmanaged where Git does not manage it, empty inside a
+	// repository. The scheduler stamps no source binding in the first state, so
+	// an emitter writes its manifest without feature evidence there; an entry
+	// stored in one state must never serve the other, in either direction. The
+	// hash omits the field when it is empty, so every key computed inside a
+	// repository keeps its address.
+	SourceState string
+
 	// Task is the task name (e.g., "build~transpile").
 	Task string
 
@@ -325,6 +338,12 @@ func (k *CacheKey) ComputeHashUsing(cm *CacheManager) (string, error) {
 	if k.OSClass != "" {
 		writeField(h, "osClass")
 		writeField(h, k.OSClass)
+	}
+	// Same shape: absent inside a repository, so those keys are unchanged, and
+	// present where Git does not manage the root, so no such key equals one.
+	if k.SourceState != "" {
+		writeField(h, "sourceState")
+		writeField(h, k.SourceState)
 	}
 	writeField(h, k.Task)
 	writeField(h, k.TaskContractDigest)
@@ -649,6 +668,31 @@ func BuildCacheKey(
 		ConfigScope:                   cachePolicy.ConfigScope,
 		UpstreamHashes:                upstreamHashes,
 	}
+}
+
+// SourceStateUnmanaged is the CacheKey.SourceState of a workspace root Git does
+// not manage: no git program is on PATH, or the root is outside every
+// repository.
+const SourceStateUnmanaged = "unmanaged"
+
+// SourceState returns the CacheKey.SourceState of workspaceRoot. Git is asked
+// once per root for the life of the manager, so every key of one invocation
+// agrees and a run inside a repository pays one git process for all of them.
+func (cm *CacheManager) SourceState(workspaceRoot string) string {
+	cm.sourceStateMu.Lock()
+	defer cm.sourceStateMu.Unlock()
+	if state, ok := cm.sourceStates[workspaceRoot]; ok {
+		return state
+	}
+	state := ""
+	if gitutil.Unmanaged(workspaceRoot) != nil {
+		state = SourceStateUnmanaged
+	}
+	if cm.sourceStates == nil {
+		cm.sourceStates = make(map[string]string)
+	}
+	cm.sourceStates[workspaceRoot] = state
+	return state
 }
 
 // OSClassWindows is the CacheKey.OSClass value of every Windows host.

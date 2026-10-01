@@ -158,6 +158,10 @@
     "cli/workspace-initialization#compact-progress",
     "cli/workspace-initialization#graph-readiness",
     "cli/workspace-initialization#parallel-artifacts",
-    "cli/workspace-initialization#parallel-probes"
+    "cli/workspace-initialization#parallel-probes",
+    "cli/workspace-without-git#bare-run-covers-every-project",
+    "cli/workspace-without-git#git-history-is-refused-in-one-line",
+    "cli/workspace-without-git#no-source-claim",
+    "cli/workspace-without-git#source-state-keys-the-cache"
   ]
 }

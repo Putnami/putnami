@@ -126,11 +126,14 @@ func TestSelectProjects_WireSelectionReportsAFilterAsScoped(t *testing.T) {
 // project set.
 func TestSelectProjects_WireSelectionReportsTheImpactedFallbackAsAll(t *testing.T) {
 	t.Parallel()
-	// A temp dir with no git repository: the baseline cannot resolve, which is
-	// the branch under test.
-	ws := workspace.NewWorkspace(t.TempDir(), &workspacepb.Config{}, wireProjects())
+	// A repository whose baseline git cannot resolve, which is the branch
+	// under test. A root with no repository is refused instead.
+	wsRoot := t.TempDir()
+	initCLISelectionGitRepo(t, wsRoot)
+	ws := workspace.NewWorkspace(wsRoot, &workspacepb.Config{}, wireProjects())
 	req := &Request{Config: &workspacepb.Config{}}
 	req.Global.Impacted = true
+	req.Global.Baseline = "no-such-ref"
 	req.Global.Projects = "[impacted]"
 
 	selected, code := selectProjects(req, ws)

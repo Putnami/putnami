@@ -17,6 +17,7 @@
     "typescript/application-lifecycle#darc-runtime-enforcement",
     "typescript/application-lifecycle#darc-runtime-evidence",
     "typescript/application-lifecycle#failed-start-unwind",
+    "typescript/application-lifecycle#no-source-claim",
     "typescript/application-lifecycle#phase-order",
     "typescript/application-lifecycle#requirement-validation",
     "typescript/application-lifecycle#shutdown-order",

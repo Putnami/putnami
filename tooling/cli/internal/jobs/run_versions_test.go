@@ -109,9 +109,9 @@ func TestBuildRunVersionsDegradesOutsideAGitRepository(t *testing.T) {
 		t.Fatalf("root line = %+v, want a degraded 0.0.0 stamp", got)
 	}
 	// The degraded stamp alone cannot say why; the error names the line and
-	// the git call that failed.
-	if err == nil || !strings.Contains(err.Error(), `version line ""`) || !strings.Contains(err.Error(), "read repository depth") {
-		t.Fatalf("degradation error = %v, want the line and the failed git call", err)
+	// says the root is outside every repository.
+	if err == nil || !strings.Contains(err.Error(), `version line ""`) || !errors.Is(err, putnamigit.ErrNotRepository) {
+		t.Fatalf("degradation error = %v, want the line and the missing repository", err)
 	}
 	// Without a snapshot the line is left out, and the error still says why.
 	if got, err := BuildRunVersions(ws, nil); len(got) != 0 || err == nil {

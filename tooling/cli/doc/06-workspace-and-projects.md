@@ -446,6 +446,8 @@ If no baseline can be resolved, `--impacted` falls back to all projects and says
 
 Bare job commands that auto-select impacted projects resolve the same trunk (`origin/HEAD`, `origin/main`, local `main`/`master`), so explicit `--impacted` and bare auto-selection can no longer disagree about what a feature branch is measured against.
 
+A workspace root Git does not manage has no history to compare: no `git` program is on `PATH`, or the root is outside every repository. There a bare job command selects every project and says `all projects (no git repository)`, and a named project needs no Git. `--impacted` and `--baseline` refuse with one line that names Git and the command to run, as do `version`, a `publish` or a `deploy` that executes. Any other Git failure keeps its own message.
+
 ### Edge Cases
 
 - **No changed files** — Structured JSON/JSONL output reports the empty selection through the typed plan or terminal session, without human notices. Human output prints "No impacted projects found against `<baseline>`" and exits with code 0; the message names the resolved ref because "nothing changed" is only as trustworthy as the baseline it was computed from.

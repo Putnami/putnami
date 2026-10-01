@@ -1,0 +1,13 @@
+{
+  "name": "example/workload",
+  "capabilityRoot": ".",
+  "capabilityPackages": [
+    {
+      "package": "example/workload",
+      "version": "0.0.0",
+      "evidencePath": "putnami.json",
+      "sourceRoot": ".",
+      "sourceBinding": "source-v1:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ]
+}
