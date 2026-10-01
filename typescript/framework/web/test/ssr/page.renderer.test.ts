@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, expect, it } from 'bun:test';
 import { CSP_NONCE_CONTEXT_KEY, SecurityHeadersMiddleware, type HttpRequestContext } from '@putnami/application';
+import { specTest } from '@putnami/runtime/spectest';
 import { restoreEnv } from '@putnami/utils';
 import { buildHttpContext } from '../../../application/src/http/http-context.builder';
 import type { StaticHandlerContext } from 'react-router';
@@ -119,6 +120,49 @@ describe('page.renderer', () => {
       for (const tag of scriptTags) expect(tag).toContain(`nonce="${nonce}"`);
       expect(html.split('__staticRouterHydrationData').length - 1).toBe(1);
     });
+
+    specTest(
+      'stamps the nonce on the script React writes to move a streamed boundary into place',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'csrf-and-csp',
+        check: 'a-script-react-streams-carries-the-per-request-nonce',
+      },
+      async () => {
+        // A lazy page above 12,800 bytes inside a layout element: React streams
+        // its boundary after the shell, with an inline script that moves it
+        // into place.
+        const lines = Array.from({ length: 400 }, (_, index) =>
+          React.createElement('p', { key: index }, `Line ${index} of a page longer than one stream chunk.`),
+        );
+        const LongPage = React.lazy(async () => ({ default: () => React.createElement('div', null, lines) }));
+        const ctx = createMockContext();
+        const handler = pageRenderer(
+          () => [
+            {
+              path: '/',
+              element: React.createElement(
+                'main',
+                null,
+                React.createElement(React.Suspense, { fallback: null }, React.createElement(LongPage)),
+              ),
+            } as never,
+          ],
+          () => RootHtml,
+          () => 'hydrate.js',
+          SSR_TIMEOUT_MS,
+        );
+        const response = await runInContext(ctx, async () => await handler());
+        const html = await response.get().text();
+        const nonce = (ctx as Record<string, unknown>)[CSP_NONCE_CONTEXT_KEY] as string;
+
+        const root = html.slice(html.indexOf('<div id="root">'));
+        const streamed = root.match(/<script\b[^>]*>/g) ?? [];
+        expect(root).toContain('<!--$?-->');
+        expect(streamed.length).toBeGreaterThan(0);
+        for (const tag of html.match(/<script\b[^>]*>/g) ?? []) expect(tag).toContain(`nonce="${nonce}"`);
+      },
+    );
 
     it('lets security headers preserve an explicit CSP while adding the SSR nonce', async () => {
       const ctx = createMockContext();

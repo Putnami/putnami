@@ -158,6 +158,28 @@ describe('ReactClientGenerator', () => {
     expect(mockWrite).toHaveBeenCalledWith('/client.tsx');
   });
 
+  it('renders a page through the page boundary, and a layout or a not-found page as a plain component', () => {
+    const generator = new ReactClientGenerator('/client.tsx', './src/app', '/scanned');
+
+    // The dashboard page is added before its layout, so the layout moves it.
+    generator.addPage('dashboard/page.tsx');
+    generator.addLayout('dashboard/layout.tsx');
+    generator.addPage('dashboard/settings/page.tsx');
+    generator.addNotFound('dashboard/not-found.tsx');
+    generator.write();
+
+    const lazyLine = (file: string) =>
+      mockAppend.mock.calls.map(([line]) => String(line)).find((line) => line.includes(`import('src/app/${file}')`));
+    const pageElement = 'element: createPageElement(d?.component ?? d)';
+    const plainComponent = 'Component: d?.component ?? d';
+
+    expect(lazyLine('dashboard/page')).toContain(pageElement);
+    expect(lazyLine('dashboard/settings/page')).toContain(pageElement);
+    expect(lazyLine('dashboard/layout')).toContain(plainComponent);
+    expect(lazyLine('dashboard/not-found')).toContain(plainComponent);
+    expect(mockAppendHead.mock.calls.some(([line]) => String(line).includes('createPageElement,'))).toBe(true);
+  });
+
   it('writes forward-slash lazy imports and routes from Windows-separated paths', () => {
     // On Windows the scan and the generated directory carry native separators.
     // A backslash in a specifier is an escape sequence (`\n` in `..\not-found`).

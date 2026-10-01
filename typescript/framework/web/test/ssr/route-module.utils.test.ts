@@ -34,6 +34,15 @@ describe('route-module.utils', () => {
     expect(defined.page).toBeDefined();
   });
 
+  it('renders a page module inside one Suspense boundary', () => {
+    for (const pageModule of [{ default: PageComponent }, { default: page().render(PageComponent) }]) {
+      const element = resolvePageOrDefinition(pageModule).page as React.ReactElement<{ children: React.ReactElement }>;
+
+      expect(element.type).toBe(React.Suspense);
+      expect(element.props.children.type).toBe(PageComponent);
+    }
+  });
+
   it('passes through direct page elements', () => {
     const element = React.createElement('div', null, 'direct');
     expect(resolvePageOrDefinition(element)).toEqual({

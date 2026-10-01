@@ -1,5 +1,9 @@
-import { describe, expect, it, mock } from 'bun:test';
+import { afterAll, describe, expect, it, mock } from 'bun:test';
 import { ReactApplicationGenerator } from '../../src/ssr/generator/react-ssr.generator';
+
+// The real module, restored after this file: bun's `mock.restore()` does not
+// undo `mock.module()`.
+const realUtils = { ...(await import('@putnami/utils')) };
 
 // Mock GeneratorHelper
 const mockAppend = mock();
@@ -41,6 +45,10 @@ mock.module('@putnami/utils', () => ({
 }));
 
 describe('ReactApplicationGenerator', () => {
+  afterAll(() => {
+    mock.module('@putnami/utils', () => realUtils);
+  });
+
   const createGenerator = () => new ReactApplicationGenerator('/path/to/loader');
 
   // Reset mocks before each test

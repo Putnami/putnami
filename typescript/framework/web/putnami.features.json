@@ -51,6 +51,7 @@
               "a-form-carries-the-csrf-token-as-a-hidden-input",
               "a-head-injected-script-carries-the-per-request-nonce",
               "a-per-request-nonce-is-generated-per-call",
+              "a-script-react-streams-carries-the-per-request-nonce",
               "an-empty-nonce-emits-no-nonce-directive",
               "the-csrf-cookie-token-is-read-by-the-client",
               "the-default-policy-is-applied-when-no-options-are-given",
@@ -133,10 +134,12 @@
               "a-missing-root-element-falls-back-to-anonymous-security",
               "a-non-numeric-injected-timeout-is-ignored",
               "a-script-break-out-in-serialized-state-is-escaped",
+              "a-server-rendered-page-hydrates-without-a-recoverable-error",
               "a-silently-blanked-outlet-is-restored-and-reported",
               "an-uncaught-hydration-error-restores-the-server-html",
               "lazy-routes-hydrate-with-the-serialized-security-context",
               "the-serialized-fetch-timeout-is-read-from-the-injected-global",
+              "the-server-renders-a-page-inside-one-suspense-boundary",
               "the-unicode-line-separators-are-escaped"
             ]
           }

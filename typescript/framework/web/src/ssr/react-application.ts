@@ -9,6 +9,7 @@ import {
 import { useConfig } from '@putnami/runtime';
 import React, { type ReactNode } from 'react';
 import type { RouteObject } from 'react-router';
+import { createPageElement } from '../shared/page-element';
 import { RouteTreeHelper } from '../shared/route-tree.utils';
 import type {
   ErrorModule,
@@ -30,7 +31,7 @@ import { ReactStaticServer } from './react-static-server';
 import { PutnamiReactConfig, type PutnamiReactConfigExtras } from './react-ssr.config';
 import { RouteMiddlewareResolver } from './route-middleware-resolver';
 import { applyMiddlewareSource, type MiddlewareSource } from './route-middleware.utils';
-import { resolveLayoutOrDefinition, resolvePageOrDefinition } from './route-module.utils';
+import { resolveLayoutOrDefinition, resolvePageComponent, resolvePageOrDefinition } from './route-module.utils';
 import {
   createLazyPageRenderer,
   createPageRenderer,
@@ -326,18 +327,15 @@ export class ReactApplication {
 
       const LazyPageComponent = React.lazy(async () => {
         const pageModule = await this.cache.loadModule(`page:${route}`, lazyPage);
-        const { page, pageDef } = resolvePageOrDefinition(pageModule);
+        const { component, pageDef } = resolvePageComponent(pageModule);
         // Update statusCode if defined in page definition
         if (pageDef?.statusCode) {
           statusCode = pageDef.statusCode;
         }
-        return { default: () => page };
+        return { default: component };
       });
-      pageNode.element = React.createElement(
-        React.Suspense,
-        { fallback: null },
-        React.createElement(LazyPageComponent),
-      );
+      // The lazy component stands for the page component inside the page boundary.
+      pageNode.element = createPageElement(LazyPageComponent);
 
       // The lazy renderer resolves and applies its own middleware on first
       // request, so it is registered directly. Skipped for static routes (below).

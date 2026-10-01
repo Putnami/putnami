@@ -123,6 +123,7 @@ export const pageRenderer =
 
       const reactStream = await createReactStream(staticRouter, {
         signal: controller.signal,
+        nonce,
         onError: (error) => {
           logger.error('SSR streaming error:', error);
         },
@@ -184,14 +185,17 @@ export const pageRenderer =
   };
 
 /**
- * Creates the React readable stream from the static router element.
+ * Creates the React readable stream from the static router element. React
+ * stamps `nonce` on the inline scripts it writes into the stream, such as the
+ * ones that move a large Suspense boundary into place.
  */
 async function createReactStream(
   staticRouter: ReactElement,
-  options: { signal: AbortSignal; onError: (err: unknown) => void },
+  options: { signal: AbortSignal; nonce: string; onError: (err: unknown) => void },
 ) {
   return await renderToReadableStream(staticRouter, {
     signal: options.signal,
+    nonce: options.nonce,
     onError: options.onError,
   });
 }
