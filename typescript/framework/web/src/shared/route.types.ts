@@ -14,6 +14,8 @@ export interface ClientRouteNode extends BaseRouteNode {
   loader?: string;
   action?: string;
   isLayout?: boolean;
+  /** The element is a page file: its route renders it inside the page boundary. */
+  isPage?: boolean;
   notFound?: string;
   children?: ClientRouteNode[];
 }

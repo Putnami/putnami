@@ -8,10 +8,27 @@ import type { NotFoundDefinition } from './not-found';
 import { isNotFoundDefinition } from './not-found';
 import type { PageDefinition } from './page';
 import { isPageDefinition } from './page';
+import { createPageElement } from '../shared/page-element';
 import { inModuleOrDefault } from './react-ssr.utils';
 
 /**
- * Resolve a page module: either a PageDefinition or a plain ComponentType.
+ * Resolve the component of a page module: the module exports either a
+ * PageDefinition or a plain ComponentType.
+ */
+export function resolvePageComponent(pageModule: PageModule): {
+  component: React.ComponentType;
+  pageDef: PageDefinition | undefined;
+} {
+  const def = inModuleOrDefault<React.ComponentType | PageDefinition, PageModule>(pageModule, 'page');
+  if (isPageDefinition(def)) {
+    return { component: def.component, pageDef: def };
+  }
+  return { component: def as React.ComponentType, pageDef: undefined };
+}
+
+/**
+ * Resolve a page to the element its route renders. A page module resolves to
+ * its component inside the page boundary; an element is returned as it is.
  */
 export function resolvePageOrDefinition(page: ReactNode | PageModule | undefined): {
   page: ReactNode | undefined;
@@ -20,17 +37,8 @@ export function resolvePageOrDefinition(page: ReactNode | PageModule | undefined
   if (!page) return { page: undefined, pageDef: undefined };
 
   if (typeof page === 'object' && page !== null && ('default' in page || 'page' in page)) {
-    const def = inModuleOrDefault<React.ComponentType | PageDefinition, PageModule>(page as PageModule, 'page');
-    if (isPageDefinition(def)) {
-      return {
-        page: React.createElement(React.Suspense, { fallback: null }, React.createElement(def.component)),
-        pageDef: def,
-      };
-    }
-    return {
-      page: React.createElement(React.Suspense, { fallback: null }, React.createElement(def as React.ComponentType)),
-      pageDef: undefined,
-    };
+    const { component, pageDef } = resolvePageComponent(page as PageModule);
+    return { page: createPageElement(component), pageDef };
   }
 
   return { page: page as ReactNode, pageDef: undefined };
