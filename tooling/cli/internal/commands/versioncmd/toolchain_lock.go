@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,7 +16,9 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -147,7 +150,7 @@ func pinDeclaredToolchains(ctx context.Context, wsRoot string, repin func(declar
 		var entry lockfile.LockEntry
 		switch name {
 		case "go":
-			entry, err = resolveGoToolchain(ctx, constraint)
+			entry, err = resolveGoToolchain(ctx, wsRoot, constraint)
 		case "bun":
 			entry, err = resolveBunToolchain(ctx, constraint, lockfile.LockEntry{})
 		}
@@ -201,7 +204,7 @@ func refreshToolchainLock(ctx context.Context, wsRoot string, lf *lockfile.LockF
 		var entry lockfile.LockEntry
 		switch name {
 		case "go":
-			entry, err = resolveGoToolchain(ctx, constraint)
+			entry, err = resolveGoToolchain(ctx, wsRoot, constraint)
 		case "bun":
 			current, _ := lf.GetToolchain(name)
 			entry, err = resolveBunToolchain(ctx, constraint, current)
@@ -348,7 +351,25 @@ type goFile struct {
 	Kind     string `json:"kind"`
 }
 
-func resolveGoToolchain(ctx context.Context, version string) (lockfile.LockEntry, error) {
+// resolveGoToolchain returns the lock entry of one exact Go release: its
+// version, the go.dev download source, and the SHA-256 of the archive of each
+// supported platform.
+//
+// The entry the release index publishes for a release is kept in a pin record
+// under the Putnami home, and a valid record is returned without a request:
+// go.dev never changes the archives of a published release, so each recorded
+// digest stays the one a download of that release is checked against. A
+// machine that pinned the release once therefore pins it in every other
+// workspace with no request to go.dev. resolveBunToolchain applies the same
+// rule to a lock entry that already pins the declared version.
+//
+// A missing record, or one readGoPinRecord rejects, is ignored and the index
+// is fetched. The fetched entry is then written as the record. A write that
+// fails leaves the entry and the pin as they are: the next pin fetches again.
+func resolveGoToolchain(ctx context.Context, wsRoot, version string) (lockfile.LockEntry, error) {
+	if entry, ok := readGoPinRecord(wsRoot, version); ok {
+		return entry, nil
+	}
 	var releases []goRelease
 	if err := getJSON(ctx, goDownloadsURL, &releases); err != nil {
 		return lockfile.LockEntry{}, err
@@ -371,7 +392,108 @@ func resolveGoToolchain(ctx context.Context, version string) (lockfile.LockEntry
 	if len(integrities) == 0 {
 		return lockfile.LockEntry{}, fmt.Errorf("go %s has no supported archives in %s", version, goDownloadsURL)
 	}
-	return lockfile.LockEntry{Version: version, Integrities: integrities, Source: goSourceURL}, nil
+	entry := lockfile.LockEntry{Version: version, Integrities: integrities, Source: goSourceURL}
+	if err := writeGoPinRecord(wsRoot, entry); err != nil {
+		slog.Debug("toolchain lock: go pin record not written", "version", version, "error", err)
+	}
+	return entry, nil
+}
+
+// goPinRecord is the content of a pin record: the lock entry of one Go release
+// as the release index published it.
+type goPinRecord struct {
+	Version     string            `json:"version"`
+	Integrities map[string]string `json:"integrities"`
+	Source      string            `json:"source"`
+}
+
+// goPinRecordMaxBytes caps the bytes read from a pin record. A record holds
+// one digest for each supported platform, under 1 KiB in all.
+const goPinRecordMaxBytes = 64 << 10
+
+// goPinRecordPath returns the pin record of a Go release:
+// toolchains/go/go-<version>.pin.json under the Putnami home of a command that
+// runs in wsRoot, beside the directory the release installs in.
+//
+// It reports false for a version that is not letters, digits and dots, which
+// has no record. The version comes from go.work, a file of the repository, and
+// one that holds a path separator must not name a file outside that directory.
+func goPinRecordPath(wsRoot, version string) (string, bool) {
+	if version == "" {
+		return "", false
+	}
+	for _, r := range version {
+		plain := r == '.' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+		if !plain {
+			return "", false
+		}
+	}
+	home := jobs.PutnamiHome(wsRoot, os.Environ())
+	return filepath.Join(home, "toolchains", "go", "go-"+version+".pin.json"), true
+}
+
+// readGoPinRecord returns the lock entry the pin record of version holds.
+//
+// It reports false unless the record is a regular file that parses, names
+// version and goSourceURL, and maps at least one supported platform, and no
+// other key, to a lowercase 64-hex SHA-256. resolveGoToolchain builds exactly
+// such an entry from the release index, so the entry of an accepted record is
+// the one a fetch returns, and the lock written from either holds the same
+// bytes.
+func readGoPinRecord(wsRoot, version string) (lockfile.LockEntry, bool) {
+	path, ok := goPinRecordPath(wsRoot, version)
+	if !ok {
+		return lockfile.LockEntry{}, false
+	}
+	if info, err := os.Lstat(path); err != nil || !info.Mode().IsRegular() {
+		return lockfile.LockEntry{}, false
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return lockfile.LockEntry{}, false
+	}
+	data, err := io.ReadAll(io.LimitReader(f, goPinRecordMaxBytes+1))
+	_ = f.Close()
+	if err != nil || len(data) > goPinRecordMaxBytes {
+		return lockfile.LockEntry{}, false
+	}
+	var record goPinRecord
+	if err := json.Unmarshal(data, &record); err != nil {
+		return lockfile.LockEntry{}, false
+	}
+	if record.Version != version || record.Source != goSourceURL || len(record.Integrities) == 0 {
+		return lockfile.LockEntry{}, false
+	}
+	for platform, digest := range record.Integrities {
+		goos, goarch, ok := lockfile.SplitPlatformKey(platform)
+		if !ok || !supportedPlatform(goos, goarch) {
+			return lockfile.LockEntry{}, false
+		}
+		if canonical, ok := normalizedSHA256(digest); !ok || canonical != digest {
+			return lockfile.LockEntry{}, false
+		}
+	}
+	return lockfile.LockEntry{Version: record.Version, Integrities: record.Integrities, Source: record.Source}, true
+}
+
+// writeGoPinRecord writes entry as the pin record of its version. The bytes go
+// to a temporary file in the record's directory that is then renamed over the
+// record, so a reader finds the previous record or the complete new one, and
+// processes that write the same record at once leave one complete file.
+func writeGoPinRecord(wsRoot string, entry lockfile.LockEntry) error {
+	path, ok := goPinRecordPath(wsRoot, entry.Version)
+	if !ok {
+		return fmt.Errorf("go %s names no pin record", entry.Version)
+	}
+	data, err := json.MarshalIndent(goPinRecord{
+		Version:     entry.Version,
+		Integrities: entry.Integrities,
+		Source:      entry.Source,
+	}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode the go %s pin record: %w", entry.Version, err)
+	}
+	return shared.AtomicWriteFile(path, append(data, '\n'))
 }
 
 type bunRelease struct {

@@ -11,7 +11,8 @@
     "A workspace putnami init creates pins the toolchains it declares, so the commands init prints next resolve them",
     "A checkout whose lock lacks a pin for a declared toolchain gets it from the first command's implicit install, and keeps every committed pin",
     "A Go project created on a host with only Putnami installed is set up with the Go the lock pins, pinned and installed first when the host has none",
-    "A new Go project requires the Go framework release the consumer's module proxies serve, and create fails before it writes anything when none answers"
+    "A new Go project requires the Go framework release the consumer's module proxies serve, and create fails before it writes anything when none answers",
+    "A machine that pinned a Go release pins it again in any workspace with no request to go.dev"
   ],
   "nonGoals": [
     "Provisioning or managing a Node runtime",
@@ -66,6 +67,10 @@
     {
       "id": "deps-report-a-failed-install",
       "text": "When the workspace-install that putnami deps add, deps remove or deps prune runs to install a missing Go fails but still leaves a go, the command edits the Go modules with that go, and prune edits every module it selected. It runs the installers no second time and exits non-zero naming putnami deps install, as putnami projects create does, so a failed install never ends in success."
+    },
+    {
+      "id": "go-pin-reuses-the-machine-record",
+      "text": "A Go pin takes the entry go.dev published for the release from a record under the Putnami home, toolchains/go/go-<version>.pin.json, and makes no request. It asks the release index only without a record that names the version and the go.dev source and maps only supported platforms to SHA-256 digests. It then writes the fetched entry as the record through a rename; a write that fails does not fail the pin. The lock holds the same bytes from the record and from the index."
     }
   ],
   "decisions": [

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -65,7 +66,8 @@ const (
 //
 // The Go is installed once for the machine, under the Putnami home, and the
 // workspace holds no copy: a second workspace that init sets up on the same
-// machine runs the same install and downloads no archive.
+// machine runs the same install, downloads no archive, and pins the release
+// from the record the first pin left, with no request to the release index.
 //
 // The extension is a fixture whose workspace-install does what @putnami/go's
 // does for these steps: it installs nothing while nothing declares Go, and
@@ -73,6 +75,8 @@ const (
 func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	spectest.Proves(t, "cli/toolchain-lock", "create-installs-a-missing-go",
 		"init-and-create-install-the-pinned-go-through-the-engine")
+	spectest.Proves(t, "cli/toolchain-lock", "go-pin-reuses-the-machine-record",
+		"a-second-init-makes-no-request-to-the-release-index")
 	clitest.RequireShell(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("shell runtime fixture")
@@ -103,10 +107,11 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	goArchive := goReleaseArchive(t, goCalls)
 	goArchiveName := fmt.Sprintf("go%s.%s-%s.tar.gz", initGoRelease, runtime.GOOS, runtime.GOARCH)
 	goArchiveDigest := sha256Hex(goArchive)
-	var goDownloads atomic.Int32
+	var goIndexRequests, goDownloads atomic.Int32
 	goDev := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/dl/":
+			goIndexRequests.Add(1)
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode([]goDevRelease{{
 				Version: "go" + initGoRelease,
@@ -175,6 +180,11 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	if got := goDownloads.Load(); got != 1 {
 		t.Fatalf("the Go archive was downloaded %d times, want once", got)
 	}
+	// The first pin of the release on the machine asks the release index.
+	firstIndexRequests := goIndexRequests.Load()
+	if firstIndexRequests < 1 {
+		t.Fatal("the first init pinned Go without a request to the release index; this test guards nothing")
+	}
 	lock, err := lockfile.ReadLockFile(wsRoot)
 	if err != nil || lock == nil {
 		t.Fatalf("read the lock init left: %v", err)
@@ -227,7 +237,8 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 		t.Fatalf("the build downloaded the Go archive again: %d downloads", got)
 	}
 
-	// A second workspace on the machine pins the same release: every
+	// A second workspace on the machine pins the same release from the record
+	// of the first, with no request to the release index: every
 	// workspace-install of its init finds the install of the first one, no
 	// archive is downloaded, and its go commands run with that install.
 	secondRoot, err := filepath.EvalSymlinks(t.TempDir())
@@ -245,8 +256,20 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	if got, want := fixtureRuns(t, records, "install"), []string{"installed", "present", "present", "present"}; !slices.Equal(got, want) {
 		t.Fatalf("workspace-install runs = %v, want %v: the second workspace finds the installed Go\n%s", got, want, transcript)
 	}
+	if got := goIndexRequests.Load() - firstIndexRequests; got != 0 {
+		t.Fatalf("the second workspace asked the release index %d times, want no request: the first init left the pin record", got)
+	}
 	if got := goDownloads.Load(); got != 1 {
 		t.Fatalf("the second workspace downloaded the Go archive: %d downloads, want the one of the first", got)
+	}
+	secondLock, err := lockfile.ReadLockFile(secondRoot)
+	if err != nil || secondLock == nil {
+		t.Fatalf("read the lock the second init left: %v", err)
+	}
+	if secondPin, pinned := secondLock.GetToolchain("go"); !pinned || secondPin.Version != pin.Version ||
+		secondPin.Source != pin.Source || !maps.Equal(secondPin.Integrities, pin.Integrities) {
+		t.Fatalf("toolchains.go of the second workspace = %+v (present %v), want the pin of the first %+v",
+			secondPin, pinned, pin)
 	}
 	if _, err := os.Lstat(filepath.Join(secondRoot, ".putnami", "extensions", "@putnami-go")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("the second workspace holds a Go release of its own: %v", err)

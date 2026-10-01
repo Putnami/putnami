@@ -696,7 +696,7 @@ func runtimeToolchainCandidatePath(workspaceRoot string, candidate extensionprot
 			path = filepath.Join(root, rel)
 		}
 	case extensionproto.RuntimeToolchainCandidatePutnamiHome:
-		path = filepath.Join(runtimePutnamiHome(workspaceRoot, base), rel)
+		path = filepath.Join(PutnamiHome(workspaceRoot, base), rel)
 	}
 	return withExecutableSuffix(runtime.GOOS, path)
 }
@@ -726,7 +726,12 @@ func unexpandedCandidateReason(candidate extensionproto.RuntimeToolchainCandidat
 	return "path missing"
 }
 
-func runtimePutnamiHome(workspaceRoot string, env []string) string {
+// PutnamiHome returns the Putnami home of a command that runs in workspaceRoot
+// with env: PUTNAMI_HOME, else .putnami under the user's home directory, else
+// .putnami under workspaceRoot. It is the directory a putnami-home candidate
+// of a runtime toolchain is relative to, so everything the CLI reads or writes
+// beside a toolchain resolves the home through it.
+func PutnamiHome(workspaceRoot string, env []string) string {
 	if root := strings.TrimSpace(envLastValue(env, "PUTNAMI_HOME")); root != "" {
 		return filepath.Clean(root)
 	}

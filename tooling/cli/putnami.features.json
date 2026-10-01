@@ -1567,6 +1567,24 @@
               "deps-prune-edits-every-module-and-names-deps-install-when-the-go-install-fails"
             ]
           }
+        },
+        {
+          "id": "go-pin-reuses-the-machine-record",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-recorded-go-release-pins-without-a-request",
+              "an-invalid-record-is-ignored-and-replaced",
+              "an-unwritable-home-still-pins",
+              "the-lock-holds-the-same-bytes-from-the-record-and-from-the-index",
+              "pins-that-start-together-leave-one-complete-record",
+              "a-second-init-makes-no-request-to-the-release-index"
+            ]
+          }
         }
       ]
     },

@@ -1102,6 +1102,20 @@ fresh checkout does not refresh them: it only adds a pin that `go.work` or
 of a language gets its pin on the next command. After you change a declared
 version, run `putnami install`.
 
+The Go entry comes from the go.dev release index. The first pin of a release on
+a machine fetches the index and writes the entry to a pin record under the
+Putnami home, `toolchains/go/go-<version>.pin.json`, beside the directory the
+release installs in. Every later pin of that release, in any workspace of the
+machine, reads the record and makes no request to go.dev, because a published
+Go release never changes its archives. The lock holds the same bytes from the
+record and from the index.
+
+A record is used only when it names the requested version and the go.dev
+source, and maps only supported `os/arch` pairs to SHA-256 digests. Any other
+record is ignored, and the entry of the next fetch replaces it. A Putnami home
+that cannot hold the record does not fail the pin: each pin then asks the
+index. To make the next pin ask the index again, delete the record.
+
 ```json
 {
   "version": 3,
