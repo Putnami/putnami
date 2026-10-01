@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,7 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/sdk/extension/publicationoutbox"
 	"go.putnami.dev/sdk/extension/registrycred"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
@@ -48,6 +50,14 @@ import (
 // with no cloud installed; when @putnami/cloud is present, registrycred resolves a
 // fresh per-host bearer and the oci tag-digest fast path is used when the registry
 // advertises it.
+//
+// When the engine sets the publication outbox (extproto.PublicationOutboxEnv),
+// an image for the managed registry is packed instead: the layout candidate, its
+// repository, its manifest digest and its tags go into the outbox, and the job
+// sends no registry request, resolves no credential, writes neither
+// published-image.json nor version.json, and emits no publication event. The
+// engine pushes the layout and records the published image. Any other registry
+// ignores the outbox.
 func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	if skipIfNoProject(ctx, emit) {
 		return "SKIP", nil, nil
@@ -110,26 +120,40 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	registry := dockerRegistry
 	regHost := oci.RegistryHost(registry)
 
-	// A native publication run routes every managed-registry request through the
-	// invocation's loopback broker (PUTNAMI_REGISTRY_OCI_URL). The broker holds
-	// the run's upstream credential; this process never asks oci.putnami.dev for
-	// a token itself. An empty registry pushes nothing, so it consults no route.
-	route, err := resolveDockerRoute(registry, dockerManifest)
-	if err != nil {
-		emit.Diagnostic("error", err.Error(), "", 0)
-		return "FAILED", nil, err
-	}
+	// Under a publication outbox, an image for the managed registry is packed for
+	// the engine to push (packImageIntoOutbox): it consults no broker route and
+	// resolves no credential. Every other registry ignores the outbox.
+	packOnly := regHost == managedOCIRegistry && publicationOutboxRequested()
+	var route dockerRoute
+	var credTok, credHint string
+	if packOnly {
+		if dockerManifest.Layout == "" || dockerManifest.Digest == "" {
+			err := fmt.Errorf("publication outbox requires an OCI layout candidate with a digest; repackage the image")
+			emit.Diagnostic("error", err.Error(), "", 0)
+			return "FAILED", nil, err
+		}
+	} else {
+		// A native publication run routes every managed-registry request through the
+		// invocation's loopback broker (PUTNAMI_REGISTRY_OCI_URL). The broker holds
+		// the run's upstream credential; this process never asks oci.putnami.dev for
+		// a token itself. An empty registry pushes nothing, so it consults no route.
+		route, err = resolveDockerRoute(registry, dockerManifest)
+		if err != nil {
+			emit.Diagnostic("error", err.Error(), "", 0)
+			return "FAILED", nil, err
+		}
 
-	// Resolve the credential @putnami/cloud holds for the registry host and build a
-	// keychain that injects it as a Bearer for that host only; every other registry
-	// (GCP, ghcr, …) keeps its native docker-config / gcloud / ADC credentials via
-	// DefaultKeychain. An empty token leaves DefaultKeychain in charge — the
-	// standard floor. credHint carries the cloud's own guidance, surfaced only if
-	// the registry then rejects the credentials (see oci.WrapAuthError). Under a
-	// private broker the seam is asked about the broker host, which is how the
-	// cloud knows to hand back the run's capability instead of a user session;
-	// the keychain still binds that bearer to the logical registry host.
-	credTok, credHint := resolveManagedDockerCredential(route.credentialHost)
+		// Resolve the credential @putnami/cloud holds for the registry host and build a
+		// keychain that injects it as a Bearer for that host only; every other registry
+		// (GCP, ghcr, …) keeps its native docker-config / gcloud / ADC credentials via
+		// DefaultKeychain. An empty token leaves DefaultKeychain in charge — the
+		// standard floor. credHint carries the cloud's own guidance, surfaced only if
+		// the registry then rejects the credentials (see oci.WrapAuthError). Under a
+		// private broker the seam is asked about the broker host, which is how the
+		// cloud knows to hand back the run's capability instead of a user session;
+		// the keychain still binds that bearer to the logical registry host.
+		credTok, credHint = resolveManagedDockerCredential(route.credentialHost)
+	}
 	keychain := oci.NewRegistryKeychain(regHost, credTok)
 
 	contentTag := dockerContentTag(dockerManifest, localRef)
@@ -164,6 +188,21 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 		}
 		emitPublishedDocker(emit, qualifiedImage, version, runtime.PublishRecord{DryRun: true})
 		return "OK", map[string]any{"dryRun": true, "imageName": imageName, "refs": allRefs, "contentTag": contentTag}, nil
+	}
+
+	if packOnly {
+		// The version is the only tag the engine assigns: content is addressed by
+		// its digest, as on the private broker route.
+		coordinate := strings.TrimPrefix(qualifiedImage, regHost+"/")
+		if err := packImageIntoOutbox(ctx, dockerManifest, qualifiedImage, coordinate, version, []string{version}); err != nil {
+			emit.Diagnostic("error", err.Error(), "", 0)
+			return "FAILED", nil, err
+		}
+		emit.Summary(fmt.Sprintf("Packed %s@%s as %s into the publication outbox; the engine pushes it", qualifiedImage, dockerManifest.Digest, version))
+		return "OK", map[string]any{
+			"imageName": imageName, "version": version, "image": versionRef,
+			"refs": allRefs, "contentTag": contentTag, "packed": true,
+		}, nil
 	}
 
 	// One push per unique content, ever: if the content is already in the registry
@@ -359,6 +398,49 @@ func resolveManagedDockerCredential(regHost string) (token, hint string) {
 	return registrycred.ResolveToken(regHost)
 }
 
+// publicationOutboxRequested reports whether the engine asked this job to pack
+// managed members into a publication outbox instead of uploading them.
+func publicationOutboxRequested() bool {
+	return os.Getenv(extproto.PublicationOutboxEnv) != ""
+}
+
+// outboxImageLayout is the layout directory of the one image a docker
+// publication packs.
+const outboxImageLayout = "oci/layout"
+
+// packImageIntoOutbox copies the packaged OCI layout candidate into the
+// publication outbox and commits a descriptor naming repository, the expected
+// manifest digest and tags. It writes nothing else: the engine pushes the
+// layout and records the published image.
+func packImageIntoOutbox(ctx *pctx.Context, manifest *pkgmeta.DockerManifest, repository, coordinate, version string, tags []string) error {
+	if ctx.Identity == nil || ctx.Identity.Project.ID == "" {
+		return fmt.Errorf("publication outbox requires the task's typed project identity")
+	}
+	writer, err := publicationoutbox.WriterFromEnv()
+	if err != nil {
+		return err
+	}
+	layoutDir := filepath.Join(pkgmeta.PackageOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, "docker"), manifest.Layout)
+	if err := writer.CopyLayout(outboxImageLayout, layoutDir); err != nil {
+		return err
+	}
+	if err := writer.Add(extproto.OutboxMember{
+		Ecosystem:  extproto.OutboxEcosystemOCI,
+		Coordinate: coordinate,
+		Version:    version,
+		Project:    ctx.Identity.Project.ID,
+		OCI: &extproto.OutboxOCI{
+			Layout:     outboxImageLayout,
+			Repository: repository,
+			Digest:     manifest.Digest,
+			Tags:       tags,
+		},
+	}); err != nil {
+		return err
+	}
+	return writer.Commit()
+}
+
 type imagePublishTarget struct {
 	RegistryPrefix string
 	Host           string
@@ -468,9 +550,16 @@ func publishImmutableImageProject(ctx *pctx.Context, emit *jsonl.Emitter, dryRun
 	if err != nil {
 		return "FAILED", nil, err
 	}
-	privateTransport, credentialHost, err := privateOCITransportFor(target)
-	if err != nil {
-		return "FAILED", nil, err
+	// Under a publication outbox, a managed image is packed for the engine to
+	// push: it consults no broker route and resolves no credential.
+	packOnly := target.Managed && publicationOutboxRequested()
+	var privateTransport http.RoundTripper
+	var credentialHost string
+	if !packOnly {
+		privateTransport, credentialHost, err = privateOCITransportFor(target)
+		if err != nil {
+			return "FAILED", nil, err
+		}
 	}
 	contentRef := target.Repository + ":" + manifest.Version
 	immutableRef := target.Repository + "@" + manifest.Digest
@@ -487,6 +576,21 @@ func publishImmutableImageProject(ctx *pctx.Context, emit *jsonl.Emitter, dryRun
 		return "OK", map[string]any{
 			"dryRun": true, "image": immutableRef, "image_digest": manifest.Digest,
 			"contentHash": manifest.ContentHash, "version": manifest.Version,
+		}, nil
+	}
+
+	if packOnly {
+		// An immutable image project is addressed by its digest alone: the engine
+		// assigns no tag.
+		coordinate := strings.TrimPrefix(target.Repository, target.Host+"/")
+		if err := packImageIntoOutbox(ctx, manifest, target.Repository, coordinate, memberVersion, nil); err != nil {
+			emit.Diagnostic("error", err.Error(), "", 0)
+			return "FAILED", nil, err
+		}
+		emit.Summary("Packed immutable image " + immutableRef + " into the publication outbox; the engine pushes it")
+		return "OK", map[string]any{
+			"imageName": manifest.Image, "image": immutableRef, "image_digest": manifest.Digest,
+			"contentHash": manifest.ContentHash, "version": manifest.Version, "packed": true,
 		}, nil
 	}
 

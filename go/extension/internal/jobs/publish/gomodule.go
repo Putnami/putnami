@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/privatebroker"
+	"go.putnami.dev/sdk/extension/publicationoutbox"
 	"go.putnami.dev/sdk/extension/registrycred"
 )
 
@@ -67,6 +68,10 @@ func resolveGoPublishRoute(declaredOrigin string, managed bool) (goPublishRoute,
 // (unlike npm/docker, which fall back to native auth). Public visibility requires
 // a separate, server-owned attestation contract and is deliberately not inferred
 // from a repository command, channel, or release-set plan.
+//
+// When the engine names a publication outbox and no explicit token is set, the
+// module is packed into the outbox and nothing else happens
+// (packGoModuleIntoOutbox). An explicit token ignores the outbox.
 func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	if ctx.Project.Name == "" {
 		emit.Summary("Skipped: no project context")
@@ -99,10 +104,17 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		emit.Diagnostic("error", err.Error(), "", 0)
 		return "FAILED", nil, err
 	}
-	route, err := resolveGoPublishRoute(registryURL, planned != nil)
-	if err != nil {
-		emit.Diagnostic("error", err.Error(), "", 0)
-		return "FAILED", nil, err
+	// Under a publication outbox, a module whose credential the cloud would
+	// supply is packed for the engine to upload and consults no broker route;
+	// an explicit token keeps the job's own upload.
+	packOnly := publicationOutboxRequested() && explicitGoPublishToken(ctx.Params) == ""
+	var route goPublishRoute
+	if !packOnly {
+		route, err = resolveGoPublishRoute(registryURL, planned != nil)
+		if err != nil {
+			emit.Diagnostic("error", err.Error(), "", 0)
+			return "FAILED", nil, err
+		}
 	}
 	wsRoot := ctx.WorkspaceRoot
 	projectPath := ctx.Project.Path
@@ -155,9 +167,12 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		}
 	}
 
-	if route.broker {
+	switch {
+	case packOnly:
+		emit.Info(fmt.Sprintf("Packing Go module %s@%s for %s into the publication outbox", modulePath, version, registryURL))
+	case route.broker:
 		emit.Info(fmt.Sprintf("Publishing Go module %s@%s to %s via private publication broker %s", modulePath, version, registryURL, route.endpoint))
-	} else {
+	default:
 		emit.Info(fmt.Sprintf("Publishing Go module %s@%s to %s", modulePath, version, registryURL))
 	}
 
@@ -170,6 +185,10 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 			"digestVerified": false,
 		})
 		return "OK", map[string]any{"dryRun": true, "modulePath": modulePath, "version": version}, nil
+	}
+
+	if packOnly {
+		return packGoModuleIntoOutbox(ctx, emit, planned, moduleMeta)
 	}
 
 	// Explicit overrides win; otherwise the cloud supplies the credential for the
@@ -289,14 +308,98 @@ func newGoRegistryHTTPClient() (*http.Client, error) {
 // @putnami/cloud's credential for the host. Explicit sources stay ahead of the
 // committed config default so a config value cannot shadow a flag/env.
 func resolveGoPublishToken(params pctx.Params, host string) (token, hint string) {
-	if t := cmp.Or(
-		params.String("go-registry-token"),
-		os.Getenv("PUTNAMI_REGISTRY_TOKEN"),
-		params.String("goRegistryToken"),
-	); t != "" {
+	if t := explicitGoPublishToken(params); t != "" {
 		return t, ""
 	}
 	return registrycred.ResolveToken(host)
+}
+
+// explicitGoPublishToken returns the bearer the job was given explicitly: the
+// --go-registry-token flag or kebab param, PUTNAMI_REGISTRY_TOKEN, then a
+// committed camelCase config default. It is empty when none is set.
+func explicitGoPublishToken(params pctx.Params) string {
+	return cmp.Or(
+		params.String("go-registry-token"),
+		os.Getenv("PUTNAMI_REGISTRY_TOKEN"),
+		params.String("goRegistryToken"),
+	)
+}
+
+// publicationOutboxRequested reports whether the engine named a publication
+// outbox (extproto.PublicationOutboxEnv) for this job.
+func publicationOutboxRequested() bool {
+	return os.Getenv(extproto.PublicationOutboxEnv) != ""
+}
+
+// The paths of a Go member's artifacts inside the publication outbox.
+const (
+	goOutboxZip  = "go/module.zip"
+	goOutboxMod  = "go/go.mod"
+	goOutboxInfo = "go/version.info"
+)
+
+// packGoModuleIntoOutbox copies the packaged module zip, go.mod and .info into
+// the publication outbox and commits the descriptor. It resolves no
+// credential, sends no request, runs no `go mod download` smoke, and emits no
+// published or published-member event: the engine uploads the bytes it
+// verifies and reports the member.
+func packGoModuleIntoOutbox(ctx *pctx.Context, emit *jsonl.Emitter, planned *releaseplan.GoProject, meta *pkgmeta.GoModuleMetadata) (string, map[string]any, error) {
+	fail := func(err error) error {
+		emit.Diagnostic("error", err.Error(), "", 0)
+		return err
+	}
+	project, err := goOutboxProject(ctx, planned, meta.ModulePath)
+	if err != nil {
+		return "FAILED", nil, fail(err)
+	}
+	if meta.ZipPath == "" || meta.ModPath == "" || meta.InfoPath == "" {
+		return "FAILED", nil, fail(fmt.Errorf("packaged Go module metadata names no zip, go.mod or .info file; run 'package' again"))
+	}
+	writer, err := publicationoutbox.WriterFromEnv()
+	if err != nil {
+		return "FAILED", nil, fail(fmt.Errorf("publication outbox: %w", err))
+	}
+
+	emit.PhaseStart("pack-module")
+	module := &extproto.OutboxGo{}
+	module.Zip, err = writer.CopyFile(goOutboxZip, meta.ZipPath)
+	if err == nil {
+		module.Mod, err = writer.CopyFile(goOutboxMod, meta.ModPath)
+	}
+	if err == nil {
+		module.Info, err = writer.CopyFile(goOutboxInfo, meta.InfoPath)
+	}
+	if err == nil {
+		err = writer.Add(extproto.OutboxMember{
+			Ecosystem: extproto.OutboxEcosystemGo, Coordinate: meta.ModulePath, Version: meta.Version, Project: project,
+			Go: module,
+		})
+	}
+	if err == nil {
+		err = writer.Commit()
+	}
+	if err != nil {
+		emit.PhaseEnd("pack-module", "failed")
+		return "FAILED", nil, fail(fmt.Errorf("publication outbox: %w", err))
+	}
+	emit.PhaseEnd("pack-module", "success")
+	emit.Summary(fmt.Sprintf("Packed %s@%s [%s] into the publication outbox; the engine uploads it", meta.ModulePath, meta.Version, module.Zip.Digest))
+	return "OK", map[string]any{
+		"modulePath": meta.ModulePath, "version": meta.Version,
+		"artifactDigest": module.Zip.Digest, "packed": true,
+	}, nil
+}
+
+// goOutboxProject is the project an outbox member names: the project the
+// release-set plan assigns the member to, else the task's typed project.
+func goOutboxProject(ctx *pctx.Context, planned *releaseplan.GoProject, modulePath string) (string, error) {
+	if planned != nil && planned.Member.ProjectID != "" {
+		return planned.Member.ProjectID, nil
+	}
+	if ctx.Identity != nil && ctx.Identity.Project.ID != "" {
+		return ctx.Identity.Project.ID, nil
+	}
+	return "", fmt.Errorf("publication outbox member %q has no project identity in the release-set plan or the task", modulePath)
 }
 
 // uploadZipBlob uploads the module zip to the gomod-write blob endpoint and

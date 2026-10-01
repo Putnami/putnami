@@ -148,6 +148,10 @@
       "text": "Every Go module publication, new or reused, reports one published member with the digest the registry served back, and writes no dist tag."
     },
     {
+      "id": "managed-publication-packs-only",
+      "text": "When the engine names a publication outbox, a Go module publication without an explicit registry token and a Docker image for the managed registry are packed into it with a descriptor that names their bytes, and the job resolves no credential, sends no registry request, runs no post-publication download, writes nothing else outside its build outputs and reports no published member. A publication with an explicit token or to any other registry ignores the outbox, and without one, publication is unchanged."
+    },
+    {
       "id": "resolved-dependency-documentation",
       "text": "The putnami.go_docs MCP tool returns AI.md only from the exact module cmd/go selects for the requested project, including go.work and local replacements, with the selected package, version, source kind, path and content digest. Resolution is bounded, offline and read-only; absent cached bytes, ambiguous projects, escaping symlinks and unversioned extension-carried copies produce an explicit unavailable result rather than documentation for a different module version."
     },
@@ -193,6 +197,7 @@
     "go/extension/doc/adr/0008-coverage-scope-decides-whose-tests-count.md",
     "go/extension/doc/adr/0009-coverage-names-the-packages-a-module-owns.md",
     "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
+    "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
     "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",
     "protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md"
   ]

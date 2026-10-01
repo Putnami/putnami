@@ -112,6 +112,10 @@
       "text": "Every npm publication, new or reused, reports one published member with its verified digest and writes no dist-tag."
     },
     {
+      "id": "managed-publication-packs-only",
+      "text": "When the engine names a publication outbox, a release-set npm member and a Docker image for the managed registry are packed into it with a descriptor that names their bytes, and the job resolves no credential, sends no registry request, writes nothing else outside its build outputs and reports no published member. Publication to any other registry ignores the outbox, and without one, publication is unchanged."
+    },
+    {
       "id": "upgrade-table-shows-source-revision",
       "text": "The upgrade table shows, for every resolved version, the source revision carried by its suffix."
     },
@@ -133,6 +137,7 @@
     "typescript/extension/doc/adr/0002-one-workspace-catalog-owns-shared-versions.md",
     "typescript/extension/doc/adr/0003-a-package-must-load-before-it-ships.md",
     "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
+    "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
     "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",
     "protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md"
   ]

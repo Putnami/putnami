@@ -25,6 +25,7 @@ import (
 	"go.putnami.dev/sdk/extension/npmpublish"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/privatebroker"
+	"go.putnami.dev/sdk/extension/publicationoutbox"
 	"go.putnami.dev/sdk/extension/registrycred"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/typescript/extension/internal/pkg"
@@ -94,15 +95,22 @@ func npmCommand(goos string, args []string) (string, error) {
 // and ambient npm config, uploads without a dist-tag, and fails closed when the
 // cloud supplies no credential. There is no managed fallback to third-party
 // credentials or public npm.
+//
+// When the engine names a publication outbox, a release-set member is packed
+// into it and nothing else happens: no credential, no broker route, no upload
+// and no published-member event (packManagedNPMIntoOutbox). Unmanaged
+// publication ignores the outbox.
 func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	if ctx.Project.Name == "" {
 		emit.Summary("Skipped: no project context")
 		return "SKIP", nil, nil
 	}
-	plannedVersion, managedReleaseSet, err := npmPublishReleaseSetMember(ctx)
+	plannedMember, managedReleaseSet, err := npmPublishReleaseSetMember(ctx)
 	if err != nil {
 		return "FAILED", nil, err
 	}
+	plannedVersion := plannedMember.Version
+	packOnly := managedReleaseSet && publicationOutboxRequested()
 
 	// A channel is no longer a publish input: the release set advances every
 	// channel it names, once, after every member has a verified digest. The
@@ -134,7 +142,7 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 	// publication may take the private broker; the unmanaged path keeps npm's
 	// native behavior and never sees the variable.
 	publishEndpoint, credentialHost := registry, hostFromURL(registry)
-	if managedReleaseSet {
+	if managedReleaseSet && !packOnly {
 		publishEndpoint, credentialHost, err = resolveManagedNPMRoute(registry)
 		if err != nil {
 			emit.Diagnostic("error", err.Error(), "", 0)
@@ -211,6 +219,15 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 			emitPublished(emit, "npm", packageName, version, true)
 		}
 		return "OK", map[string]any{"dryRun": true, "version": version}, nil
+	}
+
+	if packOnly {
+		project, err := npmOutboxProject(ctx, plannedMember)
+		if err != nil {
+			emit.Diagnostic("error", err.Error(), "", 0)
+			return "FAILED", nil, err
+		}
+		return packManagedNPMIntoOutbox(emit, wsRoot, projectPath, npmDir, pkgData, packageName, version, project)
 	}
 
 	// Ask Cloud only after dry-run has returned without requesting credentials.
@@ -336,22 +353,105 @@ func validateManagedNPMRegistry(raw string) (string, error) {
 	return u.String(), nil
 }
 
-func npmPublishReleaseSetMember(ctx *pctx.Context) (string, bool, error) {
+func npmPublishReleaseSetMember(ctx *pctx.Context) (releaseset.PlannedMember, bool, error) {
 	plan, err := releaseset.FromContext(ctx)
 	if err != nil || plan == nil {
-		return "", false, err
+		return releaseset.PlannedMember{}, false, err
 	}
 	member, ok := plan.Member("npm", ctx.Project.Name)
 	if !ok {
-		return "", true, fmt.Errorf("npm release-set plan has no member for %q", ctx.Project.Name)
+		return releaseset.PlannedMember{}, true, fmt.Errorf("npm release-set plan has no member for %q", ctx.Project.Name)
 	}
 	if !member.Selected {
-		return "", true, fmt.Errorf("npm release-set member %q is not selected for publishing", ctx.Project.Name)
+		return releaseset.PlannedMember{}, true, fmt.Errorf("npm release-set member %q is not selected for publishing", ctx.Project.Name)
 	}
 	if ctx.Identity != nil && member.ProjectID != ctx.Identity.Project.ID {
-		return "", true, fmt.Errorf("npm release-set member %q belongs to project %q, not %q", ctx.Project.Name, member.ProjectID, ctx.Identity.Project.ID)
+		return releaseset.PlannedMember{}, true, fmt.Errorf("npm release-set member %q belongs to project %q, not %q", ctx.Project.Name, member.ProjectID, ctx.Identity.Project.ID)
 	}
-	return member.Version, true, nil
+	return member, true, nil
+}
+
+// publicationOutboxRequested reports whether the engine named a publication
+// outbox (extproto.PublicationOutboxEnv) for this job.
+func publicationOutboxRequested() bool {
+	return os.Getenv(extproto.PublicationOutboxEnv) != ""
+}
+
+// npmOutboxProject is the project an outbox member names: the project the
+// release-set plan assigns the member to, else the task's typed project.
+func npmOutboxProject(ctx *pctx.Context, member releaseset.PlannedMember) (string, error) {
+	if member.ProjectID != "" {
+		return member.ProjectID, nil
+	}
+	if ctx.Identity != nil && ctx.Identity.Project.ID != "" {
+		return ctx.Identity.Project.ID, nil
+	}
+	return "", fmt.Errorf("publication outbox member %q has no project identity in the release-set plan or the task", member.Coordinate)
+}
+
+// The paths of an npm member's artifacts inside the publication outbox.
+const (
+	npmOutboxTarball  = "npm/package.tgz"
+	npmOutboxManifest = "npm/package.json"
+)
+
+// packManagedNPMIntoOutbox packs a managed release-set member into the
+// publication outbox and commits the descriptor. It packs with
+// packNPMArtifact, as the upload path does, and writes the tarball and
+// manifest, the staged package.json bytes the caller validated. It resolves no
+// credential, sends no request, and emits no published or published-member
+// event: the engine uploads the bytes it verifies and reports the member.
+func packManagedNPMIntoOutbox(emit *jsonl.Emitter, wsRoot, projectPath, npmDir string, manifest []byte, packageName, version, project string) (string, map[string]any, error) {
+	fail := func(err error) error {
+		emit.Diagnostic("error", err.Error(), "", 0)
+		return err
+	}
+	writer, err := publicationoutbox.WriterFromEnv()
+	if err != nil {
+		return "FAILED", nil, fail(fmt.Errorf("publication outbox: %w", err))
+	}
+	npmConfig, configCleanup, err := newManagedNPMConfig(nil)
+	if err != nil {
+		return "FAILED", nil, fail(err)
+	}
+	defer configCleanup()
+
+	emit.PhaseStart("npm-pack")
+	artifact, digest, cleanup, err := packNPMArtifact(npmConfig, wsRoot, projectPath, npmDir)
+	if cleanup != nil {
+		defer cleanup()
+	}
+	if err != nil {
+		emit.PhaseEnd("npm-pack", "failed")
+		return "FAILED", nil, fail(err)
+	}
+	tarball, err := writer.CopyFile(npmOutboxTarball, artifact)
+	if err == nil && tarball.Digest != digest {
+		err = fmt.Errorf("packed npm tarball changed while it was copied into the publication outbox: %s, then %s", digest, tarball.Digest)
+	}
+	var manifestFile extproto.OutboxFile
+	if err == nil {
+		manifestFile, err = writer.WriteFile(npmOutboxManifest, manifest)
+	}
+	if err == nil {
+		err = writer.Add(extproto.OutboxMember{
+			Ecosystem: extproto.OutboxEcosystemNPM, Coordinate: packageName, Version: version, Project: project,
+			NPM: &extproto.OutboxNPM{Tarball: tarball, Manifest: manifestFile},
+		})
+	}
+	if err == nil {
+		err = writer.Commit()
+	}
+	if err != nil {
+		emit.PhaseEnd("npm-pack", "failed")
+		return "FAILED", nil, fail(fmt.Errorf("publication outbox: %w", err))
+	}
+	emit.PhaseEnd("npm-pack", "success")
+	emit.Summary(fmt.Sprintf("Packed %s@%s [%s] into the publication outbox; the engine uploads it", packageName, version, tarball.Digest))
+	return "OK", map[string]any{
+		"version": version, "packageName": packageName,
+		"artifactDigest": tarball.Digest, "packed": true,
+	}, nil
 }
 
 // publishManagedNPM uploads a pre-built immutable tarball with an empty

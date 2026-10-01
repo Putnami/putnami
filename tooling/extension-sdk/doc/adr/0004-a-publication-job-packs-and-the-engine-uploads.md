@@ -16,7 +16,7 @@ the registry receives.
 
 ## Decision
 
-### 1. The job packs into an outbox and uploads nothing
+### 1. The job packs managed members into an outbox and uploads none of them
 
 The engine names a private directory in `PUTNAMI_PUBLICATION_OUTBOX`. The job
 writes each managed member's artifacts there and writes `outbox.json` last,

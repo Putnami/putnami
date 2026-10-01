@@ -1,8 +1,10 @@
 // The publication outbox: a publication job packs, the engine uploads.
 //
-// A publication job that finds PublicationOutboxEnv set uploads nothing and
-// holds no registry credential. It writes every artifact of a managed member
-// under that directory and describes them in one descriptor,
+// A publication job that finds PublicationOutboxEnv set uploads no managed
+// member and holds no registry credential for one: a member on a route the
+// workspace manages itself, with its own registry and credentials, publishes as
+// it does without the variable. The job writes every artifact of a managed
+// member under that directory and describes them in one descriptor,
 // PublicationOutboxDescriptor, at the directory's root. The engine reads the
 // descriptor with ParsePublicationOutbox, resolves every path with
 // ResolveOutboxPath, hashes the bytes it is about to upload, refuses any digest
