@@ -454,6 +454,9 @@ func TestReadGoLock(t *testing.T) {
 		{"no version", `{"toolchains":{"go":{"integrities":{}}}}`, "", "pins no Go version"},
 		{"malformed entry", `{"toolchains":{"go":{"version":3}}}`, "", "parse toolchains.go"},
 		{"malformed lock", `{`, "", "parse "},
+		{"path in the version", `{"toolchains":{"go":{"version":"1.25.7/../../../../opt/x"}}}`, "", "not a Go release name"},
+		{"parent in the version", `{"toolchains":{"go":{"version":"../1.25.7"}}}`, "", "not a Go release name"},
+		{"suffix in the version", `{"toolchains":{"go":{"version":"1.25.7-custom"}}}`, "", "not a Go release name"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := os.WriteFile(path, []byte(tc.document), 0o644); err != nil {

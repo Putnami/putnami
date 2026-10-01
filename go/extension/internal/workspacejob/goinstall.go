@@ -35,7 +35,9 @@ type GoLock struct {
 //
 // Only toolchains.go is decoded. The CLI validates the whole document when it
 // writes it; this reader must not refuse a lock a newer CLI wrote because the
-// document grew a field the extension does not know.
+// document grew a field the extension does not know. It refuses a version that
+// is not a Go release name: the version names a directory every workspace of
+// the machine shares, so it must not lead outside the toolchain root.
 func ReadGoLock(path string) (GoLock, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -58,6 +60,9 @@ func ReadGoLock(path string) (GoLock, error) {
 	entry.Version = NormalizeGoVersion(strings.TrimSpace(entry.Version))
 	if entry.Version == "" {
 		return GoLock{}, fmt.Errorf("%s pins no Go version (toolchains.go.version)", path)
+	}
+	if !isPlainGoRelease(entry.Version) {
+		return GoLock{}, fmt.Errorf("%s pins Go %q, which is not a Go release name such as 1.25.7 (toolchains.go.version)", path, entry.Version)
 	}
 	return entry, nil
 }
@@ -114,9 +119,7 @@ func goInstallComplete(version string) func(dir string) bool {
 // so one of them downloads and the others return its install.
 //
 // The release is the lock's, not the workspace's requested minimum: it must
-// satisfy the request, and a lock that pins an older release is refused. The
-// release names a directory every workspace of the machine shares, so a lock
-// version that is not a Go release name is refused before any path is built.
+// satisfy the request, and a lock that pins an older release is refused.
 func (j *Job) installLockedGo(requested string) (string, bool) {
 	lockPath := filepath.Join(j.WorkspaceRoot, LockFileName)
 	lock, err := ReadGoLock(lockPath)
@@ -132,13 +135,6 @@ func (j *Job) installLockedGo(requested string) (string, bool) {
 		return "", false
 	}
 	version := lock.Version
-	if !isPlainGoRelease(version) {
-		j.Emit.Log("info", "Installing Go "+version+"...")
-		j.Emit.Diagnostic("error", fmt.Sprintf(
-			"Cannot install Go %q: %s pins a version that is not a Go release name such as 1.25.7",
-			version, LockFileName), lockPath, 0)
-		return "", false
-	}
 	if requested != "" && !GoVersionSatisfies(version, requested) {
 		j.Emit.Log("info", "Installing Go "+requested+"...")
 		j.Emit.Diagnostic("error", fmt.Sprintf(
