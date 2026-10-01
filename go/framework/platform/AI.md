@@ -83,8 +83,9 @@ after a bounded grace period even when a probe ignores cancellation.
 ## Relationship to `http.HealthPlugin`
 
 `http.NewHealthPlugin()` mounts a single `GET /_/health`. The platform plugin is
-the richer alternative, not a superset wrapper — mount one or the other, never
-both, since they overlap on probe registration.
+the richer alternative, not a superset wrapper. Both can share one server: each
+discovers the same `app.HealthChecker` probes and reports them on its own route,
+so a service usually needs only one.
 
 ## Maintained contract
 
