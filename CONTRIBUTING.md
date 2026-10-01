@@ -180,9 +180,9 @@ document (version 3, see `protocols/ci`) declares those `commands`, the rules
 that name the channels a branch publishes and the environments that follow them
 (`main` publishes the `canary` channel, and `prod` follows it). It carries no
 job and no credential input, so a pull request is gated on exactly what you can
-run locally. A pull request also publishes into its own `pr-{number}` channel, so
-publication is exercised before the merge rather than only on `main`. The
-generated agent guidance derives its gate line from the same document.
+run locally. No rule matches a pull request, so its run stops after those
+commands: packaging and publication run on `main` only. The generated agent
+guidance derives its gate line from the same document.
 
 On `main`, the same run continues into `putnami deploy --all` with a run-bound
 Cloud capability. Deploy participation is an explicit opt-in: the workspace sets
