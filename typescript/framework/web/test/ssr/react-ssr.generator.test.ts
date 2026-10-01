@@ -1,9 +1,8 @@
 import { afterAll, describe, expect, it, mock } from 'bun:test';
 import { ReactApplicationGenerator } from '../../src/ssr/generator/react-ssr.generator';
 
-// bun's `mock.restore()` does not undo `mock.module()`: keep the real module so
-// the mock below can be removed after this file, instead of leaking into the
-// suites that run after it.
+// The real module, restored after this file: bun's `mock.restore()` does not
+// undo `mock.module()`.
 const realUtils = { ...(await import('@putnami/utils')) };
 
 // Mock GeneratorHelper

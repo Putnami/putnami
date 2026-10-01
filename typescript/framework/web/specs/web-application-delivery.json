@@ -37,7 +37,7 @@
     },
     {
       "id": "hydration-containment",
-      "text": "Hydration serializes loader, action, error, basename, timeout, and bounded role/scope state with script-safe escaping; a chunk or hydration failure preserves or restores server HTML instead of blanking the page."
+      "text": "Hydration serializes loader, action, error, basename, timeout, and bounded role/scope state with script-safe escaping; a chunk or hydration failure preserves or restores server HTML instead of blanking the page; the server and the generated client routes build the same element for a page, so a server-rendered page hydrates in place without a recoverable error."
     },
     {
       "id": "explicit-render-mode",

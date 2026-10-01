@@ -334,9 +334,7 @@ export class ReactApplication {
         }
         return { default: component };
       });
-      // The lazy component stands for the page component inside the page
-      // boundary. A second boundary here would have no match in the client
-      // routes, and React would fail to hydrate the page.
+      // The lazy component stands for the page component inside the page boundary.
       pageNode.element = createPageElement(LazyPageComponent);
 
       // The lazy renderer resolves and applies its own middleware on first

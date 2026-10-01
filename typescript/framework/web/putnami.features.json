@@ -51,6 +51,7 @@
               "a-form-carries-the-csrf-token-as-a-hidden-input",
               "a-head-injected-script-carries-the-per-request-nonce",
               "a-per-request-nonce-is-generated-per-call",
+              "a-script-react-streams-carries-the-per-request-nonce",
               "an-empty-nonce-emits-no-nonce-directive",
               "the-csrf-cookie-token-is-read-by-the-client",
               "the-default-policy-is-applied-when-no-options-are-given",

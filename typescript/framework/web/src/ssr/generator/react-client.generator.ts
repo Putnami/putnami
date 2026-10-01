@@ -239,8 +239,7 @@ export class ReactClientGenerator {
       const importBase = extRoute._relativeGenDir ?? this.relativeGenDir;
       // A native Windows separator in the specifier is an escape sequence.
       const importPath = joinPosixPath(importBase, moduleSource);
-      // The server renders a page through createPageElement. The page route
-      // must build the same element, or React fails to hydrate the page.
+      // A page route builds the element the server renders: createPageElement.
       const rendered = route.isPage ? 'element: createPageElement(d?.component ?? d)' : 'Component: d?.component ?? d';
       generator.append(
         `${subIndent}lazy: () => import('${importPath}').then((m) => { const d = m.default; return { ${rendered}, ...(d?.security ? { handle: { security: d.security } } : {}) }; }),`,
