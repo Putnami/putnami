@@ -821,12 +821,15 @@ describe('putnami.dev', () => {
       expect(html).toContain('Docs');
     });
 
-    it('should render the build version stamp in the root layout footer', async () => {
+    it('does not render the build version in the footer', async () => {
+      // A deployed image runs under its release id (`cm_<hex>`), not a Putnami
+      // release; the footer island fetches the latest version instead.
       const version = getBuildInfo()?.version;
       expect(version).toBeString();
       const res = await fetch(`${baseUrl}/`);
       const html = await res.text();
-      expect(html).toContain(version as string);
+      expect(html).toContain('FSL-1.1-MIT');
+      expect(html).not.toContain(version as string);
     });
 
     it('should load navigation items in docs layout', async () => {

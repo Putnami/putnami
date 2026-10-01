@@ -3,6 +3,22 @@
   "transports": [
     {
       "runtime": "putnami.dev",
+      "status": "transport-primitive",
+      "adapter": "sites/putnami.dev/src/app/release-version.island.tsx",
+      "callsites": [
+        {
+          "path": "sites/putnami.dev/src/app/release-version.island.tsx",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "32546c2ba469c87e5407b961afde581cf3adae56004861a62ca0deb6579795ce"
+        }
+      ],
+      "owner": "putnami.dev",
+      "tests": ["sites/putnami.dev/test/latest-version.test.ts"],
+      "reason": "Same-origin fetch of the site\u2019s own /release.json route from the browser bundle."
+    },
+    {
+      "runtime": "putnami.dev",
       "status": "pending-provider-contract",
       "adapter": "sites/putnami.dev/src/lib/content/registry.ts",
       "callsites": [
@@ -34,6 +50,24 @@
       "owner": "putnami.dev",
       "tests": ["sites/putnami.dev/test/http-routes.test.ts"],
       "reason": "Same-origin fetch of the site\u2019s own /doc-markdown route from the browser bundle."
+    },
+    {
+      "runtime": "putnami.dev",
+      "status": "pending-provider-contract",
+      "adapter": "sites/putnami.dev/src/lib/release/latest-version.ts",
+      "callsites": [
+        {
+          "path": "sites/putnami.dev/src/lib/release/latest-version.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "83dda9a0ee744a836bd59e1602e4dedb32afe5c962f166d62d91e1b34b0a24b7"
+        }
+      ],
+      "owner": "putnami.dev",
+      "tests": ["sites/putnami.dev/test/latest-version.test.ts"],
+      "reason": "Reads the version the CLI latest channel points at from the put registry, for the footer. First-party registry; no provider declares a client for protocols/distribution yet.",
+      "operations": ["distribution.channel"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
     },
     {
       "runtime": "putnami.dev",

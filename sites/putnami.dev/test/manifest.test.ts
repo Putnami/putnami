@@ -23,6 +23,8 @@ const EXPECTED_ISLANDS: Record<string, string> = {
   navbar: 'load',
   search: 'idle',
   'hero-terminal': 'visible',
+  // The footer's latest Putnami version, fetched once the page is idle.
+  'release-version': 'idle',
   'docs/[...page]/doc-toc': 'idle',
   'docs/[...page]/doc-enhancer': 'idle',
   // Redesign islands: the docs-hub search trigger and the per-page
