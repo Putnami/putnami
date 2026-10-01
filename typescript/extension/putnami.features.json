@@ -217,6 +217,22 @@
           }
         },
         {
+          "id": "no-node-on-the-host",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "lint-starts-the-native-biome-of-the-platform-package",
+              "a-musl-host-starts-the-musl-biome",
+              "a-missing-platform-package-starts-the-launcher-with-bun",
+              "lint-test-build-and-serve-run-with-no-node-on-path"
+            ]
+          }
+        },
+        {
           "id": "workspace-biome-default",
           "stage": "coded",
           "evidenceKinds": [

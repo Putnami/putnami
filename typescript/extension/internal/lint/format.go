@@ -28,13 +28,25 @@ func SetExecRunForTesting(fn func(string, []string, ...exec.Option) (*exec.Resul
 // package var so tests can observe that every biome run passes through it.
 var checkShimArgs = toolchain.CheckShimArgs
 
-// runBiome runs biome with args, unless Windows would start biomeBin through
-// cmd.exe and cmd.exe would reinterpret one of them (toolchain.CheckShimArgs).
+// biomeCommand returns the program and the arguments that start biomeBin
+// (toolchain.Command). A package var so tests can observe that every biome run
+// starts what it returns.
+var biomeCommand = toolchain.Command
+
+// runBiome runs biome with args. It starts biomeBin itself when that is a
+// native executable, and through bun when it is the JavaScript launcher
+// (toolchain.Command). It runs nothing when Windows would start the program
+// through cmd.exe and cmd.exe would reinterpret one of the arguments
+// (toolchain.CheckShimArgs).
 func runBiome(biomeBin string, args []string, opts ...exec.Option) (*exec.Result, error) {
-	if err := checkShimArgs(biomeBin, args); err != nil {
+	program, programArgs, err := biomeCommand(biomeBin, args)
+	if err != nil {
 		return nil, fmt.Errorf("biome: %w", err)
 	}
-	return execRunFunc(biomeBin, args, opts...)
+	if err := checkShimArgs(program, programArgs); err != nil {
+		return nil, fmt.Errorf("biome: %w", err)
+	}
+	return execRunFunc(program, programArgs, opts...)
 }
 
 func biomeRunContext(projectPath, configPath string) (string, string) {

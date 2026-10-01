@@ -68,6 +68,10 @@
       "text": "The lint command and its tasks cover every project file Biome can rewrite and never read or rewrite a file under a nested project root (a subdirectory with its own putnami.json, outside a symbolic link and the directories the cache key skips), resolve the workspace configuration from the config root while keeping an external configuration anchored at the project root, and bind the scheduler's CPU budget without overriding an explicit thread setting."
     },
     {
+      "id": "no-node-on-the-host",
+      "text": "Lint, test, build and serve need Bun and no node program on the host. Lint starts the native Biome executable of the platform package installed for the host, @biomejs/cli-<os>-<arch> and its -musl variant on a musl host, on every operating system and in a hoisted or an isolated install. When no platform package is installed for the host, lint starts Biome's JavaScript launcher with the task's Bun, never with a node from PATH."
+    },
+    {
       "id": "workspace-biome-default",
       "text": "Workspace dependency installation materializes the Biome rules owned by the resolved TypeScript extension with the workspace-root role when the workspace has no configuration, preserves an existing workspace configuration byte-for-byte, and fails explicitly when the extension default cannot be read or parsed."
     },

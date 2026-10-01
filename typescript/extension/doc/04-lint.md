@@ -224,6 +224,15 @@ The first `biome.json` found wins. To customize, place a `biome.json` in your pr
 
 `putnami deps install` materializes a missing workspace `biome.json` with the rules shipped by the resolved TypeScript extension and marks it as the workspace-root configuration. It preserves an existing workspace configuration byte-for-byte and stops with an explicit error if the installed extension default cannot be read, so every project resolves one stable workspace configuration.
 
+## Biome Resolution
+
+Lint needs Bun and no Node.js on the host. It looks in the nearest `node_modules`, from the project up to the workspace root, and starts the first of:
+
+1. **The native executable** of the platform package installed for the host: `@biomejs/cli-<os>-<arch>/biome`, and the `-musl` package on a musl host. A hoisted install and an isolated install are both read.
+2. **The launcher** in `node_modules/.bin`, when no platform package is installed for the host. The launcher is a JavaScript file: lint runs it with the Bun the task uses, never with a `node` from `PATH`.
+
+Without a `node_modules` entry, lint starts the `biome` found on `PATH`.
+
 ### Default Configuration
 
 The extension ships a comprehensive Biome config that covers TypeScript, JSON, CSS, HTML, and GraphQL. Key settings:
@@ -289,5 +298,5 @@ The pass emits structured diagnostics with:
 
 - **Scope**: Formatting and linting TypeScript, JavaScript, JSON, CSS, HTML, and GraphQL files within a project
 - **Out of scope**: Type checking (see [Build](./02-build.md) types phase), custom Biome plugins. Test rules other than the [skip guard](#skip-guard) come from Biome overrides
-- **Dependencies**: Biome binary resolved from `node_modules/.bin/biome` (walks up directory tree) or `PATH`
+- **Dependencies**: Bun, and Biome resolved from `node_modules` (walks up the directory tree) or `PATH`; see [Biome Resolution](#biome-resolution). Node.js is not needed
 - **Extension points**: Override Biome configuration by placing `biome.json` in project root or workspace root. Use `extends` to inherit the default config.
