@@ -28,12 +28,17 @@ Supported platforms are macOS and Linux, on `amd64` or `arm64`, and Windows on
 `amd64`, which has its own installer, below. Anything else stops with an error
 naming what it detected, rather than installing a binary that cannot run.
 
-Prerequisites are Bash, `curl`, `tar`, either `sha256sum` or `shasum`, Bun v1.4.0
-or later for the TypeScript init/serve path, network access to `putnami.dev` and
-the public artifact registry, and network access to the public package registry
-(`https://npm.putnami.dev`) used by `bun install`. No directory has to be on
-`PATH` beforehand: a script running as the child of a pipe cannot change its
-parent shell, so the block sets `PATH` itself.
+Prerequisites are Bash, `curl`, `tar`, either `sha256sum` or `shasum`, network
+access to `putnami.dev` and the public artifact registry, and network access to
+the public package registry (`https://npm.putnami.dev`) used by `bun install`.
+No directory has to be on `PATH` beforehand: a script running as the child of a
+pipe cannot change its parent shell, so the block sets `PATH` itself.
+
+Bun is not a prerequisite. `putnami init` uses a Bun the machine already holds
+when it fits. Otherwise Putnami installs Bun at
+`~/.putnami/toolchains/bun/bun-<version>/bin/bun`, from `github.com`, and
+refuses an archive whose SHA-256 is not the expected one. It writes nothing to
+`~/.bun` or to a directory on `PATH`.
 
 **What the installer does, and does not do**
 
@@ -101,7 +106,6 @@ Windows needs a few more things:
 - **Long paths.** Enable `LongPathsEnabled` in Windows and set
   `git config --global core.longpaths true`. `putnami doctor` checks both and
   prints the command for each.
-- **Bun v1.4.0 or later**, on `PATH` or where Bun's own installer puts it.
 - **Docker Desktop**, only for `putnami compose`.
 
 Prefer not to run an install script?

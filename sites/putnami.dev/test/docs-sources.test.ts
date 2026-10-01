@@ -123,8 +123,12 @@ describe('public install to serve golden path', () => {
     expect(firstBashBlock(rootReadme)).toBe(commands);
     expect(firstBashBlock(gettingStarted)).toBe(commands);
     expect(gettingStarted).toContain('macOS and Linux, on `amd64` or `arm64`');
-    expect(rootReadme).toContain('Bun v1.4.0 or later');
-    expect(gettingStarted).toContain('Bun v1.4.0');
+    // Bun is not a prerequisite: Putnami installs it under the Putnami home.
+    for (const document of [rootReadme, gettingStarted]) {
+      expect(document).not.toMatch(/Bun v\d/);
+      expect(document).toContain('installs Bun');
+    }
+    expect(gettingStarted).toContain('~/.putnami/toolchains/bun/bun-<version>/bin/bun');
     expect(gettingStarted).toContain('https://npm.putnami.dev');
     expect(gettingStarted).toContain('.npmrc');
     expect(gettingStarted).toContain('This guarantee is deliberately narrow');

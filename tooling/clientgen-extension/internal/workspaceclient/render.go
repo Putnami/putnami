@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	clientcontract "go.putnami.dev/protocol/clientcontract"
+	"go.putnami.dev/sdk/extension/putnamihome"
 )
 
 // RenderExpected creates an ephemeral mirror and runs the real language
@@ -273,12 +274,43 @@ func runResolvedGenerators(workspaceRoot, projectRoot, formatProjectRoot, goExec
 			return err
 		}
 		command.Dir = projectRoot
-		command.Env = replaceEnvironmentValue(os.Environ(), "PUTNAMI_WORKSPACE_ROOT", workspaceRoot)
+		command.Env = typescriptEmitterEnvironment(replaceEnvironmentValue(os.Environ(), "PUTNAMI_WORKSPACE_ROOT", workspaceRoot))
 		if output, err := command.CombinedOutput(); err != nil {
 			return fmt.Errorf("typescript client generation for %s failed: %w\n%s", projectRoot, err, output)
 		}
 	}
 	return nil
+}
+
+// typescriptEmitterEnvironment keeps what the emitter's Bun writes under its
+// install when Putnami installed that Bun.
+//
+// The CLI names the install of the resolved runtime in BUN_INSTALL, and Bun
+// keeps its package cache under it. Bun does not derive its transpiler cache
+// from BUN_INSTALL: without BUN_RUNTIME_TRANSPILER_CACHE_PATH it writes that
+// cache under the user's home directory. For an install under the Putnami
+// home, toolchains/bun/bun-<version>, the cache is install/cache/@t@ in it. A
+// Bun the host holds keeps its own locations, and an explicit setting is left
+// alone.
+func typescriptEmitterEnvironment(environment []string) []string {
+	const installEnv, cacheEnv = "BUN_INSTALL", "BUN_RUNTIME_TRANSPILER_CACHE_PATH"
+	install := strings.TrimSpace(environmentValue(environment, installEnv))
+	if !putnamihome.IsToolchainInstall(install, "bun") || strings.TrimSpace(environmentValue(environment, cacheEnv)) != "" {
+		return environment
+	}
+	return replaceEnvironmentValue(environment, cacheEnv, filepath.Join(install, "install", "cache", "@t@"))
+}
+
+// environmentValue returns the value the last entry of environment gives key,
+// which is the one a started program sees.
+func environmentValue(environment []string, key string) string {
+	prefix := key + "="
+	for index := len(environment) - 1; index >= 0; index-- {
+		if value, found := strings.CutPrefix(environment[index], prefix); found {
+			return value
+		}
+	}
+	return ""
 }
 
 func replaceEnvironmentValue(environment []string, key, value string) []string {

@@ -30,7 +30,8 @@ putnami serve webapp
 Open the local URL that `putnami serve` prints. You are running the full system
 locally.
 
-The TypeScript starter needs Bun v1.4.0 or later. Windows also needs Git for
+You do not install Bun: Putnami installs Bun under `~/.putnami` for the
+TypeScript starter when the machine holds none that fits. Windows needs Git for
 Windows, Win32 long paths enabled, and Docker Desktop for `putnami compose`;
 `putnami doctor` checks the long-path settings. The installer verifies each
 download against the digest the registry advertises, refuses what it cannot

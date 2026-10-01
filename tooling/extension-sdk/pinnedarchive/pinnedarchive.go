@@ -23,6 +23,10 @@
 // destination that is not a complete install: one such a writer publishes
 // while Install downloads and extracts is kept, and Install reports that it
 // installed nothing.
+//
+// A caller whose pin URL may carry userinfo passes the pin through
+// WithoutCredentials first, so that no log line and no error names the
+// credentials.
 package pinnedarchive
 
 import (
@@ -50,7 +54,8 @@ const (
 	// TarGz is a gzip-compressed tar archive, the Go distribution format on
 	// every platform except Windows.
 	TarGz Format = "tar.gz"
-	// Zip is a zip archive, the Go distribution format on Windows.
+	// Zip is a zip archive, the Go distribution format on Windows and the Bun
+	// distribution format on every platform.
 	Zip Format = "zip"
 )
 
@@ -117,6 +122,12 @@ type Options struct {
 	// rejects, and refuses an archive whose extraction it rejects. Nil
 	// accepts any existing directory.
 	Complete func(dir string) bool
+	// Prepare, when set, shapes the extracted archive into the install: Install
+	// calls it once on the staging directory, after the extraction and before
+	// Complete judges that directory. An archive that nests its content under
+	// a directory of its own is moved into place here. An error refuses the
+	// install and nothing is published.
+	Prepare func(stage string) error
 	// LockPollInterval is how often Install retries a busy lock. Zero selects
 	// 100 ms. The wait ends when the context does.
 	LockPollInterval time.Duration
@@ -185,6 +196,11 @@ func Install(ctx context.Context, pin Pin, dest string, opts Options) (installed
 	defer func() { _ = os.RemoveAll(stage) }()
 	if err := Extract(ctx, archivePath, pin.Format, stage, opts.Limits); err != nil {
 		return false, err
+	}
+	if opts.Prepare != nil {
+		if err := opts.Prepare(stage); err != nil {
+			return false, fmt.Errorf("%w: %s: %w", ErrIncomplete, pin.URL, err)
+		}
 	}
 	if !complete(stage) {
 		return false, fmt.Errorf("%w: %s", ErrIncomplete, pin.URL)
@@ -267,6 +283,46 @@ func download(ctx context.Context, pin Pin, digest string, w io.Writer, opts Opt
 		return fmt.Errorf("%w: %s has SHA-256 %s, the pin requires %s", ErrDigestMismatch, pin.URL, got, digest)
 	}
 	return nil
+}
+
+// WithoutCredentials returns pin with the userinfo of its URL removed, and the
+// client to download it with. A URL that carries userinfo gets a client that
+// sends it as basic authentication with every request to the URL's scheme and
+// host, a redirect's included, and with no request to any other, as curl does
+// with the userinfo of a URL; any other URL gets nil, the default client of
+// Install and Download. Every URL a caller logs from the returned pin, and
+// every error Install and Download return for it, then names the archive
+// without its credentials. A URL that does not parse is refused without being
+// repeated, since it may hold them.
+func WithoutCredentials(pin Pin) (Pin, *http.Client, error) {
+	parsed, err := url.Parse(pin.URL)
+	if err != nil {
+		return Pin{}, nil, errors.New("the archive URL does not parse")
+	}
+	if parsed.User == nil {
+		return pin, nil, nil
+	}
+	transport := basicAuthTransport{scheme: parsed.Scheme, host: parsed.Host, user: parsed.User, base: http.DefaultTransport}
+	parsed.User = nil
+	pin.URL = parsed.String()
+	return pin, &http.Client{Timeout: DefaultTimeout, Transport: transport}, nil
+}
+
+// basicAuthTransport sends user as basic authentication with every request to
+// scheme and host that carries no Authorization header of its own.
+type basicAuthTransport struct {
+	scheme, host string
+	user         *url.Userinfo
+	base         http.RoundTripper
+}
+
+func (t basicAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if strings.EqualFold(req.URL.Scheme, t.scheme) && strings.EqualFold(req.URL.Host, t.host) && req.Header.Get("Authorization") == "" {
+		password, _ := t.user.Password()
+		req = req.Clone(req.Context())
+		req.SetBasicAuth(t.user.Username(), password)
+	}
+	return t.base.RoundTrip(req)
 }
 
 // checkPin validates everything about a pin that can be checked without the

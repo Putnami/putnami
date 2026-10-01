@@ -1362,6 +1362,13 @@ worktrees share downloaded bytes, while their mutable dependency trees remain
 isolated. In CI, persist `~/.bun/install/cache` and reconstruct `node_modules`
 with `bun install --frozen-lockfile`.
 
+A Bun that `@putnami/typescript` installed under the Putnami home keeps its
+package cache under its own install,
+`~/.putnami/toolchains/bun/bun-<version>/install/cache`, and writes nothing to
+`~/.bun`. `putnami cache gc` bounds each of those caches with the same budget
+and grace period. `PUTNAMI_BUN_CACHE_DIR` or `BUN_INSTALL_CACHE_DIR` names one
+directory for every Bun.
+
 The package cache has a separate **10 GiB machine-wide budget**, enforced by the
 extension's `cache-gc` command — run explicitly with `putnami cache gc`, or
 started for you at most once an hour in a detached process so directory walks
@@ -1397,7 +1404,7 @@ hits wrongly.
 | Variable | Effect | Default |
 |----------|--------|---------|
 | `PUTNAMI_BUN_CACHE_DIR` | Putnami override for the shared Bun cache root; translated into `BUN_INSTALL_CACHE_DIR` by the TypeScript extension. | Bun's `BUN_INSTALL_CACHE_DIR`, then `~/.bun/install/cache`, then `$PUTNAMI_EXTENSION_CACHE_ROOT/bun` |
-| `BUN_INSTALL_CACHE_DIR` | Bun's native cache-root override. | `~/.bun/install/cache` |
+| `BUN_INSTALL_CACHE_DIR` | Bun's native cache-root override. | `~/.bun/install/cache` for a Bun of the machine; `install/cache` under its install for a Bun that Putnami installed |
 | `PUTNAMI_BUN_CACHE_MAX_BYTES` | Package/metadata byte budget across all repos and worktrees. | 10 GiB |
 | `PUTNAMI_BUN_CACHE_GC_GRACE` | How new a downloaded entry must be to be spared. Go duration. | 24h |
 | `PUTNAMI_TS_CACHE_GC_GRACE` | How recently a `ts-types` scratch entry under `.putnami/cache` must have been modified to survive `putnami cache gc`. Go duration. | 336h (14 days) |

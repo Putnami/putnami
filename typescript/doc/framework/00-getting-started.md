@@ -6,9 +6,11 @@ This path gives you a runnable project first, then points you to the framework p
 
 ## Prerequisites
 
-The gated `typescript-web` starter requires [Bun](https://bun.sh/) v1.4.0 or
-later — the workspace-declared toolchain baseline recorded in
-`package.json#packageManager` and `putnami.lock.json`.
+The Putnami CLI. You do not install [Bun](https://bun.sh/): `putnami init` uses
+a Bun the machine already holds when it fits, and installs one under the Putnami
+home otherwise. The workspace records the release in
+`package.json#packageManager` and `putnami.lock.json`, and every task runs with
+that exact release.
 
 ## Pick the project shape
 

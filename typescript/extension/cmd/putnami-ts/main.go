@@ -56,6 +56,9 @@ func main() {
 	// Putnami-side override has to be translated into the one bun reads here,
 	// once, before anything spawns bun.
 	toolchain.ApplyBunCacheEnv()
+	// A bun that Putnami installed keeps its files under its install
+	// directory, which the CLI names in BUN_INSTALL for the task.
+	toolchain.ApplyManagedBunEnv()
 
 	if handled, err := runtimeinfo.Handle(os.Args[1:], os.Stdout, tsExtensionName, runtimeVersion); handled {
 		if err != nil {

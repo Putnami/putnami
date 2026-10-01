@@ -30,7 +30,8 @@
         "candidates": [
           { "from": "path", "path": "bun" },
           { "from": "environment", "environment": "BUN_INSTALL", "path": "bin/bun" },
-          { "from": "home", "path": ".bun/bin/bun" }
+          { "from": "home", "path": ".bun/bin/bun" },
+          { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bin/bun" }
         ],
         "probe": { "args": ["--version"], "expect": "{version}" },
         "environment": {

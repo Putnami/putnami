@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"os"
@@ -825,6 +826,57 @@ func TestCopyTemplateDir_SkipsManifest(t *testing.T) {
 	// main.go should be copied
 	if _, err := os.Stat(filepath.Join(dst, "main.go")); err != nil {
 		t.Error("main.go should be copied to output")
+	}
+}
+
+// A project listed twice is written once, and a workspace with no project that
+// holds a package.json gets an empty array, never null.
+func TestScaffoldPackageJSONWorkspaces_ListsEachProjectOnceAndNeverNull(t *testing.T) {
+	workspacesOf := func(t *testing.T, dir string) string {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(dir, "package.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var manifest map[string]json.RawMessage
+		if err := json.Unmarshal(data, &manifest); err != nil {
+			t.Fatal(err)
+		}
+		var compact bytes.Buffer
+		if err := json.Compact(&compact, manifest["workspaces"]); err != nil {
+			t.Fatalf("workspaces = %q: %v", manifest["workspaces"], err)
+		}
+		return compact.String()
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"ws"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "webapp"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "webapp", "package.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "api"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := scaffoldPackageJSONWorkspaces(dir, []string{"webapp", "api", "webapp"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := workspacesOf(t, dir); got != `["webapp"]` {
+		t.Errorf("workspaces = %s, want webapp once", got)
+	}
+
+	for name, projects := range map[string][]string{"no project": nil, "no project with a package.json": {"api"}} {
+		if err := scaffoldPackageJSONWorkspaces(dir, projects); err != nil {
+			t.Fatal(err)
+		}
+		if got := workspacesOf(t, dir); got != "[]" {
+			t.Errorf("%s: workspaces = %s, want []", name, got)
+		}
 	}
 }
 

@@ -81,7 +81,8 @@
               "preparation-packages-the-runtime-and-the-go-emitter",
               "tasks-use-the-compiled-runtime-and-package-resolved-language-emitters",
               "the-framework-emitter-is-packaged-not-linked",
-              "the-published-archive-declares-the-go-emitter"
+              "the-published-archive-declares-the-go-emitter",
+              "the-typescript-emitter-resolves-the-bun-under-the-putnami-home"
             ]
           }
         },

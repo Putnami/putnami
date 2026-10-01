@@ -80,6 +80,10 @@
       "text": "Workspace install declares the bun it installs with as the root package.json packageManager, bun@<version>, when that manifest exists and declares none, so the lock written after the installers pins the bun the task runtime probes. It keeps an existing declaration and the manifest's key order, creates no manifest, and declares no bun whose version is not a plain release."
     },
     {
+      "id": "bun-under-the-putnami-home",
+      "text": "Workspace install runs with a Bun of the host that reports the release the lock pins, or any when nothing names one. Otherwise it installs the pinned release, or the extension's default one, at toolchains/bun/bun-<version>/bin/bun under the Putnami home, from an archive it refuses unless its SHA-256 is the pinned one, and leaves nothing on disk when it refuses. That Bun keeps its caches under its install, never in ~/.bun. A hosted run installs none. The task runtime lists the install as a candidate."
+    },
+    {
       "id": "workspace-install-lists-the-members",
       "text": "Workspace install writes the root package.json workspaces from the complete workspace membership in the job context, with the workspace-sync task's code, before it seeds the catalog and runs bun install, so a project created after the last projects sync is installed. It writes the list projects sync writes, leaves an unchanged list and a context without the membership untouched, and fails before bun runs when it cannot read or write the list."
     },

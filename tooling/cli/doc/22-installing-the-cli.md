@@ -29,10 +29,16 @@ putnami serve webapp
 Run it from an empty directory on macOS or Linux (`amd64` or `arm64`). On
 Windows, run the PowerShell equivalent in
 [Install on Windows](#install-on-windows). It needs
-Bash, `curl`, `tar`, a SHA-256 tool (`sha256sum` or `shasum`), Bun v1.4.0 or later
-for the TypeScript init/serve path, network access to the public site/registry,
-and network access to the public package registry (`https://npm.putnami.dev`)
-used by `bun install`. No directory has to be on `PATH` beforehand.
+Bash, `curl`, `tar`, a SHA-256 tool (`sha256sum` or `shasum`), network access to
+the public site/registry, and network access to the public package registry
+(`https://npm.putnami.dev`) used by `bun install`. No directory has to be on
+`PATH` beforehand.
+
+Bun is not a prerequisite. `putnami init` uses a Bun the machine already holds
+when it fits. Otherwise `@putnami/typescript` installs Bun at
+`~/.putnami/toolchains/bun/bun-<version>/bin/bun` from the vendor's release on
+`github.com`, and refuses an archive whose SHA-256 is not the expected one. See
+[Workspace install](../../../typescript/extension/doc/08-workspace-install.md#which-bun-runs).
 
 The first command installs the newest stable CLI into `~/.putnami/bin`, links it
 into a user-writable directory that `PATH` already names when there is one
@@ -601,12 +607,18 @@ run on the downloaded script.
 | `LongPathsEnabled` set to `1` | Store paths exceed 260 characters, and the Git, Bun and Go processes Putnami starts open them. Setting it needs an administrator once. | `putnami doctor` reports it and prints the command that sets it. |
 | Git for Windows, with `core.longpaths` set to `true` | Workspace hooks run through `sh -c`, and `@putnami/contributor` skills run `sh`. Git for Windows provides `sh` in its `usr\bin` directory. | `putnami doctor` reports `core.longpaths`. A hook that finds no `sh` fails with an error that names Git for Windows. |
 | Microsoft Visual C++ Redistributable (x64) | `@putnami/typescript` runs Biome to lint TypeScript and to format generated clients. The Windows build of Biome imports `vcruntime140.dll`, and Windows does not start it without that file (exit status `0xC0000135`). Install it with `winget install --id Microsoft.VCRedist.2015+.x64`. | `putnami doctor` reports it and prints the command that installs it. |
-| Bun v1.4.0 or later | The TypeScript init/serve path. `@putnami/typescript` looks for `bun` on `PATH`, then where Bun's installer puts it: `%BUN_INSTALL%\bin`, by default `%USERPROFILE%\.bun\bin`. | `bun --version` |
 | Docker Desktop | `putnami compose` only. | `docker version` |
 
 The installer and the golden path also need the same network access as on
 macOS and Linux: the public site and artifact registry, and the public package
 registry (`https://npm.putnami.dev`) that `bun install` uses.
+
+Bun is not a prerequisite on Windows either. `@putnami/typescript` looks for
+`bun` on `PATH`, then where Bun's installer puts it: `%BUN_INSTALL%\bin`, by
+default `%USERPROFILE%\.bun\bin`. When none fits, it installs
+`bun-windows-x64.zip` from the vendor's release on `github.com` at
+`%USERPROFILE%\.putnami\toolchains\bun\bun-<version>\bin\bun.exe`, checked
+against its SHA-256.
 
 Workspaces check out with LF line endings. `putnami init` writes a
 `.gitattributes` file with `* text=auto eol=lf` when the workspace has none,

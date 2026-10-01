@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -168,7 +166,7 @@ func (j *Job) downloadGo(lock GoLock, dest, binary string, complete func(string)
 		return false
 	}
 
-	pin, client, err := withoutCredentials(pin)
+	pin, client, err := pinnedarchive.WithoutCredentials(pin)
 	if err != nil {
 		j.Emit.Diagnostic("error", fmt.Sprintf(
 			"Refusing to download Go %s: the source in %s is not a valid URL", lock.Version, LockFileName),
@@ -202,43 +200,4 @@ func (j *Job) downloadGo(lock GoLock, dest, binary string, complete func(string)
 		j.Emit.Diagnostic("error", fmt.Sprintf("Failed to download Go %s from %s: %v", lock.Version, pin.URL, err), "", 0)
 	}
 	return false
-}
-
-// withoutCredentials returns pin with the userinfo of its URL removed, and the
-// client to download it with. A URL that carries userinfo gets a client that
-// sends it as basic authentication with every request to the URL's scheme and
-// host, a redirect's included, and with no request to any other, as curl does
-// with the userinfo of a URL; any other URL gets nil, pinnedarchive's default
-// client. Every URL the job logs, and every error pinnedarchive returns, then
-// names the archive without its credentials. A URL that does not parse is
-// refused without being repeated, since it may hold them.
-func withoutCredentials(pin pinnedarchive.Pin) (pinnedarchive.Pin, *http.Client, error) {
-	parsed, err := url.Parse(pin.URL)
-	if err != nil {
-		return pinnedarchive.Pin{}, nil, errors.New("the archive URL does not parse")
-	}
-	if parsed.User == nil {
-		return pin, nil, nil
-	}
-	transport := basicAuthTransport{scheme: parsed.Scheme, host: parsed.Host, user: parsed.User, base: http.DefaultTransport}
-	parsed.User = nil
-	pin.URL = parsed.String()
-	return pin, &http.Client{Timeout: pinnedarchive.DefaultTimeout, Transport: transport}, nil
-}
-
-// basicAuthTransport sends user as basic authentication with every request to
-// scheme and host that carries no Authorization header of its own.
-type basicAuthTransport struct {
-	scheme, host string
-	user         *url.Userinfo
-	base         http.RoundTripper
-}
-
-func (t basicAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if strings.EqualFold(req.URL.Scheme, t.scheme) && strings.EqualFold(req.URL.Host, t.host) && req.Header.Get("Authorization") == "" {
-		password, _ := t.user.Password()
-		req = req.Clone(req.Context())
-		req.SetBasicAuth(t.user.Username(), password)
-	}
-	return t.base.RoundTrip(req)
 }

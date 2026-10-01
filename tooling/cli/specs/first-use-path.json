@@ -24,6 +24,10 @@
     {
       "id": "first-use-smoke-legs",
       "text": "The smoke runs the block as printed, in a shell that stops at the first failed command. It requires HTTP 200 from /, /about and /guestbook, then exit status 0 from putnami lint,test,build on the starter and from init and lint,test,build of a Go api, whose / answers 200. It fails when ~/.bun exists, when Bun or Go is missing under the Putnami home, or when a workspace holds a copy of Go. A channel other than latest is passed as PUTNAMI_VERSION. Every failure names its leg and exits non-zero."
+    },
+    {
+      "id": "init-lists-members-once",
+      "text": "putnami init --project lists the project it creates once in the workspace config and once in the workspaces of the root package.json, also when the dependency install that follows fails and leaves those files as init wrote them. The workspaces of the root package.json are the sorted projects that hold a package.json, and an empty array when no project holds one, never null."
     }
   ],
   "decisions": [

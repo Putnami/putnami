@@ -1962,7 +1962,8 @@
             "kind": "acceptance",
             "checks": [
               "a-mismatching-ambient-binary-is-never-substituted",
-              "an-optional-mismatch-publishes-an-empty-binding"
+              "an-optional-mismatch-publishes-an-empty-binding",
+              "a-first-party-bun-runtime-resolves-the-install-under-the-putnami-home"
             ]
           }
         },
@@ -2852,6 +2853,18 @@
               "the-smoke-runs-the-documented-block-then-the-checks-and-the-go-path",
               "a-candidate-channel-is-selected-through-the-environment",
               "the-smoke-fails-under-the-leg-that-broke"
+            ]
+          }
+        },
+        {
+          "id": "init-lists-members-once",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-lists-the-created-project-once",
+              "init-writes-an-empty-workspaces-list-not-null"
             ]
           }
         }
