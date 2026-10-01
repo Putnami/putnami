@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-storage-binding.json",
+  "protocolVersion": 1,
+  "name": "uploads",
+  "backend": "gcs",
+  "bucket": "acme-shared-prod",
+  "prefix": "preview-42/uploads/",
+  "identity": "workload",
+  "signedUrls": true
+}

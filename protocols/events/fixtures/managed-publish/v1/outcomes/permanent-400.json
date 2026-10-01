@@ -1,0 +1,16 @@
+{
+  "name": "permanent-400",
+  "request": { "id": "evt-outcome-1", "topic": "orders.created" },
+  "input": {
+    "http": {
+      "status": 400,
+      "body": {
+        "protocol": "putnami.events.v1",
+        "code": "invalid_frame",
+        "message": "Managed publish frame is invalid.",
+        "retryable": false
+      }
+    }
+  },
+  "expected": { "class": "permanent", "action": "fail" }
+}

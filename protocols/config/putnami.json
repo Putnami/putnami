@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/protocol/config",
+  "visibility": "public",
+  "tags": ["go", "protocol"],
+  "extensions": ["/go/extension"],
+  "publish": ["go"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "publish": {
+      "archives": false
+    }
+  },
+  "featureAuthority": {
+    "none": "Typed configuration is delivered by the framework packages; this module only fixes the wire shape they exchange."
+  }
+}

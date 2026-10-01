@@ -1,0 +1,5 @@
+{
+  "protocol": "putnami.events.v1",
+  "type": "unknown",
+  "topic": "user.updated"
+}

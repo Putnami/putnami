@@ -1,0 +1,30 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/migration-execution",
+  "outcomes": [
+    "A feature owns migration sources while one runner owns execution for each migration kind",
+    "Applying the same registered set repeatedly is ordered and idempotent",
+    "An operator detects hash drift and missing registered or stored migrations before release",
+    "A failed migration cannot be reported as successfully applied"
+  ],
+  "nonGoals": [
+    "Making all migration kinds or datasources one distributed atomic transaction",
+    "Inferring rollback SQL when a migration author did not provide it",
+    "Starting runtime listeners as part of migration execution",
+    "Specifying SQL execution atomicity, drift, or reversibility, which go/sql-migration-execution owns"
+  ],
+  "requirements": [
+    {
+      "id": "deterministic-order",
+      "text": "Contributed kinds execute in lexicographic order and the registry aggregates per-kind results in that same order; per-kind execution order is the owning runner's, specified by go/sql-migration-execution."
+    },
+    {
+      "id": "runner-ownership",
+      "text": "Exactly one runner may own a kind and explicit apply, rollback, status, and verify fail before execution when contributed sources have no runner."
+    }
+  ],
+  "decisions": [
+    "go/framework/migration/doc/adr/0001-deterministic-per-migration-atomicity.md"
+  ]
+}

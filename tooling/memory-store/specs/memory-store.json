@@ -1,0 +1,65 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/memory-store",
+  "outcomes": [
+    "A workspace binds its memory to a directory or to a branch of a Git repository it owns, locally or behind a remote, and changes backend by editing one binding",
+    "Skills load context and save checkpoints through the memory contract; which records are relevant depends on their identity, kind and scope, never on how a backend stores them",
+    "Two agents that checkpoint one mission from the same revision never overwrite each other: exactly one lands and the other is told the current revision",
+    "A checkpoint whose answer was lost is repeated safely: it replays the write that landed instead of writing it twice, and a write nobody can confirm is reported unresolved rather than retried",
+    "Memory stays context: checkpoints reference gate, review and qualification records and never state that anything passed"
+  ],
+  "nonGoals": [
+    "A hosted memory service, an index, or semantic search: search is a case-insensitive substring match",
+    "Choosing a backend, a repository or a remote the binding does not name, or bundling any repository identity or credential",
+    "Merging concurrent checkpoints: a checkpoint replaces the mission's state, and a loser re-reads and decides",
+    "Deciding whether proof is valid: memory carries references to evidence, never a verdict",
+    "Keeping a history API: the Git backend's commits are an audit trail for people, not an operation"
+  ],
+  "requirements": [
+    {
+      "id": "explicit-backend",
+      "text": "The binding's settings name the backend, file or git; no backend is chosen by default, and an unknown setting, a Git setting on the file backend, a branch that is not a branch name, a remote that could be read as an option, and a remote URL carrying a password, an HTTP user, a query or a fragment are refused as invalid settings before anything is read or written. Credentials come from Git's own helpers and SSH agent."
+    },
+    {
+      "id": "one-contract-every-backend",
+      "text": "context, mission, checkpoint and search behave identically on the file backend, the Git backend on a local branch and the Git backend behind a remote: the same contract scenarios run against all three. A mission is checkpointed, read back, checkpointed again against its revision and resumed by another process from the store alone; list answers are bounded pages in one kind-then-id order that a write between two pages neither repeats nor skips."
+    },
+    {
+      "id": "compare-and-set-checkpoints",
+      "text": "A checkpoint states expectedRevision or mustNotExist, and the comparison and the write are one step: under an exclusive lock on the file store, or as a Git ref update or push conditional on the head it read. Of concurrent checkpoints from one revision, or concurrent creations, exactly one lands and every other is a conflict carrying the current revision, whether the writers are goroutines or processes. A Git writer that lost the race to another mission is rebuilt on the new head."
+    },
+    {
+      "id": "readable-records",
+      "text": "A stored record is bounded by the contract's 4 MiB document bound on write as on read: a checkpoint whose members are all at their bounds, stored in more than 1 MiB, is written and read back unchanged on every backend, and a record that would encode above the bound is refused as invalid (record.too_large) before either backend writes it."
+    },
+    {
+      "id": "retries-never-duplicate",
+      "text": "A record keeps digests of the idempotency key and request that produced its revision: repeating that checkpoint replays it, and the key with other content is a conflict. A push whose answer was lost is reconciled by reading the remote branch first: it landed when the branch is or descends from its commit, did not when the branch is at the base, and is unresolved, never retryable, when the branch cannot be read, as is a file write whose directory sync failed after its rename. A write answers within 160 s."
+    },
+    {
+      "id": "layout-independent-context",
+      "text": "A record is selected when every identity member the request names is the record's or absent from it, its scope overlaps the requested scope, its kind is requested, and — for a narrowed project selection the orchestrator resolved — it names no scope or its scope overlaps a selected project; scopes compare as '/'-separated paths. The backend's file names play no part."
+    },
+    {
+      "id": "explicit-outage",
+      "text": "A store that cannot be read or written — a missing directory replaced by a file, no git executable, an unreachable remote — answers unavailable on every operation, and a checkpoint that failed before it could write changes nothing and asks for no reconciliation. A store holding records without its identity document answers unavailable (store.invalid) to every operation: a checkpoint never gives it a new identity."
+    },
+    {
+      "id": "contextual-memory",
+      "text": "A record carries its content, source references, evidence references (kind, locator, digest) and provenance exactly as a checkpoint gave them, and no member that states a verdict; the provider adds none."
+    },
+    {
+      "id": "truthful-manifest",
+      "text": "The manifest passes the extension protocol's strict validation and the collaboration offer check: memory version 1 with context, mission, checkpoint and search, checkpoint declaring atomic preconditions, context and search taking the resolved selection, every tool routed to the runtime bridge and marked as possibly reaching outside the machine, as the Git backend with a remote does."
+    },
+    {
+      "id": "portable-git-writes",
+      "text": "The Git backend builds commits with plumbing in a private index, runs no hook, signs nothing, commits under a neutral provider identity, ignores repository-locating environment variables it inherits, never moves a branch a worktree has checked out, and leaves the working tree, index and HEAD of the repository it writes to unchanged."
+    }
+  ],
+  "decisions": [
+    "tooling/memory-store/doc/adr/0001-one-memory-provider-two-backends.md",
+    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md"
+  ]
+}

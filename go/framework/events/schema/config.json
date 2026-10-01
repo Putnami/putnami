@@ -1,0 +1,106 @@
+{
+  "appName": "go.putnami.dev/events",
+  "version": "0.0.0",
+  "schemaHash": "sha256:3a4404f6c48a289e",
+  "configs": [
+    {
+      "path": "events",
+      "fields": [
+        {
+          "name": "delivery",
+          "type": "string"
+        },
+        {
+          "name": "push",
+          "type": "object",
+          "fields": [
+            {
+              "name": "enabled",
+              "type": "bool"
+            },
+            {
+              "name": "issuer",
+              "type": "string"
+            },
+            {
+              "name": "audience",
+              "type": "string"
+            },
+            {
+              "name": "jwksUrl",
+              "type": "string"
+            },
+            {
+              "name": "allowedServiceAccounts",
+              "type": "array",
+              "items": {
+                "name": "",
+                "type": "string"
+              }
+            },
+            {
+              "name": "allowInsecure",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "transport",
+          "type": "string"
+        },
+        {
+          "name": "pubsub",
+          "type": "object",
+          "fields": [
+            {
+              "name": "projectId",
+              "type": "string"
+            },
+            {
+              "name": "topicTemplate",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "eventServer",
+          "type": "object",
+          "fields": [
+            {
+              "name": "contractVersion",
+              "type": "int"
+            },
+            {
+              "name": "endpoint",
+              "type": "string"
+            },
+            {
+              "name": "audience",
+              "type": "string"
+            },
+            {
+              "name": "protocol",
+              "type": "string"
+            },
+            {
+              "name": "workspaceId",
+              "type": "string"
+            },
+            {
+              "name": "environment",
+              "type": "string"
+            },
+            {
+              "name": "workload",
+              "type": "string"
+            },
+            {
+              "name": "topologyGenerationId",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

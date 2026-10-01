@@ -1,0 +1,10 @@
+{
+  "contract": "memory",
+  "operation": "context",
+  "outcome": "unsupported",
+  "error": {
+    "message": "no memory provider is bound: add options.collaboration.memory to putnami.workspace.json",
+    "reason": "binding.missing",
+    "retryable": false
+  }
+}

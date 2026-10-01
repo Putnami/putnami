@@ -1,0 +1,25 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/subcommand-workspace-optional-not-interactive",
+  "commandGroups": {
+    "audit": {
+      "subcommands": {
+        "run": {
+          "command": "audit-run",
+          "workspace": "optional"
+        }
+      }
+    }
+  },
+  "commands": {
+    "audit-run": {
+      "run": [{ "id": "run", "task": "audit-exec" }]
+    }
+  },
+  "tasks": {
+    "audit-exec": {
+      "kind": "command",
+      "command": "echo"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/protocol/runtime",
+  "visibility": "public",
+  "tags": ["go", "protocol"],
+  "extensions": ["/go/extension"],
+  "publish": ["go"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "publish": {
+      "archives": false
+    }
+  },
+  "featureAuthority": {
+    "none": "The runtime event stream is how jobs report; the outcome belongs to the commands that render it."
+  }
+}

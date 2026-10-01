@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-doctor.json",
+  "protocolVersion": 1,
+  "waivers": [
+    {
+      "code": "doctor.made_up_check",
+      "project": "go.putnami.dev/example/iam",
+      "owner": "platform-team",
+      "reason": "accepting for now",
+      "expires": "2027-06-30"
+    }
+  ]
+}

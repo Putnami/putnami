@@ -1,0 +1,14 @@
+{
+  "appName": "task-api",
+  "version": "1.0.0",
+  "schemaHash": "sha256:1234567890abcdef",
+  "registeredAt": "2026-03-15T10:30:00Z",
+  "configs": [
+    {
+      "path": "server",
+      "fields": [
+        { "name": "port", "type": "int", "required": true }
+      ]
+    }
+  ]
+}

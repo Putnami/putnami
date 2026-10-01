@@ -1,0 +1,43 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/object-storage",
+  "outcomes": [
+    "Application code uses one object API while composition selects memory, filesystem, S3, GCS, or managed bindings",
+    "Logical buckets and key prefixes isolate application data from provider bucket names",
+    "The plugin-provided backend rejects disallowed or oversized uploads to registered buckets, and a rejected upload leaves the existing object intact",
+    "Control-plane deadlines do not truncate a streaming object body after Get returns"
+  ],
+  "nonGoals": [
+    "Providing cross-backend transactions or automatic replication",
+    "Making a backend you construct yourself enforce bucket constraints unless you wrap it",
+    "Bounding the size of an upload made through a signed PUT URL",
+    "Granting signed URLs without both backend capability and binding permission"
+  ],
+  "requirements": [
+    {
+      "id": "backend-contract",
+      "text": "Backends implement put, get, delete, list, exists, copy, and close consistently; a missing Get returns no object and no fabricated content; a Put whose body reader fails commits nothing and leaves any existing object intact."
+    },
+    {
+      "id": "isolation",
+      "text": "Filesystem paths cannot escape the configured root, no path segment of a filesystem key can end with a suffix the backend reserves for metadata or temporary files, unbound logical buckets fail closed, binding prefixes remain within their provider mapping, and each HTTP backend owns its transport lifecycle."
+    },
+    {
+      "id": "constraints",
+      "text": "The constrained wrapper enforces registered MIME and byte limits: it rejects a known oversized body before backend I/O, refuses a known-length body that grows before the backend has all of it, and bounds other bodies while streaming. The plugin backend applies it to logical bucket names. A reported rejection deletes nothing, so a rejected overwrite keeps the previous object; a truncated object a backend reported as stored is deleted best-effort. A signed PUT URL enforces the MIME allowlist only."
+    },
+    {
+      "id": "deadlines-and-streams",
+      "text": "Remote control operations honor bounded request contexts, but Get returns a caller-owned body whose continued streaming is not cut off by a method-scoped timeout."
+    },
+    {
+      "id": "signed-access",
+      "text": "Signed URLs are issued only by a capable backend and, for managed bindings, only when the binding explicitly grants signedUrls."
+    }
+  ],
+  "decisions": [
+    "go/framework/storage/doc/adr/0001-backend-and-bucket-isolation.md",
+    "go/framework/storage/doc/adr/0002-enforce-constraints-on-the-plugin-backend.md"
+  ]
+}

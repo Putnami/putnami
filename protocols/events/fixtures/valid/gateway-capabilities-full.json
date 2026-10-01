@@ -1,0 +1,29 @@
+{
+  "protocol": "putnami.events.v1",
+  "server": {
+    "name": "acme-events",
+    "version": "1.0.0"
+  },
+  "transports": ["sse", "websocket", "http", "grpc"],
+  "features": {
+    "replay": true,
+    "publish": true,
+    "ack": true,
+    "auth": ["bearer", "headers", "serviceAccount", "workloadIdentity"],
+    "cursor": ["latest", "earliest", "message-id"],
+    "payload": ["json"]
+  },
+  "endpoints": {
+    "sse": { "method": "GET", "path": "/events/stream" },
+    "websocket": { "method": "GET", "path": "/events/ws" },
+    "publish": { "method": "POST", "path": "/events/publish" },
+    "health": { "method": "GET", "path": "/events/health" },
+    "grpc": { "service": "putnami.events.v1.EventServer" }
+  },
+  "limits": {
+    "maxPayloadBytes": 1048576,
+    "maxFrameBytes": 1048576,
+    "maxSubscriptions": 128,
+    "maxTopicsPerSubscription": 64
+  }
+}

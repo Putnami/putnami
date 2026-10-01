@@ -1,0 +1,203 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-capabilities.json",
+  "title": "Putnami Capability Manifest",
+  "description": "The deterministic per-project artifact that aggregates every capability a project contributes to a workload, each entry carrying provenance. Emitted to <project>/.gen/schema/capabilities.json and promoted to the tracked tree at <project>/schema/capabilities.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "protocolVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Current capabilities-manifest protocol version."
+    },
+    "project": {
+      "type": "string",
+      "description": "The project this manifest describes."
+    },
+    "configDefinitions": {
+      "type": "array",
+      "description": "Config blocks the project contributes, with sensitive-field flags.",
+      "items": { "$ref": "#/$defs/configDefinition" }
+    },
+    "schemas": {
+      "type": "array",
+      "description": "Route, OpenAPI, and proto schemas the project exposes.",
+      "items": { "$ref": "#/$defs/schemaContribution" }
+    },
+    "discoverers": {
+      "type": "array",
+      "description": "Source and config discoverers the project registers.",
+      "items": { "$ref": "#/$defs/discoverer" }
+    },
+    "migrations": {
+      "type": "array",
+      "description": "Migration bundles the project contributes, bound to datasources.",
+      "items": { "$ref": "#/$defs/migrationBundle" }
+    },
+    "infraRequirements": {
+      "type": "array",
+      "description": "Infrastructure requirements projected from go.putnami.dev/protocol/infra.",
+      "items": { "$ref": "#/$defs/infraRequirement" }
+    },
+    "healthContributors": {
+      "type": "array",
+      "description": "Components feeding the health/liveness/readiness probes.",
+      "items": { "$ref": "#/$defs/healthContributor" }
+    },
+    "lifecycleHooks": {
+      "type": "array",
+      "description": "Starter and stopper hooks the project registers.",
+      "items": { "$ref": "#/$defs/lifecycleHook" }
+    },
+    "packageVersions": {
+      "type": "array",
+      "description": "Resolved framework and package versions the project depends on.",
+      "items": { "$ref": "#/$defs/packageVersion" }
+    },
+    "requiredCapabilities": {
+      "type": "array",
+      "description": "Logical capabilities that depend on a set of other capability kinds.",
+      "items": { "$ref": "#/$defs/requiredCapability" }
+    }
+  },
+  "$defs": {
+    "sourceKind": {
+      "type": "string",
+      "enum": ["framework", "manual", "generated"],
+      "description": "How a contribution entry was discovered. Closed enum; adding a kind requires a protocol version bump."
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "sourceKind"],
+      "description": "Where a contribution entry came from.",
+      "properties": {
+        "project":      { "type": "string" },
+        "package":      { "type": "string" },
+        "version":      { "type": "string" },
+        "sourceKind":   { "$ref": "#/$defs/sourceKind" },
+        "evidencePath": { "type": "string", "description": "Workspace-relative path to the declaring source." }
+      }
+    },
+    "configField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name":      { "type": "string" },
+        "type":      { "type": "string" },
+        "sensitive": { "type": "boolean", "description": "Whether the field holds secret material." }
+      }
+    },
+    "configDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "provenance"],
+      "properties": {
+        "path":       { "type": "string" },
+        "fields":     { "type": "array", "items": { "$ref": "#/$defs/configField" } },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "schemaContribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "provenance"],
+      "properties": {
+        "name":       { "type": "string" },
+        "kind":       { "type": "string", "enum": ["route", "openapi", "proto"] },
+        "path":       { "type": "string" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "discoverer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "provenance"],
+      "properties": {
+        "name":       { "type": "string" },
+        "kind":       { "type": "string", "enum": ["source", "config"] },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "migrationBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "provenance"],
+      "properties": {
+        "name":       { "type": "string" },
+        "datasource": { "type": "string" },
+        "digest":     { "type": "string" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "infraRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "provenance"],
+      "properties": {
+        "name":       { "type": "string" },
+        "kind":       { "type": "string", "enum": ["database", "events", "storage", "secret", "scheduledJob"] },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "healthContributor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "probe", "provenance"],
+      "properties": {
+        "name":       { "type": "string" },
+        "probe":      { "type": "string", "enum": ["health", "liveness", "readiness"] },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "lifecycleHook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "phase", "provenance"],
+      "properties": {
+        "name":       { "type": "string" },
+        "phase":      { "type": "string", "enum": ["starter", "stopper"] },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "packageVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package", "version", "provenance"],
+      "properties": {
+        "package":    { "type": "string" },
+        "version":    { "type": "string" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "capabilityKind": {
+      "type": "string",
+      "enum": [
+        "config", "schema", "discoverer", "migration", "datasource",
+        "infra", "health", "liveness", "readiness", "lifecycle", "package"
+      ],
+      "description": "One kind a logical capability can depend on. Closed enum."
+    },
+    "requiredCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "requires", "provenance"],
+      "properties": {
+        "name":     { "type": "string" },
+        "requires": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/capabilityKind" }
+        },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    }
+  }
+}

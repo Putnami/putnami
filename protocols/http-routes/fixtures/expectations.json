@@ -1,0 +1,39 @@
+{
+  "valid": [
+    "catch-all-gomod.json",
+    "catch-all-suffix-disjoint.json",
+    "escaped-unicode.json",
+    "full.json",
+    "minimal.json"
+  ],
+  "invalid": {
+    "bad-digest.json": "http_routes.digest_mismatch",
+    "bad-method.json": "http_routes.invalid_method",
+    "catch-all-bad-name.json": "http_routes.unsupported_pattern",
+    "catch-all-in-exact.json": "http_routes.unsupported_pattern",
+    "catch-all-in-prefix.json": "http_routes.unsupported_pattern",
+    "catch-all-partial.json": "http_routes.unsupported_pattern",
+    "catch-all-visibility-overlap.json": "http_routes.visibility_overlap",
+    "double-catch-all.json": "http_routes.unsupported_pattern",
+    "duplicate-method.json": "http_routes.duplicate_method",
+    "duplicate-template.json": "http_routes.duplicate_route",
+    "encoded-separator.json": "http_routes.invalid_path",
+    "encoded-unreserved.json": "http_routes.invalid_path",
+    "invalid-digest.json": "http_routes.invalid_digest",
+    "invalid-evidence-path.json": "http_routes.invalid_evidence_path",
+    "invalid-protocol.json": "http_routes.invalid_protocol",
+    "invalid-source-kind.json": "http_routes.invalid_source_kind",
+    "invalid-template.json": "http_routes.unsupported_pattern",
+    "invalid-utf8.json": "http_routes.invalid_path",
+    "lowercase-escape.json": "http_routes.invalid_path",
+    "missing-project.json": "http_routes.missing_provenance",
+    "missing-public-edge.json": "http_routes.parse_error",
+    "native-parameter.json": "http_routes.unsupported_pattern",
+    "null-public-edge.json": "http_routes.parse_error",
+    "root-prefix.json": "http_routes.unsupported_pattern",
+    "trailing-json.json": "http_routes.parse_error",
+    "unknown-field.json": "http_routes.unknown_field",
+    "visibility-overlap.json": "http_routes.visibility_overlap",
+    "wildcard.json": "http_routes.unsupported_pattern"
+  }
+}

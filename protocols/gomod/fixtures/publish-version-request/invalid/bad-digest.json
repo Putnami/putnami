@@ -1,0 +1,4 @@
+{
+  "go_mod": "module go.putnami.dev/http\n\ngo 1.25.7\n",
+  "zip_digest": "not-a-digest"
+}

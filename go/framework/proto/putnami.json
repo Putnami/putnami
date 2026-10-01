@@ -1,0 +1,34 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/proto",
+  "visibility": "public",
+  "tags": [
+    "go"
+  ],
+  "extensions": [
+    "/go/extension"
+  ],
+  "dependencies": [
+    "/go/framework/api",
+    "/go/framework/app",
+    "/go/framework/errors",
+    "/go/framework/http",
+    "/go/framework/inject",
+    "/go/framework/logger",
+    "/go/framework/schema"
+  ],
+  "publish": ["go"],
+  "disable": {
+    "jobs": [
+      "serve"
+    ]
+  },
+  "options": {
+    "publish": {
+      "archives": false
+    }
+  },
+  "featureAuthority": {
+    "owner": "go/api-contracts"
+  }
+}

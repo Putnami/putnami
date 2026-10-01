@@ -1,0 +1,11 @@
+{
+  "protocol": "putnami.events.v1",
+  "type": "event",
+  "id": "1713980000000-0",
+  "topic": "user.updated",
+  "channel": "realtime",
+  "payload": { "id": "user-1", "name": "Jane" },
+  "timestamp": "2026-04-24T10:00:00Z",
+  "attributes": {},
+  "traceId": "trace-1"
+}

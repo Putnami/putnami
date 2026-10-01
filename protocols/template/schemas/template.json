@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-template.json",
+  "title": "Putnami Template Manifest",
+  "description": "Standalone template manifest for project scaffolding.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "description"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "name": {
+      "type": "string",
+      "description": "Template identifier (e.g., typescript-library, go-server). Must be a scoped package name (@scope/name) or a simple kebab-case identifier.",
+      "pattern": "^(@[a-z0-9-]+/[a-z0-9-]+|[a-z0-9][a-z0-9-]*)$"
+    },
+    "version": {
+      "type": "string",
+      "description": "Template version (semver)."
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the template."
+    },
+    "extension": {
+      "type": "string",
+      "description": "Extension to activate for projects created from this template."
+    },
+    "workspaceDevDependencies": {
+      "type": "object",
+      "description": "Dev dependencies to add to the workspace root when using this template.",
+      "additionalProperties": { "type": "string" }
+    },
+    "testVariables": {
+      "type": "object",
+      "description": "Variable overrides for template testing. Keys are variable names (e.g., projectName), values are the test values to use instead of defaults.",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

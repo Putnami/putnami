@@ -1,0 +1,27 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "putnami-dev/cookieless-audience-measurement#what-the-site-records-is-what-the-notice-says",
+    "putnami-dev/public-documentation#agent-surfaces-track-the-docs-tree",
+    "putnami-dev/public-documentation#docs-enumeration-is-build-order-independent",
+    "putnami-dev/public-documentation#documentation-sources-are-version-addressed-snapshots",
+    "putnami-dev/public-documentation#model-pages-are-not-surfaces",
+    "putnami-dev/public-documentation#no-generated-mirror-in-source",
+    "putnami-dev/public-documentation#one-source-per-section",
+    "putnami-dev/public-documentation#python-is-browseable-not-anchored",
+    "putnami-dev/public-documentation#python-is-marked-experimental",
+    "putnami-dev/public-documentation#route-inventory-is-complete",
+    "putnami-dev/public-documentation#sparse-release-delivery-is-explicit",
+    "putnami-dev/public-documentation#system-model-is-published",
+    "putnami-dev/public-documentation#unmatched-paths-are-not-routed",
+    "putnami-dev/published-support-catalog#catalog-is-the-only-source",
+    "putnami-dev/published-support-catalog#closed-status-vocabulary",
+    "putnami-dev/published-support-catalog#cold-build-enumerates-the-page",
+    "putnami-dev/published-support-catalog#generated-page-is-deterministic",
+    "putnami-dev/published-support-catalog#independent-claims-are-rendered",
+    "putnami-dev/published-support-catalog#invalid-catalog-fails-the-build",
+    "putnami-dev/published-support-catalog#support-is-not-maturity",
+    "putnami-dev/published-support-catalog#unclassified-subject-shows-no-status"
+  ]
+}

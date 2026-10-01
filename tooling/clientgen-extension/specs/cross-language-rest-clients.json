@@ -1,0 +1,116 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/cross-language-rest-clients",
+  "outcomes": [
+    "A Go service can hand a TypeScript consumer a typed client, and a TypeScript service can hand a Go consumer one, generated from the contract the provider actually built rather than from either language's source",
+    "One workspace command builds every provider contract itself, regenerates every configured target in place, and verifies the result against a fresh render",
+    "Every imported generated binding is reported as a concrete provider-operation to generated-artifact to consumer-project edge with its declared auth profiles and transports",
+    "Everything that decides an emitted byte — the contract, the configuration and the formatter that canonicalizes the output — is a declared cache-key entry, so a cache hit is never a stale render",
+    "A gate that already runs — lint, test, build, validate — rejects generated-client drift and newly handwritten first-party transports: drift is judged by the engine on each generator task's declared output at the moment it writes, and the guard reads committed inputs only, so it builds nothing and renders nothing"
+  ],
+  "nonGoals": [
+    "Owning the language emitters, which stay in go.putnami.dev/api and @putnami/client next to the runtimes their output depends on",
+    "Removing the low-level client APIs tests and explicit external adapters use",
+    "Guessing whether an unmarked specification is first-party",
+    "Choosing where a generated client lands — the provider's clientgen configuration does",
+    "Rewriting a call the manifests cannot prove: an argument, credential or call-shape change stays in the reported adaptation queue"
+  ],
+  "requirements": [
+    {
+      "id": "spec-mediated-generation",
+      "text": "Generation reads the provider's already-built contract: the project command depends on build so the document exists before either emitter runs, and no task invokes another language's extension or the CLI."
+    },
+    {
+      "id": "protocol-conformant-manifest",
+      "text": "The extension manifest produces zero diagnostics under the protocol's comprehensive validation, stays on the v3 task contract with a declaration on every task and exactly one owner per declared output, and the same predicates reject a forged ownership or effect declaration."
+    },
+    {
+      "id": "dynamic-output-ownership",
+      "text": "Each language target reports its configured output directory through its own port and owns that exact dynamic directory, so a cache restore recreates a deleted generated client and the two targets never overlap."
+    },
+    {
+      "id": "unclaimed-outputs-are-declared-unclaimed",
+      "text": "An output directory the provider's configuration chooses is never claimed at a literal path a later configuration can move out from under: it is declared only through a pathFrom naming a port the task actually reports, or not at all."
+    },
+    {
+      "id": "portable-emitter-resolution",
+      "text": "Preparation packages the runtime and the framework Go emitter side by side and the TypeScript emitter is the Putnami-installed package shim run through the lock-resolved runtime, so no task needs a framework source checkout. The emitter is packaged, never linked: no compiled package imports go.putnami.dev/api."
+    },
+    {
+      "id": "honest-effects",
+      "text": "Each task declares exactly the effects it has, a task is cacheable only when no declared effect is one a cache hit cannot reproduce, and a dishonest declaration is rejected by the shared validator."
+    },
+    {
+      "id": "formatter-inputs-are-cache-keyed",
+      "text": "The emitted TypeScript is canonicalized by Biome, so the resolved configuration, its overrides, its extends chain and the EditorConfig beside it are generation inputs. Every one of them is a declared cache-key entry, an input that cannot be declared fails resolution instead of being skipped, and both cacheable generators key on the built contract they read."
+    },
+    {
+      "id": "no-source-mutation",
+      "text": "Exactly one task rewrites an authored source: the adoption command, which declares the workspace-scoped authored-source write and the workspace-files effect it performs. Every other task — discovery, generation, synchronization, verification — writes generated clients only: none declares mutatesSources, the project-scoped sources write, the authored-source write or the workspace-files effect, and none performs one."
+    },
+    {
+      "id": "workspace-one-pass",
+      "text": "Sync and adopt materialize first, then build every project that DECLARES this extension through the spawning Putnami with an explicit selection - including projects a disabled workspace tag excludes by default - regenerate every target in place, and compile every project. Cache reuse is refused for the declaring projects alone, not their dependencies. A workspace that declares none builds nothing. The check builds nothing, renders nothing and spawns no Putnami."
+    },
+    {
+      "id": "strict-provider-discovery",
+      "text": "Provider authority comes from the Putnami workspace project index and each project's contract; unindexed trees and fixtures cannot become providers, an unmarked contract requires explicit thirdParty mode, and an x-putnami-external-contract operation is not a provider operation. Sync reads the built contract over a stale committed copy; the check reads the committed sidecar over whatever build last wrote, and names a provider's targets from its committed manifests when no build wrote a generation contract."
+    },
+    {
+      "id": "external-authority",
+      "text": "Every third-party configuration carries an entry in its project's clientgen.external.json naming its authority, adapter, exact normalized callsites, owner, contract tests and reason. An entry exempts only the matching path, transport, symbol and fingerprint, never a first-party marker, and its schema matches the strict parser field for field. Each project commits its own inventories; its directory names the project and no entry does. The older root layout, whose entries name their project, is never read."
+    },
+    {
+      "id": "runtime-capability-gate",
+      "text": "clientgen-check fails a committed manifest that declares a response cache policy without requiring the response-cache runtime capability, or that requires a capability the client runtimes of this protocol version do not implement, with clientgen.unsupported-runtime-capability; regenerating cannot fix it, upgrading the runtime can. A committed operation whose cache policy differs from the provider's published contract is operation drift."
+    },
+    {
+      "id": "drift-closure",
+      "text": "Check judges every committed manifest against the committed contract and every committed file against the hash its manifest recorded; it fails on forged hashes, missing or extra artifacts, a deleted target, operation or contract, and a manifest that does not parse, while an intentional sync passes before commit. Sync compares a fresh render with the worktree it regenerated. Whether committed bytes are what the contract generates is the generator task's verdict, judged by the engine on its declared output."
+    },
+    {
+      "id": "named-omissions",
+      "text": "An operation a target's configuration leaves out, such as a Go target's go.omitOperations, is named by its committed manifest. The check accounts for it from committed bytes alone, so a cold clone and a built tree reach one verdict: the operation stays required and is never covered, and a manifest that names an operation the provider does not declare fails."
+    },
+    {
+      "id": "empty-first-party-contract",
+      "text": "A provider may declare its service identity and no first-party operation at all: every route owned by an external authority, or none served. The committed contract sidecar is that declaration, so the check is satisfied on a cold clone with no configuration, target or manifest, requires nothing, and names no target. Only a genuinely empty set qualifies: one declared operation, one the check could not read, or a committed target still owe their verdicts, and a consumer is told to classify."
+    },
+    {
+      "id": "handwritten-client-guard",
+      "text": "Go AST and TypeScript lexical analysis inventory each production HTTP, Connect, SSE and WebSocket callsite across aliases and project-scoped endpoint configuration. Sources come only from indexed project trees; comments, strings, tests and validated generated files do not trigger, and framework runtime authority is bound to exact callsite identities. A failing handwritten-transport diagnostic names the service and the binding to call, or the target to regenerate or declare: a failed job emits no report."
+    },
+    {
+      "id": "consumer-lineage",
+      "text": "The machine report joins actual generated binding symbols to consumer imports and lists every available operation with its provider, generated manifest, consumer project, language, auth profiles, stream mode and transports."
+    },
+    {
+      "id": "native-validation-gate",
+      "text": "The check is contributed to validate as a workspace-once command, so one guard runs per session whatever the selection resolves to and no project opts out by not declaring the extension. The guard task is reachable only from validate and the explicit check command. Validate depends on the !clientgen session barrier: each selected provider regenerates in place, the engine judging drift, before the guard reads it; a consumer-only selection plans no generation. The guard declares a workspace read and no cache."
+    },
+    {
+      "id": "censused-pending-transports",
+      "text": "Handwritten transport callsites that predate the guard are recorded in a committed census as a count per exact verdict, file, transport and symbol. Censused callsites are reported without failing; anything the census does not account for fails, including a second call of a listed symbol in a listed file. An entry that matches nothing fails, so the census only shrinks, and a malformed census fails instead of being read leniently."
+    },
+    {
+      "id": "safe-source-adoption",
+      "text": "`clientgen-adopt` rewrites only what two real emitter manifests prove: the package a generated import points at, and the client constructor and registration call the product contract promises. Both need identical contract bytes, service and operations; a manifest that moved package and symbol at once is queued. Go renames a qualified selector on the exact bound identifier; TypeScript refuses a source where the name is bound locally or used in shorthand. Every file is staged before any is written."
+    },
+    {
+      "id": "classified-transport-inventory",
+      "text": "Every detected transport callsite is claimed by an inventory entry or fails. An entry claims exact callsite expressions, never a folder, a file or a transport, and its authority survives an unrelated edit to that file. Only the two generated-binding runtimes may claim `framework-runtime`, every other status is bound to the identity the project manifest declares, and `pending-provider-contract` names the operations it waits on and the work that closes it. No entry silences a first-party reference."
+    },
+    {
+      "id": "transport-detection-precision",
+      "text": "The scanner reads what the source means. A property call such as `this.fetch(sql)` and a method declaration such as `private async fetch(` are not the global transport, and neither is counted. The point where a module takes `globalThis.fetch` or `globalThis.WebSocket` as a value is counted, because that is where a handwritten transport enters the code; a `typeof` capability probe binds nothing and is not."
+    }
+  ],
+  "decisions": [
+    "tooling/clientgen-extension/doc/adr/0001-clients-are-generated-from-the-published-contract.md",
+    "tooling/clientgen-extension/doc/adr/0003-drift-is-the-generator-tasks-verdict.md",
+    "tooling/clientgen-extension/doc/adr/0004-an-empty-first-party-contract-is-a-declaration.md",
+    "tooling/clientgen-extension/doc/adr/0005-each-project-commits-its-own-client-inventories.md",
+    "protocols/clientcontract/doc/adr/0007-a-response-cache-is-declared-per-operation.md"
+  ]
+}

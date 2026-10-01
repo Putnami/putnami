@@ -1,0 +1,23 @@
+{
+  "version": 3,
+  "commands": [
+    "test"
+  ],
+  "distribution": {
+    "namespace": "putnami",
+    "channels": {
+      "latest": {
+        "visibility": "public",
+        "protected": true
+      }
+    }
+  },
+  "rules": [
+    {
+      "branches": "main",
+      "publish": [
+        "latest"
+      ]
+    }
+  ]
+}

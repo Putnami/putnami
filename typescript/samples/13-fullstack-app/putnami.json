@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@example/13-fullstack-app",
+  "tags": ["e2e", "ts"],
+  "extensions": ["/typescript/extension"],
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    },
+    "serve": {
+      "port": 3913
+    },
+    "@putnami/web:generate": {
+      "react": {
+        "scanRoots": [
+          {
+            "path": "src/app"
+          },
+          {
+            "path": "src/projects/web",
+            "routePrefix": "/projects"
+          },
+          {
+            "path": "src/tasks/web",
+            "routePrefix": "/tasks"
+          }
+        ]
+      }
+    }
+  }
+}

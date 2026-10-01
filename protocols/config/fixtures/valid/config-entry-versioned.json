@@ -1,0 +1,10 @@
+{
+  "appName": "task-api",
+  "environment": "staging",
+  "version": "2.1.0",
+  "path": "database",
+  "values": {
+    "pool": 20,
+    "timeout": "10s"
+  }
+}

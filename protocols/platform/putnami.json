@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/protocol/platform",
+  "visibility": "public",
+  "tags": ["go", "protocol"],
+  "extensions": ["/go/extension"],
+  "publish": ["go"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "publish": {
+      "archives": false
+    }
+  },
+  "featureAuthority": {
+    "none": "Operational endpoint shapes back `go.putnami.dev/platform`, which owns the platform-endpoints outcome."
+  }
+}

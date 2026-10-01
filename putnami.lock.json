@@ -1,0 +1,44 @@
+{
+  "version": 3,
+  "cli": {
+    "source": "workspace"
+  },
+  "toolchains": {
+    "bun": {
+      "version": "1.4.0",
+      "integrities": {
+        "darwin/amd64": "1d0211b8f1dc991182344687ad15e72ee86f154845a5f7fa477994cd341dd9b0",
+        "darwin/arm64": "c669e97f6164e1c96e0701748db98dfa77492908cbd8394c7557134a735de381",
+        "linux/amd64": "2d03fb5fb83ac8b567aca0a281b2ce1a1a19d488f56c2968d88c3f25e92fe452",
+        "linux/arm64": "4b1a332ee861983eb93bcfe6f770fff94e3e31b2c388bdaea3c8ed35e58eed0e",
+        "windows/amd64": "e6f093d39da486b20262ca8cdd5ed6a9e8bc9c2f275b78e6d3a0c5b28cc95901",
+        "windows/arm64": "f473bfe2df73ee770548c93dd5d380aea7120c218ec2aa1afdd0bbba7bf18c47"
+      },
+      "source": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/"
+    },
+    "go": {
+      "version": "1.26.1",
+      "integrities": {
+        "darwin/amd64": "65773dab2f8cc4cd23d93ba6d0a805de150ca0b78378879292be0b903b8cdd08",
+        "darwin/arm64": "353df43a7811ce284c8938b5f3c7df40b7bfb6f56cb165b150bc40b5e2dd541f",
+        "linux/amd64": "031f088e5d955bab8657ede27ad4e3bc5b7c1ba281f05f245bcc304f327c987a",
+        "linux/arm64": "a290581cfe4fe28ddd737dde3095f3dbeb7f2e4065cab4eae44dfc53b760c2f7",
+        "windows/amd64": "9b68112c913f45b7aebbf13c036721264bbba7e03a642f8f7490c561eebd1ecc",
+        "windows/arm64": "c17e09676be0faad3cbed1c81bb02f38fb73e2f93d048571cc13730fe23f2d5b"
+      },
+      "source": "https://go.dev/dl/"
+    }
+  },
+  "extensions": {
+    "@putnami/cloud": {
+      "version": "0.0.0-20260928064056-c6aca839c",
+      "integrities": {
+        "darwin/arm64": "a6d4143234132e09555da8548991ab9b264fb6d4d90227d704802d774d984a66",
+        "linux/amd64": "06c452664a50bd99ad3382df20398357db8ea88df9fac92504c9fed4b9897fb4"
+      },
+      "manifestHash": "e66c091d0e75c4ce07e44d376b92b15df1b605391386c6e374f0fc8858669e35",
+      "source": "https://put.putnami.dev/putnami/cloud/download?channel=0.0.0-20260928064056-c6aca839c"
+    }
+  },
+  "templates": {}
+}

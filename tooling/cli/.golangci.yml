@@ -1,0 +1,245 @@
+# Custom golangci-lint configuration for tooling/cli.
+# Extends the workspace default (go/extension/config/.golangci.yml) with
+# exclusions appropriate for a CLI tool that reads files by path, spawns
+# subprocesses, uses non-crypto hashing, and silently skips errors in
+# filepath.Walk callbacks.
+
+version: "2"
+
+run:
+  # Kept in step with the shipped default (go/extension/config/.golangci.yml):
+  # strictly below the 600000ms scheduler deadline of the golangci tasks, so a
+  # slow lint reports golangci's own "Timeout exceeded" instead of an opaque
+  # `job timed out`. See the note in the shipped config.
+  timeout: 8m
+  tests: true
+  go: "1.25"
+  allow-parallel-runners: true
+
+output:
+  formats:
+    text:
+      print-linter-name: true
+
+linters:
+  default: none
+  enable:
+    # correctness / bugs
+    - govet
+    - errcheck
+    - unused
+    - ineffassign
+    - errorlint
+
+    # code hygiene
+    - revive
+    - misspell
+    - unconvert
+    - unparam
+
+    # security (tuned below for CLI context)
+    - gosec
+
+    # style (moderate)
+    - gocritic
+    - bidichk
+
+    # complexity / reviewability gates
+    - funlen
+    - gocyclo
+    - nestif
+
+    # Disabled:
+    # - nilerr: all usages are intentional filepath.Walk callbacks returning nil on error
+    # - prealloc: low value for CLI with small collections
+
+  settings:
+    govet:
+      enable-all: false
+      enable:
+        - assign
+        - atomic
+        - bools
+        - composites
+        - copylocks
+        - errorsas
+        - httpresponse
+        - loopclosure
+        - lostcancel
+        - nilfunc
+        - printf
+        - shift
+        - sortslice
+        - stdmethods
+        - stringintconv
+        - tests
+        - unmarshal
+        - unreachable
+        - unsafeptr
+        - unusedresult
+
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+      exclude-functions:
+        # Cleanup / defer close — errors are non-critical
+        - (*os.File).Close
+        - (io.Closer).Close
+        - (*compress/gzip.Writer).Close
+        - (*archive/tar.Reader).Next
+        - (net.Listener).Close
+        # Removal / cleanup — best-effort
+        - os.Remove
+        - os.RemoveAll
+        # I/O to stdout/stderr — non-recoverable in a CLI
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        # Marshaling / unmarshaling stable types
+        - encoding/json.Marshal
+        - encoding/json.MarshalIndent
+        - encoding/json.Unmarshal
+        # File walking — errors handled via callback, not return value
+        - path/filepath.Walk
+        # Cache/session writes — non-critical, best-effort
+        - os.WriteFile
+        - os.MkdirAll
+        # Tabwriter flush — rarely fails and non-critical
+        - (*text/tabwriter.Writer).Flush
+        # Crypto rand — only fails if OS entropy pool is exhausted
+        - crypto/rand.Read
+
+    revive:
+      severity: warning
+      rules:
+        - name: blank-imports
+        - name: early-return
+        - name: errorf
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: var-declaration
+        - name: var-naming
+
+    misspell:
+      locale: US
+
+    gosec:
+      excludes:
+        # G104: errcheck already covers unchecked errors with proper exclude-functions;
+        #       gosec G104 duplicates it without the fine-grained control
+        - G104
+        # G103: unsafe calls are used for terminal ioctl — audited and intentional
+        - G103
+        # G304: CLI tools legitimately use variable file paths (workspace configs, caches)
+        - G304
+        # G301/G302/G306: CLI creates workspace directories/files with standard permissions (0755/0644)
+        - G301
+        - G302
+        - G306
+        # G204: CLI spawns build tools from extension manifests — not user input
+        - G204
+        # G102: Watch mode binds to all interfaces for port availability checks
+        - G102
+        # G401/G505: SHA1 used for non-cryptographic cache hashing
+        - G401
+        - G505
+        # G110: Decompression is from trusted local cache (turbo adapter), not user input
+        - G110
+        # G115: Integer overflow on tar header mode (int64→uint32) is safe after masking with 0o777
+        - G115
+        # G305: Tar extraction has manual path traversal guard (Clean + HasPrefix check)
+        - G305
+        # G404: Random number generation for non-security purposes
+        - G404
+        # G703: Path traversal false positives — CLI builds paths from workspace config, not user input
+        - G703
+
+    # Complexity gates. These started as ceilings sized to the tree so
+    # the build stayed green while preventing functions from growing past the
+    # then-worst offenders; they are ratcheted down as the grandfathered
+    # functions are refactored. Cohesive, linear string-builder generators
+    # (help/completion/AI-context) are excluded by path rather than
+    # per-function nolints — see exclusions.rules.
+    #
+    # funlen: RATCHETED from 190/115, after splitting
+    # jobs.Scheduler.Run (185 lines / 103 statements — the tree's largest by
+    # statements, and the original named offender, regrown) into named phase
+    # helpers, leaving it at 106/53. Each number is now exactly one above the
+    # tree's real maximum, internal/commands/lifecycle.WorkspaceInit (moved
+    # from flat internal/commands) at 186 lines / 100 statements, so neither
+    # has slack left to absorb an increment: the next cross-cutting feature
+    # has to attach at a named seam instead of
+    # extending a function that already fills the budget. Lowering further
+    # requires splitting WorkspaceInit first — do that, then move these with it.
+    #
+    # gocyclo/nestif are NOT ratcheted here: 36 is already exactly
+    # internal/commands/lifecycle.ProjectsSync's (same move) measured
+    # complexity, and Run was never the binding function for either, so the
+    # split does not free any room.
+    funlen:
+      lines: 187
+      statements: 101
+      ignore-comments: true
+
+    gocyclo:
+      min-complexity: 36
+
+    nestif:
+      min-complexity: 15
+
+    gocritic:
+      disabled-checks:
+        # Style preference, not a correctness issue
+        - ifElseChain
+
+  exclusions:
+    generated: lax
+    rules:
+      # Test files get relaxed rules. Table-driven tests are legitimately long
+      # and branchy, so the complexity gates do not apply to them.
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+          - revive
+          - unparam
+          - funlen
+          - gocyclo
+          - nestif
+
+      # Cohesive, linear string-builder generators (shell completion, help/man
+      # pages, AI-context and structured-help output) are long by nature and not
+      # mixed-concern logic — exempt them from the function-length gate.
+      - path: (completion.*|help_man|help_markdown|structured_help|agent_md|ai_context|context_generate)\.go
+        linters:
+          - funlen
+
+      # var-naming style exclusion
+      - text: "var-naming:"
+        linters:
+          - revive
+
+      # Internal packages don't need doc comments on exported symbols
+      - path: internal/
+        text: "exported:"
+        linters:
+          - revive
+    # Each pattern matches a whole directory name below the project directory
+    # and never a `..` segment. `build` and `bin` are not excluded: they name Go
+    # packages, and an output directory holds no Go file.
+    paths:
+      - ^([^/]*[^./][^/]*/)*vendor(/|$)
+      - ^([^/]*[^./][^/]*/)*node_modules(/|$)
+      - ^([^/]*[^./][^/]*/)*dist(/|$)
+      - ^([^/]*[^./][^/]*/)*\.putnami(/|$)
+
+formatters:
+  enable:
+    - goimports
+    - gofmt

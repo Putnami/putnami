@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-transaction-result.json",
+  "title": "Putnami Transaction Result (outcome envelope)",
+  "description": "The result-side envelope a transaction runner returns for a unit of work: the typed, closed Outcome result code plus a Retryable advisory that mirrors protocol/cache and protocol/events. Retryable must agree with the outcome taxonomy — only 'retryable-serialization-failure' is retryable — and the strict validator enforces that so the advisory can never contradict the code.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "outcome"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "protocolVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Current transaction-protocol version."
+    },
+    "outcome": {
+      "$ref": "#/$defs/outcome"
+    },
+    "retryable": {
+      "type": "boolean",
+      "description": "Advisory metadata: true iff the caller may safely retry the unit of work. Must equal the outcome's inherent retryability (true only for 'retryable-serialization-failure')."
+    },
+    "message": {
+      "type": "string",
+      "description": "Optional human-readable detail for logging/diagnostics. Never load-bearing — callers switch on outcome, not message."
+    }
+  },
+  "$defs": {
+    "outcome": {
+      "type": "string",
+      "enum": ["applied", "already-consumed-conflict", "not-found", "retryable-serialization-failure"],
+      "description": "Typed result code of running a unit of work. Closed enum so callers can switch exhaustively across languages."
+    }
+  }
+}

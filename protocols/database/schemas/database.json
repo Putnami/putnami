@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-database.json",
+  "title": "Putnami Database Requirements (manifest)",
+  "description": "A project's declared logical database needs, keyed by logical datasource name. Secret-free: a requirement never carries a connection, so it can be projected into infra/requirements.json without leaking credentials. A deployer resolves each requirement into a binding (see putnami-database-binding.json).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "protocolVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Current database-protocol version."
+    },
+    "databases": {
+      "type": "object",
+      "description": "Logical datasources this project requires, keyed by datasource name.",
+      "propertyNames": { "$ref": "#/$defs/datasourceName" },
+      "additionalProperties": { "$ref": "#/$defs/requirement" }
+    }
+  },
+  "$defs": {
+    "datasourceName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_./-]{0,63}$",
+      "description": "Canonical logical datasource identifier: lowercase letters, digits, '-', '_', '.', '/'; 1–64 chars."
+    },
+    "engine": {
+      "type": "string",
+      "enum": ["postgres"],
+      "description": "Database engine. Closed enum; postgres is the only v1 implementation and adding an engine requires a protocol version bump."
+    },
+    "schemaName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+      "description": "Owning schema / search_path entry; an unquoted SQL identifier. Required for postgres."
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine", "schema"],
+      "description": "One datasource's logical, secret-free need.",
+      "properties": {
+        "engine": { "$ref": "#/$defs/engine" },
+        "schema": { "$ref": "#/$defs/schemaName" }
+      }
+    }
+  }
+}

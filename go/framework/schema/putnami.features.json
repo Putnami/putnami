@@ -1,0 +1,151 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/struct-validation",
+      "type": "feature",
+      "name": "Go struct-tag validation",
+      "outcome": "Untrusted input is checked against constraints declared on the struct that receives it, producing the same field errors at every boundary",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "absent-fields",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "absent-and-nil-fields-are-skipped-and-defaults-precede-required",
+              "a-default-tag-fills-an-absent-field"
+            ]
+          }
+        },
+        {
+          "id": "custom-constraints",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-registered-constraint-passes-and-fails-on-its-own-terms",
+              "registration-replaces-a-built-in-of-the-same-name",
+              "the-replacement-is-what-lookup-returns",
+              "validation-dispatches-to-the-registered-function"
+            ]
+          }
+        },
+        {
+          "id": "declaration-faults",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unknown-constraint-name-is-a-schema-error",
+              "a-declaration-fault-is-reported-even-when-the-field-is-absent",
+              "a-typoed-required-does-not-silently-disable-the-check",
+              "an-uncompilable-pattern-is-a-schema-error",
+              "an-empty-pattern-is-a-schema-error",
+              "a-non-numeric-constraint-parameter-is-a-schema-error"
+            ]
+          }
+        },
+        {
+          "id": "error-labels",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-label-prefixes-every-reported-field-name",
+              "a-prefixed-field-error-renders-its-full-name"
+            ]
+          }
+        },
+        {
+          "id": "decoded-json-fidelity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "raw-json-presence-distinguishes-absent-null-and-present-zero-values",
+              "nested-json-values-are-validated-recursively-with-exact-numbers",
+              "optional-defaults-are-applied-to-the-decoded-value",
+              "json-field-selection-matches-encoding-json",
+              "invalid-defaults-fail-without-exposing-authored-values"
+            ]
+          }
+        },
+        {
+          "id": "length-in-runes",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "maxlen-counts-runes-not-bytes",
+              "minlen-counts-runes-not-bytes",
+              "maxlen-holds-at-its-ascii-boundary"
+            ]
+          }
+        },
+        {
+          "id": "no-panic-on-bad-type",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-non-struct-type-returns-a-schema-error-instead-of-panicking",
+              "a-pointer-to-struct-reports-the-same-errors-as-the-struct",
+              "a-pointer-to-struct-produces-the-same-data-as-the-struct"
+            ]
+          }
+        },
+        {
+          "id": "opt-in-coercion",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "coercion-converts-only-when-it-is-opted-into",
+              "without-opt-in-the-caller-supplied-type-survives",
+              "coercion-passes-a-non-string-through-untouched"
+            ]
+          }
+        },
+        {
+          "id": "url-scheme-allowlist",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-http-and-https-are-accepted",
+              "a-non-http-scheme-is-rejected",
+              "an-http-url-is-accepted",
+              "a-malformed-url-is-rejected"
+            ]
+          }
+        },
+        {
+          "id": "validated-data-only",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-field-that-failed-a-constraint-is-excluded-from-data",
+              "a-field-that-passed-every-constraint-reaches-data"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

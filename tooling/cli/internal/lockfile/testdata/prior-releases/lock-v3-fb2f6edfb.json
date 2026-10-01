@@ -1,0 +1,30 @@
+{
+  "version": 3,
+  "toolchains": {
+    "go": {
+      "version": "1.26.1",
+      "integrities": {
+        "darwin/amd64": "65773dab2f8cc4cd23d93ba6d0a805de150ca0b78378879292be0b903b8cdd08",
+        "darwin/arm64": "353df43a7811ce284c8938b5f3c7df40b7bfb6f56cb165b150bc40b5e2dd541f",
+        "linux/amd64": "031f088e5d955bab8657ede27ad4e3bc5b7c1ba281f05f245bcc304f327c987a",
+        "linux/arm64": "a290581cfe4fe28ddd737dde3095f3dbeb7f2e4065cab4eae44dfc53b760c2f7",
+        "windows/amd64": "9b68112c913f45b7aebbf13c036721264bbba7e03a642f8f7490c561eebd1ecc",
+        "windows/arm64": "c17e09676be0faad3cbed1c81bb02f38fb73e2f93d048571cc13730fe23f2d5b"
+      },
+      "source": "https://go.dev/dl/"
+    }
+  },
+  "extensions": {
+    "@putnami/cloud": {
+      "version": "0.0.0-52f2431",
+      "integrities": {
+        "darwin/arm64": "97cea734f8d567671bcfe23308d971f6559ded73535943e55a263db1ae231baf",
+        "linux/amd64": "eae0b0b071e7fa4a4e2d6105deeb984ac2ddc423c5945acf64ed228aeda413dd"
+      },
+      "manifestHash": "fb54c3730836658a7d2f23bd1ff89fbe9330eda5ff5fb0ae55bebc9d17f034e2",
+      "source": "https://put.putnami.dev/putnami/cloud/download?channel=0.0.0-52f2431",
+      "taskContract": 3
+    }
+  },
+  "templates": {}
+}

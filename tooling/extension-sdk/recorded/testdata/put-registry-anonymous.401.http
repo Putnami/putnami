@@ -1,0 +1,12 @@
+HTTP/1.1 401 Unauthorized
+content-type: application/json
+x-request-id: 30c8045ac98ed30d198f6181eb91b22c/16923108171752747736
+Content-Length: 36
+date: Thu, 17 Sep 2026 10:24:13 GMT
+server: Google Frontend
+x-cloud-trace-context: 30c8045ac98ed30d198f6181eb91b22c/16923108171752747736
+traceparent: 00-30c8045ac98ed30d198f6181eb91b22c-eadaf53840d532d8-00
+via: 1.1 google
+Alt-Svc: h3=":443"; ma=2592000
+
+{"error":"authentication required"}

@@ -1,0 +1,6 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-template.json",
+  "name": "typescript-server",
+  "description": "TypeScript HTTP server with API routes",
+  "extension": "@putnami/typescript"
+}

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature-evidence.json",
+  "protocolVersion": 1,
+  "evidence": [
+    {
+      "id": "conformance/generated-evidence/implementation/aea1a320d5a6",
+      "feature": "conformance/generated-evidence",
+      "requirement": "implementation",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "putnami.conformance/producer"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "conformance.example",
+        "binding": "source-v1:sha256:3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "conformance.example",
+          "kind": "migration",
+          "subkind": "sql",
+          "key": "events"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "receiver.go",
+        "symbol": "ReceiverFeature"
+      }
+    },
+    {
+      "id": "conformance/generated-evidence/implementation/fd13eb407f45",
+      "feature": "conformance/generated-evidence",
+      "requirement": "implementation",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "putnami.conformance/producer"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "conformance.example",
+        "binding": "source-v1:sha256:3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "conformance.example",
+          "kind": "config",
+          "key": "receiver"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "receiver.go",
+        "symbol": "ReceiverFeature"
+      }
+    }
+  ]
+}

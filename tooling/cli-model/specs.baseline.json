@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "cli/workspace-model#canonical-identity",
+    "cli/workspace-model#change-impact",
+    "cli/workspace-model#dependency-graph",
+    "cli/workspace-model#import-visibility",
+    "cli/workspace-model#model-purity",
+    "cli/workspace-model#selection-filters",
+    "cli/workspace-model#target-expression-grammar"
+  ]
+}

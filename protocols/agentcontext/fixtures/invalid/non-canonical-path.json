@@ -1,0 +1,22 @@
+{
+  "protocolVersion": 1,
+  "identity": {
+    "id": "/go/samples/library",
+    "name": "go.putnami.dev/examples/library",
+    "path": "go/samples/library"
+  },
+  "capabilities": [
+    {
+      "path": "./schema/capabilities.json",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "provenance": {
+    "workspaceRevision": "deadbeef",
+    "generator": {
+      "name": "putnami",
+      "version": "0.1.0"
+    },
+    "aggregationMethod": "by-reference"
+  }
+}

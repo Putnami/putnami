@@ -1,0 +1,16 @@
+{
+  "contract": "proposals",
+  "version": 1,
+  "operation": "upsert",
+  "provider": {
+    "name": "@acme/github",
+    "version": "1.4.0"
+  },
+  "outcome": "unresolved",
+  "error": {
+    "message": "the provider did not answer within 30s; the proposal may have been created",
+    "reason": "provider.timeout",
+    "retryable": false,
+    "reconcile": "inspect the pull request in GitHub before any retry"
+  }
+}

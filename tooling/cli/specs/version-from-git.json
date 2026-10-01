@@ -1,0 +1,36 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/version-from-git",
+  "outcomes": [
+    "A user gets the exact version every version line is at, derived from the line's git tags and the conventional commits that touch it, and releases a line with one command that writes its changelog, its release commit, and its tag",
+    "Two builds of one line never publish under one version: an untagged commit carries the ordered suffix above the line's last tag",
+    "A release is reviewable before it happens: version tag prints the proposed tag and its changelog and writes nothing without --yes"
+  ],
+  "nonGoals": [
+    "Declaring a version in the workspace, a scope, or a project document",
+    "Deriving a publication channel from the checked-out branch",
+    "Editing a version in place: version set and version bump no longer exist"
+  ],
+  "requirements": [
+    {
+      "id": "tag-sets-the-version",
+      "text": "A commit tagged with its line's pattern has the tag's version; a dirty tree is refused for publish; several tags on HEAD need --scope."
+    },
+    {
+      "id": "conventional-advance",
+      "text": "An untagged commit takes the line's last tag advanced by the conventional commits that touch the line, at least a patch, plus the ordered suffix; before 1.0 breaking and feat are minor."
+    },
+    {
+      "id": "full-clone-required",
+      "text": "A shallow clone or a checkout without tags is refused for version and publish; a full clone without a tag on the line yields 0.0.0."
+    },
+    {
+      "id": "release-commit-then-tag",
+      "text": "version tag regenerates the line's changelog, creates the release commit, then the annotated tag on it."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md"
+  ]
+}

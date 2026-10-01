@@ -1,0 +1,9 @@
+{
+  "protocol": "putnami.events.v1",
+  "type": "publish",
+  "id": "evt-1",
+  "dedupeKey": "dedupe-1",
+  "topic": "projects/provider-project/topics/evt-t-orders-created-abc123",
+  "topicVersion": "1",
+  "payload": { "orderId": "order-1" }
+}

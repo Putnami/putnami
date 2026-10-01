@@ -1,0 +1,27 @@
+{
+  "protocolVersion": 1,
+  "evidence": [
+    {
+      "id": "billing/invalid-subject",
+      "feature": "billing/invoice-export",
+      "requirement": "implementation",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": { "kind": "build", "id": "builder" },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/example/billing",
+        "binding": "source-v1:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "subject": {
+        "kind": "artifact",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/example/billing",
+          "kind": "config",
+          "key": "billing.enabled"
+        }
+      },
+      "provenance": { "root": "project", "path": "billing.go" }
+    }
+  ]
+}

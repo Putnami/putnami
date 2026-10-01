@@ -1,0 +1,6 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-transaction-result.json",
+  "protocolVersion": 1,
+  "outcome": "already-consumed-conflict",
+  "message": "idempotency key already consumed"
+}

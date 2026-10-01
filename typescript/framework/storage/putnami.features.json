@@ -1,0 +1,175 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/object-storage",
+      "type": "feature",
+      "name": "TypeScript object storage",
+      "outcome": "A TypeScript workload reads and writes objects through declared buckets that behave identically on memory, filesystem, S3, and the remote service, and hands browsers time-bounded signed URLs instead of credentials",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "backend-lifecycle",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-shared-backend-closes-only-with-the-last-managed-client",
+              "close-all-closes-every-cached-backend",
+              "closing-one-client-removes-only-that-client",
+              "file-backends-differing-only-by-secret-are-not-shared",
+              "remote-backends-differing-only-by-credentials-are-not-shared"
+            ]
+          }
+        },
+        {
+          "id": "bounded-expiry",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-file-backend-allows-the-7-day-maximum",
+              "the-file-backend-defaults-to-a-15-minute-expiry",
+              "the-file-backend-refuses-an-expiry-beyond-7-days",
+              "the-s3-backend-defaults-to-a-15-minute-expiry",
+              "the-s3-backend-refuses-an-expiry-beyond-7-days"
+            ]
+          }
+        },
+        {
+          "id": "declared-infrastructure",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-retention-is-included",
+              "a-registered-bucket-defaults-its-access-level",
+              "a-stale-sidecar-is-removed-when-the-registry-empties",
+              "an-explicit-access-level-and-public-flag-survive",
+              "entries-are-sorted-one-per-bucket",
+              "no-registered-bucket-emits-nothing",
+              "the-sidecar-is-written-at-its-declared-path"
+            ]
+          }
+        },
+        {
+          "id": "error-body-not-serialized",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-error-message-carries-operation-and-status-but-not-the-body",
+              "the-response-body-is-stored-non-enumerably"
+            ]
+          }
+        },
+        {
+          "id": "key-safety",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-key-containing-a-null-byte-is-rejected",
+              "a-leading-traversal-segment-is-rejected",
+              "a-legitimate-nested-path-is-still-allowed",
+              "a-signed-download-url-validates-its-key",
+              "a-signed-upload-url-validates-its-key",
+              "a-trailing-traversal-segment-is-rejected",
+              "a-traversal-segment-in-the-middle-is-rejected",
+              "an-absolute-key-is-rejected",
+              "an-empty-key-is-rejected",
+              "both-ends-of-a-copy-are-validated",
+              "every-key-taking-client-method-rejects-traversal"
+            ]
+          }
+        },
+        {
+          "id": "one-contract",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-zero-byte-object-round-trips",
+              "copy-of-a-missing-source-raises-not-found",
+              "delete-of-a-missing-key-is-a-no-op",
+              "existence-is-reported-and-cleared-by-delete",
+              "get-of-a-missing-bucket-returns-null",
+              "get-of-a-missing-key-returns-null",
+              "list-is-scoped-by-prefix",
+              "list-of-a-missing-bucket-is-empty",
+              "put-then-get-round-trips-with-size-and-etag"
+            ]
+          }
+        },
+        {
+          "id": "public-bucket-warning",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-public-bucket-is-named-in-one-startup-warning",
+              "no-warning-is-logged-when-no-bucket-is-public"
+            ]
+          }
+        },
+        {
+          "id": "signed-url-binding",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-forged-signature-is-rejected",
+              "a-properly-signed-token-is-accepted",
+              "a-token-does-not-carry-to-another-bucket",
+              "a-token-does-not-carry-to-another-key",
+              "a-token-does-not-carry-to-another-method",
+              "a-token-signed-with-another-secret-is-rejected",
+              "an-expired-token-is-rejected",
+              "an-unsigned-token-is-rejected"
+            ]
+          }
+        },
+        {
+          "id": "typed-shapes",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unparseable-last-modified-is-dropped-rather-than-surfaced-invalid",
+              "the-remote-backend-returns-last-modified-as-a-date"
+            ]
+          }
+        },
+        {
+          "id": "upload-constraints",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-blob-over-the-declared-size-limit-is-rejected",
+              "a-blob-with-a-disallowed-mime-type-is-rejected",
+              "a-buffer-over-the-declared-size-limit-is-rejected",
+              "a-signed-upload-url-with-a-disallowed-or-missing-mime-type-is-refused",
+              "a-stream-exceeding-the-limit-is-rejected-while-streaming",
+              "a-stream-with-a-disallowed-mime-type-is-rejected",
+              "a-stream-within-the-limit-is-accepted"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

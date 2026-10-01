@@ -1,0 +1,29 @@
+{
+  "name": "@putnami/migration",
+  "version": "0.0.0",
+  "description": "Transversal migration framework: backend-free contracts (Kind, Source, Runner, Registry) every kind plugs into. SQL today; GCS, document, cache, event-topic later.",
+  "keywords": [
+    "migration",
+    "database",
+    "putnami"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/migration"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./cli": "./src/cli/index.ts"
+  },
+  "dependencies": {
+    "@putnami/runtime": "workspace:*"
+  },
+  "private": false
+}

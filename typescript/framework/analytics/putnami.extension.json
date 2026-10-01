@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "extensionDependencies": ["@putnami/web"],
+  "hooks": {
+    "preBuild": {
+      "kind": "command",
+      "command": "bun",
+      "args": ["run", "{extensionRoot}/bin/generate"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000
+    }
+  },
+  "commands": {}
+}

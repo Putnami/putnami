@@ -1,0 +1,14 @@
+exit 2
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "features diff",
+  "status": "failure",
+  "exitCode": 2,
+  "error": {
+    "code": "usage",
+    "message": "features diff requires exactly \u003cbase-revision\u003e and \u003chead-revision\u003e"
+  }
+}
+--- stderr ---
+putnami: features diff requires exactly <base-revision> and <head-revision>

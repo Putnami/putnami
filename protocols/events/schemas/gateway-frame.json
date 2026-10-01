@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/events/gateway-frame.json",
+  "title": "Putnami Events Event Server Frame",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "type"],
+  "properties": {
+    "protocol": { "const": "putnami.events.v1" },
+    "type": {
+      "enum": ["auth", "subscribe", "publish", "event", "ack", "nack", "error", "complete"]
+    },
+    "id": { "type": "string" },
+    "topic": { "type": "string" },
+    "channel": { "type": "string" },
+    "from": { "type": "string" },
+    "payload": true,
+    "key": { "type": "string" },
+    "dedupeKey": { "type": "string" },
+    "topicVersion": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "attributes": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "traceId": { "type": "string" },
+    "token": { "type": "string" },
+    "headers": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "message": { "type": "string" },
+    "error": { "type": "string" }
+  }
+}

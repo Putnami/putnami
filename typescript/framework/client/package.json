@@ -1,0 +1,36 @@
+{
+  "name": "@putnami/client",
+  "version": "0.0.0",
+  "description": "Smart client library for consuming Putnami APIs with typed clients, retry, telemetry, and DI integration",
+  "keywords": [
+    "http-client",
+    "api-client",
+    "retry",
+    "telemetry"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/client"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./generator": "./src/generator/index.ts"
+  },
+  "bin": {
+    "putnami-client-generate": "./bin/generate.ts"
+  },
+  "dependencies": {
+    "@biomejs/biome": "^2.5.3",
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/utils": "workspace:*"
+  },
+  "private": false
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "hooks": {
+    "preBuild": {
+      "kind": "command",
+      "command": "bun",
+      "args": ["run", "{extensionRoot}/bin/generate"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "order": 100
+    },
+    "configExtract": {
+      "kind": "command",
+      "command": "bun",
+      "args": ["run", "{extensionRoot}/bin/config-extract"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "order": 100
+    }
+  },
+  "commands": {}
+}

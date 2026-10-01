@@ -1,0 +1,34 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/with-contracts",
+  "contracts": {
+    "schemas": {
+      "build-input": {
+        "type": "object",
+        "properties": {
+          "target": { "type": "string" }
+        }
+      },
+      "build-output": {
+        "type": "object",
+        "properties": {
+          "bundle": { "type": "string" }
+        }
+      }
+    }
+  },
+  "commands": {
+    "build": {
+      "run": [{ "id": "build", "task": "build-exec" }]
+    }
+  },
+  "tasks": {
+    "build-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["built"],
+      "inputSchemaRef": "build-input",
+      "outputSchemaRef": "build-output"
+    }
+  }
+}

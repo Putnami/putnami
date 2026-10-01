@@ -1,0 +1,21 @@
+{
+  "appName": "go.putnami.dev/examples/capabilities-proof",
+  "version": "0.1.0",
+  "schemaHash": "sha256:ca92c7856fb2bfc7",
+  "configs": [
+    {
+      "path": "proof",
+      "fields": [
+        {
+          "name": "endpoint",
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "type": "string",
+          "sensitive": true
+        }
+      ]
+    }
+  ]
+}

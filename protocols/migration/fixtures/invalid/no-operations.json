@@ -1,0 +1,5 @@
+{
+  "protocol": "migration-bundle.v1",
+  "appName": "svc",
+  "operations": []
+}

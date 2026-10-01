@@ -1,0 +1,155 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-transaction-conformance.json",
+  "title": "Putnami Transaction Conformance Manifest",
+  "description": "The ordered behavioral conformance corpus both the Go and TypeScript database adapters execute against a real Postgres, driving the tx/CAS primitives (compare-and-set / consume-once / rotate) directly and asserting the typed transaction Outcome. Structure mirrors protocols/transaction/conformance.go; both runners interpret this document identically.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "suite", "protocolVersion", "cases"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "protocol": { "const": "putnami.transaction.v1" },
+    "suite": { "const": "putnami.transaction.conformance.v1" },
+    "protocolVersion": { "type": "integer", "const": 1 },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z_][a-z0-9_]*$" },
+    "outcome": {
+      "type": "string",
+      "enum": ["applied", "already-consumed-conflict", "not-found", "retryable-serialization-failure"]
+    },
+    "value": { "type": ["string", "boolean", "number", "null"] },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "level", "setup", "operations"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "level": { "enum": ["required", "recommended", "optional"] },
+        "summary": { "type": "string" },
+        "setup": { "$ref": "#/$defs/setup" },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/operation" }
+        },
+        "concurrency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/concurrency" }
+        },
+        "asserts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/rowAssert" }
+        }
+      }
+    },
+    "setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tables"],
+      "properties": {
+        "tables": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/table" }
+        }
+      }
+    },
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "columns"],
+      "properties": {
+        "name": { "$ref": "#/$defs/identifier" },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/column" }
+        },
+        "seed": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": { "$ref": "#/$defs/value" } }
+        }
+      }
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "$ref": "#/$defs/identifier" },
+        "type": { "enum": ["text", "boolean", "integer"] },
+        "primaryKey": { "type": "boolean" },
+        "notNull": { "type": "boolean" },
+        "default": { "type": "string" }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "table", "primitive", "args"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "table": { "$ref": "#/$defs/identifier" },
+        "primitive": { "enum": ["compare-and-set", "consume-once", "rotate"] },
+        "boundary": { "enum": ["none", "transaction", "nested-transaction"] },
+        "fault": { "enum": ["none", "callback-error"] },
+        "repeat": { "type": "integer", "minimum": 0 },
+        "args": { "$ref": "#/$defs/args" },
+        "expect": { "$ref": "#/$defs/outcome" }
+      }
+    },
+    "args": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "keyColumn": { "type": "string" },
+        "key": { "$ref": "#/$defs/value" },
+        "column": { "type": "string" },
+        "expected": { "$ref": "#/$defs/value" },
+        "next": { "$ref": "#/$defs/value" },
+        "claimGuard": { "type": "string" },
+        "set": { "type": "string" },
+        "predecessorKey": { "$ref": "#/$defs/value" },
+        "stateColumn": { "type": "string" },
+        "revoked": { "$ref": "#/$defs/value" },
+        "successorColumns": { "type": "array", "items": { "$ref": "#/$defs/identifier" } },
+        "successorValues": { "type": "array", "items": { "$ref": "#/$defs/value" } }
+      }
+    },
+    "concurrency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "operations", "expect"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "operations": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "expect": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/outcome" },
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "rowAssert": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["table", "where", "count"],
+      "properties": {
+        "table": { "$ref": "#/$defs/identifier" },
+        "where": { "type": "string", "minLength": 1 },
+        "count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

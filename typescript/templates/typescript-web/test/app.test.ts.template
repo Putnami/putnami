@@ -1,0 +1,40 @@
+import { resolve } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { createTestApp, type TestApp } from '@putnami/application/testing';
+import { react } from '@putnami/web';
+
+describe('<%= projectName %>', () => {
+  let testApp: TestApp;
+
+  beforeAll(async () => {
+    testApp = await createTestApp({ plugins: [react({ scanPath: resolve(__dirname, '../src/app') })] });
+  });
+
+  afterAll(async () => {
+    await testApp.stop();
+  });
+
+  it('should render the home page', async () => {
+    const res = await testApp.fetch('/');
+    expect(res.status).toBe(200);
+
+    const html = await res.text();
+    expect(html).toContain('Welcome to Putnami');
+  });
+
+  it('should render the about page', async () => {
+    const res = await testApp.fetch('/about');
+    expect(res.status).toBe(200);
+
+    const html = await res.text();
+    expect(html).toContain('About this app');
+  });
+
+  it('should render the guestbook page', async () => {
+    const res = await testApp.fetch('/guestbook');
+    expect(res.status).toBe(200);
+
+    const html = await res.text();
+    expect(html).toContain('Guestbook');
+  });
+});

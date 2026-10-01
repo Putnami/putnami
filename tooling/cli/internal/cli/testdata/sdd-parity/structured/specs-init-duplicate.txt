@@ -1,0 +1,49 @@
+exit 2
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "specs init",
+  "status": "failure",
+  "exitCode": 2,
+  "data": {
+    "revision": {
+      "kind": "worktree",
+      "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08"
+    },
+    "feature": "billing/invoice",
+    "path": "billing/specs/billing.invoice.json",
+    "project": "@acme/billing",
+    "created": false,
+    "dryRun": false,
+    "declarations": [
+      {
+        "kind": "manifest",
+        "source": "billing/putnami.features.json",
+        "project": "@acme/billing",
+        "name": "Invoice export",
+        "outcome": "Customers export issued invoices",
+        "owner": "billing",
+        "type": "feature",
+        "target": "modeled",
+        "provenance": {
+          "path": "billing/putnami.features.json",
+          "symbol": "features[0]"
+        }
+      }
+    ],
+    "diagnostics": [
+      {
+        "severity": "error",
+        "code": "features.duplicate_spec",
+        "message": "feature \"billing/invoice\" is already specified; edit that document instead",
+        "field": "billing/specs/billing.invoice.json"
+      }
+    ]
+  },
+  "error": {
+    "code": "usage",
+    "message": "feature \"billing/invoice\" already has a spec at billing/specs/billing.invoice.json"
+  }
+}
+--- stderr ---
+putnami: feature "billing/invoice" already has a spec at billing/specs/billing.invoice.json

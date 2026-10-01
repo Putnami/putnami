@@ -1,0 +1,43 @@
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { api } from '@putnami/application';
+import { createTestApp, type TestApp } from '@putnami/application/testing';
+
+describe('<%= projectName %>', () => {
+  let testApp: TestApp;
+
+  beforeAll(async () => {
+    testApp = await createTestApp({ plugins: [api({ scanPath: 'src/api' })] });
+  });
+
+  afterAll(async () => {
+    await testApp.stop();
+  });
+
+  it('should return a greeting on GET /', async () => {
+    const res = await testApp.fetch('/');
+    expect(res.status).toBe(200);
+
+    const data = await res.json();
+    expect(data).toEqual({ message: 'Hello, World!' });
+  });
+
+  it('should greet by name on GET /?name=Putnami', async () => {
+    const res = await testApp.fetch('/?name=Putnami');
+    expect(res.status).toBe(200);
+
+    const data = await res.json();
+    expect(data).toEqual({ message: 'Hello, Putnami!' });
+  });
+
+  it('should create on POST /', async () => {
+    const res = await testApp.fetch('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Test' }),
+    });
+    expect(res.status).toBe(200);
+
+    const data = await res.json();
+    expect(data).toEqual({ message: 'Created: Test' });
+  });
+});

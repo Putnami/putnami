@@ -1,0 +1,44 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "build": {
+      "run": [
+        { "id": "compile", "task": "build-compile" },
+        { "id": "setup", "task": "test-setup" }
+      ]
+    }
+  },
+  "tasks": {
+    "build-compile": {
+      "kind": "command",
+      "command": "echo",
+      "declares": {
+        "outputs": {
+          "bundle": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "compile",
+            "drift": "fail",
+            "description": "The command-output root is never committed, so there is nothing there to drift from."
+          }
+        }
+      }
+    },
+    "test-setup": {
+      "kind": "command",
+      "command": "echo",
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "socket": {
+            "kind": "runtime-file",
+            "scope": "invocation",
+            "path": "db.sock",
+            "drift": "warn",
+            "description": "A runtime file is never in the tree after the run; an invocation-scoped output is discarded with the invocation."
+          }
+        }
+      }
+    }
+  }
+}

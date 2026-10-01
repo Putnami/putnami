@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/ecosystem-bad-pattern",
+  "ecosystems": [
+    {
+      "id": "npm",
+      "coordinate": { "pattern": "^[a-z" },
+      "version": { "pattern": "^v?\\d+$", "ordering": "semver" },
+      "channel": "native",
+      "registries": { "type": "object" },
+      "publish": "publish-npm"
+    }
+  ],
+  "commands": {
+    "publish-npm": { "run": [{ "id": "publish", "task": "publish-exec" }] }
+  },
+  "tasks": {
+    "publish-exec": { "kind": "command", "command": "echo", "args": ["published"] }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "build": {
+      "run": [{ "id": "generate", "task": "build-generate" }]
+    }
+  },
+  "tasks": {
+    "build-generate": {
+      "kind": "command",
+      "command": "echo",
+      "outputs": {
+        "docsOutput": {
+          "description": "Workspace-relative directory of the rendered documentation"
+        }
+      },
+      "declares": {
+        "outputs": {
+          "docs": {
+            "kind": "directory",
+            "root": "workspace",
+            "pathFrom": "docsOutput",
+            "drift": "unknown",
+            "description": "A pathFrom output's reference is a digest of its root taken before the path is known; the workspace is not a root anybody digests before every run. The policy value is also outside the vocabulary."
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "tags": ["ts"],
+  "extensions": ["/typescript/extension"],
+  "publishConfig": {
+    "npm": {
+      "namePattern": "@putnami/{name}"
+    }
+  },
+  "groups": {
+    "ts-core": "/typescript/framework/runtime,/typescript/framework/utils",
+    "ts-web": "/typescript/framework/web,/typescript/framework/ui,/typescript/framework/application"
+  }
+}

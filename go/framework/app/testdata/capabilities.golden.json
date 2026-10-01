@@ -1,0 +1,87 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities.json",
+  "protocolVersion": 1,
+  "project": "go.putnami.dev/examples/capabilities-proof",
+  "configDefinitions": [
+    {
+      "path": "database.default",
+      "fields": [
+        {
+          "name": "url",
+          "type": "string"
+        },
+        {
+          "name": "password",
+          "type": "string",
+          "sensitive": true
+        }
+      ],
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "sourceKind": "framework"
+      }
+    }
+  ],
+  "migrations": [
+    {
+      "name": "iam",
+      "datasource": "default",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "sourceKind": "framework"
+      }
+    }
+  ],
+  "infraRequirements": [
+    {
+      "name": "default",
+      "kind": "database",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "sourceKind": "framework"
+      }
+    }
+  ],
+  "healthContributors": [
+    {
+      "name": "diskSpace",
+      "probe": "health",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "sourceKind": "framework"
+      }
+    },
+    {
+      "name": "primaryDatabase",
+      "probe": "readiness",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "sourceKind": "framework"
+      }
+    }
+  ],
+  "lifecycleHooks": [
+    {
+      "name": "connectionPool",
+      "phase": "starter",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "sourceKind": "framework"
+      }
+    },
+    {
+      "name": "connectionPool",
+      "phase": "stopper",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "sourceKind": "framework"
+      }
+    }
+  ]
+}

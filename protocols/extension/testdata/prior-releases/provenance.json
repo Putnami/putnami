@@ -1,0 +1,21 @@
+{
+  "$comment": "Immutable prior-release extension manifests, recovered with `git show <sourceCommit>:<sourcePath>`. Checked by TestPriorReleaseManifestsAreImmutable. The compatibility budget these prove is tooling/cli/doc/21-compatibility-and-migration.md.",
+  "fixtures": [
+    {
+      "file": "shell-extension-contract-absent-a7dc5c956.json",
+      "declaredContract": 0,
+      "sourceCommit": "a7dc5c956eb6549dd017df6edb6163981b710bc2",
+      "sourcePath": "tooling/samples/shell-extension/putnami.extension.json",
+      "committed": "2026-07-28",
+      "sha256": "10b4e0035bfb4b167d948a4e40c23b3d8d33d017ccd242f9b121a3011d14a71b",
+      "expect": "reject",
+      "why": "A real pre-registry manifest: it declares commands, so the contract ladder governs it, and it carries no `cliContract` member at all — which is what contract 0 looks like on disk. It is the last committed state of this manifest before the contract-3 cutover stamped it."
+    }
+  ],
+  "gaps": [
+    {
+      "shape": "a manifest stamped at cliContract 1 or 2",
+      "reason": "The stamp is EARNED at package time and written into the packaged artifact, so no repository-committed manifest has ever carried 1 or 2. The lower-but-nonzero arm is covered synthetically by TestLoadManifest_CompatibilityMatrix, which renders every ladder rung against every surface kind."
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "tasks": {
+    "provider": "@putnami/local-collaboration",
+    "version": 1
+  },
+  "proposals": {
+    "provider": "@putnami/local-collaboration",
+    "version": 1,
+    "settings": {
+      "repository": "local",
+      "root": ".putnami/collaboration"
+    }
+  },
+  "memory": {
+    "provider": "@acme/memory-git",
+    "version": 1,
+    "require": [
+      "search"
+    ],
+    "settings": {
+      "remote": "origin",
+      "branch": "memory"
+    }
+  }
+}

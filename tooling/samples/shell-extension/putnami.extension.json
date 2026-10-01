@@ -1,0 +1,77 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "cliContract": 4,
+  "name": "sample/shell-extension",
+  "commands": {
+    "build": {
+      "flags": {
+        "target": {
+          "type": "string",
+          "default": "release",
+          "description": "Build target",
+          "choices": ["debug", "release"]
+        },
+        "clean": {
+          "type": "boolean",
+          "default": false,
+          "description": "Clean before building"
+        }
+      },
+      "run": [{ "id": "build", "task": "build-exec", "dependsOn": ["^build"] }]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "flags": {
+        "test-verbose": {
+          "type": "boolean",
+          "default": false,
+          "description": "Verbose test output",
+          "short": "-l"
+        },
+        "filter": {
+          "type": "string",
+          "description": "Filter tests by name"
+        }
+      },
+      "run": [{ "id": "test", "task": "test-exec" }]
+    }
+  },
+  "tasks": {
+    "build-exec": {
+      "description": "Compile the project and copy the artifacts into <command-output>/build, which this task owns.",
+      "kind": "command",
+      "command": "{extensionRoot}/bin/build",
+      "cwd": "{projectRoot}",
+      "cache": {
+        "enabled": true,
+        "key": {
+          "files": ["**/*.c", "**/*.h", "Makefile"]
+        }
+      },
+      "declares": {
+        "outputs": {
+          "artifacts": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "build",
+            "description": "Compiled artifacts copied out of the project's build directory."
+          }
+        }
+      }
+    },
+    "test-exec": {
+      "description": "Run the project's test target. It writes no files, so its declaration is empty and cache.noOutput says so.",
+      "kind": "command",
+      "command": "{extensionRoot}/bin/test",
+      "cwd": "{projectRoot}",
+      "cache": {
+        "enabled": true,
+        "noOutput": true,
+        "key": {
+          "files": ["**/*.c", "**/*.h", "Makefile"]
+        }
+      },
+      "declares": {}
+    }
+  }
+}

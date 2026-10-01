@@ -1,0 +1,50 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "putnami-dev/published-support-catalog",
+  "outcomes": [
+    "A visitor reads the reviewed support status of every classified package and protocol on one published page",
+    "A status change in the reviewed catalog reaches the published page without anyone editing the site",
+    "A reader can tell what each status commits to, and that an unlisted subject carries no promise at all"
+  ],
+  "nonGoals": [
+    "Classifying the deployed sites themselves, which the support protocol deliberately does not cover",
+    "Restating release planning, compatibility, or license-transition decisions that RELEASE.md and LICENSE.md own",
+    "Presenting feature maturity as if it were a support commitment"
+  ],
+  "requirements": [
+    {
+      "id": "catalog-is-the-only-source",
+      "text": "Every published support status is rendered from the workspace-root support catalog; the site holds no second list of statuses."
+    },
+    {
+      "id": "closed-status-vocabulary",
+      "text": "Only the three reviewed statuses are accepted and rendered; a catalog carrying any other status token fails the build instead of being displayed."
+    },
+    {
+      "id": "invalid-catalog-fails-the-build",
+      "text": "A catalog that is unreadable, carries a protocolVersion other than the exact integer 1, repeats a (kind, id) identity, or claims an experimental subject is default-on fails the build rather than publishing a partial page."
+    },
+    {
+      "id": "independent-claims-are-rendered",
+      "text": "The independent non-default and no-parity claims are published for the subjects that carry them, and no claim is shown for a subject that omits it."
+    },
+    {
+      "id": "unclassified-subject-shows-no-status",
+      "text": "A documented surface the catalog does not classify renders no status badge, and the page states that an unlisted subject has no reviewed public support status."
+    },
+    {
+      "id": "support-is-not-maturity",
+      "text": "The published page states that support status and feature maturity are different concepts and links to the feature-spec guide rather than merging the two vocabularies."
+    },
+    {
+      "id": "generated-page-is-deterministic",
+      "text": "The published page is a pure function of the reviewed catalog, so repeated builds write identical bytes and entries keep a stable order."
+    },
+    {
+      "id": "cold-build-enumerates-the-page",
+      "text": "The generated page exists before the docs tree is enumerated for static paths, so a cold build publishes the same page set as a warm one."
+    }
+  ],
+  "decisions": ["sites/putnami.dev/doc/adr/0001-the-support-catalog-is-rendered-never-restated.md"]
+}

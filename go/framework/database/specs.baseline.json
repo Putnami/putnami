@@ -1,0 +1,21 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/persistence-transactions#multi-datasource-boundary",
+    "go/persistence-transactions#pool-scoped-transaction",
+    "go/persistence-transactions#secret-safe-telemetry",
+    "go/persistence-transactions#transaction-finalization",
+    "go/persistence-transactions#unit-of-work",
+    "go/shared-datasource-pooling#acquire-time-search-path",
+    "go/shared-datasource-pooling#datasource-bound-acquire",
+    "go/shared-datasource-pooling#one-pool-per-physical-database",
+    "go/shared-datasource-pooling#shared-pool-lifetime",
+    "go/shared-datasource-pooling#tuning-agreement",
+    "go/sql-migration-execution#atomic-record",
+    "go/sql-migration-execution#deterministic-execution",
+    "go/sql-migration-execution#read-only-observation",
+    "go/sql-migration-execution#repeatability-and-drift",
+    "go/sql-migration-execution#reversibility"
+  ]
+}

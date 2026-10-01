@@ -1,0 +1,19 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/home/u/.putnami/user",
+  "outputPath": "/home/u/.putnami/user/.putnami/out/audit-run",
+  "cacheRoot": "/home/u/.putnami/user/.putnami/cache",
+  "workspace": {"name": "user", "rootPath": "/home/u/.putnami/user"},
+  "project": {"name": "user", "path": ".", "fullPath": "/home/u/.putnami/user"},
+  "extension": {"name": "@acme/audit", "root": "/home/u/.putnami/user/.putnami/extensions/@acme/audit"},
+  "job": {"name": "audit-run"},
+  "identity": {
+    "key": "user:audit-run",
+    "scope": "workspace",
+    "project": {"id": "user", "name": "user"},
+    "task": {"name": "audit-run", "command": "audit-run", "kind": "audit-run"},
+    "provider": {"extension": "@acme/audit", "version": "1.2.0"}
+  },
+  "userScope": {"callerDir": "/home/u/src/repository"},
+  "params": {}
+}

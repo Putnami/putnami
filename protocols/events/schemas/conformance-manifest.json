@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/events/conformance-manifest.json",
+  "title": "Putnami Events Conformance Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "suite", "target", "cases"],
+  "properties": {
+    "protocol": { "const": "putnami.events.v1" },
+    "suite": { "const": "putnami.events.conformance.v1" },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "topicPrefix": { "type": "string", "minLength": 1 },
+        "timeoutMs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["discoveryPath", "grpcService"],
+      "properties": {
+        "discoveryPath": { "const": "/.well-known/putnami/events" },
+        "grpcService": { "const": "putnami.events.v1.EventServer" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "formats": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["json", "junit"] }
+        },
+        "requiredFields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "level", "transport", "steps", "expect"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "level": { "enum": ["required", "recommended", "optional"] },
+        "transport": { "enum": ["discovery", "sse", "websocket", "http", "grpc", "push"] },
+        "requires": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "transports": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "enum": ["sse", "websocket", "http", "grpc"] }
+            },
+            "features": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "enum": ["replay", "publish", "ack"] }
+            },
+            "auth": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "enum": ["none", "bearer", "headers", "cookie", "serviceAccount", "workloadIdentity"] }
+            }
+          }
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "expect": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

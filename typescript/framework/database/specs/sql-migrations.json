@@ -1,0 +1,61 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/sql-migrations",
+  "outcomes": [
+    "The same migration set produces the same schema in the same order on a laptop, in CI, and in production",
+    "A migration either applied or did not: there is no state where the DDL committed and the record did not",
+    "Editing a migration that already ran is caught at the next run instead of drifting silently",
+    "Two instances starting at once do not both migrate, whichever language they are written in",
+    "A long DDL or backfill is not killed by the timeout that protects request-serving queries"
+  ],
+  "nonGoals": [
+    "Choosing an authoring format: this runner consumes what the SQL source contributes",
+    "Rolling forward past a failed migration, or repairing a schema the runner did not create",
+    "Cross-datasource atomicity: each datasource migrates under its own lock and transaction",
+    "Promising that a pre-1.0 minor release keeps the previous migration contract"
+  ],
+  "requirements": [
+    {
+      "id": "byte-order-apply",
+      "text": "Migrations apply in plain code-unit order of their name — byte-identical to the Go runner and the bundle protocol — never in locale-dependent collation order, because both runners share one state store."
+    },
+    {
+      "id": "reverse-order-rollback",
+      "text": "Rollback, rollback-to, and reset reverse that same name order rather than ordering by execution timestamp, which is unstable for a batch applied inside one millisecond or under clock skew."
+    },
+    {
+      "id": "atomic-bookkeeping",
+      "text": "A migration's body and its success row commit in one transaction, so a failure between the two cannot leave a schema change that the next run would apply again."
+    },
+    {
+      "id": "failure-is-recorded",
+      "text": "A failed migration rolls its body back, records the failure outside the rolled-back transaction as a best effort, logs one terminal record, and aborts the run with a typed `MigrationError` naming the migration."
+    },
+    {
+      "id": "body-drift-fails",
+      "text": "An already-applied migration whose committed SQL no longer hashes to the stored hash fails the run with both hashes, instead of being skipped by name as a plain forward apply would."
+    },
+    {
+      "id": "rollback-integrity",
+      "text": "Stored rollback SQL is verified against its stored hash before it runs, and the state row is claimed before the down body executes so a concurrent runner cannot roll the same migration back twice."
+    },
+    {
+      "id": "single-writer",
+      "text": "Every migration operation holds a PostgreSQL advisory lock keyed on the datasource, hashed server-side from the same literal the Go runner uses, so concurrent starts serialize across languages."
+    },
+    {
+      "id": "unbounded-statement",
+      "text": "`statement_timeout` is disabled transaction-locally for a migration body and for a rollback body, so a long DDL is not aborted by the pool's request-serving timeout, and the setting reverts at COMMIT or ROLLBACK rather than leaking onto the pooled connection."
+    },
+    {
+      "id": "schema-scoped-ddl",
+      "text": "A datasource that declares a schema applies it as a transaction-local `search_path` around each body, so one migration set can target several schemas with unqualified DDL, while the state store stays fully qualified."
+    },
+    {
+      "id": "unambiguous-target",
+      "text": "A migration named by bare basename resolves only when it is unique; an ambiguous basename fails with the candidate list rather than picking one."
+    }
+  ],
+  "decisions": ["typescript/framework/database/doc/adr/0002-migration-order-is-the-name-not-the-clock.md"]
+}

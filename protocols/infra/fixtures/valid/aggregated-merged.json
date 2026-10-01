@@ -1,0 +1,58 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "workload": "go.putnami.dev/example/api",
+  "databases": [
+    {
+      "name": "primary",
+      "engine": "postgres",
+      "schemas": ["audit", "iam"],
+      "sources": [
+        { "project": "go.putnami.dev/example/audit", "contributor": "manual" },
+        { "project": "go.putnami.dev/example/iam", "contributor": "framework:go.putnami.dev/database" }
+      ]
+    }
+  ],
+  "events": {
+    "publishes": [
+      {
+        "name": "workspace.deploy.completed",
+        "sources": [{ "project": "go.putnami.dev/example/api", "contributor": "manual" }]
+      }
+    ],
+    "subscribes": [
+      {
+        "name": "billing.invoice.issued",
+        "sources": [{ "project": "go.putnami.dev/example/billing", "contributor": "manual" }]
+      }
+    ]
+  },
+  "storage": [
+    {
+      "name": "audit-logs",
+      "access": "write",
+      "public": true,
+      "retention": "90d",
+      "sources": [{ "project": "go.putnami.dev/example/audit", "contributor": "manual" }]
+    }
+  ],
+  "secrets": [
+    {
+      "name": "jwks_signing_key",
+      "sources": [{ "project": "go.putnami.dev/example/iam", "contributor": "manual" }]
+    }
+  ],
+  "scheduledJobs": [
+    {
+      "name": "nightly-rollup",
+      "schedule": "0 2 * * *",
+      "entrypoint": "jobs.NightlyRollup",
+      "sources": [{ "project": "go.putnami.dev/example/audit", "contributor": "manual" }]
+    }
+  ],
+  "runtime": {
+    "ingress": { "domain": "api.example.com", "public": true },
+    "scaling": { "max": 100, "concurrency": 80 },
+    "protocols": { "http2": false }
+  }
+}

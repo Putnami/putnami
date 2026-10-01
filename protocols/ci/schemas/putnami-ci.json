@@ -1,0 +1,489 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-ci.json",
+  "title": "Putnami workspace CI intent",
+  "description": "Version 3: the ordered commands every run executes, the flags appended to that invocation, the runner's own configuration, what the repository declares to its release-set provider, the ordered rules that name the channels a trigger publishes, and the environments that follow those channels.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "commands"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://putnami.dev/schemas/putnami-ci.json",
+      "description": "Editor-facing schema identifier."
+    },
+    "version": {
+      "type": "integer",
+      "const": 3,
+      "description": "Selects the dedicated-file contract semantics."
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/commandEntry"
+      },
+      "description": "Canonical framework graph roots every run executes, in order, as one invocation `putnami <c1,c2,…> --impacted <flags>`."
+    },
+    "flags": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/flag"
+      },
+      "description": "Flags appended verbatim to that invocation; each command takes the flags it declares."
+    },
+    "runner": {
+      "type": "object",
+      "description": "What the runner needs to configure itself and nothing else. Its content is open and owned by the runner implementation."
+    },
+    "distribution": {
+      "$ref": "#/$defs/distribution",
+      "description": "What the repository declares to its release-set provider."
+    },
+    "rules": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/rule"
+      },
+      "description": "Ordered first-match rules. A trigger that matches no rule runs the commands only."
+    },
+    "review": {
+      "$ref": "#/$defs/reviewProfile",
+      "description": "Semantic guidance read from the target revision; grants no execution, credential, tool or publication authority."
+    },
+    "envs": {
+      "type": "object",
+      "maxProperties": 64,
+      "additionalProperties": {
+        "$ref": "#/$defs/environment"
+      },
+      "description": "Environments that follow a channel and synchronize their workloads when it moves."
+    }
+  },
+  "$defs": {
+    "reviewProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "fallbackEngine", "focus", "instructions"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "fallbackEngine": { "enum": ["codex", "claude-code"] },
+        "focus": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": { "enum": ["correctness", "security", "architecture", "performance", "maintainability", "tests"] }
+        },
+        "instructions": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "^[^\\s\\u0000-\\u001f\\u007f-\\u009f](?:[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\s\\u0000-\\u001f\\u007f-\\u009f])?$"
+          }
+        }
+      }
+    },
+    "command": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+      "description": "A canonical Putnami graph job name."
+    },
+    "commandEntry": {
+      "description": "A blocking command, authored as its bare name, or an object that reports its errors as warnings instead.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/command"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/command"
+            },
+            "failOnError": {
+              "type": "boolean",
+              "default": true,
+              "description": "False runs the command and reports its errors as warnings: the run passes."
+            }
+          }
+        }
+      ]
+    },
+    "flag": {
+      "type": "string",
+      "pattern": "^--[a-z0-9][a-z0-9-]*(=[^\\s]+)?$",
+      "description": "A long flag such as --enforce-coverage or --name=value."
+    },
+    "glob": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Slash-aware glob; ** matches any number of segments."
+    },
+    "globs": {
+      "description": "One glob or an array of globs.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/glob"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/glob"
+          }
+        }
+      ]
+    },
+    "channel": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 70,
+      "pattern": "^[a-z0-9][a-z0-9._{}-]{0,69}$",
+      "description": "Portable channel name. On a pullRequests rule it may carry {number} once."
+    },
+    "retain": {
+      "type": "string",
+      "pattern": "^(while-open|[1-9][0-9]{0,2}d)$",
+      "description": "\"while-open\", only on a pullRequests rule whose every published channel carries {number}, which expects the provider to retract the channel when that pull request closes or merges; or a whole number of days from 1d to 365d, after which the provider is expected to expire it. A Go duration is not accepted: days are the only unit.",
+      "examples": [
+        "while-open",
+        "30d"
+      ]
+    },
+    "visibility": {
+      "type": "string",
+      "enum": [
+        "internal",
+        "private",
+        "public"
+      ],
+      "description": "Level of the visibility inheritance chain: repository, registry, channel, version, set, member."
+    },
+    "selector": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CLI selection vocabulary: tag:<tag>, group:<group>, scope:<path>, or a project id."
+    },
+    "selectors": {
+      "description": "One selector or an array of selectors.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/selector"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/selector"
+          }
+        }
+      ]
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+          "description": "The repository's declared namespace at the release-set provider."
+        },
+        "visibility": {
+          "$ref": "#/$defs/visibility",
+          "description": "Repository level of the inheritance chain; internal when absent."
+        },
+        "memberAttribution": {
+          "type": "boolean",
+          "default": false,
+          "description": "Record each member's source project and artifact kind on the published sets. Turn it on only once every extension the workspace pins and its release-set provider know the two fields; an older consumer refuses them as unknown fields."
+        },
+        "memberSourceTree": {
+          "type": "boolean",
+          "default": false,
+          "description": "Record on each republished member the git tree of the clean checkout it was built from. Turn it on only once every extension the workspace pins and its release-set provider know the field; an older consumer refuses it as an unknown field."
+        },
+        "registries": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "visibility": {
+                "$ref": "#/$defs/visibility",
+                "description": "Registry level of the inheritance chain."
+              },
+              "mirror": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "to"
+                ],
+                "properties": {
+                  "to": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "External registry the backend copies public members to."
+                  }
+                },
+                "description": "External distribution target for this ecosystem."
+              }
+            }
+          },
+          "description": "Per ecosystem id, the registry level of the chain and its mirror target."
+        },
+        "channels": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "visibility": {
+                "$ref": "#/$defs/visibility",
+                "description": "Channel level of the inheritance chain."
+              },
+              "protected": {
+                "type": "boolean",
+                "default": false,
+                "description": "A channel no rule may target and no CI principal may move; only `putnami channel set` by a user moves it."
+              }
+            }
+          },
+          "description": "Per channel name, its level and whether it is protected."
+        },
+        "versions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "stable": {
+              "$ref": "#/$defs/visibility",
+              "description": "Level a release version resolves to."
+            },
+            "prerelease": {
+              "$ref": "#/$defs/visibility",
+              "description": "Level a prerelease version resolves to."
+            }
+          },
+          "description": "Maps a version shape to a visibility level."
+        },
+        "members": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "select",
+              "visibility"
+            ],
+            "properties": {
+              "select": {
+                "$ref": "#/$defs/selectors",
+                "description": "Projects whose members take this level."
+              },
+              "visibility": {
+                "$ref": "#/$defs/visibility",
+                "description": "Member level of the inheritance chain; the finest, and the last word."
+              }
+            }
+          },
+          "description": "Ordered selection rules that give a member its own level."
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "branches"
+          ]
+        },
+        {
+          "required": [
+            "tags"
+          ]
+        },
+        {
+          "required": [
+            "pullRequests"
+          ]
+        }
+      ],
+      "properties": {
+        "branches": {
+          "$ref": "#/$defs/globs",
+          "description": "Selects a push whose branch matches one of the globs."
+        },
+        "tags": {
+          "$ref": "#/$defs/globs",
+          "description": "Selects a tag whose name matches one of the globs."
+        },
+        "pullRequests": {
+          "type": "boolean",
+          "description": "Selects every pull request. It is the only way a pull request publishes."
+        },
+        "publish": {
+          "description": "The channels the publish advances, in --impacted mode, or false to opt out of the tag convention.",
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/channel"
+              }
+            },
+            {
+              "type": "boolean",
+              "const": false
+            }
+          ]
+        },
+        "retain": {
+          "$ref": "#/$defs/retain",
+          "description": "How long the channels this rule publishes are kept. Absent, the rule declares no lifetime and the channel is kept until someone removes it. \"while-open\" additionally requires every channel of this rule's publish list to carry {number}, a cross-field rule this schema cannot express: the contract's validator owns it and is the stricter of the two."
+        },
+        "baseline": {
+          "$ref": "#/$defs/channel",
+          "description": "The channel whose head the publish measures against when the first channel of publish has no head. It is read, never advanced. It must not appear in publish and cannot carry {number}; both are cross-field or alphabet rules the contract's validator owns and is the stricter of the two."
+        }
+      }
+    },
+    "rollout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy"
+      ],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "progressive",
+            "all-at-once"
+          ],
+          "description": "How the synchronization advances."
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "description": "Ascending percentages in 1..100 whose last entry is 100."
+        },
+        "advance": {
+          "type": "string",
+          "minLength": 1,
+          "description": "\"manual\" or a Go duration between two steps."
+        },
+        "abortOn": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Signal that rolls the step back."
+        }
+      },
+      "description": "How an environment advances a synchronization."
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "approval": {
+          "type": "string",
+          "const": "manual",
+          "description": "The one constraint every implementation supports."
+        }
+      },
+      "description": "Gates the synchronization of an environment or of a workload rule."
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/channel",
+          "description": "Channel this environment follows. Without one, it only reacts to a typed command."
+        },
+        "constraints": {
+          "$ref": "#/$defs/constraints"
+        },
+        "rollout": {
+          "$ref": "#/$defs/rollout"
+        },
+        "variants": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "channel",
+              "routing"
+            ],
+            "properties": {
+              "channel": {
+                "$ref": "#/$defs/channel",
+                "description": "Channel the variant follows."
+              },
+              "routing": {
+                "type": "object",
+                "description": "Implementation-owned routing description."
+              }
+            }
+          },
+          "description": "Parallel channels routed beside the main one."
+        },
+        "workloads": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "select"
+            ],
+            "properties": {
+              "select": {
+                "$ref": "#/$defs/selectors",
+                "description": "Workloads this rule selects."
+              },
+              "channel": {
+                "$ref": "#/$defs/channel",
+                "description": "Overrides the environment's channel."
+              },
+              "rollout": {
+                "$ref": "#/$defs/rollout"
+              },
+              "constraints": {
+                "$ref": "#/$defs/constraints"
+              }
+            }
+          },
+          "description": "Ordered selection rules, first match; a workload no rule selects is not part of the environment."
+        }
+      }
+    }
+  }
+}

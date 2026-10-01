@@ -1,0 +1,21 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "databases": [
+    {
+      "name": "analytics",
+      "engine": "firestore",
+      "schemas": [
+        "events"
+      ]
+    },
+    {
+      "name": "default",
+      "engine": "firestore",
+      "schemas": [
+        "orders",
+        "users"
+      ]
+    }
+  ]
+}

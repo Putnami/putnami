@@ -1,0 +1,28 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": { "attributes": [] },
+      "scopeMetrics": [
+        {
+          "scope": { "name": "putnami" },
+          "metrics": [
+            {
+              "name": "http.duration",
+              "unit": "ms",
+              "histogram": {
+                "dataPoints": [
+                  {
+                    "timeUnixNano": "1700000000000000000",
+                    "sum": 30,
+                    "bucketCounts": ["2"]
+                  }
+                ],
+                "aggregationTemporality": 1
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

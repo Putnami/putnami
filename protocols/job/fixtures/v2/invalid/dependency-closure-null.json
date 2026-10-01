@@ -1,0 +1,23 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/o",
+  "cacheRoot": "/c",
+  "workspace": {"name": "w"},
+  "project": {
+    "name": "p",
+    "path": "p",
+    "fullPath": "/ws/p",
+    "dependencyClosure": null
+  },
+  "extension": {"name": "e", "root": "/e"},
+  "job": {"name": "build"},
+  "identity": {
+    "key": "/p:build",
+    "scope": "project",
+    "project": {"id": "/p", "name": "p"},
+    "task": {"name": "build", "command": "build", "kind": "build"},
+    "provider": {"extension": "e"}
+  },
+  "params": {}
+}

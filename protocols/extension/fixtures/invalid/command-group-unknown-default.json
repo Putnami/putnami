@@ -1,0 +1,25 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/command-group-unknown-default",
+  "commandGroups": {
+    "audit": {
+      "default": "scan",
+      "subcommands": {
+        "run": {
+          "command": "audit-run"
+        }
+      }
+    }
+  },
+  "commands": {
+    "audit-run": {
+      "run": [{ "id": "run", "task": "audit-exec" }]
+    }
+  },
+  "tasks": {
+    "audit-exec": {
+      "kind": "command",
+      "command": "echo"
+    }
+  }
+}

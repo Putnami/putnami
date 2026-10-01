@@ -1,0 +1,26 @@
+{
+  "protocolVersion": 1,
+  "results": [
+    {
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "hit": true,
+      "result": {
+        "status": "success",
+        "durationMs": 4200,
+        "events": [
+          {
+            "v": 1,
+            "type": "metric",
+            "data": { "name": "tests-total", "value": 51, "unit": "count" }
+          },
+          {
+            "v": 1,
+            "type": "summary",
+            "data": { "message": "51/51 passed, 84.0% coverage" }
+          }
+        ]
+      },
+      "manifest": { "files": [] }
+    }
+  ]
+}

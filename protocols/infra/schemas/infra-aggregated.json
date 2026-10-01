@@ -1,0 +1,212 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-infra.json",
+  "title": "Putnami Infrastructure Requirements (aggregated)",
+  "description": "Ephemeral build-emitted aggregated infrastructure manifest. Lives at <workload>/.gen/requirements.json. Produced by walking the workload's dependency graph, merging committed infra/requirements.json files, and layering runtime intent; every entry carries provenance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "workload"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "protocolVersion": {
+      "type": "integer",
+      "const": 2
+    },
+    "workload": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical workload project identifier (e.g. go.putnami.dev/example/api)."
+    },
+    "databases": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/aggregatedDatabase" }
+    },
+    "events": {
+      "$ref": "#/$defs/aggregatedEvents"
+    },
+    "storage": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/aggregatedStorage" }
+    },
+    "secrets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/aggregatedSecret" }
+    },
+    "scheduledJobs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/aggregatedScheduledJob" }
+    },
+    "runtime": {
+      "$ref": "#/$defs/runtime"
+    }
+  },
+  "$defs": {
+    "resourceName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_./-]{0,63}$"
+    },
+    "engine": {
+      "type": "string",
+      "enum": ["postgres", "mysql", "sqlite", "firestore"]
+    },
+    "storageAccess": {
+      "type": "string",
+      "enum": ["read", "write", "readwrite"]
+    },
+    "delivery": {
+      "type": "string",
+      "enum": ["pull", "stream", "push"],
+      "description": "How a subscriber receives events. Absent means the pull default; set only for non-default subscribe entries. Owned by go.putnami.dev/protocol/events."
+    },
+    "contributor": {
+      "type": "string",
+      "pattern": "^(manual|framework:.+)$",
+      "description": "Either the legacy literal \"manual\" or \"framework:<name>\" (including framework:requirements for committed generated manifests)."
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "contributor"],
+      "properties": {
+        "project": { "type": "string", "minLength": 1 },
+        "contributor": { "$ref": "#/$defs/contributor" }
+      }
+    },
+    "sourcesList": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "aggregatedDatabase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "engine", "sources"],
+      "properties": {
+        "name": { "$ref": "#/$defs/resourceName" },
+        "engine": { "$ref": "#/$defs/engine" },
+        "schemas": { "type": "array", "items": { "type": "string" } },
+        "sources": { "$ref": "#/$defs/sourcesList" }
+      }
+    },
+    "aggregatedEvents": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "publishes": { "type": "array", "items": { "$ref": "#/$defs/aggregatedTopic" } },
+        "subscribes": { "type": "array", "items": { "$ref": "#/$defs/aggregatedTopic" } }
+      }
+    },
+    "aggregatedTopic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sources"],
+      "properties": {
+        "name": { "$ref": "#/$defs/resourceName" },
+        "delivery": { "$ref": "#/$defs/delivery" },
+        "sources": { "$ref": "#/$defs/sourcesList" }
+      }
+    },
+    "aggregatedStorage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sources"],
+      "properties": {
+        "name": { "$ref": "#/$defs/resourceName" },
+        "access": { "$ref": "#/$defs/storageAccess" },
+        "public": { "type": "boolean" },
+        "retention": { "type": "string" },
+        "sources": { "$ref": "#/$defs/sourcesList" }
+      }
+    },
+    "aggregatedSecret": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sources"],
+      "properties": {
+        "name": { "$ref": "#/$defs/resourceName" },
+        "sources": { "$ref": "#/$defs/sourcesList" }
+      }
+    },
+    "aggregatedScheduledJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "schedule", "sources"],
+      "properties": {
+        "name": { "$ref": "#/$defs/resourceName" },
+        "schedule": { "type": "string", "minLength": 1, "description": "5-field Cloud Scheduler (unix-cron) expression. The Go validator rejects malformed expressions; JSON Schema only enforces non-empty." },
+        "entrypoint": { "type": "string" },
+        "sources": { "$ref": "#/$defs/sourcesList" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ingress": { "$ref": "#/$defs/ingress" },
+        "scaling": { "$ref": "#/$defs/scaling" },
+        "resources": { "$ref": "#/$defs/resources" },
+        "security": { "$ref": "#/$defs/security" },
+        "protocols": { "$ref": "#/$defs/runtimeProtocols" }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "domain": { "type": "string" },
+        "domains": { "type": "array", "items": { "type": "string" } },
+        "public": { "type": "boolean" }
+      }
+    },
+    "scaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max": { "type": "integer", "minimum": 0 },
+        "concurrency": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": { "type": "string" },
+        "memory": { "type": "string" },
+        "limits": { "$ref": "#/$defs/resourceLimits" }
+      }
+    },
+    "resourceLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": { "type": "string" },
+        "memory": { "type": "string" }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "platformAuth": { "type": "string" },
+        "signBlob": { "type": "boolean" },
+        "eventsGateway": {
+          "type": "boolean",
+          "description": "Whether the workload acts as an event pull/stream gateway and requires deployer-granted event subscriber access."
+        }
+      }
+    },
+    "runtimeProtocols": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "http2": {
+          "type": "boolean",
+          "description": "Whether the workload supports deploy-target HTTP/2 to the container. On h2c-based platforms, false keeps the service on HTTP/1.1."
+        }
+      }
+    }
+  }
+}

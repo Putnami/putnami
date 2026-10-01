@@ -1,0 +1,10 @@
+{
+  "appName": "go.putnami.dev/example/shadow",
+  "version": "0.1.0",
+  "configs": [
+    {
+      "path": "server",
+      "fields": [{ "name": "port", "type": "int", "env": "SERVER_PORT" }]
+    }
+  ]
+}

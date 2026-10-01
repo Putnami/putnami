@@ -1,0 +1,363 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "tooling",
+  "features": [
+    {
+      "id": "tooling/cross-language-rest-clients",
+      "type": "feature",
+      "name": "First-party generated service client lifecycle",
+      "outcome": "A Putnami provider contract is discovered, rendered into strict Go and TypeScript clients with exact output ownership, and verified across the whole workspace in one pass that no build, cache hit or handwritten transport can slip past",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "spec-mediated-generation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "neither-generator-invokes-the-other-languages-extension",
+              "the-clientgen-command-depends-on-build"
+            ]
+          }
+        },
+        {
+          "id": "protocol-conformant-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-declared-output-has-exactly-one-owner",
+              "every-task-carries-a-v3-declaration",
+              "the-contract-harness-rejects-forged-ownership-and-effects",
+              "the-manifest-exercises-the-v3-task-contract-harness",
+              "the-manifest-produces-zero-diagnostics-under-full-validation"
+            ]
+          }
+        },
+        {
+          "id": "dynamic-output-ownership",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "both-language-targets-report-and-own-their-configured-output-directory"
+            ]
+          }
+        },
+        {
+          "id": "unclaimed-outputs-are-declared-unclaimed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-config-chosen-output-is-never-claimed-at-a-literal-path"
+            ]
+          }
+        },
+        {
+          "id": "portable-emitter-resolution",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-external-workspace-needs-no-framework-source-checkout",
+              "preparation-packages-the-runtime-and-the-go-emitter",
+              "tasks-use-the-compiled-runtime-and-package-resolved-language-emitters",
+              "the-framework-emitter-is-packaged-not-linked",
+              "the-published-archive-declares-the-go-emitter"
+            ]
+          }
+        },
+        {
+          "id": "honest-effects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dishonest-effect-declaration-is-rejected",
+              "cacheable-generation-has-no-unreplayed-external-effect",
+              "each-task-declares-exactly-the-effects-it-has"
+            ]
+          }
+        },
+        {
+          "id": "formatter-inputs-are-cache-keyed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cacheable-generator-keys-on-the-built-contract-it-reads",
+              "an-undeclarable-formatter-input-fails-instead-of-being-skipped",
+              "every-resolved-formatter-input-is-a-declared-cache-key-entry"
+            ]
+          }
+        },
+        {
+          "id": "no-source-mutation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-generation-and-verification-task-leaves-authored-sources-alone",
+              "only-the-adoption-command-declares-and-performs-an-authored-source-write"
+            ]
+          }
+        },
+        {
+          "id": "workspace-one-pass",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-workspace-that-declares-no-provider-builds-nothing",
+              "an-explicit-selection-includes-default-excluded-provider-projects",
+              "sync-and-adopt-materialize-all-provider-contracts-themselves",
+              "the-check-builds-nothing-and-renders-nothing",
+              "the-explicit-selection-plans-a-build-for-every-provider",
+              "the-provider-build-refuses-the-cache-for-the-providers-alone"
+            ]
+          }
+        },
+        {
+          "id": "strict-provider-discovery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-operation-an-external-authority-owns-is-not-a-provider-operation",
+              "built-contracts-win-over-stale-committed-copies",
+              "only-indexed-projects-are-provider-authorities",
+              "the-check-reads-the-committed-contract-and-names-targets-from-committed-manifests",
+              "unmarked-contracts-require-explicit-third-party-mode"
+            ]
+          }
+        },
+        {
+          "id": "external-authority",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-first-party-provider-may-consume-an-external-contract",
+              "each-project-commits-its-own-inventories",
+              "external-authority-is-scoped-to-exact-transport-callsites",
+              "external-contract-inventory-schema-matches-the-strict-parser",
+              "external-contracts-carry-authority-adapter-owner-tests-and-reason-without-first-party-bypass"
+            ]
+          }
+        },
+        {
+          "id": "runtime-capability-gate",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-committed-manifest-that-declares-a-cache-policy-its-runtime-does-not-implement-fails-the-check",
+              "a-committed-cache-policy-that-drifts-from-the-provider-contract-fails-the-check"
+            ]
+          }
+        },
+        {
+          "id": "drift-closure",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-deleted-target-operation-or-contract-is-detected",
+              "an-unparseable-committed-manifest-is-a-finding",
+              "forged-missing-and-extra-generated-artifacts-fail",
+              "intentional-sync-can-be-checked-before-commit",
+              "sync-compares-a-fresh-render-with-the-worktree",
+              "the-check-judges-committed-bytes-against-the-committed-manifest-and-contract"
+            ]
+          }
+        },
+        {
+          "id": "named-omissions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-operation-the-manifest-leaves-out-is-accounted-and-never-covered"
+            ]
+          }
+        },
+        {
+          "id": "empty-first-party-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-committed-target-of-an-empty-contract-is-still-judged-in-full",
+              "a-consumer-of-an-empty-contract-is-told-to-classify-the-callsite",
+              "a-contract-discovery-could-not-read-is-never-empty",
+              "a-contract-that-declares-no-first-party-operation-needs-no-generated-target",
+              "a-contract-with-first-party-operations-still-needs-its-generated-target"
+            ]
+          }
+        },
+        {
+          "id": "handwritten-client-guard",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "comments-strings-tests-and-validated-generated-files-do-not-trigger",
+              "framework-runtime-authority-is-bound-to-exact-callsite-identities",
+              "only-indexed-production-sources-enter-the-transport-inventory",
+              "provider-association-is-scoped-to-the-transport-expression",
+              "source-aware-scanning-covers-http-connect-sse-and-websocket-aliases",
+              "the-failure-names-the-service-and-the-generated-binding"
+            ]
+          }
+        },
+        {
+          "id": "consumer-lineage",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-imported-binding-reports-provider-operation-artifact-consumer-auth-and-transport"
+            ]
+          }
+        },
+        {
+          "id": "native-validation-gate",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-guard-declares-a-workspace-read-and-no-cache",
+              "the-guard-task-is-reachable-only-from-validate-and-the-explicit-check-command",
+              "validate-contributes-exactly-one-workspace-guard-for-any-selection",
+              "validate-waits-for-the-selected-providers-generation"
+            ]
+          }
+        },
+        {
+          "id": "censused-pending-transports",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-callsite-the-census-does-not-account-for-fails",
+              "a-censused-callsite-reports-without-failing",
+              "a-malformed-census-fails-instead-of-being-read-leniently",
+              "an-entry-that-matches-nothing-fails-so-the-census-only-shrinks",
+              "the-census-counts-exact-callsite-classes-not-files-or-transports"
+            ]
+          }
+        },
+        {
+          "id": "safe-source-adoption",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-local-binding-or-shorthand-keeps-the-rename-in-the-queue",
+              "a-manifest-that-does-not-parse-has-no-before-and-is-a-finding",
+              "a-multi-file-adoption-that-cannot-finish-writes-nothing",
+              "a-renamed-construction-is-exchanged-at-every-qualified-use",
+              "an-already-migrated-source-is-left-untouched",
+              "the-before-manifests-are-read-before-the-command-writes",
+              "unchanged-generated-lineage-applies-go-and-typescript-import-moves"
+            ]
+          }
+        },
+        {
+          "id": "classified-transport-inventory",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-callsite-authority-survives-an-unrelated-edit-to-its-file",
+              "a-pending-provider-contract-entry-names-its-operations-and-its-closing-work",
+              "a-status-can-only-be-claimed-by-the-exact-project-identity",
+              "an-inventory-entry-cannot-silence-a-first-party-service-reference",
+              "every-detected-transport-callsite-is-claimed-or-fails"
+            ]
+          }
+        },
+        {
+          "id": "transport-detection-precision",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-global-transport-taken-as-a-value-is-a-callsite",
+              "a-member-call-or-a-declaration-is-not-a-global-transport"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

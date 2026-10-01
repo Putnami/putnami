@@ -1,0 +1,5 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-workspace.json",
+  "name": "ws",
+  "unknownField": true
+}

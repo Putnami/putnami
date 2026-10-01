@@ -1,0 +1,195 @@
+{
+  "$comment": "Shared static service-binding header corpus (ADR 0007 of go/framework/client, ADR 0006 of typescript/framework/client). The Go and TypeScript runtimes must accept every accepted map and snapshot it as canonical, and must refuse every refused map with client.config before any byte reaches the network, without echoing a value. Every reservedNames entry is refused in its listed, lower-case and upper-case spellings, and every reservedPrefixes entry is refused followed by any token. declaredCredentialHeaders lists the api-key or named-header profile headers the provider declares for that case. Each runtime reserves exactly reservedNames and reservedPrefixes, no more.",
+  "reservedNames": [
+    "Authorization",
+    "Cookie",
+    "Set-Cookie",
+    "Host",
+    "Connection",
+    "Keep-Alive",
+    "Upgrade",
+    "Content-Type",
+    "Content-Length",
+    "Content-Encoding",
+    "Transfer-Encoding",
+    "TE",
+    "Trailer",
+    "Accept",
+    "Accept-Encoding",
+    "Traceparent",
+    "Tracestate",
+    "Baggage",
+    "X-Forwarded-For",
+    "Forwarded",
+    "X-Real-IP",
+    "X-Cloud-Trace-Context",
+    "Origin",
+    "X-Client-Id",
+    "X-Request-Id",
+    "X-Putnami-Client-Id",
+    "X-Putnami-Service",
+    "X-Trace-Id",
+    "X-Region",
+    "X-Experiments"
+  ],
+  "reservedPrefixes": [
+    "Sec-WebSocket-",
+    "Proxy-",
+    "Connect-",
+    "Grpc-"
+  ],
+  "accepted": [
+    {
+      "name": "an advisory revision",
+      "headers": {
+        "X-Putnami-Observed-Revision": "revision-one"
+      },
+      "canonical": {
+        "X-Putnami-Observed-Revision": "revision-one"
+      }
+    },
+    {
+      "name": "a name is canonicalized and inner spaces and tabs are kept",
+      "headers": {
+        "x-hint": "a b\tc"
+      },
+      "canonical": {
+        "X-Hint": "a b\tc"
+      }
+    },
+    {
+      "name": "an empty value is a value",
+      "headers": {
+        "X-Empty": ""
+      },
+      "canonical": {
+        "X-Empty": ""
+      }
+    },
+    {
+      "name": "every token punctuation character is a name character",
+      "headers": {
+        "X-!#$%&'*+.^_`|~1": "v"
+      },
+      "canonical": {
+        "X-!#$%&'*+.^_`|~1": "v"
+      }
+    },
+    {
+      "name": "names that only resemble a reserved name are ordinary",
+      "headers": {
+        "X-Request-Ids": "v",
+        "X-Traced": "v",
+        "Grpc": "v",
+        "Connect": "v",
+        "Proxy": "v",
+        "Sec-Websocket": "v",
+        "Accepted": "v"
+      },
+      "canonical": {
+        "X-Request-Ids": "v",
+        "X-Traced": "v",
+        "Grpc": "v",
+        "Connect": "v",
+        "Proxy": "v",
+        "Sec-Websocket": "v",
+        "Accepted": "v"
+      }
+    },
+    {
+      "name": "no headers",
+      "headers": {},
+      "canonical": {}
+    }
+  ],
+  "refused": [
+    {
+      "name": "an empty name",
+      "headers": {
+        "": "private-value"
+      }
+    },
+    {
+      "name": "a space in a name",
+      "headers": {
+        "bad name": "private-value"
+      }
+    },
+    {
+      "name": "a colon in a name",
+      "headers": {
+        "bad:name": "private-value"
+      }
+    },
+    {
+      "name": "a non-ASCII name",
+      "headers": {
+        "X-\u00e4": "private-value"
+      }
+    },
+    {
+      "name": "a CRLF in a value",
+      "headers": {
+        "X-Hint": "private-value\r\ninjected: yes"
+      }
+    },
+    {
+      "name": "a NUL in a value",
+      "headers": {
+        "X-Hint": "private-value\u0000"
+      }
+    },
+    {
+      "name": "a C0 control in a value",
+      "headers": {
+        "X-Hint": "private\u0001value"
+      }
+    },
+    {
+      "name": "a DEL in a value",
+      "headers": {
+        "X-Hint": "private-value\u007f"
+      }
+    },
+    {
+      "name": "a Latin-1 value",
+      "headers": {
+        "X-Hint": "private-caf\u00e9"
+      }
+    },
+    {
+      "name": "a non-Latin-1 value",
+      "headers": {
+        "X-Hint": "private-\u20ac"
+      }
+    },
+    {
+      "name": "a leading space",
+      "headers": {
+        "X-Hint": " private-value"
+      }
+    },
+    {
+      "name": "a trailing tab",
+      "headers": {
+        "X-Hint": "private-value\t"
+      }
+    },
+    {
+      "name": "a case alias",
+      "headers": {
+        "X-Hint": "private-value",
+        "x-hint": "private-value"
+      }
+    },
+    {
+      "name": "a declared api-key or named-header credential header, case-insensitively",
+      "headers": {
+        "x-key": "private-value"
+      },
+      "declaredCredentialHeaders": [
+        "X-Key"
+      ]
+    }
+  ]
+}

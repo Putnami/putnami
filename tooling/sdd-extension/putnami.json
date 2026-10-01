@@ -1,0 +1,48 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/sdd",
+  "tags": [
+    "go",
+    "extension"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "options": {
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-sdd",
+      "version-var": "main.runtimeVersion"
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    },
+    "test": {
+      "filePatterns": [
+        "../../protocols/architecture/README.md",
+        "../../protocols/architecture/doc/repository-adoption-matrix.md",
+        "git:**/putnami.architecture.json",
+        "git:**/putnami.json",
+        "git:**/go.mod",
+        "git:**/package.json",
+        "git:**/schema/capabilities.json",
+        "git:**/putnami.features.json",
+        "git:**/specs/*.json",
+        "../../protocols/architecture/fixtures/valid/cloud-pilot/runtime.json",
+        "../../protocols/architecture/fixtures/valid/cloud-pilot/observability.json",
+        "../../protocols/architecture/fixtures/conformance/typescript-emitted-capabilities.json",
+        "../../protocols/features/fixtures/equivalence/go-typescript-design.golden.json",
+        "../../protocols/capabilities/fixtures/v2/valid/all-kinds.json",
+        "../../protocols/capabilities/fixtures/valid/full.json"
+      ]
+    }
+  }
+}

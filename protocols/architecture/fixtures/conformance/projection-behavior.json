@@ -1,0 +1,1099 @@
+{
+  "protocolVersion": 1,
+  "comment": "What a projection contract DOES. Every case seeds the runtime clock from 'now', builds the contract by a shallow top-level merge over a named base, and runs ordered steps. The projected value is always a string so the corpus stays language-neutral.",
+  "bases": {
+    "projection": {
+      "id": "consumer.producer-projection.v1",
+      "version": 1,
+      "from": {
+        "domain": "producer",
+        "export": "producer.facts.v1"
+      },
+      "as": "consumer.producer-copy",
+      "mode": "projection",
+      "status": "active",
+      "facts": [
+        "project_identity",
+        "dependency_edges"
+      ],
+      "bootstrap": {
+        "kind": "in-process",
+        "contract": "putnami.probe.v1",
+        "availability": "active"
+      },
+      "updates": {
+        "kind": "in-process",
+        "contract": "putnami.probe.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "1h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "sourceVersion": "probe_digest",
+        "idempotencyKey": "identity_digest",
+        "lateEvents": "ignore-older"
+      },
+      "localModel": {
+        "name": "consumer.producer-copy",
+        "kind": "projection",
+        "sourceIdentity": "project_identity",
+        "projectedFields": [
+          "project_identity",
+          "dependency_edges"
+        ],
+        "localFields": [],
+        "provenanceField": "probe_digest",
+        "observedAtField": "observed_at",
+        "freshnessField": "freshness_state",
+        "writer": "consumer.loader",
+        "rebuildable": true,
+        "rebuild": "bootstrap"
+      },
+      "deletion": {
+        "strategy": "not-applicable"
+      },
+      "justification": "The consumer keeps a rebuildable local copy so read-only paths answer without paying a probe."
+    }
+  },
+  "consistencyPresets": {
+    "ignore-older": {
+      "maxStaleness": "1h",
+      "onMissing": "fail-closed",
+      "onStale": "use-stale",
+      "ordering": "source-version",
+      "sourceVersion": "probe_digest",
+      "idempotencyKey": "identity_digest",
+      "lateEvents": "ignore-older"
+    },
+    "reject": {
+      "maxStaleness": "1h",
+      "onMissing": "fail-closed",
+      "onStale": "use-stale",
+      "ordering": "source-version",
+      "sourceVersion": "probe_digest",
+      "idempotencyKey": "identity_digest",
+      "lateEvents": "reject"
+    },
+    "apply": {
+      "maxStaleness": "1h",
+      "onMissing": "fail-closed",
+      "onStale": "use-stale",
+      "ordering": "source-version",
+      "sourceVersion": "probe_digest",
+      "idempotencyKey": "identity_digest",
+      "lateEvents": "apply"
+    },
+    "stale-fail-closed": {
+      "maxStaleness": "1h",
+      "onMissing": "fail-closed",
+      "onStale": "fail-closed",
+      "ordering": "source-version",
+      "sourceVersion": "probe_digest",
+      "idempotencyKey": "identity_digest",
+      "lateEvents": "ignore-older"
+    },
+    "missing-fail-open": {
+      "maxStaleness": "1h",
+      "onMissing": "fail-open",
+      "onStale": "use-stale",
+      "ordering": "source-version",
+      "sourceVersion": "probe_digest",
+      "idempotencyKey": "identity_digest",
+      "lateEvents": "ignore-older"
+    }
+  },
+  "cases": [
+    {
+      "name": "a newer source version replaces the local copy",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v2",
+          "sourceVersion": "2",
+          "idempotencyKey": "k2",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "value": "v2",
+            "freshness": "fresh"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a repeated delivery of the applied update changes nothing",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": false
+          }
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "value": "v1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "an older update is dropped under ignore-older",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v2",
+          "sourceVersion": "2",
+          "idempotencyKey": "k2",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": false
+          }
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "value": "v2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "an older update is refused under reject",
+      "base": "projection",
+      "consistency": "reject",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v2",
+          "sourceVersion": "2",
+          "idempotencyKey": "k2",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "error": "late-update"
+          }
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "value": "v2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "an older update overwrites under apply",
+      "base": "projection",
+      "consistency": "apply",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v2",
+          "sourceVersion": "2",
+          "idempotencyKey": "k2",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "value": "v1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a copy past the declared bound is stamped stale and served under use-stale",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "value": "v1",
+            "freshness": "fresh"
+          }
+        },
+        {
+          "op": "advance",
+          "seconds": 7200
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "value": "v1",
+            "freshness": "stale"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a copy past the declared bound is refused under fail-closed and still returned",
+      "base": "projection",
+      "consistency": "stale-fail-closed",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "advance",
+          "seconds": 7200
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "value": "v1",
+            "freshness": "stale",
+            "error": "stale"
+          }
+        }
+      ]
+    },
+    {
+      "name": "an absent fact is refused under fail-closed",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "get",
+          "id": "missing",
+          "expect": {
+            "found": false,
+            "error": "missing"
+          }
+        }
+      ]
+    },
+    {
+      "name": "an absent fact is not an error under fail-open",
+      "base": "projection",
+      "consistency": "missing-fail-open",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "get",
+          "id": "missing",
+          "expect": {
+            "found": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "the local model names one writer and hands the handle out once",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "writer",
+          "name": "consumer.projector",
+          "expect": {
+            "error": "not-the-writer"
+          }
+        },
+        {
+          "op": "writer",
+          "name": "consumer.loader",
+          "expect": {}
+        },
+        {
+          "op": "writer",
+          "name": "consumer.loader",
+          "expect": {
+            "error": "writer-claimed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "the copy is stamped with the producer export it came from",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "provenance": "producer.facts.v1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "enumeration is ordered by source identity and stamps each copy",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "c",
+          "value": "v3",
+          "sourceVersion": "1",
+          "idempotencyKey": "k3",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "apply",
+          "id": "b",
+          "value": "v2",
+          "sourceVersion": "1",
+          "idempotencyKey": "k2",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "all",
+          "expect": {
+            "ids": [
+              "a",
+              "b",
+              "c"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "enumeration orders non-BMP identities by Unicode code point",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "𐀀",
+          "value": "supplementary",
+          "sourceVersion": "1",
+          "idempotencyKey": "non-bmp",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "apply",
+          "id": "",
+          "value": "private-use",
+          "sourceVersion": "1",
+          "idempotencyKey": "bmp",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "all",
+          "expect": {
+            "ids": [
+              "",
+              "𐀀"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a bootstrap rebuild replaces what the projection held",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": [
+          {
+            "id": "x",
+            "value": "bootstrapped",
+            "sourceVersion": "5",
+            "idempotencyKey": "kx"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "rebuild",
+          "expect": {}
+        },
+        {
+          "op": "all",
+          "expect": {
+            "ids": [
+              "x"
+            ]
+          }
+        },
+        {
+          "op": "get",
+          "id": "x",
+          "expect": {
+            "found": true,
+            "value": "bootstrapped"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a replay rebuild resumes from the newest source version held",
+      "base": "projection",
+      "set": {
+        "localModel": {
+          "name": "consumer.producer-copy",
+          "kind": "projection",
+          "sourceIdentity": "project_identity",
+          "projectedFields": [
+            "project_identity",
+            "dependency_edges"
+          ],
+          "localFields": [],
+          "provenanceField": "probe_digest",
+          "observedAtField": "observed_at",
+          "freshnessField": "freshness_state",
+          "writer": "consumer.loader",
+          "rebuildable": true,
+          "rebuild": "replay"
+        }
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "replay": [
+          {
+            "id": "b",
+            "value": "replayed",
+            "sourceVersion": "9",
+            "idempotencyKey": "kb"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v3",
+          "sourceVersion": "3",
+          "idempotencyKey": "k3",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "rebuild",
+          "expect": {
+            "since": "3"
+          }
+        },
+        {
+          "op": "all",
+          "expect": {
+            "ids": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a bootstrap-and-replay rebuild bootstraps first and replays from the bootstrapped state",
+      "base": "projection",
+      "set": {
+        "localModel": {
+          "name": "consumer.producer-copy",
+          "kind": "projection",
+          "sourceIdentity": "project_identity",
+          "projectedFields": [
+            "project_identity",
+            "dependency_edges"
+          ],
+          "localFields": [],
+          "provenanceField": "probe_digest",
+          "observedAtField": "observed_at",
+          "freshnessField": "freshness_state",
+          "writer": "consumer.loader",
+          "rebuildable": true,
+          "rebuild": "bootstrap-and-replay"
+        }
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": [
+          {
+            "id": "x",
+            "value": "bootstrapped",
+            "sourceVersion": "5",
+            "idempotencyKey": "kx"
+          }
+        ],
+        "replay": [
+          {
+            "id": "y",
+            "value": "replayed",
+            "sourceVersion": "7",
+            "idempotencyKey": "ky"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "rebuild",
+          "expect": {
+            "since": "5"
+          }
+        },
+        {
+          "op": "all",
+          "expect": {
+            "ids": [
+              "x",
+              "y"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a contract that declares no deletion refuses to delete",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "delete",
+          "id": "a",
+          "sourceVersion": "2",
+          "expect": {
+            "error": "deletion-not-applicable"
+          }
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "value": "v1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a tombstoned record reads as absent and leaves enumeration",
+      "base": "projection",
+      "set": {
+        "deletion": {
+          "strategy": "tombstone",
+          "tombstoneField": "deleted_at"
+        }
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "apply",
+          "id": "b",
+          "value": "v2",
+          "sourceVersion": "1",
+          "idempotencyKey": "k2",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "delete",
+          "id": "a",
+          "sourceVersion": "2",
+          "expect": {}
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": false,
+            "error": "missing"
+          }
+        },
+        {
+          "op": "all",
+          "expect": {
+            "ids": [
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a hard delete removes the record and keeps its ordering watermark",
+      "base": "projection",
+      "set": {
+        "deletion": {
+          "strategy": "hard-delete"
+        }
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "delete",
+          "id": "a",
+          "sourceVersion": "2",
+          "expect": {}
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": false,
+            "error": "missing"
+          }
+        },
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "resurrected",
+          "sourceVersion": "1",
+          "idempotencyKey": "kz",
+          "expect": {
+            "changed": false
+          }
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": false,
+            "error": "missing"
+          }
+        }
+      ]
+    },
+    {
+      "name": "replaying a hard delete at the same producer state is a no-op",
+      "base": "projection",
+      "set": {
+        "deletion": {
+          "strategy": "hard-delete"
+        }
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "delete",
+          "id": "a",
+          "sourceVersion": "2",
+          "expect": {}
+        },
+        {
+          "op": "delete",
+          "id": "a",
+          "sourceVersion": "2",
+          "expect": {}
+        },
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "same-state",
+          "sourceVersion": "2",
+          "idempotencyKey": "kz",
+          "expect": {
+            "changed": false
+          }
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": false,
+            "error": "missing"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a newer producer state may recreate a hard-deleted record",
+      "base": "projection",
+      "set": {
+        "deletion": {
+          "strategy": "hard-delete"
+        }
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "delete",
+          "id": "a",
+          "sourceVersion": "2",
+          "expect": {}
+        },
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "recreated",
+          "sourceVersion": "3",
+          "idempotencyKey": "k3",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "value": "recreated"
+          }
+        }
+      ]
+    },
+    {
+      "name": "retain keeps the copy visible and still advances the watermark",
+      "base": "projection",
+      "set": {
+        "deletion": {
+          "strategy": "retain"
+        }
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "steps": [
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "v1",
+          "sourceVersion": "1",
+          "idempotencyKey": "k1",
+          "expect": {
+            "changed": true
+          }
+        },
+        {
+          "op": "delete",
+          "id": "a",
+          "sourceVersion": "3",
+          "expect": {}
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "value": "v1"
+          }
+        },
+        {
+          "op": "apply",
+          "id": "a",
+          "value": "late",
+          "sourceVersion": "2",
+          "idempotencyKey": "k2",
+          "expect": {
+            "changed": false
+          }
+        },
+        {
+          "op": "get",
+          "id": "a",
+          "expect": {
+            "found": true,
+            "value": "v1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a planned projection is refused at construction",
+      "base": "projection",
+      "set": {
+        "status": "planned",
+        "bootstrap": {
+          "kind": "in-process",
+          "contract": "putnami.probe.v1",
+          "availability": "planned"
+        },
+        "updates": {
+          "kind": "in-process",
+          "contract": "putnami.probe.v1",
+          "availability": "planned"
+        }
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "expectError": "not-active"
+    },
+    {
+      "name": "a projection that declares bootstrap with no bootstrap source is refused",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {},
+      "expectError": "contract"
+    },
+    {
+      "name": "a projection handed a replay source it does not declare is refused",
+      "base": "projection",
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": [],
+        "replay": []
+      },
+      "expectError": "contract"
+    },
+    {
+      "name": "a snapshot contract is refused by the projection component",
+      "base": "projection",
+      "set": {
+        "mode": "snapshot"
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "sources": {
+        "bootstrap": []
+      },
+      "expectError": "contract"
+    }
+  ]
+}

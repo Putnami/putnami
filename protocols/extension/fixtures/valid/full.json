@@ -1,0 +1,107 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/full-extension",
+  "version": "1.0.0",
+  "autoServe": true,
+  "extensionDependencies": {
+    "@putnami/typescript": "*"
+  },
+  "workspaceDevDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "hooks": {
+    "preBuild": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["pre-build"],
+      "timeoutMs": 10000,
+      "cache": {
+        "inputs": ["src/**/*.ts"],
+        "outputs": ["generated/**/*.ts"]
+      }
+    },
+    "onInstall": {
+      "kind": "command",
+      "command": "putnami",
+      "args": ["cloud", "setup"],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    }
+  },
+  "contracts": {
+    "schemas": {
+      "build-input": {
+        "target": { "type": "string" },
+        "optimize": { "type": "boolean", "optional": true }
+      }
+    }
+  },
+  "commands": {
+    "build": {
+      "description": "Build the project",
+      "activationFiles": ["tsconfig.json"],
+      "flags": {
+        "target": {
+          "type": "string",
+          "default": "production",
+          "description": "Build target",
+          "choices": ["development", "production"]
+        }
+      },
+      "run": [
+        { "id": "generate", "task": "codegen", "dependsOn": ["^generate"] },
+        { "id": "transpile", "task": "build-exec", "dependsOn": ["generate"] }
+      ],
+      "outputs": {
+        "bundle": { "fromStep": "transpile", "path": "data.outputPath" }
+      }
+    },
+    "test": {
+      "description": "Run tests",
+      "run": [{ "id": "test", "task": "test-exec", "heavy": true, "cpuWeight": 2 }]
+    }
+  },
+  "tasks": {
+    "codegen": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["generating"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 60000,
+      "inputs": {
+        "schemas": { "from": "project", "files": ["schemas/**/*.json"] }
+      },
+      "outputs": {
+        "generated": { "kind": "directory", "path": "generated/" }
+      }
+    },
+    "build-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["building"],
+      "cwd": "{projectRoot}",
+      "env": { "NODE_ENV": "production" },
+      "inputSchemaRef": "build-input",
+      "cache": {
+        "enabled": true,
+        "deterministic": true,
+        "key": {
+          "files": ["src/**/*.ts", "tsconfig.json"],
+          "params": ["target"],
+          "env": ["NODE_ENV"]
+        },
+        "outputs": [
+          { "id": "bundle", "kind": "directory", "path": "dist/" }
+        ],
+        "restoreMode": "all-or-nothing"
+      }
+    },
+    "test-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["testing"],
+      "cwd": "{projectRoot}",
+      "cache": false
+    }
+  }
+}

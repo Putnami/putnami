@@ -1,0 +1,108 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "example/storefront",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/api/users",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": false,
+      "provenance": {
+        "project": "example/storefront",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/users/post.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/api/users/{userId}",
+      "methods": [
+        "GET"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "example/storefront",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/users/[userId]/get.ts"
+      }
+    },
+    {
+      "match": "prefix",
+      "path": "/assets/",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "example/storefront",
+        "package": "@putnami/application",
+        "sourceKind": "static-mount",
+        "evidencePath": "public/assets"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/blog/{slug}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "example/storefront",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/blog/[slug]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/favicon.ico",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "example/storefront",
+        "sourceKind": "public-file",
+        "evidencePath": "public/favicon.ico"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/robots.txt",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "example/storefront",
+        "sourceKind": "public-file",
+        "evidencePath": "public/robots.txt"
+      }
+    }
+  ],
+  "digest": "sha256:b9b1df83b351439e30d8aff5c6d2ec7de61de8a9bab1444738c4c27984c1f77e"
+}

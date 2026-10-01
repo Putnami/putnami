@@ -1,0 +1,5 @@
+{
+  "id": "putnami.health.conformance",
+  "capabilityKinds": ["health", "liveness", "readiness"],
+  "languages": ["go", "typescript"]
+}

@@ -1,0 +1,601 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/api-contracts",
+      "type": "feature",
+      "name": "Go API contracts",
+      "outcome": "A Go service declares each endpoint once and serves it while publishing the OpenAPI and Protobuf contracts that describe the same operations",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "streamed-binary-payloads",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-streamed-body-preserves-octets-and-the-callers-media-type-without-buffering",
+              "a-streamed-body-refuses-a-missing-or-nonconcrete-media-type-before-reading",
+              "the-contract-and-generated-client-preserve-explicit-streaming-and-caller-owned-media-types",
+              "the-emitted-client-uploads-and-downloads-caller-labelled-octets-through-a-real-provider"
+            ]
+          }
+        },
+        {
+          "id": "body-methods",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-body-schema-does-not-reject-a-get",
+              "a-declared-body-schema-does-not-reject-a-delete",
+              "body-validation-runs-for-post-put-and-patch",
+              "a-declared-delete-body-is-validated-when-the-request-carries-one"
+            ]
+          }
+        },
+        {
+          "id": "build-time-artifacts",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "describe-writes-the-openapi-document-below-the-output-directory",
+              "describe-writes-the-proto-document-below-the-output-directory",
+              "the-openapi-plugin-writes-nothing-before-configure",
+              "the-proto-plugin-writes-nothing-before-configure",
+              "configuring-the-proto-plugin-never-writes-to-disk",
+              "the-openapi-describe-short-circuits-when-the-project-is-not-targeted",
+              "the-proto-describe-short-circuits-when-the-project-is-not-targeted"
+            ]
+          }
+        },
+        {
+          "id": "catch-all-paths",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-catch-all-parameter-matches-joined-segments-over-real-http",
+              "a-catch-all-parameter-at-the-end-matches-joined-segments",
+              "a-catch-all-parameter-in-the-middle-matches-joined-segments",
+              "openapi-renders-a-catch-all-as-a-single-segment-parameter-describing-its-semantics",
+              "a-generated-client-substitutes-the-joined-value-without-re-escaping"
+            ]
+          }
+        },
+        {
+          "id": "document-only",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-document-only-endpoint-is-not-bound-to-the-transport",
+              "a-document-only-endpoint-does-not-shadow-a-directly-mounted-handler",
+              "a-document-only-stream-records-its-mode-without-binding",
+              "a-document-only-route-is-published-in-the-openapi-document",
+              "a-document-only-route-is-absent-from-the-protobuf-service",
+              "a-document-only-route-is-absent-from-the-connect-bridge"
+            ]
+          }
+        },
+        {
+          "id": "late-route-discovery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "describe-re-renders-the-document-after-every-configurer",
+              "start-re-renders-the-document-after-a-later-plugin-registers-routes",
+              "the-served-handler-refreshes-before-start-completes"
+            ]
+          }
+        },
+        {
+          "id": "single-declaration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-endpoint-carries-its-method-and-path",
+              "an-endpoint-carries-its-input-schemas",
+              "an-endpoint-carries-its-response-declaration",
+              "a-primary-created-status-is-published-and-keeps-generated-response-type",
+              "an-endpoint-carries-its-error-declarations",
+              "an-endpoint-carries-its-security-rule",
+              "an-endpoint-carries-its-middleware",
+              "the-plugin-binds-a-declared-endpoint-to-the-transport",
+              "the-plugin-exposes-the-same-metadata-to-contract-consumers"
+            ]
+          }
+        },
+        {
+          "id": "spec-disclosure",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-openapi-document-is-no-store-unless-a-cacheable-directive-is-declared"
+            ]
+          }
+        },
+        {
+          "id": "stable-operation-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "operation-identity-is-derived-from-method-and-path",
+              "the-openapi-operation-id-is-derived-the-same-way",
+              "the-protobuf-rpc-name-is-derived-the-same-way",
+              "a-generated-client-preserves-the-canonical-operation-id",
+              "colliding-routes-are-disambiguated-in-the-openapi-document",
+              "colliding-rpc-names-are-disambiguated",
+              "duplicate-routes-are-disambiguated-numerically",
+              "a-generated-descriptor-survives-symbol-normalization",
+              "routes-sharing-a-go-client-symbol-are-disambiguated-by-their-path-parameters",
+              "the-emitted-go-client-and-its-manifest-name-each-operation-alike",
+              "the-emitted-go-client-calls-each-route-that-differs-only-by-a-path-parameter"
+            ]
+          }
+        },
+        {
+          "id": "validation-pipeline",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "path-parameters-are-validated",
+              "query-parameters-are-validated",
+              "the-request-body-is-validated",
+              "an-undecodable-body-answers-400",
+              "the-stages-run-path-then-query-then-body",
+              "a-dependency-resolution-failure-answers-a-generic-500"
+            ]
+          }
+        },
+        {
+          "id": "generated-from-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "generating-twice-is-byte-identical",
+              "the-output-is-gofmt-clean-and-compilable",
+              "the-provider-document-is-read-in-memory-from-the-owning-plugin",
+              "canonical-provider-bytes-keep-client-hash-through-unchanged-publication",
+              "a-route-the-provider-removed-leaves-no-residue-in-the-generated-client",
+              "the-emitted-go-client-compiles-against-the-real-client-runtime"
+            ]
+          }
+        },
+        {
+          "id": "generation-refuses-unhonorable-declarations",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stream-with-no-honorable-transport-is-refused-at-generation",
+              "a-transport-no-runtime-can-honor-is-refused-at-generation",
+              "an-integer-without-a-declared-format-is-refused-at-generation",
+              "a-first-party-integer-declares-its-width-and-its-exact-bounds",
+              "a-declared-error-without-a-stable-code-is-refused-at-generation",
+              "a-generated-client-never-sends-a-get-or-head-request-body",
+              "a-first-party-request-body-on-get-or-head-is-refused-at-generation"
+            ]
+          }
+        },
+        {
+          "id": "json-body-fidelity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "first-party-json-bodies-preserve-presence-null-root-shapes-and-exact-integers",
+              "invalid-first-party-json-bodies-are-rejected-before-dispatch"
+            ]
+          }
+        },
+        {
+          "id": "optional-fields",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unset-optional-query-param-is-left-out-of-the-url"
+            ]
+          }
+        },
+        {
+          "id": "producer-attribution",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-operation-records-its-producing-project-and-feature",
+              "a-feature-trace-is-embedded-when-the-design-declares-one"
+            ]
+          }
+        },
+        {
+          "id": "shared-contract-source",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "committed-spec-and-committed-generated-clients-stay-in-sync",
+              "the-go-reader-matches-the-shared-first-party-corpus-expectations",
+              "a-declared-integer-width-and-its-exact-bounds-survive-the-read"
+            ]
+          }
+        },
+        {
+          "id": "first-party-websocket-streams",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-go-provider-serves-the-first-party-go-websocket-client",
+              "admission-heartbeat-and-idle-follow-the-declared-policy",
+              "an-application-message-before-admission-is-refused",
+              "cancellation-and-application-shutdown-end-the-conversation",
+              "declared-credentials-and-headers-are-reconstructed-from-the-init-frame",
+              "the-endpoint-security-chain-runs-before-any-handler",
+              "the-first-party-subprotocol-is-negotiated",
+              "the-provider-never-emits-a-frame-its-contract-refuses",
+              "the-published-websocket-corpus-is-replayed-against-the-real-server",
+              "the-three-stream-directions-carry-their-declared-values"
+            ]
+          }
+        },
+        {
+          "id": "connect-descriptor-parity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "proto3-presence-follows-the-published-schema",
+              "a-non-struct-request-root-keeps-its-declaration",
+              "embedded-struct-fields-are-flattened-like-json",
+              "a-declaration-proto3-cannot-carry-is-refused",
+              "every-published-route-binds-to-one-protobuf-method",
+              "the-shared-descriptor-carries-every-wire-fact",
+              "connect-is-advertised-only-when-a-mounted-bridge-serves-it",
+              "a-descriptor-alone-does-not-advertise-connect",
+              "the-corpus-descriptor-schema-and-ir-carry-one-declaration",
+              "the-reader-refuses-a-descriptor-that-disagrees-with-the-schema",
+              "every-descriptor-parity-rule-names-its-disagreement",
+              "an-enum-and-its-published-members-are-one-set",
+              "every-projected-field-states-its-kind"
+            ]
+          }
+        },
+        {
+          "id": "websocket-stream-emission",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-server-stream-follows-the-declared-transport-order",
+              "a-client-stream-is-emitted-as-a-typed-request-stream",
+              "a-bidirectional-stream-is-emitted-as-a-typed-bidi-stream"
+            ]
+          }
+        },
+        {
+          "id": "declared-transport-order",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-order-cannot-publish-a-transport-the-provider-does-not-serve",
+              "a-declared-transport-order-is-the-published-order",
+              "declared-stream-resume-is-published-on-the-websocket-transport",
+              "resume-is-refused-on-every-shape-that-cannot-be-continued"
+            ]
+          }
+        },
+        {
+          "id": "declared-stream-resume",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-continuation-runs-the-endpoint-security-chain-again",
+              "a-resume-grant-expires-at-its-bound",
+              "a-resume-grant-is-bound-to-the-operation-and-identity-that-earned-it",
+              "a-resume-grant-is-spent-by-its-single-redemption",
+              "a-resume-position-ahead-of-what-the-provider-delivered-is-refused",
+              "a-resumed-server-stream-continues-the-sequence-it-left",
+              "a-stream-stops-being-resumable-once-its-budget-is-spent",
+              "a-stream-that-is-not-declared-resumable-issues-no-grant",
+              "every-admission-mints-its-own-grant",
+              "the-live-grants-of-one-endpoint-are-bounded"
+            ]
+          }
+        },
+        {
+          "id": "binary-payloads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-raw-octet-payload-is-declared-with-its-media-type-and-bound",
+              "a-declared-raw-octet-body-reaches-the-handler-unchanged",
+              "an-oversized-raw-octet-request-is-refused-before-the-body-is-read",
+              "an-undeclared-request-media-type-is-refused",
+              "raw-octets-are-refused-inside-a-json-document",
+              "raw-octets-are-refused-where-they-cannot-travel-unchanged",
+              "the-emitted-client-carries-octets-without-json-or-base64"
+            ]
+          }
+        },
+        {
+          "id": "declared-connect-encoding-order",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-connect-encoding-order-cannot-publish-an-encoding-the-bridge-does-not-serve",
+              "a-declared-connect-encoding-order-is-the-published-order"
+            ]
+          }
+        },
+        {
+          "id": "declared-response-cache",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-cache-policy-is-published-in-the-operation-contract",
+              "a-cache-on-a-non-idempotent-operation-or-an-undeclared-key-field-is-refused-at-publication",
+              "the-emitted-go-client-pins-the-response-cache-capability-and-its-manifest-declares-the-policy",
+              "the-emitted-go-client-answers-a-declared-cached-operation-through-the-real-runtime",
+              "an-invalidation-field-naming-no-scalar-response-property-is-refused-at-publication"
+            ]
+          }
+        },
+        {
+          "id": "multiple-success-statuses",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-multi-success-operation-returns-the-answered-status-and-its-declared-body",
+              "a-multi-success-operation-is-refused-only-where-its-result-cannot-travel",
+              "the-emitted-go-client-answers-each-declared-success-status-through-the-real-runtime",
+              "an-operation-go-omit-operations-names-is-left-out-and-named"
+            ]
+          }
+        },
+        {
+          "id": "opaque-json",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-go-provider-declares-raw-json-maps-of-any-and-the-empty-interface-in-the-closed-opaque-spelling",
+              "the-framework-error-envelope-never-publishes-an-empty-schema",
+              "a-route-carrying-opaque-json-keeps-rest-and-is-left-out-of-the-protobuf-descriptor",
+              "the-emitted-go-client-holds-opaque-json-as-raw-bytes",
+              "an-opaque-value-is-refused-as-a-parameter-and-on-a-connect-dispatch",
+              "the-emitted-go-client-carries-opaque-json-bytes-through-the-real-runtime"
+            ]
+          }
+        },
+        {
+          "id": "optional-credential",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-optional-rule-publishes-its-credential-then-the-anonymous-alternative",
+              "an-anonymous-alternative-is-refused-unless-the-rule-is-optional-and-it-comes-last",
+              "several-credential-profiles-are-never-guessed-for-an-optional-rule",
+              "a-bound-client-presents-the-optional-credential-it-holds-and-calls-anonymously-otherwise",
+              "the-emitted-go-client-presents-an-optional-credential-only-when-its-binding-holds-one"
+            ]
+          }
+        },
+        {
+          "id": "provider-owned-websocket-wires",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-byte-stream-carries-raw-octets-both-ways-after-an-upgrade-admission",
+              "a-typed-provider-wire-carries-json-frames-under-its-declared-subprotocol",
+              "a-provider-owned-wire-that-cannot-be-published-is-refused-at-registration",
+              "the-contract-publishes-the-provider-owned-wire-as-the-only-transport",
+              "the-emitted-go-client-returns-a-byte-stream-or-a-frame-stream",
+              "the-emitted-go-client-carries-both-provider-owned-wires-through-the-real-runtime"
+            ]
+          }
+        },
+        {
+          "id": "explicit-client-binding",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-binding-constructor-is-deterministic-and-its-symbol-is-reserved",
+              "the-emitted-binding-client-preserves-auth-policy-schemas-and-errors-without-di",
+              "a-client-constructed-without-di-calls-the-real-declared-provider"
+            ]
+          }
+        },
+        {
+          "id": "external-contract-operations",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-contradictory-external-declaration-fails-the-provider-before-any-route-is-bound",
+              "a-contradictory-external-route-handed-to-the-generator-fails-generation",
+              "an-external-route-is-served-by-the-standard-pipeline",
+              "the-go-reader-skips-an-external-operation-whole",
+              "an-external-route-is-published-with-its-authority-and-no-client-metadata",
+              "the-emitted-go-client-exposes-only-the-first-party-routes-through-the-real-runtime",
+              "an-external-route-is-absent-from-the-protobuf-service",
+              "an-external-route-is-absent-from-the-connect-bridge"
+            ]
+          }
+        },
+        {
+          "id": "caller-resolved-bindings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-emitted-page-client-calls-distinct-owner-paths-and-audiences-in-go-and-typescript"
+            ]
+          }
+        },
+        {
+          "id": "declared-sse-continuation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-sse-continuation-is-published-on-the-sse-transport",
+              "an-sse-continuation-is-refused-on-every-shape-that-cannot-carry-it",
+              "a-cursor-names-a-required-plain-string-output-field-and-a-declared-query-parameter",
+              "the-emitted-go-client-continues-a-declared-cursor-stream-through-the-real-runtime",
+              "the-emitted-go-client-reopens-a-declared-best-effort-stream-through-the-real-runtime"
+            ]
+          }
+        },
+        {
+          "id": "negotiated-sse-wire",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-negotiated-sse-stream-is-acknowledged-and-ends-with-complete",
+              "an-sse-request-that-does-not-negotiate-keeps-the-legacy-framing",
+              "a-failed-or-canceled-negotiated-stream-never-ends-with-complete",
+              "a-draining-provider-ends-a-negotiated-stream-without-a-terminal"
+            ]
+          }
+        },
+        {
+          "id": "declared-error-details",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-endpoint-declares-a-typed-details-body-per-error-code",
+              "the-implicit-codes-refuse-a-declared-details-body",
+              "the-contract-publishes-the-declared-details-schema-for-that-code-only",
+              "a-throws-status-shared-by-codes-with-declared-details-keeps-each-codes-schema",
+              "the-emitted-go-client-decodes-declared-details-from-a-real-provider"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

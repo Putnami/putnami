@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "extensions": {
+    "@putnami/cloud": {
+      "version": "0.0.0-52f2431",
+      "integrity": "eae0b0b071e7fa4a4e2d6105deeb984ac2ddc423c5945acf64ed228aeda413dd",
+      "integrities": {
+        "darwin/arm64": "97cea734f8d567671bcfe23308d971f6559ded73535943e55a263db1ae231baf",
+        "linux/amd64": "eae0b0b071e7fa4a4e2d6105deeb984ac2ddc423c5945acf64ed228aeda413dd"
+      },
+      "manifestHash": "fb54c3730836658a7d2f23bd1ff89fbe9330eda5ff5fb0ae55bebc9d17f034e2",
+      "source": "https://put.putnami.dev/putnami/cloud/download?channel=0.0.0-52f2431",
+      "taskContract": 3
+    }
+  },
+  "templates": {}
+}

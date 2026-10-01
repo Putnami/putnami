@@ -1,0 +1,1 @@
+{"v":1,"type":"result","data":{"status":"OK","data":{"releaseSet":{"protocolVersion":1,"namespace":"putnami","channel":"canary","ref":{"id":"rs_78cf0c289ecbf6ff1634206ce32e4f902ba095d48d7e04d8e6cc32e7d17b64ba","digest":"sha256:78cf0c289ecbf6ff1634206ce32e4f902ba095d48d7e04d8e6cc32e7d17b64ba"}}}}}

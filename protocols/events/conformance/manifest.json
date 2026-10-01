@@ -1,0 +1,260 @@
+{
+  "protocol": "putnami.events.v1",
+  "suite": "putnami.events.conformance.v1",
+  "defaults": {
+    "topicPrefix": "conformance.${runId}",
+    "timeoutMs": 10000
+  },
+  "target": {
+    "discoveryPath": "/.well-known/putnami/events",
+    "grpcService": "putnami.events.v1.EventServer"
+  },
+  "output": {
+    "formats": ["json", "junit"],
+    "requiredFields": ["runId", "target", "capabilities", "cases"]
+  },
+  "cases": [
+    {
+      "id": "discovery.capabilities.valid",
+      "level": "required",
+      "transport": "discovery",
+      "steps": [
+        "GET the discovery document from target.discoveryPath",
+        "decode it as EventServerCapabilities",
+        "validate protocol, transports, features, endpoints, and limits"
+      ],
+      "expect": [
+        "protocol is putnami.events.v1",
+        "every listed transport has a matching endpoint entry",
+        "payload support includes json"
+      ]
+    },
+    {
+      "id": "http.publish.valid",
+      "level": "required",
+      "transport": "http",
+      "requires": {
+        "transports": ["http"],
+        "features": ["publish"]
+      },
+      "steps": [
+        "POST a publish frame to endpoints.publish.path using a generated conformance topic",
+        "include a JSON payload, key, dedupeKey, attributes, and traceId",
+        "decode the response as a publish acknowledgement"
+      ],
+      "expect": [
+        "response protocol is putnami.events.v1",
+        "response includes id, topic, and timestamp",
+        "topic matches the published topic"
+      ]
+    },
+    {
+      "id": "http.publish.invalid-frame",
+      "level": "required",
+      "transport": "http",
+      "requires": {
+        "transports": ["http"],
+        "features": ["publish"]
+      },
+      "steps": [
+        "POST a publish frame missing topic or payload",
+        "decode the error response as EventServerError"
+      ],
+      "expect": [
+        "request is rejected",
+        "error code is invalid_frame or invalid_envelope",
+        "error protocol is putnami.events.v1"
+      ]
+    },
+    {
+      "id": "sse.subscribe.realtime",
+      "level": "required",
+      "transport": "sse",
+      "requires": {
+        "transports": ["sse", "http"],
+        "features": ["publish"]
+      },
+      "steps": [
+        "open endpoints.sse.path with topic and from=latest",
+        "publish an event to the same topic through HTTP publish",
+        "read one SSE event frame"
+      ],
+      "expect": [
+        "SSE id matches the frame id",
+        "frame type is event",
+        "frame payload matches the published payload"
+      ]
+    },
+    {
+      "id": "sse.subscribe.replay",
+      "level": "recommended",
+      "transport": "sse",
+      "requires": {
+        "transports": ["sse", "http"],
+        "features": ["replay", "publish"]
+      },
+      "steps": [
+        "publish an event and record the accepted id",
+        "connect to SSE with Last-Event-ID or from set to the recorded id",
+        "read the replayed event or the next event according to the advertised cursor mode"
+      ],
+      "expect": [
+        "server honors Last-Event-ID when from is omitted",
+        "server rejects unsupported cursor values with invalid_cursor",
+        "replay behavior matches features.cursor"
+      ]
+    },
+    {
+      "id": "websocket.subscribe.realtime",
+      "level": "required",
+      "transport": "websocket",
+      "requires": {
+        "transports": ["websocket", "http"],
+        "features": ["publish"]
+      },
+      "steps": [
+        "open endpoints.websocket.path",
+        "send an auth frame when the target requires credentials",
+        "send a subscribe frame for a generated conformance topic",
+        "publish an event to the same topic through HTTP publish"
+      ],
+      "expect": [
+        "server emits an ack or event frame after subscription",
+        "received event frame uses canonical EventServerFrame fields",
+        "payload matches the published payload"
+      ]
+    },
+    {
+      "id": "websocket.invalid-protocol",
+      "level": "required",
+      "transport": "websocket",
+      "requires": {
+        "transports": ["websocket"]
+      },
+      "steps": [
+        "open endpoints.websocket.path",
+        "send a frame with a wrong protocol identifier"
+      ],
+      "expect": [
+        "server emits an error frame or closes with a protocol error",
+        "error code is protocol_mismatch or invalid_frame"
+      ]
+    },
+    {
+      "id": "grpc.capabilities.valid",
+      "level": "required",
+      "transport": "grpc",
+      "requires": {
+        "transports": ["grpc"]
+      },
+      "steps": [
+        "call putnami.events.v1.EventServer.Capabilities",
+        "decode the response with proto/putnami/events/v1/event_server.proto"
+      ],
+      "expect": [
+        "response matches the HTTP discovery capabilities",
+        "protocol is putnami.events.v1"
+      ]
+    },
+    {
+      "id": "grpc.publish.subscribe",
+      "level": "required",
+      "transport": "grpc",
+      "requires": {
+        "transports": ["grpc"],
+        "features": ["publish"]
+      },
+      "steps": [
+        "open Subscribe for a generated conformance topic",
+        "call Publish with a JSON payload for the same topic",
+        "read one EventServerFrame from the Subscribe stream"
+      ],
+      "expect": [
+        "Publish returns id, topic, and timestamp",
+        "Subscribe emits an event frame with the published payload",
+        "all messages use the canonical proto service"
+      ]
+    },
+    {
+      "id": "grpc.health.valid",
+      "level": "required",
+      "transport": "grpc",
+      "requires": {
+        "transports": ["grpc"]
+      },
+      "steps": [
+        "call putnami.events.v1.EventServer.Health"
+      ],
+      "expect": [
+        "response protocol is putnami.events.v1",
+        "status is ok, degraded, or unavailable"
+      ]
+    },
+    {
+      "id": "limits.payload-too-large",
+      "level": "recommended",
+      "transport": "http",
+      "requires": {
+        "transports": ["http"],
+        "features": ["publish"]
+      },
+      "steps": [
+        "read limits.maxPayloadBytes from capabilities",
+        "when the limit is greater than zero, publish a payload larger than the limit"
+      ],
+      "expect": [
+        "server rejects the request",
+        "error code is payload_too_large"
+      ]
+    },
+    {
+      "id": "push.receiver.valid",
+      "level": "required",
+      "transport": "push",
+      "requires": {
+        "features": ["ack"]
+      },
+      "steps": [
+        "configure a delivery:push subscription so the provider POSTs to the receiver route",
+        "POST a provider push wrapper carrying a base64-encoded canonical Envelope to the receiver",
+        "include a valid audience-pinned OIDC bearer token minted as the events-server service account"
+      ],
+      "expect": [
+        "receiver verifies the OIDC token (issuer, audience, and service-account-email allowlist) before dispatch",
+        "the handler runs once and the receiver responds 2xx to acknowledge",
+        "the decoded envelope matches the published envelope"
+      ]
+    },
+    {
+      "id": "push.receiver.auth-rejected",
+      "level": "required",
+      "transport": "push",
+      "requires": {
+        "features": ["ack"]
+      },
+      "steps": [
+        "POST a provider push wrapper with a missing, expired, wrong-audience, or non-allowlisted service-account token"
+      ],
+      "expect": [
+        "receiver rejects the request fail-closed without dispatching the handler",
+        "response status is 401 or 403"
+      ]
+    },
+    {
+      "id": "push.receiver.ack-dlq-retry",
+      "level": "recommended",
+      "transport": "push",
+      "requires": {
+        "features": ["ack"]
+      },
+      "steps": [
+        "deliver one message the handler acknowledges, one it permanently rejects, and one whose handler fails transiently"
+      ],
+      "expect": [
+        "acknowledged delivery responds 2xx (ack)",
+        "permanently rejected delivery responds 4xx (dead-letter)",
+        "transiently failed delivery responds 5xx (provider retries)"
+      ]
+    }
+  ]
+}

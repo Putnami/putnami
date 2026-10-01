@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/cache-lifecycle#eviction",
+    "go/cache-lifecycle#expiration",
+    "go/cache-lifecycle#ownership"
+  ]
+}

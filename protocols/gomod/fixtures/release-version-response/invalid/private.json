@@ -1,0 +1,5 @@
+{
+  "module": "go.putnami.dev/protocol/distribution",
+  "version": "v1.2.3-canary.1",
+  "visibility": "private"
+}

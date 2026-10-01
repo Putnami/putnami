@@ -1,0 +1,26 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/p/validate",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {"name": "putnami"},
+  "project": {"name": "p", "path": "p", "fullPath": "/ws/p"},
+  "selection": {
+    "mode": "impacted",
+    "scoped": true,
+    "baseline": "origin/main",
+    "baselineSource": "upstream",
+    "projects": [],
+    "emptyImpact": true
+  },
+  "extension": {"name": "@putnami/sdd", "root": "/ws/tooling/sdd-extension"},
+  "job": {"name": "validate"},
+  "identity": {
+    "key": "/p:validate",
+    "scope": "project",
+    "project": {"id": "/p", "name": "p"},
+    "task": {"name": "validate", "command": "validate", "kind": "validate"},
+    "provider": {"extension": "@putnami/sdd"}
+  },
+  "params": {}
+}

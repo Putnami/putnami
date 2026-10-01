@@ -1,0 +1,101 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/extension-authoring",
+  "outcomes": [
+    "An extension author writes only what their ecosystem knows, and inherits the orchestrator handshake — events, context, flags, subprocesses, manifest — from the SDK",
+    "A manifest that the CLI would reject is rejected while the extension is being built, in the extension's own test run, rather than in a consumer's workspace at plan time",
+    "The lifecycle primitives an extension may own — runtime preparation, workspace adaptation, machine caches, invocation-scoped sensitive outputs, infra aggregation — have one neutral implementation, so every extension behaves the same way in the parts that are not language-specific",
+    "A credential an extension provisions never reaches the event stream, the process argv, or a cached artifact"
+  ],
+  "nonGoals": [
+    "Defining the wire contracts themselves — those belong to protocols/extension, protocols/job and protocols/runtime; this module is the authoring library over them",
+    "Being a general-purpose Go utility library: a helper belongs here only when the orchestrator handshake or a shared lifecycle primitive requires it",
+    "Providing an authoring SDK for languages other than Go",
+    "Promising compatibility across every pre-1.0 minor release, which RELEASE.md governs"
+  ],
+  "requirements": [
+    {
+      "id": "release-plan-compatibility",
+      "text": "The job-context release-set plan accepts additive unknown fields at the supported protocol version, rejects unsupported versions naming received and supported versions, and preserves single-document framing, size limits and validation of known fields."
+    },
+    {
+      "id": "event-stream-conformance",
+      "text": "The emitter's output conforms to the runtime protocol's wire shape, including the typed readiness marker at the negotiated version, and a value the protocol cannot represent is dropped rather than emitted malformed."
+    },
+    {
+      "id": "log-forwarding-fidelity",
+      "text": "A child process's structured log line is forwarded with its severity and fields preserved, a plain line is forwarded as text, an unparseable line is not dropped, and reserved protocol keys in child output cannot overwrite the envelope."
+    },
+    {
+      "id": "manifest-validated-at-build-time",
+      "text": "Building a manifest runs the same protocol validation the CLI runs and refuses to produce one that violates the task contract or is structurally defective; writing one emits canonical JSON and refuses to write an invalid manifest."
+    },
+    {
+      "id": "builder-does-not-alias",
+      "text": "A built manifest does not alias the builder's state, so a later builder mutation cannot change a manifest already produced."
+    },
+    {
+      "id": "architecture-authored-in-code",
+      "text": "An ARC/DARC manifest can be authored in Go. Build applies the protocol verdict and refuses invalid domains; ReferenceFact omits placeholder data metadata only on reference-only exports; canonical bytes round-trip through the strict reader; mode constructors emit only their own members; permissions remain explicit; and Pin fails on hand edits."
+    },
+    {
+      "id": "subprocess-control",
+      "text": "Subprocess execution honours the working directory, an explicit environment, an unset list that preserves every other variable, a timeout, an external cancellation, and stdin, and reports a missing binary as an error rather than a failed run."
+    },
+    {
+      "id": "host-identity-scrub",
+      "text": "The platform-identity variable list covers the managed-runtime identity variables, excludes credential- and endpoint-bearing variables, is sorted and unique, is matched case-sensitively, and is returned as an independent copy that a caller cannot mutate in place."
+    },
+    {
+      "id": "checkout-independent-generation-paths",
+      "text": "Every path a generation result serializes is project-relative, relativizing and resolving round-trip, an already-absolute value resolves to itself, and the transformation rewrites every value in a map or list rather than a subset."
+    },
+    {
+      "id": "cache-eviction-policy",
+      "text": "Machine-cache collection evicts oldest-first to the low watermark, protects entries inside the grace window, is deterministic for identical inputs, treats an absent budget as unbounded rather than zero, treats a missing cache root as success, and skips a root another collector holds instead of blocking."
+    },
+    {
+      "id": "credential-confinement",
+      "text": "A provisioned database credential is confined to the invocation-scoped sensitive artifact: the event stream is credential-free, and the artifact is the only path a consumer reads the binding from."
+    },
+    {
+      "id": "test-environment-policy",
+      "text": "The database test-environment mode resolves by a fixed precedence, never creates infrastructure outside auto mode off CI, uses a server the pipeline provided when one is named, is a no-op when the dependency closure declares no database, bounds the connection pool of every binding it emits unless the provided server states otherwise, and lets an externally supplied binding win over any provider."
+    },
+    {
+      "id": "infra-aggregation-neutrality",
+      "text": "Infra aggregation merges the dependency closure, skips libraries, treats an unclassified project as a workload, ignores generator scratch, normalizes wire-compatible v1 generated manifests to v2, reports a conflict as a diagnostic, and lets a language extension's compatibility hook apply to both defaults and authored runtimes without ever failing the task."
+    },
+    {
+      "id": "shared-package-metadata-writer",
+      "text": "Every packager records the channels it produced inside the output directory it owns, so no writer shares a path with a sibling; the channel index is derived over those records in sorted directory order, drops empty and duplicate names, skips a damaged record, still reports one an earlier run left, and reports not-exist when none exists. The archive publication manifest has a single owner that states its whole document."
+    },
+    {
+      "id": "local-image-publication-boundary",
+      "text": "Image packaging owns a cache-restorable local OCI candidate and never output-registry identity, credentials, or publication evidence; project-base composition consumes that local candidate; Docker publish alone resolves the target, publishes and remotely verifies the digest, then writes publish-owned immutable evidence without mutating package bytes. Private publish may use a numeric loopback broker while preserving the logical repository, digest reference, and registry evidence."
+    },
+    {
+      "id": "ecosystem-profiles",
+      "text": "The SDK ships the oci ecosystem profile and the member event helpers an extension uses to declare an ecosystem and report each published artifact."
+    },
+    {
+      "id": "oci-publish-by-digest",
+      "text": "Verified uploads and reuse emit a member at the full repository path, excluding only the registry host. Native images require an exact selected plan coordinate, project and version; standalone images retain their content version. Private image publication writes only the digest; workload Docker publication may tag its version. Channels belong to the release. The workspace registry determines the target. Publication makes one manifest existence check, with no extra push or digest lookup."
+    },
+    {
+      "id": "agent-content-packaging",
+      "text": "An extension's agent content is built by the same agent-artifact builder as a standalone artifact, under the extension's own name and version and its declared content policy. Packaging a content-only extension writes the built tree and the packaged contribution form, stamps the lowest CLI contract that covers the manifest, refuses what it cannot certify, and returns only a reproducible, platform-independent archive this CLI's own loader reads; the manifest builder stamps the same contract."
+    },
+    {
+      "id": "agent-content-staging",
+      "text": "A packager that ships an executable stages an extension's agent content with the same builder: the tree built from the authored source under agentContent.path and the packaged form bound by its digest, leaving a manifest without agent content untouched. It refuses a contribution without a source, another name, an occupied path, and content the policy forbids, writing nothing; verification refuses any staged byte, file or symlink the digests do not bind."
+    }
+  ],
+  "decisions": [
+    "tooling/extension-sdk/doc/adr/0001-the-sdk-owns-the-neutral-half-of-a-lifecycle.md",
+    "tooling/extension-sdk/doc/adr/0002-a-secret-lives-in-one-artifact.md",
+    "protocols/extension/doc/adr/0006-agent-content-is-an-additive-contract.md",
+    "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "protocolVersion": 1,
+  "entries": [
+    { "id": "@putnami/python", "kind": "package", "status": "beta" }
+  ]
+}

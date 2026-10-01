@@ -1,0 +1,1482 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "cliContract": 4,
+  "runtime": {
+    "executable": "compiled/putnami-go",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          { "from": "environment", "environment": "GOROOT", "path": "bin/go" },
+          { "from": "path", "path": "go" },
+          { "from": "putnami-home", "path": "toolchains/go/go-{version}/go/bin/go" },
+          { "from": "environment", "environment": "PUTNAMI_WORKSPACE_ROOT", "path": ".putnami/extensions/@putnami-go/libs/go-{version}/go/bin/go" }
+        ],
+        "probe": {
+          "args": ["env", "GOVERSION"],
+          "expect": "go{version}",
+          "unset": ["GOROOT"],
+          "environment": { "GOTOOLCHAIN": "local" }
+        },
+        "environment": {
+          "GOROOT": { "from": "ancestor", "levels": 2 },
+          "GOTOOLCHAIN": { "from": "literal", "value": "local" }
+        },
+        "prependPath": true
+      }
+    },
+    "runToolchains": ["runtimeCompiler"],
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": ["--output", "{runtimeOutput}"],
+      "inputs": ["bin/prepare", "cmd/**", "go.mod", "go.sum", "internal/**", "tools/**"],
+      "toolchains": ["runtimeCompiler"]
+    }
+  },
+  "workspace": {
+    "markers": ["go.mod"],
+    "inputs": ["go.mod", "**/*.go", "go.work"],
+    "excludes": ["testdata", "vendor"],
+    "syncTask": "workspace-sync-exec",
+    "dependencySources": true
+  },
+  "commands": {
+    "build": {
+      "description": "Build Go project: refresh dependencies and compile for the host platform. Cross-compilation is opt-in via `platforms` / `--target`; the full release matrix belongs to `package`.",
+      "activationFiles": ["**/*.go", "go.mod"],
+      "flags": {
+        "skip-deps": { "type": "boolean", "default": false, "description": "Skip dependency refresh" },
+        "readonly": { "type": "boolean", "default": false, "description": "Use module download mode readonly" },
+        "mod": { "type": "string", "description": "Module download mode: readonly, vendor, or mod" },
+        "target": { "type": "string", "short": "-t", "description": "Cross-compile for one platform instead of the host (GOOS/GOARCH, e.g., linux/amd64). Wins over `platforms`." },
+        "platforms": { "type": "string", "description": "Cross-compile for an explicit platform set instead of the host: `host`, `all`, or a comma-separated list (e.g., linux/amd64,darwin/arm64). Also settable per project as options[\"@putnami/go\"].platforms." },
+        "output_path": { "type": "string", "short": "-o", "description": "Output binary path" },
+        "ldflags": { "type": "string", "description": "Linker flags (e.g., -s -w for stripping)" },
+        "gcflags": { "type": "string", "description": "Go compiler flags (e.g., -N -l for debugging)" },
+        "asmflags": { "type": "string", "description": "Go assembler flags" },
+        "tags": { "type": "string", "description": "Build tags (comma-separated)" },
+        "race": { "type": "boolean", "default": false, "description": "Enable race detector" },
+        "trimpath": { "type": "boolean", "default": false, "description": "Remove file system paths from binary" },
+        "installsuffix": { "type": "string", "description": "Install suffix for build cache isolation" },
+        "p": { "type": "number", "short": "-p", "description": "Parallel builds (default: GOMAXPROCS)" },
+        "cgo": { "type": "boolean", "description": "Build with CGO enabled" },
+        "buildmode": {
+          "type": "string",
+          "description": "Build mode (default, archive, c-archive, c-shared, shared, exe, pie)"
+        },
+        "entrypoint": {
+          "type": "string",
+          "description": "Package path to build (default: .). Use for projects with cmd/ layout (e.g., ./cmd/myapp)"
+        },
+        "describe-entrypoint": {
+          "type": "string",
+          "description": "Package path to run for build-time describe/OpenAPI generation when it differs from the build target"
+        },
+        "install": {
+          "type": "string",
+          "description": "Copy compiled binary to this path (relative to workspace root) after successful build"
+        },
+        "version-var": {
+          "type": "string",
+          "description": "Go variable path to inject version via -X ldflags (e.g., main.Version or full/pkg/path.Version)"
+        },
+        "remote-build-cache": { "type": "boolean", "default": true, "description": "Back the Go build cache with the run's shared object cache when a cache provider offers one; the local Go cache is used either way. Off keeps the local cache alone." }
+      },
+      "run": [
+        {
+          "id": "config-merge",
+          "task": "config-merge-exec",
+          "dependsOn": ["^config-merge"]
+        },
+        {
+          "id": "tidy",
+          "task": "build-tidy",
+          "dependsOn": ["^tidy", "config-merge"],
+          "if": "!params.skip-deps"
+        },
+        {
+          "id": "generate",
+          "task": "build-generate",
+          "dependsOn": ["^generate", "tidy"]
+        },
+        {
+          "id": "describe",
+          "heavy": true,
+          "task": "build-describe",
+          "dependsOn": ["^describe", "generate"],
+          "activation": { "contains": { "go.mod": "go.putnami.dev/app" } }
+        },
+        {
+          "id": "compile",
+          "heavy": true,
+          "task": "build-compile",
+          "dependsOn": ["describe"],
+          "if": "project.type != 'library' || !(commands.build && commands.lint && commands.test) || params.target || params.platforms || params.mod || params.readonly || params.ldflags || params.gcflags || params.asmflags || params.tags || params.race != commandParams.test.race || params.trimpath || params.installsuffix || params.p != null || params.cgo != null || params.buildmode || params.version-var"
+        },
+        {
+          "id": "infra",
+          "task": "build-infra",
+          "dependsOn": ["generate", "describe", "compile"]
+        }
+      ]
+    },
+    "test": {
+      "description": "Run Go tests with coverage support.",
+      "activationFiles": ["**/*_test.go", "go.mod"],
+      "flags": {
+        "coverage": { "type": "boolean", "default": true, "description": "Per-project coverage policy. Set false to opt a project out of coverage entirely (authoritative — the validation cadence never overrides it)." },
+        "enforce-coverage": { "type": "boolean", "default": true, "description": "Enforce each project's coverage-threshold. On by default so a coverage drop fails the run that caused it. Pass --no-enforce-coverage to keep measuring and reporting coverage without failing on the threshold; to skip instrumentation entirely use --coverage=false, which this never overrides." },
+        "race": { "type": "boolean", "default": false, "description": "Enable race detector" },
+        "timeout": { "type": "string", "description": "Test timeout (e.g., 30s, 5m)" },
+        "short": { "type": "boolean", "default": false, "description": "Run only short tests" },
+        "run": { "type": "string", "description": "Run only tests matching the pattern" },
+        "count": { "type": "number", "description": "Run tests n times (useful for flaky detection)" },
+        "shuffle": { "type": "boolean", "default": false, "description": "Randomize test order (Go 1.17+)" },
+        "bench": { "type": "string", "description": "Run benchmarks matching the pattern" },
+        "benchtime": { "type": "string", "description": "Benchmark duration (e.g., 1s, 100x)" },
+        "describe-entrypoint": {
+          "type": "string",
+          "description": "Package path to run for build-time describe/OpenAPI generation"
+        },
+        "test-verbose": { "type": "boolean", "default": false, "description": "Show the complete test transcript at info level (and pass -v to go test); changes visibility only, never the verdict" },
+        "test-json": { "type": "boolean", "default": true, "description": "Run go test with -json for structured parsing" },
+        "package-parallel": { "type": "number", "description": "Maximum number of packages Go tests in parallel (-p). Absent by default, preserving Go's native scheduling." },
+        "parallel": { "type": "number", "description": "Run tests in parallel (default: GOMAXPROCS)" },
+        "failfast": { "type": "boolean", "default": false, "description": "Fail fast on first test failure" },
+        "coverprofile": { "type": "string", "description": "Coverage output file (default: coverage.out)" },
+        "covermode": { "type": "string", "description": "Coverage mode: set, count, or atomic" },
+        "outputdir": { "type": "string", "description": "Coverage output directory" },
+        "coverhtml": { "type": "boolean", "default": false, "description": "Generate HTML coverage report" },
+        "coverage-threshold": {
+          "type": "number",
+          "default": 0,
+          "description": "Minimum required coverage percentage (0 disables the gate). Fails the test job when statement coverage is below it. Enforced by default; --no-enforce-coverage zeroes it for the run while still reporting coverage. Configurable per workspace, language, or project."
+        },
+        "coverage-scope": {
+          "type": "string",
+          "default": "batch",
+          "choices": ["batch", "project"],
+          "description": "Whose tests count toward a batched project's coverage. batch (default) runs one go test over every batch member and a line of this project covered by a batch mate's tests counts as covered. project runs one go test per member with -coverpkg limited to the member's own packages, so its coverage counts its own tests only and does not depend on which projects share its batch. Any other value fails the test job."
+        },
+        "remote-build-cache": { "type": "boolean", "default": true, "description": "Back the Go build cache with the run's shared object cache when a cache provider offers one; the local Go cache is used either way. Off keeps the local cache alone." }
+      },
+      "run": [
+        {
+          "id": "config-merge",
+          "task": "config-merge-test-exec",
+          "dependsOn": ["^config-merge"]
+        },
+        {
+          "id": "generate",
+          "task": "build-generate",
+          "dependsOn": ["^generate", "config-merge"],
+          "with": { "mode": { "value": "test" } }
+        },
+        {
+          "id": "describe",
+          "heavy": true,
+          "task": "build-describe",
+          "dependsOn": ["^describe", "generate"],
+          "activation": { "contains": { "go.mod": "go.putnami.dev/app" } }
+        },
+        {
+          "id": "test-env",
+          "task": "test-env-up",
+          "dependsOn": ["describe"],
+          "activation": { "closureFiles": ["infra/requirements.json"] }
+        },
+        { "id": "test", "heavy": true, "task": "test-exec", "dependsOn": ["describe", "test-env"] },
+        {
+          "id": "test-env-teardown",
+          "task": "test-env-down",
+          "runOn": "finally",
+          "finalizes": {
+            "producer": "test-env",
+            "consumers": ["test"],
+            "pruneIf": "!params.infra-down"
+          },
+          "activation": { "closureFiles": ["infra/requirements.json"] }
+        }
+      ]
+    },
+    "lint": {
+      "description": "Lint Go code with golangci-lint and staticcheck.",
+      "activationFiles": ["**/*.go", "go.mod"],
+      "flags": {
+        "fix": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-fix issues where possible (golangci-lint only)"
+        },
+        "config": { "type": "string", "description": "Custom config path for golangci-lint" },
+        "new": {
+          "type": "boolean",
+          "default": false,
+          "description": "Only lint new/changed code (golangci-lint only)"
+        },
+        "tool": { "type": "string", "default": "all", "description": "Which tool: golangci-lint, staticcheck, or all" },
+        "timeout": { "type": "string", "description": "Timeout for golangci-lint" },
+        "skip-guard": { "type": "boolean", "default": true, "description": "Refuse a test skip that runs unconditionally or names flakiness or CI (runs with golangci-lint). A reviewed exception is written `//putnami:allow-skip <reason>` and reported as a warning." },
+        "docs-links": { "type": "boolean", "default": true, "description": "Check every relative link and anchor in the project's README.md files and doc/ trees; a broken one fails lint (runs when tool is all)." },
+        "remote-build-cache": { "type": "boolean", "default": true, "description": "Back the Go build cache with the run's shared object cache when a cache provider offers one; the local Go cache is used either way. Off keeps the local cache alone." }
+      },
+      "run": [
+        {
+          "id": "golangci-lint",
+          "heavy": true,
+          "task": "lint-golangci-fix",
+          "if": "params.fix && (params.tool == 'all' || params.tool == 'golangci-lint')"
+        },
+        {
+          "id": "staticcheck",
+          "heavy": true,
+          "task": "lint-staticcheck",
+          "dependsOn": ["golangci-lint"],
+          "if": "params.fix && (params.tool == 'all' || params.tool == 'staticcheck')"
+        },
+        {
+          "id": "golangci-lint-check-only",
+          "heavy": true,
+          "task": "lint-golangci-readonly",
+          "if": "!params.fix && (params.tool == 'all' || params.tool == 'golangci-lint')"
+        },
+        {
+          "id": "staticcheck-check-only",
+          "heavy": true,
+          "task": "lint-staticcheck",
+          "if": "!params.fix && (params.tool == 'all' || params.tool == 'staticcheck')"
+        },
+        {
+          "id": "docs",
+          "task": "lint-docs",
+          "if": "params.docs-links && params.tool == 'all'"
+        }
+      ]
+    },
+    "serve": {
+      "description": "Run Go application with hot-reload. Build-and-exec: the served process is compiled and run in one step, and no binary is emitted.",
+      "activationFiles": ["**/*.go", "go.mod"],
+      "flags": {
+        "entrypoint": { "type": "string", "description": "Entry point to serve (main.go file or package path)" },
+        "describe-entrypoint": {
+          "type": "string",
+          "description": "Package path to run for build-time describe/OpenAPI generation"
+        },
+        "watch": { "type": "boolean", "default": true, "short": "-w", "description": "Watch for changes and restart" },
+        "kill-port": { "type": "boolean", "description": "Kill any process using the port before starting" },
+        "port": { "type": "number", "description": "Server port (set via PORT environment variable)" },
+        "race": { "type": "boolean", "default": false, "description": "Run with race detector" },
+        "args": { "type": "string", "description": "Additional arguments to pass to the program" },
+        "remote-build-cache": { "type": "boolean", "default": true, "description": "Back the Go build cache with the run's shared object cache when a cache provider offers one; the local Go cache is used either way. Off keeps the local cache alone." }
+      },
+      "run": [
+        { "id": "config-merge", "task": "config-merge-exec", "dependsOn": ["^config-merge"] },
+        { "id": "tidy", "task": "build-tidy", "dependsOn": ["config-merge"] },
+        {
+          "id": "generate",
+          "task": "build-generate",
+          "dependsOn": ["^generate", "tidy"],
+          "with": { "mode": { "value": "serve" } }
+        },
+        {
+          "id": "describe",
+          "task": "build-describe",
+          "dependsOn": ["^describe", "generate"],
+          "activation": { "contains": { "go.mod": "go.putnami.dev/app" } }
+        },
+        { "id": "serve", "task": "serve-run", "dependsOn": ["describe"] }
+      ]
+    },
+    "run": {
+      "description": "Build a Go workload for the host, run it once, and forward its exit code.",
+      "activationFiles": ["**/*.go", "go.mod"],
+      "flags": {
+        "entrypoint": { "type": "string", "description": "Entry point to run (main.go file or package path)" },
+        "describe-entrypoint": {
+          "type": "string",
+          "description": "Package path to run for build-time describe/OpenAPI generation"
+        },
+        "port": { "type": "number", "description": "Server port (set via PORT environment variable)" },
+        "race": { "type": "boolean", "default": false, "description": "Run with the race detector" },
+        "args": { "type": "string", "description": "Additional arguments to pass to the program" },
+        "remote-build-cache": { "type": "boolean", "default": true, "description": "Back the Go build cache with the run's shared object cache when a cache provider offers one; the local Go cache is used either way. Off keeps the local cache alone." }
+      },
+      "run": [
+        { "id": "config-merge", "task": "config-merge-exec", "dependsOn": ["^config-merge"] },
+        { "id": "tidy", "task": "build-tidy", "dependsOn": ["config-merge"] },
+        {
+          "id": "generate",
+          "task": "build-generate",
+          "dependsOn": ["^generate", "tidy"],
+          "with": { "mode": { "value": "serve" } }
+        },
+        {
+          "id": "describe",
+          "task": "build-describe",
+          "dependsOn": ["^describe", "generate"],
+          "activation": { "contains": { "go.mod": "go.putnami.dev/app" } }
+        },
+        { "id": "run", "task": "run-exec", "dependsOn": ["describe"] }
+      ]
+    },
+    "workspace-install": {
+      "description": "Install Go toolchain, sync go.work, and install dev tools.",
+      "quiet": true,
+      "flags": {
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "Force reinstall of Go toolchain and dev tools"
+        },
+        "remote-build-cache": { "type": "boolean", "default": true, "description": "Back the Go build cache with the run's shared object cache when a cache provider offers one; the local Go cache is used either way. Off keeps the local cache alone." }
+      },
+      "run": [{ "id": "workspace-install", "task": "workspace-install-exec" }]
+    },
+    "workspace-fetch": {
+      "description": "Download the modules and build the pinned dev tools with a Go from outside the workspace, running none of the workspace's code and writing no committed file.",
+      "quiet": true,
+      "flags": {
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "Force reinstall of the dev tools"
+        }
+      },
+      "run": [{ "id": "workspace-fetch", "task": "workspace-fetch-exec" }]
+    },
+    "workspace-sync": {
+      "description": "Synchronize Go-owned workspace state (go.mod workspace-replace closure).",
+      "visibility": "internal",
+      "quiet": true,
+      "activation": "workspace-once",
+      "run": [{ "id": "workspace-sync", "task": "workspace-sync-exec" }]
+    },
+    "cache-clean": {
+      "description": "Purge the Go build cache this extension owns so the next build is genuinely cold.",
+      "visibility": "internal",
+      "quiet": true,
+      "activation": "workspace-once",
+      "run": [{ "id": "cache-clean", "task": "cache-clean-exec" }]
+    },
+    "cache-gc": {
+      "description": "Bound the shared Go build/module cache to its byte budget.",
+      "visibility": "internal",
+      "quiet": true,
+      "activation": "workspace-once",
+      "run": [{ "id": "cache-gc", "task": "cache-gc-exec" }]
+    },
+    "deps-upgrade": {
+      "description": "Upgrade the go.putnami.dev/* workspace release lock and declared standalone module dependencies.",
+      "visibility": "internal",
+      "quiet": true,
+      "flags": {
+        "putnami-version": {
+          "type": "string",
+          "default": "latest",
+          "description": "go.putnami.dev/* version to require"
+        }
+      },
+      "run": [{ "id": "deps-upgrade", "task": "deps-upgrade-exec" }]
+    },
+    "package": {
+      "description": "Create distribution packages (archives, binaries, Docker images, Go modules).",
+      "sessionPrerequisites": [
+        { "command": "build", "if": "params.image" }
+      ],
+      "flags": {
+        "docker-registry": {
+          "type": "string",
+          "description": "Publish target compatibility flag; local packaging ignores it"
+        },
+        "docker-tag": {
+          "type": "string",
+          "description": "Override Docker image tag"
+        },
+        "docker-base-image": {
+          "type": "string",
+          "description": "Override the digest-pinned base image (must include @sha256:... for reproducible digests)"
+        },
+        "docker-base-project": {
+          "type": "string",
+          "description": "Use the typed local OCI candidate of this graph dependency as the image base"
+        },
+        "docker-load": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also load the assembled image into the local docker daemon"
+        },
+        "platform": {
+          "type": "string",
+          "default": "linux/amd64",
+          "description": "Docker build target platform. The docker channel compiles exactly this platform and nothing else."
+        },
+        "platforms": {
+          "type": "string",
+          "description": "Release matrix for the archive channels: `all`, or a comma-separated list (e.g. linux/amd64,darwin/arm64). Defaults to the five archive platforms. Also settable per project as options[\"@putnami/go\"].platforms."
+        },
+        "workspace-builder-image": {
+          "type": "string",
+          "description": "Workspace builder image for CI multi-stage builds"
+        },
+        "port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Container port to expose"
+        },
+        "archives": { "type": "boolean", "default": false, "description": "Create platform-specific archive packages" },
+        "go": { "type": "boolean", "default": false, "description": "Prepare Go module for publishing" },
+        "docker": { "type": "boolean", "default": false, "description": "Build Docker image" },
+        "binary-name": {
+          "type": "string",
+          "description": "Binary name for the 'binary' channel"
+        },
+        "describe-entrypoint": {
+          "type": "string",
+          "description": "Package path to run for build-time describe/OpenAPI generation"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show what would be packaged without creating artifacts"
+        },
+        "remote-build-cache": { "type": "boolean", "default": true, "description": "Back the Go build cache with the run's shared object cache when a cache provider offers one; the local Go cache is used either way. Off keeps the local cache alone." }
+      },
+      "run": [
+        { "id": "tidy", "task": "build-tidy", "dependsOn": ["^tidy"], "if": "!params.image" },
+        { "id": "generate", "task": "build-generate", "dependsOn": ["^generate", "tidy"], "if": "!params.image" },
+        {
+          "id": "describe",
+          "task": "build-describe",
+          "dependsOn": ["^describe", "generate"],
+          "activation": { "contains": { "go.mod": "go.putnami.dev/app" } },
+          "if": "!params.image"
+        },
+        { "id": "cross-compile", "heavy": true, "task": "build-cross-compile", "dependsOn": ["describe"], "if": "!params.image" },
+        { "id": "archives", "task": "package-archives", "dependsOn": ["cross-compile"], "if": "params.archives && !params.image" },
+        { "id": "docker", "task": "package-docker", "dependsOn": ["cross-compile", "^image"], "if": "params.docker && !params.image" },
+        { "id": "image", "task": "package-docker", "dependsOn": ["^image"], "if": "params.image" },
+        { "id": "go", "task": "package-go", "dependsOn": ["describe"], "if": "params.go && !params.image" }
+      ]
+    },
+    "publish": {
+      "dependsOn": ["package"],
+      "description": "Publish pre-built packages to registries (Go module, Docker). Auto-runs package first; that pipeline owns every required build step while its image-project branch stays compiler-free. @putnami/cloud, when installed, provides the go.putnami.dev registry credential and the oci tag-digest fast path; otherwise explicit credentials / native docker auth are used.",
+      "flags": {
+        "docker-package-publisher": { "type": "string", "description": "Extension whose package command produces this OCI member; defaults to @putnami/go" },
+        "docker-package-step": { "type": "string", "description": "Exact package step producing this OCI member; defaults to docker" },
+        "docker-registry": { "type": "string", "description": "Docker registry URL prefix (e.g. us-docker.pkg.dev/project/repo)" },
+        "go-registry-token": { "type": "string", "description": "Explicit Go module registry bearer-token override. Also resolved from PUTNAMI_REGISTRY_TOKEN; otherwise requested from @putnami/cloud for the registry host." },
+        "go": { "type": "boolean", "default": false, "description": "Publish Go module" },
+        "docker": { "type": "boolean", "default": false, "description": "Push Docker image to registry" },
+        "dry-run": { "type": "boolean", "default": false, "description": "Show what would be published without uploading" },
+        "remote-build-cache": { "type": "boolean", "default": true, "description": "Back the Go build cache with the run's shared object cache when a cache provider offers one; the local Go cache is used either way. Off keeps the local cache alone." }
+      },
+      "run": [
+        { "id": "docker", "task": "publish-docker", "if": "params.docker" },
+        { "id": "go", "task": "publish-go", "if": "params.go" }
+      ]
+    },
+    "config-extract": {
+      "description": "Extract config schema from Go source files to schema/config.json (committed; options.generate.schema=false falls back to .gen/config-schema.json)",
+      "activationFiles": ["**/*.go", "go.mod"],
+      "run": [
+        { "id": "tidy", "task": "build-tidy", "dependsOn": ["^tidy"] },
+        { "id": "extract", "task": "config-extract-exec", "dependsOn": ["tidy"] }
+      ]
+    },
+    "config-merge": {
+      "description": "Merge config files from workspace dependencies into .gen/conf/",
+      "activationFiles": ["conf/.env.yaml", "conf/.env.*.yaml", "putnami.json"],
+      "run": [
+        { "id": "config-merge", "task": "config-merge-exec", "dependsOn": ["^config-merge"] }
+      ]
+    }
+  },
+  "tasks": {
+    "test-env-up": {
+      "description": "Provision the database test environment this project's tests run against, and write the resolved binding into the invocation-scoped sensitive artifact `test-exec` reads. Extension-owned since an earlier migration — the CLI used to discover the datasources, run the container and inject the binding through a private env seam it then had to hide from its own cache key. Policy is unchanged: an externally supplied DATABASE_TEST_BINDINGS always wins, `--infra` (auto|require|skip) steers the mode with the CI default `require`, `--infra-down` tears every workspace-labeled container down and provisions nothing, and only a local `auto` run with docker on PATH ever touches the docker CLI. NEVER FAILS: an environment that could not be provisioned is reported by `test-exec` itself, which fails under `require` and skips its live cases otherwise.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["test-env-up"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": 360000,
+      "inputs": {
+        "requirements": { "from": "closure", "files": ["infra/requirements.json"] },
+        "infra": { "from": "params" },
+        "infra-down": { "from": "params" },
+        "DATABASE_TEST_BINDINGS": { "from": "env" },
+        "PUTNAMI_TEST_PG_URL": { "from": "env" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": {
+          "description": "Test-environment outcome (provisioned, external, no-databases, not-provisioned, torn-down), the resolved mode, the datasource count and the server configuration digest. Credential-free by construction."
+        }
+      },
+      "declares": {
+        "outputs": {
+          "bindings": {
+            "kind": "runtime-file",
+            "scope": "invocation",
+            "sensitive": true,
+            "path": "database/bindings.json",
+            "optionalEmpty": true,
+            "description": "The resolved database test binding (a pdb.TestBinding, credentials included). Invocation-scoped and sensitive: it lives at mode 0600 in the invocation's private tree, is never captured or restored, and dies with the invocation. Absent whenever this run provisioned nothing — an external binding won, the closure declares no database, or the policy forbade provisioning."
+          },
+          "lease": {
+            "kind": "file",
+            "scope": "invocation",
+            "path": "database/lease.json",
+            "optionalEmpty": true,
+            "description": "Non-secret record of the provisioned server (invocation id, label, configuration digest, container name, retention intent) the finalizer reclaims by. Has no free-form member, so it can never carry a credential onto a label or filter."
+          }
+        },
+        "effects": ["process", "network"]
+      }
+    },
+    "test-env-down": {
+      "description": "Finalize the database test environment: read the non-secret lease and do what it says. The ordinary run RETAINS its server — a still-running container whose configuration digest matches is interchangeable across invocations, and the next `test-env-up` reaps every digest-mismatched container before it reuses or starts one — while an `--infra-down` lease sweeps. Runs with `runOn: finally`, so the orchestrator runs it exactly once whenever `test-env` STARTED, consumer failure and cancellation included.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["test-env-down"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": 360000,
+      "declares": {
+        "effects": ["process"]
+      }
+    },
+    "test-exec": {
+      "description": "Run `go test` for the project. Declared outputs are the coverage artifacts it writes into the per-command output directory; the test binaries and build artifacts `go test` produces live in the machine-global Go build cache, which is why this task declares the toolchain-cache effect instead of trying to name them.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["test"],
+      "cwd": "{projectRoot}",
+      "env": {
+        "APP_ENV": "test"
+      },
+      "timeoutMs": 600000,
+      "inputs": {
+        "tests": { "from": "project", "files": ["**/*_test.go"] },
+        "sources": { "from": "project", "files": ["**/*.go"] },
+        "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "config": {
+          "from": "project",
+          "files": ["putnami.json", ".putnamirc.json", "conf/.env.yaml", "conf/.env.*.yaml", ".gen/conf/.env.*.yaml"]
+        },
+        "DATABASE_TEST_BINDINGS": { "from": "env" },
+        "entrypoint": { "from": "params" },
+        "describe-entrypoint": { "from": "params" },
+        "coverage": { "from": "params" },
+        "enforce-coverage": { "from": "params" },
+        "race": { "from": "params" },
+        "timeout": { "from": "params" },
+        "short": { "from": "params" },
+        "run": { "from": "params" },
+        "count": { "from": "params" },
+        "shuffle": { "from": "params" },
+        "bench": { "from": "params" },
+        "benchtime": { "from": "params" },
+        "test-verbose": { "from": "params" },
+        "test-json": { "from": "params" },
+        "package-parallel": { "from": "params" },
+        "parallel": { "from": "params" },
+        "failfast": { "from": "params" },
+        "coverprofile": { "from": "params" },
+        "covermode": { "from": "params" },
+        "outputdir": { "from": "params" },
+        "coverhtml": { "from": "params" },
+        "coverage-threshold": { "from": "params" },
+        "coverage-scope": { "from": "params" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Test execution result with pass/fail counts and coverage breakdown" }
+      },
+      "reads": ["gen", "sources", { "id": "workspace-clients", "scope": "workspace" }],
+      "cache": {
+        "enabled": true
+      },
+      "batchable": {
+        "tool": "go-test",
+        "maxProjectsParam": "batch-max-projects"
+      },
+      "declares": {
+        "outputs": {
+          "coverage": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "coverage.out",
+            "optionalEmpty": true,
+            "description": "Go coverage profile. Sole owner of <command-output>/coverage.out. Absent unless coverage is instrumented (--enforce-coverage, or an explicit --coverprofile/--covermode/--coverhtml). The batch path writes a scratch profile to a temp dir (one for the whole group under coverage-scope batch, one per member under coverage-scope project) and splits it into each project's own file at this path, so the declaration holds for both the singleton and the batched run; --coverprofile/--outputdir relocate it, and a relocated profile is out of the declaration by construction."
+          },
+          "coverageHtml": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "coverage.html",
+            "optionalEmpty": true,
+            "description": "Rendered HTML coverage report, emitted next to the profile whenever coverage data was produced. Sole owner of <command-output>/coverage.html."
+          },
+          "featureVerification": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "putnami-feature-verification.json",
+            "optionalEmpty": true,
+            "description": "The reserved run-scoped feature verification report: the merged observations of every test bound to a declared check through protocol/features/spectest. Absent when no test in the project bound one. Written per member under batching, so per-project attribution and cache restore hold for both the singleton and the batched run — a cache hit that lost this report would silently disarm the spec gate."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "config-merge-test-exec": {
+      "description": "Merge the project's test config into .gen/conf/. Ownership decision: this task DECLARES the merged file it writes, <project>/.gen/conf/.env.test.yaml, at the path test-exec's binding fallback and every dependent's config-merge read it. build-generate cedes .gen/conf to make that claim legal: the two tasks run in the opposite order to the describe cedes — config-merge runs BEFORE generate — so generate's snapshot adopted whatever merged file was on disk at capture, and its restore then swapped that snapshot over .gen, deleting the merged file whenever the snapshot lacked it, while this task's own cache hit reproduced nothing because it declared no output. The path is literal rather than a pathFrom port: APP_ENV is pinned to test in this task's env, so the path is static, and the plan-time owner check compares two pathFrom outputs by PORT under one project, which would make this task and config-merge-exec (both planned for every project under build,test) overlap on the same port name. The output is optionalEmpty because the task legitimately SKIPs (config injected at runtime, or nothing to merge) and then writes nothing. The .manifest.json sidecar this task also writes beside the merged file is deliberately NOT declared: it carries a generatedAt timestamp, so capturing it would make a cache.deterministic task's entry vary between two equivalent runs, and no consumer reads it, in Go or in the TypeScript runtime. It sits inside the ceded .gen/conf and is captured by nobody, which protocol ADR 0003 records as a declaration rather than a defect. The config-files input is a CLOSURE input, not a project one: this task reads its direct dependencies' merged .gen/conf/.env.test.yaml (or their source conf/.env*.yaml), which are functions of the transitive closure's source config files, so a dependency's config change moves this key — a key blind to it would restore a stale merged file on every later hit. The closure includes the project itself, so the project's own config files are not declared a second time.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["config-merge"],
+      "cwd": "{projectRoot}",
+      "env": {
+        "APP_ENV": "test"
+      },
+      "timeoutMs": 300000,
+      "inputs": {
+        "config-files": { "from": "closure", "files": ["conf/.env.yaml", "conf/.env.*.yaml"] },
+        "putnami-json": { "from": "project", "files": ["putnami.json"] },
+        "CONFIG_DATA": { "from": "env" },
+        "K_SERVICE": { "from": "env" }
+      },
+      "outputs": {
+        "data": { "description": "Merged test config file path and source count" },
+        "mergedConfig": {
+          "description": "Project-relative slash path of the merged config file this run wrote (.gen/conf/.env.test.yaml here, since APP_ENV is pinned to test), reported only on success and absent on a SKIP. config-merge-exec declares its output through this port (pathFrom); this task declares the same file by its literal path and reports the port for symmetry, so one runtime reports one shape for both."
+        }
+      },
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "merged": {
+            "kind": "file",
+            "root": "project",
+            "path": ".gen/conf/.env.test.yaml",
+            "optionalEmpty": true,
+            "description": "The merged test config file, at the path test-exec's binding fallback and every dependent's config-merge read. build-generate cedes .gen/conf so this claim is legal and so generate's restore leaves the file alone; a cache hit on this task restores it, which is what keeps the test database binding available on a fully cached run. Absent when the task skipped."
+          }
+        }
+      }
+    },
+    "workspace-fetch-exec": {
+      "description": "Download the modules and build the pinned dev tools with a Go from outside the workspace, and give the read credential the engine hands this job to the go commands that download, as an ephemeral NETRC file removed when each one ends. It installs no Go and leaves go.work and every checksum file as committed. On a hosted run it runs before any repository-controlled process, and every other job then runs with module downloads off. Declares no outputs: what it produces lives in the machine-global Go caches.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["workspace-fetch"],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "workspace-install-exec": {
+      "description": "Install the pinned Go toolchain, sync go.work, and install dev tools. Declares no outputs: everything it produces lives outside the workspace (the toolchain and tool binaries in the machine-global Go caches) or is a shared workspace file (go.work), which the workspace-files effect states.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["workspace-install"],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "workspace-sync-exec": {
+      "description": "Maintain the go.mod workspace-replace closure of every go.work member, then settle the modules it changed with `go mod tidy`. Declares no outputs: it rewrites shared workspace go.mod/go.sum files, which the workspace-files effect states, and the tidy pass reaches the module proxy and the shared module cache.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["workspace-sync"],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "cache-clean-exec": {
+      "description": "Remove the shared Go BUILD cache (GOCACHE) and leave the immutable module cache in place. Declares no outputs and the toolchain-cache effect: it mutates the machine-global cache every worktree shares, which no cache hit could reproduce.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["cache-clean"],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": ["toolchain-cache"]
+      }
+    },
+    "cache-gc-exec": {
+      "description": "Evict the least recently used Go build-cache entries down to the byte budget, sparing anything inside the grace window and preserving the immutable module cache. Declares no outputs and the toolchain-cache effect.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["cache-gc"],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000,
+      "declares": {
+        "effects": ["toolchain-cache"]
+      }
+    },
+    "deps-upgrade-exec": {
+      "description": "Upgrade the root go.work release lock and the go.mod/go.sum files of Go-published or explicitly standalone projects. Declares no outputs: these metadata rewrites are a workspace-files effect rather than a captured artifact.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["deps-upgrade"],
+      "cwd": "{workspaceRoot}",
+      "inputs": {
+        "releaseSet": { "from": "params" }
+      },
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "build-tidy": {
+      "description": "Run `go mod tidy` for the project. Declares no outputs (cache.noOutput already says it writes none) and no source mutation: tidy DOES rewrite the project's go.mod/go.sum, but declaring mutatesSources requires the project-scoped \"sources\" write resource that the planner serializes conflicting jobs on, and adding that resource would change plan shape (new serialization edges against lint --fix). That migration was declaration-only, so this task keeps the behavior it has today — a failed tidy still rolls the modfiles back itself — and the honest mutatesSources declaration is deferred to a later change that can absorb the plan change. GOPROXY is a cache-key input because it decides WHETHER tidy runs: `off` forbids every module download, tidy resolves a module graph wider than the build list `putnami install` warms, so the task reports a no-op instead of spawning a command that cannot resolve anything. PUTNAMI_OFFLINE_DEPENDENCIES is a cache-key input for the same reason: on a hosted run it turns GOPROXY off in every go command, whatever the inherited GOPROXY says. Keying on both variables is what keeps that offline no-op from answering a run that can resolve modules. The task stays non-deterministic on purpose: a tidy that RAN and failed is an uncacheable skip, so a transient network failure is never recorded.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["build", "--phase", "tidy"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "modules": { "from": "project", "files": ["go.mod", "go.sum"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "GOPROXY": { "from": "env" },
+        "PUTNAMI_OFFLINE_DEPENDENCIES": { "from": "env" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Tidy result" }
+      },
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-generate": {
+      "description": "Generate specs and config artifacts from the project's Go sources. Ownership decision: build-generate is the SINGLE PRODUCER of <project>/.gen and declares that subtree whole, minus the subpaths it CEDES to build-describe and to the two config-merge tasks. Every task that writes inside the region generate keeps — config-extract's .gen/config-schema.json fallback, build-infra's .gen/requirements.json — writes into generate-owned territory instead of claiming a slice of it, because file-vs-subtree nesting counts as the same path under ONE OWNER PER OUTPUT. The describe cedes exist because generate runs BEFORE describe: its capture predates everything describe writes, so a subtree a later task produces has to be owned by that task to survive a cache hit. Ceded AND claimed by build-describe: .gen/schema, .gen/clientgen, .gen/design, .gen/migrations.json, .gen/migration-bundle. Ceded to and claimed by config-merge-exec and config-merge-test-exec: .gen/conf, for the opposite ordering reason — config-merge runs BEFORE this task, so this task's snapshot adopted whatever merged file happened to be on disk at capture and its restore swapped that snapshot over .gen, deleting .gen/conf/.env.test.yaml whenever the snapshot lacked it, while a config-merge cache hit reproduced nothing; a config-merge hit must restore the merged file, and a generate restore must not delete what config-merge wrote. Ceded and claimed by NOBODY, which protocol ADR 0003 states is a declaration rather than a defect: .gen/.describe.lock (a run-scoped lockedfile mutex) and .gen/config-deps.json (a fragment describe consumes in the same run) — keeping them made this task's entry depend on whether the tree happened to be clean, which alone makes a cache.deterministic task disagree with itself. Because .gen/schema is ceded, this task keeps its own pre-merge copy of what it writes there under .gen/generate-staging/schema, a path it still owns and still restores, and build-describe REBUILDS .gen/schema from it before merging — removing the tree first, so nothing an earlier build left there reaches describe's capture; .gen/schema/<rel> stays the only path a consumer ever reads. Two shared regions are deliberately NOT ceded: .gen/infra, whose fragments this task deletes at the start of every run so its entry is a pure function of its own producers and whose durable form is the committed infra/requirements.json, and .gen/generate-result.json, whose only reader is build-describe, before describe rewrites it. Declaring a project-rooted path on a task five commands schedule (build, test, serve, run, package) is plannable because the plan-time owner check counts one manifest task scheduled by several commands as ONE owner (sameManifestTask in tooling/cli/internal/jobs/plan_contract.go). The committed sidecars this task ALSO writes for projects without a describe phase (schema/openapi.json, schema/config.json and its .jsonschema companion, infra/requirements.json) are deliberately NOT declared here: they are tracked source files whose writer is chosen at runtime by the describe-sole-committer rule — describe commits them for app projects, generate for library/CLI projects — so no static single owner exists. The one exception is schema/config.json, which the dedicated config-extract-exec task owns because its cache hit is the only one that has to reproduce it. A project with no describe phase may not set options.generate.schema=false: nothing restores .gen/schema for it, so the contract would have no durable home at all, and this task fails with that reason instead of losing the file on the next cache hit. The refusal is raised only when a contract is actually about to be written into the ceded subtree — the option is INHERITED, so refusing on the option alone would fail every library and CLI under a workspace-level default, none of which has anything to lose.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["build-generate"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.go", "!**/*_test.go"] },
+        "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "config": { "from": "project", "files": ["putnami.json", ".putnamirc.json"] },
+        "mode": { "from": "params" },
+        "clear": { "from": "params" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Generated specs (openapi, proto, …) and exports map" }
+      },
+      "writes": ["gen"],
+      "reads": ["sources"],
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "gen": {
+            "kind": "directory",
+            "root": "project",
+            "path": ".gen",
+            "excludes": [
+              ".gen/.describe.lock",
+              ".gen/clientgen",
+              ".gen/conf",
+              ".gen/config-deps.json",
+              ".gen/design",
+              ".gen/migration-bundle",
+              ".gen/migrations.json",
+              ".gen/schema"
+            ],
+            "description": "Generated sources: the project-rooted .gen subtree, owned exclusively by this task, minus the subpaths it cedes (see the ownership decision in the task description). Five of them build-describe declares because it writes them AFTER this task's snapshot is taken; .gen/conf is ceded to the two config-merge tasks, which write it BEFORE this task runs and declare the merged file inside it so their cache hit reproduces it and this task's restore does not delete it; .gen/.describe.lock and .gen/config-deps.json are ceded to nobody on purpose."
+          }
+        }
+      }
+    },
+    "build-describe": {
+      "description": "Compile a host binary of the app, run it once in describe mode, and reconcile the artifacts its Describer plugins emit. That host binary is built with the SAME configuration as build-compile's host build — the cgo, tags, gcflags, asmflags, race, trimpath and buildmode parameters declared as inputs below, resolved by one helper both steps call — so the two builds are the same program and Go's build cache serves the second one: compile links what describe compiled instead of recompiling every package above `net`. -ldflags is deliberately not shared: linker flags never enter a compile action, so leaving the version stamp out of describe keeps a version bump from re-linking this binary. Ownership decision: everything this task writes under <project>/.gen is a subpath build-generate CEDES, because generate runs first and its capture predates every describe write — a run serving both tasks from cache would otherwise restore a .gen snapshotted before describe existed. This task DECLARES the five a LATER task reads, each at the documented contract path rather than a private staging copy: .gen/schema (the converged openapi/capabilities/http-routes/api.proto/feature-evidence tree that @putnami/clientgen discovery and go/framework/api read in PREFERENCE to the committed sidecar, and that both clientgen tasks name among their cache-key files), .gen/clientgen (the clientgen contract and staged client the same discovery reads, which `validate` runs), .gen/design (the design graph @putnami/sdd and `putnami context` project features from), .gen/migrations.json and .gen/migration-bundle (release-set migration publication, deploy, the database test provider, database.ApplyBundle). Two more are ceded and claimed by NOBODY on purpose — .gen/.describe.lock, the run-scoped mutex that serializes a build and a test describe of one project, and .gen/config-deps.json, a fragment this job consumes in the same run — so neither varies a cached entry with the state the tree happened to be in. .gen/schema is the one region with TWO producers, resolved as generate stages and describe converges: generate writes its static output both to .gen/schema and to the generate-owned mirror .gen/generate-staging/schema, and this task REBUILDS .gen/schema from that mirror before it snapshots and merges, so its starting tree is identical whether generate executed or was restored from cache. The rebuild removes the tree first: declared capture walks the directory rather than this job's artifact list, so an artifact whose producer was DELETED from the app — a dropped proto.New, an openapi plugin that no longer configures — would otherwise be captured under this run's key and restored by every later hit on it. A describer that still runs drops its own stale output; the rebuild covers the one that does not run at all. What describe also owns exclusively is the generated typed client it mirrors out of .gen/clientgen/go into the project tree; that directory is chosen by the project's clientgen config, so it is declarable only through the clientOutputs data port (a declared output's pathFrom). The committed schema/infra sidecars describe converges for app projects (schema/openapi.json, schema/capabilities.json, infra/requirements.json, schema/config.json) are NOT declared: they are tracked source files whose writer is picked at runtime by the describe-sole-committer rule — describe for app projects, build-generate for library/CLI projects — so a static single owner would be a false claim, exactly like a merge point. Their converged build-time copies live under .gen/schema, which this task owns. Source input contract: the declared sources are the project's Go files MINUS `**/*_test.go`. The host binary is a `go build` of the project's main package and the two runtime predicates that gate the task (`ModuleHasMain`, `usesPutnamiApp`) skip test files by the same rule, so no byte this task emits is a function of a test file. The exclusion is load-bearing beyond this project: `^describe` is the cross-project edge every dependent's describe, compile and test sits behind, so a test file in this key would move the identity of a whole dependent closure for an edit none of it reads.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["build-describe"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 900000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.go", "!**/*_test.go"] },
+        "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "config": { "from": "project", "files": ["putnami.json", ".putnamirc.json"] },
+        "cgo": { "from": "params" },
+        "tags": { "from": "params" },
+        "gcflags": { "from": "params" },
+        "asmflags": { "from": "params" },
+        "race": { "from": "params" },
+        "trimpath": { "from": "params" },
+        "buildmode": { "from": "params" },
+        "mod": { "from": "params" },
+        "readonly": { "from": "params" },
+        "installsuffix": { "from": "params" },
+        "p": { "from": "params" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Build-time describe artifacts (openapi, proto, …) emitted by Describer plugins" },
+        "clientOutputs": {
+          "description": "Project-relative directories of the generated typed clients this run manages, reported only when the project configures a client generator. This is the pathFrom anchor for the client half of the ownership decision above: the directory comes from the project's clientgen config, so this port is the only way the v3 task contract can name it. The consumer reads it back under this exact name (tooling/cli scheduler_exec.go resolves the managed directory from it)."
+        }
+      },
+      "reads": ["gen", "sources"],
+      "writes": ["clients"],
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "client": {
+            "kind": "directory",
+            "pathFrom": "clientOutputs",
+            "optionalEmpty": true,
+            "preserves": [".gen", "go.mod", "go.sum", "putnami.json"],
+            "drift": "fail",
+            "description": "Generated typed client at the config-chosen directory the clientOutputs port reports; absent when the project configures no client generator, and empty when the generator produced no client (e.g. no routes). The client is committed, and this task is the FIRST writer of that directory in a session, so the engine compares what it writes (or a cache hit restores) with the bytes present before and fails the task on a difference — the worktree then holds the regenerated client to commit (protocols/extension ADR 0004). The project document and module files a workspace commits inside the directory are preserved: never captured, restored over, or judged (protocols/extension ADR 0005). The client project's own .gen directory, which the engine and that project's tasks write, is preserved the same way."
+          },
+          "clientgen": {
+            "kind": "directory",
+            "root": "project",
+            "path": ".gen/clientgen",
+            "optionalEmpty": true,
+            "description": "The clientgen contract (.gen/clientgen/config.json) and the staged client the describe binary emitted, at the path @putnami/clientgen discovery reads — the check `validate` runs reports a first-party provider with no config.json as a finding, so losing it on a cached build changed what validate said. Absent for a project that configures no client generator."
+          },
+          "design": {
+            "kind": "directory",
+            "root": "project",
+            "path": ".gen/design",
+            "optionalEmpty": true,
+            "description": "The disposable design graph (.gen/design/graph.json) the describe binary derives from native Feature declarations, at the path @putnami/sdd's feature projection and `putnami context` read after the build. Absent for a project that declares no native feature, which is also how the describe binary removes a stale one."
+          },
+          "migrationBundle": {
+            "kind": "directory",
+            "root": "project",
+            "path": ".gen/migration-bundle",
+            "optionalEmpty": true,
+            "description": "The migration bundle this run described, at the documented contract path every consumer reads (release-set migration publication, deploy, the database test provider, database.ApplyBundle). build-generate cedes this subpath of .gen so the task that produces it also captures and restores it: generate runs first, so its snapshot predates the bundle and a run serving both tasks from cache would otherwise lose it. Legitimately absent for a project that contributes no migration operation, and the describe binary removes a stale one."
+          },
+          "migrations": {
+            "kind": "file",
+            "root": "project",
+            "path": ".gen/migrations.json",
+            "optionalEmpty": true,
+            "description": "The migration registry view the describe binary dumps for CI assertions. Declared rather than left in generate's capture for the resurrection reason, not for a reader: the describe binary SKIPS the write when a project contributes no migration source, so a copy adopted from an incremental tree into generate's entry would be restored forever by every later hit on that key."
+          },
+          "schema": {
+            "kind": "directory",
+            "root": "project",
+            "path": ".gen/schema",
+            "optionalEmpty": true,
+            "description": "The converged generated contracts (openapi.json and its .gz, capabilities.json, http-routes.json, api.proto, feature-evidence/) at the single path every consumer resolves. build-generate cedes it because only this task's capture holds the CONVERGED bytes: generate's snapshot predates the describe run, so a cached build without this claim restores generate's static stub, or nothing at all, under the path @putnami/clientgen discovery and go/framework/api prefer over the committed sidecar. Absent for a project whose producers emit no contract."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-compile": {
+      "description": "Compile the project for the ORDINARY VALIDATION intent — the `build` pipeline's compile step. Nature+intent scoping: an application compiles its entrypoints for the HOST platform only, a library (no `package main`) compile-checks `go build ./...` and emits no binary, and cross-compilation is reached only through the plan-time `platforms` / `--target` parameters, which are declared inputs and therefore cache-key participants. It used to be the `serve` pipeline's build step, where the binary it emitted was never executed — serve is build-and-exec now, so this task belongs to `build`. Ownership decision: it owns <command-output>/bin and <command-output>/VERSION. build-cross-compile declares the same two paths, and the two never collide because they never appear in one command — build-compile runs only under `build`, cross-compile only under `package` — so each resolves to a different per-command output directory. Deadline: 900000ms, the same ceiling build-cross-compile carries, because an explicit `platforms` request can ask this task for the full matrix; the host-only default uses a small fraction of it. Cache identity: it declares the `hostPlatform` runtime input, because its DEFAULT platform set is the machine. Without that declaration nothing in the key varies with the machine — runtime.Version() is the same string on every OS and ExtensionImplementationDigest covers workspace-local extensions only — while entries are shared dev<->CI, so a darwin-built entry could be restored on linux: an ELF-expecting consumer would get Mach-O, and a library's compile-check VERDICT would be reused across OSes even though `//go:build linux` files are only compiled on linux. With the host in the key the result is fully determined by the key again, which is what keeps cache.deterministic honest. The same gap is PRE-EXISTING on test-exec and is deliberately left to its own change. Source input contract: the declared sources are the project's Go files MINUS `**/*_test.go`. `go build` never compiles a test file, so neither the emitted binary nor the library compile-check verdict is a function of one; test files stay in test-exec's key, where they are read.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["build", "--phase", "compile"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 900000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.go", "!**/*_test.go"] },
+        "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "config": { "from": "project", "files": ["putnami.json", ".putnamirc.json"] },
+        "platforms": { "from": "params" },
+        "target": { "from": "params" },
+        "ldflags": { "from": "params" },
+        "gcflags": { "from": "params" },
+        "asmflags": { "from": "params" },
+        "tags": { "from": "params" },
+        "race": { "from": "params" },
+        "trimpath": { "from": "params" },
+        "buildmode": { "from": "params" },
+        "cgo": { "from": "params" },
+        "mod": { "from": "params" },
+        "readonly": { "from": "params" },
+        "installsuffix": { "from": "params" },
+        "p": { "from": "params" },
+        "version-var": { "from": "params" },
+        "hostPlatform": { "from": "runtime" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Compilation result: binary paths and the resolved platform set" }
+      },
+      "reads": ["gen", "sources"],
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "bin": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "bin",
+            "optionalEmpty": true,
+            "description": "Host-platform binaries, one per resolved entrypoint, at bin/<name>; an explicit `platforms`/`--target` request writes the platform-partitioned bin/<platform-suffix>/<name> tree instead. Sole owner of <command-output>/bin for the commands this task runs in. Legitimately empty for a library, whose evidence is a compile check, and when every target fails to compile."
+          },
+          "version": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "VERSION",
+            "optionalEmpty": true,
+            "description": "Workspace version stamp written next to the binaries; absent when the workspace declares no version."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "build-cross-compile": {
+      "description": "Cross-compile the project's entrypoints for the DISTRIBUTION intent — the `package` pipeline's compile step — scoped to the platforms the invocation's PACKAGE CHANNELS consume. A docker channel owes exactly the image's platform, because an image carries one binary and the other cross-compiles were discarded; an archive channel owes the declared release matrix (`platforms`, defaulting to the five archive platforms — declared targets only, never widened); a channel that carries no binary (the go module channel) owes nothing; `--target` still names one platform and wins over all of it. Every input to that resolution is plan-time and keyed: `target`, `platforms`, `platform` and the channel flags are declared `from: \"params\"` inputs, and the project's `publish` declaration — UNIONED with those parameters, exactly as the plan gate unions them, because the orchestrator injects declared channels into the PLAN's parameters but not into a task's own parameter map — lives in putnami.json, already a declared `from: \"project\"` file input. Nothing is discovered at execution time, so a four-platform entry can never answer a one-platform request. Union is load-bearing: `package --docker` on a project declaring `publish: [\"archives\"]` schedules BOTH packagers, so a compile that read the flag as a replacement would leave the archive packager staging binaries nobody built. Ownership decision: it owns <command-output>/bin and <command-output>/VERSION. build-compile declares the same two paths; the two never share a command (build-compile runs only under `build`, this task only under `package`), so they resolve to different per-command output directories and never collide. The package channel tasks read this tree and own disjoint sibling subdirectories of the same directory. Deadline: 900000ms. It compiles every entrypoint once per archive platform SEQUENTIALLY, so its wall time is roughly 5x a single compile and it is the extension's longest single-tool task. The previous 600000ms was reached exactly in production and the same commit then passed on retry in 213s — an undersized ceiling, not a repository verdict. `go build` exposes no timeout of its own, so the scheduler deadline is the only one; see doc/build.md for the measurement set.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["build", "--phase", "cross-compile", "--trimpath", "--cgo", "false"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 900000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.go", "!**/*_test.go"] },
+        "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "config": { "from": "project", "files": ["putnami.json", ".putnamirc.json"] },
+        "target": { "from": "params" },
+        "platforms": { "from": "params" },
+        "platform": { "from": "params" },
+        "archives": { "from": "params" },
+        "template-archives": { "from": "params" },
+        "docker": { "from": "params" },
+        "go": { "from": "params" },
+        "ldflags": { "from": "params" },
+        "tags": { "from": "params" },
+        "mod": { "from": "params" },
+        "readonly": { "from": "params" },
+        "gcflags": { "from": "params" },
+        "asmflags": { "from": "params" },
+        "race": { "from": "params" },
+        "installsuffix": { "from": "params" },
+        "p": { "from": "params" },
+        "buildmode": { "from": "params" },
+        "version-var": { "from": "params" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Cross-compilation result: per-platform binary paths and the resolved platform set" }
+      },
+      "reads": ["gen", "sources"],
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "bin": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "bin",
+            "optionalEmpty": true,
+            "description": "Per-platform binaries at bin/<platform-suffix>/<name>. Sole owner of <command-output>/bin for the commands this task runs in. Empty when every platform fails to compile."
+          },
+          "version": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "VERSION",
+            "optionalEmpty": true,
+            "description": "Workspace version stamp written next to the binaries; absent when the workspace declares no version."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-infra": {
+      "description": "Aggregate the workload's deployability requirements into <project>/.gen/requirements.json: every project in the workload's dependency closure contributes its committed infra/requirements.json, the workload's infra/overrides.json suppresses what it does not want, and its infra/runtime.json (or the framework defaults sidecar) supplies the runtime block. Extension-owned since an earlier migration — the CLI used to gate and write this artifact itself. Libraries are skipped: they are consumed, never deployed. Ownership decision: it declares NO outputs, for the same reason as config-merge-exec — everything it writes lands under <project>/.gen, which build-generate owns whole as its single producer. Never cached: its inputs are OTHER projects' committed manifests, which no per-project cache key can cover, and it is a few small file reads.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["build-infra"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": 60000,
+      "outputs": {
+        "data": {
+          "description": "Aggregation outcome (emitted, cleared, skipped), the manifest path, and the number of contributing projects"
+        }
+      },
+      "declares": {}
+    },
+    "lint-golangci-fix": {
+      "description": "golangci-lint pass that APPLIES fixes (`golangci-lint run --fix`, plus the explicit gofmt/goimports diff gate that only the fixing path needs). This is the mutating half of the check/fix split: it is the only lint task that declares mutatesSources, together with the project-scoped \"sources\" write resource the planner serializes conflicting jobs on. The lint pipeline schedules it only when params.fix is true; the read-only counterparts are lint-golangci-readonly and lint-staticcheck. Deadline: 600000ms, held EQUAL to lint-golangci-readonly. Both run the same tool over the same sources under one shared config, and this one does strictly more work (--fix plus the fmt --diff gate), so a lower ceiling here would be the binding one; the shared config exposes a single tool timeout, so a split would force run.timeout below the smaller of the two and nullify the readonly raise.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["lint", "--tool", "golangci-lint"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 600000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.go"] },
+        "modules": { "from": "project", "files": ["go.mod"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "config": { "from": "project", "files": [".golangci.yml", ".golangci.yaml"] },
+        "fix": { "from": "params" },
+        "config-path": { "from": "params" },
+        "new": { "from": "params" },
+        "timeout": { "from": "params" },
+        "skip-guard": { "from": "params" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Lint result with diagnostics" }
+      },
+      "writes": ["sources"],
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "batchable": {
+        "tool": "golangci-lint",
+        "configFiles": [
+          "{projectRoot}/.golangci.yml",
+          "{projectRoot}/.golangci.yaml",
+          "{extensionRoot}/config/.golangci.yml"
+        ],
+        "maxProjects": 12
+      },
+      "declares": {
+        "mutatesSources": true,
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "lint-golangci-readonly": {
+      "description": "golangci-lint pass that only REPORTS (`golangci-lint run`, no --fix). The pure-check half of the check/fix split: it reads sources, never writes them, and therefore declares neither mutatesSources nor the \"sources\" write resource. The lint pipeline schedules it only when params.fix is false. Deadline: 600000ms. The previous 300000ms was reached EXACTLY in production (`intelligence-server:lint~golangci-lint-check-only`, 300002ms, `job timed out`) with the shipped config's own run.timeout also at 5m — two identical deadlines, so the scheduler always won and the tool never got to report a cause. config/.golangci.yml now sets run.timeout to 8m, strictly below this, so the structured tool timeout fires first; the pair is pinned by TestGolangciToolDeadlineStaysBelowItsSchedulerDeadline.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["lint", "--tool", "golangci-lint"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 600000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.go"] },
+        "modules": { "from": "project", "files": ["go.mod"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "config": { "from": "project", "files": [".golangci.yml", ".golangci.yaml"] },
+        "fix": { "from": "params" },
+        "config-path": { "from": "params" },
+        "new": { "from": "params" },
+        "timeout": { "from": "params" },
+        "skip-guard": { "from": "params" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Lint result with diagnostics" }
+      },
+      "reads": ["sources"],
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "batchable": {
+        "tool": "golangci-lint",
+        "configFiles": [
+          "{projectRoot}/.golangci.yml",
+          "{projectRoot}/.golangci.yaml",
+          "{extensionRoot}/config/.golangci.yml"
+        ],
+        "maxProjects": 12
+      },
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "lint-docs": {
+      "description": "Documentation link check: every relative link and anchor in the project's README.md files and doc/ trees must resolve, with the case of the file on disk. The task body is the SDK's docslinks.Job, shared with every language extension. UNCACHEABLE on purpose: a link may name any file of the workspace, so no file-pattern key covers the read set, and a key that missed a deleted target would serve a green verdict for a broken link. The check reads text and starts no tool.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["lint-docs"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "outputs": {
+        "data": { "description": "Documentation link result with diagnostics" }
+      },
+      "reads": ["sources"],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "lint-staticcheck": {
+      "description": "staticcheck pass. staticcheck has no fix mode, so this single task serves both the fixing and the check-only lint pipelines and never mutates sources. Batchable: compatible projects share one staticcheck process over the package patterns of every member, grouped by governing go.work root. No `configFiles` partition is declared, and that is the point — staticcheck resolves `staticcheck.conf` per PACKAGE from that package's own directory hierarchy, so a shared process cannot leak one project's check selection into another's the way golangci-lint's single --config would.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["lint", "--tool", "staticcheck"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.go"] },
+        "modules": { "from": "project", "files": ["go.mod"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Staticcheck result with diagnostics" }
+      },
+      "reads": ["sources"],
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "batchable": {
+        "tool": "staticcheck",
+        "maxProjects": 12
+      },
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "serve-run": {
+      "description": "Serve the project with hot-reload. BUILD-AND-EXEC: it compiles the resolved entrypoint for the host itself — `go run` in dev, a scratch-directory build it deletes on return in production — and declares no outputs, because a served process is not an artifact. The `serve` pipeline used to schedule build-compile ahead of it and then ignore the binary tree that step emitted, paying one whole extra compile per served project. It is uncacheable: a cache hit cannot reproduce a live process or a bound port.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["serve"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "run-exec": {
+      "description": "Build the workload for the host, run it once, and forward its exit code. Declares no outputs: it compiles to a temporary directory it deletes on return.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["run"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "package-go": {
+      "description": "Stage the project as a publishable Go module. Ownership decision: the three package channels share ONE per-command output directory and are resolved by exact disjoint subpaths — this task owns go/, package-archives owns archives/, package-docker owns docker/. It records its channel in go/channel.json, inside the directory it owns, so a cache restore of that directory restores the record with the module it describes; the channel index publish reads is DERIVED over every packager's record (pkgmeta.ReadChannelIndex) rather than kept as a shared file. Nothing is written outside this declaration, which is what makes the task ordinarily cache-restorable.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["package", "--go"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "releaseSetPlan": { "from": "params" }
+      },
+      "cache": { "versionAware": true },
+      "declares": {
+        "outputs": {
+          "go": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "go",
+            "optionalEmpty": true,
+            "description": "Staged Go module source, module zip and the go channel record. Sole owner of <command-output>/go. Absent when the project has no go publish channel; a dry run stages only the channel record."
+          }
+        }
+      }
+    },
+    "package-archives": {
+      "description": "Build platform archives from the pre-built cross-compiled binaries. Owns <command-output>/archives, where it records its channel in archives/channel.json, AND <command-output>/metadata.json, the archive publication manifest the archive uploader reads (version, artifact, stable, channels, template). It reads (never writes) the bin/ tree build-cross-compile owns. For the Go extension itself (detected by the staged tools/versions.json pin manifest) it also builds the pinned development tools for every release platform into compiled/tools/, so `putnami install` on a consumer machine copies them instead of compiling them — which is why it resolves modules over the network and writes the shared Go build cache. It packages the five archive platforms at the same time. With four platforms the task measured 6.6 s warm on a 10-core laptop, against 25.6 s one platform after another. Cold, each tool cross-compile, two per platform and ten in all, took about 85 s in an earlier serial measurement, so the deadline is sized for a cold, CPU-starved runner rather than for the archive step alone.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["package", "--archives"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "cache": { "versionAware": true },
+      "declares": {
+        "effects": ["network", "toolchain-cache"],
+        "outputs": {
+          "archives": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "archives",
+            "optionalEmpty": true,
+            "description": "Per-platform .tar.gz archives and the archive channel record. Sole owner of <command-output>/archives. Absent when the project has no archive publish channel; a dry run stages only the channel record."
+          },
+          "publication-manifest": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "metadata.json",
+            "optionalEmpty": true,
+            "description": "Archive publication manifest read by the archive uploader (@putnami/cloud publish-archives): version, artifact, stable, channels, template. Sole owner of <command-output>/metadata.json — no other task writes it, and this one states the whole document rather than merging into it. Absent when the project has no archive publish channel."
+          }
+        }
+      }
+    },
+    "package-docker": {
+      "description": "Assemble a local OCI image candidate from pre-built binaries or a first-class image project's spec. It never resolves an output registry or emits publication evidence; the mutually exclusive paths share this single owner of <command-output>/docker, where both record the docker channel in docker/channel.json. It needs no restoreMode opt-in: every task under `package` writes only inside its declaration and is captured the ordinary way.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["package", "--docker"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "cache": { "versionAware": true },
+      "declares": {
+        "outputs": {
+          "docker": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "docker",
+            "optionalEmpty": true,
+            "description": "Local OCI candidate layout, manifest (candidate digest, platform, content identity, and relative artifact location only) and the docker channel record. Sole owner of <command-output>/docker; never contains a published immutable reference. Absent when the project has no docker publish channel; a dry run stages only the channel record."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "publish-go": {
+      "description": "Upload the staged Go module to the module registry. Declares the registry effect, which a cache hit cannot reproduce — hence cache:false.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["publish", "--go"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "releaseSetPlan": { "from": "params" }
+      },
+      "cache": false,
+      "declares": {
+        "effects": [
+          "network",
+          "registry"
+        ]
+      }
+    },
+    "publish-docker": {
+      "description": "Push the assembled image to the container registry. Declares the registry effect, which a cache hit cannot reproduce — hence cache:false.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["publish", "--docker"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "published-image": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "docker/published-image.json",
+            "optionalEmpty": true,
+            "description": "Publish-owned verified remote image record. Present only after registry digest verification; package never writes or rewrites it."
+          }
+        },
+        "effects": [
+          "network",
+          "registry"
+        ]
+      }
+    },
+    "config-merge-exec": {
+      "description": "Merge config files from workspace dependencies into .gen/conf/. Ownership decision: this task DECLARES the merged file it writes, <project>/.gen/conf/.env.<APP_ENV or local>.yaml, for the same reason as config-merge-test-exec — build-generate cedes .gen/conf so a config-merge cache hit reproduces the merged file and a generate restore does not delete it. The path depends on APP_ENV, which this task reads from the ambient env rather than pinning, so it is declared through the mergedConfig data port (pathFrom), the same mechanism build-describe uses for its config-chosen client directory. The output is optionalEmpty because the task legitimately SKIPs (config injected at runtime, or nothing to merge) and then reports no path. The .manifest.json sidecar is deliberately NOT declared, for the reason config-merge-test-exec states: a generatedAt timestamp, and no reader. The config-files input is a CLOSURE input for the reason config-merge-test-exec states: the merged file is a function of the transitive closure's source config files, and the closure includes the project itself.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["config-merge"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "config-files": { "from": "closure", "files": ["conf/.env.yaml", "conf/.env.*.yaml"] },
+        "putnami-json": { "from": "project", "files": ["putnami.json"] },
+        "APP_ENV": { "from": "env" },
+        "CONFIG_DATA": { "from": "env" },
+        "K_SERVICE": { "from": "env" }
+      },
+      "outputs": {
+        "data": { "description": "Merged config file path and source count" },
+        "mergedConfig": {
+          "description": "Project-relative slash path of the merged config file this run wrote (.gen/conf/.env.<APP_ENV or local>.yaml), reported only on success and absent on a SKIP. This is the pathFrom anchor for the merged output declared below: the environment suffix comes from the ambient APP_ENV, so this port is the only way the v3 task contract can name the file. The consumer reads it back under this exact name (tooling/cli task_capture.go resolves a declared output's path from it)."
+        }
+      },
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "merged": {
+            "kind": "file",
+            "root": "project",
+            "pathFrom": "mergedConfig",
+            "optionalEmpty": true,
+            "description": "The merged config file at the environment-suffixed path the mergedConfig port reports. build-generate cedes .gen/conf so this claim is legal and so generate's restore leaves the file alone; a cache hit on this task restores it. Absent when the task skipped and reported no path."
+          }
+        }
+      }
+    },
+    "config-extract-exec": {
+      "description": "Extract the workload's config schema to the committed schema/config.json (plus its JSON Schema companion). Ownership decision: this task is the DECLARED OWNER of that pair, because it is the only task whose cache hit has to reproduce them — producing them is its entire job. build-generate and build-describe write the same tracked files inside the build pipeline, under the runtime describe-sole-committer rule, and deliberately do not claim them; their canonical build-time copy lives under .gen, which build-generate owns whole. The .gen/config-schema.json fallback this task writes when options.generate.schema=false is likewise inside generate-owned territory and is never claimed here.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["config-extract"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.go"] },
+        "modules": { "from": "project", "files": ["go.mod"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] }
+      },
+      "outputs": {
+        "schema": { "description": "Config schema JSON file path" }
+      },
+      "reads": ["gen", "sources"],
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "schema": {
+            "kind": "file",
+            "path": "schema/config.json",
+            "optionalEmpty": true,
+            "description": "Committed config manifest. Absent when the workload registers no config blocks, or when options.generate.schema=false routes the manifest to the .gen/config-schema.json fallback — that fallback lives inside the .gen subtree build-generate owns, so it is captured there and is deliberately not claimed here."
+          },
+          "jsonSchema": {
+            "kind": "file",
+            "path": "schema/config.jsonschema.json",
+            "optionalEmpty": true,
+            "description": "JSON Schema companion of schema/config.json, emitted and absent under exactly the same conditions."
+          }
+        }
+      }
+    }
+  },
+  "tools": {
+    "putnami.go_docs": {
+      "description": "Return the AI.md bytes from the exact Go module selected for one project. Resolution uses cmd/go with an explicit human GOWORK choice or the project's nearest go.work and existing module cache in offline, read-only mode; it never downloads a module, edits go.mod/go.sum, or substitutes the extension's unversioned framework-docs bundle. Omit project only when the reference identifies exactly one declaring Go project.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "Exact Go module path, for example go.putnami.dev/app"
+          },
+          "project": {
+            "type": "string",
+            "description": "Optional Putnami project name, module path, or workspace-relative project directory"
+          }
+        },
+        "additionalProperties": false,
+        "required": ["reference"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": ["mcp-tool"],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 10000
+    }
+  },
+  "ecosystems": [
+    {
+      "id": "go",
+      "coordinate": { "pattern": "^[a-z0-9][a-z0-9.-]*(/[a-z0-9][a-z0-9._~-]*)+$" },
+      "version": {
+        "pattern": "^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$",
+        "ordering": "semver"
+      },
+      "channel": "native",
+      "registries": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "origin": { "type": "string" },
+          "proxy": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "publish": "publish"
+    }
+  ],
+  "uses": ["oci"]
+}

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/structured-errors",
+      "type": "feature",
+      "name": "Go structured errors",
+      "outcome": "Go framework code carries machine-readable error meaning across package boundaries while keeping internal details out of client responses",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "creation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bug-captures-origin-stack",
+              "new-captures-origin-stack",
+              "wrap-adds-meaning-without-a-second-stack",
+              "wrap-nil-cause-returns-nil"
+            ]
+          }
+        },
+        {
+          "id": "disclosure",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "http-details-gated-by-category",
+              "http-internal-message-replaced",
+              "json-excludes-cause-chain",
+              "json-excludes-stack",
+              "json-gates-internal-message-and-attributes"
+            ]
+          }
+        },
+        {
+          "id": "inspection",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "attributes-collected-across-wrapped-tree",
+              "category-discoverable",
+              "code-discoverable-across-wrapped-tree",
+              "inspection-descends-into-aggregate",
+              "inspection-descends-into-nested-aggregate",
+              "retryability-discoverable-across-wrapped-tree"
+            ]
+          }
+        },
+        {
+          "id": "observation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "hooks-are-panic-isolated",
+              "hooks-are-reentrancy-safe",
+              "hooks-are-removable",
+              "hooks-fire-only-for-origin-and-bug-errors"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

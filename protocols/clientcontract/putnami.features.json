@@ -1,0 +1,161 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "client-contract",
+  "features": [
+    {
+      "id": "client-contract/first-party-generated-clients",
+      "type": "feature",
+      "name": "Versioned first-party client metadata foundation",
+      "outcome": "Putnami-owned client semantics have one versioned, lossless and language-neutral metadata contract with strict validation and deterministic generated-target manifests",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "strict-provider-authority",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-full-cross-protocol-provider-fixture-is-valid-for-the-go-reader",
+              "unsupported-or-ambiguous-semantics-are-rejected-by-the-go-reader",
+              "exact-json-semantics-round-trip-without-loss",
+              "only-version-1-is-accepted"
+            ]
+          }
+        },
+        {
+          "id": "generated-inventory",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-operation-a-target-leaves-out-is-named-and-never-inventoried-as-generated",
+              "the-generated-manifest-inventories-contract-operations-and-file-hashes",
+              "unsupported-generator-markers-and-unsafe-generated-paths-are-rejected",
+              "published-schemas-match-the-wire-types"
+            ]
+          }
+        },
+        {
+          "id": "opaque-json-values",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-opaque-json-value-and-a-free-form-object-are-accepted-in-their-one-closed-spelling",
+              "the-empty-schema-and-every-other-opaque-spelling-are-refused",
+              "the-opaque-json-keyword-round-trips-through-the-wire-type"
+            ]
+          }
+        },
+        {
+          "id": "response-cache-policy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cache-policy-is-accepted-only-on-a-unary-safe-or-idempotent-operation",
+              "cache-values-and-key-fields-are-validated-strictly",
+              "a-manifest-that-declares-a-cache-policy-requires-the-response-cache-runtime-capability",
+              "the-published-schemas-carry-the-cache-policy-and-the-capability-vocabulary",
+              "invalidation-fields-name-a-string-integer-or-boolean-property-of-the-success-body"
+            ]
+          }
+        },
+        {
+          "id": "external-contract-operations",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-operation-an-external-authority-owns-is-skipped-whole-by-the-go-reader",
+              "an-external-contract-that-contradicts-itself-is-refused",
+              "the-published-schema-carries-the-external-contract-marker"
+            ]
+          }
+        },
+        {
+          "id": "websocket-state-machine",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "auth-is-admitted-before-handler-messages",
+              "control-data-half-close-terminal-and-resume-transitions-are-closed",
+              "frame-bounds-and-wide-sequences-are-enforced-and-lossless",
+              "published-wire-schema-matches-frame-vocabulary"
+            ]
+          }
+        },
+        {
+          "id": "provider-owned-websocket-wires",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-provider-owned-wire-is-declared-with-its-encoding-and-subprotocol",
+              "the-first-party-websocket-transport-keeps-its-exact-bytes",
+              "a-malformed-reserved-or-undeclared-provider-wire-is-refused",
+              "a-first-party-conversation-never-admits-on-a-provider-owned-wire"
+            ]
+          }
+        },
+        {
+          "id": "sse-continuation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-sse-transport-declares-a-cursor-or-best-effort-continuation",
+              "a-reconnect-needs-a-resumable-websocket-or-a-continuable-sse-transport",
+              "a-malformed-misplaced-or-mismatched-continuation-is-refused",
+              "a-manifest-that-declares-a-continuation-requires-the-sse-continuation-runtime-capability",
+              "the-published-schema-carries-the-continuation-declaration",
+              "the-negotiated-wire-terminal-and-mixed-version-outcomes-are-pinned-by-shared-scenes"
+            ]
+          }
+        },
+        {
+          "id": "shared-page-transport",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "shared-page-schemas-preserve-owner-specialization-and-exact-wire-types",
+              "absent-owner-confirmation-is-omitted-without-dropping-zero-watermark",
+              "caller-operation-paths-refuse-unknown-or-unsafe-targets"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

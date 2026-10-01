@@ -1,0 +1,66 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature-evidence.json",
+  "protocolVersion": 1,
+  "evidence": [
+    {
+      "id": "telemetry-putnami-dev/cli-usage-receiver/expiry-runs-without-the-service/679d267c3ace",
+      "feature": "telemetry-putnami-dev/cli-usage-receiver",
+      "requirement": "expiry-runs-without-the-service",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "telemetry.putnami.dev",
+        "binding": "source-v1:sha256:964c42f968ef2bab72041dee3953fd5f42a154c167e27bdbe12d535c194565e8"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "telemetry.putnami.dev",
+          "kind": "migration",
+          "subkind": "sql",
+          "key": "cliagg"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "main.go",
+        "symbol": "main.main"
+      }
+    },
+    {
+      "id": "telemetry-putnami-dev/cli-usage-receiver/expiry-runs-without-the-service/9031e5cdf8c2",
+      "feature": "telemetry-putnami-dev/cli-usage-receiver",
+      "requirement": "expiry-runs-without-the-service",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "telemetry.putnami.dev",
+        "binding": "source-v1:sha256:964c42f968ef2bab72041dee3953fd5f42a154c167e27bdbe12d535c194565e8"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "telemetry.putnami.dev",
+          "kind": "discoverer",
+          "subkind": "source",
+          "key": "sql:cliagg"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "main.go",
+        "symbol": "main.main"
+      }
+    }
+  ]
+}

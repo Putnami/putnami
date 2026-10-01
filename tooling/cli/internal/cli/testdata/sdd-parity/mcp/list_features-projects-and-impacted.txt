@@ -1,0 +1,3 @@
+isError true
+--- block 0 ---
+projects and impacted select the same thing two ways: pass one

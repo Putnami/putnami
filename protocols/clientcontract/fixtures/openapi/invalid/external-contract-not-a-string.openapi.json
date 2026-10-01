@@ -1,0 +1,19 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "invalid", "version": "1" },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": { "id": "invalid", "audience": "urn:invalid" },
+    "credentials": {}
+  },
+  "paths": {
+    "/v2/{name}/tags/list": {
+      "get": {
+        "operationId": "getV2_Name_TagsList",
+        "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "204": { "description": "empty" } },
+        "x-putnami-external-contract": { "authority": "OCI Distribution Specification v1.1" }
+      }
+    }
+  }
+}

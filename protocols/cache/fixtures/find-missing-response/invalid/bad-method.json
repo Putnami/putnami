@@ -1,0 +1,1 @@
+{ "protocolVersion": 1, "uploads": [ { "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "url": "https://cas.example/up/e", "method": "GET" } ] }

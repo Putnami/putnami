@@ -1,0 +1,109 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "samples",
+  "features": [
+    {
+      "id": "samples/go-first-party-client-matrix",
+      "type": "feature",
+      "name": "Go-provider first-party client matrix",
+      "outcome": "Every transport this Go provider declares is exercised by a generated client of both languages against the running provider, and the machine index states, cell by cell, what that proves and what it does not",
+      "owner": "samples",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "identity-is-declared-and-never-downgraded",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-alternative-is-satisfied-whole-or-not-at-all",
+              "a-forwarded-user-identity-comes-from-the-inbound-request",
+              "a-credential-reaches-only-the-operation-that-declares-it",
+              "a-refused-stream-credential-arrives-before-any-message"
+            ]
+          }
+        },
+        {
+          "id": "a-result-is-what-the-contract-declared",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-error-narrows-to-its-generated-type",
+              "an-undeclared-remote-failure-stays-untyped-and-carries-no-prose",
+              "a-response-that-violates-the-declared-schema-is-refused",
+              "opaque-json-crosses-the-wire-without-loss"
+            ]
+          }
+        },
+        {
+          "id": "the-declared-request-policy-is-the-one-applied",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-retry-repeats-one-request-identity",
+              "declared-attempts-are-a-bound",
+              "a-declared-budget-ends-an-attempt-that-never-answers",
+              "a-declared-circuit-stops-calling"
+            ]
+          }
+        },
+        {
+          "id": "a-call-is-observable-and-ends-with-its-application",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-generated-call-continues-the-inbound-trace-and-is-measured-once",
+              "a-retained-client-refuses-every-call-after-its-application-stopped",
+              "a-raw-octet-call-is-traced-and-measured-without-its-octets"
+            ]
+          }
+        },
+        {
+          "id": "generation-is-deterministic-and-a-break-is-detected",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-committed-client-is-what-the-generator-renders",
+              "a-removed-operation-is-detected-rather-than-rendered-through",
+              "the-capability-manifest-is-canonical"
+            ]
+          }
+        },
+        {
+          "id": "a-declared-continuation-survives-an-instance-change",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cursor-stream-continues-on-another-instance-after-the-last-delivered-change",
+              "a-position-the-provider-never-issued-is-its-typed-refusal"
+            ]
+          }
+        },
+        {
+          "id": "the-matrix-index-is-checkable",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-index-names-tests-that-exist",
+              "the-index-states-every-cell-and-family-for-every-consumer"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

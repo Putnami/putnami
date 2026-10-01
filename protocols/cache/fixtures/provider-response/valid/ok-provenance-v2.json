@@ -1,0 +1,1 @@
+{ "protocolVersion": 2, "id": 8, "ok": true, "payload": { "status": "hit", "producer": "ci", "producerIdentity": "oidc:repo:putnami/putnami", "channel": "trusted" } }

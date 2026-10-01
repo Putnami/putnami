@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/spectest",
+  "tags": ["ts"],
+  "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
+  "options": {
+    "package": {
+      "npm": true
+    },
+    "publish": {
+      "npm": true
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

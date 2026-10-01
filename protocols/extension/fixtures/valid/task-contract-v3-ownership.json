@@ -1,0 +1,162 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/task-contract-v3-ownership",
+  "version": "1.0.0",
+  "cliContract": 2,
+  "commands": {
+    "package": {
+      "description": "Package the project",
+      "run": [
+        { "id": "archive", "task": "package-archive" },
+        { "id": "report", "task": "package-report", "dependsOn": ["archive"] }
+      ]
+    },
+    "docs": {
+      "description": "Render the documentation site",
+      "run": [{ "id": "render", "task": "docs-render" }]
+    },
+    "deploy": {
+      "description": "Deploy the project",
+      "run": [{ "id": "apply", "task": "deploy-apply" }]
+    },
+    "format": {
+      "description": "Rewrite sources in place",
+      "run": [{ "id": "format", "task": "format-write" }]
+    },
+    "build": {
+      "description": "Generate the project's contracts, then describe them",
+      "run": [
+        { "id": "generate", "task": "build-generate" },
+        { "id": "describe", "task": "build-describe", "dependsOn": ["generate"] }
+      ]
+    }
+  },
+  "tasks": {
+    "package-archive": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["archive"],
+      "cwd": "{projectRoot}",
+      "reads": ["sources"],
+      "cache": { "enabled": true, "deterministic": true },
+      "declares": {
+        "outputs": {
+          "archive": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "package/app.tar.gz",
+            "description": "Packaged archive; a sibling step of the same command owns report.json."
+          }
+        }
+      }
+    },
+    "package-report": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["report"],
+      "cwd": "{projectRoot}",
+      "cache": { "enabled": true },
+      "declares": {
+        "outputs": {
+          "report": { "kind": "file", "root": "command-output", "path": "report.json" }
+        }
+      }
+    },
+    "docs-render": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["render"],
+      "cwd": "{projectRoot}",
+      "reads": ["sources"],
+      "outputs": {
+        "siteOutput": {
+          "description": "Command-output-relative directory the rendered site was written to"
+        }
+      },
+      "cache": { "enabled": true },
+      "declares": {
+        "outputs": {
+          "report": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "report.json",
+            "description": "Same command-output path as package-report, in a different command's directory."
+          },
+          "site": {
+            "kind": "directory",
+            "root": "command-output",
+            "pathFrom": "siteOutput",
+            "optionalEmpty": true
+          },
+          "shared": {
+            "kind": "directory",
+            "root": "workspace",
+            "path": "docs/.gen/sample",
+            "optionalEmpty": true,
+            "description": "Workspace-rooted subtree; ownership of it is workspace-global."
+          }
+        },
+        "effects": ["network"]
+      }
+    },
+    "deploy-apply": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["deploy"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "declares": {
+        "effects": ["cloud", "network"]
+      }
+    },
+    "build-generate": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["generate"],
+      "cwd": "{projectRoot}",
+      "reads": ["sources"],
+      "cache": { "enabled": true, "deterministic": true },
+      "declares": {
+        "outputs": {
+          "gen": {
+            "kind": "directory",
+            "root": "project",
+            "path": ".gen",
+            "excludes": [".gen/migration-bundle"],
+            "description": "The generated subtree owned whole, minus the one subpath the describe step produces after this task has already been captured."
+          }
+        }
+      }
+    },
+    "build-describe": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["describe"],
+      "cwd": "{projectRoot}",
+      "reads": ["gen", "sources"],
+      "cache": { "enabled": true, "deterministic": true },
+      "declares": {
+        "outputs": {
+          "bundle": {
+            "kind": "directory",
+            "root": "project",
+            "path": ".gen/migration-bundle",
+            "optionalEmpty": true,
+            "description": "The subpath build-generate cedes: nested inside another task's declared subtree, and legal only because that task excludes it."
+          }
+        }
+      }
+    },
+    "format-write": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["format"],
+      "cwd": "{projectRoot}",
+      "writes": ["sources"],
+      "cache": { "enabled": true, "noOutput": true },
+      "declares": {
+        "mutatesSources": true
+      }
+    }
+  }
+}

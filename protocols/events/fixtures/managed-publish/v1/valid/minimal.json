@@ -1,0 +1,9 @@
+{
+  "protocol": "putnami.events.v1",
+  "type": "publish",
+  "id": "evt-01JAZ6Y5K1W8FQ2CP3R4T5V6X7",
+  "dedupeKey": "order-created:order-123",
+  "topic": "orders.created",
+  "topicVersion": "1",
+  "payload": { "orderId": "order-123" }
+}

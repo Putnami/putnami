@@ -1,0 +1,1 @@
+{"workspaceRoot":"/ws","outputPath":"/o","cacheRoot":"/c","workspace":{"name":"w"},"project":{"name":"p","path":"p","fullPath":"/ws/p"},"selectedProjects":[{"name":"a","path":"a","fullPath":"/ws/a"},{"name":"b","path":"b","fullPath":"/ws/b","dependencies":["/a"]}],"extension":{"name":"e","root":"/e"},"job":{"name":"build"},"params":{}}

@@ -1,0 +1,153 @@
+version: "2"
+
+run:
+  # Kept in step with the shipped default (go/extension/config/.golangci.yml):
+  # strictly below the 600000ms scheduler deadline of the golangci tasks, so a
+  # slow lint reports golangci's own "Timeout exceeded" instead of an opaque
+  # `job timed out`. See the note in the shipped config.
+  timeout: 8m
+  tests: true
+  go: "1.25"
+  allow-parallel-runners: true
+
+output:
+  formats:
+    text:
+      print-linter-name: true
+
+linters:
+  default: none
+  enable:
+    - govet
+    - errcheck
+    - unused
+    - ineffassign
+    - nilerr
+    - errorlint
+    - revive
+    - misspell
+    - unconvert
+    - unparam
+    - prealloc
+    - gosec
+    - gocritic
+
+  settings:
+    govet:
+      enable:
+        - assign
+        - atomic
+        - bools
+        - composites
+        - copylocks
+        - errorsas
+        - httpresponse
+        - loopclosure
+        - lostcancel
+        - nilfunc
+        - printf
+        - shift
+        - sortslice
+        - stdmethods
+        - stringintconv
+        - tests
+        - unmarshal
+        - unreachable
+        - unsafeptr
+        - unusedresult
+
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    gosec:
+      excludes:
+        # G104: errcheck already covers unchecked errors with fine-grained control;
+        #       gosec G104 duplicates it without exclude-functions support
+        - G104
+        # G117: Struct fields named AccessKey/SecretKey are expected in cloud SDK config types
+        - G117
+        # G602: Slice index false positives where bounds are guaranteed by prior checks
+        - G602
+        # G704: SSRF false positives on HTTP client calls where URLs come from trusted config
+        - G704
+
+    revive:
+      severity: warning
+      rules:
+        - name: blank-imports
+        - name: early-return
+        - name: errorf
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: var-declaration
+        - name: var-naming
+
+    misspell:
+      locale: US
+
+  exclusions:
+    generated: lax
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+          - revive
+          - errorlint
+      - text: "var-naming:"
+        linters:
+          - revive
+      - linters:
+          - gosec
+        text: "G404"
+      - path: errors/inspect\.go
+        linters:
+          - errorlint
+        source: '^\s*switch x := err\.\(type\) \{$'
+      - path: client/service_binding\.go
+        linters:
+          - gosec
+        text: "G101"
+        source: '^\s*CredentialSource(OAuthClientCredentials|OAuthExtensionGrant|OAuthClientAssertion|GCPIDToken)\s+CredentialSourceKind\s+=\s+"(oauth-client-credentials|oauth-extension-grant|oauth-client-assertion|gcp-id-token)"$'
+      - path: logger/logtest/logtest\.go
+        linters:
+          - gosec
+        text: "G101"
+        source: '^\s*TokenTimestamp\s+=\s+"<iso8601-millis-utc>"$'
+      - path: security/introspect\.go
+        linters:
+          - gosec
+        text: "G101"
+        source: '^\s*clientAssertionTypeJWTBearer\s+=\s+"urn:ietf:params:oauth:client-assertion-type:jwt-bearer"$'
+      - path: storage/gcs_auth\.go
+        linters:
+          - gosec
+        text: "G101"
+        source: '^\s*gcsDefaultTokenURI\s+=\s+"https://oauth2\.googleapis\.com/token"$'
+      - path: telemetry/gcp_token_source\.go
+        linters:
+          - gosec
+        text: "G101"
+        source: '^\s*gcpIDTokenPath\s+=\s+"/computeMetadata/v1/instance/service-accounts/default/identity"$'
+      - path: http/websocket\.go
+        linters:
+          - gosec
+        text: "G401|G505"
+        source: '^\s*("crypto/sha1"|h := sha1\.New\(\))$'
+      - path: client/ws_dial\.go
+        linters:
+          - gosec
+        text: "G401|G505"
+        source: '^\s*("crypto/sha1"|digest := sha1\.Sum\(\[\]byte\(key \+ wsHandshakeGUID\)\))$'
+
+formatters:
+  enable:
+    - goimports
+    - gofmt

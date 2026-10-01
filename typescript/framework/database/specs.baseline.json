@@ -1,0 +1,29 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/relational-persistence#cancellation",
+    "typescript/relational-persistence#cross-language-conformance",
+    "typescript/relational-persistence#declared-infrastructure",
+    "typescript/relational-persistence#lazy-transaction",
+    "typescript/relational-persistence#partial-commit-is-an-error",
+    "typescript/relational-persistence#secret-free-telemetry",
+    "typescript/relational-persistence#single-committer",
+    "typescript/relational-persistence#timeout-rollback",
+    "typescript/shared-datasource-pooling#acquire-time-search-path",
+    "typescript/shared-datasource-pooling#datasource-bound-acquire",
+    "typescript/shared-datasource-pooling#one-pool-per-physical-database",
+    "typescript/shared-datasource-pooling#shared-pool-lifetime",
+    "typescript/shared-datasource-pooling#tuning-agreement",
+    "typescript/sql-migrations#atomic-bookkeeping",
+    "typescript/sql-migrations#body-drift-fails",
+    "typescript/sql-migrations#byte-order-apply",
+    "typescript/sql-migrations#failure-is-recorded",
+    "typescript/sql-migrations#reverse-order-rollback",
+    "typescript/sql-migrations#rollback-integrity",
+    "typescript/sql-migrations#schema-scoped-ddl",
+    "typescript/sql-migrations#single-writer",
+    "typescript/sql-migrations#unambiguous-target",
+    "typescript/sql-migrations#unbounded-statement"
+  ]
+}

@@ -1,0 +1,10 @@
+DROP TRIGGER IF EXISTS cli_daily_contributor_bound ON cli_daily_contributor;
+DROP TRIGGER IF EXISTS cli_daily_counter_bound ON cli_daily_counter;
+DROP TRIGGER IF EXISTS cli_device_day_bound ON cli_device_day;
+DROP FUNCTION IF EXISTS cli_bound_daily_contributor();
+DROP FUNCTION IF EXISTS cli_bound_daily_counter();
+DROP FUNCTION IF EXISTS cli_bound_device_day();
+DROP TABLE IF EXISTS cli_applied_flush;
+DROP TABLE IF EXISTS cli_cardinality_admission;
+DROP TABLE IF EXISTS cli_aggregate_overflow;
+DROP TABLE IF EXISTS cli_daily_contributor;

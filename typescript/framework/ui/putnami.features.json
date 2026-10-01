@@ -1,0 +1,147 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/ui-system",
+      "type": "feature",
+      "name": "TypeScript UI system",
+      "outcome": "React applications compose responsive, themeable user interfaces whose server-rendered styles, interaction semantics, and rich-content safety remain predictable through hydration",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "external-link-containment",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-new-context-link-receives-noopener", "a-rejected-url-loses-its-target-but-keeps-its-text"]
+          }
+        },
+        {
+          "id": "focus-boundary",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-disabled-node-is-not-focusable",
+              "a-negative-tabindex-node-is-not-focusable",
+              "an-aria-hidden-node-is-not-focusable",
+              "escaped-focus-is-pulled-back-inside",
+              "focus-wraps-from-the-first-element-to-the-last",
+              "focus-wraps-from-the-last-element-to-the-first",
+              "the-surface-is-the-fallback-when-no-descendant-is-focusable"
+            ]
+          }
+        },
+        {
+          "id": "interactive-semantics",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-closed-overlay-renders-nothing",
+              "a-disabled-control-sets-its-accessibility-attributes",
+              "a-loading-control-exposes-busy-and-disables-interaction",
+              "an-overlay-exposes-dialog-semantics-while-open",
+              "tabs-publish-a-roving-tabindex",
+              "tabs-publish-tablist-tab-and-tabpanel-roles",
+              "tabs-publish-their-selection-state"
+            ]
+          }
+        },
+        {
+          "id": "keyboard-and-dismissal",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-click-on-the-triggering-node-does-not-dismiss",
+              "an-outside-click-dismisses-the-surface",
+              "an-unattached-ref-never-dismisses",
+              "arrow-left-moves-to-the-previous-tab",
+              "arrow-navigation-skips-a-disabled-tab",
+              "arrow-navigation-wraps-past-the-last-tab",
+              "arrow-right-moves-to-the-next-tab",
+              "escape-is-a-dismiss-key",
+              "home-and-end-select-the-first-and-last-enabled-tab"
+            ]
+          }
+        },
+        {
+          "id": "mode-reactive-colors",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-semantic-color-token-resolves-through-the-theme",
+              "both-palettes-emit-custom-color-variables",
+              "the-dark-palette-resolves-its-own-colors",
+              "the-resolved-mode-is-applied-to-html-as-attribute-and-color-scheme"
+            ]
+          }
+        },
+        {
+          "id": "responsive-layout",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-null-entry-is-skipped",
+              "a-scalar-value-produces-a-simple-declaration",
+              "a-single-element-array-adds-no-breakpoint",
+              "later-values-map-in-order-to-every-declared-breakpoint",
+              "surplus-values-beyond-the-breakpoints-are-ignored",
+              "the-first-array-value-is-the-base-declaration"
+            ]
+          }
+        },
+        {
+          "id": "rich-content-sanitization",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "code-blocks-keep-their-classes",
+              "data-and-aria-attributes-are-preserved",
+              "entity-encoded-scheme-obfuscation-is-defeated",
+              "event-handler-attributes-are-stripped",
+              "html-comments-are-removed",
+              "iframe-object-and-embed-are-removed",
+              "inline-style-attributes-are-stripped",
+              "only-allowlisted-attributes-survive",
+              "script-elements-are-removed-with-their-contents",
+              "structural-and-semantic-markup-is-preserved",
+              "style-elements-are-removed-with-their-contents",
+              "whitespace-obfuscated-schemes-are-defeated"
+            ]
+          }
+        },
+        {
+          "id": "ssr-color-mode",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unrelated-script-child-is-not-mistaken-for-the-bootstrap",
+              "hydration-recognizes-a-previously-injected-script",
+              "the-bootstrap-script-is-a-storage-failure-tolerant-iife",
+              "the-bootstrap-script-is-registered-exactly-once-during-ssr",
+              "the-script-falls-back-to-the-os-preference-for-system",
+              "the-script-reads-the-persisted-preference-before-paint"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

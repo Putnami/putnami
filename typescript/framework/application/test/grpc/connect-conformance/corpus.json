@@ -1,0 +1,654 @@
+{
+  "source": {
+    "specification": "The Connect protocol",
+    "url": "https://connectrpc.com/docs/protocol/",
+    "protocolVersion": "1",
+    "read": "2026-09-09",
+    "note": "Scenes are transcribed from the specification text, not from either Putnami implementation."
+  },
+  "codes": [
+    {
+      "code": "canceled",
+      "httpStatus": 499,
+      "grpcNumber": 1
+    },
+    {
+      "code": "unknown",
+      "httpStatus": 500,
+      "grpcNumber": 2
+    },
+    {
+      "code": "invalid_argument",
+      "httpStatus": 400,
+      "grpcNumber": 3
+    },
+    {
+      "code": "deadline_exceeded",
+      "httpStatus": 504,
+      "grpcNumber": 4
+    },
+    {
+      "code": "not_found",
+      "httpStatus": 404,
+      "grpcNumber": 5
+    },
+    {
+      "code": "already_exists",
+      "httpStatus": 409,
+      "grpcNumber": 6
+    },
+    {
+      "code": "permission_denied",
+      "httpStatus": 403,
+      "grpcNumber": 7
+    },
+    {
+      "code": "resource_exhausted",
+      "httpStatus": 429,
+      "grpcNumber": 8
+    },
+    {
+      "code": "failed_precondition",
+      "httpStatus": 400,
+      "grpcNumber": 9
+    },
+    {
+      "code": "aborted",
+      "httpStatus": 409,
+      "grpcNumber": 10
+    },
+    {
+      "code": "out_of_range",
+      "httpStatus": 400,
+      "grpcNumber": 11
+    },
+    {
+      "code": "unimplemented",
+      "httpStatus": 501,
+      "grpcNumber": 12
+    },
+    {
+      "code": "internal",
+      "httpStatus": 500,
+      "grpcNumber": 13
+    },
+    {
+      "code": "unavailable",
+      "httpStatus": 503,
+      "grpcNumber": 14
+    },
+    {
+      "code": "data_loss",
+      "httpStatus": 500,
+      "grpcNumber": 15
+    },
+    {
+      "code": "unauthenticated",
+      "httpStatus": 401,
+      "grpcNumber": 16
+    }
+  ],
+  "httpInference": [
+    {
+      "status": 400,
+      "code": "internal"
+    },
+    {
+      "status": 401,
+      "code": "unauthenticated"
+    },
+    {
+      "status": 403,
+      "code": "permission_denied"
+    },
+    {
+      "status": 404,
+      "code": "unimplemented"
+    },
+    {
+      "status": 429,
+      "code": "unavailable"
+    },
+    {
+      "status": 502,
+      "code": "unavailable"
+    },
+    {
+      "status": 503,
+      "code": "unavailable"
+    },
+    {
+      "status": 504,
+      "code": "unavailable"
+    },
+    {
+      "status": 418,
+      "code": "unknown"
+    },
+    {
+      "status": 500,
+      "code": "unknown"
+    },
+    {
+      "status": 451,
+      "code": "unknown"
+    }
+  ],
+  "headers": {
+    "protocolVersion": {
+      "name": "Connect-Protocol-Version",
+      "value": "1"
+    },
+    "timeout": {
+      "name": "Connect-Timeout-Ms",
+      "grammar": "positive integer, at most 10 digits",
+      "source": "\"Timeout → “connect-timeout-ms” Timeout-Milliseconds\""
+    },
+    "streamingContentEncoding": {
+      "name": "Connect-Content-Encoding"
+    },
+    "streamingAcceptEncoding": {
+      "name": "Connect-Accept-Encoding"
+    }
+  },
+  "contentTypes": {
+    "unaryJson": "application/json",
+    "unaryProto": "application/proto",
+    "streamJson": "application/connect+json",
+    "streamProto": "application/connect+proto",
+    "unaryErrorContentType": "application/json",
+    "source": "\"Unary-Content-Type → “content-type application/” (“proto” / “json”)\" and \"Streaming-Content-Type → “content-type application/connect+” (“proto” / “json”)\""
+  },
+  "timeouts": [
+    {
+      "raw": "1",
+      "expect": 1
+    },
+    {
+      "raw": "9999999999",
+      "expect": 9999999999
+    },
+    {
+      "raw": "0",
+      "expect": null
+    },
+    {
+      "raw": "10000000000",
+      "expect": null
+    },
+    {
+      "raw": "100m",
+      "expect": null
+    },
+    {
+      "raw": "-1",
+      "expect": null
+    },
+    {
+      "raw": "",
+      "expect": null
+    },
+    {
+      "raw": " 5",
+      "expect": null
+    }
+  ],
+  "errors": [
+    {
+      "name": "simplest-form-is-a-code-alone",
+      "source": "\"The simplest form of Error contains just a code\"",
+      "json": {
+        "code": "unavailable"
+      },
+      "expect": {
+        "code": "unavailable"
+      }
+    },
+    {
+      "name": "code-message-and-a-typed-detail",
+      "source": "the published Error example carrying a google.rpc.RetryInfo detail",
+      "json": {
+        "code": "unavailable",
+        "message": "overloaded: back off and retry",
+        "details": [
+          {
+            "type": "google.rpc.RetryInfo",
+            "value": "CgIIPA",
+            "debug": {
+              "retryDelay": "30s"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "code": "unavailable",
+        "message": "overloaded: back off and retry",
+        "details": [
+          {
+            "type": "google.rpc.RetryInfo",
+            "value": "CgIIPA",
+            "debug": {
+              "retryDelay": "30s"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty-object-is-invalid",
+      "source": "\"{\\\"code\\\": null} and {} are invalid\"",
+      "json": {},
+      "expect": null
+    },
+    {
+      "name": "null-code-is-invalid",
+      "source": "\"{\\\"code\\\": null} and {} are invalid\"",
+      "json": {
+        "code": null
+      },
+      "expect": null
+    },
+    {
+      "name": "an-unlisted-code-is-invalid",
+      "source": "\"Only the codes below are valid — there are no user-defined codes.\"",
+      "json": {
+        "code": "teapot",
+        "message": "short and stout"
+      },
+      "expect": null
+    },
+    {
+      "name": "grpc-uppercase-name-is-not-a-connect-code",
+      "source": "\"Only the codes below are valid\"; the codes are lower-case snake case",
+      "json": {
+        "code": "NOT_FOUND"
+      },
+      "expect": null
+    },
+    {
+      "name": "message-may-be-omitted",
+      "source": "\"When message is omitted or the empty string, clients may synthesize a user-facing message\"",
+      "json": {
+        "code": "internal",
+        "details": []
+      },
+      "expect": {
+        "code": "internal"
+      }
+    },
+    {
+      "name": "a-detail-without-value-is-dropped",
+      "source": "\"Each detail is an object with “type” and “value” properties\"",
+      "json": {
+        "code": "internal",
+        "details": [
+          {
+            "type": "google.rpc.ErrorInfo"
+          }
+        ]
+      },
+      "expect": {
+        "code": "internal"
+      }
+    }
+  ],
+  "endStream": [
+    {
+      "name": "successful-rpc-is-an-empty-object",
+      "source": "\"After a successful RPC, EndStreamResponse can be as simple as {}\"",
+      "json": {},
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "failure-carries-an-error",
+      "source": "the published EndStreamResponse example",
+      "json": {
+        "error": {
+          "code": "unavailable"
+        },
+        "metadata": {
+          "acme-operation-cost": ["237"]
+        }
+      },
+      "expect": {
+        "ok": false,
+        "code": "unavailable",
+        "metadata": {
+          "acme-operation-cost": ["237"]
+        }
+      }
+    },
+    {
+      "name": "metadata-alone-is-a-success",
+      "source": "\"successful RPCs must omit the property. The “metadata” property is optional.\"",
+      "json": {
+        "metadata": {
+          "acme-operation-cost": ["237"]
+        }
+      },
+      "expect": {
+        "ok": true,
+        "metadata": {
+          "acme-operation-cost": ["237"]
+        }
+      }
+    },
+    {
+      "name": "null-error-is-invalid",
+      "source": "\"{\\\"error\\\": null}, {\\\"error\\\": {}}, and {\\\"error\\\": {\\\"code\\\": null}} are invalid\"",
+      "json": {
+        "error": null
+      },
+      "expect": null
+    },
+    {
+      "name": "empty-error-is-invalid",
+      "source": "\"{\\\"error\\\": null}, {\\\"error\\\": {}}, and {\\\"error\\\": {\\\"code\\\": null}} are invalid\"",
+      "json": {
+        "error": {}
+      },
+      "expect": null
+    },
+    {
+      "name": "error-with-null-code-is-invalid",
+      "source": "\"{\\\"error\\\": null}, {\\\"error\\\": {}}, and {\\\"error\\\": {\\\"code\\\": null}} are invalid\"",
+      "json": {
+        "error": {
+          "code": null
+        }
+      },
+      "expect": null
+    },
+    {
+      "name": "grpc-web-trailers-are-not-an-end-stream-response",
+      "source": "\"Note that this is not the same as the gRPC-Web protocol\"",
+      "json": {
+        "grpc-status": 14,
+        "grpc-message": "overloaded"
+      },
+      "expect": {
+        "ok": true
+      }
+    }
+  ],
+  "envelope": {
+    "headerBytes": 5,
+    "lengthEncoding": "4 byte unsigned integer, big-endian",
+    "flags": [
+      {
+        "bit": 0,
+        "mask": 1,
+        "name": "compressed",
+        "source": "\"If the least significant bit is 1, the Message is compressed\""
+      },
+      {
+        "bit": 1,
+        "mask": 2,
+        "name": "endStream",
+        "source": "\"If the next least significant bit is 1, the Message is an EndStreamResponse\""
+      }
+    ],
+    "reservedMask": 252,
+    "reservedSource": "\"The six most significant bits are reserved for future protocol extensions.\"",
+    "golden": {
+      "name": "published-failed-server-stream-terminal",
+      "source": "\"< <flags: 2><length: 58>{\\\"error\\\": {\\\"code\\\": \\\"unavailable\\\", \\\"message\\\": \\\"overloaded\\\"}}\"",
+      "flags": 2,
+      "payload": "{\"error\": {\"code\": \"unavailable\", \"message\": \"overloaded\"}}",
+      "payloadByteLength": 59,
+      "publishedLength": 58,
+      "bytesHex": "020000003b7b226572726f72223a207b22636f6465223a2022756e617661696c61626c65222c20226d657373616765223a20226f7665726c6f61646564227d7d"
+    }
+  },
+  "streams": [
+    {
+      "name": "one-message-then-a-successful-terminal",
+      "source": "\"server implementations must send an EndStreamResponse as the final message in the stream\"",
+      "frames": [
+        {
+          "flags": 0,
+          "json": {
+            "seq": 1
+          }
+        },
+        {
+          "flags": 2,
+          "json": {}
+        }
+      ],
+      "expect": {
+        "outcome": "complete",
+        "messages": [
+          {
+            "seq": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "zero-messages-then-a-successful-terminal",
+      "source": "\"Streaming-Response → Streaming-Response-Headers 1*Enveloped-Message\"",
+      "frames": [
+        {
+          "flags": 2,
+          "json": {}
+        }
+      ],
+      "expect": {
+        "outcome": "complete",
+        "messages": []
+      }
+    },
+    {
+      "name": "terminal-carries-the-failure",
+      "source": "the published failed server streaming RPC example",
+      "frames": [
+        {
+          "flags": 2,
+          "json": {
+            "error": {
+              "code": "unavailable",
+              "message": "overloaded"
+            }
+          }
+        }
+      ],
+      "expect": {
+        "outcome": "error",
+        "code": "unavailable",
+        "message": "overloaded",
+        "messages": []
+      }
+    },
+    {
+      "name": "messages-delivered-before-a-failing-terminal-are-kept",
+      "source": "\"Failed RPCs must provide an Error in the “error” property\"",
+      "frames": [
+        {
+          "flags": 0,
+          "json": {
+            "seq": 1
+          }
+        },
+        {
+          "flags": 2,
+          "json": {
+            "error": {
+              "code": "aborted"
+            }
+          }
+        }
+      ],
+      "expect": {
+        "outcome": "error",
+        "code": "aborted",
+        "messages": [
+          {
+            "seq": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "a-stream-that-ends-without-a-terminal-is-a-failure",
+      "source": "\"server implementations must send an EndStreamResponse as the final message in the stream\"",
+      "frames": [
+        {
+          "flags": 0,
+          "json": {
+            "seq": 1
+          }
+        }
+      ],
+      "expect": {
+        "outcome": "error",
+        "code": "internal",
+        "messages": [
+          {
+            "seq": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "a-second-terminal-is-refused",
+      "source": "\"must not send an EndStreamResponse earlier in the stream\"",
+      "frames": [
+        {
+          "flags": 2,
+          "json": {}
+        },
+        {
+          "flags": 2,
+          "json": {}
+        }
+      ],
+      "expect": {
+        "outcome": "error",
+        "code": "internal",
+        "messages": []
+      }
+    },
+    {
+      "name": "a-message-after-the-terminal-is-refused",
+      "source": "\"must not send an EndStreamResponse earlier in the stream\"",
+      "frames": [
+        {
+          "flags": 2,
+          "json": {}
+        },
+        {
+          "flags": 0,
+          "json": {
+            "seq": 2
+          }
+        }
+      ],
+      "expect": {
+        "outcome": "error",
+        "code": "internal",
+        "messages": []
+      }
+    },
+    {
+      "name": "a-reserved-flag-bit-is-refused",
+      "source": "\"The six most significant bits are reserved for future protocol extensions.\"",
+      "frames": [
+        {
+          "flags": 4,
+          "json": {
+            "seq": 1
+          }
+        }
+      ],
+      "expect": {
+        "outcome": "error",
+        "code": "internal",
+        "messages": []
+      }
+    },
+    {
+      "name": "the-compressed-bit-without-a-declared-encoding-is-refused",
+      "source": "\"If Streaming-Content-Encoding is omitted or “identity”, this bit must be 0.\"",
+      "frames": [
+        {
+          "flags": 1,
+          "json": {
+            "seq": 1
+          }
+        }
+      ],
+      "expect": {
+        "outcome": "error",
+        "code": "internal",
+        "messages": []
+      }
+    },
+    {
+      "name": "a-malformed-terminal-is-a-failure-not-a-success",
+      "source": "\"{\\\"error\\\": {}} … are invalid\"",
+      "frames": [
+        {
+          "flags": 2,
+          "json": {
+            "error": {}
+          }
+        }
+      ],
+      "expect": {
+        "outcome": "error",
+        "code": "internal",
+        "messages": []
+      }
+    }
+  ],
+  "detailValue": {
+    "name": "published-retry-info-detail",
+    "source": "\"\\\"value\\\": \\\"CgIIPA\\\"\" in the published Error example",
+    "base64": "CgIIPA",
+    "bytesHex": "0a02083c",
+    "type": "google.rpc.RetryInfo",
+    "descriptor": {
+      "google.rpc.RetryInfo": [
+        {
+          "name": "retry_delay",
+          "jsonName": "retryDelay",
+          "number": 1,
+          "type": "google.protobuf.Duration",
+          "optional": false,
+          "repeated": false
+        }
+      ],
+      "google.protobuf.Duration": [
+        {
+          "name": "seconds",
+          "jsonName": "seconds",
+          "number": 1,
+          "type": "int64",
+          "optional": false,
+          "repeated": false
+        },
+        {
+          "name": "nanos",
+          "jsonName": "nanos",
+          "number": 2,
+          "type": "int32",
+          "optional": false,
+          "repeated": false
+        }
+      ]
+    },
+    "decoded": {
+      "retry_delay": {
+        "seconds": "60",
+        "nanos": 0
+      }
+    },
+    "publishedDebug": {
+      "retryDelay": "30s"
+    },
+    "note": "The bytes are normative; the published debug rendering says 30s while 0x3c is 60. Clients must not depend on debug."
+  }
+}

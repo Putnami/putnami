@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "py_example_library",
+  "tags": [
+    "sample",
+    "python",
+    "e2e"
+  ],
+  "extensions": [
+    "/python/extension",
+    "/tooling/sdd-extension"
+  ],
+  "options": {
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

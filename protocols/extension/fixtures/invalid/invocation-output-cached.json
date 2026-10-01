@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/invocation-output-cached",
+  "commands": {
+    "test": { "run": [{ "id": "setup", "task": "test-setup" }] }
+  },
+  "tasks": {
+    "test-setup": {
+      "kind": "command",
+      "command": "echo",
+      "cache": { "enabled": true },
+      "declares": {
+        "outputs": {
+          "lease": { "kind": "file", "scope": "invocation", "path": "database/lease.json" }
+        }
+      }
+    }
+  }
+}

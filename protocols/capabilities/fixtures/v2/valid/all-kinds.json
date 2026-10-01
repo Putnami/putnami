@@ -1,0 +1,138 @@
+{
+  "protocolVersion": 2,
+  "project": "example",
+  "configDefinitions": [
+    {
+      "identity": { "ownerProject": "example", "kind": "config", "key": "app.name" },
+      "path": "app.name",
+      "provenance": {
+        "project": "example",
+        "sourceKind": "manual",
+        "declaration": { "root": "project", "path": "config.go" }
+      }
+    }
+  ],
+  "schemas": [
+    {
+      "identity": { "ownerProject": "example", "kind": "schema", "subkind": "route", "key": "users" },
+      "name": "users",
+      "kind": "route",
+      "provenance": {
+        "project": "example",
+        "sourceKind": "manual",
+        "declaration": { "root": "project", "path": "routes.go" }
+      }
+    }
+  ],
+  "discoverers": [
+    {
+      "identity": { "ownerProject": "example", "kind": "discoverer", "subkind": "source", "key": "routes" },
+      "name": "routes",
+      "kind": "source",
+      "provenance": {
+        "project": "example",
+        "sourceKind": "manual",
+        "declaration": { "root": "project", "path": "discover.go" }
+      }
+    }
+  ],
+  "migrations": [
+    {
+      "identity": { "ownerProject": "example", "kind": "migration", "subkind": "sql", "key": "users" },
+      "name": "users",
+      "kind": "sql",
+      "provenance": {
+        "project": "example",
+        "sourceKind": "manual",
+        "declaration": { "root": "project", "path": "migrations.go" }
+      }
+    }
+  ],
+  "infraRequirements": [
+    {
+      "identity": { "ownerProject": "example", "kind": "infra", "subkind": "database", "key": "primary" },
+      "name": "primary",
+      "kind": "database",
+      "provenance": {
+        "project": "example",
+        "sourceKind": "manual",
+        "declaration": { "root": "project", "path": "infra.go" }
+      }
+    }
+  ],
+  "healthContributors": [
+    {
+      "identity": { "ownerProject": "example", "kind": "health", "subkind": "readiness", "key": "database" },
+      "name": "database",
+      "probe": "readiness",
+      "provenance": {
+        "project": "example",
+        "sourceKind": "manual",
+        "declaration": { "root": "project", "path": "health.go" }
+      }
+    }
+  ],
+  "lifecycleHooks": [
+    {
+      "identity": { "ownerProject": "example", "kind": "lifecycle", "subkind": "starter", "key": "server" },
+      "name": "server",
+      "phase": "starter",
+      "provenance": {
+        "project": "example",
+        "sourceKind": "manual",
+        "declaration": { "root": "project", "path": "lifecycle.go" }
+      }
+    }
+  ],
+  "packages": [
+    {
+      "identity": { "ownerProject": "example", "kind": "package", "key": "example" },
+      "package": "example",
+      "provenance": {
+        "project": "example",
+        "package": "example",
+        "sourceKind": "manual",
+        "declaration": { "root": "project", "path": "putnami.json" }
+      }
+    }
+  ],
+  "requiredCapabilities": [
+    {
+      "identity": { "ownerProject": "example", "kind": "requiredCapability", "key": "database-feature" },
+      "name": "database-feature",
+      "requires": ["config", "schema", "package"],
+      "provenance": {
+        "project": "example",
+        "sourceKind": "manual",
+        "declaration": { "root": "project", "path": "capabilities.go" }
+      }
+    }
+  ],
+  "domainAccess": [
+    {
+      "identity": { "ownerProject": "example", "kind": "domainAccess", "subkind": "projection", "key": "example.workspace-context.v1" },
+      "import": "example.workspace-context.v1",
+      "mode": "projection",
+      "status": "active",
+      "transports": [
+        { "role": "bootstrap", "kind": "api", "contract": "runtime.workspace-bindings.v1", "availability": "active" },
+        { "role": "updates", "kind": "event", "contract": "runtime.workspace-binding-changed.v1", "availability": "active" }
+      ],
+      "enforced": {
+        "maxStaleness": "5m",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "lateEvents": "ignore-older",
+        "deletion": "tombstone",
+        "writer": "example.workspace-context-projector",
+        "rebuild": "bootstrap"
+      },
+      "provenance": {
+        "project": "example",
+        "sourceKind": "framework",
+        "declaration": { "root": "project", "path": "darc.go" }
+      }
+    }
+  ]
+}

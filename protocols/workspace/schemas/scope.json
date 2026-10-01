@@ -1,0 +1,180 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-scope.json",
+  "title": "Putnami Scope Configuration",
+  "description": "Scope-level configuration file (putnami.json). Placed in intermediate directories between workspace root and projects. Defines inheritable config (tags, extensions, publishConfig) and optionally declares included sub-projects. When `activate: true`, the same file also acts as a project — project-shape fields (name, type, options, jobs, dependencies, etc.) are accepted and apply to the scope-self project.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference"
+    },
+    "line": {
+      "type": "object",
+      "description": "Declares this scope a version line: its projects are versioned and tagged together, and their version is derived from the line's git tags. A project belongs to its nearest ancestor line, exactly one; a line under another line, or a line on an activated scope, is a validation error. A workspace where no scope declares a line is one line, with the pattern 'v{version}'.",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "type": "string",
+          "description": "Pattern of the line's git tags, carrying exactly one '{version}' placeholder and otherwise made of [A-Za-z0-9._/{}-] (for example 'ts/v{version}'). Omitted means the default '<scope path>/v{version}'."
+        }
+      }
+    },
+    "activate": {
+      "type": "boolean",
+      "description": "When true, the scope directory is also registered as an activation target — extensions run against the scope itself in addition to its declared includes. Use this for scope-shaped artifacts (e.g. workspace-level infra) that don't fit a leaf project."
+    },
+    "includes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Included project paths relative to this scope directory. Makes this an autonomous scope that declares its own sub-projects."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Tags inherited by all projects under this scope. Merged (union) with ancestor scope tags. When activate is true, also applied to the scope-self project."
+    },
+    "extensions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Extensions inherited by all projects under this scope. Deepest scope wins (replaces, not merges). When activate is true, also applied to the scope-self project."
+    },
+    "publishConfig": {
+      "type": "object",
+      "description": "Publish configuration inherited by projects. Deepest scope wins per channel.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "projectAliases": {
+      "type": "object",
+      "description": "Project aliases (alias → target ID). Aggregated across all scopes; duplicates are an error.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "groups": {
+      "type": "object",
+      "description": "Project groups (group name → pattern). Aggregated across all scopes; duplicates are an error.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "distribution": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/distribution",
+      "description": "Distribution level inherited by every project under this scope that declares none of its own. Deepest scope wins. When activate is true, also applied to the scope-self project."
+    },
+
+    "name": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/name",
+      "description": "Project name for the scope-self project. Only meaningful when activate is true."
+    },
+    "type": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/type",
+      "description": "Project type for the scope-self project. Only meaningful when activate is true."
+    },
+    "description": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/description"
+    },
+    "main": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/main",
+      "description": "Main entry point for the scope-self project. Only meaningful when activate is true."
+    },
+    "bin": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/bin",
+      "description": "Binary entry points for the scope-self project. Only meaningful when activate is true."
+    },
+    "exports": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/exports",
+      "description": "Export map for the scope-self project. Only meaningful when activate is true."
+    },
+    "publish": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/publish",
+      "description": "Publish channels for the scope-self project. Only meaningful when activate is true."
+    },
+    "runsWith": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/runsWith",
+      "description": "Runtime service dependencies for the scope-self project. Only meaningful when activate is true."
+    },
+    "build": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/build",
+      "description": "Build configuration for the scope-self project. Only meaningful when activate is true."
+    },
+    "dependencies": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/dependencies",
+      "description": "Workspace dependencies of the scope-self project. Only meaningful when activate is true."
+    },
+    "visibility": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/visibility",
+      "description": "Import boundary of the scope-self project. Only meaningful when activate is true."
+    },
+    "registries": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/registries",
+      "description": "Registry entries overriding the workspace section for the scope-self project. Only meaningful when activate is true."
+    },
+    "options": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/options",
+      "description": "Per-command and per-extension parameter defaults applied to the scope-self project. Only meaningful when activate is true."
+    },
+    "jobs": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/jobs",
+      "description": "Accepted but ignored, exactly as on a project: an activated scope is also a project, so a 'jobs' block here is parsed, warned about, and never planned. Use 'disable.jobs' or 'tasks' instead."
+    },
+    "tasks": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/tasks",
+      "description": "Per-task execution tuning for the scope-self project. Only meaningful when activate is true."
+    },
+    "disable": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/disable",
+      "description": "Opt-out configuration for the scope-self project. Only meaningful when activate is true."
+    },
+    "featureAuthority": {
+      "type": "object",
+      "description": "Why this project declares no user-facing feature of its own. Set exactly one member. Absent means the project is expected to declare a feature.",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The authored feature ID this project contributes to, when the declaration lives in another project."
+        },
+        "none": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why this project deliberately has no user-facing feature."
+        }
+      },
+      "oneOf": [{ "required": ["owner"] }, { "required": ["none"] }]
+    }
+  },
+  "if": {
+    "not": {
+      "properties": {
+        "activate": { "const": true }
+      },
+      "required": ["activate"]
+    }
+  },
+  "then": {
+    "properties": {
+      "name": false,
+      "type": false,
+      "description": false,
+      "main": false,
+      "bin": false,
+      "exports": false,
+      "publish": false,
+      "runsWith": false,
+      "build": false,
+      "dependencies": false,
+      "visibility": false,
+      "registries": false,
+      "options": false,
+      "jobs": false,
+      "tasks": false,
+      "disable": false
+    }
+  }
+}

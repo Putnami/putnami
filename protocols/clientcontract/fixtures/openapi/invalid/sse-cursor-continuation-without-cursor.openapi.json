@@ -1,0 +1,95 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "invalid",
+    "version": "1"
+  },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": {
+      "id": "invalid",
+      "audience": "urn:invalid"
+    },
+    "credentials": {}
+  },
+  "paths": {
+    "/tail": {
+      "get": {
+        "operationId": "invalid.tail",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/Frame"
+                }
+              }
+            }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "server",
+          "messages": {
+            "output": {
+              "$ref": "#/components/schemas/Frame"
+            }
+          },
+          "transports": [
+            {
+              "protocol": "sse",
+              "path": "/tail",
+              "encoding": "json",
+              "sse": {
+                "continuation": {
+                  "mode": "cursor"
+                }
+              }
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": []
+              }
+            ]
+          },
+          "errors": [],
+          "idempotency": {
+            "kind": "safe"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Frame": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "line": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cursor",
+          "line"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

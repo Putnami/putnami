@@ -1,0 +1,493 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/distribution-release-set-provider-v2.json",
+  "title": "Putnami Distribution Release Set Provider v2",
+  "description": "Strict request and response shapes for resolve, release, channel-set, and channel-status. Select a root with #/$defs/<shape>. A resolve answers an empty channel with null; a release stores the set and advances every listed channel by compare-and-swap in one transaction; a channel-set moves one channel from an existing set without uploading anything; a channel-status exposes desired versus observed.",
+  "$defs": {
+    "ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "digest"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^rs_[0-9a-f]{64}$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "namespace": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "channel": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+      "description": "A portable channel name: valid at once as an npm dist-tag, a Go query, an OCI tag, and a put channel."
+    },
+    "releaseId": {
+      "type": "string",
+      "pattern": "^rs_[0-9a-f]{64}$"
+    },
+    "ecosystem": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,31}$"
+    },
+    "visibility": {
+      "type": "string",
+      "enum": [
+        "internal",
+        "private",
+        "public"
+      ],
+      "description": "One of the three ordered levels: internal < private < public."
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The monotone counter of accepted moves on a channel. A registry applies a projection only when the generation increases."
+    },
+    "releaseSet": {
+      "$ref": "distribution-release-set-v2.json"
+    },
+    "channelHead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "generation"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "generation": {
+          "$ref": "#/$defs/generation"
+        },
+        "releaseSet": {
+          "$ref": "#/$defs/releaseSet"
+        }
+      }
+    },
+    "nullableChannelHead": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/channelHead"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "headMap": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 16,
+      "propertyNames": {
+        "$ref": "#/$defs/channel"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/nullableChannelHead"
+      }
+    },
+    "visibilityChain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repo",
+        "versions",
+        "set"
+      ],
+      "description": "The permission inheritance the repository declares, from the widest level to the finest: repo, registry, channel, version, set, member. The finest level that states a value wins; a silent level inherits.",
+      "properties": {
+        "repo": {
+          "$ref": "#/$defs/visibility"
+        },
+        "registries": {
+          "type": "object",
+          "maxProperties": 16,
+          "propertyNames": {
+            "$ref": "#/$defs/ecosystem"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/visibility"
+          }
+        },
+        "versions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "stable": {
+              "$ref": "#/$defs/visibility"
+            },
+            "prerelease": {
+              "$ref": "#/$defs/visibility"
+            }
+          }
+        },
+        "set": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/visibility"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "members": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ecosystem",
+              "coordinate",
+              "visibility"
+            ],
+            "properties": {
+              "ecosystem": {
+                "$ref": "#/$defs/ecosystem"
+              },
+              "coordinate": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "visibility": {
+                "$ref": "#/$defs/visibility"
+              }
+            }
+          }
+        }
+      }
+    },
+    "resolveRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "namespace"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "const": 2
+        },
+        "namespace": {
+          "$ref": "#/$defs/namespace"
+        },
+        "channels": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/channel"
+          }
+        },
+        "releaseId": {
+          "$ref": "#/$defs/releaseId"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "channels"
+          ],
+          "not": {
+            "required": [
+              "releaseId"
+            ]
+          }
+        },
+        {
+          "required": [
+            "releaseId"
+          ],
+          "not": {
+            "required": [
+              "channels"
+            ]
+          }
+        }
+      ]
+    },
+    "resolveResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "const": 2
+        },
+        "heads": {
+          "$ref": "#/$defs/headMap"
+        },
+        "release": {
+          "$ref": "#/$defs/channelHead"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "heads"
+          ],
+          "not": {
+            "required": [
+              "release"
+            ]
+          }
+        },
+        {
+          "required": [
+            "release"
+          ],
+          "not": {
+            "required": [
+              "heads"
+            ]
+          }
+        }
+      ]
+    },
+    "mirrorTargets": {
+      "type": "object",
+      "maxProperties": 16,
+      "propertyNames": {
+        "$ref": "#/$defs/ecosystem"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["to"],
+        "properties": {
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "pattern": "^(https://)?[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~!$&'()*+,;=:@%-]*)*$"
+          }
+        }
+      }
+    },
+    "releaseRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "namespace",
+        "releaseSet",
+        "channels",
+        "visibility"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "const": 2
+        },
+        "namespace": {
+          "$ref": "#/$defs/namespace"
+        },
+        "releaseSet": {
+          "$ref": "#/$defs/releaseSet"
+        },
+        "channels": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "expected",
+              "visibility"
+            ],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/channel"
+              },
+              "expected": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/ref"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "visibility": {
+                "$ref": "#/$defs/visibility"
+              },
+              "immutable": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "visibility": {
+          "$ref": "#/$defs/visibilityChain"
+        },
+        "mirrors": {
+          "$ref": "#/$defs/mirrorTargets"
+        }
+      }
+    },
+    "releaseResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "outcome",
+        "current"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "const": 2
+        },
+        "outcome": {
+          "type": "string",
+          "maxLength": 64,
+          "enum": [
+            "released",
+            "already-current",
+            "conflict"
+          ]
+        },
+        "current": {
+          "$ref": "#/$defs/headMap"
+        }
+      }
+    },
+    "channelSetRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "namespace",
+        "channel",
+        "expected",
+        "from"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "const": 2
+        },
+        "namespace": {
+          "$ref": "#/$defs/namespace"
+        },
+        "channel": {
+          "$ref": "#/$defs/channel"
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "from": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "channel": {
+              "$ref": "#/$defs/channel"
+            },
+            "releaseId": {
+              "$ref": "#/$defs/releaseId"
+            }
+          },
+          "oneOf": [
+            {
+              "required": [
+                "channel"
+              ],
+              "not": {
+                "required": [
+                  "releaseId"
+                ]
+              }
+            },
+            {
+              "required": [
+                "releaseId"
+              ],
+              "not": {
+                "required": [
+                  "channel"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "channelStatusRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "namespace",
+        "channel"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "const": 2
+        },
+        "namespace": {
+          "$ref": "#/$defs/namespace"
+        },
+        "channel": {
+          "$ref": "#/$defs/channel"
+        }
+      }
+    },
+    "channelStatusResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "desired"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "const": 2
+        },
+        "desired": {
+          "$ref": "#/$defs/nullableChannelHead"
+        },
+        "observed": {
+          "type": "object",
+          "maxProperties": 16,
+          "propertyNames": {
+            "$ref": "#/$defs/ecosystem"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/generation"
+          }
+        }
+      }
+    }
+  }
+}

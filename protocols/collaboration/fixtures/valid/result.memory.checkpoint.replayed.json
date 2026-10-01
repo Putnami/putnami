@@ -1,0 +1,40 @@
+{
+  "record": {
+    "ref": {
+      "source": "git:acme-memory",
+      "id": "missions/42"
+    },
+    "revision": "a1b2c3d",
+    "kind": "mission",
+    "identity": {
+      "workspace": "putnami",
+      "repository": "github.com/Putnami/putnami",
+      "scope": "/tooling",
+      "mission": "42"
+    },
+    "title": "Contributor offering",
+    "content": "Task 2 done; task 3 consumes the contracts.",
+    "sources": [
+      {
+        "source": "github:Putnami/putnami",
+        "id": "42"
+      }
+    ],
+    "evidence": [
+      {
+        "kind": "gate",
+        "locator": ".putnami/sessions/20260924-080000/session.json",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "provenance": {
+      "recordedAt": "2026-09-24T08:10:00Z",
+      "recordedBy": "claude-opus-5-5"
+    },
+    "freshness": {
+      "updatedAt": "2026-09-24T08:10:00Z",
+      "retrievedAt": "2026-09-24T09:00:00Z"
+    }
+  },
+  "replayed": true
+}

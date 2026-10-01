@@ -1,0 +1,43 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/application-lifecycle",
+  "outcomes": [
+    "An application composes plugins, child modules, dependency providers, and module hooks under one lifecycle owner",
+    "Startup makes dependency and configuration failures visible before the application reports ready",
+    "Shutdown runs cleanup in dependency-safe reverse order and reports every cleanup failure",
+    "Describe mode can collect deterministic build metadata without starting runtime workloads",
+    "A declared Domain Access & Replication Contract is enforced by the code that implements it, so a projection cannot serve a copy older than the bound its manifest promises"
+  ],
+  "nonGoals": [
+    "Defining HTTP, gRPC, storage, database, or event transport behavior",
+    "Restarting failed plugins or supervising a crashed process",
+    "Promising strict compatibility between every pre-1.0 minor release",
+    "Moving the data a DARC contract governs: the consumer supplies bootstrap and updates over whichever carrier the contract declares, and darc governs only what happens to them"
+  ],
+  "requirements": [
+    {
+      "id": "describe",
+      "text": "Describe mode validates and configures a lazy dependency container, runs only describers, writes only below its output directory, and never starts runtime plugins. Build-triggered migration bundles use the authored project identity; programmatic describe calls retain the runtime application name."
+    },
+    {
+      "id": "phase-order",
+      "text": "The lifecycle runs module pre-configuration top-down, builds dependency injection, configures plugins, runs module post-configuration bottom-up, applies migrations, invokes functions, starts plugins, and then runs module start hooks top-down."
+    },
+    {
+      "id": "shutdown",
+      "text": "Shutdown runs module stop hooks bottom-up, stops plugins in reverse registration order, closes the dependency container, and aggregates cleanup errors."
+    },
+    {
+      "id": "startup-failure",
+      "text": "Concurrent plugin start failures are aggregated before cleanup; a start timeout cancels sibling startup, waits a bounded interval for starters to drain, and avoids racing cleanup with a cooperative starter."
+    },
+    {
+      "id": "darc-runtime-evidence",
+      "text": "A reference refuses a fact its import does not name, and a registered darc component contributes exactly one describe-owned capability row per import and mode, carrying the declared contract verbatim in deterministic bytes. The row is evidence and never authority: emitting it cannot create a cross-domain permission."
+    }
+  ],
+  "decisions": [
+    "go/framework/app/doc/adr/0001-phase-major-lifecycle.md"
+  ]
+}

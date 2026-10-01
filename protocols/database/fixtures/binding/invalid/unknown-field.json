@@ -1,0 +1,12 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-database-binding.json",
+  "protocolVersion": 1,
+  "databases": {
+    "auth": {
+      "engine": "postgres",
+      "schema": "iam",
+      "connection": { "dsn": "postgres://postgres:postgres@localhost:5432/auth" },
+      "pool": 10
+    }
+  }
+}

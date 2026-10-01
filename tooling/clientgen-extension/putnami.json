@@ -1,0 +1,51 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/clientgen",
+  "tags": [
+    "tooling",
+    "extension",
+    "go"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "dependencies": [
+    "/go/framework/api",
+    "/protocols/registry",
+    "/tooling/extension-sdk",
+    "/typescript/framework/client"
+  ],
+  "options": {
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-clientgen",
+      "version-var": "main.runtimeVersion",
+      "executables": [
+        {
+          "name": "putnami-client-generate-go",
+          "package": "go.putnami.dev/api/cmd/clientgen"
+        }
+      ]
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true
+    },
+    "test": {
+      "coverage": true,
+      "coverage-threshold": 70
+    },
+    "generate": {
+      "filePatterns": [
+        "../../typescript/framework/client/package.json"
+      ]
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

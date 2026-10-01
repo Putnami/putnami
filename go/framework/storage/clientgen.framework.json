@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "go.putnami.dev/storage",
+      "status": "transport-primitive",
+      "adapter": "go/framework/storage/backend.go",
+      "callsites": [
+        {
+          "path": "go/framework/storage/backend.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "467b483f0323661fdb841df6a38176240f396cac0d0e40a298f6381ff546bd20"
+        }
+      ],
+      "owner": "go.putnami.dev/storage",
+      "tests": ["go/framework/storage/backend_test.go"],
+      "reason": "Builds the pooled http.Client each object-storage backend owns. It names no endpoint and speaks no protocol; the adapters that use it carry their own external authority."
+    }
+  ]
+}

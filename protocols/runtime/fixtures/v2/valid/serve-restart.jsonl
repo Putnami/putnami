@@ -1,0 +1,9 @@
+{"v":2,"type":"meta","time":"2026-07-28T09:00:00.000Z","level":"info","message":"Starting serve","data":{"extension":"@putnami/go","job":"serve"}}
+{"v":2,"type":"phase","time":"2026-07-28T09:00:00.100Z","name":"serve","action":"start"}
+{"v":2,"type":"log","time":"2026-07-28T09:00:01.000Z","level":"info","message":"⚡️ listening http://localhost:8080"}
+{"v":2,"type":"ready","time":"2026-07-28T09:00:01.000Z","data":{"target":"server","endpoints":[{"scheme":"http","host":"localhost","port":8080}],"durationMs":900}}
+{"v":2,"type":"log","time":"2026-07-28T09:00:30.000Z","level":"info","message":"Restarting server due to source change"}
+{"v":2,"type":"log","time":"2026-07-28T09:00:31.000Z","level":"info","message":"⚡️ listening http://localhost:8080"}
+{"v":2,"type":"ready","time":"2026-07-28T09:00:31.000Z","data":{"target":"server","endpoints":[{"scheme":"http","host":"localhost","port":8080}],"durationMs":850}}
+{"v":2,"type":"phase","time":"2026-07-28T09:01:00.000Z","name":"serve","action":"end","status":"success"}
+{"v":2,"type":"result","time":"2026-07-28T09:01:00.100Z","level":"info","message":"Job OK","data":{"status":"OK"}}

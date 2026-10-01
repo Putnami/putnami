@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/document-repository#adapter-capabilities",
+    "typescript/document-repository#bounded-bulk-behavior",
+    "typescript/document-repository#collection-contract",
+    "typescript/document-repository#credential-redaction",
+    "typescript/document-repository#infra-publication",
+    "typescript/document-repository#operation-observability",
+    "typescript/document-repository#portable-query",
+    "typescript/document-repository#store-lifecycle",
+    "typescript/document-repository#stored-write-result",
+    "typescript/document-repository#transaction-atomicity"
+  ]
+}

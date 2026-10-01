@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-doctor.json",
+  "protocolVersion": 1,
+  "waivers": [
+    {
+      "code": "doctor.missing_required_config",
+      "project": "go.putnami.dev/example/api",
+      "field": "server.port",
+      "owner": "platform-team",
+      "reason": "server.port is injected by the platform at deploy time; PUT-1400",
+      "expires": "2027-06-30"
+    },
+    {
+      "code": "doctor.missing_required_config",
+      "project": "go.putnami.dev/example/api",
+      "field": "database.password",
+      "owner": "security-team",
+      "reason": "database.password is delivered by the secret manager; PUT-1401",
+      "expires": "2027-06-30"
+    }
+  ]
+}

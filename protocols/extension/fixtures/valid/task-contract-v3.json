@@ -1,0 +1,167 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/task-contract-v3",
+  "version": "1.0.0",
+  "cliContract": 2,
+  "commands": {
+    "build": {
+      "description": "Build the project",
+      "run": [
+        { "id": "generate", "task": "build-generate" },
+        { "id": "compile", "task": "build-compile", "dependsOn": ["generate"] },
+        { "id": "describe", "task": "build-describe", "dependsOn": ["compile"] }
+      ]
+    },
+    "test": {
+      "description": "Run tests",
+      "run": [{ "id": "test", "task": "test-exec" }]
+    },
+    "lint": {
+      "description": "Lint and fix sources",
+      "run": [{ "id": "fix", "task": "lint-fix" }]
+    },
+    "deps": {
+      "description": "Install workspace dependencies",
+      "run": [{ "id": "install", "task": "deps-install" }]
+    },
+    "publish": {
+      "description": "Publish to the registry",
+      "run": [{ "id": "push", "task": "publish-registry" }]
+    },
+    "serve": {
+      "description": "Serve the project",
+      "run": [{ "id": "serve", "task": "serve-app" }]
+    }
+  },
+  "tasks": {
+    "build-generate": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["generate"],
+      "cwd": "{projectRoot}",
+      "writes": ["gen"],
+      "reads": ["sources"],
+      "cache": { "enabled": true, "deterministic": true },
+      "declares": {
+        "outputs": {
+          "gen": {
+            "kind": "directory",
+            "root": "project",
+            "path": ".gen",
+            "description": "Generated specs, loaders, and schema sidecars."
+          }
+        }
+      }
+    },
+    "build-compile": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["compile"],
+      "cwd": "{projectRoot}",
+      "reads": ["gen", "sources"],
+      "cache": { "enabled": true, "deterministic": true },
+      "declares": {
+        "outputs": {
+          "binary": { "kind": "file", "path": "bin/app", "root": "command-output" },
+          "cross": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "dist",
+            "optionalEmpty": true,
+            "description": "Cross-compiled artifacts; absent unless --platforms is set."
+          }
+        },
+        "effects": ["toolchain-cache"]
+      }
+    },
+    "build-describe": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["describe"],
+      "cwd": "{projectRoot}",
+      "writes": ["clients"],
+      "reads": ["gen", "sources"],
+      "outputs": {
+        "clientOutput": {
+          "description": "Project-relative directory the generated clients were written to"
+        }
+      },
+      "declares": {
+        "outputs": {
+          "clients": {
+            "kind": "directory",
+            "root": "project",
+            "pathFrom": "clientOutput",
+            "optionalEmpty": true,
+            "description": "Generated clients; the directory is configured per project."
+          }
+        }
+      }
+    },
+    "test-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["test"],
+      "cwd": "{projectRoot}",
+      "reads": ["gen", "sources"],
+      "cache": { "enabled": true },
+      "declares": {
+        "outputs": {
+          "coverage": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "lcov.info",
+            "optionalEmpty": true,
+            "description": "Merged coverage profile; absent when coverage is disabled."
+          },
+          "junit": { "kind": "file", "root": "command-output", "path": "junit.xml", "optionalEmpty": true }
+        },
+        "effects": ["toolchain-cache"]
+      }
+    },
+    "lint-fix": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["lint", "--fix"],
+      "cwd": "{projectRoot}",
+      "writes": ["sources"],
+      "cache": { "enabled": true, "noOutput": true },
+      "declares": {
+        "mutatesSources": true
+      }
+    },
+    "deps-install": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["install"],
+      "cwd": "{workspaceRoot}",
+      "cache": { "enabled": true },
+      "declares": {
+        "outputs": {
+          "lockfile": { "kind": "file", "root": "workspace", "path": "bun.lock" }
+        },
+        "effects": ["network", "toolchain-cache", "workspace-files"]
+      }
+    },
+    "publish-registry": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["publish"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "declares": {
+        "effects": ["network", "registry"]
+      }
+    },
+    "serve-app": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["serve"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "declares": {
+        "effects": ["process"]
+      }
+    }
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/bounded-parallel-work",
+      "type": "feature",
+      "name": "Bounded parallel Go work",
+      "outcome": "Go applications fan work out with a concurrency bound, ordered results, cancellation, and panic containment",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "concurrency",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bounded-inflight",
+              "unbounded-when-limit-negative",
+              "unbounded-when-limit-zero"
+            ]
+          }
+        },
+        {
+          "id": "dispatch-throughput-budget",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "threshold",
+            "checks": [
+              "bounded-dispatch-sustains-the-throughput-floor"
+            ],
+            "metric": "dispatch.throughput",
+            "aggregation": "value",
+            "operator": "gte",
+            "target": 50000,
+            "unit": "items-per-second",
+            "window": {
+              "kind": "invocation"
+            }
+          }
+        },
+        {
+          "id": "failure",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bounded-dispatch-stops-on-cancellation",
+              "canceled-goroutine-skips-user-function",
+              "first-error-cancels-siblings",
+              "first-error-wins"
+            ]
+          }
+        },
+        {
+          "id": "ordering",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "ordered-results"
+            ]
+          }
+        },
+        {
+          "id": "panic",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "panic-cancels-siblings",
+              "panic-returns-panic-error"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

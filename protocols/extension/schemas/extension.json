@@ -1,0 +1,1842 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-extension.json",
+  "title": "Putnami Extension Manifest",
+  "description": "Polyglot-first extension manifest. Public commands stay simple while internal tasks are atomic and composable via pipeline-mode commands.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "name": {
+      "type": "string",
+      "description": "Extension name. Must be a scoped package name (@scope/name) or a simple kebab-case identifier.",
+      "pattern": "^(@[a-z0-9-]+/[a-z0-9-]+|[a-z0-9][a-z0-9-]*)$"
+    },
+    "version": {
+      "type": "string",
+      "description": "Extension version (optional metadata in manifest)."
+    },
+    "cliContract": {
+      "type": "integer",
+      "minimum": 4,
+      "maximum": 5,
+      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
+    },
+    "extensionDependencies": {
+      "description": "Other extensions this extension depends on.",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "workspaceDevDependencies": {
+      "description": "NPM devDependencies this extension requires in the workspace root package.json.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "autoServe": {
+      "type": "boolean",
+      "description": "Whether projects with this extension should be auto-discovered by serve."
+    },
+    "runtime": {
+      "$ref": "#/$defs/runtimeDefinition"
+    },
+    "workspace": {
+      "$ref": "#/$defs/workspaceAdapter"
+    },
+    "hooks": {
+      "$ref": "#/$defs/hooks"
+    },
+    "contracts": {
+      "$ref": "#/$defs/contracts"
+    },
+    "commands": {
+      "type": "object",
+      "description": "Public entrypoints exposed to users (`putnami <command>`).",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/commandDefinition"
+      }
+    },
+    "commandGroups": {
+      "type": "object",
+      "description": "Structured command groups that route subcommands to flat commands (e.g. `putnami cloud login`).",
+      "additionalProperties": {
+        "$ref": "#/$defs/commandGroupDefinition"
+      }
+    },
+    "tasks": {
+      "type": "object",
+      "description": "Atomic internal units with explicit input/output contracts and cache policy.",
+      "additionalProperties": {
+        "$ref": "#/$defs/taskDefinition"
+      }
+    },
+    "tools": {
+      "type": "object",
+      "description": "Namespaced MCP tools contributed by this extension. Each invocation runs in the extension-owned subprocess declared by the tool.",
+      "additionalProperties": {
+        "$ref": "#/$defs/toolDefinition"
+      }
+    },
+    "agentContent": {
+      "$ref": "#/$defs/agentContentContribution"
+    },
+    "ecosystems": {
+      "type": "array",
+      "description": "Ecosystem profiles this extension owns. A profile has exactly one owner: another extension that publishes to the same ecosystem lists its id under `uses` instead of redeclaring it.",
+      "items": {
+        "$ref": "#/$defs/ecosystemProfile"
+      }
+    },
+    "uses": {
+      "type": "array",
+      "description": "Ecosystem ids another extension owns and this extension publishes to. An id listed here must be declared by some installed extension, and must not be declared by this manifest.",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+      }
+    },
+    "optionNamespaces": {
+      "type": "array",
+      "description": "Bare `options.<name>` blocks of a project config this extension reads for itself, beyond the blocks keyed by its own name or path reference. A cache key drops a namespace another extension declares and this one does not; a namespace nobody declares stays in every key, and one two extensions declare stays in both. A command name declared here never narrows the key of an extension providing that command, because `options.<command>` is merged into its resolved task parameters; declaring one states a read by an extension that does not provide it.",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+      }
+    }
+  },
+  "$defs": {
+    "agentContentContribution": {
+      "type": "object",
+      "description": "Agent instructions this extension ships under its own version: skills, worker profiles, references and helpers with their host adapters. The built content is an agent-artifact tree (putnami.agent-artifact.json plus the files it declares) under path. The authored form names its source; the packaged form binds the built tree by manifestSha256. Declaring it requires cliContract 5, and a workspace receives the content only when it opts in.",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Extension-relative, canonical directory of the built content tree. It never names the extension root or escapes it."
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Authored form only: extension-relative, canonical directory holding the closed authoring layout (skills/<name>/..., agents/<name>/...). A local extension is built from it on every run; the package step builds it into path and replaces it with manifestSha256. It must not overlap path."
+        },
+        "manifestSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Packaged form only: SHA-256 of the agent-artifact manifest under path, written by the package step."
+        },
+        "supersedes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(@[a-z0-9-]+/[a-z0-9-]+|[a-z0-9][a-z0-9-]*)$"
+          },
+          "description": "Agent-artifact identities this content replaces: separately declared registry or in-tree artifacts whose workflows the extension now ships. A workspace that opts into this content while still declaring one of them is refused, and `putnami migrate agent-content` moves their declarations, pins and ownership records to this content. Never the extension's own name. Kept by the package step."
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["source"],
+          "not": {"required": ["manifestSha256"]}
+        },
+        {
+          "required": ["manifestSha256"],
+          "not": {"required": ["source"]}
+        }
+      ]
+    },
+    "ecosystemProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One ecosystem, declared by the extension that owns it: what a coordinate and a version look like, whether the registry projects channels natively, the schema of the ecosystem's workspace registry entry, and the command that publishes a member.",
+      "required": [
+        "id",
+        "coordinate",
+        "version",
+        "channel",
+        "registries",
+        "publish"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,31}$",
+          "description": "Ecosystem identifier. It is the key of the ecosystem's entry in the workspace `registries` section and the value of a release-set member's `ecosystem`."
+        },
+        "coordinate": {
+          "$ref": "#/$defs/patternRule",
+          "description": "Rule a member's coordinate — its package name in this ecosystem — must satisfy."
+        },
+        "version": {
+          "$ref": "#/$defs/versionRule",
+          "description": "Rule and ordering a member's version must satisfy."
+        },
+        "channel": {
+          "type": "string",
+          "enum": [
+            "native",
+            "none"
+          ],
+          "description": "Channel projection: `native` when the registry has one (an npm dist-tag, an OCI tag), `none` otherwise. An ecosystem with no native channel is followed by --release or --version only."
+        },
+        "channelEncoding": {
+          "type": "string",
+          "description": "RE2 pattern narrowing the portable channel alphabet ^[a-z0-9][a-z0-9._-]{0,63}$ for this ecosystem. It may only be stricter: a channel name must match both."
+        },
+        "registries": {
+          "type": "object",
+          "description": "JSON Schema of this ecosystem's entry in the workspace `registries` section. Must describe an object, so the workspace can validate a registry entry without knowing the ecosystem.",
+          "properties": {
+            "type": {
+              "const": "object"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        "publish": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the command, in this manifest, that publishes a member of this ecosystem and emits the published-member event."
+        }
+      }
+    },
+    "patternRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A single RE2 pattern a value must match.",
+      "required": [
+        "pattern"
+      ],
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "RE2 pattern."
+        }
+      }
+    },
+    "versionRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The shape and the ordering of an ecosystem's versions.",
+      "required": [
+        "pattern",
+        "ordering"
+      ],
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "RE2 pattern a version must match."
+        },
+        "ordering": {
+          "type": "string",
+          "enum": [
+            "semver",
+            "string"
+          ],
+          "description": "How two versions compare: semantic-version precedence, or byte comparison for ecosystems whose versions are opaque strings."
+        }
+      }
+    },
+    "globArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "visibility": {
+      "type": "string",
+      "enum": [
+        "public",
+        "internal"
+      ]
+    },
+    "outputMode": {
+      "type": "string",
+      "enum": [
+        "jsonl",
+        "text",
+        "both"
+      ]
+    },
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "manifestFlagDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "boolean",
+            "number",
+            "array"
+          ]
+        },
+        "short": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "default": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preBuild": {
+          "$ref": "#/$defs/commandHookDefinition"
+        },
+        "onInstall": {
+          "$ref": "#/$defs/commandHookDefinition"
+        }
+      }
+    },
+    "commandHookDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "command"
+      ],
+      "properties": {
+        "kind": {
+          "const": "command"
+        },
+        "command": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "env": {
+          "$ref": "#/$defs/stringMap"
+        },
+        "output": {
+          "$ref": "#/$defs/outputMode"
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cache": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "inputs",
+            "outputs"
+          ],
+          "properties": {
+            "inputs": {
+              "$ref": "#/$defs/globArray"
+            },
+            "outputs": {
+              "$ref": "#/$defs/globArray"
+            }
+          }
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "order": {
+          "type": "integer",
+          "default": 0,
+          "description": "Invocation rank among all extensions declaring this hook kind for one project. Hooks run in ascending order, ties broken by extension name in byte order. 0 (the default) is the producer rank for hooks that only write generated sources; a hook that must observe what the other hooks generated — for example one that imports the workload entry point — declares a higher value so it runs last."
+        }
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "description": "Optional local contracts that can be referenced by inputSchemaRef/outputSchemaRef.",
+      "additionalProperties": false,
+      "properties": {
+        "schemas": {
+          "type": "object",
+          "description": "Named contract schemas in putnami schema format. Each schema is a map of property names to their definitions.",
+          "additionalProperties": {
+            "$ref": "#/$defs/contractSchemaDefinition"
+          }
+        }
+      }
+    },
+    "contractSchemaDefinition": {
+      "type": "object",
+      "description": "A contract schema \u2014 maps property names to typed definitions.",
+      "additionalProperties": {
+        "$ref": "#/$defs/contractPropertyDefinition"
+      }
+    },
+    "contractPropertyDefinition": {
+      "type": "object",
+      "description": "A typed property definition for contract validation.",
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "array",
+            "object"
+          ]
+        },
+        "optional": {
+          "type": "boolean",
+          "default": false
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Constraint name: uuid, email, integer, url, dateIso, min, max, minLength, maxLength, pattern, oneOf"
+              },
+              "value": {
+                "description": "Constraint parameter (e.g., min value, pattern string, oneOf values array)"
+              }
+            }
+          }
+        },
+        "items": {
+          "$ref": "#/$defs/contractPropertyDefinition",
+          "description": "For array types: the item schema."
+        },
+        "properties": {
+          "$ref": "#/$defs/contractSchemaDefinition",
+          "description": "For object types: nested property definitions."
+        }
+      }
+    },
+    "commandGroupDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subcommands"
+      ],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "default": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of one of this group's own subcommands. `putnami <group>` with no subcommand word runs it, with any flags that follow; `putnami <group> --help` still prints the group help."
+        },
+        "flags": {
+          "type": "object",
+          "description": "Shared flags inherited by every subcommand in this group unless the subcommand (or its command target) redeclares the same flag name. Declare a cross-cutting flag (e.g. --env) once instead of on every subcommand. Names that collide with a Putnami global flag (e.g. --output, --dry-run) are consumed by the CLI before the extension sees them, so use extension-owned names here.",
+          "additionalProperties": {
+            "$ref": "#/$defs/manifestFlagDefinition"
+          }
+        },
+        "subcommands": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/subcommandDefinition"
+          }
+        }
+      }
+    },
+    "subcommandDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": ["workspace"],
+            "properties": {
+              "workspace": { "const": "optional" }
+            }
+          },
+          "then": {
+            "required": ["interactive"],
+            "properties": {
+              "interactive": { "const": true }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string",
+          "description": "Name of a flat command in this manifest's commands map. Nested subcommands may omit this and inherit the nearest ancestor command."
+        },
+        "interactive": {
+          "type": "boolean",
+          "description": "When true, the subprocess inherits stdin/stdout/stderr and the live job renderer is bypassed.",
+          "default": false
+        },
+        "workspace": {
+          "type": "string",
+          "enum": ["required", "optional"],
+          "description": "Whether the subcommand needs a workspace. `optional` also runs it outside any workspace, from an extension pinned in the user scope, and requires `interactive: true`. The CLI reads it on the top-level subcommand it dispatches.",
+          "default": "required"
+        },
+        "flags": {
+          "type": "object",
+          "description": "Flags accepted by this subcommand in addition to flags declared by the inherited command target.",
+          "additionalProperties": {
+            "$ref": "#/$defs/manifestFlagDefinition"
+          }
+        },
+        "positionals": {
+          "type": "array",
+          "description": "Positional arguments accepted by this subcommand. Static completion does not provide positional values yet.",
+          "items": {
+            "$ref": "#/$defs/positionalDefinition"
+          }
+        },
+        "subcommands": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Nested subcommands parsed by the inherited command target.",
+          "additionalProperties": {
+            "$ref": "#/$defs/subcommandDefinition"
+          }
+        },
+        "examples": {
+          "type": "array",
+          "description": "Runnable examples shown under an Examples: section in `putnami <group> <subcommand> --help`.",
+          "items": {
+            "$ref": "#/$defs/exampleDefinition"
+          }
+        }
+      }
+    },
+    "exampleDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command"
+      ],
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "A runnable command line, e.g. `putnami cloud status --output=jsonl`."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional gloss explaining what the example does."
+        }
+      }
+    },
+    "positionalDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "sessionPrerequisiteParamBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": ["value"],
+          "properties": {"value": {"not": {"type": "null"}}}
+        },
+        {
+          "required": ["fromProjectParam"],
+          "properties": {
+            "fromProjectParam": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Dotted path in the owning command parameters resolved for the prerequisite project."
+            }
+          }
+        }
+      ],
+      "properties": {
+        "value": {"not": {"type": "null"}},
+        "fromProjectParam": {"type": "string", "minLength": 1}
+      }
+    },
+    "sessionPrerequisiteDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Command planned in this session before the command owning this declaration."
+        },
+        "if": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Condition over the owning command parameters; false suppresses the prerequisite subtree."
+        },
+        "projectsFromParam": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional owning-command string parameter containing a workspace target expression. Empty falls back to the current selection."
+        },
+        "projectIf": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Per-project condition over owning-command parameters resolved for that project."
+        },
+        "dependsOn": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1},
+          "description": "Commands whose session leaves gate every root contributed to the prerequisite command."
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/sessionPrerequisiteParamBinding"},
+          "description": "Invocation-local prerequisite parameters from constants or owning-command project parameters."
+        }
+      }
+    },
+    "commandDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run"
+      ],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "visibility": {
+          "$ref": "#/$defs/visibility",
+          "default": "public"
+        },
+        "activationFiles": {
+          "$ref": "#/$defs/globArray"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Commands that must run before this command. Bare names are same-project prerequisites; names prefixed with ! are session barriers across the current project selection. Pipeline-step references prefixed with ^, /, or * are invalid here."
+        },
+        "sessionPrerequisites": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/sessionPrerequisiteDefinition"},
+          "description": "Dependent-command-owned commands planned and gated in the same session."
+        },
+        "alsoRuns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Companion commands planned whenever this command is requested. Each companion keeps its own activation, so a workspace-once companion still plans exactly once even when this command activates nowhere — which is what dependsOn and sessionPrerequisites cannot express. Companions must name commands in the same manifest."
+        },
+        "flags": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/manifestFlagDefinition"
+          }
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "quiet": {
+          "type": "boolean"
+        },
+        "run": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/pipelineStep"
+          },
+          "description": "Step DAG composing tasks into the command implementation."
+        },
+        "outputs": {
+          "type": "object",
+          "description": "Named outputs projected from step results.",
+          "additionalProperties": {
+            "$ref": "#/$defs/outputBinding"
+          }
+        },
+        "traits": {
+          "$ref": "#/$defs/commandTraits",
+          "description": "Orchestration traits; replaces the well-known verb's defaults wholesale when declared."
+        }
+      }
+    },
+    "toolDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "inputSchema",
+        "annotations",
+        "_meta",
+        "command"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputSchema": {
+          "type": "object",
+          "description": "JSON Schema for the MCP tool arguments object."
+        },
+        "annotations": {
+          "$ref": "#/$defs/toolAnnotations"
+        },
+        "_meta": {
+          "type": "object",
+          "description": "Agent-facing metadata. Must include putnami.dev/contract with access, readOnly, and supportsDryRun."
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Extension-owned executable invoked for this tool."
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "env": {
+          "$ref": "#/$defs/stringMap"
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Invocation timeout in milliseconds. Omit for the 30-second default."
+        },
+        "workspaceSelection": {
+          "type": "boolean",
+          "description": "Ask the orchestrator to resolve this tool's workspace view and publish it on the request: the complete project membership (workspaceProjects) and the projection the canonical projects/impacted/baseline arguments resolve to (selection). Opt-in, because those three argument names are the CLI's vocabulary and not every tool's."
+        }
+      }
+    },
+    "toolAnnotations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "readOnlyHint",
+        "destructiveHint",
+        "idempotentHint",
+        "openWorldHint"
+      ],
+      "properties": {
+        "readOnlyHint": {
+          "type": "boolean"
+        },
+        "destructiveHint": {
+          "type": "boolean"
+        },
+        "idempotentHint": {
+          "type": "boolean"
+        },
+        "openWorldHint": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pipelineStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "task"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": ["runOn"],
+            "properties": {
+              "runOn": { "const": "finally" }
+            }
+          },
+          "then": {
+            "required": ["finalizes"],
+            "properties": {
+              "dependsOn": { "maxItems": 0 }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["finalizes"]
+          },
+          "then": {
+            "required": ["runOn"],
+            "properties": {
+              "runOn": { "const": "finally" }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Step id used by downstream bindings."
+        },
+        "task": {
+          "type": "string",
+          "description": "Name of a task in top-level `tasks`."
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Step ids or external refs (^upstream, /workspace, *all-providers) this step depends on."
+        },
+        "with": {
+          "type": "object",
+          "description": "Task input bindings.",
+          "additionalProperties": {
+            "$ref": "#/$defs/inputBinding"
+          }
+        },
+        "optional": {
+          "type": "boolean",
+          "description": "If true, failure marks step as skipped and continues."
+        },
+        "if": {
+          "type": "string",
+          "description": "Expression evaluated at plan time against resolved params, effective provider/project command membership (commands.<name>), resolved parameters for those commands (commandParams.<command>.<name>), and resolved project facts (project.type) to exclude the step from the execution graph."
+        },
+        "runOn": {
+          "type": "string",
+          "enum": [
+            "success",
+            "finally"
+          ],
+          "default": "success",
+          "description": "Step lifecycle condition. success is the default. finally is the v3 finalizer form and requires an explicit finalizes producer/consumer relation instead of ordinary dependsOn."
+        },
+        "finalizes": {
+          "$ref": "#/$defs/finalizesRelation"
+        },
+        "activation": {
+          "$ref": "#/$defs/stepActivation"
+        },
+        "cache": {
+          "$ref": "#/$defs/stepCacheOverride"
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "heavy": {
+          "type": "boolean",
+          "description": "Marks this step CPU/memory heavy for worker tuning, overriding the command's heavy trait."
+        },
+        "cpuWeight": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Relative multiplier on deterministic, history-derived CPU demand. 1 is the default; a project-level tasks entry overrides it, and machine capacity caps the resulting budget. Execution hint only — never affects cache keys."
+        }
+      }
+    },
+    "finalizesRelation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Explicit invocation-resource cleanup relation. Producer start arms exactly this finalizer; cleanup waits until every consumer reaches a terminal state.",
+      "required": [
+        "producer",
+        "consumers"
+      ],
+      "properties": {
+        "producer": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Local step whose start arms cleanup."
+        },
+        "consumers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Complete local terminal frontier allowed to consume the producer's invocation artifacts."
+        },
+        "pruneIf": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional plan-time expression over command params. An all-hit consumer frontier prunes the producer and finalizer only when this evaluates true. Empty defaults to prunable; false or malformed expressions keep the lifecycle so pruning cannot swallow an imperative side effect."
+        }
+      }
+    },
+    "stepActivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Plan-time gate that drops a step from the DAG when the target project does not match. Dependents inherit the dropped step's dependencies, so ordering is preserved. Conditions fail closed, mirroring runtime skip checks.",
+      "properties": {
+        "files": {
+          "$ref": "#/$defs/globArray",
+          "description": "Step is active only if at least one project file matches one of these globs."
+        },
+        "closureFiles": {
+          "$ref": "#/$defs/globArray",
+          "description": "Step is active only if at least one member of the project's dependency closure (seed included) has a file matching one of these globs. The plan-time twin of a 'closure' task input, so a gate asks the same question the task answers at runtime."
+        },
+        "contains": {
+          "$ref": "#/$defs/stringMap",
+          "description": "Map of project-relative file path to a required substring; the step is active only if every file exists and contains its substring."
+        }
+      }
+    },
+    "inputBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "value": {}
+          }
+        },
+        {
+          "required": [
+            "from",
+            "path"
+          ],
+          "properties": {
+            "from": {
+              "type": "string",
+              "enum": [
+                "command",
+                "context"
+              ]
+            },
+            "path": {
+              "type": "string",
+              "description": "JSONPath-like selector."
+            },
+            "default": {}
+          }
+        },
+        {
+          "required": [
+            "fromStep"
+          ],
+          "properties": {
+            "fromStep": {
+              "type": "string"
+            },
+            "output": {
+              "type": "string",
+              "description": "Named output port from the upstream step."
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "default": {}
+          }
+        }
+      ]
+    },
+    "outputBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fromStep",
+        "path"
+      ],
+      "properties": {
+        "fromStep": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "taskDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "command"
+      ],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "visibility": {
+          "$ref": "#/$defs/visibility",
+          "default": "internal"
+        },
+        "kind": {
+          "const": "command"
+        },
+        "command": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "env": {
+          "$ref": "#/$defs/stringMap"
+        },
+        "toolchains": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "description": "Additional runtime toolchain aliases required by this task."
+        },
+        "output": {
+          "$ref": "#/$defs/outputMode"
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "inputSchemaRef": {
+          "type": "string",
+          "description": "Task input contract reference."
+        },
+        "outputSchemaRef": {
+          "type": "string",
+          "description": "Task output contract reference."
+        },
+        "inputs": {
+          "type": "object",
+          "description": "Explicit task input ports. Each key is a port name. Replaces cache.key for v2 manifests.",
+          "additionalProperties": {
+            "$ref": "#/$defs/taskInputPort"
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "description": "Explicit task output ports. Each key is a port name. Replaces cache.outputs for v2 manifests.",
+          "additionalProperties": {
+            "$ref": "#/$defs/taskOutputPort"
+          }
+        },
+        "writes": {
+          "type": "array",
+          "description": "Resources this task writes. Jobs whose resource accesses conflict (writer/writer or writer/reader) are serialized by the planner independently of functional dependencies.",
+          "items": {
+            "$ref": "#/$defs/resourceRef"
+          }
+        },
+        "reads": {
+          "type": "array",
+          "description": "Resources this task reads. A read is serialized against conflicting writers of the same resource so it never observes a partial write.",
+          "items": {
+            "$ref": "#/$defs/resourceRef"
+          }
+        },
+        "resources": {
+          "type": "object",
+          "description": "Named budget claims: units of a scarce shared resource one execution of this task holds while it runs, e.g. {\"db-connections\": 230}. Unlike writes/reads, which serialize conflicting access, a claim only has to fit inside what the run declares exists (--resource <name>=<units>): the scheduler starts a task when the worker count allows it and every resource it claims still has budget. A resource with no budget declared on the run is unlimited.",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "cache": {
+          "$ref": "#/$defs/taskCachePolicy"
+        },
+        "batchable": {
+          "$ref": "#/$defs/taskBatchPolicy"
+        },
+        "declares": {
+          "$ref": "#/$defs/taskDeclaration"
+        }
+      }
+    },
+    "taskDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Task contract v3: the exact outputs the task produces, its effects beyond those outputs, and whether it rewrites the sources it reads. Additive — a task without this block keeps v2 semantics, where the footprint is inferred from a captured directory.",
+      "properties": {
+        "outputs": {
+          "type": "object",
+          "description": "Exact filesystem outputs keyed by output id. Distinct from the sibling 'outputs' map, which declares data ports for pipeline wiring; a declared output may take its path from such a port via pathFrom. No two tasks may declare overlapping paths (file-vs-subtree nesting counts as overlap).",
+          "additionalProperties": {
+            "$ref": "#/$defs/declaredOutput"
+          }
+        },
+        "effects": {
+          "type": "array",
+          "description": "Consequences beyond the declared outputs, from the closed effect vocabulary. Normalized to sorted order; duplicates are a validation error.",
+          "items": {
+            "$ref": "#/$defs/taskEffect"
+          },
+          "uniqueItems": true
+        },
+        "mutatesSources": {
+          "type": "boolean",
+          "description": "The task rewrites files in the source tree it reads (a formatter, lint --fix, a codemod). Requires the project-scoped \"sources\" write resource, which is what the planner serializes source mutation on."
+        }
+      }
+    },
+    "declaredOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One exact output: a file or a subtree at a path relative to a named root. Exactly one of path and pathFrom is set.",
+      "required": [
+        "kind"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "path"
+          ]
+        },
+        {
+          "required": [
+            "pathFrom"
+          ]
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": ["kind"],
+            "properties": {
+              "kind": { "const": "runtime-file" }
+            }
+          },
+          "then": {
+            "required": ["scope"],
+            "properties": {
+              "scope": { "const": "invocation" }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["sensitive"],
+            "properties": {
+              "sensitive": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["scope", "path"],
+            "properties": {
+              "scope": { "const": "invocation" }
+            },
+            "not": { "required": ["pathFrom"] }
+          }
+        },
+        {
+          "if": {
+            "required": ["scope"],
+            "properties": {
+              "scope": { "const": "invocation" }
+            }
+          },
+          "then": {
+            "not": { "required": ["root"] }
+          }
+        },
+        {
+          "if": {
+            "required": ["excludes"]
+          },
+          "then": {
+            "required": ["path"],
+            "properties": {
+              "kind": { "const": "directory" }
+            },
+            "not": { "required": ["pathFrom"] }
+          }
+        },
+        {
+          "if": {
+            "required": ["preserves"]
+          },
+          "then": {
+            "properties": {
+              "kind": { "const": "directory" },
+              "scope": { "const": "durable" }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["drift"]
+          },
+          "then": {
+            "properties": {
+              "kind": { "enum": ["file", "directory"] },
+              "scope": { "const": "durable" },
+              "root": { "enum": ["project", "workspace"] }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["drift", "pathFrom"]
+          },
+          "then": {
+            "properties": {
+              "root": { "const": "project" }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "file",
+            "directory",
+            "runtime-file"
+          ],
+          "description": "file is a single regular file; directory is the whole subtree, captured and restored recursively; runtime-file is a file whose content only means anything inside the invocation that wrote it (a connection string, a socket path) and is therefore never captured — it requires scope invocation."
+        },
+        "root": {
+          "type": "string",
+          "enum": [
+            "project",
+            "workspace",
+            "command-output"
+          ],
+          "default": "project",
+          "description": "Root the path resolves against: the project directory (default), the workspace root, or the per-command output directory shared by the command's steps. Must be left unset when scope is invocation: an invocation-scoped output resolves against the invocation scratch, which is not a staging root."
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "durable",
+            "invocation"
+          ],
+          "default": "durable",
+          "description": "How long the output lives. durable (default) outlives the invocation and is captured into the task's cache entry. invocation confines it to the current CLI invocation: written to the invocation's private scratch (mode 0600 when sensitive), never captured, never restored, and discarded by the finalizer or by lease reaping. A task declaring one must set cache.enabled to false."
+        },
+        "sensitive": {
+          "type": "boolean",
+          "description": "The output's path and bytes must never reach an event, a result, a session record, telemetry, or cache traffic. Requires scope invocation and a literal path — a pathFrom value is reported through the task result, which would publish the path this flag exists to withhold."
+        },
+        "path": {
+          "type": "string",
+          "description": "Literal root-relative path in cleaned slash form. No globs, no template variables, no escape above the root, and never the root itself."
+        },
+        "pathFrom": {
+          "type": "string",
+          "description": "Name of a port in the task's 'outputs' map whose reported value supplies the root-relative path, for an output whose location is chosen at runtime (a configured generated-client directory)."
+        },
+        "optionalEmpty": {
+          "type": "boolean",
+          "description": "The output may legitimately be absent, or an empty directory, after a SUCCESSFUL run (a coverage file when coverage is off). Capture records nothing and restore materializes nothing, and neither is an error."
+        },
+        "excludes": {
+          "type": "array",
+          "description": "Root-relative subpaths strictly inside path that this directory output CEDES: they are neither captured nor restored with it, and another task may own them — which is how the task that writes one subtree of an owned tree keeps it across a cache hit. Each entry is a literal cleaned path inside path and never equal to it; duplicates are a validation error. Requires kind directory and a literal path: a file has no subpath, and a pathFrom value is unknown until the task runs.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "preserves": {
+          "type": "array",
+          "description": "Output-relative subpaths of this directory output that the WORKSPACE owns — a putnami.json project document, a go.mod or go.sum — committed inside a generated directory so it can be a workspace project of its own. The task may scaffold one when absent, but it is never captured with the output, a cache restore never replaces or deletes it, and a drift comparison never judges it. Entries are relative to the output (not the root), so a pathFrom output may carry them; each is a literal cleaned path, duplicates are a validation error. Requires kind directory and a durable scope.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "drift": {
+          "type": "string",
+          "enum": ["warn", "fail"],
+          "description": "Ask the engine to compare the bytes this task produces (or a cache hit restores) at the output path with the bytes present there immediately before, and to report a difference as the diagnostic generated-output-drift listing the added, removed and changed paths. warn keeps the task's status; fail fails the task, with its outputs still written or restored so the worktree holds the regenerated bytes to commit. Absent means no comparison. Requires a durable, non-sensitive file or directory under the project or workspace root; a pathFrom output may carry it under the project root only, because the reference is a digest of the root taken before the path is known. Neither the reference nor the verdict enters the cache key."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of this output."
+        }
+      }
+    },
+    "runtimeDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The extension's own executable and how to obtain it. Replaces name-based classification of extensions in the CLI: a task references {extensionRuntime} instead of a language-specific wrapper.",
+      "required": [
+        "executable"
+      ],
+      "properties": {
+        "executable": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Runtime binary path relative to the extension root (published extension) or to the prepared runtime directory (prepared extension). The same relative path in both cases. Cleaned slash form, no globs, no template variables, no escape above the root."
+        },
+        "toolchains": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" },
+          "additionalProperties": { "$ref": "#/$defs/runtimeToolchain" },
+          "description": "Provider-neutral, lock-resolved executable recipes keyed by local aliases."
+        },
+        "runToolchains": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "description": "Toolchain aliases required by every task executed through this runtime."
+        },
+        "prepare": {
+          "$ref": "#/$defs/runtimePrepare"
+        }
+      }
+    },
+    "runtimePrepare": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Workspace-independent build of the runtime executable. Declaration validation rejects ambient-cwd commands and external/escaping path syntax. The executor additionally sets cwd to the extension root, disables ambient workspace resolution (GOWORK=off for Go), and exposes only the maintained extension-module view and assigned output; arbitrary executable isolation is an execution responsibility. The declaration, inputs, platform, extension identity and runtime ABI form the artifact digest.",
+      "required": [
+        "command",
+        "inputs"
+      ],
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Executable that performs the build: a bare program name resolved on PATH, or {extensionRoot}/<relative-path>. Slash-relative, absolute, drive-qualified, backslash-separated, and parent-segment paths are rejected. Only {extensionRoot} and {runtimeOutput} may appear."
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Arguments in order; order is meaningful and is digested as written. Paths are extension-root-relative or explicitly rooted at {extensionRoot}/{runtimeOutput}; absolute, drive-qualified, backslash-separated, and parent-segment paths are rejected."
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Extension-root-relative globs whose content the artifact digest is taken over. Required: a digest that cannot see its own sources would serve a stale binary after every source edit. Relative, no escape above the extension root."
+        },
+        "toolchains": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "description": "Runtime toolchain aliases needed only to prepare a mutable local runtime."
+        }
+      }
+    },
+    "runtimeToolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lock", "candidates", "probe"],
+      "properties": {
+        "lock": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" },
+        "optional": { "type": "boolean" },
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/runtimeToolchainCandidate" }
+        },
+        "probe": { "$ref": "#/$defs/runtimeToolchainProbe" },
+        "environment": {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+          "additionalProperties": { "$ref": "#/$defs/runtimeToolchainEnvironment" }
+        },
+        "prependPath": { "type": "boolean" }
+      }
+    },
+    "runtimeToolchainCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "path"],
+      "properties": {
+        "from": { "enum": ["path", "environment", "home", "putnami-home"] },
+        "path": { "type": "string", "minLength": 1 },
+        "environment": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }
+      }
+    },
+    "runtimeToolchainProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expect"],
+      "properties": {
+        "args": { "type": "array", "maxItems": 16, "items": { "type": "string" } },
+        "expect": { "type": "string", "minLength": 9 },
+        "unset": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }
+        },
+        "environment": {
+          "type": "object",
+          "maxProperties": 16,
+          "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "runtimeToolchainEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from"],
+      "properties": {
+        "from": { "enum": ["executable", "ancestor", "literal"] },
+        "levels": { "type": "integer", "minimum": 1, "maximum": 16 },
+        "value": { "type": "string" }
+      }
+    },
+    "workspaceAdapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How this extension participates in project discovery and workspace synchronization. Every member is a PATH pattern relative to a candidate directory: probe contracts key on paths and never assume a project root is also a module root.",
+      "required": [
+        "markers",
+        "inputs"
+      ],
+      "properties": {
+        "markers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Candidate-directory-relative patterns whose presence makes a directory a project this extension owns. Every marker must also appear in inputs: the probe reads the marker, so editing it must invalidate the workspace snapshot."
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Candidate-directory-relative patterns whose content determines the probe's answer. Core hashes this bounded set on ordinary loads; the content digest — never a size or an mtime — is the snapshot's validity oracle."
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Directory patterns the scan must not descend into. Additive to the always-excluded .git and .putnami and to gitignored directories, which core excludes for every extension."
+        },
+        "syncTask": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of a task in this manifest that performs the extension's own workspace mutations (package-workspace membership, module discovery and replace closure, native name alignment). Omit for an extension that reads the workspace but never writes it."
+        },
+        "dependencySources": {
+          "type": "boolean",
+          "description": "The probe attributes every edge it reports to the manifest family it came from (an import, or a declaration nothing imports). Core asks for the attribution only from an adapter that declares it: a provider built before the request member would reject a request carrying it."
+        }
+      }
+    },
+    "taskEffect": {
+      "type": "string",
+      "description": "A consequence a task has beyond writing its declared outputs. registry, cloud, and process are external: a cache hit cannot reproduce them, so a task declaring one must disable caching.",
+      "enum": [
+        "workspace-files",
+        "toolchain-cache",
+        "network",
+        "registry",
+        "cloud",
+        "process"
+      ]
+    },
+    "taskBatchPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool"
+      ],
+      "properties": {
+        "tool": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable logical tool identity included in the batch key."
+        },
+        "configFiles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Ordered template-expanded config candidates. The first existing regular file supplies the source-qualified config digest."
+        },
+        "maxProjects": {
+          "type": "integer",
+          "minimum": 2,
+          "description": "Optional maximum number of projects per shared invocation. Omitted means unbounded."
+        },
+        "maxProjectsParam": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\S+$",
+          "description": "Optional parameter a workspace or project sets to replace maxProjects, for example through options[\"@putnami/go:test\"]. Absent keeps maxProjects. A positive integer replaces it, 1 runs every project alone, and any other value fails the plan. The parameter only groups jobs, so it never enters a task cache key: the task must not declare it as an input or cache key param, a command that runs the task must not declare it as a flag, and a step must not bind it."
+        },
+        "maxWorkers": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional maximum scheduler worker count at which batching is economic. Omitted enables batching at every worker count."
+        }
+      }
+    },
+    "resourceRef": {
+      "description": "A write/read resource reference. A bare string is shorthand for a project-scoped resource.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Project-scoped resource id."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Resource identifier."
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "project",
+                "workspace"
+              ],
+              "default": "project",
+              "description": "Conflict scope: project (default) confines the resource to the owning project; workspace shares it across all projects."
+            }
+          }
+        }
+      ]
+    },
+    "taskInputPort": {
+      "type": "object",
+      "description": "A task input port declaration.",
+      "required": [
+        "from"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string",
+          "enum": [
+            "project",
+            "workspace",
+            "closure",
+            "task",
+            "params",
+            "env",
+            "runtime"
+          ],
+          "description": "Input source type."
+        },
+        "files": {
+          "$ref": "#/$defs/globArray",
+          "description": "File glob patterns (for 'project', 'workspace' or 'closure' inputs). A 'closure' port matches them in every member of the project's dependency closure, seed included."
+        },
+        "optional": {
+          "type": "boolean",
+          "description": "Only for 'task' inputs. False (the default) states a hard producer requirement: the consuming pipeline step must bind the port to a producing step that survives into the plan, or planning fails naming both identities. True means the consuming task handles a missing producer itself."
+        }
+      }
+    },
+    "taskOutputPort": {
+      "type": "object",
+      "description": "A task output port declaration.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "file",
+            "directory"
+          ],
+          "description": "Output kind. Omit for data (JSON) outputs."
+        },
+        "path": {
+          "type": "string",
+          "description": "Output path (for file/directory outputs). Supports template variables."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of this output."
+        }
+      }
+    },
+    "taskCachePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "deterministic": {
+          "type": "boolean",
+          "description": "Whether output is deterministic for the same inputs."
+        },
+        "versionAware": {
+          "type": "boolean",
+          "description": "Whether the task output embeds the full publish version (e.g. npm/Go module/version-stamped archive). When true, the cache key varies with the per-commit version suffix so repackaging at a new release id is a cache miss."
+        },
+        "key": {
+          "$ref": "#/$defs/taskCacheKey"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/taskOutputArtifact"
+          }
+        },
+        "restoreMode": {
+          "type": "string",
+          "description": "Deprecated and ignored: cache eligibility is the task's declaration itself, in every command. Accepted so manifests published before that change still load.",
+          "enum": [
+            "all-or-nothing",
+            "best-effort"
+          ]
+        },
+        "atomicWrite": {
+          "type": "boolean",
+          "description": "Write outputs to temp location then atomic rename."
+        }
+      }
+    },
+    "taskCacheKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "$ref": "#/$defs/globArray"
+        },
+        "workspaceFiles": {
+          "$ref": "#/$defs/globArray",
+          "description": "Workspace-root file glob patterns included in the cache key."
+        },
+        "closureFiles": {
+          "$ref": "#/$defs/globArray",
+          "description": "Project-relative glob patterns hashed across every member of the project's dependency closure (seed included), so a dependency's committed manifest moves the key of the task that reads it."
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Input payload fields included in cache key."
+        },
+        "params": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Command parameter names included in cache key."
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Environment variable names included in cache key."
+        },
+        "runtime": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Runtime selectors (for example extension version, platform, arch)."
+        }
+      }
+    },
+    "taskOutputArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "path"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "file",
+            "directory",
+            "report",
+            "coverage",
+            "bundle",
+            "list",
+            "custom"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "stepCacheOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "bustOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Extra selectors to force misses for this step."
+        }
+      }
+    },
+    "commandTraits": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Machine-readable orchestration semantics of a command. See doc/06-verbs.md.",
+      "properties": {
+        "heavy": {
+          "type": "boolean",
+          "description": "Jobs are CPU/memory heavy; worker tuning leaves them headroom."
+        },
+        "requiresRunnable": {
+          "type": "boolean",
+          "description": "Skip for projects without a runnable entrypoint (libraries)."
+        },
+        "injectPublishChannels": {
+          "type": "boolean",
+          "description": "Auto-activate the project's declared publish channels as boolean params."
+        },
+        "sideEffects": {
+          "type": "string",
+          "enum": [
+            "registry",
+            "cloud"
+          ],
+          "description": "What the command mutates outside the workspace."
+        }
+      }
+    }
+  }
+}

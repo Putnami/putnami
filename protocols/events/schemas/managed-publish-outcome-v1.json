@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/events/managed-publish-outcome-v1.json",
+  "title": "Putnami Events Managed Publish Outcome Fixture v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "request", "input", "expected"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "topic"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "topic": { "type": "string", "minLength": 1 }
+      }
+    },
+    "input": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["http"],
+          "properties": { "http": { "$ref": "#/$defs/http" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["transportError"],
+          "properties": {
+            "transportError": {
+              "enum": ["timeout", "reset", "client-canceled-after-send"]
+            }
+          }
+        }
+      ]
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "action"],
+      "properties": {
+        "class": { "enum": ["accepted", "permanent", "retryable", "ambiguous"] },
+        "action": { "enum": ["complete", "fail", "retry"] },
+        "sameRoute": { "type": "boolean" },
+        "sameRequestBytes": { "type": "boolean" },
+        "honorRetryAfter": { "type": "boolean" }
+      }
+    }
+  },
+  "$defs": {
+    "http": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "body"],
+      "properties": {
+        "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "body": true
+      }
+    }
+  }
+}

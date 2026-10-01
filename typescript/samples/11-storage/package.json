@@ -1,0 +1,17 @@
+{
+  "name": "@example/11-storage",
+  "version": "0.0.0",
+  "description": "Object storage with file uploads, downloads, and listing",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/storage": "workspace:*"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

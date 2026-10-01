@@ -1,0 +1,16 @@
+{
+  "name": "@example/02-rest-api",
+  "version": "0.0.0",
+  "description": "CRUD API with endpoint builder, validation, and OpenAPI",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

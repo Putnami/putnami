@@ -1,0 +1,14 @@
+{
+  "identity": {
+    "mission": "42"
+  },
+  "kinds": [
+    "mission",
+    "note"
+  ],
+  "impacted": true,
+  "baseline": "origin/main",
+  "page": {
+    "size": 10
+  }
+}

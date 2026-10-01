@@ -1,0 +1,51 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "specs validate",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "completeness": {
+      "featuresWithoutSpec": [],
+      "projectsWithoutFeature": [],
+      "projectsWithoutSupport": [],
+      "supportAssessed": false
+    },
+    "diagnosticCounts": {
+      "errors": 0,
+      "info": 0,
+      "warnings": 1
+    },
+    "diagnostics": [
+      {
+        "code": "specs.missing_support_catalog",
+        "field": "putnami.support.json",
+        "message": "no support catalog was found, so project support completeness was not assessed",
+        "severity": "warning"
+      }
+    ],
+    "revision": {
+      "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08",
+      "kind": "worktree"
+    },
+    "selection": {
+      "baseline": "main",
+      "baselineSource": "local-trunk",
+      "emptyImpact": true,
+      "externalRecords": [],
+      "features": 0,
+      "mode": "impacted",
+      "projects": [],
+      "scoped": true,
+      "specs": 0
+    },
+    "summary": {
+      "authoredFeatures": 0,
+      "publishableProjects": 0,
+      "specs": 0
+    },
+    "valid": true
+  }
+}
+--- stderr ---

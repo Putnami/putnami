@@ -1,0 +1,153 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "SSE continuation fixture", "version": "1.0.0" },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": { "id": "fixtures.logs", "audience": "urn:putnami:fixtures:logs" },
+    "credentials": {
+      "service": { "kind": "service-token", "scopes": ["logs:read"] }
+    }
+  },
+  "paths": {
+    "/runs/{run}/logs/tail": {
+      "get": {
+        "operationId": "tailRunLogs",
+        "parameters": [
+          { "name": "run", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "cursor", "in": "query", "required": false, "schema": { "type": "string", "minLength": 1 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run log frames",
+            "content": { "text/event-stream": { "schema": { "$ref": "#/components/schemas/RunLogFrame" } } }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "server",
+          "messages": { "output": { "$ref": "#/components/schemas/RunLogFrame" } },
+          "transports": [
+            {
+              "protocol": "sse",
+              "path": "/runs/{run}/logs/tail",
+              "encoding": "json",
+              "sse": {
+                "continuation": {
+                  "mode": "cursor",
+                  "cursor": { "outputField": "cursor", "queryParameter": "cursor" }
+                }
+              }
+            },
+            {
+              "protocol": "websocket",
+              "path": "/runs/{run}/logs/tail",
+              "encoding": "json",
+              "websocket": { "subprotocol": "putnami.service.v1", "resume": true }
+            }
+          ],
+          "security": { "alternatives": [{ "allOf": [{ "profile": "service" }] }] },
+          "errors": [{ "status": 400, "code": "http.bad_request" }],
+          "idempotency": { "kind": "safe" },
+          "resilience": { "stream": { "reconnect": true, "idleTimeoutMs": 30000 } }
+        }
+      }
+    },
+    "/runs/{run}/logs/follow": {
+      "get": {
+        "operationId": "followRunLogs",
+        "parameters": [
+          { "name": "run", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "after", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run log frames, continued only by a consumer that opts in",
+            "content": { "text/event-stream": { "schema": { "$ref": "#/components/schemas/RunLogFrame" } } }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "server",
+          "messages": {
+            "output": {
+              "type": "object",
+              "properties": {
+                "position": { "type": "string" },
+                "line": { "type": "string" }
+              },
+              "required": ["position", "line"],
+              "additionalProperties": false
+            }
+          },
+          "transports": [
+            {
+              "protocol": "sse",
+              "path": "/runs/{run}/logs/follow",
+              "encoding": "json",
+              "sse": {
+                "continuation": {
+                  "mode": "cursor",
+                  "cursor": { "outputField": "position", "queryParameter": "after" }
+                }
+              }
+            }
+          ],
+          "security": { "alternatives": [{ "allOf": [{ "profile": "service" }] }] },
+          "errors": [],
+          "idempotency": { "kind": "safe" }
+        }
+      }
+    },
+    "/logs/tail": {
+      "get": {
+        "operationId": "tailLogs",
+        "parameters": [
+          { "name": "selector", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Live log lines",
+            "content": { "text/event-stream": { "schema": { "$ref": "#/components/schemas/LogLine" } } }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "server",
+          "messages": { "output": { "$ref": "#/components/schemas/LogLine" } },
+          "transports": [
+            {
+              "protocol": "sse",
+              "path": "/logs/tail",
+              "encoding": "json",
+              "sse": { "continuation": { "mode": "best-effort" } }
+            }
+          ],
+          "security": { "alternatives": [{ "allOf": [{ "profile": "service" }] }] },
+          "errors": [],
+          "idempotency": { "kind": "safe" },
+          "resilience": { "stream": { "reconnect": true } }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "RunLogFrame": {
+        "type": "object",
+        "properties": {
+          "cursor": { "$ref": "#/components/schemas/Position" },
+          "line": { "type": "string" }
+        },
+        "required": ["cursor", "line"],
+        "additionalProperties": false
+      },
+      "Position": { "type": "string", "minLength": 1 },
+      "LogLine": {
+        "type": "object",
+        "properties": {
+          "service": { "type": "string" },
+          "line": { "type": "string" }
+        },
+        "required": ["service", "line"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

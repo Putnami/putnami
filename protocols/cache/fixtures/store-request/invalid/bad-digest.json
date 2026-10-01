@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "manifest": {
+    "files": [
+      { "path": "dist/index.js", "digest": "md5:deadbeef", "mode": 420 }
+    ]
+  }
+}

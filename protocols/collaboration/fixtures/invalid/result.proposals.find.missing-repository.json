@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "ref": {
+        "source": "local:3f9a0c1d",
+        "id": "P-1"
+      },
+      "revision": "r1",
+      "change": {
+        "base": "main",
+        "head": "x"
+      },
+      "title": "feat(cli): route collaboration contracts",
+      "body": "Implements the provider contracts.",
+      "state": "open",
+      "updatedAt": "2026-09-24T08:05:00Z"
+    }
+  ],
+  "page": {}
+}

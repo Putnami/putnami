@@ -1,0 +1,8 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "tags": ["sample", "python", "e2e"],
+  "extensions": ["/python/extension"],
+  "publishConfig": {
+    "pypi": { "namePattern": "py_example_{name}" }
+  }
+}

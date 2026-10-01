@@ -1,0 +1,51 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/declarative-schema",
+  "outcomes": [
+    "One field declaration drives runtime validation, TypeScript inference, and generated documentation",
+    "A browser bundle uses the same declaration without pulling server-only code into the graph",
+    "Validation failures name the field that failed instead of reporting that the whole payload is wrong",
+    "The fast path used for per-request validation accepts and rejects exactly what the reference validator does"
+  ],
+  "nonGoals": [
+    "Being a general-purpose schema language for data outside a Putnami workload",
+    "Emitting JSON Schema, OpenAPI, or client code from this package",
+    "Promising that a pre-1.0 minor release keeps the previous schema vocabulary"
+  ],
+  "requirements": [
+    {
+      "id": "required-and-default",
+      "text": "A field declared with Default() is optional in input and always present in output; a field with neither Default() nor Optional() is required and its absence is an error."
+    },
+    {
+      "id": "type-enforcement",
+      "text": "A value whose type does not match its declaration is reported as a field-level error and the value is kept as authored rather than silently replaced."
+    },
+    {
+      "id": "opt-in-coercion",
+      "text": "String inputs are coerced to the declared type only when the caller enables coercion; an uncoercible value is still reported as a type mismatch."
+    },
+    {
+      "id": "nested-and-collections",
+      "text": "Validation recurses into nested objects, arrays, and maps, reporting the failing path and rejecting a collection whose container type is wrong."
+    },
+    {
+      "id": "stateless-constraints",
+      "text": "Repeated validation of the same schema produces the same verdict, and a constraint never mutates a value the caller supplied."
+    },
+    {
+      "id": "compiled-parity",
+      "text": "A compiled validator agrees with the interpreted validator on accepted values, rejected values, applied defaults, and coercion, and delegates any case it cannot reproduce exactly."
+    },
+    {
+      "id": "browser-safe-barrel",
+      "text": "The browser entry point exports the shared vocabulary and no server-only utility, and the shared modules import no Node built-in."
+    },
+    {
+      "id": "hooks-are-opt-in",
+      "text": "The JSONL build-hook protocol is reachable only from the dedicated hooks subpath and is not exported by the root or browser barrels."
+    }
+  ],
+  "decisions": ["typescript/framework/utils/doc/adr/0001-one-schema-vocabulary-browser-safe-by-construction.md"]
+}

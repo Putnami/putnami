@@ -1,0 +1,7 @@
+{
+  "protocol": "putnami.events.v1",
+  "id": "message-1",
+  "payload": { "ok": true },
+  "timestamp": "2026-04-24T10:00:00Z",
+  "attempt": 1
+}

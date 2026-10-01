@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/app",
+  "visibility": "public",
+  "tags": ["go"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
+  "dependencies": ["/go/framework/errors", "/go/framework/inject", "/go/framework/logger", "/go/framework/migration", "/protocols/capabilities", "/protocols/features", "/protocols/infra"],
+  "publish": ["go"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "publish": {
+      "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

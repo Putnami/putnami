@@ -1,0 +1,267 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities.json",
+  "protocolVersion": 1,
+  "project": "go.putnami.dev/examples/capabilities-proof",
+  "configDefinitions": [
+    {
+      "path": "database.default",
+      "fields": [
+        {
+          "name": "url",
+          "type": "string"
+        },
+        {
+          "name": "password",
+          "type": "string",
+          "sensitive": true
+        }
+      ],
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    }
+  ],
+  "schemas": [
+    {
+      "name": "api-proto",
+      "kind": "proto",
+      "path": "schema/api.proto",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    },
+    {
+      "name": "listUsers",
+      "kind": "route",
+      "path": "/api/users",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    },
+    {
+      "name": "openapi",
+      "kind": "openapi",
+      "path": "schema/openapi.json",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    }
+  ],
+  "discoverers": [
+    {
+      "name": "database.default",
+      "kind": "config",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    },
+    {
+      "name": "sql:iam",
+      "kind": "source",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    }
+  ],
+  "migrations": [
+    {
+      "name": "iam",
+      "datasource": "default",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    }
+  ],
+  "infraRequirements": [
+    {
+      "name": "avatars",
+      "kind": "storage",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/examples/capabilities-proof",
+        "version": "0.1.0",
+        "sourceKind": "generated",
+        "evidencePath": ".gen/infra/inventory.json"
+      }
+    },
+    {
+      "name": "cleanup",
+      "kind": "scheduledJob",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/examples/capabilities-proof",
+        "version": "0.1.0",
+        "sourceKind": "generated",
+        "evidencePath": ".gen/infra/inventory.json"
+      }
+    },
+    {
+      "name": "default",
+      "kind": "database",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/examples/capabilities-proof",
+        "version": "0.1.0",
+        "sourceKind": "generated",
+        "evidencePath": ".gen/infra/migration.json"
+      }
+    },
+    {
+      "name": "oauth.client-secret",
+      "kind": "secret",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/examples/capabilities-proof",
+        "version": "0.1.0",
+        "sourceKind": "generated",
+        "evidencePath": ".gen/infra/inventory.json"
+      }
+    },
+    {
+      "name": "user.created",
+      "kind": "events",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/examples/capabilities-proof",
+        "version": "0.1.0",
+        "sourceKind": "generated",
+        "evidencePath": ".gen/infra/inventory.json"
+      }
+    },
+    {
+      "name": "user.updated",
+      "kind": "events",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/examples/capabilities-proof",
+        "version": "0.1.0",
+        "sourceKind": "generated",
+        "evidencePath": ".gen/infra/inventory.json"
+      }
+    }
+  ],
+  "healthContributors": [
+    {
+      "name": "diskSpace",
+      "probe": "health",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    },
+    {
+      "name": "primaryDatabase",
+      "probe": "readiness",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    }
+  ],
+  "lifecycleHooks": [
+    {
+      "name": "connectionPool",
+      "phase": "starter",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    },
+    {
+      "name": "connectionPool",
+      "phase": "stopper",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    }
+  ],
+  "packageVersions": [
+    {
+      "package": "go.putnami.dev/app",
+      "version": "1.4.0",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    },
+    {
+      "package": "go.putnami.dev/examples/capabilities-proof",
+      "version": "0.1.0",
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/examples/capabilities-proof",
+        "version": "0.1.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/go.mod"
+      }
+    }
+  ],
+  "requiredCapabilities": [
+    {
+      "name": "sql",
+      "requires": [
+        "config",
+        "datasource",
+        "discoverer",
+        "health",
+        "infra",
+        "lifecycle",
+        "migration",
+        "package",
+        "readiness",
+        "schema"
+      ],
+      "provenance": {
+        "project": "go.putnami.dev/examples/capabilities-proof",
+        "package": "go.putnami.dev/app",
+        "version": "1.4.0",
+        "sourceKind": "framework",
+        "evidencePath": "example/iam/db.go"
+      }
+    }
+  ]
+}

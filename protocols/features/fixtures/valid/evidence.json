@@ -1,0 +1,28 @@
+{
+  "protocolVersion": 1,
+  "evidence": [
+    {
+      "id": "billing/evidence-invoice-coded",
+      "feature": "billing/invoice-export",
+      "requirement": "implementation",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": { "kind": "build", "id": "go.putnami.dev/app" },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/example/billing",
+        "binding": "source-v1:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/example/billing",
+          "kind": "migration",
+          "subkind": "sql",
+          "key": "billing"
+        }
+      },
+      "provenance": { "root": "project", "path": "migrations.go", "symbol": "BillingMigrations" }
+    }
+  ]
+}

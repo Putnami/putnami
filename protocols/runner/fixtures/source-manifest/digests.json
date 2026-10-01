@@ -1,0 +1,8 @@
+{
+  "bound.json": "sha256:e6a41140866418db50254afe33656794f334d49d2feed5930da037a7fe1c3022",
+  "empty.json": "sha256:8bcae181d21321b79e1cee4976a6c9759a0f03769dde64b6f821ab5d22a33921",
+  "escapes.json": "sha256:d722acb45fa3f46ea02e7b80c3f170a603a6baf32d4787f4d0ee7916a76dd546",
+  "files.json": "sha256:f10b165c611fc33cda1d9ad21b9848877596b268286de3ad7341d748722386e8",
+  "symlinks.json": "sha256:77f4fe11e56b13a9d088894a877a20a5cbeae2bed388b3eb2205b7ec64fe230f",
+  "unicode.json": "sha256:aaef4df55edbd42600af9a1dd6eb6d65116c0b4b9e8362274c5cb6dcee0f3757"
+}

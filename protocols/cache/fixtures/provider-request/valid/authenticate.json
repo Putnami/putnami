@@ -1,0 +1,1 @@
+{ "protocolVersion": 2, "id": 2, "op": "authenticate", "payload": { "credential": "prc_fixture-run-credential" } }

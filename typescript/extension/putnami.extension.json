@@ -1,0 +1,2097 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "cliContract": 4,
+  "runtime": {
+    "executable": "compiled/putnami-ts",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          { "from": "environment", "environment": "GOROOT", "path": "bin/go" },
+          { "from": "path", "path": "go" },
+          { "from": "putnami-home", "path": "toolchains/go/go-{version}/go/bin/go" }
+        ],
+        "probe": {
+          "args": ["env", "GOVERSION"],
+          "expect": "go{version}",
+          "unset": ["GOROOT"],
+          "environment": { "GOTOOLCHAIN": "local" }
+        },
+        "environment": {
+          "GOROOT": { "from": "ancestor", "levels": 2 },
+          "GOTOOLCHAIN": { "from": "literal", "value": "local" }
+        },
+        "prependPath": true
+      },
+      "taskRuntime": {
+        "lock": "bun",
+        "candidates": [
+          { "from": "path", "path": "bun" },
+          { "from": "environment", "environment": "BUN_INSTALL", "path": "bin/bun" },
+          { "from": "home", "path": ".bun/bin/bun" }
+        ],
+        "probe": { "args": ["--version"], "expect": "{version}" },
+        "environment": { "BUN_INSTALL": { "from": "ancestor", "levels": 2 } },
+        "prependPath": true
+      }
+    },
+    "runToolchains": ["taskRuntime"],
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "internal/**"
+      ],
+      "toolchains": ["runtimeCompiler"]
+    }
+  },
+  "workspace": {
+    "markers": [
+      "package.json"
+    ],
+    "inputs": [
+      "biome.json",
+      "bun.lock",
+      "bun.lockb",
+      "bunfig.toml",
+      "package.json",
+      "tsconfig.base.json",
+      "tsconfig.json",
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.mts",
+      "**/*.cts",
+      "**/*.js",
+      "**/*.jsx",
+      "**/*.mjs",
+      "**/*.cjs"
+    ],
+    "excludes": [
+      "dist",
+      "node_modules"
+    ],
+    "syncTask": "workspace-sync-exec",
+    "dependencySources": true
+  },
+  "workspaceDevDependencies": {
+    "@biomejs/biome": "^2.5.3",
+    "@types/bun": "^1.4.0",
+    "typescript": "^6.0.2"
+  },
+  "ecosystems": [
+    {
+      "id": "npm",
+      "coordinate": {
+        "pattern": "^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$"
+      },
+      "version": {
+        "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$",
+        "ordering": "semver"
+      },
+      "channel": "native",
+      "registries": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "publish": {
+            "type": "string",
+            "pattern": "^https?://[^\\r\\n]+$"
+          },
+          "scopes": {
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^@[a-z0-9][a-z0-9._-]*$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^https?://[^\\r\\n]+$"
+            }
+          }
+        }
+      },
+      "publish": "publish"
+    }
+  ],
+  "uses": [
+    "oci"
+  ],
+  "commands": {
+    "build": {
+      "description": "Build project: generate code, transpile library and/or compile bundled output.",
+      "flags": {
+        "transpile": {
+          "type": "boolean",
+          "default": false,
+          "description": "Produce transpiled JavaScript library output"
+        },
+        "types": {
+          "type": "boolean",
+          "default": false,
+          "description": "Generate TypeScript type declarations"
+        },
+        "compile": {
+          "type": "boolean",
+          "default": false,
+          "description": "Produce compiled bundle"
+        },
+        "target": {
+          "type": "string",
+          "short": "-p",
+          "default": "bun",
+          "description": "Build target platform"
+        },
+        "compile-target": {
+          "type": "string",
+          "description": "Bun executable compile target"
+        },
+        "bundle": {
+          "type": "string",
+          "short": "-b",
+          "default": "none",
+          "description": "Bundle mode (bundled, local, none)"
+        },
+        "sourcemap": {
+          "type": "string",
+          "short": "-m",
+          "default": "external",
+          "description": "Sourcemap mode"
+        },
+        "minify": {
+          "type": "boolean",
+          "default": true,
+          "description": "Minify output"
+        },
+        "splitting": {
+          "type": "boolean",
+          "description": "Enable code splitting"
+        },
+        "metafile": {
+          "type": "boolean",
+          "default": false,
+          "description": "Write bun's markdown module-graph report (--metafile-md, Bun 1.4) next to the transpiled output, one per build graph"
+        },
+        "publish-config-access": {
+          "type": "string",
+          "default": "public",
+          "description": "Package access level for npm"
+        },
+        "version-suffix": {
+          "type": "string",
+          "description": "Version suffix to use"
+        },
+        "fast": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip TypeScript declaration generation"
+        },
+        "skip-package-json": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip generating output package.json"
+        },
+        "skip-artifacts": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip copying build artifacts"
+        },
+        "clear": {
+          "type": "boolean",
+          "default": false,
+          "description": "Clear dist folder before building"
+        },
+        "release": {
+          "type": "boolean",
+          "default": false,
+          "description": "Build for stable release"
+        }
+      },
+      "run": [
+        {
+          "id": "generate",
+          "task": "build-generate",
+          "dependsOn": [
+            "^generate"
+          ]
+        },
+        {
+          "id": "transpile",
+          "task": "build-transpile",
+          "dependsOn": [
+            "generate"
+          ],
+          "if": "params.transpile || !params.transpile && !params.types && !params.compile",
+          "with": {
+            "generateResult": {
+              "fromStep": "generate",
+              "output": "data"
+            }
+          }
+        },
+        {
+          "id": "types",
+          "heavy": true,
+          "task": "build-types",
+          "dependsOn": [
+            "generate",
+            "transpile"
+          ],
+          "if": "params.types || !params.transpile && !params.types && !params.compile",
+          "with": {
+            "generateResult": {
+              "fromStep": "generate",
+              "output": "data"
+            }
+          }
+        },
+        {
+          "id": "compile",
+          "task": "build-compile",
+          "dependsOn": [
+            "generate"
+          ],
+          "if": "params.compile",
+          "with": {
+            "generateResult": {
+              "fromStep": "generate",
+              "output": "data"
+            }
+          }
+        },
+        {
+          "id": "infra",
+          "task": "build-infra",
+          "dependsOn": [
+            "generate",
+            "transpile",
+            "types",
+            "compile"
+          ]
+        }
+      ]
+    },
+    "test": {
+      "description": "Run tests.",
+      "activationFiles": [
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "**/*.test.tsx",
+        "**/*.spec.tsx"
+      ],
+      "flags": {
+        "timeout": {
+          "type": "number",
+          "default": 5000,
+          "description": "Per-test timeout in milliseconds"
+        },
+        "timeout-budget": {
+          "type": "number",
+          "default": 600000,
+          "description": "Wall-clock timeout for the test subprocess in milliseconds"
+        },
+        "update-snapshots": {
+          "type": "boolean",
+          "default": false,
+          "description": "Update snapshot files"
+        },
+        "rerun-each": {
+          "type": "number",
+          "description": "Re-run each test file N times"
+        },
+        "only": {
+          "type": "boolean",
+          "description": "Only run tests marked with test.only()"
+        },
+        "todo": {
+          "type": "boolean",
+          "description": "Include tests marked with test.todo()"
+        },
+        "coverage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Per-project coverage policy. Set false to opt a project out of coverage entirely (authoritative — the validation cadence never overrides it)."
+        },
+        "enforce-coverage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enforce each project's coverage-threshold. On by default so a coverage drop fails the run that caused it. Pass --no-enforce-coverage to keep measuring and reporting coverage without failing on the threshold; to skip instrumentation entirely use --coverage=false, which this never overrides."
+        },
+        "coverage-threshold": {
+          "type": "number",
+          "default": 0,
+          "description": "Minimum required line coverage percentage (0 disables the gate). Fails the test job when coverage is below it. Enforced by default; --no-enforce-coverage zeroes it for the run while still reporting coverage. Configurable per workspace, language, or project."
+        },
+        "bail": {
+          "type": "number",
+          "description": "Exit after N failures"
+        },
+        "test-name-pattern": {
+          "type": "string",
+          "description": "Run tests matching regex"
+        },
+        "test": {
+          "type": "string",
+          "short": "-t",
+          "description": "Test filter to run"
+        },
+        "concurrent": {
+          "type": "string",
+          "description": "Treat all tests as concurrent"
+        },
+        "parallel": {
+          "type": "string",
+          "description": "Opt-in bun test worker processes (Bun 1.4): true for --parallel, a number for --parallel=N. Off by default — the putnami DAG already runs projects in parallel."
+        },
+        "pass-with-no-tests": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pass if no tests found"
+        },
+        "test-verbose": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the complete test transcript at info level; changes visibility only, never the Bun invocation or verdict"
+        }
+      },
+      "run": [
+        {
+          "id": "generate",
+          "task": "build-generate",
+          "dependsOn": [
+            "^generate"
+          ],
+          "with": {
+            "mode": {
+              "value": "test"
+            }
+          }
+        },
+        {
+          "id": "test-env",
+          "task": "test-env-up",
+          "dependsOn": [
+            "generate"
+          ],
+          "activation": {
+            "closureFiles": [
+              "infra/requirements.json"
+            ]
+          }
+        },
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "generate",
+            "test-env"
+          ]
+        },
+        {
+          "id": "test-env-teardown",
+          "task": "test-env-down",
+          "runOn": "finally",
+          "finalizes": {
+            "producer": "test-env",
+            "consumers": [
+              "test"
+            ],
+            "pruneIf": "!params.infra-down"
+          },
+          "activation": {
+            "closureFiles": [
+              "infra/requirements.json"
+            ]
+          }
+        }
+      ]
+    },
+    "serve": {
+      "description": "Serve an application with hot-reload.",
+      "flags": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Entry point to serve"
+        },
+        "watch": {
+          "type": "boolean",
+          "default": true,
+          "short": "-w",
+          "description": "Auto-restart on file change"
+        },
+        "kill-port": {
+          "type": "boolean",
+          "description": "Kill process using port before starting"
+        },
+        "port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for Bun.serve"
+        },
+        "inspect": {
+          "type": "boolean",
+          "description": "Activate Bun's debugger"
+        },
+        "inspect-wait": {
+          "type": "boolean",
+          "description": "Debugger waits for connection"
+        },
+        "inspect-brk": {
+          "type": "boolean",
+          "description": "Debugger breaks on first line"
+        }
+      },
+      "run": [
+        {
+          "id": "generate",
+          "task": "build-generate",
+          "dependsOn": [
+            "^generate"
+          ],
+          "with": {
+            "mode": {
+              "value": "serve"
+            }
+          }
+        },
+        {
+          "id": "serve",
+          "task": "serve-app",
+          "dependsOn": [
+            "generate"
+          ]
+        }
+      ]
+    },
+    "run": {
+      "description": "Run a workload once for the host and forward its exit code.",
+      "activationFiles": [
+        "package.json",
+        "src/**/*.ts",
+        "src/**/*.tsx"
+      ],
+      "flags": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Entry point to run (defaults to ./run export, then main)"
+        },
+        "port": {
+          "type": "number",
+          "description": "Port (set via the PORT environment variable)"
+        },
+        "args": {
+          "type": "string",
+          "description": "Additional arguments to pass to the program"
+        }
+      },
+      "run": [
+        {
+          "id": "generate",
+          "task": "build-generate",
+          "dependsOn": [
+            "^generate"
+          ],
+          "with": {
+            "mode": {
+              "value": "serve"
+            }
+          }
+        },
+        {
+          "id": "run",
+          "task": "run-app",
+          "dependsOn": [
+            "generate"
+          ]
+        }
+      ]
+    },
+    "lint": {
+      "description": "Lint and format project code.",
+      "activationFiles": [
+        "**/*.ts",
+        "**/*.tsx",
+        "**/*.js",
+        "**/*.jsx",
+        "**/*.mts",
+        "**/*.cts",
+        "**/*.mjs",
+        "**/*.cjs",
+        "**/*.json",
+        "**/*.jsonc",
+        "**/*.css",
+        "**/*.graphql",
+        "**/*.gql",
+        "**/*.html",
+        "**/*.htm",
+        "**/*.grit"
+      ],
+      "flags": {
+        "config-path": {
+          "type": "string",
+          "default": "node_modules/@putnami/typescript/config",
+          "description": "Path to Biome config"
+        },
+        "fix": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-fix issues"
+        },
+        "max-diagnostics": {
+          "type": "number",
+          "default": 10,
+          "description": "Max diagnostics to show"
+        },
+        "diagnostic-level": {
+          "type": "string",
+          "default": "warn",
+          "description": "Diagnostic level (error, warn, info, off)"
+        },
+        "skip-guard": {
+          "type": "boolean",
+          "default": true,
+          "description": "Refuse a focused test (`.only(`) and a test skip without a guard, or with a guard that names flakiness or CI. A reviewed exception is written `// putnami:allow-skip <reason>` and reported as a warning."
+        },
+        "docs-links": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check every relative link and anchor in the project's README.md files and doc/ trees; a broken one fails lint."
+        }
+      },
+      "run": [
+        {
+          "id": "format",
+          "task": "lint-format",
+          "if": "params.fix"
+        },
+        {
+          "id": "check",
+          "heavy": true,
+          "task": "lint-check",
+          "dependsOn": [
+            "format"
+          ],
+          "if": "params.fix"
+        },
+        {
+          "id": "check-only",
+          "heavy": true,
+          "task": "lint-all",
+          "if": "!params.fix"
+        },
+        {
+          "id": "docs",
+          "task": "lint-docs",
+          "if": "params.docs-links"
+        }
+      ]
+    },
+    "package": {
+      "description": "Create distribution packages (npm, docker).",
+      "flags": {
+        "access": {
+          "type": "string",
+          "default": "public",
+          "description": "Package access level"
+        },
+        "registry": {
+          "type": "string",
+          "description": "Custom npm registry URL"
+        },
+        "docker-registry": {
+          "type": "string",
+          "description": "Publish target compatibility flag; local packaging ignores it"
+        },
+        "docker-tag": {
+          "type": "string",
+          "description": "Override Docker image tag"
+        },
+        "platform": {
+          "type": "string",
+          "default": "linux/amd64",
+          "description": "Docker build target platform"
+        },
+        "workspace-builder-image": {
+          "type": "string",
+          "description": "Workspace builder image for CI multi-stage builds"
+        },
+        "docker-base-image": {
+          "type": "string",
+          "description": "Override the digest-pinned base image (must include @sha256:... for reproducible digests)"
+        },
+        "docker-base-project": {
+          "type": "string",
+          "description": "Use the typed local OCI candidate of this graph dependency as the image base"
+        },
+        "docker-load": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also load the assembled image into the local docker daemon"
+        },
+        "port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Container port to expose"
+        },
+        "npm": {
+          "type": "boolean",
+          "default": false,
+          "description": "Create npm package"
+        },
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Build Docker image"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show what would be packaged without creating artifacts"
+        }
+      },
+      "run": [
+        {
+          "id": "generate",
+          "task": "build-generate",
+          "dependsOn": [
+            "^generate"
+          ],
+          "if": "!params.image"
+        },
+        {
+          "id": "transpile",
+          "task": "build-transpile",
+          "dependsOn": [
+            "generate",
+            "^transpile"
+          ],
+          "if": "!params.image"
+        },
+        {
+          "id": "types",
+          "heavy": true,
+          "task": "build-types",
+          "dependsOn": [
+            "generate"
+          ],
+          "if": "!params.image"
+        },
+        {
+          "id": "compile",
+          "task": "build-compile",
+          "dependsOn": [
+            "generate"
+          ],
+          "if": "params.docker && !params.image"
+        },
+        {
+          "id": "npm",
+          "task": "package-npm",
+          "dependsOn": [
+            "transpile",
+            "types",
+            "^npm"
+          ],
+          "if": "params.npm && !params.image"
+        },
+        {
+          "id": "docker",
+          "task": "package-docker",
+          "dependsOn": [
+            "compile",
+            "^image"
+          ],
+          "if": "params.docker && !params.image"
+        },
+        {
+          "id": "image",
+          "task": "package-docker",
+          "dependsOn": [
+            "^image"
+          ],
+          "if": "params.image"
+        }
+      ]
+    },
+    "publish": {
+      "dependsOn": [
+        "package"
+      ],
+      "description": "Publish pre-built packages to registries (npm and Docker). Auto-runs package first; that pipeline owns every required build step while its image-project branch stays compiler-free. @putnami/cloud, when installed, provides advanced publishing; otherwise native registry credentials are used.",
+      "flags": {
+        "access": {
+          "type": "string",
+          "default": "public",
+          "description": "npm access level (public or restricted)"
+        },
+        "registry": {
+          "type": "string",
+          "description": "npm registry URL"
+        },
+        "otp": {
+          "type": "string",
+          "description": "npm OTP for two-factor authentication"
+        },
+        "docker-registry": {
+          "type": "string",
+          "description": "Docker registry URL prefix (e.g. us-docker.pkg.dev/project/repo)"
+        },
+        "npm": {
+          "type": "boolean",
+          "default": false,
+          "description": "Publish npm package"
+        },
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push Docker image to registry"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show what would be published without uploading"
+        }
+      },
+      "run": [
+        {
+          "id": "npm",
+          "task": "publish-npm",
+          "if": "params.npm"
+        },
+        {
+          "id": "docker",
+          "task": "publish-docker",
+          "if": "params.docker"
+        }
+      ]
+    },
+    "config-extract": {
+      "description": "Extract config schema from the workload to schema/config.json (committed; options.generate.schema=false falls back to .gen/config-schema.json)",
+      "run": [
+        {
+          "id": "generate",
+          "task": "build-generate",
+          "dependsOn": [
+            "^generate"
+          ]
+        },
+        {
+          "id": "extract",
+          "task": "config-extract-exec",
+          "dependsOn": [
+            "generate"
+          ]
+        }
+      ]
+    },
+    "workspace-fetch": {
+      "description": "Download the packages the committed bun.lock names into bun's cache, running none of their code.",
+      "quiet": true,
+      "run": [
+        {
+          "id": "workspace-fetch",
+          "task": "workspace-fetch-exec"
+        }
+      ]
+    },
+    "workspace-install": {
+      "description": "Install workspace dependencies.",
+      "quiet": true,
+      "flags": {
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "Force reinstall even if bun.lock is up to date"
+        }
+      },
+      "run": [
+        {
+          "id": "workspace-install",
+          "task": "workspace-install-exec"
+        }
+      ]
+    },
+    "workspace-sync": {
+      "description": "Synchronize TypeScript-owned workspace state (package workspaces, package names).",
+      "visibility": "internal",
+      "quiet": true,
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "workspace-sync",
+          "task": "workspace-sync-exec"
+        }
+      ]
+    },
+    "cache-clean": {
+      "description": "Purge the TypeScript incremental scratch this extension owns. Bun's shared package cache is deliberately left alone: one worktree's cold rebuild must not cost every checkout on the machine its downloads.",
+      "visibility": "internal",
+      "quiet": true,
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "cache-clean",
+          "task": "cache-clean-exec"
+        }
+      ]
+    },
+    "cache-gc": {
+      "description": "Bound the TypeScript incremental scratch and the Bun package cache to their budgets.",
+      "visibility": "internal",
+      "quiet": true,
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "cache-gc",
+          "task": "cache-gc-exec"
+        }
+      ]
+    },
+    "deps-upgrade": {
+      "description": "Upgrade @putnami/* framework dependencies to latest versions.",
+      "visibility": "internal",
+      "quiet": true,
+      "run": [
+        {
+          "id": "deps-upgrade",
+          "task": "deps-upgrade-exec"
+        }
+      ]
+    },
+    "version": {
+      "description": "Report the project's version metadata (from .gen/version.json).",
+      "run": [
+        {
+          "id": "version",
+          "task": "version-report"
+        }
+      ]
+    }
+  },
+  "tools": {
+    "putnami.typescript_docs": {
+      "description": "Return the AI.md bytes from the exact npm package resolved for one TypeScript project. Resolution walks that project's node_modules ancestry in Node order, verifies the installed package name and version, and never invokes Bun, installs dependencies, consults a registry, or substitutes extension-carried docs. Omit project only when the reference identifies exactly one declaring TypeScript project.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "Exact npm package name, for example @putnami/web"
+          },
+          "project": {
+            "type": "string",
+            "description": "Optional Putnami project name, npm package name, or workspace-relative project directory"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reference"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "mcp-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 10000
+    }
+  },
+  "tasks": {
+    "workspace-fetch-exec": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-fetch"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "workspace-install-exec": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-install"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "workspace-sync-exec": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-sync"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 120000,
+      "declares": {
+        "effects": [
+          "workspace-files"
+        ]
+      }
+    },
+    "cache-clean-exec": {
+      "description": "Remove the ts-types incremental scratch this extension writes under the worktree cache root. Bun's shared package cache is deliberately left alone (GC bounds it; clean never wipes it). Declares no outputs and the toolchain-cache effect: it mutates machine-global state no cache hit could reproduce.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "cache-clean"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": [
+          "toolchain-cache"
+        ]
+      }
+    },
+    "cache-gc-exec": {
+      "description": "Evict ts-types scratch untouched within its grace window and bound Bun's package cache to its byte budget. Declares no outputs and the toolchain-cache effect.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "cache-gc"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000,
+      "declares": {
+        "effects": [
+          "toolchain-cache"
+        ]
+      }
+    },
+    "deps-upgrade-exec": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "deps-upgrade"
+      ],
+      "cwd": "{workspaceRoot}",
+      "inputs": {
+        "releaseSet": {
+          "from": "params"
+        }
+      },
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "build-generate": {
+      "description": "Generate code into the project's .gen subtree (and, when the project generates one, the configured TypeScript client directory). Ownership decision: build-generate is the SINGLE producer of <project>/.gen — every other task that writes inside it (config-extract-exec's .gen/config-schema.json fallback) writes into generate-owned territory rather than claiming a slice of it. Its v3 `declares` block is deliberately still absent: six commands (build, test, serve, run, package, config-extract) schedule this one task, and the plan-time owner check counts each of those plan nodes as a separate owner of <project>/.gen, so declaring it today makes every multi-command TypeScript plan (`putnami lint,test,build`) unplannable. The declaration lands with the CLI change that treats repeated scheduling of ONE task for ONE project as one owner; until then this task keeps v2 inferred capture via its gen/clients write resources.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build-generate"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "src/**/*.ts",
+            "src/**/*.tsx"
+          ]
+        },
+        "assets": {
+          "from": "project",
+          "files": [
+            "public/**/*"
+          ]
+        },
+        "config": {
+          "from": "project",
+          "files": [
+            "package.json"
+          ]
+        },
+        "clear": {
+          "from": "params"
+        },
+        "release": {
+          "from": "params"
+        },
+        "mode": {
+          "from": "params"
+        },
+        "filePatterns": {
+          "from": "params"
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "package.json",
+            "bun.lock",
+            "bun.lockb",
+            "bunfig.toml",
+            "tsconfig.json",
+            "tsconfig.base.json",
+            "biome.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Generated code metadata and exports map"
+        },
+        "clientOutput": {
+          "description": "Project-relative directory of the generated TypeScript client, reported only when the client generator emitted one. This is the pathFrom anchor for the clients half of the ownership decision above: the directory is chosen by the project's clientgen config, so it is declarable only through this port. The consumer reads it under this exact name."
+        }
+      },
+      "writes": [
+        "gen",
+        "clients"
+      ],
+      "reads": [
+        "sources"
+      ],
+      "batchable": {
+        "tool": "putnami-ts-build",
+        "maxProjects": 8
+      },
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "gen": {
+            "kind": "directory",
+            "root": "project",
+            "path": ".gen",
+            "description": "Generated sources: the whole project-rooted .gen subtree, owned exclusively by this task (config-extract's schema fallback inside .gen is this task's output, not a second owner)."
+          },
+          "client": {
+            "kind": "directory",
+            "pathFrom": "clientOutput",
+            "optionalEmpty": true,
+            "preserves": [".gen", "node_modules", "putnami.json"],
+            "drift": "fail",
+            "description": "Generated TypeScript client at the config-chosen directory the clientOutput port reports; absent when the project generates no client. The client is committed, and this task is the FIRST writer of that directory in a session, so the engine compares what it writes (or a cache hit restores) with the bytes present before and fails the task on a difference — the worktree then holds the regenerated client to commit (protocols/extension ADR 0004). The project document a workspace commits inside the directory, and the dependency install the workspace materializes there when the client is a package of its own, are preserved: never captured, restored over, or judged (protocols/extension ADR 0005). The client project's own .gen directory, which the engine and that project's tasks write, is preserved the same way."
+          },
+          "capabilities": {
+            "kind": "file",
+            "root": "project",
+            "path": "schema/capabilities.json",
+            "optionalEmpty": true,
+            "description": "The project's capability manifest, promoted out of .gen into the tracked tree when the project sets options.generate.capabilities. The framework producer is its sole author; this task only copies what it wrote, the same split the Go extension keeps between describe and promotion. Absent for every project that does not opt in."
+          },
+          "openapi": {
+            "kind": "file",
+            "root": "project",
+            "path": "schema/openapi.json",
+            "optionalEmpty": true,
+            "drift": "fail",
+            "description": "The project's committed OpenAPI contract, written by the application's openapi() document at slot 0 during this task's pre-build hook — the one document clientGenerator(), workspace client discovery and compose read. It is committed, and this task is its first writer in a session, so the engine compares what it writes (or a cache hit restores) with the bytes present before and fails the task with generated-output-drift on a difference — the worktree then holds the regenerated contract to commit (protocols/extension ADR 0004). Absent for a project without openapi(), or whose document sets output to false or to another path."
+          }
+        },
+        "effects": [
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-transpile": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build-transpile"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "src/**/*.ts",
+            "src/**/*.tsx"
+          ]
+        },
+        "config": {
+          "from": "project",
+          "files": [
+            "tsconfig.json",
+            "tsconfig.lib.json",
+            "package.json"
+          ]
+        },
+        "generateResult": {
+          "from": "task",
+          "optional": true
+        },
+        "target": {
+          "from": "params"
+        },
+        "bundle": {
+          "from": "params"
+        },
+        "sourcemap": {
+          "from": "params"
+        },
+        "minify": {
+          "from": "params"
+        },
+        "splitting": {
+          "from": "params"
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "package.json",
+            "bun.lock",
+            "bun.lockb",
+            "bunfig.toml",
+            "tsconfig.json",
+            "tsconfig.base.json",
+            "biome.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Transpilation result metadata"
+        }
+      },
+      "reads": [
+        "gen",
+        "sources"
+      ],
+      "batchable": {
+        "tool": "putnami-ts-build",
+        "maxProjects": 8
+      },
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "lib": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lib",
+            "optionalEmpty": true,
+            "description": "Transpiled JavaScript library. Sole owner of <command-output>/lib; sibling steps own types/ and compile/. Empty when the project resolves no entrypoint."
+          }
+        },
+        "effects": [
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-types": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build-types"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "src/**/*.ts",
+            "src/**/*.tsx"
+          ]
+        },
+        "config": {
+          "from": "project",
+          "files": [
+            "tsconfig.json",
+            "tsconfig.lib.json",
+            "package.json"
+          ]
+        },
+        "generateResult": {
+          "from": "task",
+          "optional": true
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "package.json",
+            "bun.lock",
+            "bun.lockb",
+            "bunfig.toml",
+            "tsconfig.json",
+            "tsconfig.base.json",
+            "biome.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Type declaration generation result"
+        }
+      },
+      "reads": [
+        "gen",
+        "sources"
+      ],
+      "batchable": {
+        "tool": "putnami-ts-build",
+        "maxProjects": 8
+      },
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "types": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "types",
+            "optionalEmpty": true,
+            "description": "Emitted .d.ts declarations. Sole owner of <command-output>/types. Empty when tsc emits nothing."
+          }
+        },
+        "effects": [
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-compile": {
+      "description": "Compile the project's entrypoint into standalone bun executables. The target set is scoped by PACKAGE CHANNEL: under `package --docker` the compile is bound to the image's `platform` and produces that one bun target, because an image carries one executable and the other three were compiled and discarded; `--compile-target` still names one target and wins; every other invocation keeps the full four-target distribution matrix. Both deciding inputs (`docker`, `platform`) are declared `from: \"params\"`, so the resolved set is a plan-time cache-key participant and a four-target entry can never answer a one-target request. The docker intent is read as a parameter rather than from the project's `publish` declaration because a parameter is what the key can see and what a batched invocation shares across its members; a project that declares the channel without `options.package.docker` still packages an image and simply keeps the full set — extra targets, never a missing one.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build-compile"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "src/**/*.ts",
+            "src/**/*.tsx"
+          ]
+        },
+        "config": {
+          "from": "project",
+          "files": [
+            "tsconfig.json",
+            "tsconfig.app.json",
+            "package.json"
+          ]
+        },
+        "generateResult": {
+          "from": "task",
+          "optional": true
+        },
+        "target": {
+          "from": "params"
+        },
+        "compile-target": {
+          "from": "params"
+        },
+        "docker": {
+          "from": "params"
+        },
+        "platform": {
+          "from": "params"
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "package.json",
+            "bun.lock",
+            "bun.lockb",
+            "bunfig.toml",
+            "tsconfig.json",
+            "tsconfig.base.json",
+            "biome.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Compilation result metadata"
+        }
+      },
+      "reads": [
+        "gen",
+        "sources"
+      ],
+      "batchable": {
+        "tool": "putnami-ts-build",
+        "maxProjects": 8
+      },
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "compile": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "compile",
+            "optionalEmpty": true,
+            "description": "Compiled bundle/executable. Sole owner of <command-output>/compile. Empty when the project resolves no compile entrypoint."
+          }
+        },
+        "effects": [
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-infra": {
+      "description": "Aggregate the workload's deployability requirements into <project>/.gen/requirements.json: every project in the workload's dependency closure contributes its committed infra/requirements.json, the workload's infra/overrides.json suppresses what it does not want, and its infra/runtime.json (or the framework defaults sidecar) supplies the runtime block. Extension-owned since an earlier migration — the CLI used to gate and write this artifact itself, and to decide, by matching project tags and extension names, that a TypeScript workload must run without HTTP/2. That compatibility statement now lives HERE, where Bun's h2c support is a fact this extension owns. Libraries are skipped: they are consumed, never deployed. Ownership decision: it declares NO outputs, for the same reason as config-extract-exec's schema fallback — everything it writes lands under <project>/.gen, which build-generate owns whole as its single producer. Never cached: its inputs are OTHER projects' committed manifests, which no per-project cache key can cover, and it is a few small file reads.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build-infra"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": 60000,
+      "outputs": {
+        "data": {
+          "description": "Aggregation outcome (emitted, cleared, skipped), the manifest path, and the number of contributing projects"
+        }
+      },
+      "declares": {}
+    },
+    "lint-all": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.js",
+            "**/*.jsx",
+            "**/*.mts",
+            "**/*.cts",
+            "**/*.mjs",
+            "**/*.cjs",
+            "**/*.json",
+            "**/*.jsonc",
+            "**/*.css",
+            "**/*.graphql",
+            "**/*.gql",
+            "**/*.html",
+            "**/*.htm",
+            "**/*.grit",
+            "!.gen/**"
+          ]
+        },
+        "config": {
+          "from": "project",
+          "files": [
+            "biome.json",
+            "package.json"
+          ]
+        },
+        "max-diagnostics": {
+          "from": "params"
+        },
+        "diagnostic-level": {
+          "from": "params"
+        },
+        "skip-guard": {
+          "from": "params"
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "package.json",
+            "bun.lock",
+            "bun.lockb",
+            "bunfig.toml",
+            "tsconfig.json",
+            "tsconfig.base.json",
+            "biome.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Combined read-only format + lint result with diagnostics"
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "batchable": {
+        "tool": "biome",
+        "configFiles": [
+          "{projectRoot}/biome.json",
+          "{workspaceRoot}/biome.json",
+          "{extensionRoot}/config/biome.json"
+        ]
+      },
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {}
+    },
+    "lint-format": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint-format"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.js",
+            "**/*.jsx",
+            "**/*.mts",
+            "**/*.cts",
+            "**/*.mjs",
+            "**/*.cjs",
+            "**/*.json",
+            "**/*.jsonc",
+            "**/*.css",
+            "**/*.graphql",
+            "**/*.gql",
+            "**/*.html",
+            "**/*.htm",
+            "**/*.grit"
+          ]
+        },
+        "config": {
+          "from": "project",
+          "files": [
+            "biome.json",
+            "package.json"
+          ]
+        },
+        "fix": {
+          "from": "params"
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "package.json",
+            "bun.lock",
+            "bun.lockb",
+            "bunfig.toml",
+            "tsconfig.json",
+            "tsconfig.base.json",
+            "biome.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Format result"
+        }
+      },
+      "writes": [
+        "sources"
+      ],
+      "batchable": {
+        "tool": "biome",
+        "configFiles": [
+          "{projectRoot}/biome.json",
+          "{workspaceRoot}/biome.json",
+          "{extensionRoot}/config/biome.json"
+        ]
+      },
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {
+        "mutatesSources": true
+      }
+    },
+    "lint-docs": {
+      "description": "Documentation link check: every relative link and anchor in the project's README.md files and doc/ trees must resolve, with the case of the file on disk. The task body is the SDK's docslinks.Job, shared with every language extension. UNCACHEABLE on purpose: a link may name any file of the workspace, so no file-pattern key covers the read set, and a key that missed a deleted target would serve a green verdict for a broken link.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint-docs"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "outputs": {
+        "data": {
+          "description": "Documentation link result with diagnostics"
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "lint-check": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint-check"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.js",
+            "**/*.jsx",
+            "**/*.mts",
+            "**/*.cts",
+            "**/*.mjs",
+            "**/*.cjs",
+            "**/*.json",
+            "**/*.jsonc",
+            "**/*.css",
+            "**/*.graphql",
+            "**/*.gql",
+            "**/*.html",
+            "**/*.htm",
+            "**/*.grit"
+          ]
+        },
+        "config": {
+          "from": "project",
+          "files": [
+            "biome.json",
+            "package.json"
+          ]
+        },
+        "fix": {
+          "from": "params"
+        },
+        "max-diagnostics": {
+          "from": "params"
+        },
+        "diagnostic-level": {
+          "from": "params"
+        },
+        "skip-guard": {
+          "from": "params"
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "package.json",
+            "bun.lock",
+            "bun.lockb",
+            "bunfig.toml",
+            "tsconfig.json",
+            "tsconfig.base.json",
+            "biome.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Lint check result with diagnostics"
+        }
+      },
+      "writes": [
+        "sources"
+      ],
+      "batchable": {
+        "tool": "biome",
+        "configFiles": [
+          "{projectRoot}/biome.json",
+          "{workspaceRoot}/biome.json",
+          "{extensionRoot}/config/biome.json"
+        ]
+      },
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {
+        "mutatesSources": true
+      }
+    },
+    "test-env-up": {
+      "description": "Provision the database test environment this project's tests run against, and write the resolved binding into the invocation-scoped sensitive artifact `test-run` reads. Extension-owned since an earlier migration — the CLI used to discover the datasources, run the container and inject the binding through a private env seam it then had to hide from its own cache key. Policy is unchanged: an externally supplied DATABASE_TEST_BINDINGS always wins, `--infra` (auto|require|skip) steers the mode with the CI default `require`, `--infra-down` tears every workspace-labeled container down and provisions nothing, and only a local `auto` run with docker on PATH ever touches the docker CLI. NEVER FAILS: an environment that could not be provisioned is reported by the test run itself, which skips its live cases when no binding is present.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test-env-up"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": 360000,
+      "inputs": {
+        "requirements": {
+          "from": "closure",
+          "files": [
+            "infra/requirements.json"
+          ]
+        },
+        "infra": {
+          "from": "params"
+        },
+        "infra-down": {
+          "from": "params"
+        },
+        "DATABASE_TEST_BINDINGS": {
+          "from": "env"
+        },
+        "PUTNAMI_TEST_PG_URL": {
+          "from": "env"
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Test-environment outcome (provisioned, external, no-databases, not-provisioned, torn-down), the resolved mode, the datasource count and the server configuration digest. Credential-free by construction."
+        }
+      },
+      "declares": {
+        "outputs": {
+          "bindings": {
+            "kind": "runtime-file",
+            "scope": "invocation",
+            "sensitive": true,
+            "path": "database/bindings.json",
+            "optionalEmpty": true,
+            "description": "The resolved database test binding (credentials included). Invocation-scoped and sensitive: it lives at mode 0600 in the invocation's private tree, is never captured or restored, and dies with the invocation. Absent whenever this run provisioned nothing."
+          },
+          "lease": {
+            "kind": "file",
+            "scope": "invocation",
+            "path": "database/lease.json",
+            "optionalEmpty": true,
+            "description": "Non-secret record of the provisioned server (invocation id, label, configuration digest, container name, retention intent) the finalizer reclaims by. Has no free-form member, so it can never carry a credential onto a label or filter."
+          }
+        },
+        "effects": [
+          "process",
+          "network"
+        ]
+      }
+    },
+    "test-env-down": {
+      "description": "Finalize the database test environment: read the non-secret lease and do what it says. The ordinary run RETAINS its server — a still-running container whose configuration digest matches is interchangeable across invocations, and the next `test-env-up` reaps every digest-mismatched container before it reuses or starts one — while an `--infra-down` lease sweeps. Runs with `runOn: finally`, so the orchestrator runs it exactly once whenever `test-env` STARTED, consumer failure and cancellation included.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test-env-down"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": 360000,
+      "declares": {
+        "effects": [
+          "process"
+        ]
+      }
+    },
+    "test-run": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 600000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "src/**/*.ts",
+            "src/**/*.tsx"
+          ]
+        },
+        "tests": {
+          "from": "project",
+          "files": [
+            "test/**/*.ts",
+            "test/**/*.tsx"
+          ]
+        },
+        "config": {
+          "from": "project",
+          "files": [
+            "package.json"
+          ]
+        },
+        "DATABASE_TEST_BINDINGS": {
+          "from": "env"
+        },
+        "test-verbose": {
+          "from": "params"
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "package.json",
+            "bun.lock",
+            "bun.lockb",
+            "bunfig.toml",
+            "tsconfig.json",
+            "tsconfig.base.json",
+            "biome.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Test execution result with pass/fail counts"
+        }
+      },
+      "reads": [
+        "gen",
+        "sources",
+        { "id": "workspace-clients", "scope": "workspace" }
+      ],
+      "batchable": {
+        "tool": "bun",
+        "maxWorkers": 1,
+        "maxProjects": 4,
+        "configFiles": [
+          "{workspaceRoot}/bun.lock",
+          "{workspaceRoot}/bunfig.toml"
+        ]
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "coverage": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "lcov.info",
+            "optionalEmpty": true,
+            "description": "Merged lcov report; absent unless coverage is instrumented (--enforce-coverage). The per-worker .lcov.info.*.tmp shards are deleted before the task returns and are never an output."
+          },
+          "junit": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "results.junit.xml",
+            "optionalEmpty": true,
+            "description": "JUnit report; absent when the project has no test files."
+          },
+          "featureVerification": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "putnami-feature-verification.json",
+            "optionalEmpty": true,
+            "description": "The reserved run-scoped feature verification report: the merged observations of every test bound to a declared check through @putnami/runtime/spectest. Absent when no test in the project bound one. Written per member under batching, so per-project attribution and cache restore hold for both the singleton and the batched run — a cache hit that lost this report would silently disarm the spec gate."
+          }
+        },
+        "effects": [
+          "toolchain-cache"
+        ]
+      }
+    },
+    "serve-app": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "serve"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "network",
+          "process"
+        ]
+      }
+    },
+    "run-app": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "run"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": [
+          "process"
+        ]
+      }
+    },
+    "package-npm": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-npm"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "releaseSetPlan": {
+          "from": "params"
+        }
+      },
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "npm": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "npm",
+            "optionalEmpty": true,
+            "description": "Assembled npm package directory and the npm channel record (npm/channel.json). Sole owner of <command-output>/npm; it reads (never writes) the lib/ and types/ trees its sibling build steps own. Absent when the project has no publishable build output. Recording the channel INSIDE this directory is what keeps the task under ordinary declared capture: the record is restored with the package it describes, and the channel index publish reads is derived over every packager's record (pkgmeta.ReadChannelIndex) instead of kept as a shared file."
+          }
+        }
+      }
+    },
+    "package-docker": {
+      "description": "Assemble a local OCI image candidate from compiled output or a first-class image project's spec. It never resolves an output registry or emits publication evidence; the mutually exclusive paths share this single owner of <command-output>/docker. Every task under `package` writes only inside its declaration and is captured the ordinary way.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-docker"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "reads": [
+        "gen"
+      ],
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "docker": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "docker",
+            "optionalEmpty": true,
+            "description": "Local OCI candidate layout, manifest (candidate digest, platform, content identity, and relative artifact location only) and the docker channel record (docker/channel.json). Sole owner of <command-output>/docker; it reads the compile/ tree its sibling step owns and never contains a published immutable reference. Absent on a dry run. Like package-npm, it records its channel inside the directory it owns — see the note on package-npm's declared output."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "publish-npm": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-npm"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "releaseSetPlan": {
+          "from": "params"
+        }
+      },
+      "cache": false,
+      "declares": {
+        "effects": [
+          "network",
+          "registry"
+        ]
+      }
+    },
+    "publish-docker": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-docker"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "published-image": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "docker/published-image.json",
+            "optionalEmpty": true,
+            "description": "Publish-owned verified remote image record. Present only after registry digest verification; package never writes or rewrites it."
+          }
+        },
+        "effects": [
+          "network",
+          "registry"
+        ]
+      }
+    },
+    "config-extract-exec": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "config-extract"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "src/**/*.ts",
+            "src/**/*.tsx"
+          ]
+        },
+        "config": {
+          "from": "project",
+          "files": [
+            "package.json"
+          ]
+        },
+        "committedSchema": {
+          "from": "project",
+          "files": [
+            "schema/config.json"
+          ]
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "package.json",
+            "bun.lock",
+            "bun.lockb",
+            "bunfig.toml",
+            "tsconfig.json",
+            "tsconfig.base.json",
+            "biome.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "schema": {
+          "description": "Path to the emitted schema/config.json (or .gen/config-schema.json fallback)"
+        }
+      },
+      "reads": [
+        "gen",
+        "sources"
+      ],
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "schema": {
+            "kind": "file",
+            "path": "schema/config.json",
+            "optionalEmpty": true,
+            "description": "Committed config manifest. Absent when the workload registers no config blocks, or when options.generate.schema=false routes the manifest to the .gen/config-schema.json fallback — that fallback lives inside the .gen subtree build-generate owns, so it is captured there and is deliberately not claimed here."
+          },
+          "jsonSchema": {
+            "kind": "file",
+            "path": "schema/config.jsonschema.json",
+            "optionalEmpty": true,
+            "description": "JSON Schema companion of schema/config.json, emitted and absent under exactly the same conditions."
+          }
+        },
+        "effects": [
+          "toolchain-cache"
+        ]
+      }
+    },
+    "version-report": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "version"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": 60000,
+      "outputs": {
+        "data": {
+          "description": "Project version metadata (name, version, sha, branch, isDirty, buildTime)"
+        }
+      },
+      "declares": {}
+    }
+  }
+}

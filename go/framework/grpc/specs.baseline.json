@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/grpc-services#api-bridge",
+    "go/grpc-services#bounded-drain",
+    "go/grpc-services#bridge-validation",
+    "go/grpc-services#connect-protocol",
+    "go/grpc-services#gateway-mounting",
+    "go/grpc-services#interceptor-chain",
+    "go/grpc-services#reflection-opt-in",
+    "go/grpc-services#secure-defaults"
+  ]
+}

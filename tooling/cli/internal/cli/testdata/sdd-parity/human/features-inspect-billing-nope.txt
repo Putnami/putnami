@@ -1,0 +1,14 @@
+exit 2
+--- stdout ---
+
+  Feature inspection failed
+  Revision: worktree @ git:7c5122267ea7854954d543e1eda0a15c7cc56b08
+  Candidate feature IDs (2):
+    billing/invoice
+    shipping/labels
+  Diagnostics (1):
+    [error] features.unknown_feature · featureId
+      feature selector did not match a feature; use one exact candidate ID
+
+--- stderr ---
+putnami: feature selector matched no feature

@@ -1,0 +1,16 @@
+{
+  "name": "@example/07-authentication",
+  "version": "0.0.0",
+  "description": "OAuth2 with sessions, protected routes, and JWT",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

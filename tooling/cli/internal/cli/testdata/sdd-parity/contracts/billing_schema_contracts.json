@@ -1,0 +1,41 @@
+{
+  "protocolVersion": 1,
+  "name": "go.putnami.dev/acme/billing",
+  "enums": [
+    {
+      "name": "Currency",
+      "values": [
+        {
+          "name": "USD",
+          "value": "usd"
+        }
+      ]
+    }
+  ],
+  "scopes": [
+    {
+      "name": "billing:read"
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "readInvoices",
+      "scopes": [
+        "billing:read"
+      ]
+    }
+  ],
+  "grants": [
+    {
+      "name": "billingReader",
+      "capability": "readInvoices"
+    }
+  ],
+  "claims": [
+    {
+      "name": "sub",
+      "type": "string",
+      "required": true
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+exit 0
+--- stdout ---
+
+  Architecture snapshot
+  2 domain(s) · 1 export(s) · 1 import(s)
+  Edges: 1 declared · 1 observed · 0 finding(s)
+  Coverage: projects=enforced-for-mapped-projects · database=not-detected · http=not-detected · events=not-detected
+  Baseline: git:7c5122267ea7854954d543e1eda0a15c7cc56b08 (main; prior file loaded)
+
+--- stderr ---

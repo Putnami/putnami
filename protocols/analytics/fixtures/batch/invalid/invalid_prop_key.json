@@ -1,0 +1,19 @@
+{
+  "protocolVersion": 1,
+  "sentAt": "2026-09-02T10:00:00.000Z",
+  "events": [
+    {
+      "eventId": "0199116c-8f00-7a1b-8c2d-3e4f5a6b7c8d",
+      "name": "page_view",
+      "clientTs": "2026-09-02T09:59:59.500Z",
+      "seq": 0,
+      "sessionId": "0199116c-8e00-7a1b-8c2d-3e4f5a6b7c00",
+      "page": {
+        "path": "/"
+      },
+      "props": {
+        "Plan": "pro"
+      }
+    }
+  ]
+}

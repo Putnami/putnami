@@ -1,0 +1,21 @@
+{
+  "name": "retryable-503",
+  "request": { "id": "evt-outcome-1", "topic": "orders.created" },
+  "input": {
+    "http": {
+      "status": 503,
+      "body": {
+        "protocol": "putnami.events.v1",
+        "code": "upstream_unavailable",
+        "message": "The exact managed publish route is unavailable.",
+        "retryable": true
+      }
+    }
+  },
+  "expected": {
+    "class": "retryable",
+    "action": "retry",
+    "sameRoute": true,
+    "sameRequestBytes": true
+  }
+}

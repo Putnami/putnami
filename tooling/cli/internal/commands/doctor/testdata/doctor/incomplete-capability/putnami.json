@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "example/incomplete-capability",
+  "options": {
+    "generate": {
+      "schema": true
+    }
+  }
+}

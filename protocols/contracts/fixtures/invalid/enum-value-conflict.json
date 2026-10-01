@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-contracts.json",
+  "protocolVersion": 1,
+  "name": "go.putnami.dev/example/payments",
+  "enums": [
+    {
+      "name": "Currency",
+      "values": [
+        { "name": "USD", "value": "usd" },
+        { "name": "USD", "value": "eur" }
+      ]
+    }
+  ]
+}

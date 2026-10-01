@@ -1,0 +1,26 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/api-contracts#binary-payloads",
+    "typescript/api-contracts#client-contract-conformance",
+    "typescript/api-contracts#connect-descriptors",
+    "typescript/api-contracts#connect-protocol-conformance",
+    "typescript/api-contracts#declared-connect-encoding-order",
+    "typescript/api-contracts#declared-stream-resume",
+    "typescript/api-contracts#first-party-websocket-streams",
+    "typescript/api-contracts#websocket-wire-conformance",
+    "typescript/application-lifecycle#bootstrap-guard",
+    "typescript/application-lifecycle#build-only-generation",
+    "typescript/application-lifecycle#capability-publication",
+    "typescript/application-lifecycle#composition-invalidation",
+    "typescript/application-lifecycle#darc-runtime-enforcement",
+    "typescript/application-lifecycle#darc-runtime-evidence",
+    "typescript/application-lifecycle#failed-start-unwind",
+    "typescript/application-lifecycle#phase-order",
+    "typescript/application-lifecycle#requirement-validation",
+    "typescript/application-lifecycle#shutdown-order",
+    "typescript/application-lifecycle#signal-shutdown",
+    "typescript/server-streams#sse-admission-and-bounds"
+  ]
+}

@@ -1,0 +1,22 @@
+isError true
+--- block 0 ---
+{
+  "revision": {
+    "kind": "worktree",
+    "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08"
+  },
+  "feature": "billing/nope",
+  "source": {},
+  "declarations": [],
+  "decisions": [],
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "features.unknown_feature",
+      "message": "no authored declaration mints feature \"billing/nope\"",
+      "field": "feature"
+    }
+  ]
+}
+--- block 1 ---
+no authored feature declaration mints "billing/nope"

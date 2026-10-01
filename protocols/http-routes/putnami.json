@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/protocol/http-routes",
+  "visibility": "public",
+  "tags": ["go", "protocol"],
+  "extensions": ["/go/extension"],
+  "publish": ["go"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "publish": {
+      "archives": false
+    }
+  },
+  "featureAuthority": {
+    "none": "The route inventory is a build output about a workload's surface, not an outcome the workload's user selects."
+  }
+}

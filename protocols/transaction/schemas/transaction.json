@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-transaction.json",
+  "title": "Putnami Transaction Unit of Work (descriptor)",
+  "description": "The request-side descriptor a caller hands to a transaction runner: how a transactional unit of work should be run — its propagation relative to an enclosing transaction, its isolation level, and whether it is read-only. It carries no result and no connection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "propagation"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "protocolVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Current transaction-protocol version."
+    },
+    "name": {
+      "$ref": "#/$defs/unitOfWorkName"
+    },
+    "propagation": {
+      "$ref": "#/$defs/propagation"
+    },
+    "isolation": {
+      "$ref": "#/$defs/isolation"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "description": "When true, the unit of work performs no writes and the runner may open a read-only transaction."
+    }
+  },
+  "$defs": {
+    "unitOfWorkName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_./-]{0,63}$",
+      "description": "Optional logical unit-of-work identifier: lowercase letters, digits, '-', '_', '.', '/'; 1–64 chars."
+    },
+    "propagation": {
+      "type": "string",
+      "enum": ["required", "requires-new", "nested"],
+      "description": "How the unit of work composes with an enclosing transaction. Closed enum. 'nested' = join-outer, no savepoints (the frameworks' current behaviour)."
+    },
+    "isolation": {
+      "type": "string",
+      "enum": ["read-committed", "repeatable-read", "serializable"],
+      "description": "Transaction isolation level, mapped one-to-one onto Postgres isolation levels. Closed enum."
+    }
+  }
+}

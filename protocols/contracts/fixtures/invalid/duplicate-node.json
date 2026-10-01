@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-contracts.json",
+  "protocolVersion": 1,
+  "name": "go.putnami.dev/example/payments",
+  "enums": [
+    { "name": "Money", "values": [{ "name": "ZERO", "value": "zero" }] }
+  ],
+  "structs": [
+    { "name": "Money", "fields": [{ "name": "amount", "type": "int" }] }
+  ]
+}

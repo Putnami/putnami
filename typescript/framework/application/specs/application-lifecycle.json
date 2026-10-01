@@ -1,0 +1,70 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/application-lifecycle",
+  "outcomes": [
+    "An application composes plugins, child modules, dependency providers, and shutdown hooks under one lifecycle owner",
+    "Build-time generation produces every artifact a packaged workload needs without opening a runtime resource",
+    "A failed startup releases exactly what it acquired and reports the failure to its caller instead of ending the host process",
+    "A stop signal drains the application on the framework's own deadline instead of waiting to be killed"
+  ],
+  "nonGoals": [
+    "Restarting a failed plugin or supervising a crashed process",
+    "Generating code, routes, or manifests while the application is running",
+    "Promising that a pre-1.0 minor release keeps the previous lifecycle contract"
+  ],
+  "requirements": [
+    {
+      "id": "phase-order",
+      "text": "start() warms plugins up sequentially in module-tree order, collects migration sources, builds the dependency container, runs migrate hooks, starts plugins concurrently, and only then runs the application runner."
+    },
+    {
+      "id": "build-only-generation",
+      "text": "generate() and postGenerate() run only from build(); postGenerate observes every artifact the generate barrier produced, and start() never invokes generate()."
+    },
+    {
+      "id": "capability-publication",
+      "text": "build() invalidates the capability manifest before generation and writes it only after generation succeeds, so a failed build leaves no manifest that appears to describe it."
+    },
+    {
+      "id": "composition-invalidation",
+      "text": "Registering a provider or mounting a module after the container context was first read rebuilds that context, so the started application contains every declared registration."
+    },
+    {
+      "id": "requirement-validation",
+      "text": "A module requirement that no visible provider satisfies fails when the container is composed, not when the missing dependency is first resolved."
+    },
+    {
+      "id": "shutdown-order",
+      "text": "stop() runs shutdown hooks in reverse registration order, stops plugins in reverse module-tree order, closes the container last, and does nothing when the application is not running."
+    },
+    {
+      "id": "failed-start-unwind",
+      "text": "A startup failure stops only the plugins whose start() resolved, closes the container, leaves the application not running, and re-throws to the caller; every additional concurrent start failure is logged rather than discarded."
+    },
+    {
+      "id": "bootstrap-guard",
+      "text": "bootstrapServe builds the application inside its failure guard and reports a construction-time or start-time failure as exactly one structured log line before exiting non-zero, never logging the same failure twice."
+    },
+    {
+      "id": "signal-shutdown",
+      "text": "SIGTERM and SIGINT drive one graceful stop per process, exit zero only when the drain resolves, exit non-zero when it rejects, and force-exit non-zero once the shutdown deadline elapses."
+    },
+    {
+      "id": "darc-runtime-enforcement",
+      "text": "A TypeScript workload enforces a Domain Access & Replication Contract from the declaration itself: construction applies the architecture protocol's own verdict, and every read, write, rebuild, and deletion follows the declared freshness bound, ordering, late-event, single-writer, and deletion rules. Neither runtime is its own oracle: Go and TypeScript answer one shared conformance corpus, so a behavior that differs between them fails on one side instead of shipping as two runtimes."
+    },
+    {
+      "id": "darc-runtime-evidence",
+      "text": "A component that enforces a contract contributes one capability-manifest row carrying the declared contract verbatim, under the identity and provenance every other contribution carries. The row is evidence and never authority: emitting it cannot create a cross-domain permission, only a reviewed manifest edit can. A project that enforces nothing emits no rows, and the bytes TypeScript emits are the bytes the Go detector reads back."
+    },
+    {
+      "id": "route-loader-activation",
+      "text": "Every api() plugin that scans a route folder (a scanPath or autoScan on), every StaticPlugin without skipLoading, and every events() plugin that scans a handler folder exports its generated loader under its own key: <family>-loader for the first in module-tree registration order, <family>-<n>-loader for the others. The packaged entrypoint registers each key and each plugin resolves only its own, so a packaged workload serves every instance. A plugin that owns no loader resolves none."
+    }
+  ],
+  "decisions": [
+    "typescript/framework/application/doc/adr/0001-build-and-runtime-are-disjoint-phases.md",
+    "typescript/framework/application/doc/adr/0006-a-scanned-api-finds-its-packaged-loader-by-composition-slot.md"
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/dependency-injection",
+      "type": "feature",
+      "name": "Go dependency injection",
+      "outcome": "Go applications resolve constructor-based or token-based dependencies with validated lifetimes and deterministic cleanup",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "cleanup",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "close-hook-runs-for-built-instance",
+              "close-hooks-run-in-reverse-registration-order",
+              "close-runs-children-before-parent",
+              "close-skips-never-built-singleton",
+              "scoped-close-hooks-run-per-scope"
+            ]
+          }
+        },
+        {
+          "id": "lifetimes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "root-resolution-of-scoped-provider-fails",
+              "scoped-instance-is-per-scope",
+              "singleton-depending-on-scoped-violates-scope",
+              "singleton-shared-across-scopes-and-root"
+            ]
+          }
+        },
+        {
+          "id": "resolution",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "concurrent-first-resolution-builds-once",
+              "constructor-based-resolution",
+              "constructor-missing-dependency-rejected",
+              "cycles-rejected",
+              "duplicate-provider-rejected",
+              "private-visibility-enforced",
+              "runtime-cycle-rejected-across-goroutines",
+              "runtime-cycle-rejected-through-a-nested-create",
+              "runtime-cycle-reports-the-full-path",
+              "tagged-resolution",
+              "token-based-resolution",
+              "token-missing-dependency-rejected"
+            ]
+          }
+        },
+        {
+          "id": "startup",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "start-eagerly-resolves-non-lazy-singletons",
+              "start-failure-closes-built-singletons-and-resets-to-idle",
+              "start-retryable-after-failure",
+              "start-validates-graph"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "build": {
+      "run": [
+        { "id": "generate", "task": "build-generate" },
+        { "id": "describe", "task": "build-describe", "dependsOn": ["generate"] }
+      ]
+    }
+  },
+  "tasks": {
+    "build-generate": {
+      "kind": "command",
+      "command": "echo",
+      "writes": ["gen"],
+      "declares": {
+        "outputs": {
+          "gen": { "kind": "directory", "path": ".gen" }
+        }
+      }
+    },
+    "build-describe": {
+      "kind": "command",
+      "command": "echo",
+      "declares": {
+        "outputs": {
+          "openapi": { "kind": "file", "path": ".gen/api/openapi.json" }
+        }
+      }
+    }
+  }
+}

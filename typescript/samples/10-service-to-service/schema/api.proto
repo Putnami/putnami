@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package catalog.items.v1;
+
+message GetBlobsByIdRequestParams {
+  string id = 1;
+}
+
+message GetBlobsByIdRequest {
+  GetBlobsByIdRequestParams params = 1;
+}
+
+message GetBlobsByIdResponse {
+}
+
+message CreateBlobsEchoRequest {
+}
+
+message CreateBlobsEchoResponse {
+}
+
+message ListItemsRequestQuery {
+  string search = 1;
+  double limit = 2;
+}
+
+message ListItemsRequest {
+  ListItemsRequestQuery query = 1;
+}
+
+message ListItemsResponse {
+  string tenant = 1;
+  repeated string items = 2;
+}
+
+message CreateItemsRequestBody {
+  string name = 1;
+  double price = 2;
+  double stock = 3;
+}
+
+message CreateItemsRequest {
+  CreateItemsRequestBody body = 1;
+}
+
+message CreateItemsResponseItem {
+  string id = 1;
+  string name = 2;
+  double price = 3;
+  double stock = 4;
+  optional string discontinued_at = 5;
+}
+
+message CreateItemsResponse {
+  CreateItemsResponseItem item = 1;
+}
+
+message GetItemsByIdRequestParams {
+  string id = 1;
+}
+
+message GetItemsByIdRequest {
+  GetItemsByIdRequestParams params = 1;
+}
+
+message GetItemsByIdResponseItem {
+  string id = 1;
+  string name = 2;
+  double price = 3;
+  double stock = 4;
+  optional string discontinued_at = 5;
+}
+
+message GetItemsByIdResponse {
+  GetItemsByIdResponseItem item = 1;
+}
+
+message ListProxyRequest {
+}
+
+message ListProxyResponse {
+  string message = 1;
+  string tenant = 2;
+  repeated string items = 3;
+}
+
+message GetQuotesByIdRequestParams {
+  string id = 1;
+}
+
+message GetQuotesByIdRequest {
+  GetQuotesByIdRequestParams params = 1;
+}
+
+message GetQuotesByIdResponse {
+  string id = 1;
+  int64 units = 2;
+  int32 offset = 3;
+  repeated string tags = 4;
+}
+
+message ListQuotesByIdSnapshotRequestParams {
+  string id = 1;
+}
+
+message ListQuotesByIdSnapshotRequest {
+  ListQuotesByIdSnapshotRequestParams params = 1;
+}
+
+message ListQuotesByIdSnapshotResponse {
+  string id = 1;
+  int64 units = 2;
+  int32 offset = 3;
+  repeated string tags = 4;
+}
+
+message ListTenantCheckRequest {
+}
+
+message ListTenantCheckResponse {
+  bool key = 1;
+  bool tenant = 2;
+}
+
+message ListWhoamiRequest {
+}
+
+message ListWhoamiResponse {
+  string subject = 1;
+}
+
+service BlobsService {
+  rpc GetBlobsById(GetBlobsByIdRequest) returns (GetBlobsByIdResponse);
+  rpc CreateBlobsEcho(CreateBlobsEchoRequest) returns (CreateBlobsEchoResponse);
+}
+
+service ItemsService {
+  rpc ListItems(ListItemsRequest) returns (ListItemsResponse);
+  rpc CreateItems(CreateItemsRequest) returns (CreateItemsResponse);
+  rpc GetItemsById(GetItemsByIdRequest) returns (GetItemsByIdResponse);
+}
+
+service ProxyService {
+  rpc ListProxy(ListProxyRequest) returns (ListProxyResponse);
+}
+
+service QuotesService {
+  rpc GetQuotesById(GetQuotesByIdRequest) returns (GetQuotesByIdResponse);
+  rpc ListQuotesByIdSnapshot(ListQuotesByIdSnapshotRequest) returns (ListQuotesByIdSnapshotResponse);
+}
+
+service TenantCheckService {
+  rpc ListTenantCheck(ListTenantCheckRequest) returns (ListTenantCheckResponse);
+}
+
+service WhoamiService {
+  rpc ListWhoami(ListWhoamiRequest) returns (ListWhoamiResponse);
+}

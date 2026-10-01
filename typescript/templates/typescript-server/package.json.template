@@ -1,0 +1,12 @@
+{
+  "name": "<%= projectName %>",
+  "private": true,
+  "main": "src/main.ts",
+  "exports": {
+    "./serve": "./src/serve.ts"
+  },
+  "dependencies": {
+    "@putnami/application": "catalog:",
+    "@putnami/runtime": "catalog:"
+  }
+}

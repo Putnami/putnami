@@ -1,0 +1,40 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/command-groups-without-workspace",
+  "commandGroups": {
+    "audit": {
+      "description": "Audit a repository, with or without a workspace",
+      "default": "run",
+      "subcommands": {
+        "run": {
+          "command": "audit-run",
+          "description": "Audit the current directory.",
+          "interactive": true,
+          "workspace": "optional"
+        },
+        "report": {
+          "command": "audit-report",
+          "description": "Summarize the last audit of this workspace.",
+          "workspace": "required"
+        }
+      }
+    }
+  },
+  "commands": {
+    "audit-run": {
+      "description": "Audit the current directory.",
+      "run": [{ "id": "run", "task": "audit-exec" }]
+    },
+    "audit-report": {
+      "description": "Summarize the last audit.",
+      "run": [{ "id": "report", "task": "audit-exec" }]
+    }
+  },
+  "tasks": {
+    "audit-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["audit"]
+    }
+  }
+}

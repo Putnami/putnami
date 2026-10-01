@@ -1,0 +1,8 @@
+{
+  "protocolVersion": 1,
+  "mode": "toplevel",
+  "keys": [
+    { "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "extension": "@putnami/typescript", "task": "build~transpile", "project": "web", "durationMs": 4200, "sizeBytes": 10240 },
+    { "key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+  ]
+}

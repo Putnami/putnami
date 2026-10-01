@@ -1,0 +1,1 @@
+{ "workspace": "ws-id", "branch": "main", "commands": ["build", "test"], "selection": "all" }

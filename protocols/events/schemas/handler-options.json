@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/events/handler-options.json",
+  "title": "Putnami Events Handler Options",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "group": { "type": "string" },
+    "distribution": { "enum": ["competing", "broadcast"] },
+    "maxRetries": { "type": "integer", "minimum": 1 },
+    "maxBackoffMs": { "type": "integer", "minimum": 0 },
+    "timeoutMs": { "type": "integer", "minimum": 0 },
+    "concurrency": { "type": "integer", "minimum": 0 },
+    "queueLimit": { "type": "integer", "minimum": 0 },
+    "overflow": { "enum": ["throw", "drop"] },
+    "dlq": { "type": "boolean" },
+    "ack": { "enum": ["auto", "manual"] }
+  }
+}

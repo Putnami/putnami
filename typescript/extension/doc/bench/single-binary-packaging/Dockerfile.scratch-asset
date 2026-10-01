@@ -1,0 +1,31 @@
+# Floor case: FROM scratch plus the glibc runtime the bun-compiled executable
+# is dynamically linked against (bun does not emit a static binary), and nothing
+# else. Measures how much of an image is base OS versus payload.
+#
+# `ldd` on the bun 1.4.0 linux-x64 output reports exactly: ld-linux, libc, libm,
+# libpthread, libdl. The CA bundle is not needed by this sample but ships anyway
+# because a scratch image without it cannot make an outbound TLS call, which any
+# realistic service does.
+#
+# Build context: $BENCH_WORK/ctx (see bench.sh prepare_ctx).
+ARG BASE_IMAGE=gcr.io/distroless/base-debian12
+FROM ${BASE_IMAGE} AS libs
+
+FROM scratch
+COPY --from=libs /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /lib/x86_64-linux-gnu/
+COPY --from=libs /lib/x86_64-linux-gnu/libc.so.6 /lib/x86_64-linux-gnu/
+COPY --from=libs /lib/x86_64-linux-gnu/libm.so.6 /lib/x86_64-linux-gnu/
+COPY --from=libs /lib/x86_64-linux-gnu/libpthread.so.0 /lib/x86_64-linux-gnu/
+COPY --from=libs /lib/x86_64-linux-gnu/libdl.so.2 /lib/x86_64-linux-gnu/
+COPY --from=libs /lib64/ld-linux-x86-64.so.2 /lib64/
+COPY --from=libs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY srv-binary-asset-bytecode /app/server
+
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV PWD=/app
+ENV PUTNAMI_ASSETS_DIR=/\$bunfs/root/public
+
+EXPOSE 3000
+ENTRYPOINT ["/app/server"]

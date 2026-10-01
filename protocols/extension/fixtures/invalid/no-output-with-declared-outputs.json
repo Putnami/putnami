@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "test": {
+      "run": [{ "id": "test", "task": "test-exec" }]
+    }
+  },
+  "tasks": {
+    "test-exec": {
+      "kind": "command",
+      "command": "echo",
+      "cache": { "enabled": true, "noOutput": true },
+      "declares": {
+        "outputs": {
+          "coverage": { "kind": "file", "root": "command-output", "path": "lcov.info" }
+        }
+      }
+    }
+  }
+}

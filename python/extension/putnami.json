@@ -1,0 +1,39 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/python",
+  "tags": [
+    "go",
+    "python",
+    "extension"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "options": {
+    "test": {
+      "coverage-threshold": 50,
+      "filePatterns": [
+        "../../putnami.support.json",
+        "../templates/python-server/**",
+        "../templates/python-library/**",
+        "putnami.extension.json"
+      ]
+    },
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-python",
+      "version-var": "main.runtimeVersion"
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

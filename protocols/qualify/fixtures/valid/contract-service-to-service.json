@@ -1,0 +1,42 @@
+{
+  "protocolVersion": 1,
+  "project": "/go/samples/service-to-service",
+  "derivedFrom": [
+    {
+      "kind": "http-routes",
+      "path": "go/samples/service-to-service/schema/http-routes.json",
+      "digest": "sha256:b71b8bcddd7e3f336d3abc1cf4cff56ed3a89536c44de8da65fccb01469681be"
+    }
+  ],
+  "requests": [
+    {
+      "id": "GET /credential-check",
+      "method": "GET",
+      "path": "/credential-check",
+      "maxStatus": 499,
+      "provenance": "typed-api"
+    },
+    {
+      "id": "GET /items",
+      "method": "GET",
+      "path": "/items",
+      "maxStatus": 499,
+      "provenance": "typed-api"
+    },
+    {
+      "id": "GET /tenant-check",
+      "method": "GET",
+      "path": "/tenant-check",
+      "maxStatus": 499,
+      "provenance": "typed-api"
+    },
+    {
+      "id": "GET /whoami",
+      "method": "GET",
+      "path": "/whoami",
+      "maxStatus": 499,
+      "provenance": "typed-api"
+    }
+  ],
+  "digest": "sha256:19782e4140d2d58581b8821654e85ea9c96deaf1b2683dd55d2912856c4d8adc"
+}

@@ -1,0 +1,10 @@
+{
+  "contract": "tasks",
+  "version": 1,
+  "operation": "get",
+  "outcome": "partial",
+  "error": {
+    "message": "half done",
+    "retryable": false
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/v1/cli-usage/aggregate",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "telemetry-receiver",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/v1/logs",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "telemetry-receiver",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    }
+  ],
+  "digest": "sha256:fd78a9a7cc3ab600f2b0c0faf9f6f612fe2f1469fdd51003edd12ccc427ddbb6"
+}

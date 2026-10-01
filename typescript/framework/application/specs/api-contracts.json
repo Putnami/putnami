@@ -1,0 +1,100 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/api-contracts",
+  "outcomes": [
+    "A stream an endpoint declares once is served over the transports the published contract advertises, and a consumer reaches it without knowing anything about the socket",
+    "A first-party WebSocket caller is admitted by the first frame it sends, so a browser — which cannot set a header on an upgrade — is admitted by the same path as a service",
+    "A frame the published wire refuses never reaches a handler and never leaves this provider, in either direction",
+    "A stream that ends — by result, by error, by cancel, by budget, or by application shutdown — ends with exactly one typed terminal the caller can decode",
+    "A Connect call reaches this provider on the protocol the Connect specification publishes, so a client that has never seen this framework can read its statuses, its errors and the end of its streams"
+  ],
+  "nonGoals": [
+    "Resuming a stream: this provider declares no resume agreement and refuses a request for one",
+    "Replacing the endpoint's own security chain with a second authorization source",
+    "Client and bidirectional streaming over Connect, which HTTP/1.1 cannot carry and which this provider answers unimplemented"
+  ],
+  "requirements": [
+    {
+      "id": "client-contract-conformance",
+      "text": "The x-putnami-client contract this provider projects is the one protocols/clientcontract publishes: the shared corpus is replayed here, a fixture service contract and operation policy survive projection unchanged, a semantic this version cannot represent is refused at registration rather than published, and an unhandled framework exception leaves as the stable {code,error,message} envelope. This is the TypeScript reader's half of client-contract/first-party-generated-clients strict-provider-authority."
+    },
+    {
+      "id": "first-party-websocket-streams",
+      "text": "A stream endpoint under a first-party client contract negotiates putnami.service.v1, admits the caller through the init frame — identity, declared credential profiles, ordinary headers, propagation context and budget — then runs the endpoint's own security chain on the request rebuilt from that frame, re-reads cancellation and shutdown after any asynchronous credential check, and only then answers ready. Server, client and bidirectional streams each reach exactly one terminal."
+    },
+    {
+      "id": "websocket-wire-conformance",
+      "text": "The frame vocabulary, the transition table and the session facts are the ones protocols/clientcontract publishes: the shared corpus is replayed here, valid scenes accepted and invalid scenes refused with the exact diagnostic code the corpus declares. Every frame this provider emits is read back by the same strict parser before a byte leaves, so it can never write bytes a conforming consumer must refuse."
+    },
+    {
+      "id": "connect-protocol-conformance",
+      "text": "A Connect call is answered on the published protocol: one of the sixteen lower-case codes, the HTTP status the protocol pairs with it, `application/json` on a unary error, `application/connect+{json,proto}` on a stream, `Connect-Timeout-Ms` for the deadline, and exactly one `EndStreamResponse` ending every response stream. Error details carry binary protobuf, and the first-party envelope rides in one of them so a declared error keeps its stable code and its declared details."
+    },
+    {
+      "id": "declared-response-cache",
+      "text": "An endpoint declares its response cache through .client({ resilience: { cache } }). The published operation contract carries the policy unchanged. A cache on a stream or a non-idempotent operation, a document-level cache default, non-positive values, a staleMs that does not exceed freshMs, a key field naming no declared input, and an invalidation field naming no non-octet string, integer or boolean response property all fail publication with the route named, exactly as the Go provider refuses them."
+    },
+    {
+      "id": "connect-descriptors",
+      "text": "A descriptor field means on the wire what the declaration means: a contract `int` is 64 bits on every transport, presence is implicit unless declared optional, a repeated or map field has no presence of its own, a `oneof` carries at most one member, an enum reserves zero for unspecified, and every field carries the `json_name` protobuf derives from its wire name so a message is the same object whichever encoding delivered it."
+    },
+    {
+      "id": "declared-stream-resume",
+      "text": "The TypeScript provider issues a single-use, rotating grant with each admission of a resumable server stream, bound to the operation and client identity that earned it and bounded by a time to live, a continuation budget and a per-endpoint capacity. Redeeming it continues the sequence the stream left and tells the handler where to produce from, so a consumer sees neither a gap nor a duplicate. A continuation runs the endpoint's security chain again; every other token buys nothing."
+    },
+    {
+      "id": "streamed-binary-payloads",
+      "text": "BinaryStream declares an opaque, bounded, unframed unary HTTP body as wildcard binary content with x-putnami-streamed true and a positive x-putnami-max-bytes. The caller supplies a concrete Content-Type, including any parameters; JSON-labelled octets remain opaque. The provider passes a bounded readable body to the handler, answers 413 on overflow, and retains a streamed response's request scope until EOF, cancellation or failure. A streamed body cannot declare a response cache."
+    },
+    {
+      "id": "binary-payloads",
+      "text": "A raw octet payload is declared with its wire media type and a strictly positive byte bound, and published as that media type carrying x-putnami-max-bytes beside the two refusals it adds. The endpoint pipeline answers 415 on an undeclared media type and 413 on a payload past the bound, taken from Content-Length before the body is read, and hands the handler the octets unchanged."
+    },
+    {
+      "id": "declared-connect-encoding-order",
+      "text": "An operation may declare its Connect payload encoding order. The contract carries one Connect transport per encoding and a generated client dispatches the first one it can carry, so the declared order decides which encoding travels. It narrows and reorders the encodings the gRPC plugin serves, in place of the first Connect entry; an encoding named twice, one the plugin does not serve, or an order on a route that publishes no Connect transport fails projection with the route named."
+    },
+    {
+      "id": "optional-credential",
+      "text": "An endpoint declares .secure({ optional: true }) to serve a caller that presents no credential; its other requirements bind an authenticated caller only, a non-empty Authorization header that resolved no identity returns 401, and with verify only the verifier yields an identity. Its .client() security may end with an anonymous alternative, an empty allOf, kept last and mirrored by {} in plain OpenAPI. An anonymous alternative on a required endpoint or before a credentialed one fails publication."
+    },
+    {
+      "id": "provider-owned-websocket-wires",
+      "text": "A TypeScript provider declares a byte stream with .body(ByteStream()).returns(ByteStream()) and a provider-owned subprotocol with .subprotocol(token) on a bidirectional Stream() endpoint. Both admit on the upgrade, where middleware and validation refuse with an HTTP status, speak exactly their token, and close with declared codes. The contract carries the wire as the only transport, as the Go provider does, and a declaration the contract refuses throws at registration."
+    },
+    {
+      "id": "external-contract-operations",
+      "text": "endpoint().client({ external: authority }) marks a route an external authority owns. It stays served and in the OpenAPI document with x-putnami-external-contract and no x-putnami-client; its own schemas are projected as a document without a client contract projects them, never as a component; it has no proto RPC, and answers errors and streams as an API without a contract does. A blank authority, external beside a non-zero option, or external without api({ client }) fails registration and generation."
+    },
+    {
+      "id": "contract-scope",
+      "text": "openapi() documents every api() plugin registered on the module it resolves, else on the closest ancestor that uses api(): the routes each plugin registered and the routes it scanned, at build time and at runtime. A module with its own api({ client }) and openapi() thus publishes a first-party contract for its routes only. The plugins of one document must declare the same client contract, or generation fails. Scanned routes are documented under the plugin's prefix, else its module's .path()."
+    },
+    {
+      "id": "document-slots",
+      "text": "Each openapi() of an application writes its own document: the one publishing a client contract takes slot 0, the others slots from 1 in module-tree registration order. Slot 0 keeps schema/openapi.json and /_/openapi.json, which every contract consumer reads; slot n writes .gen/schema/openapi-<n>.json unless output names a path, under the asset key schema/openapi-<n>.json and the route /_/openapi-<n>.json. An application whose documents publish two client contracts fails generation."
+    },
+    {
+      "id": "declared-sse-continuation",
+      "text": "An operation declares how its SSE transport continues: a cursor naming a required plain-string output field and a declared plain-string query parameter, or best effort. The projection publishes it on the SSE transport of a safe server stream only, and refuses every other shape, a malformed declaration and a cursor its schemas cannot carry with the route named."
+    },
+    {
+      "id": "declared-error-details",
+      "text": ".mayThrowDetails(code, schema) declares an error code and the schema of its details member, as Go's MayThrowDetails does, and refuses the implicit BadRequest and InternalServerError. The contract publishes it as that code's schema, as a component; a code declared twice stays one error; the error response documents details as the schema, or anyOf the schemas in code order. It overrides a .throws() schema for its status. The provider answers the exception's response object as details, unary and stream."
+    }
+  ],
+  "decisions": [
+    "go/framework/api/doc/adr/0011-streamed-octets-carry-their-own-media-type.md",
+    "typescript/framework/application/doc/adr/0003-websocket-admission-runs-the-security-chain-on-the-rebuilt-request.md",
+    "typescript/framework/application/doc/adr/0004-connect-carries-the-first-party-error-as-a-typed-detail.md",
+    "typescript/framework/application/doc/adr/0002-server-stream-admission-is-the-response-head.md",
+    "go/framework/api/doc/adr/0007-a-raw-octet-payload-is-declared-and-bounded.md",
+    "protocols/clientcontract/doc/adr/0007-a-response-cache-is-declared-per-operation.md",
+    "go/framework/security/doc/adr/0002-an-optional-rule-serves-a-caller-that-presents-no-credential.md",
+    "protocols/clientcontract/doc/adr/0010-a-provider-owned-websocket-wire-is-declared-not-inferred.md",
+    "typescript/framework/application/doc/adr/0005-a-provider-owned-wire-admits-on-the-upgrade.md",
+    "protocols/clientcontract/doc/adr/0011-an-external-authority-can-own-an-operation.md",
+    "protocols/clientcontract/doc/adr/0013-an-sse-stream-declares-how-it-continues-and-a-negotiated-stream-ends-explicitly.md"
+  ]
+}

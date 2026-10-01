@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-database-binding.json",
+  "protocolVersion": 1,
+  "databases": {
+    "billing": {
+      "engine": "postgres",
+      "schema": "billing",
+      "connection": {
+        "instance": "project:region:billing-db",
+        "port": 5432,
+        "ssl": true
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "python/example-library-utilities#clamp-bounds"
+  ]
+}

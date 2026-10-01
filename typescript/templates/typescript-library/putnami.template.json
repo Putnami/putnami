@@ -1,0 +1,6 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-template.json",
+  "name": "typescript-library",
+  "description": "TypeScript library with exports",
+  "extension": "@putnami/typescript"
+}

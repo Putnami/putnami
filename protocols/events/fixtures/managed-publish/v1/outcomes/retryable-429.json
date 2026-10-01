@@ -1,0 +1,23 @@
+{
+  "name": "retryable-429",
+  "request": { "id": "evt-outcome-1", "topic": "orders.created" },
+  "input": {
+    "http": {
+      "status": 429,
+      "headers": { "Retry-After": "3" },
+      "body": {
+        "protocol": "putnami.events.v1",
+        "code": "rate_limited",
+        "message": "Publish rate limit exceeded.",
+        "retryable": true
+      }
+    }
+  },
+  "expected": {
+    "class": "retryable",
+    "action": "retry",
+    "sameRoute": true,
+    "sameRequestBytes": true,
+    "honorRetryAfter": true
+  }
+}

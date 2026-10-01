@@ -1,0 +1,5 @@
+{
+  "project": "/example/payments",
+  "manifest": "go.putnami.dev/example/payments",
+  "outcome": "clean"
+}

@@ -1,0 +1,42 @@
+{
+  "name": "@putnami/events",
+  "version": "0.0.0",
+  "description": "Event messaging broker with typed topics, handler builders, and in-memory broker for local development",
+  "keywords": [
+    "events",
+    "messaging",
+    "pub-sub",
+    "broker"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/events"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "react-native": "./src/index.browser.ts",
+      "browser": "./src/index.browser.ts",
+      "default": "./src/index.ts"
+    },
+    "./client": "./src/client/index.ts",
+    "./google": "./src/google/index.ts",
+    "./postgres": "./src/postgres/index.ts",
+    "./protocol": "./src/protocol/index.ts",
+    "./redis": "./src/redis/index.ts",
+    "./topic": "./src/topic/index.ts",
+    "./serve": "./src/serve.ts"
+  },
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/utils": "workspace:*"
+  },
+  "private": false
+}

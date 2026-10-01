@@ -1,0 +1,21 @@
+{
+  "name": "@example/06-database",
+  "version": "0.0.0",
+  "description": "PostgreSQL with repository pattern, migrations, and transactions",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/database": "workspace:*",
+    "@putnami/migration": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "postgres": "^3.4.7"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

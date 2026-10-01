@@ -1,0 +1,47 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/migration-execution",
+      "type": "feature",
+      "name": "Go migration execution",
+      "outcome": "Go services discover, order, apply, roll back, and verify owned migrations through a backend-neutral registry",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "deterministic-order",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "kinds-execute-in-lexicographic-order",
+              "per-kind-results-aggregate-in-that-same-order"
+            ]
+          }
+        },
+        {
+          "id": "runner-ownership",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "exactly-one-runner-may-own-a-kind",
+              "explicit-apply-fails-before-execution-without-a-runner",
+              "rollback-fails-before-execution-without-a-runner",
+              "status-fails-before-execution-without-a-runner"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

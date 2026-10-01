@@ -1,0 +1,6 @@
+interface:
+  display_name: "Fix Loop"
+  short_description: "Fix matching backlog tasks until none remain"
+  default_prompt: "Use $fix-loop to process the matching task backlog."
+policy:
+  allow_implicit_invocation: false

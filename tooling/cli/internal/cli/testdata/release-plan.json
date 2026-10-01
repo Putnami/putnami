@@ -1,0 +1,362 @@
+{
+  "protocolVersion": 1,
+  "release": {
+    "series": "0.2.0",
+    "license": "FSL-1.1-MIT",
+    "futureLicense": "MIT",
+    "targets": [
+      "darwin/amd64",
+      "darwin/arm64",
+      "linux/amd64",
+      "linux/arm64",
+      "windows/amd64"
+    ]
+  },
+  "freshRoot": {
+    "defaultBranch": "main",
+    "visibility": "public",
+    "description": "Putnami: a deterministic, observable workspace toolchain and application framework for Go, TypeScript and Python.",
+    "topics": [
+      "build-system",
+      "developer-tools",
+      "go",
+      "monorepo",
+      "observability",
+      "typescript"
+    ],
+    "scopes": [
+      "go",
+      "protocols",
+      "python",
+      "sites",
+      "tooling",
+      "typescript"
+    ],
+    "labels": [
+      "group/design",
+      "group/developer-experience",
+      "group/operations",
+      "group/performance",
+      "group/security",
+      "group/testing",
+      "priority/p1",
+      "priority/p2",
+      "priority/p3",
+      "scope/go",
+      "scope/protocols",
+      "scope/python",
+      "scope/sites",
+      "scope/tooling",
+      "scope/typescript",
+      "severity/critical",
+      "severity/high",
+      "severity/low",
+      "severity/medium",
+      "source/audit",
+      "source/code-review",
+      "source/epic",
+      "source/plan",
+      "status/audit-finding",
+      "status/confirmed",
+      "status/in-progress",
+      "status/needs-review"
+    ],
+    "labelAxes": [
+      {
+        "prefix": "group/"
+      },
+      {
+        "prefix": "priority/"
+      },
+      {
+        "prefix": "prop/",
+        "authority": ".agents/skills/audit/SKILL.md"
+      },
+      {
+        "prefix": "scope/"
+      },
+      {
+        "prefix": "severity/"
+      },
+      {
+        "prefix": "source/"
+      },
+      {
+        "prefix": "status/"
+      }
+    ]
+  },
+  "publishOrder": [
+    {
+      "id": "protocols",
+      "channels": [
+        "go"
+      ],
+      "artifacts": [
+        "go.putnami.dev/protocol/*"
+      ],
+      "rollbackPoint": "the previously released protocol module versions on the Go module proxy, and the reviewed pre-release commit on the release branch",
+      "reversal": "A published Go module version is immutable and cannot be withdrawn. Reverse it by releasing a superseding patch version and adding a retract directive for the bad version in the same module. Nothing is deleted and no consumer loses a resolvable version."
+    },
+    {
+      "id": "extension-sdk",
+      "channels": [
+        "go"
+      ],
+      "artifacts": [
+        "putnami-extension-sdk"
+      ],
+      "rollbackPoint": "the previously released go.putnami.dev/sdk/extension module version on the Go module proxy",
+      "reversal": "Release a superseding patch version and retract the bad version. Preserve the immutable SDK version so extensions already pinned to it remain resolvable."
+    },
+    {
+      "id": "go-framework",
+      "channels": [
+        "go"
+      ],
+      "artifacts": [
+        "go.putnami.dev/*"
+      ],
+      "rollbackPoint": "the previously released framework module versions on the Go module proxy",
+      "reversal": "Same as the protocol step: release a superseding patch version and retract the bad version. Because the protocols published first, a retracted framework version never leaves a consumer without the protocol version it imports."
+    },
+    {
+      "id": "typescript-framework",
+      "channels": [
+        "npm"
+      ],
+      "artifacts": [
+        "@putnami/*"
+      ],
+      "rollbackPoint": "the previously released package versions in the npm registry",
+      "reversal": "Release a superseding patch version and deprecate the bad version so installers stop resolving it. Full removal is only available inside the registry's 72-hour unpublish window and is never the primary plan."
+    },
+    {
+      "id": "language-extensions",
+      "channels": [
+        "archives"
+      ],
+      "artifacts": [
+        "@putnami/clientgen",
+        "@putnami/go",
+        "@putnami/python",
+        "@putnami/scaffold",
+        "@putnami/sdd",
+        "@putnami/typescript"
+      ],
+      "rollbackPoint": "the previous extension archive channel pointer",
+      "reversal": "Repoint the extension archive channel at the previous version. Installed workspaces are unaffected because the lock pins a resolved version, so the rollback only changes what a new resolve returns."
+    },
+    {
+      "id": "cli",
+      "channels": [
+        "archives"
+      ],
+      "artifacts": [
+        "@putnami/cli"
+      ],
+      "rollbackPoint": "the previous CLI download channel pointer",
+      "reversal": "Repoint the latest CLI download channel at the previous version. Already-installed binaries keep working, and the next upgrade resolves the restored channel. The CLI publishes after everything it resolves, so a rollback here never strands a consumer."
+    },
+    {
+      "id": "contributor-extensions",
+      "channels": [
+        "archives"
+      ],
+      "artifacts": [
+        "@putnami/contributor",
+        "@putnami/github-collaboration",
+        "@putnami/local-collaboration",
+        "@putnami/memory-store"
+      ],
+      "rollbackPoint": "the previous contributor and collaboration-provider archive channel pointers",
+      "reversal": "Repoint the contributor and provider archive channels at the previous version. An installed workspace is unaffected because its lock pins a resolved version and archive digest, so the rollback only changes what a fresh resolve returns. These extensions publish after the CLI because agent content needs extension contract 5, which the CLI reads, and before templates because every starter declares @putnami/contributor."
+    },
+    {
+      "id": "templates",
+      "channels": [
+        "archives",
+        "template-archives"
+      ],
+      "artifacts": [
+        "*-library",
+        "*-server",
+        "typescript-web"
+      ],
+      "rollbackPoint": "the previous template archive channel pointer",
+      "reversal": "Repoint the template archive channel at the previous version. Templates publish last because they pin the package versions published above them, so reversing them affects only new scaffolds."
+    }
+  ],
+  "excluded": [
+    {
+      "id": "container-images",
+      "channels": [
+        "docker"
+      ],
+      "artifacts": [
+        "go.putnami.dev/examples/*",
+        "putnami.dev",
+        "py_example_application",
+        "telemetry.putnami.dev"
+      ],
+      "reason": "These publish container images for site deployment and sample demonstration. They are deployment artifacts of this repository, not artifacts the public release promises, so they stay out of the release publish order and out of the support catalog."
+    }
+  ],
+  "finalSwitch": {
+    "step": "rename the private repository to the archive name and publish the released tree as one signed root commit in a new repository",
+    "owner": "the human release approver named in the governance record",
+    "excluded": true,
+    "rollbackPoint": "the archived private repository and its verified history bundle, both untouched by this rehearsal and by every step above",
+    "reversal": "Until the new repository is public, delete it and rename the archive back; after that, set the new repository back to private. The archive keeps the full private history and is never published, and no artifact is deleted, so the switch stays reversible until an external clone of the public root exists. This step runs only after a human reads the recorded verdict."
+  },
+  "checks": [
+    {
+      "id": "version-and-artifact-manifest",
+      "evidence": "version and artifact manifest",
+      "requirements": []
+    },
+    {
+      "id": "checksums-and-provenance",
+      "evidence": "checksums and provenance",
+      "requirements": [
+        {
+          "kind": "file",
+          "target": "tooling/cli/scripts/install.sh",
+          "input": "the public installer integrity path",
+          "owner": "release-rehearsal"
+        },
+        {
+          "kind": "file",
+          "target": "tooling/cli/scripts/smoke-check-release.sh",
+          "input": "the release smoke integrity path",
+          "owner": "release-rehearsal"
+        },
+        {
+          "kind": "file",
+          "target": "tooling/cli/doc/release-provenance.md",
+          "input": "the durable release provenance policy",
+          "owner": "release-rehearsal"
+        }
+      ]
+    },
+    {
+      "id": "support-report",
+      "evidence": "support report",
+      "requirements": []
+    },
+    {
+      "id": "migration-report",
+      "evidence": "migration report",
+      "requirements": [
+        {
+          "kind": "file",
+          "target": "tooling/cli/doc/21-compatibility-and-migration.md",
+          "input": "the public compatibility and migration guide",
+          "owner": "release-rehearsal"
+        },
+        {
+          "kind": "file",
+          "target": "tooling/cli/doc/adr/0010-compatibility-budget.md",
+          "input": "the accepted per-format compatibility budget",
+          "owner": "release-rehearsal"
+        },
+        {
+          "kind": "tree-prefix",
+          "target": "tooling/cli/internal/lockfile/testdata/prior-releases/",
+          "input": "the immutable prior-release lock corpus",
+          "owner": "release-rehearsal"
+        },
+        {
+          "kind": "tree-prefix",
+          "target": "protocols/cli/testdata/prior-releases/",
+          "input": "the immutable prior-release machine-result corpus",
+          "owner": "release-rehearsal"
+        },
+        {
+          "kind": "tree-prefix",
+          "target": "protocols/extension/testdata/prior-releases/",
+          "input": "the immutable prior-release extension-contract corpus",
+          "owner": "release-rehearsal"
+        }
+      ]
+    },
+    {
+      "id": "scrub-result",
+      "evidence": "scrub result",
+      "requirements": [
+        {
+          "kind": "ignore-entry",
+          "target": ".context/",
+          "input": "the committed ignore guard for local agent state and release-operation context, so neither a fresh clone nor the public root ever tracks it",
+          "owner": "public-cut"
+        }
+      ]
+    },
+    {
+      "id": "golden-path-result",
+      "evidence": "golden-path result",
+      "requirements": [
+        {
+          "kind": "file",
+          "target": "tooling/cli/scripts/smoke-check-release.sh",
+          "input": "the release smoke runner",
+          "owner": "release-smoke"
+        },
+        {
+          "kind": "phrase",
+          "target": "tooling/cli/scripts/smoke-check-release.sh",
+          "phrase": "putnami init",
+          "input": "the initialized-workspace leg of the install to init to serve to HTTP golden path",
+          "owner": "release-smoke"
+        },
+        {
+          "kind": "phrase",
+          "target": "tooling/cli/scripts/smoke-check-release.sh",
+          "phrase": "putnami serve",
+          "input": "the served-HTTP leg of the golden path, so a release candidate is proven to answer a request and stop cleanly",
+          "owner": "release-smoke"
+        }
+      ]
+    },
+    {
+      "id": "governance-checklist",
+      "evidence": "governance checklist",
+      "requirements": [
+        {
+          "kind": "phrase",
+          "target": "CONTRIBUTING.md",
+          "phrase": "Contributor CI Without Putnami Cloud Credentials",
+          "input": "a neutral contributor CI path that runs without private Cloud credentials, defined as documented commands the tests execute",
+          "owner": "governance"
+        },
+        {
+          "kind": "tree-prefix",
+          "target": ".github/workflows/",
+          "input": "a workflow running that same neutral path on hardware this project does not own, so a fork's pull request is checked without reaching the private native runner",
+          "owner": "governance"
+        },
+        {
+          "kind": "file",
+          "target": "GOVERNANCE.md",
+          "input": "the public governance record: release owner and approver, release cadence, support-promotion rules, patch and first-72-hour triage, rollback ownership, and the exception path",
+          "owner": "governance"
+        }
+      ]
+    },
+    {
+      "id": "label-scope-bootstrap-plan",
+      "evidence": "label/scope bootstrap plan",
+      "requirements": []
+    },
+    {
+      "id": "publish-order",
+      "evidence": "publish order",
+      "requirements": []
+    },
+    {
+      "id": "rollback-plan",
+      "evidence": "rollback plan",
+      "requirements": []
+    }
+  ]
+}

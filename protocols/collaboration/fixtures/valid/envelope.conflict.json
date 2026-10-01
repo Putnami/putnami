@@ -1,0 +1,15 @@
+{
+  "contract": "memory",
+  "version": 1,
+  "operation": "checkpoint",
+  "provider": {
+    "name": "@acme/memory-git"
+  },
+  "outcome": "conflict",
+  "error": {
+    "message": "mission 42 is at revision b2c3d4e, not a1b2c3d",
+    "reason": "revision.conflict",
+    "retryable": false,
+    "current": "b2c3d4e"
+  }
+}

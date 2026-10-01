@@ -1,0 +1,56 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/github-collaboration",
+  "outcomes": [
+    "A workspace keeps its work items and pull requests on GitHub and its skills speak only the tasks and proposals contracts",
+    "A repository's own status labels are configuration of one binding, not knowledge written into skills",
+    "A retry after a lost answer finds what the first attempt created instead of creating it again, and an outcome the provider cannot establish is reported as unresolved",
+    "A GitHub credential is used where gh would use it and appears in no answer, message or log"
+  ],
+  "nonGoals": [
+    "Exclusive claims: GitHub cannot hold an issue for one agent, so an assignee is information only",
+    "Detecting a concurrent writer between the read and the write of a checked precondition, or two concurrent creates with one idempotency key",
+    "Authorizing merges: merge is refused unless the binding allows it, and binding the provider authorizes nobody",
+    "Serving several repositories from one binding, or any tracker other than GitHub issues and pull requests",
+    "Running the live proof in the ordinary gate: it mutates a real repository and runs only on request"
+  ],
+  "requirements": [
+    {
+      "id": "contract-scenarios",
+      "text": "The shared tasks and proposals scenarios of go.putnami.dev/protocol/collaboration/providertest pass against GitHub's API: empty and paginated finds, idempotent creation and review, stale revisions, one open proposal per exact identity, and not-found foreign references."
+    },
+    {
+      "id": "configurable-state-mapping",
+      "text": "Task states map to issue labels through binding settings, none hard-coded: a transition removes every state label and applies the target state's first label, also when an open issue reads as that state through another label or, for open, through no label; done and canceled close the issue as completed and not planned; a state that needs a label and has none is unsupported; create applies a state label only for a state that needs one; create and update refuse a state label."
+    },
+    {
+      "id": "exact-proposal-identity",
+      "text": "A proposal is found, created and updated for the exact repository, base and head the request names: a fork's branch of the same name is another proposal, a requested head commit that is not the head's is a conflict before anything is written, and a request naming a repository the binding does not serve is refused."
+    },
+    {
+      "id": "reported-publication",
+      "text": "Every proposal answer lists the pull request's labels and assignees, [] when it has none. An upsert answers after assignAuthor and inheritLabelPrefixes applied their additions, and is unresolved when GitHub dropped one; the proposal's revision covers its labels and assignees, so a change to either by anyone moves it."
+    },
+    {
+      "id": "reconciled-writes",
+      "text": "Every write is sent once. After a lost answer or a 5xx, the provider reads the repository back and answers from what it finds, never with a second issue, pull request or review; a keyed repeat finds its issue before GitHub lists it, past deleted, moved and discussion numbers, as GitHub names them; a lookup that cannot finish creates nothing and says whether a retry can succeed; an unestablished outcome is unresolved, never retryable, and names what settles it; a partly applied write names what exists."
+    },
+    {
+      "id": "honest-failures",
+      "text": "Failures keep their meaning: pages cover every item present throughout a traversal exactly once, a search traversal ends at the 1,000 results GitHub's search serves, a missing item or a pull request read as a task is not found, an outage is unavailable and writes nothing, a rate limit is retryable and never repeated, merge is denied unless the binding allows it, and exclusive claims are not offered because GitHub cannot enforce them."
+    },
+    {
+      "id": "credential-safety",
+      "text": "The provider finds its credential the way the gh CLI does, sends it only to the configured host's API or a loopback stand-in, and removes it and every string shaped like a GitHub token from everything it writes, including GitHub error messages that echo it."
+    },
+    {
+      "id": "truthful-manifest",
+      "text": "The manifest passes the extension protocol's strict validation and the collaboration offer check, declares preconditions checked where GitHub cannot compare and write in one step, and marks every tool as reaching outside the machine. Its link tool states that a task's parent is outside the revision, which link does not move."
+    }
+  ],
+  "decisions": [
+    "tooling/github-collaboration/doc/adr/0001-github-collaboration-provider.md",
+    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md"
+  ]
+}

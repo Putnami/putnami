@@ -1,0 +1,88 @@
+# See http://help.github.com/ignore-files/ for more about ignoring files.
+
+# compiled output
+dist
+tmp
+.cache
+
+# dependencies
+node_modules
+yarn.lock
+
+# misc
+/coverage
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# python
+__pycache__
+.pytest_cache
+.ruff_cache
+
+# Go test coverage
+*.out
+
+# Go sample binaries (built locally, name = package dir)
+go/samples/simple-api/simple-api
+go/samples/task-api/task-api
+
+# Go site-service binaries (built locally, name = package dir)
+sites/telemetry.putnami.dev/telemetry.putnami.dev
+
+# Putnami
+.putnami
+.gen
+.gen.*
+.generated
+**/public/search/
+**/public/schemas/
+# Dev-serve copy of lock-pinned site-content bundles (content-bundle plugin);
+# the build output lives under .gen/public/docs/.
+/sites/putnami.dev/public/docs/
+
+# Local data
+.data
+
+# Local agent state and release-operation context, at any depth. None of it is
+# tracked or published.
+.context/
+.claude/worktrees/
+.claude/settings.local.json
+
+# Local dotenv files, which Bun loads (.env, .env.local, .env.production, and
+# the rest), and the local and prod config overrides. The other conf/.env*.yaml
+# files are configuration, not secrets, and stay tracked.
+.env
+.env.*
+!.env*.yaml
+.env.local.yaml
+.env.prod.yaml
+
+# Putnami samples
+*.types.json
+samples/bun.lock
+**/clients/ts/
+# The Go sample commits its cross-language TypeScript client (a workspace member
+# so @putnami/client resolves for typechecking); regular in-app clients/ts stay
+# ignored. Its node_modules (a bun workspace-install artifact) and .gen (the
+# per-project version.json build stamp) stay ignored — otherwise the stamp shows
+# up untracked and marks every publish dirty.
+!/go/samples/service-to-service/clients/ts/
+!/go/samples/service-to-service/clients/ts/**
+/go/samples/service-to-service/clients/ts/node_modules/
+/go/samples/service-to-service/clients/ts/.gen/
+# The TypeScript service-to-service sample commits its generated client so the
+# documented provider -> generate -> bind -> call path compiles from a fresh
+# checkout. Workspace/install artifacts within that package stay ignored.
+!/typescript/samples/10-service-to-service/clients/ts/
+!/typescript/samples/10-service-to-service/clients/ts/**
+/typescript/samples/10-service-to-service/clients/ts/node_modules/
+/typescript/samples/10-service-to-service/clients/ts/.gen/
+
+# BEGIN PUTNAMI AUDIT MANAGED
+# Local audit attestations and parallel fleet-run state.
+.AI/audit/attestations/
+.audit-runs/
+# END PUTNAMI AUDIT MANAGED

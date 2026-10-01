@@ -1,0 +1,10 @@
+{"v":2,"type":"meta","data":{"extension":"@putnami/go","job":"build"}}
+{"v":2,"type":"log","level":"info","message":"starting build"}
+{"v":2,"type":"phase","name":"compile","action":"start"}
+{"v":2,"type":"progress","current":1,"total":1,"message":"compiling pkg1"}
+{"v":2,"type":"diagnostic","severity":"warning","message":"unused import","code":"lint/unused","location":{"file":"main.go","line":5,"column":2}}
+{"v":2,"type":"metric","name":"compile-time","value":1234,"unit":"ms"}
+{"v":2,"type":"phase","name":"compile","action":"end","status":"success"}
+{"v":2,"type":"artifact","id":"bin","name":"app","kind":"binary","path":"dist/app"}
+{"v":2,"type":"summary","message":"build succeeded in 1.2s"}
+{"v":2,"type":"result","data":{"status":"OK","data":{"binaryPath":"dist/app"}}}

@@ -1,0 +1,26 @@
+{
+  "operationId": "widgets.watch",
+  "stream": "server",
+  "encoding": "json",
+  "idempotency": "safe",
+  "resume": true,
+  "maxFrameBytes": 4096,
+  "maxBufferedMessages": 8,
+  "steps": [
+    {
+      "direction": "client-to-server",
+      "frame": {
+        "v": 1,
+        "type": "init",
+        "operationId": "widgets.watch",
+        "clientId": "fixtures-consumer",
+        "deadlineUnixMs": "1800000000000",
+        "budgetMs": "60000",
+        "credentials": [{ "profile": "service", "value": "Bearer fixture-token" }],
+        "headers": [],
+        "resume": { "token": "fixture-resume-token-1", "afterSequence": "12" }
+      }
+    },
+    { "direction": "server-to-client", "frame": { "v": 1, "type": "ready", "resumed": true } }
+  ]
+}

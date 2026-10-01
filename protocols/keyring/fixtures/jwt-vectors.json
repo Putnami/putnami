@@ -1,0 +1,118 @@
+{
+  "description": "Cross-language sign/verify JWT vectors for ES256 and RS256. The 'valid' tokens are REAL signatures produced offline (crypto/ecdsa + crypto/rsa) and self-verified; the framework security packages cryptographically verify them against the accompanying public JWK. THIS module performs only structural checks: a valid vector's token must have three non-empty base64url segments, an asymmetric header alg, a header alg/kid that agree with the public JWK, and a JWK that strict-parses as public (carrying no private material). Each 'invalid' vector breaks exactly one of those structural rules; 'reason' says which.",
+  "payload": "{\"sub\":\"user-123\",\"iss\":\"https://issuer.example\",\"aud\":\"putnami\",\"exp\":4102444800,\"iat\":1700000000,\"roles\":[\"admin\"]}",
+  "valid": [
+    {
+      "id": "es256",
+      "algorithm": "ES256",
+      "kid": "ec-key-1",
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImVjLWtleS0xIn0.eyJzdWIiOiJ1c2VyLTEyMyIsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUiLCJhdWQiOiJwdXRuYW1pIiwiZXhwIjo0MTAyNDQ0ODAwLCJpYXQiOjE3MDAwMDAwMDAsInJvbGVzIjpbImFkbWluIl19.mT-l041V_ee9gsmQNqtzaFedYtdlVdkisrQOquggCBDF7BW3Uy1jmSbSkZuvcMxp9imRtWbmTED5GA_5NameRA",
+      "jwk": {
+        "kty": "EC",
+        "kid": "ec-key-1",
+        "use": "sig",
+        "alg": "ES256",
+        "crv": "P-256",
+        "x": "ldU7ev5JtThfL1ZQYHDQ0bdKtF5zBA6x532O6OMqMSE",
+        "y": "iWyo5Oba6r0hs9qJkOe5YjQjnrfK9dwWmlP6_Uj3Xlw"
+      }
+    },
+    {
+      "id": "rs256",
+      "algorithm": "RS256",
+      "kid": "rsa-key-1",
+      "token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InJzYS1rZXktMSJ9.eyJzdWIiOiJ1c2VyLTEyMyIsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUiLCJhdWQiOiJwdXRuYW1pIiwiZXhwIjo0MTAyNDQ0ODAwLCJpYXQiOjE3MDAwMDAwMDAsInJvbGVzIjpbImFkbWluIl19.Y0seQO8XSq9lLkCQC53aNfCim09H5NtCYNEfivoE4rdAe-LB_XbOk8fCnJsQZWLz1jJWFp4IJP8Vz8q-Sj62culKH5OvHszrPwPe7PVXtt-ZzxSMTHylO6gOMHoFCyWEOwESnK-OybFn8KnJ8oZeuPDXeUKhkk-YsViqqi1f1IQpjt_U-bATMk-yHlIlllqUyLUl_Hur2wf0gKLIUQ8GnVEC5EmF25Ec0FoLTjunklVYa6uPD7xhQ1gSX-OpL-J_SYUVIVSuI8Ol2mjKKxyFUUF-CZnudR0CFEPWJ_NVz-5sKCz9i8_zNgXSbhxZnPsLd04zkvd5JQmZQQIMjbt3Sg",
+      "jwk": {
+        "kty": "RSA",
+        "kid": "rsa-key-1",
+        "use": "sig",
+        "alg": "RS256",
+        "n": "zqVsoOngCvI5rW9nHEbpiTRVcVeiKyT8L-2HcQ3puhoaX4pZxg5EVBsfaxnmV7jnKKYxZAJb1ukgEfymGsNlckbLKej62NIaWWPknrmVeQt1WfK6VQ2DUAmctFco8c3HsSinOzSYJ3tcYaZKURwid9I5y7OAT5mkaWPWdV8IMx5NOjL8i8CZE9rgBsdX-7EglndH5zHx7aVIg6qSQ3lHHILm21XqYR1N4UVWqAYnhQyDBOGjMY-YEQ1FyLXWFQN3zq9KVkxXf1OxLQlrzjyLFxgmJ6sWV5wxTykrtSGyQ1X-I04zuA3-uTOVVOc6i7Gw2wUbp2BktZIQ1yeE_BDj5Q",
+        "e": "AQAB"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "id": "two-segments",
+      "algorithm": "ES256",
+      "kid": "ec-key-1",
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImVjLWtleS0xIn0.eyJzdWIiOiJ1c2VyLTEyMyIsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUiLCJhdWQiOiJwdXRuYW1pIiwiZXhwIjo0MTAyNDQ0ODAwLCJpYXQiOjE3MDAwMDAwMDAsInJvbGVzIjpbImFkbWluIl19",
+      "jwk": {
+        "kty": "EC",
+        "kid": "ec-key-1",
+        "use": "sig",
+        "alg": "ES256",
+        "crv": "P-256",
+        "x": "ldU7ev5JtThfL1ZQYHDQ0bdKtF5zBA6x532O6OMqMSE",
+        "y": "iWyo5Oba6r0hs9qJkOe5YjQjnrfK9dwWmlP6_Uj3Xlw"
+      },
+      "reason": "token has 2 segments, not 3"
+    },
+    {
+      "id": "symmetric-hs256-alg",
+      "algorithm": "HS256",
+      "kid": "hmac-1",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImhtYWMtMSJ9.eyJzdWIiOiJ1c2VyLTEyMyIsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUiLCJhdWQiOiJwdXRuYW1pIiwiZXhwIjo0MTAyNDQ0ODAwLCJpYXQiOjE3MDAwMDAwMDAsInJvbGVzIjpbImFkbWluIl19.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "jwk": {
+        "kty": "EC",
+        "kid": "hmac-1",
+        "use": "sig",
+        "alg": "ES256",
+        "crv": "P-256",
+        "x": "ldU7ev5JtThfL1ZQYHDQ0bdKtF5zBA6x532O6OMqMSE",
+        "y": "iWyo5Oba6r0hs9qJkOe5YjQjnrfK9dwWmlP6_Uj3Xlw"
+      },
+      "reason": "header alg HS256 is symmetric and cannot be verified via a public JWKS"
+    },
+    {
+      "id": "alg-mismatch",
+      "algorithm": "ES256",
+      "kid": "rsa-key-1",
+      "token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InJzYS1rZXktMSJ9.eyJzdWIiOiJ1c2VyLTEyMyIsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUiLCJhdWQiOiJwdXRuYW1pIiwiZXhwIjo0MTAyNDQ0ODAwLCJpYXQiOjE3MDAwMDAwMDAsInJvbGVzIjpbImFkbWluIl19.Y0seQO8XSq9lLkCQC53aNfCim09H5NtCYNEfivoE4rdAe-LB_XbOk8fCnJsQZWLz1jJWFp4IJP8Vz8q-Sj62culKH5OvHszrPwPe7PVXtt-ZzxSMTHylO6gOMHoFCyWEOwESnK-OybFn8KnJ8oZeuPDXeUKhkk-YsViqqi1f1IQpjt_U-bATMk-yHlIlllqUyLUl_Hur2wf0gKLIUQ8GnVEC5EmF25Ec0FoLTjunklVYa6uPD7xhQ1gSX-OpL-J_SYUVIVSuI8Ol2mjKKxyFUUF-CZnudR0CFEPWJ_NVz-5sKCz9i8_zNgXSbhxZnPsLd04zkvd5JQmZQQIMjbt3Sg",
+      "jwk": {
+        "kty": "EC",
+        "kid": "rsa-key-1",
+        "use": "sig",
+        "alg": "ES256",
+        "crv": "P-256",
+        "x": "ldU7ev5JtThfL1ZQYHDQ0bdKtF5zBA6x532O6OMqMSE",
+        "y": "iWyo5Oba6r0hs9qJkOe5YjQjnrfK9dwWmlP6_Uj3Xlw"
+      },
+      "reason": "header alg RS256 does not match the public JWK alg ES256"
+    },
+    {
+      "id": "kid-not-in-jwk",
+      "algorithm": "ES256",
+      "kid": "ec-key-1",
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImVjLWtleS0xIn0.eyJzdWIiOiJ1c2VyLTEyMyIsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUiLCJhdWQiOiJwdXRuYW1pIiwiZXhwIjo0MTAyNDQ0ODAwLCJpYXQiOjE3MDAwMDAwMDAsInJvbGVzIjpbImFkbWluIl19.mT-l041V_ee9gsmQNqtzaFedYtdlVdkisrQOquggCBDF7BW3Uy1jmSbSkZuvcMxp9imRtWbmTED5GA_5NameRA",
+      "jwk": {
+        "kty": "EC",
+        "kid": "some-other-key",
+        "use": "sig",
+        "alg": "ES256",
+        "crv": "P-256",
+        "x": "ldU7ev5JtThfL1ZQYHDQ0bdKtF5zBA6x532O6OMqMSE",
+        "y": "iWyo5Oba6r0hs9qJkOe5YjQjnrfK9dwWmlP6_Uj3Xlw"
+      },
+      "reason": "header kid ec-key-1 does not match the public JWK kid some-other-key"
+    },
+    {
+      "id": "jwk-carries-private-material",
+      "algorithm": "ES256",
+      "kid": "ec-key-1",
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImVjLWtleS0xIn0.eyJzdWIiOiJ1c2VyLTEyMyIsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUiLCJhdWQiOiJwdXRuYW1pIiwiZXhwIjo0MTAyNDQ0ODAwLCJpYXQiOjE3MDAwMDAwMDAsInJvbGVzIjpbImFkbWluIl19.mT-l041V_ee9gsmQNqtzaFedYtdlVdkisrQOquggCBDF7BW3Uy1jmSbSkZuvcMxp9imRtWbmTED5GA_5NameRA",
+      "jwk": {
+        "kty": "EC",
+        "kid": "ec-key-1",
+        "use": "sig",
+        "alg": "ES256",
+        "crv": "P-256",
+        "x": "ldU7ev5JtThfL1ZQYHDQ0bdKtF5zBA6x532O6OMqMSE",
+        "y": "iWyo5Oba6r0hs9qJkOe5YjQjnrfK9dwWmlP6_Uj3Xlw",
+        "d": "16YPtQ8Ppfdze3-1D9-PzX9rrMhZVTDQY-fEB2BYSQA"
+      },
+      "reason": "public JWK must not carry private material (d); a JWKS parser rejects it as an unknown field"
+    }
+  ]
+}

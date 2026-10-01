@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-workspace.json",
+  "name": "test-workspace",
+  "output": ".putnami/output",
+  "epicBranches": ["epic/*"],
+  "quiet": false,
+  "verbose": true,
+  "includes": ["typescript/**", "go/**", "app", "lib"],
+  "aliases": {
+    "b": "build",
+    "t": "test"
+  },
+  "projectAliases": {
+    "app": "/typescript/framework/app"
+  },
+  "groups": {
+    "ts-all": "/typescript/..."
+  },
+  "extensions": {
+    "@putnami/go": "^1.0.0",
+    "@putnami/typescript": "^2.0.0"
+  },
+  "registries": {
+    "npm": { "publish": "https://npm.putnami.dev", "scopes": { "@putnami": "https://npm.putnami.dev" } },
+    "go": { "origin": "https://go.putnami.dev", "proxy": ["https://proxy.golang.org", "direct"] },
+    "oci": { "publish": "oci.putnami.dev/putnami" }
+  },
+  "templates": ["./templates"],
+  "agentArtifacts": ["@putnami/agent-workflows"],
+  "options": {
+    "*": { "verbose": true },
+    "build": { "target": "production" }
+  },
+  "sessions": {
+    "keep": 200
+  }
+}

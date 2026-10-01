@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/declarative-schema#browser-safe-barrel",
+    "typescript/declarative-schema#compiled-parity",
+    "typescript/declarative-schema#hooks-are-opt-in",
+    "typescript/declarative-schema#nested-and-collections",
+    "typescript/declarative-schema#opt-in-coercion",
+    "typescript/declarative-schema#required-and-default",
+    "typescript/declarative-schema#stateless-constraints",
+    "typescript/declarative-schema#type-enforcement"
+  ]
+}

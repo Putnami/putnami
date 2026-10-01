@@ -1,0 +1,209 @@
+{
+  "protocolVersion": 1,
+  "comment": "The two modes with no local copy. A reference enforces fact minimization \u2014 reaching past the declared surface fails where it happens. A command enforces that a planned target cannot become traffic, and keeps the fire-and-forget shape observable.",
+  "bases": {
+    "reference": {
+      "id": "consumer.producer-reference.v1",
+      "version": 1,
+      "from": {
+        "domain": "producer",
+        "export": "producer.contracts.v1"
+      },
+      "as": "consumer.producer-contracts",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "wire_contract_definitions",
+        "contract_owner"
+      ],
+      "justification": "The consumer holds a stable handle and resolves it at the owner."
+    },
+    "command": {
+      "id": "consumer.producer-command.v1",
+      "version": 1,
+      "from": {
+        "domain": "producer",
+        "export": "producer.ingest.v1"
+      },
+      "as": "consumer.producer-ingest",
+      "mode": "command",
+      "status": "active",
+      "facts": [
+        "usage_ingest"
+      ],
+      "transport": {
+        "kind": "event",
+        "contract": "putnami.usage.v1",
+        "availability": "active"
+      },
+      "justification": "The consumer may ask the owner to ingest a record; the owner decides whether it happens."
+    }
+  },
+  "cases": [
+    {
+      "name": "a declared fact resolves to the producer export that stays authoritative for it",
+      "base": "reference",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        {
+          "op": "fact",
+          "name": "wire_contract_definitions",
+          "expect": {
+            "provenance": "producer.contracts.v1"
+          }
+        },
+        {
+          "op": "fact",
+          "name": "contract_owner",
+          "expect": {
+            "provenance": "producer.contracts.v1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a fact the import does not name is refused",
+      "base": "reference",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        {
+          "op": "fact",
+          "name": "contract_body",
+          "expect": {
+            "error": "fact-not-imported"
+          }
+        }
+      ]
+    },
+    {
+      "name": "the minimized fact list is reported sorted",
+      "base": "reference",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        {
+          "op": "facts",
+          "expect": {
+            "facts": [
+              "contract_owner",
+              "wire_contract_definitions"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a planned reference is refused at construction",
+      "base": "reference",
+      "set": {
+        "status": "planned"
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "expectError": "not-active"
+    },
+    {
+      "name": "a command contract is refused by the reference component",
+      "base": "reference",
+      "set": {
+        "mode": "command",
+        "transport": {
+          "kind": "event",
+          "contract": "putnami.usage.v1",
+          "availability": "active"
+        }
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "expectError": "contract"
+    },
+    {
+      "name": "a delivered send reports success and is counted",
+      "base": "command",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        {
+          "op": "send",
+          "payload": "p1",
+          "expect": {}
+        },
+        {
+          "op": "stats",
+          "expect": {
+            "attempted": 1,
+            "failed": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "a refused send surfaces the carrier failure to the caller",
+      "base": "command",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        {
+          "op": "send",
+          "payload": "p1",
+          "fail": true,
+          "expect": {
+            "error": "refused"
+          }
+        },
+        {
+          "op": "stats",
+          "expect": {
+            "attempted": 1,
+            "failed": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "a refused emit never reaches the caller and still reaches the observer",
+      "base": "command",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        {
+          "op": "emit",
+          "payload": "p1",
+          "fail": true,
+          "expect": {
+            "observed": 1
+          }
+        },
+        {
+          "op": "emit",
+          "payload": "p2",
+          "expect": {
+            "observed": 0
+          }
+        },
+        {
+          "op": "stats",
+          "expect": {
+            "attempted": 2,
+            "failed": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "a planned command cannot become traffic",
+      "base": "command",
+      "set": {
+        "status": "planned",
+        "transport": {
+          "kind": "event",
+          "contract": "putnami.usage.v1",
+          "availability": "planned"
+        }
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "expectError": "not-active"
+    },
+    {
+      "name": "a command with no carrier is refused at construction",
+      "base": "command",
+      "now": "2026-01-01T00:00:00Z",
+      "carrier": false,
+      "expectError": "contract"
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/platform-endpoints",
+      "type": "feature",
+      "name": "Go platform endpoints",
+      "outcome": "An operator probes liveness, readiness, build metadata, and optional profiles on the same operational surface for every Go workload",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "bounded-probes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "probes-run-in-parallel-each-under-its-own-timeout",
+              "a-probe-that-ignores-cancellation-does-not-stall-the-aggregate"
+            ]
+          }
+        },
+        {
+          "id": "deferred-discovery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-health-probe-is-discovered-on-the-first-aggregate-request",
+              "a-readiness-probe-is-discovered-on-the-first-aggregate-request",
+              "a-probe-contributed-by-a-later-configured-plugin-is-still-found",
+              "discovery-walks-from-a-nested-module-to-the-root",
+              "an-explicitly-registered-probe-is-not-overwritten-by-a-discovered-one"
+            ]
+          }
+        },
+        {
+          "id": "endpoint-set",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "core-endpoints-mount-at-the-root",
+              "the-configured-prefix-applies-to-the-core-endpoints",
+              "profiling-handlers-are-off-by-default",
+              "profiling-handlers-mount-when-the-workload-enables-them",
+              "the-configured-prefix-applies-to-the-profiling-handlers"
+            ]
+          }
+        },
+        {
+          "id": "error-redaction",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failing-probe-reports-a-generic-message-when-redaction-is-enabled",
+              "the-real-cause-of-a-redacted-failure-is-logged-server-side",
+              "the-real-cause-of-an-abandoned-probe-is-logged-server-side"
+            ]
+          }
+        },
+        {
+          "id": "lifecycle-state",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "health-is-unavailable-before-start",
+              "readiness-is-unavailable-before-start",
+              "the-aggregates-are-unavailable-after-stop",
+              "health-is-ok-while-running-with-no-probes",
+              "health-is-degraded-with-per-probe-detail-when-a-probe-fails",
+              "readiness-is-degraded-with-per-probe-detail-when-a-probe-fails"
+            ]
+          }
+        },
+        {
+          "id": "liveness-is-trivial",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "liveness-answers-success-before-start",
+              "liveness-answers-success-after-stop",
+              "liveness-runs-no-probes"
+            ]
+          }
+        },
+        {
+          "id": "probe-names",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-explicit-health-probe-name-is-validated-at-registration",
+              "an-explicit-readiness-probe-name-is-validated-at-registration",
+              "a-discovered-probe-with-an-invalid-name-fails-start",
+              "a-required-probe-with-an-invalid-name-fails-start"
+            ]
+          }
+        },
+        {
+          "id": "required-probes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-required-probe-makes-readiness-degraded",
+              "a-registered-required-probe-runs-normally",
+              "a-missing-required-probe-is-reported-alongside-a-passing-one",
+              "health-ignores-the-required-list"
+            ]
+          }
+        },
+        {
+          "id": "version-fallback",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-version-path-returns-the-configured-build-metadata",
+              "an-empty-configured-field-falls-back-to-the-embedded-build-information",
+              "a-field-with-no-value-anywhere-is-omitted-rather-than-reported-empty"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

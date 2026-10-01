@@ -1,0 +1,70 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "putnami-dev/public-documentation",
+  "outcomes": [
+    "A visitor picks a surface — tooling, TypeScript, Go, experimental Python, or the managed platform — and reaches its documentation from the docs hub",
+    "Every published documentation section is traceable to exactly one source of truth in the repository, and a source that disappears fails the build instead of the section",
+    "An agent reads the same structure a human reads, through stable URL prefixes, a machine-readable index, and raw markdown",
+    "A visitor who wants to know what Putnami is, what it costs, which contracts it publishes, and what an agent is allowed to do with it, reads that as documentation rather than as marketing copy"
+  ],
+  "nonGoals": [
+    "Hosting documentation that a package or protocol owns; the site publishes it, the owning project writes it",
+    "Serving a page whose source no longer exists in the repository",
+    "Requiring a reader to know the repository layout in order to use Putnami"
+  ],
+  "requirements": [
+    {
+      "id": "one-source-per-section",
+      "text": "Each published documentation section is produced by exactly one mechanism — a declared asset copy, a lock-pinned content bundle, or a named generator — and no section is committed as generated output."
+    },
+    {
+      "id": "documentation-sources-are-version-addressed-snapshots",
+      "text": "Every documentation source another domain owns is enforced as a version-addressed snapshot: the build resolves the section's file inventory through the snapshot's latest state, a source that is absent fails closed instead of publishing an empty section, a version is the content digest of the source tree, and re-attaching a version with different content is refused."
+    },
+    {
+      "id": "no-generated-mirror-in-source",
+      "text": "Generated documentation is written only under the build output root; mirroring a section into the served source folder fails the build rather than declaring the same route twice."
+    },
+    {
+      "id": "python-is-marked-experimental",
+      "text": "Every published surface that presents Python states that it is experimental, requires explicit opt-in, is not default, and carries no Go or TypeScript parity promise."
+    },
+    {
+      "id": "route-inventory-is-complete",
+      "text": "The build emits a complete route inventory of everything the site serves, including the copies and warmup-registered endpoints no framework emitter can observe."
+    },
+    {
+      "id": "unmatched-paths-are-not-routed",
+      "text": "The 404 experience is a rendering decision and is never expressed as a root prefix or catch-all in the route inventory."
+    },
+    {
+      "id": "agent-surfaces-track-the-docs-tree",
+      "text": "The machine-readable index and the raw-markdown endpoint resolve against the same generated documentation tree the site renders."
+    },
+    {
+      "id": "sparse-release-delivery-is-explicit",
+      "text": "The public shipping guide distinguishes a mutable channel from an immutable release-set reference, states that an empty channel needs no bootstrap and that a workspace without a release-set provider still publishes every member to its declared registries, and requires publish-to-deploy handoff by the exact id and digest without a second channel resolution."
+    },
+    {
+      "id": "docs-enumeration-is-build-order-independent",
+      "text": "Every generated documentation source is materialized before static paths are enumerated, so a cold build and a warm build publish the same pages and the same route digest."
+    },
+    {
+      "id": "system-model-is-published",
+      "text": "The cross-cutting system model — the bet and its tradeoffs, the layers and constraints, the wire contracts, and the agent-operability surface — is published as documentation pages under the docs tree, so no claim about what Putnami is exists only outside it."
+    },
+    {
+      "id": "model-pages-are-not-surfaces",
+      "text": "A cross-cutting model page is never presented as a product surface: it carries no glyph, no page count, and no support subject, because it describes the system rather than something a reader depends on."
+    },
+    {
+      "id": "python-is-browseable-not-anchored",
+      "text": "Python is reachable from every published documentation listing but is not a first-level navigation anchor, because an anchor beside TypeScript and Go would imply a parity the workspace does not offer."
+    }
+  ],
+  "decisions": [
+    "sites/putnami.dev/doc/adr/0001-the-support-catalog-is-rendered-never-restated.md",
+    "sites/putnami.dev/doc/adr/0002-the-system-model-is-a-navigation-axis.md"
+  ]
+}

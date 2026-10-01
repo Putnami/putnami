@@ -1,0 +1,25 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "tooling/cross-language-rest-clients#censused-pending-transports",
+    "tooling/cross-language-rest-clients#classified-transport-inventory",
+    "tooling/cross-language-rest-clients#consumer-lineage",
+    "tooling/cross-language-rest-clients#drift-closure",
+    "tooling/cross-language-rest-clients#dynamic-output-ownership",
+    "tooling/cross-language-rest-clients#external-authority",
+    "tooling/cross-language-rest-clients#formatter-inputs-are-cache-keyed",
+    "tooling/cross-language-rest-clients#handwritten-client-guard",
+    "tooling/cross-language-rest-clients#honest-effects",
+    "tooling/cross-language-rest-clients#native-validation-gate",
+    "tooling/cross-language-rest-clients#no-source-mutation",
+    "tooling/cross-language-rest-clients#portable-emitter-resolution",
+    "tooling/cross-language-rest-clients#protocol-conformant-manifest",
+    "tooling/cross-language-rest-clients#safe-source-adoption",
+    "tooling/cross-language-rest-clients#spec-mediated-generation",
+    "tooling/cross-language-rest-clients#strict-provider-discovery",
+    "tooling/cross-language-rest-clients#transport-detection-precision",
+    "tooling/cross-language-rest-clients#unclaimed-outputs-are-declared-unclaimed",
+    "tooling/cross-language-rest-clients#workspace-one-pass"
+  ]
+}

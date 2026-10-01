@@ -1,0 +1,6 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-transaction.json",
+  "protocolVersion": 1,
+  "name": "Charge Card!",
+  "propagation": "required"
+}

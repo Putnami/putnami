@@ -1,0 +1,131 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-agent-context.json",
+  "protocolVersion": 1,
+  "identity": {
+    "id": "/go/samples/task-api",
+    "name": "go.putnami.dev/examples/task-api",
+    "path": "go/samples/task-api",
+    "tags": [
+      "go",
+      "e2e"
+    ],
+    "languages": [
+      "go"
+    ],
+    "dependencies": [
+      "/go/framework/app",
+      "/go/framework/http"
+    ],
+    "dependents": [
+      "/go/samples/application"
+    ]
+  },
+  "compositionRoots": [
+    {
+      "kind": "applicationMain",
+      "path": "go/samples/task-api/main.go",
+      "provenance": "type=application"
+    },
+    {
+      "kind": "describeEntrypoint",
+      "path": "go/samples/task-api/describe.go",
+      "provenance": "describe-hook"
+    }
+  ],
+  "capabilities": [
+    {
+      "path": "go/samples/task-api/schema/capabilities.json",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "contracts": [
+    {
+      "path": "go/samples/task-api/schema/contracts.json",
+      "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "infra": [
+    {
+      "path": "go/samples/task-api/infra/requirements.json",
+      "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "kind": "secret",
+      "sensitive": true
+    }
+  ],
+  "migrations": [
+    {
+      "path": "go/samples/task-api/migrations/bundle.json",
+      "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "representativeSources": [
+    {
+      "path": "go/samples/task-api/main.go",
+      "startLine": 1,
+      "endLine": 40,
+      "why": "main",
+      "tokens": {
+        "estimated": 260,
+        "method": "bytes/4"
+      }
+    },
+    {
+      "path": "go/samples/task-api/tasks.go",
+      "startLine": 12,
+      "endLine": 58,
+      "why": "capability-evidence",
+      "tokens": {
+        "estimated": 410,
+        "method": "bytes/4"
+      }
+    }
+  ],
+  "tests": {
+    "policy": "require",
+    "packs": [
+      {
+        "id": "putnami.transaction.conformance",
+        "capabilityKinds": [
+          "datasource"
+        ],
+        "languages": [
+          "go",
+          "typescript"
+        ]
+      }
+    ],
+    "fixtureDigests": [
+      {
+        "path": "go/samples/task-api/testdata/fixtures.json",
+        "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+      }
+    ]
+  },
+  "docs": [
+    {
+      "path": "go/samples/task-api/README.md",
+      "relationship": "checked"
+    },
+    {
+      "path": "docs/task-api.md",
+      "relationship": "unchecked"
+    }
+  ],
+  "config": {
+    "schemaRef": {
+      "path": "go/samples/task-api/schema/config.json",
+      "digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    "operational": {
+      "platformEndpoints": true
+    }
+  },
+  "provenance": {
+    "workspaceRevision": "0123456789abcdef0123456789abcdef01234567",
+    "generator": {
+      "name": "putnami",
+      "version": "0.1.0"
+    },
+    "aggregationMethod": "by-reference"
+  }
+}

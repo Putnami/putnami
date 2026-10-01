@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-jwks.json",
+  "title": "Putnami Public JWKS",
+  "description": "The PUBLIC JSON Web Key Set ({\"keys\":[...]}) a verifier fetches — the projection of a private keyring. It carries public verification material only: no private key material and no lifecycle state. Its shape matches go/framework/security.JWKS so a verifier can consume it directly. 'oct' symmetric keys never appear here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["keys"],
+  "properties": {
+    "keys": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/publicJwk" },
+      "description": "The public verification keys."
+    }
+  },
+  "$defs": {
+    "keyType": {
+      "type": "string",
+      "enum": ["RSA", "EC"],
+      "description": "Public JWK key type. Symmetric 'oct' keys have no public projection and never appear in a JWKS."
+    },
+    "publicJwk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kty"],
+      "description": "A public JSON Web Key. It has NO private-material fields (d, p, q, dp, dq, qi, k) by construction.",
+      "properties": {
+        "kty": { "$ref": "#/$defs/keyType" },
+        "kid": { "type": "string", "description": "Key ID." },
+        "use": { "type": "string", "description": "Public key use, e.g. 'sig'." },
+        "alg": { "type": "string", "description": "Algorithm, e.g. 'RS256', 'ES256'." },
+        "crv": { "type": "string", "description": "EC curve, e.g. 'P-256'." },
+        "x": { "type": "string", "description": "EC X coordinate (base64url)." },
+        "y": { "type": "string", "description": "EC Y coordinate (base64url)." },
+        "n": { "type": "string", "description": "RSA modulus (base64url)." },
+        "e": { "type": "string", "description": "RSA exponent (base64url)." }
+      }
+    }
+  }
+}

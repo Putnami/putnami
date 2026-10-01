@@ -1,0 +1,10 @@
+{
+  "protocolVersion": 1,
+  "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "result": { "status": "success", "durationMs": 4200, "sizeBytes": 10240 },
+  "manifest": {
+    "files": [
+      { "path": "dist/index.js", "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "mode": 420, "size": 10240 }
+    ]
+  }
+}

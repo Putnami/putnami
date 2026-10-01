@@ -1,0 +1,40 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/declared-output-preserves",
+  "version": "1.0.0",
+  "cliContract": 4,
+  "commands": {
+    "build": {
+      "description": "Generate the configured client into a directory that is a workspace project of its own",
+      "run": [{ "id": "clients", "task": "build-clients" }]
+    }
+  },
+  "tasks": {
+    "build-clients": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["clients"],
+      "cwd": "{projectRoot}",
+      "reads": ["sources"],
+      "writes": ["clients"],
+      "cache": { "enabled": true, "deterministic": true },
+      "outputs": {
+        "clientOutput": {
+          "description": "Project-relative directory of the generated client, chosen by the project's configuration."
+        }
+      },
+      "declares": {
+        "outputs": {
+          "client": {
+            "kind": "directory",
+            "pathFrom": "clientOutput",
+            "optionalEmpty": true,
+            "preserves": ["putnami.json", "go.sum", "go.mod"],
+            "drift": "fail",
+            "description": "The committed generated client. Its project document and module files are the workspace's: never captured, never replaced by a restore, never judged for drift (protocol ADR 0005)."
+          }
+        }
+      }
+    }
+  }
+}

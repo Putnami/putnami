@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "results": [
+    {
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "hit": true,
+      "result": { "status": "success" },
+      "downloads": [ { "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "url": "https://cas.example/dl/x", "method": "PUT" } ]
+    }
+  ]
+}

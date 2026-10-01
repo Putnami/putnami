@@ -1,0 +1,23 @@
+putnami.install-commands.v1
+# The commands `curl -fsSL "https://putnami.dev/install.sh?run=<command>" | bash`
+# can run, and the extension that provides each one. The site publishes this file
+# at https://putnami.dev/install-commands.txt, next to install.sh.
+#
+# The first line is the format header above. Every other line is blank, a comment
+# starting with #, or one entry:
+#
+#   <command> <@scope/name[@constraint]>
+#
+#   command     ^[a-z][a-z0-9-]{0,63}$, listed at most once
+#   extension   @scope/name, optionally @<constraint>: an optional ^ or ~, then
+#               letters, digits, and . + _ -
+#
+# Anything else makes the installer refuse to run a command. This file is not
+# signed: it is trusted exactly as far as install.sh, which is served from the
+# same origin. The extension an entry names is installed by the CLI, which
+# verifies its SHA-256 like any extension install.
+#
+# An extension owner adds its entry by pull request. The command must declare
+# that it runs without a workspace.
+
+agent-readiness @putnami/intelligence

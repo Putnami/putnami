@@ -1,0 +1,24 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/ws/deps~install",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {"name": "putnami", "rootPath": "/ws"},
+  "project": {"name": "putnami", "path": ".", "fullPath": "/ws"},
+  "extension": {"name": "@putnami/typescript", "root": "/ws/typescript/extension"},
+  "job": {"name": "deps~install"},
+  "identity": {
+    "key": "/:deps~install",
+    "scope": "workspace",
+    "project": {"id": "/", "name": "putnami"},
+    "task": {"name": "deps~install", "command": "deps", "step": "install", "kind": "deps-install"},
+    "provider": {"extension": "@putnami/typescript", "version": "0.1.0"}
+  },
+  "staging": {
+    "root": "/ws/.putnami/staging/ws/deps~install",
+    "project": "/ws/.putnami/staging/ws/deps~install/project",
+    "workspace": "/ws/.putnami/staging/ws/deps~install/workspace",
+    "commandOutput": "/ws/.putnami/staging/ws/deps~install/command-output"
+  },
+  "params": {}
+}

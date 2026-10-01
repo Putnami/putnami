@@ -1,0 +1,24 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-ci.json",
+  "version": 3,
+  "commands": [
+    "lint",
+    "test"
+  ],
+  "rules": [
+    {
+      "pullRequests": true,
+      "publish": [
+        "pr-{number}"
+      ],
+      "retain": "while-open",
+      "baseline": "canary"
+    },
+    {
+      "branches": "main",
+      "publish": [
+        "canary"
+      ]
+    }
+  ]
+}

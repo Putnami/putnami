@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "tags": ["go"],
+  "extensions": ["/go/extension"],
+  "publishConfig": {
+    "go": {
+      "namePattern": "go.putnami.dev/{name}"
+    }
+  },
+  "groups": {
+    "go-core": "/go/framework/app,/go/framework/inject,/go/framework/errors,/go/framework/logger,/go/framework/config,/go/framework/schema",
+    "go-infra": "/go/framework/database,/go/framework/cache,/go/framework/storage,/go/framework/events,/go/framework/client"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "protocol": "migration-bundle.v1",
+  "appName": "svc",
+  "operations": [
+    {
+      "kind": "sql",
+      "target": "default",
+      "namespace": "iam",
+      "name": "iam/0001_init",
+      "up": { "path": "payload/sql/default/iam/0001_init.up.sql", "hash": "1111111111111111111111111111111111111111111111111111111111111111" },
+      "safety": "safe-online"
+    },
+    {
+      "kind": "sql",
+      "target": "default",
+      "namespace": "iam",
+      "name": "iam/0001_init",
+      "up": { "path": "payload/sql/default/iam/0001_init_dup.up.sql", "hash": "3333333333333333333333333333333333333333333333333333333333333333" },
+      "safety": "safe-online"
+    }
+  ]
+}

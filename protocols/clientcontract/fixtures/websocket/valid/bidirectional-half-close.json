@@ -1,0 +1,39 @@
+{
+  "operationId": "widgets.chat",
+  "stream": "bidirectional",
+  "encoding": "json",
+  "idempotency": "non-idempotent",
+  "resume": false,
+  "maxFrameBytes": 4096,
+  "maxBufferedMessages": 4,
+  "steps": [
+    {
+      "direction": "client-to-server",
+      "frame": {
+        "v": 1,
+        "type": "init",
+        "operationId": "widgets.chat",
+        "clientId": "fixtures-consumer",
+        "deadlineUnixMs": "0",
+        "budgetMs": "0",
+        "credentials": [{ "profile": "service", "value": "Bearer fixture-token" }],
+        "headers": []
+      }
+    },
+    { "direction": "server-to-client", "frame": { "v": 1, "type": "ready", "resumed": false } },
+    {
+      "direction": "client-to-server",
+      "frame": { "v": 1, "type": "message", "sequence": "1", "payload": { "encoding": "json", "value": { "text": "hello" } } }
+    },
+    {
+      "direction": "server-to-client",
+      "frame": { "v": 1, "type": "message", "sequence": "1", "payload": { "encoding": "json", "value": { "text": "ack" } } }
+    },
+    { "direction": "client-to-server", "frame": { "v": 1, "type": "half-close" } },
+    {
+      "direction": "server-to-client",
+      "frame": { "v": 1, "type": "message", "sequence": "2", "payload": { "encoding": "json", "value": { "text": "after-half-close" } } }
+    },
+    { "direction": "server-to-client", "frame": { "v": 1, "type": "result" } }
+  ]
+}

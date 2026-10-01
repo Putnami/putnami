@@ -1,0 +1,35 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/typescript/framework/utils/build",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {
+    "name": "putnami",
+    "rootPath": "/ws",
+    "version": "1.2.0",
+    "options": {"sdd": {"verification": {"architecture": "report"}}}
+  },
+  "project": {
+    "name": "@putnami/utils",
+    "path": "typescript/framework/utils",
+    "fullPath": "/ws/typescript/framework/utils",
+    "main": "src/index.ts",
+    "publish": ["npm"]
+  },
+  "extension": {"name": "@putnami/typescript", "root": "/ws/typescript/extension"},
+  "job": {"name": "build~compile"},
+  "identity": {
+    "key": "/typescript/framework/utils:build~compile",
+    "scope": "project",
+    "project": {"id": "/typescript/framework/utils", "name": "@putnami/utils"},
+    "task": {"name": "build~compile", "command": "build", "step": "compile", "kind": "ts-build"},
+    "provider": {"extension": "@putnami/typescript", "version": "0.1.0"}
+  },
+  "staging": {
+    "root": "/ws/.putnami/staging/typescript/framework/utils/build~compile",
+    "project": "/ws/.putnami/staging/typescript/framework/utils/build~compile/project",
+    "workspace": "/ws/.putnami/staging/typescript/framework/utils/build~compile/workspace",
+    "commandOutput": "/ws/.putnami/staging/typescript/framework/utils/build~compile/command-output"
+  },
+  "params": {"minify": true}
+}

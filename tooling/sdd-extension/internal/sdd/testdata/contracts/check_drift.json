@@ -1,0 +1,11 @@
+{
+  "project": "/example/payments",
+  "manifest": "go.putnami.dev/example/payments",
+  "outcome": "drift",
+  "drift": [
+    {
+      "path": "schema/contracts.md",
+      "reason": "stale"
+    }
+  ]
+}

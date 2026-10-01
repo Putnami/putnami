@@ -1,0 +1,8 @@
+{
+  "version": 4,
+  "cli": {
+    "source": "workspace"
+  },
+  "extensions": {},
+  "templates": {}
+}

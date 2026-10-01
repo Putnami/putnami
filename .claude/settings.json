@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": ["Bash(gh label create:*)"],
+    "additionalDirectories": ["./.claude/skills"]
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.agents/skills/fix/scripts/session-cap.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

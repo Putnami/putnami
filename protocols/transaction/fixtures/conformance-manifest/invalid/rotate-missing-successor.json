@@ -1,0 +1,40 @@
+{
+  "protocol": "putnami.transaction.v1",
+  "suite": "putnami.transaction.conformance.v1",
+  "protocolVersion": 1,
+  "cases": [
+    {
+      "id": "bad.rotate",
+      "level": "required",
+      "setup": {
+        "tables": [
+          {
+            "name": "tokens",
+            "columns": [
+              { "name": "id", "type": "text", "primaryKey": true },
+              { "name": "state", "type": "text" }
+            ]
+          }
+        ]
+      },
+      "operations": [
+        {
+          "id": "rot",
+          "table": "tokens",
+          "primitive": "rotate",
+          "boundary": "transaction",
+          "args": {
+            "keyColumn": "id",
+            "predecessorKey": "old",
+            "stateColumn": "state",
+            "expected": "active",
+            "revoked": "revoked",
+            "successorColumns": ["id", "state"],
+            "successorValues": ["new"]
+          },
+          "expect": "applied"
+        }
+      ]
+    }
+  ]
+}

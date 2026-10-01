@@ -1,0 +1,24 @@
+{
+  "valid": [
+    "/snapshot",
+    "/owner/access-replica/page",
+    "/"
+  ],
+  "invalid": [
+    "",
+    "relative",
+    "//evil.example/path",
+    "/x//y",
+    "/x/../y",
+    "/x/./y",
+    "/%2e%2e/y",
+    "/%252e%252e/y",
+    "/x%2Fy",
+    "/x\\y",
+    "/x?token=secret",
+    "/x#fragment",
+    "/x\r\ny",
+    "/x%0ay",
+    "/{owner}"
+  ]
+}

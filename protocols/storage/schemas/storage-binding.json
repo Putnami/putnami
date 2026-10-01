@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-storage-binding.json",
+  "title": "Putnami Storage Binding",
+  "description": "The resolved backend coordinates a deployer injects into a workload after provisioning a storage resource. The workload constructs a storage backend from it and transfers object bytes directly to the provider.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "name", "backend", "bucket"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "protocolVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Current storage-protocol version."
+    },
+    "name": {
+      "$ref": "#/$defs/resourceName",
+      "description": "Logical resource name the workload requested (joins back to the manifest resource)."
+    },
+    "backend": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Provider-neutral backend kind the workload should construct (e.g. \"gcs\", \"s3\", \"file\"). Open string so the protocol is not coupled to a fixed provider set."
+    },
+    "bucket": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Physical bucket/container the resource resolved to."
+    },
+    "prefix": {
+      "type": "string",
+      "description": "Optional key prefix within the bucket, e.g. a per-scope isolation prefix."
+    },
+    "identity": {
+      "$ref": "#/$defs/identity"
+    },
+    "signedUrls": {
+      "type": "boolean",
+      "description": "Whether signed-URL capability was granted."
+    }
+  },
+  "$defs": {
+    "resourceName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_./-]{0,63}$"
+    },
+    "identity": {
+      "type": "string",
+      "enum": ["static", "workload"],
+      "description": "How the workload authenticates to the provider: static credentials, or an ambient workload identity. Closed enum; adding a value requires a protocol version bump."
+    }
+  }
+}

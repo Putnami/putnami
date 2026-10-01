@@ -1,0 +1,180 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "telemetry-putnami-dev",
+  "features": [
+    {
+      "id": "telemetry-putnami-dev/cli-usage-receiver",
+      "type": "feature",
+      "name": "Anonymous CLI-usage telemetry receiver",
+      "outcome": "Putnami maintainers see aggregate CLI usage without the receiver ever retaining a raw event, a caller address, or anything that identifies a user, and a CLI run is never affected by whether the receiver answers",
+      "owner": "telemetry.putnami.dev",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "ingest-is-anonymous",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bearer-token-on-ingest-is-ignored",
+              "the-ingest-route-never-drives-a-key-fetch"
+            ]
+          }
+        },
+        {
+          "id": "aggregate-read-fails-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unconfigured-issuer-or-audience-denies-every-request",
+              "a-pinned-identity-is-required",
+              "the-caller-allowlist-must-be-satisfied",
+              "the-trailing-slash-form-authenticates-like-the-declared-path"
+            ]
+          }
+        },
+        {
+          "id": "caller-address-is-not-retained",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "no-caller-address-reaches-an-emitted-event",
+              "the-caller-address-is-derived-only-for-request-limits",
+              "the-caller-address-is-used-to-apply-a-per-caller-limit",
+              "no-caller-address-reaches-an-aggregate"
+            ]
+          }
+        },
+        {
+          "id": "fields-are-allowlisted",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unknown-field-is-dropped-before-storage",
+              "a-record-outside-the-closed-vocabulary-is-dropped",
+              "every-free-text-surface-is-removed",
+              "the-compiled-allowlist-reduction-is-pinned"
+            ]
+          }
+        },
+        {
+          "id": "acceptance-is-not-an-oracle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-content-problem-answers-like-a-clean-accept",
+              "an-unavailable-downstream-answers-like-a-clean-accept"
+            ]
+          }
+        },
+        {
+          "id": "small-groups-are-withheld",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-group-below-the-contributor-threshold-is-withheld",
+              "repeating-an-event-does-not-raise-the-contributor-count",
+              "the-write-side-counts-distinct-contributors-not-events"
+            ]
+          }
+        },
+        {
+          "id": "sent-fields-are-aggregated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "run-shape-fields-are-folded-into-fixed-ranges"
+            ]
+          }
+        },
+        {
+          "id": "exhausted-dimension-is-reported-unavailable",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-exhausted-dimension-is-unavailable-not-a-partial-count",
+              "unaffected-dimensions-stay-available",
+              "the-read-side-detects-overflow-instead-of-truncating"
+            ]
+          }
+        },
+        {
+          "id": "expiry-runs-without-the-service",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation",
+            "capability"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "retention-expiry-is-scheduled-in-the-database"
+            ]
+          }
+        },
+        {
+          "id": "declared-surface-is-complete",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-committed-artifact-matches-what-the-server-describes",
+              "the-artifact-is-independent-of-deploy-time-configuration",
+              "every-declared-path-and-method-carries-real-traffic",
+              "the-committed-artifact-is-canonical"
+            ]
+          }
+        },
+        {
+          "id": "undeclared-requests-are-rejected",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-undeclared-request-never-reaches-workload-logic",
+              "the-receiver-never-answers-with-a-redirect"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

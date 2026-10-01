@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-qualify-verdict.json",
+  "title": "Putnami Workload Qualification Verdict",
+  "description": "The single outcome of running a workload's smoke contract against one target. It fails closed: passed is the only pass, and a passed verdict carries its proof — every phase passed, at least one request and every request passed, the observed build matching the expected one, and a clean teardown.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocolVersion",
+    "project",
+    "target",
+    "binding",
+    "contract",
+    "phases",
+    "requests",
+    "state",
+    "startedAt",
+    "finishedAt"
+  ],
+  "properties": {
+    "protocolVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Document version. A reader refuses any other value."
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical ID of the qualified workload."
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "description": "What the contract ran against.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["local", "url"],
+          "description": "local is a workload composed on this machine; url is a running deployment."
+        },
+        "url": {
+          "type": "string",
+          "description": "Base URL requests were sent to. Required for a url target; never carries credentials."
+        },
+        "compositionId": {
+          "type": "string",
+          "description": "Identifier of the local composition that served the target."
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "description": "Which build the verdict proves. A tree binding names the worktree fingerprint and HEAD; an artifact binding names the sha the deployment must report.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["tree", "artifact"],
+          "description": "tree for a local target, artifact for a deployed one."
+        },
+        "fingerprint": {
+          "type": "string",
+          "description": "Content digest of the worktree a tree binding served."
+        },
+        "dirty": {
+          "type": "boolean",
+          "description": "Whether that worktree differed from HEAD."
+        },
+        "headSHA": {
+          "type": "string",
+          "description": "Commit the worktree sat on."
+        },
+        "expectedSHA": {
+          "type": "string",
+          "description": "Git sha an artifact binding requires the target to report on /version (prefix match, at least 7 characters)."
+        },
+        "observedSHA": {
+          "type": "string",
+          "description": "Sha the target reported on /version, when it reported one."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version the target reported on /version, when it reported one."
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest", "requests", "derivedFrom"],
+      "description": "Identifies the executed contract.",
+      "properties": {
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "Digest of the executed contract."
+        },
+        "requests": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of requests the contract holds."
+        },
+        "derivedFrom": {
+          "type": "array",
+          "description": "Documents the executed contract was derived from.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "path", "digest"],
+            "properties": {
+              "kind": { "type": "string", "enum": ["http-routes"], "description": "Source document kind." },
+              "path": { "type": "string", "description": "Workspace-relative path of the document read." },
+              "digest": { "type": "string", "description": "Digest the source document declares for itself." }
+            }
+          }
+        }
+      }
+    },
+    "phases": {
+      "type": "array",
+      "description": "Every phase, in execution order: resolve-target, readiness, version-binding, smoke, teardown. A phase that never started is not_run.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "state", "durationMs"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["resolve-target", "readiness", "version-binding", "smoke", "teardown"],
+            "description": "Phase name."
+          },
+          "state": { "$ref": "#/$defs/state", "description": "Phase outcome." },
+          "durationMs": { "type": "integer", "minimum": 0, "description": "Wall-clock duration in milliseconds." },
+          "diagnostics": {
+            "type": "array",
+            "description": "Findings explaining a non-pass state. They carry no secret.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["severity", "code", "message"],
+              "properties": {
+                "severity": { "type": "string", "enum": ["error", "warning", "info"], "description": "Whether the finding blocks." },
+                "code": { "type": "string", "description": "Stable qualify.* code a consumer branches on." },
+                "message": { "type": "string", "description": "Human-readable explanation; not a frozen vocabulary." },
+                "field": { "type": "string", "description": "Dotted member path the finding is about, when it is about one." }
+              }
+            }
+          }
+        }
+      }
+    },
+    "requests": {
+      "type": "array",
+      "description": "Every contract request, in contract order. A request that never ran is not_run.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "durationMs", "state"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "description": "Contract request ID." },
+          "status": { "type": "integer", "minimum": 100, "maximum": 599, "description": "HTTP status the target answered, when it answered." },
+          "durationMs": { "type": "integer", "minimum": 0, "description": "Wall-clock duration in milliseconds." },
+          "state": { "$ref": "#/$defs/state", "description": "Request outcome." },
+          "reason": { "type": "string", "description": "Explanation of a non-pass state." }
+        }
+      }
+    },
+    "state": {
+      "$ref": "#/$defs/state",
+      "description": "The verdict: the first non-pass phase state, or passed. Only passed is a pass; exit code 0 follows it alone."
+    },
+    "startedAt": {
+      "type": "string",
+      "description": "RFC 3339 UTC time the run started."
+    },
+    "finishedAt": {
+      "type": "string",
+      "description": "RFC 3339 UTC time the run finished."
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "leftovers"],
+      "description": "Teardown report of a local target; absent for a url target.",
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["clean", "partial"],
+          "description": "clean released everything; partial left resources behind."
+        },
+        "leftovers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Resources a partial teardown left behind."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "state": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "unsupported",
+        "not_run",
+        "timed_out",
+        "canceled",
+        "target_unreachable",
+        "digest_mismatch",
+        "composition_failed"
+      ],
+      "description": "Closed outcome vocabulary. passed is the only pass."
+    }
+  }
+}

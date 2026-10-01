@@ -1,0 +1,180 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "sdd",
+  "owner": "sdd",
+  "projects": [
+    "/tooling/sdd-extension"
+  ],
+  "owns": [
+    {
+      "id": "sdd.method-documentation",
+      "kind": "fact",
+      "description": "The authored spec-driven development documentation tree under /tooling/sdd-extension/doc: the method's own wording, its ADRs, and its contract references. This domain decides what the method claims; a site that publishes it copies the tree and never edits it."
+    },
+    {
+      "id": "sdd.spec-driven-development",
+      "kind": "model",
+      "description": "Feature, spec, architecture, and contract validation. The extension learns workspace facts from the job wire only; it never imports CLI internals and never execs putnami."
+    }
+  ],
+  "exports": [
+    {
+      "id": "sdd.method-documentation.v1",
+      "version": 1,
+      "status": "active",
+      "description": "The authored spec-driven development documentation tree (/tooling/sdd-extension/doc): the markdown a publisher copies verbatim, addressed by a deterministic digest over its sorted (relative path, content digest) pairs. The carrier contract is putnami.documentation-tree.v1.",
+      "facts": [
+        {
+          "name": "spec_driven_development_documentation",
+          "authority": "sdd",
+          "classification": "public",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "snapshot"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    }
+  ],
+  "imports": [
+    {
+      "id": "sdd.extension-runtime.v1",
+      "version": 1,
+      "from": {
+        "domain": "extension-sdk",
+        "export": "extension-sdk.extension-runtime.v1"
+      },
+      "as": "sdd.extension-runtime",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "extension_runtime_api"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/tooling/extension-sdk"
+        }
+      ],
+      "justification": "This is an extension binary: it emits its phases, diagnostics, artifacts, and interactive result envelopes through the SDK runtime instead of writing the JSONL wire itself. The ADR 0013 boundary allows exactly this reference and forbids reaching into CLI internals."
+    },
+    {
+      "id": "sdd.protocol-contracts.v1",
+      "version": 1,
+      "from": {
+        "domain": "protocols",
+        "export": "protocols.wire-contracts.v1"
+      },
+      "as": "sdd.protocol-contracts",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "wire_contract_definitions"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/config"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/contracts"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/support"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/workspace"
+        }
+      ],
+      "justification": "The SDD extension validates features, specs, and architecture through the shared strict contract packages; the ADR 0013 boundary allows protocol and SDK references and forbids CLI internals."
+    }
+  ]
+}

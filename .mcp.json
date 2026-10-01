@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "putnami": {
+      "args": [
+        "mcp"
+      ],
+      "command": "putnami",
+      "env": {
+        "PUTNAMI_AGENT_WORKSPACE": "${CLAUDE_PROJECT_DIR:-.}"
+      }
+    }
+  }
+}

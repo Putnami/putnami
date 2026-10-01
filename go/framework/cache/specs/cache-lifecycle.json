@@ -1,0 +1,31 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/cache-lifecycle",
+  "outcomes": [
+    "A service can use an in-memory cache with the cache-aside call shape",
+    "The built-in memory cache never serves a value after its expiration deadline",
+    "A service can bound entry count and observe misses, hits, and capacity evictions"
+  ],
+  "nonGoals": [
+    "Providing distributed cache coherence or a network cache backend",
+    "Promising strict compatibility between every pre-1.0 minor release"
+  ],
+  "requirements": [
+    {
+      "id": "expiration",
+      "text": "Positive TTLs in MemoryCache expire on one deadline, zero TTLs do not expire."
+    },
+    {
+      "id": "eviction",
+      "text": "A positive MaxEntries bound evicts capacity entries without evicting merely because an existing key is overwritten; capacity evictions are counted separately from deletion and expiration."
+    },
+    {
+      "id": "ownership",
+      "text": "Set and Get do not expose shared mutable byte slices between callers and cache state."
+    }
+  ],
+  "decisions": [
+    "go/framework/cache/doc/adr/0001-expiration-and-capacity-eviction.md"
+  ]
+}

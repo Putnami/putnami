@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "name": "workflows",
+  "version": "1.0.0",
+  "files": [
+    {
+      "path": ".agents/skills/fix/SKILL.md",
+      "sha256": "sha256:not-hex"
+    }
+  ]
+}

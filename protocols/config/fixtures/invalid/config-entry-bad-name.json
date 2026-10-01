@@ -1,0 +1,6 @@
+{
+  "appName": "task api/../../etc",
+  "environment": "production",
+  "path": "server",
+  "values": { "port": 8080 }
+}

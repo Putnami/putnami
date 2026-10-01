@@ -1,0 +1,183 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/document-repository",
+      "type": "feature",
+      "name": "TypeScript document repository",
+      "outcome": "TypeScript workloads store validated document-shaped data through one typed repository contract whose queries, pagination, transactions, and backend limits stay explicit",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "adapter-capabilities",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-composite-document-id-is-refused-where-unsupported",
+              "a-composite-document-id-round-trips-where-supported",
+              "incompatible-negative-filters-are-refused",
+              "multiple-negative-filters-are-allowed-where-supported",
+              "the-firestore-adapter-reports-a-clear-negative-filter-error",
+              "the-shared-contract-covers-save-get-exists-delete"
+            ]
+          }
+        },
+        {
+          "id": "bounded-bulk-behavior",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-positive-limit-is-honored-exactly",
+              "a-zero-limit-means-zero-rows",
+              "a-zero-limit-means-zero-rows-at-the-adapter-too",
+              "an-absent-or-invalid-limit-falls-back-to-the-default-page-size",
+              "an-exists-false-scan-is-chunked",
+              "bulk-save-re-reads-are-chunked",
+              "delete-many-refuses-an-all-undefined-filter",
+              "delete-many-refuses-an-empty-filter",
+              "delete-many-spans-more-than-one-batch"
+            ]
+          }
+        },
+        {
+          "id": "collection-contract",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-collection-definition-carries-its-options",
+              "a-replace-save-missing-a-required-field-is-rejected",
+              "a-schema-invalid-save-is-rejected-at-the-boundary",
+              "an-empty-document-is-rejected",
+              "field-and-document-id-definitions-are-produced",
+              "save-many-rejects-a-schema-invalid-document",
+              "save-many-rejects-an-empty-array",
+              "save-many-rejects-an-empty-document"
+            ]
+          }
+        },
+        {
+          "id": "credential-redaction",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-non-json-value-is-treated-as-a-key-file-path",
+              "inline-json-credentials-are-parsed",
+              "malformed-inline-credentials-raise-a-typed-error",
+              "no-credentials-yields-an-empty-config",
+              "the-credential-value-never-appears-in-the-error"
+            ]
+          }
+        },
+        {
+          "id": "infra-publication",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-memory-store-is-omitted",
+              "a-store-not-configured-for-firestore-is-omitted",
+              "collections-in-the-default-store-group-into-one-database",
+              "each-store-backend-resolves-independently",
+              "one-collection-emits-one-firestore-database",
+              "one-database-per-named-store-sorted-by-name",
+              "repeated-collection-names-are-de-duplicated",
+              "the-producer-output-matches-the-shared-golden-fixture",
+              "zero-collections-emit-nothing"
+            ]
+          }
+        },
+        {
+          "id": "operation-observability",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-committed-transaction-records-its-metrics-and-gauge",
+              "a-failed-operation-records-collection-scoped-duration",
+              "a-rolled-back-transaction-records-its-metrics",
+              "a-slow-failure-is-recorded-from-a-repository-operation",
+              "a-slow-operation-is-recorded-past-the-threshold",
+              "a-successful-operation-records-its-metrics",
+              "backend-lifecycle-metrics-are-recorded-on-close",
+              "recording-is-safe-when-telemetry-is-disabled"
+            ]
+          }
+        },
+        {
+          "id": "portable-query",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "document-id-fields-are-appended-as-ordering-tie-breakers",
+              "filters-and-cursors-round-trip-at-the-adapter",
+              "find-operators-and-pagination-results-are-supported",
+              "only-the-documented-operator-subset-is-parsed",
+              "paging-is-deterministic-with-the-id-tie-breaker"
+            ]
+          }
+        },
+        {
+          "id": "store-lifecycle",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-explicit-config-override-returns-an-unmanaged-backend",
+              "close-backend-permits-clean-recreation",
+              "different-store-names-stay-isolated",
+              "one-managed-backend-is-reused-per-store",
+              "the-plugin-closes-every-managed-backend-on-stop"
+            ]
+          }
+        },
+        {
+          "id": "stored-write-result",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-merge-write-is-explicit",
+              "save-many-reflects-a-server-applied-write-transform",
+              "save-many-returns-documents-decoupled-from-the-inputs",
+              "save-reflects-a-server-applied-write-transform",
+              "save-replaces-by-default",
+              "save-returns-the-stored-document-not-the-input-reference"
+            ]
+          }
+        },
+        {
+          "id": "transaction-atomicity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-second-store-is-refused-inside-a-transaction",
+              "a-throwing-body-rolls-the-transaction-back",
+              "a-transaction-commits-atomically-with-read-your-writes",
+              "a-transactional-delete-spans-multiple-pages",
+              "commit-and-rollback-are-atomic-at-the-adapter"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

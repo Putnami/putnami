@@ -1,0 +1,18 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/event-messaging#at-least-once",
+    "typescript/event-messaging#bounded-concurrency",
+    "typescript/event-messaging#bounded-retry",
+    "typescript/event-messaging#browser-surface",
+    "typescript/event-messaging#cross-language-records",
+    "typescript/event-messaging#dead-letter-or-drop",
+    "typescript/event-messaging#graceful-drain",
+    "typescript/event-messaging#isolated-invocation",
+    "typescript/event-messaging#no-silent-loss",
+    "typescript/event-messaging#one-record-per-message",
+    "typescript/event-messaging#payload-validation",
+    "typescript/event-messaging#residual-failures-are-routed"
+  ]
+}

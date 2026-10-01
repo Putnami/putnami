@@ -1,0 +1,211 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-project.json",
+  "title": "Putnami Project Configuration",
+  "description": "Project-level configuration file (putnami.json). Placed in a project directory to configure project identity, metadata, and job options.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference"
+    },
+    "name": {
+      "type": "string",
+      "description": "Project name. Required for Go projects (which lack a native name field). Overrides native manifest for others."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["library", "application", "image"],
+      "description": "Project type. Libraries cannot be served; image projects package declared OCI inputs without a compiled application. Defaults to \"application\" when omitted."
+    },
+    "description": {
+      "type": "string",
+      "description": "Project description."
+    },
+    "main": {
+      "type": "string",
+      "description": "Main entry point file."
+    },
+    "bin": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      ],
+      "description": "Binary entry points."
+    },
+    "exports": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "properties": {
+                  "types": { "type": "string" },
+                  "import": { "type": "string" },
+                  "require": { "type": "string" },
+                  "default": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      ],
+      "description": "Export map for the project."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Project tags for filtering with --tag."
+    },
+    "publish": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Publish channels enabled for this project (e.g., 'npm', 'docker')."
+    },
+    "runsWith": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Runtime service dependencies — project names that should be served alongside this project."
+    },
+    "build": {
+      "type": "object",
+      "properties": {
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "description": "Source path for asset files (glob pattern). Relative to project root or absolute from workspace root."
+              }
+            },
+            "required": ["from"]
+          },
+          "description": "External asset paths that should trigger rebuild when changed."
+        },
+        "compile": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Executable compile targets. Map source entrypoint -> output filename (relative to build output)."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Build configuration."
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Workspace project dependencies. Source of truth, auto-maintained by scanning sources."
+    },
+    "extensions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Extension names this project uses. Required for native projects (Go, Python) to enable extension jobs."
+    },
+    "registries": {
+      "type": "object",
+      "description": "Registry endpoints overriding the workspace 'registries' section for this project, one entry per ecosystem id. The override replaces the workspace entry whole; the keys inside it are defined by that ecosystem's profile.",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+      "additionalProperties": { "type": "object" }
+    },
+    "visibility": {
+      "type": "string",
+      "enum": ["scope", "public"],
+      "description": "Who may import this project. \"scope\" (the default) allows the projects of its own scope; \"public\" allows the whole workspace. It governs real imports (go.mod require or replace, package.json dependency on a workspace package), never declared dependencies. A generated client's contract edge is always allowed, and a generated client that declares no visibility is importable from every scope."
+    },
+    "distribution": {
+      "type": "object",
+      "description": "Who may pull what this project publishes. Unrelated to 'visibility', which is an import boundary inside the workspace.",
+      "additionalProperties": false,
+      "required": ["visibility"],
+      "properties": {
+        "visibility": {
+          "type": "string",
+          "enum": ["internal", "private", "public"],
+          "description": "Distribution level of every release-set member this project produces. It wins over a scope's declaration and over a putnami.ci.json distribution.members[] rule; a members[] rule that selects this project must agree with it."
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "description": "Per-command and per-extension parameter defaults for this project. Keys: command names ('build'), extension names ('@putnami/typescript'), or qualified names ('@putnami/typescript:build').",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "jobs": {
+      "type": "object",
+      "description": "Accepted but ignored. Project-level job definitions are not implemented: the key never reaches planning, and the CLI warns when a project declares it. Use 'disable.jobs' to opt out of an extension-provided job, or 'tasks' for per-project execution tuning.",
+      "additionalProperties": true
+    },
+    "tasks": {
+      "type": "object",
+      "description": "Per-task execution tuning for this project. Keys are job names: a full step name ('build~transpile') or a command name ('lint'), which applies to every step of that command unless a more specific step entry exists.",
+      "additionalProperties": {
+        "$ref": "#/definitions/taskTuning"
+      }
+    },
+    "disable": {
+      "type": "object",
+      "description": "Opt-out configuration for jobs in this project.",
+      "properties": {
+        "jobs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Jobs to disable for this project. Supports job names ('lint') or qualified names ('@putnami/typescript:lint')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "featureAuthority": {
+      "type": "object",
+      "description": "Why this project declares no user-facing feature of its own. Set exactly one member. Absent means the project is expected to declare a feature.",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The authored feature ID this project contributes to, when the declaration lives in another project."
+        },
+        "none": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why this project deliberately has no user-facing feature."
+        }
+      },
+      "oneOf": [{ "required": ["owner"] }, { "required": ["none"] }]
+    }
+  },
+  "definitions": {
+    "taskTuning": {
+      "type": "object",
+      "description": "Execution tuning for one task in this project.",
+      "additionalProperties": false,
+      "properties": {
+        "cpuWeight": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Relative multiplier on deterministic, history-derived CPU demand. 1 is the default; 4 gives an otherwise identical task four times the CPU budget, capped by machine capacity. Execution hint only — never affects cache keys."
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Scheduler deadline for this task, in milliseconds, overriding the extension manifest for this project. Must be positive: 0 (use the CLI default) and negative values (no deadline) are manifest-only sentinels. Execution hint only — never affects cache keys."
+        }
+      }
+    }
+  }
+}

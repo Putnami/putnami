@@ -1,0 +1,31 @@
+{
+  "protocolVersion": 1,
+  "domain": "observability",
+  "owner": "observability",
+  "projects": [
+    "/observability/workloads/telemetry-api"
+  ],
+  "exports": [],
+  "imports": [
+    {
+      "id": "observability.runtime-workspace-context.v1",
+      "version": 1,
+      "from": {
+        "domain": "runtime",
+        "export": "runtime.workspace-telemetry-binding.v1"
+      },
+      "as": "observability.workspace-context",
+      "mode": "projection",
+      "status": "planned",
+      "facts": [
+        "workspace_id"
+      ],
+      "updates": {
+        "kind": "event",
+        "contract": "runtime.workspace-telemetry-binding-changed.v1",
+        "availability": "planned"
+      },
+      "justification": "Invalid fixture: a projection cannot omit bootstrap."
+    }
+  ]
+}

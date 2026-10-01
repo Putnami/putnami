@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/workspace-marker-not-input",
+  "workspace": {
+    "markers": ["go.mod"],
+    "inputs": ["go.sum"]
+  },
+  "commands": {
+    "build": { "run": [{ "id": "build", "task": "build-exec" }] }
+  },
+  "tasks": {
+    "build-exec": { "kind": "command", "command": "echo" }
+  }
+}

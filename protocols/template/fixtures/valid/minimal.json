@@ -1,0 +1,5 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-template.json",
+  "name": "minimal-library",
+  "description": "A minimal project template"
+}

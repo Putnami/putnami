@@ -1,0 +1,27 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/sensitive-output-path-from-port",
+  "commands": {
+    "test": { "run": [{ "id": "setup", "task": "test-setup" }] }
+  },
+  "tasks": {
+    "test-setup": {
+      "kind": "command",
+      "command": "echo",
+      "cache": false,
+      "outputs": {
+        "credentialsPath": { "description": "Where the credentials file was written" }
+      },
+      "declares": {
+        "outputs": {
+          "credentials": {
+            "kind": "runtime-file",
+            "scope": "invocation",
+            "sensitive": true,
+            "pathFrom": "credentialsPath"
+          }
+        }
+      }
+    }
+  }
+}

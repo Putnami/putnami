@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-infra.json",
+  "title": "Putnami Infrastructure Requirements (per-project)",
+  "description": "Committed generator-owned per-project infrastructure requirements manifest. Lives at <project>/infra/requirements.json. Declares only what this project's own code needs; workload-level runtime concerns are rejected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "protocolVersion": {
+      "type": "integer",
+      "const": 2,
+      "description": "Current infra-requirements protocol version."
+    },
+    "databases": {
+      "type": "array",
+      "description": "Database requirements declared by this project.",
+      "items": { "$ref": "#/$defs/database" }
+    },
+    "events": {
+      "$ref": "#/$defs/events"
+    },
+    "storage": {
+      "type": "array",
+      "description": "Object-storage bucket requirements.",
+      "items": { "$ref": "#/$defs/storageBucket" }
+    },
+    "secrets": {
+      "type": "array",
+      "description": "Secret names required by this project.",
+      "items": { "$ref": "#/$defs/resourceName" }
+    },
+    "scheduledJobs": {
+      "type": "array",
+      "description": "Scheduled job requirements (cron expression + entrypoint).",
+      "items": { "$ref": "#/$defs/scheduledJob" }
+    }
+  },
+  "$defs": {
+    "resourceName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_./-]{0,63}$",
+      "description": "Canonical resource identifier: lowercase letters, digits, '-', '_', '.', '/'; 1–64 chars."
+    },
+    "engine": {
+      "type": "string",
+      "enum": ["postgres", "mysql", "sqlite", "firestore"],
+      "description": "Database engine. Closed enum; adding an engine requires a protocol version bump."
+    },
+    "storageAccess": {
+      "type": "string",
+      "enum": ["read", "write", "readwrite"],
+      "description": "Object-storage access level the runtime identity is granted; drives the IAM grant scope. Closed enum mirroring go.putnami.dev/protocol/storage."
+    },
+    "delivery": {
+      "type": "string",
+      "enum": ["pull", "stream", "push"],
+      "description": "How a subscriber receives events. 'pull'/'stream' hold a long-lived process; 'push' has the provider POST each event to a workload receiver (serverless). Owned by go.putnami.dev/protocol/events; absent means the back-compatible default, pull."
+    },
+    "subscription": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topic"],
+      "description": "A subscribed topic with an explicit non-default delivery model. In 'subscribes', a bare topic string is shorthand for delivery 'pull'.",
+      "properties": {
+        "topic":    { "$ref": "#/$defs/resourceName" },
+        "delivery": { "$ref": "#/$defs/delivery" }
+      }
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "engine"],
+      "properties": {
+        "name":    { "$ref": "#/$defs/resourceName" },
+        "engine":  { "$ref": "#/$defs/engine" },
+        "schemas": {
+          "type": "array",
+          "description": "Optional list of schema names required inside this database.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Event topic publish/subscribe requirements.",
+      "properties": {
+        "publishes":  { "type": "array", "items": { "$ref": "#/$defs/resourceName" } },
+        "subscribes": {
+          "type": "array",
+          "description": "Subscribed topics. Each item is a bare topic string (delivery 'pull') or a { topic, delivery } object.",
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/resourceName" },
+              { "$ref": "#/$defs/subscription" }
+            ]
+          }
+        }
+      }
+    },
+    "storageBucket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name":      { "$ref": "#/$defs/resourceName" },
+        "access":    { "$ref": "#/$defs/storageAccess" },
+        "public": {
+          "type": "boolean",
+          "description": "Whether objects need public (unauthenticated) read access; a deployer maps it onto a public bucket policy / IAM grant."
+        },
+        "retention": {
+          "type": "string",
+          "description": "Free-form retention string (e.g. \"30d\"). Format is deployer-defined."
+        }
+      }
+    },
+    "scheduledJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "schedule"],
+      "properties": {
+        "name":       { "$ref": "#/$defs/resourceName" },
+        "schedule":   {
+          "type": "string",
+          "minLength": 1,
+          "description": "5-field Cloud Scheduler (unix-cron) expression, e.g. \"0 2 * * *\". The Go validator rejects malformed expressions (wrong field count, out-of-range values, @macros); JSON Schema only enforces non-empty."
+        },
+        "entrypoint": {
+          "type": "string",
+          "description": "Optional command or symbol the scheduler invokes."
+        }
+      }
+    }
+  }
+}

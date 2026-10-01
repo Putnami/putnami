@@ -1,0 +1,40 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "putnami.framework", "value": { "stringValue": "typescript" } },
+          { "key": "service.name", "value": { "stringValue": "checkout" } }
+        ]
+      },
+      "scopeLogs": [
+        {
+          "scope": { "name": "putnami", "version": "1.0.0" },
+          "logRecords": [
+            {
+              "timeUnixNano": "1700000000000000000",
+              "observedTimeUnixNano": "1700000000000000000",
+              "severityNumber": 9,
+              "severityText": "info",
+              "body": { "stringValue": "request handled" },
+              "attributes": [
+                { "key": "route", "value": { "stringValue": "/checkout" } }
+              ]
+            },
+            {
+              "timeUnixNano": "1700000000500000000",
+              "severityNumber": 17,
+              "severityText": "error",
+              "body": { "stringValue": "payment failed" },
+              "attributes": [
+                { "key": "error.code", "value": { "stringValue": "card_declined" } }
+              ],
+              "traceId": "5b8efff798038103d269b633813fc60c",
+              "spanId": "eee19b7ec3c1b174"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

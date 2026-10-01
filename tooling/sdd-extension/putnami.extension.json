@@ -1,0 +1,1449 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/sdd",
+  "cliContract": 4,
+  "optionNamespaces": ["sdd", "publish"],
+  "extensionDependencies": {},
+  "runtime": {
+    "executable": "compiled/putnami-sdd",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          { "from": "environment", "environment": "GOROOT", "path": "bin/go" },
+          { "from": "path", "path": "go" },
+          { "from": "putnami-home", "path": "toolchains/go/go-{version}/go/bin/go" }
+        ],
+        "probe": {
+          "args": ["env", "GOVERSION"],
+          "expect": "go{version}",
+          "unset": ["GOROOT"],
+          "environment": { "GOTOOLCHAIN": "local" }
+        },
+        "environment": {
+          "GOROOT": { "from": "ancestor", "levels": 2 },
+          "GOTOOLCHAIN": { "from": "literal", "value": "local" }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "internal/**"
+      ],
+      "toolchains": ["runtimeCompiler"]
+    }
+  },
+  "commands": {
+    "sdd-architecture-init": {
+      "description": "Scaffold one domain manifest",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-architecture-init-exec"
+        }
+      ]
+    },
+    "sdd-architecture-inspect": {
+      "description": "Inspect one declared domain and its relationships",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-architecture-inspect-exec"
+        }
+      ]
+    },
+    "sdd-architecture-snapshot": {
+      "description": "Emit the deterministic declared and observed architecture",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-architecture-snapshot-exec"
+        }
+      ]
+    },
+    "sdd-architecture-sync": {
+      "description": "Reconcile the mechanical half of every domain manifest",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-architecture-sync-exec"
+        }
+      ]
+    },
+    "sdd-architecture-validate": {
+      "description": "Validate ARC/DARC declarations and structural drift",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-architecture-validate-exec"
+        }
+      ]
+    },
+    "sdd-contracts-check": {
+      "description": "Check contract artifacts for drift and breaking changes",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-contracts-check-exec"
+        }
+      ]
+    },
+    "sdd-contracts-generate": {
+      "description": "Generate committed contract artifacts from a manifest",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-contracts-generate-exec"
+        }
+      ]
+    },
+    "sdd-features-diff": {
+      "description": "Compare feature evidence between immutable revisions",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-features-diff-exec"
+        }
+      ]
+    },
+    "sdd-features-inspect": {
+      "description": "Inspect one feature and its exact evidence provenance",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-features-inspect-exec"
+        }
+      ]
+    },
+    "sdd-features-list": {
+      "description": "List the compact catalog of authored product features",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-features-list-exec"
+        }
+      ]
+    },
+    "sdd-features-snapshot": {
+      "description": "Summarize the deterministic current-workspace feature view",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-features-snapshot-exec"
+        }
+      ]
+    },
+    "sdd-features-validate": {
+      "description": "Validate feature intent, evidence, and contribution references",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-features-validate-exec"
+        }
+      ]
+    },
+    "sdd-selfcheck": {
+      "description": "Report the @putnami/sdd runtime and the job context the orchestrator hands it.",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "quiet": true,
+      "run": [
+        {
+          "id": "selfcheck",
+          "task": "sdd-selfcheck-exec"
+        }
+      ]
+    },
+    "sdd-specs-baseline": {
+      "description": "Derive the enforced-spec floor and ratchet the committed baseline",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-specs-baseline-exec"
+        }
+      ]
+    },
+    "sdd-specs-init": {
+      "description": "Create one minimal spec for an authored feature",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-specs-init-exec"
+        }
+      ]
+    },
+    "sdd-specs-inspect": {
+      "description": "Inspect one feature's spec, declaration, and decisions",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-specs-inspect-exec"
+        }
+      ]
+    },
+    "sdd-specs-list": {
+      "description": "List durable specs with their features and outcomes",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-specs-list-exec"
+        }
+      ]
+    },
+    "sdd-specs-validate": {
+      "description": "Validate every spec and report completeness gaps",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-specs-validate-exec"
+        }
+      ]
+    },
+    "sdd-specs-verify": {
+      "description": "Replay the recorded executable-spec verification verdict",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "run",
+          "task": "sdd-specs-verify-exec"
+        }
+      ]
+    },
+    "validate": {
+      "description": "Validate a project's specification-driven declarations: its features and the specs that detail them.",
+      "activationFiles": [
+        "putnami.features.json",
+        "specs/*.json"
+      ],
+      "run": [
+        {
+          "id": "features",
+          "task": "features-validate"
+        },
+        {
+          "id": "specs",
+          "task": "specs-validate",
+          "dependsOn": [
+            "features"
+          ]
+        }
+      ],
+      "alsoRuns": [
+        "validate-workspace"
+      ]
+    },
+    "validate-workspace": {
+      "description": "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, and check the links of every README.md file and doc/ tree of the workspace.",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "architecture",
+          "task": "architecture-validate"
+        },
+        {
+          "id": "specs-ratchet",
+          "task": "specs-ratchet-validate"
+        },
+        {
+          "id": "decisions",
+          "task": "decisions-validate"
+        },
+        {
+          "id": "recipes",
+          "task": "recipes-validate"
+        },
+        {
+          "id": "codeowners",
+          "task": "codeowners-sync"
+        },
+        {
+          "id": "docs-links",
+          "task": "docs-links-validate"
+        }
+      ]
+    }
+  },
+  "commandGroups": {
+    "architecture": {
+      "description": "Validate and inspect executable domain architecture",
+      "subcommands": {
+        "init": {
+          "description": "Create one canonical putnami.architecture.json for a domain that does not exist yet, carrying only what you stated: the domain id, its owner, and the projects your selection resolved to. It refuses a domain another manifest already declares and never overwrites an existing file. Exports, imports, and bindings stay for you to author, because each is an agreement between two domains that no generator can derive. --dry-run prints the target path and the exact canonical bytes without writing",
+          "command": "sdd-architecture-init",
+          "interactive": true,
+          "flags": {
+            "at": {
+              "type": "string",
+              "description": "Workspace-relative directory for the manifest (default: the first mapped project, else the workspace root)."
+            },
+            "dry-run": {
+              "type": "boolean",
+              "description": "Print the target path and the exact canonical bytes without writing the file."
+            },
+            "owner": {
+              "type": "string",
+              "description": "Team or role accountable for the domain (default: the domain id)."
+            }
+          },
+          "positionals": [
+            {
+              "name": "domain-id",
+              "required": true
+            }
+          ],
+          "examples": [
+            {
+              "command": "putnami architecture init billing --projects /billing,/billing-api --dry-run"
+            },
+            {
+              "command": "putnami architecture init billing --projects /billing --owner billing-team"
+            }
+          ]
+        },
+        "inspect": {
+          "description": "Select one exact manifest domain ID and show its owner, source, projects, owned concepts, exports, imports, inbound and outbound DARC edges, observed project dependencies, scoped findings, detector coverage, and baseline provenance",
+          "command": "sdd-architecture-inspect",
+          "interactive": true,
+          "positionals": [
+            {
+              "name": "domain-id",
+              "required": true
+            }
+          ],
+          "examples": [
+            {
+              "command": "putnami architecture inspect observability"
+            },
+            {
+              "command": "putnami architecture inspect runtime --output=jsonl"
+            }
+          ]
+        },
+        "snapshot": {
+          "description": "Aggregate validated domain declarations into one canonical graph, attach exact cross-domain project edges, explicit detector coverage, stable findings, and ratchet dispositions, and emit the same snapshot used by validation",
+          "command": "sdd-architecture-snapshot",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami architecture snapshot"
+            },
+            {
+              "command": "putnami architecture snapshot --output=json"
+            }
+          ]
+        },
+        "sync": {
+          "description": "Recompute what follows from the resolved graph and nothing else: drop a project entry the workspace no longer contains, drop a binding whose project edge is no longer observed, and propose a binding for an observed edge the consumer domain ALREADY declares an import for. It never writes an import: an observed dependency with no declared contract is refused and named, and stays a failing architecture finding until a human declares it. Without --apply nothing is written; with it, the git diff is where each proposed permission is authorized. The reconciliation covers every manifest, so project selection flags are rejected rather than silently ignored",
+          "command": "sdd-architecture-sync",
+          "interactive": true,
+          "flags": {
+            "apply": {
+              "type": "boolean",
+              "description": "Write the reconciled manifests instead of only printing the suggestion."
+            }
+          },
+          "examples": [
+            {
+              "command": "putnami architecture sync"
+            },
+            {
+              "command": "putnami architecture sync --apply"
+            },
+            {
+              "command": "putnami architecture sync --output=json"
+            }
+          ]
+        },
+        "validate": {
+          "description": "Strictly validate every putnami.architecture.json declaration and its cross-domain references, compare exact mapped project dependencies with declared bindings, then fail only for new drift, stale debt metadata, expired waivers, or growth of the frozen baseline. Database, HTTP, and event observations remain explicitly outside v1 detector coverage",
+          "command": "sdd-architecture-validate",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami architecture validate"
+            },
+            {
+              "command": "putnami architecture validate --baseline origin/main --output=jsonl"
+            }
+          ]
+        }
+      }
+    },
+    "contracts": {
+      "description": "Generate and check contract artifacts",
+      "subcommands": {
+        "check": {
+          "description": "Regenerate in memory and fail (exit 2) on artifact drift or on a renamed/removed enum value, scope, claim, or grant vs the git-committed prior contract; emits a machine-readable compatibility report",
+          "command": "sdd-contracts-check",
+          "interactive": true,
+          "flags": {
+            "project": {
+              "type": "string",
+              "description": "Project ID, path, or name"
+            }
+          },
+          "examples": [
+            {
+              "command": "putnami contracts check --project /tooling/cli"
+            },
+            {
+              "command": "putnami contracts check --project @putnami/cli --output=jsonl"
+            }
+          ]
+        },
+        "generate": {
+          "description": "Validate the authored contract manifest and (atomically) regenerate the committed canonical IR, Go type twin, and JSON Schema under schema/",
+          "command": "sdd-contracts-generate",
+          "interactive": true,
+          "flags": {
+            "project": {
+              "type": "string",
+              "description": "Project ID, path, or name"
+            }
+          },
+          "examples": [
+            {
+              "command": "putnami contracts generate --project /tooling/cli"
+            },
+            {
+              "command": "putnami contracts generate --project @putnami/cli --output=jsonl"
+            }
+          ]
+        }
+      }
+    },
+    "features": {
+      "description": "List, validate, inspect, and compare product feature evidence",
+      "subcommands": {
+        "diff": {
+          "description": "Resolve both revisions to exact commits, independently rebuild each revision's workspace membership and source-bound feature assessment directly from Git objects, and report deterministic added, removed, promoted, regressed, stale, contradicted, and newly unclassified deltas without checkout or worktree mutation. The two revisions are the target, so project selection flags are rejected rather than silently ignored",
+          "command": "sdd-features-diff",
+          "interactive": true,
+          "positionals": [
+            {
+              "name": "base-revision",
+              "required": true
+            },
+            {
+              "name": "head-revision",
+              "required": true
+            }
+          ],
+          "examples": [
+            {
+              "command": "putnami features diff origin/main HEAD"
+            },
+            {
+              "command": "putnami features diff HEAD~1 HEAD --output=jsonl"
+            }
+          ]
+        },
+        "inspect": {
+          "description": "Show one feature's authored intent, target and current maturity, every requirement and evidence state, exact semantic contribution identities, source-bound declarations and artifacts, transport containers, related unclassified facts, revision, and sorted diagnostics. The target is already exact, so project selection flags are rejected rather than silently ignored: narrowing an exact lookup could only turn a found answer into a missing one",
+          "command": "sdd-features-inspect",
+          "interactive": true,
+          "positionals": [
+            {
+              "name": "feature-id",
+              "required": true
+            }
+          ],
+          "examples": [
+            {
+              "command": "putnami features inspect billing/checkout"
+            },
+            {
+              "command": "putnami features inspect billing/checkout --output=jsonl"
+            }
+          ]
+        },
+        "list": {
+          "description": "List every explicitly authored product feature \u2014 native design declarations plus durable putnami.features.json entries at the workspace and exact project roots \u2014 with its outcome, owner, implementing projects, and exact declaration sources. Project selection is applied first and bounds the work as well as the answer: only the selected projects' design graphs are read, while durable declarations stay workspace-wide so identity and duplicate detection never depend on the selection. An optional query then filters ids, names, outcomes, and owners",
+          "command": "sdd-features-list",
+          "interactive": true,
+          "positionals": [
+            {
+              "name": "query"
+            }
+          ],
+          "examples": [
+            {
+              "command": "putnami features list"
+            },
+            {
+              "command": "putnami features list --projects @acme/billing"
+            },
+            {
+              "command": "putnami features list --impacted --output=json"
+            },
+            {
+              "command": "putnami features list \"invoice export\""
+            }
+          ]
+        },
+        "snapshot": {
+          "description": "Derive the current feature assessment from authored intent and source-bound evidence. Human output is a concise summary; structured output carries the explicitly provisional deterministic snapshot, the resolved selection metadata, and sorted diagnostics. Project selection scopes the snapshot the same way it scopes validation",
+          "command": "sdd-features-snapshot",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami features snapshot"
+            },
+            {
+              "command": "putnami features snapshot --projects @acme/billing"
+            },
+            {
+              "command": "putnami features snapshot --output=json"
+            }
+          ]
+        },
+        "validate": {
+          "description": "Discover only workspace and exact project-root feature artifacts, validate their strict protocol shapes and cross-document references, and report every sorted structural error and assessment warning. Missing, stale, contradicted, and unclassified evidence remains advisory. Project selection scopes the run to the selected projects' features while still following the declarations, evidence, and technical contributions those features depend on across project boundaries; a failure wholly outside the selection never fails a scoped run",
+          "command": "sdd-features-validate",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami features validate"
+            },
+            {
+              "command": "putnami features validate --impacted"
+            },
+            {
+              "command": "putnami features validate --projects @acme/billing --output=jsonl"
+            }
+          ]
+        }
+      }
+    },
+    "specs": {
+      "description": "Discover, inspect, verify, and start durable feature specs",
+      "subcommands": {
+        "baseline": {
+          "description": "Derive the enforced-spec floor \u2014 every project whose effective specs verification mode is enforce, with the feature#requirement identities its criteria make executable \u2014 and compare it byte-for-byte with the committed specs.baseline.json files, one in the directory of each enforced project. --update rewrites them to the canonical derived floor and deletes a file the floor no longer names; this command is the one place the ratchet's baseline is raised or deliberately lowered, while the validate-workspace task only ever compares. The floor is whole-workspace by construction, so project selection flags are rejected rather than silently ignored",
+          "command": "sdd-specs-baseline",
+          "interactive": true,
+          "flags": {
+            "update": {
+              "type": "boolean",
+              "description": "Rewrite the committed specs.baseline.json files to record the derived floor."
+            }
+          },
+          "examples": [
+            {
+              "command": "putnami specs baseline"
+            },
+            {
+              "command": "putnami specs baseline --update"
+            },
+            {
+              "command": "putnami specs baseline --output=json"
+            }
+          ]
+        },
+        "init": {
+          "description": "Create one canonical spec skeleton next to the declaration of an already-authored feature, carrying only what that declaration states. It refuses an unknown feature, refuses a feature that already has a spec, and never overwrites an existing file; --dry-run prints the target path and the exact canonical bytes without writing. Requirements, non-goals, and decision links stay for you to author. The feature is an exact target, so project selection flags are rejected rather than silently ignored",
+          "command": "sdd-specs-init",
+          "interactive": true,
+          "flags": {
+            "dry-run": {
+              "type": "boolean",
+              "description": "Print the target path and the exact canonical bytes without writing the file."
+            }
+          },
+          "positionals": [
+            {
+              "name": "feature-id",
+              "required": true
+            }
+          ],
+          "examples": [
+            {
+              "command": "putnami specs init billing/invoice-export --dry-run"
+            },
+            {
+              "command": "putnami specs init billing/invoice-export"
+            }
+          ]
+        },
+        "inspect": {
+          "description": "Show one already-authored feature's durable declaration, its spec's outcomes, non-goals and requirements, every linked decision record with whether that record exists in this worktree, the exact source path and owning project, and the diagnostics scoped to that document. No design graph, evidence document, or capability manifest is read. The feature is already an exact target, so project selection flags are rejected rather than silently ignored",
+          "command": "sdd-specs-inspect",
+          "interactive": true,
+          "positionals": [
+            {
+              "name": "feature-id",
+              "required": true
+            }
+          ],
+          "examples": [
+            {
+              "command": "putnami specs inspect billing/invoice-export"
+            },
+            {
+              "command": "putnami specs inspect billing/invoice-export --output=jsonl"
+            }
+          ]
+        },
+        "list": {
+          "description": "List every canonical specs/*.json document with the exact feature it details, its file path and owning project, its first intended outcomes, and its non-goal, requirement, and decision counts. Narrow it by owning project with the normal selection flags; there is deliberately no filename filter, because a filename never mints identity: the feature field does",
+          "command": "sdd-specs-list",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami specs list"
+            },
+            {
+              "command": "putnami specs list --projects @acme/billing"
+            },
+            {
+              "command": "putnami specs list --impacted --output=json"
+            }
+          ]
+        },
+        "validate": {
+          "description": "Validate every discovered spec through the durable spec contract \u2014 strict shape, canonical location, resolvable feature reference, contained decision links, and one spec per feature \u2014 then report the authoring gaps around it: authored features with no spec, publishable projects with no reviewed support entry, and publishable projects with no owning feature link. Contract violations fail; completeness gaps stay warnings. Project selection scopes both the validated documents and the completeness counts to the selected projects, while duplicate detection stays workspace-wide",
+          "command": "sdd-specs-validate",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami specs validate"
+            },
+            {
+              "command": "putnami specs validate --impacted"
+            },
+            {
+              "command": "putnami specs validate --projects @acme/billing --output=jsonl"
+            }
+          ]
+        },
+        "verify": {
+          "description": "Reproduce what the spec gate decided for the selected projects from the record persisted beside an engine session (decision 9): per spec-owning project, the effective enforce/report/off mode with its provenance, every textual requirement's verified/unmapped/unexecutable/missing/stale/contradicted state with per-check detail, the observation reports read with their digests, and the recorded blocking decision. --session names an exact recorded session; the default is the latest. A spec no session covered is evaluated against zero observations through the same shared rule, so nothing unproven reads as green. Structural spec errors fail exactly as specs validate fails; an effective off policy reports automaticEvaluation: false and succeeds",
+          "command": "sdd-specs-verify",
+          "interactive": true,
+          "flags": {
+            "session": {
+              "type": "string",
+              "description": "Recorded session ID to replay (default: the latest recorded session)."
+            }
+          },
+          "examples": [
+            {
+              "command": "putnami specs verify"
+            },
+            {
+              "command": "putnami specs verify --projects go.putnami.dev/logger"
+            },
+            {
+              "command": "putnami specs verify --session latest --output=json"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "tasks": {
+    "architecture-validate": {
+      "description": "Automatically validate the workspace's ARC/DARC declarations according to committed options.sdd.verification.architecture: enforce blocks on coherent findings, report publishes them as advisory warnings, and off skips this automatic evaluation. Policy/config/parse/provider-view errors remain blocking, and the effective mode and provenance are always reported. The evaluation compares declarations with the exact cross-domain edges of the resolved project graph. It also reads each mapped project's committed capability manifest and compares the framework implementations recorded there with the declared imports, reporting a declared active contract nothing implements and an implemented one nobody declared. That is committed-file evidence, never runtime observation. Runs over the CURRENT WORKTREE ONLY and reads no git history: the shrink-only baseline comparison resolves a commit, which is state this task's key does not name, so folding it in would make a restored verdict depend on which ref origin/HEAD points at. Dropping it is stricter, never laxer \u2014 nothing is excused as known debt \u2014 and shrink-only ratcheting stays with the interactive `putnami architecture validate --baseline REF`.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "architecture-validate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "inputs": {
+        "declarations": {
+          "from": "workspace",
+          "files": [
+            "**/putnami.architecture.json",
+            "**/architecture.baseline.json",
+            "**/architecture.waivers.json"
+          ]
+        },
+        "evidence": {
+          "from": "workspace",
+          "files": [
+            "**/schema/capabilities.json"
+          ]
+        },
+        "policy": {
+          "from": "workspace",
+          "files": [
+            "putnami.workspace.json"
+          ]
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Architecture validation report: effective mode and provenance, evaluation state, repository counts, coverage, findings and sorted diagnostics."
+        }
+      },
+      "cache": {
+        "enabled": true,
+        "noOutput": true
+      },
+      "declares": {}
+    },
+    "decisions-validate": {
+      "description": "Prove the workspace's committed decisions.json registries, the root one and each project's, against this worktree. Each entry states a settled value with a stable id, the date it was settled and who settled it, and carries either a json-value check validate proves or the reviewOnly mark a reviewer holds. A violation fails naming the decision \u2014 id, statement and settled date \u2014 so the way out is to change the decision, not the code; an absent registry is adoption, never a failure. UNCACHEABLE on purpose, for the same reason features-validate is: a check's read set is whatever its own `files` globs name, those globs are authored per repository, and no static input pattern can cover them, so an under-declared key would serve a stale verdict while claiming to have checked. There is no verification-mode knob: a decision a repository wrote down and dated is either held or re-decided, and a report mode would be the silent re-decision the registry exists to prevent.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "decisions-validate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "outputs": {
+        "data": {
+          "description": "Decision report: registry presence, the settled/enforced/review-only accounting, the files checked, and one finding per violating file."
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "docs-links-validate": {
+      "description": "Check every relative link and anchor in every README.md file and doc/ tree of the workspace, once per run whatever the selection: the documents no project owns, the projects without a language extension, and a link from one project into another that a change to the other breaks. It applies the SDK's docslinks rule, which each language extension's lint-docs task applies inside its project. UNCACHEABLE on purpose: a link may name any file of the workspace, so no file-pattern key covers the read set.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "docs-links-validate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "outputs": {
+        "data": {
+          "description": "Documentation link report: the number of documents checked and the sorted broken links."
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "codeowners-sync": {
+      "description": "Write .github/CODEOWNERS from the owners declared in options.sdd.owners: putnami.workspace.json gives the catch-all rule, a scope or project putnami.json gives its directory a rule, and the spec-governance files stay with the workspace owners. The committed file is rewritten only when it differs, so it follows the declarations without a command of its own; a workspace that declares no owners is left alone. UNCACHEABLE on purpose: it reads the putnami.json of every project and every directory above one, and it rewrites a file that is also its input, so a replayed success over a stale file would skip the rewrite.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "codeowners-sync"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "outputs": {
+        "data": {
+          "description": "CODEOWNERS report: whether owners are declared, the rendered rules with their declaring file, whether the file was rewritten, and sorted diagnostics."
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "writes": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "mutatesSources": true
+      }
+    },
+    "recipes-validate": {
+      "description": "Check every committed <lang>/samples/recipes.json against this worktree. Each recipe maps one intention to the sample that demonstrates it, the framework primitives it uses and the hand-rolled shapes it replaces; a recipe whose sample is not a directory fails naming it, a second recipe for one intention fails, and an absent index is adoption. UNCACHEABLE on purpose: the verdict depends on whether each named sample directory exists, and no file-pattern key can express that.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "recipes-validate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "outputs": {
+        "data": {
+          "description": "Recipe report: the index files read, the recipe count, and sorted diagnostics."
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "features-validate": {
+      "description": "Validate one project's durable feature manifest and the evidence backing its requirements. UNCACHEABLE in v1, and deliberately: this verdict depends on evidence source bindings \u2014 arbitrary bound files plus their git blob state \u2014 so no file-pattern key can cover the read set, and an under-declared key would serve a stale verdict while claiming to have checked. A binding-aware key is a follow-up, not a smaller version of this one.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "features-validate"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "outputs": {
+        "data": {
+          "description": "Feature validation report: counts, assessments and sorted diagnostics."
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-architecture-init-exec": {
+      "description": "Scaffold one domain manifest. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "architecture",
+        "init"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "writes": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "mutatesSources": true
+      }
+    },
+    "sdd-architecture-inspect-exec": {
+      "description": "Inspect one declared domain and its relationships. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "architecture",
+        "inspect"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-architecture-snapshot-exec": {
+      "description": "Emit the deterministic declared and observed architecture. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "architecture",
+        "snapshot"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-architecture-sync-exec": {
+      "description": "Reconcile the mechanical half of every domain manifest. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "architecture",
+        "sync"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "writes": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "mutatesSources": true
+      }
+    },
+    "sdd-architecture-validate-exec": {
+      "description": "Validate ARC/DARC declarations and structural drift. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "architecture",
+        "validate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-contracts-check-exec": {
+      "description": "Check contract artifacts for drift and breaking changes. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "contracts",
+        "check"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-contracts-generate-exec": {
+      "description": "Generate committed contract artifacts from a manifest. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "contracts",
+        "generate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "writes": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "mutatesSources": true
+      }
+    },
+    "sdd-features-diff-exec": {
+      "description": "Compare feature evidence between immutable revisions. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "features",
+        "diff"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-features-inspect-exec": {
+      "description": "Inspect one feature and its exact evidence provenance. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "features",
+        "inspect"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-features-list-exec": {
+      "description": "List the compact catalog of authored product features. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "features",
+        "list"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-features-snapshot-exec": {
+      "description": "Summarize the deterministic current-workspace feature view. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "features",
+        "snapshot"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-features-validate-exec": {
+      "description": "Validate feature intent, evidence, and contribution references. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "features",
+        "validate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-selfcheck-exec": {
+      "description": "Print the extension identity, the job-context protocol version and the resolved `selection` block, then exit. Declares no outputs and no effects: it reads only the context file the orchestrator wrote and writes only its own result document. Uncacheable on purpose \u2014 its whole verdict is about the environment of THIS invocation, so a restored answer from another one would be the single thing it must never report.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "selfcheck"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 60000,
+      "outputs": {
+        "data": {
+          "description": "Extension identity plus the job-context members the SDD engines read."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-specs-baseline-exec": {
+      "description": "Derive the enforced-spec floor and ratchet the committed baseline. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "specs",
+        "baseline"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "writes": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "mutatesSources": true
+      }
+    },
+    "sdd-specs-init-exec": {
+      "description": "Create one minimal spec for an authored feature. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "specs",
+        "init"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "writes": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "mutatesSources": true
+      }
+    },
+    "sdd-specs-inspect-exec": {
+      "description": "Inspect one feature's spec, declaration, and decisions. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "specs",
+        "inspect"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-specs-list-exec": {
+      "description": "List durable specs with their features and outcomes. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "specs",
+        "list"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-specs-validate-exec": {
+      "description": "Validate every spec and report completeness gaps. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "specs",
+        "validate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "sdd-specs-verify-exec": {
+      "description": "Replay the recorded executable-spec verification verdict. Interactive: the CLI runs it with the terminal's own stdout and parses nothing, so it writes the command's result envelope (or its human rendering) itself and declares no output ports.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "specs",
+        "verify"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 600000,
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "specs-ratchet-validate": {
+      "description": "Compare the executable-spec enforce floor against the specs.baseline.json each enforced project commits, with the protocol's shrink-only rule. The CURRENT floor \u2014 every project whose effective options.sdd.verification.specs is enforce, with the feature#requirement identities its criteria make executable \u2014 is derived from the same committed manifests, specs, and options every other gate surface reads. An enforced project that regressed to report/off, or lost a recorded requirement, fails; the reviewed policy change is an edit to the project's committed baseline in the same diff. Growth never fails and only draws a nudge to raise the floor. Runs over the CURRENT WORKTREE ONLY and reads no git history, so the declared input patterns cover the whole read set and a cached verdict stays honest.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "specs-ratchet-validate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "inputs": {
+        "floor": {
+          "from": "workspace",
+          "files": [
+            "**/putnami.features.json",
+            "**/specs/*.json",
+            "**/putnami.json",
+            "putnami.workspace.json",
+            "**/specs.baseline.json"
+          ]
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Specs ratchet report: the derived enforce floor, the committed baseline's presence, the shrink/growth accounting, and sorted diagnostics."
+        }
+      },
+      "cache": {
+        "enabled": true,
+        "noOutput": true
+      },
+      "declares": {}
+    },
+    "specs-validate": {
+      "description": "Validate one project's specs against the features they detail, resolve their decision links in this worktree, and report the completeness gaps around them. It OWNS one project's rows and READS the workspace's authored identities: a spec is keyed by feature id, one spec per feature is a workspace-wide guarantee, and a subset cannot prove either. The key follows the read set rather than the ownership \u2014 the two project ports name what this task reports on, the workspace port names the identity tier it resolves against \u2014 because a key that stopped at the project would let a sibling's manifest change this verdict silently. On a valid repository it additionally emits the executable-criteria projection (D9): the bounded (feature, requirement) \u2192 criterion join derived only from manifests and specs, which core joins with run observations. The projection is a declared output so a cache hit restores it byte-identically.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "specs-validate"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "inputs": {
+        "identity": {
+          "from": "workspace",
+          "files": [
+            "**/putnami.features.json",
+            "**/specs/*.json"
+          ]
+        },
+        "manifest": {
+          "from": "project",
+          "files": [
+            "putnami.features.json"
+          ]
+        },
+        "specs": {
+          "from": "project",
+          "files": [
+            "specs/*.json"
+          ]
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Spec validation report: counts, completeness gaps and sorted diagnostics."
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "criteria": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "spec-criteria.json",
+            "optionalEmpty": true,
+            "description": "Executable-criteria projection: every textual spec requirement of this project joined to its same-ID authored feature requirement and criterion. Absent when the project's specs state no requirement."
+          }
+        }
+      }
+    }
+  },
+  "tools": {
+    "sdd.architecture_context": {
+      "description": "Return one exact authored architecture domain from a worktree-only ARC/DARC evaluation. The report carries the domain's complete imports and exports, every declared inbound and outbound edge, every touching observed edge, relevant findings, detector coverage, and structural diagnostics. Requires a resolved workspace selection and never reads Git history or an adoption baseline.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "Exact manifest-authored architecture domain id"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "mcp-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 30000,
+      "workspaceSelection": true
+    },
+    "sdd.feature_context": {
+      "description": "Return one explicitly authored feature with its sorted declaration sources and exact provenance. Durable manifest intent is always retained; when native design graphs exist, technical facts are grouped into modules, APIs, dependencies, data, events, clients, projects, commands, and representative critical paths. Accepts an exact feature id or an unambiguous final id segment and excludes raw graph storage and unrelated workspace diagnostics.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "feature": {
+            "type": "string",
+            "description": "Exact feature id or unambiguous final id segment"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "feature"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "mcp-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 30000,
+      "workspaceSelection": true
+    },
+    "sdd.list_features": {
+      "description": "List the compact product-feature catalog derived from explicit native design declarations and durable putnami.features.json files at the workspace or exact project roots. Use this first when the feature id is unknown. Narrow it with projects or impacted to bound both the answer and the work: project selection is applied FIRST and decides which design graphs are read at all, then optional query terms filter semantic ids, names, outcomes, and owners. Durable declarations stay workspace-wide so feature identity and duplicate detection never depend on the selection.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Optional space-separated terms matched across feature id, name, outcome, and owner, applied after project selection"
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Project ids or names owning the features to list (default: every project)"
+          },
+          "impacted": {
+            "type": "boolean",
+            "description": "List the features owned by the projects the current git change reaches, instead of 'projects'"
+          },
+          "baseline": {
+            "type": "string",
+            "description": "Git baseline ref for 'impacted'. When omitted, Putnami resolves workspace config baseline, nearest configured epic branch, trunk (origin/HEAD, origin/main), local main/master, then the upstream tracking ref \u2014 never the current branch itself."
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "mcp-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 30000,
+      "workspaceSelection": true
+    },
+    "sdd.list_specs": {
+      "description": "List the durable feature specifications discovered as direct JSON children of specs/ at the workspace or exact project roots. Each row carries the exact feature the spec details, its file path and owning project, its first intended outcomes, and its non-goal, requirement, and decision counts, plus how many authored features still have no spec. Narrow it by owning project with projects or impacted; there is deliberately no filename filter, because a spec's identity is its feature field and never its filename. Use it to find which spec to read; call sdd.spec_context for one whole document.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Project ids or names owning the specs to list (default: every project)"
+          },
+          "impacted": {
+            "type": "boolean",
+            "description": "List the specs owned by the projects the current git change reaches, instead of 'projects'"
+          },
+          "baseline": {
+            "type": "string",
+            "description": "Git baseline ref for 'impacted'. When omitted, Putnami resolves workspace config baseline, nearest configured epic branch, trunk (origin/HEAD, origin/main), local main/master, then the upstream tracking ref \u2014 never the current branch itself."
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "mcp-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 30000,
+      "workspaceSelection": true
+    },
+    "sdd.spec_context": {
+      "description": "Return one already-authored feature's durable spec: the intended outcomes, non-goals and agreed requirement sentences, the feature declaration that mints its identity, every linked decision record with whether that record exists in this worktree, the exact source path and owning project, and the diagnostics scoped to that document. Requires an exact feature id and reads no design graph, evidence document, or capability manifest.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "feature": {
+            "type": "string",
+            "description": "Exact authored feature id, e.g. \"billing/invoice-export\""
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "feature"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "mcp-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 30000,
+      "workspaceSelection": true
+    }
+  }
+}

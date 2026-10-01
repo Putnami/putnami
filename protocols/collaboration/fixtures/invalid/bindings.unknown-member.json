@@ -1,0 +1,7 @@
+{
+  "tasks": {
+    "provider": "@acme/github",
+    "version": 1,
+    "fallback": "@putnami/local-collaboration"
+  }
+}

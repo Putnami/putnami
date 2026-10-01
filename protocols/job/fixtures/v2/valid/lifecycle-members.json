@@ -1,0 +1,35 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/p/build",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {"name": "putnami"},
+  "project": {
+    "name": "p",
+    "path": "p",
+    "fullPath": "/ws/p",
+    "metadata": {
+      "@putnami/go": {"module": "go.putnami.dev/p", "moduleRoot": "."},
+      "@putnami/typescript": {"packageName": "@putnami/p"}
+    }
+  },
+  "extension": {
+    "name": "@putnami/go",
+    "root": "/ws/go/extension",
+    "runtimePath": "/ws/.putnami/runtimes/@putnami/go/tc1-abc/bin/putnami-go",
+    "cacheRoot": "/Users/dev/.putnami/cache/extensions/@putnami/go"
+  },
+  "job": {"name": "build"},
+  "identity": {
+    "key": "/p:build",
+    "scope": "project",
+    "project": {"id": "/p", "name": "p"},
+    "task": {"name": "build", "command": "build", "kind": "build"},
+    "provider": {"extension": "@putnami/go"}
+  },
+  "invocation": {
+    "id": "inv-123",
+    "artifactRoot": "/ws/.putnami/invocations/inv-123/artifacts"
+  },
+  "params": {}
+}

@@ -1,0 +1,1 @@
+{ "protocolVersion": 1, "blobExchangeDir": "/ws/.putnami/cache/cas", "mode": "full", "workspace": "ws-id", "branch": "main", "capabilities": ["find-missing"], "knownDigests": ["sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"] }

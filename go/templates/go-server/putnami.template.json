@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-template.json",
+  "name": "go-server",
+  "description": "Go HTTP server using the Putnami framework (app, http, logger)",
+  "extension": "@putnami/go",
+  "workspaceDevDependencies": {
+    "go.putnami.dev/go/extension": "latest"
+  }
+}

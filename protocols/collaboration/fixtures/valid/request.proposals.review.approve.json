@@ -1,0 +1,10 @@
+{
+  "ref": {
+    "source": "local:3f9a0c1d",
+    "id": "P-1"
+  },
+  "verdict": "approve",
+  "body": "Looks right.",
+  "commit": "55e2a8e42",
+  "idempotencyKey": "review:P-1:55e2a8e42"
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "telemetry-putnami-dev/cli-usage-receiver",
+  "outcomes": [
+    "A CLI run is unaffected by whether this receiver is fast, slow, broken, or unreachable",
+    "An operator answers aggregate product questions without any surface that can return a single device's activity",
+    "A reader of the public documentation can check what is collected against what this workload actually accepts"
+  ],
+  "nonGoals": [
+    "Retaining raw events, caller IP addresses, or anything that identifies a user or a workspace",
+    "Offering an export, a raw-event read, or any per-device query",
+    "Promising availability or retention for the hosted service",
+    "Governing telemetry inside applications built with the Go or TypeScript frameworks"
+  ],
+  "requirements": [
+    {
+      "id": "ingest-is-anonymous",
+      "text": "Ingest accepts no credential and cannot be authenticated: a bearer token on the ingest route is ignored and never drives a key fetch."
+    },
+    {
+      "id": "aggregate-read-fails-closed",
+      "text": "The aggregate read denies every request unless issuer, audience, and caller allowlist are all configured and satisfied, and the trailing-slash form of the path is authenticated exactly like the declared path."
+    },
+    {
+      "id": "caller-address-is-not-retained",
+      "text": "A caller's network address is used only to apply request limits and is never stored with an event or an aggregate."
+    },
+    {
+      "id": "fields-are-allowlisted",
+      "text": "A record is reduced to the compiled field allowlist and closed vocabularies before anything is stored; unknown command names and unknown fields are dropped rather than persisted."
+    },
+    {
+      "id": "acceptance-is-not-an-oracle",
+      "text": "An accepted ingest answers identically whether the payload had content problems or downstream storage was unavailable, so a sender learns nothing about the receiver's internal state."
+    },
+    {
+      "id": "small-groups-are-withheld",
+      "text": "An aggregate group is withheld unless enough distinct rotating identifiers contributed to it, and repeating an event does not increase that contributor count."
+    },
+    {
+      "id": "sent-fields-are-aggregated",
+      "text": "Every business field the CLI sends is folded into a bounded aggregate: project and job counts and session duration only as fixed ranges, flags only as presence counts, never as exact values."
+    },
+    {
+      "id": "exhausted-dimension-is-reported-unavailable",
+      "text": "A dimension that reaches its storage ceiling is reported as unavailable rather than returned as a plausible partial count, and unaffected dimensions stay available."
+    },
+    {
+      "id": "expiry-runs-without-the-service",
+      "text": "Retention expiry is scheduled in the database so it still runs when the receiver has scaled to zero."
+    },
+    {
+      "id": "declared-surface-is-complete",
+      "text": "The committed route artifact is byte-identical to what the running server describes, is independent of deploy-time configuration, and declares every path and method the workload serves."
+    },
+    {
+      "id": "undeclared-requests-are-rejected",
+      "text": "A request outside the declared surface never reaches workload logic, and the receiver never answers a request with a redirect."
+    }
+  ],
+  "decisions": ["sites/telemetry.putnami.dev/doc/adr/0001-aggregate-only-anonymous-receiver.md"]
+}

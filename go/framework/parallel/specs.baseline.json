@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/bounded-parallel-work#concurrency",
+    "go/bounded-parallel-work#dispatch-throughput-budget",
+    "go/bounded-parallel-work#failure",
+    "go/bounded-parallel-work#ordering",
+    "go/bounded-parallel-work#panic"
+  ]
+}

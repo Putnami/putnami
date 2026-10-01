@@ -1,0 +1,40 @@
+isError false
+--- block 0 ---
+{
+  "revision": {
+    "kind": "worktree",
+    "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08"
+  },
+  "selection": {
+    "mode": "all",
+    "scoped": false,
+    "projects": [
+      "/billing",
+      "/shipping"
+    ],
+    "features": 2,
+    "specs": 1,
+    "externalRecords": []
+  },
+  "counts": {
+    "specs": 1,
+    "authoredFeatures": 2,
+    "featuresWithoutSpec": 1
+  },
+  "specs": [
+    {
+      "feature": "billing/invoice",
+      "path": "billing/specs/billing.invoice.json",
+      "project": "@acme/billing",
+      "outcomes": [
+        "Customers export issued invoices"
+      ],
+      "outcomeCount": 1,
+      "nonGoals": 0,
+      "requirements": 0,
+      "decisions": 0,
+      "valid": true
+    }
+  ],
+  "diagnostics": []
+}

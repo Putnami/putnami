@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "waivers": [
+    {
+      "code": "doctor.missing_required_config",
+      "project": "app",
+      "owner": "platform-team",
+      "reason": "server.port is injected by the platform at deploy time; tracked in OPS-1234",
+      "expires": "2099-01-01"
+    }
+  ]
+}

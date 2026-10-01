@@ -1,0 +1,80 @@
+{
+  "protocolVersion": 1,
+  "recipes": [
+    {
+      "intention": "Call a service that requires a credential and scopes (authorization client)",
+      "sample": "go/samples/service-to-service",
+      "primitives": [
+        "go.putnami.dev/api: api.WithClientService(api.ClientServiceOptions{Credentials})",
+        "go.putnami.dev/api: Endpoint(...).Secure(security.Options{...}).Client(api.ClientOperationOptions{Security})",
+        "go.putnami.dev/security: IdentityResolver",
+        "go.putnami.dev/client: Services() binding carrying the credential values"
+      ],
+      "antiPatterns": [
+        "A hand-written client struct that sets the Authorization header itself",
+        "A custom middleware that parses credentials instead of security.IdentityResolver",
+        "Credential header names repeated in consumer code instead of the provider's credential profiles"
+      ],
+      "since": "0.0.0-20260917065345-3cc91b658"
+    },
+    {
+      "intention": "Generate a typed HTTP client for a provider service",
+      "sample": "go/samples/service-to-service",
+      "primitives": [
+        "go.putnami.dev/openapi: NewPlugin(...).From(apiPlugin)",
+        "go.putnami.dev/api: Clients(api.ClientsOptions{Targets})",
+        "putnami clientgen",
+        "generated client: RegisterItemsClient(module) with go.putnami.dev/client: Services()"
+      ],
+      "antiPatterns": [
+        "A net/http wrapper with request and response structs copied by hand",
+        "An edit inside a generated clients/ tree instead of a regeneration",
+        "A base URL, header or retry loop written in the consumer"
+      ],
+      "since": "0.0.0-20260917065345-3cc91b658"
+    },
+    {
+      "intention": "Run tests against a real database",
+      "sample": "go/samples/unit-of-work-proof",
+      "primitives": [
+        "infra/requirements.json databases entry (putnami test provisions the binding)",
+        "go.putnami.dev/database/testprovider: Provision, EnvTestBinding",
+        "go.putnami.dev/database: PoolConfigFromBinding, NewPool"
+      ],
+      "antiPatterns": [
+        "A per-package dbtest.go that hardcodes a connection string or starts its own container",
+        "A shared long-lived test database that each test cleans up by hand"
+      ],
+      "since": "0.0.0-20260917065345-3cc91b658"
+    },
+    {
+      "intention": "Add a database migration",
+      "sample": "go/samples/migrations-feature",
+      "primitives": [
+        "go.putnami.dev/app: MigrationContributor.MigrationSources()",
+        "go.putnami.dev/database: NewSQLSource over //go:embed migrations/*.sql",
+        "go.putnami.dev/migratecli: Run"
+      ],
+      "antiPatterns": [
+        "Schema DDL run from application startup code",
+        "A manual file walk or registry call per feature in cmd/ binaries"
+      ],
+      "since": "0.0.0-20260917065345-3cc91b658"
+    },
+    {
+      "intention": "Subscribe to an event topic",
+      "sample": "go/samples/task-api",
+      "primitives": [
+        "go.putnami.dev/events: NewTopic",
+        "go.putnami.dev/events: Events(events.PluginConfig{Transport})",
+        "go.putnami.dev/events: Handle(topic, handler, WithDistribution(...))",
+        "go.putnami.dev/events: RegisterPublisher"
+      ],
+      "antiPatterns": [
+        "A polling loop or a channel shared between features",
+        "An untyped payload decoded by hand in the subscriber"
+      ],
+      "since": "0.0.0-20260917065345-3cc91b658"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/engine-provenance",
+  "outcomes": [
+    "A workspace states which putnami engine may run against it, and a workspace that builds its own engine refuses every binary it did not produce",
+    "A workspace that produces the CLI needs no published pin and no activation commit: the engine that gates a commit is built from that commit",
+    "The committed declaration survives every ordinary read, refresh, and write unchanged, so no unrelated command dirties it",
+    "The from-source build is reused whenever the sources have not changed, and rebuilt whenever they have, without anyone remembering a flag",
+    "Concurrent work in one checkout is safe: running the wrapper never invalidates an engine another run is already executing, nor the children that engine spawns"
+  ],
+  "nonGoals": [
+    "Changing how a consumer workspace resolves, verifies, or escapes a published CLI pin",
+    "Changing the lock format version or its compatibility window",
+    "Publishing, signing, or distributing a CLI release"
+  ],
+  "requirements": [
+    {
+      "id": "source-workspace-declaration",
+      "text": "A workspace that builds its own CLI records the reserved literal \"workspace\" as its lock cli.source, with no version and no per-platform digests. Reading, refreshing, and rewriting that lock leaves the entry byte-identical: a metadata refresh stamps no protocolVersion on it and never erases it. `putnami pin <version>` replaces it with a real pin and `putnami pin --remove` clears it."
+    },
+    {
+      "id": "foreign-engine-refused",
+      "text": "In a source workspace only a putnami built from that tree may run. The wrapper proves it with a pair: the workspace root, compared as resolved paths, and the content key whose immutable store blob the running binary must be. The pair is scoped to the inheriting process tree, so a concurrent wrapper run cannot retract the proof of a live CLI or its children. Anything else is a hard error naming the missing proof and the ./putnamiw recovery. A Go test binary runs as-is."
+    },
+    {
+      "id": "content-keyed-source-build",
+      "text": "The wrapper keys its from-source build on the content of the sources it compiles, not on timestamps. An unchanged tree reuses the cached build without invoking the compiler; a change anywhere in the keyed pathspec, including outside the CLI's own directory, rebuilds; two worktrees at the same tree state share one build; and a failed build stops the run instead of using a cached binary. Published blobs are immutable: a later run never rewrites one in use."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0028-self-hosted-cli-source-workspace.md"
+  ]
+}

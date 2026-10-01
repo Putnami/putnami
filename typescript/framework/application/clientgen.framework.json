@@ -1,0 +1,77 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "@putnami/application",
+      "status": "transport-primitive",
+      "adapter": "typescript/framework/application/src/conformance/health-runner.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/application/src/conformance/health-runner.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "15df46c87cc4f701bdd1ca28f5514b6994f8b81840af1a5e4056f577560d8b84"
+        },
+        {
+          "path": "typescript/framework/application/src/conformance/health-runner.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "c2d6ecb6866c6803416e7fc19736c1a88e61c261401b51e87c887c1f2242195f"
+        }
+      ],
+      "owner": "@putnami/application",
+      "tests": ["typescript/framework/application/test/conformance/health.test.ts"],
+      "reason": "A shipped bun:test conformance pack that probes the application under test at a base URL the test passes. It exercises a server, it does not consume a declared client contract."
+    },
+    {
+      "runtime": "@putnami/application",
+      "status": "transport-primitive",
+      "adapter": "typescript/framework/application/src/grpc/grpc-testing.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/application/src/grpc/grpc-testing.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "4dd25dc4c00b4496f650d951de093ac198d3018f92bc9806ebfb22cbcd5903b8"
+        },
+        {
+          "path": "typescript/framework/application/src/grpc/grpc-testing.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "56774e454c055320cc2e05bbc510db1f7c5d6b85e1ee4efc482b01414cbd5572"
+        },
+        {
+          "path": "typescript/framework/application/src/grpc/grpc-testing.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "7cc989792a3bdf80b611e098ca6b29abc27ccebd150e7cb44500e2509ace808a"
+        },
+        {
+          "path": "typescript/framework/application/src/grpc/grpc-testing.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "e44e74d2a8531a47881ae301df3e7b1247bf8bc0ef9559d2a6eb318e165af4f4"
+        }
+      ],
+      "owner": "@putnami/application",
+      "tests": ["typescript/framework/application/test/grpc/grpc-testing.test.ts"],
+      "reason": "A shipped gRPC test harness that posts to the service under test. The URL and the payload come from the test, not from a provider declaration."
+    },
+    {
+      "runtime": "@putnami/application",
+      "status": "transport-primitive",
+      "adapter": "typescript/framework/application/src/testing/test-app.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/application/src/testing/test-app.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "b9dc259dcbcdd3f22eaeae04b0c2e2c22b1faf6ad1b474e3c18656172575044b"
+        }
+      ],
+      "owner": "@putnami/application",
+      "tests": ["typescript/framework/application/test/testing/test-app.test.ts"],
+      "reason": "Binds the global fetch into the test-application handle so a test can call its own booted app on a loopback port."
+    }
+  ]
+}

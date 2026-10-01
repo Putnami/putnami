@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/migratecli",
+  "visibility": "public",
+  "tags": ["go"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
+  "dependencies": ["/go/framework/app", "/go/framework/migration"],
+  "publish": ["go"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "publish": {
+      "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

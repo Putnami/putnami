@@ -1,0 +1,12 @@
+{
+  "ingress": {
+    "domains": ["putnami.dev"]
+  },
+  "scaling": {
+    "max": 1,
+    "concurrency": 500
+  },
+  "security": {
+    "platformAuth": "disabled"
+  }
+}

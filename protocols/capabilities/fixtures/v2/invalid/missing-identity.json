@@ -1,0 +1,14 @@
+{
+  "protocolVersion": 2,
+  "project": "example",
+  "configDefinitions": [
+    {
+      "path": "database.default",
+      "provenance": {
+        "project": "example",
+        "sourceKind": "manual",
+        "declaration": { "root": "project", "path": "config.ts" }
+      }
+    }
+  ]
+}

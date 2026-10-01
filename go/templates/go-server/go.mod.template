@@ -1,0 +1,10 @@
+module <%= projectModule %>
+
+go 1.25.7
+
+require (
+	go.putnami.dev/app <%= goFrameworkVersion %>
+	go.putnami.dev/config <%= goFrameworkVersion %>
+	go.putnami.dev/http <%= goFrameworkVersion %>
+	go.putnami.dev/logger <%= goFrameworkVersion %>
+)

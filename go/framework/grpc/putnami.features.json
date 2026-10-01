@@ -1,0 +1,135 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/grpc-services",
+      "type": "feature",
+      "name": "Go gRPC services",
+      "outcome": "Go services expose gRPC and Connect endpoints with secure server defaults, ordered interceptors, and an explicit gateway boundary",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "api-bridge",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bridge-forwards-body-and-path-params",
+              "bridge-forwards-query-params",
+              "bridge-registers-connect-style-rpc-paths",
+              "bridge-service-name-is-overridable",
+              "bridge-skips-document-only-endpoints",
+              "bridge-mounts-the-declared-protobuf-method-identity",
+              "bridge-refuses-to-start-when-its-urls-are-not-the-declared-methods"
+            ]
+          }
+        },
+        {
+          "id": "bounded-drain",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "shutdown-timeout-defaults-when-unset",
+              "stop-before-start-is-safe",
+              "stop-force-closes-after-the-deadline"
+            ]
+          }
+        },
+        {
+          "id": "bridge-validation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bridge-preserves-large-numeric-param-text",
+              "bridge-rejects-invalid-json"
+            ]
+          }
+        },
+        {
+          "id": "connect-protocol",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-bridge-refuses-a-codec-it-does-not-serve",
+              "the-bridge-serves-the-published-proto-encoding",
+              "a-declared-error-travels-as-the-connect-error-document",
+              "the-bridge-applies-the-callers-connect-timeout",
+              "connect-compression-is-negotiated-and-bounded",
+              "a-server-stream-ends-with-exactly-one-endstreamresponse",
+              "one-provider-publishes-a-descriptor-schema-and-ir-that-agree",
+              "the-proto-encoding-is-refused-where-it-would-lose-a-declared-null",
+              "a-generated-go-client-calls-a-real-go-provider-over-connect"
+            ]
+          }
+        },
+        {
+          "id": "gateway-mounting",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "gateway-mounts-a-handler",
+              "gateway-stays-unmounted-without-register-on",
+              "register-on-marks-the-gateway-mounted",
+              "register-on-validates-at-describe-time"
+            ]
+          }
+        },
+        {
+          "id": "interceptor-chain",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "di-interceptor-scopes-the-context",
+              "di-stream-interceptor-scopes-the-context",
+              "recovery-converts-a-handler-panic-to-internal",
+              "recovery-interceptor-recovers-a-unary-panic",
+              "recovery-interceptor-recovers-a-stream-panic",
+              "unary-interceptors-run-in-registration-order"
+            ]
+          }
+        },
+        {
+          "id": "reflection-opt-in",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "reflection-is-off-by-default",
+              "reflection-registers-when-enabled"
+            ]
+          }
+        },
+        {
+          "id": "secure-defaults",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "keepalive-config-applies-at-start",
+              "keepalive-enforcement-policy-is-applied",
+              "keepalive-parameters-are-overridable",
+              "keepalive-server-parameter-defaults",
+              "max-concurrent-streams-is-applied"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

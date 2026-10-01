@@ -1,0 +1,28 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "Google Compute Engine metadata server v1 (cloud.google.com/compute/docs/metadata/overview)",
+      "adapter": "go/framework/database/gcp_identity.go",
+      "callsites": [
+        {
+          "path": "go/framework/database/gcp_identity.go",
+          "transport": "http",
+          "symbol": "http.DefaultClient.Do",
+          "fingerprint": "6c0e4f49da8d565aec20f3e28b0db81b3aab632668c144ab80f86488cd96b59b"
+        },
+        {
+          "path": "go/framework/database/gcp_identity.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "34533f3afdaa28fbbec49684d69cb71b6963adcf0833e44fc94f4fd714228df5"
+        }
+      ],
+      "owner": "go.putnami.dev/database",
+      "tests": [
+        "go/framework/database/gcp_identity_test.go"
+      ],
+      "reason": "Reads the workload service-account token and email used as the Cloud SQL IAM password."
+    }
+  ]
+}

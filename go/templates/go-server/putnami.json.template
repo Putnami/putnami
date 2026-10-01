@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "<%= projectName %>",
+  "type": "application",
+  "main": "main.go",
+  "extensions": [
+    "@putnami/go"
+  ]
+}

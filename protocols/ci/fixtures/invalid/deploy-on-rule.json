@@ -1,0 +1,17 @@
+{
+  "version": 3,
+  "commands": [
+    "test"
+  ],
+  "rules": [
+    {
+      "branches": "main",
+      "publish": [
+        "canary"
+      ],
+      "deploy": {
+        "environment": "prod"
+      }
+    }
+  ]
+}

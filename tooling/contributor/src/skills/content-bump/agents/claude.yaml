@@ -1,0 +1,5 @@
+name: content-bump
+description: Refresh a pinned-content lock the repository policy declares to its channel head, validate the pinned projects, and publish a proposal
+disable-model-invocation: true
+allowed-tools: Bash, Read, Grep, Glob, TodoWrite
+argument-hint: [--bundle <name>] [--no-pr] [--dry-run]

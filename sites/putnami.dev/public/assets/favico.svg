@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 340" width="340" height="340">
+	<title>Putnami icon</title>
+	<mask id="cutout">
+		<rect x="0" y="0" width="340" height="340" rx="68" fill="white" />
+		<g transform="translate(83.9 89.4)">
+			<g transform="scale(0.84)">
+				<path
+					fill-rule="evenodd"
+					fill="black"
+					d="
+        M 0 55
+        C 0 25 25 0 55 0
+        L 150 0
+        C 180 0 205 25 205 55
+        L 205 137
+        C 205 167 180 192 150 192
+        L 48 192
+        L 48 298
+        L 0 298
+        Z
+        M 48 57
+        C 48 49 54 44 62 44
+        L 143 44
+        C 151 44 157 50 157 58
+        L 157 134
+        C 157 142 151 148 143 148
+        L 62 148
+        C 54 148 48 142 48 134
+        Z
+        "
+				/>
+			</g>
+		</g>
+	</mask>
+	<rect x="0" y="0" width="340" height="340" rx="68" fill="black" mask="url(#cutout)" />
+</svg>

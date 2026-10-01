@@ -1,0 +1,98 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "Go module proxy protocol (go.dev/ref/mod#goproxy-protocol) and the go-import meta tag of a remote import path (go.dev/ref/mod#vcs-find)",
+      "adapter": "tooling/cli/internal/commands/lifecycle/projects_create_goframework.go",
+      "callsites": [
+        {
+          "path": "tooling/cli/internal/commands/lifecycle/projects_create_goframework.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "83f8f83640fa25bd4541768049bba79e6a459fa3377bc68a32a244a705bfd864"
+        },
+        {
+          "path": "tooling/cli/internal/commands/lifecycle/projects_create_goframework.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "95d8d2bf618481aa5cc664e9238c1554fb0e2780e1ae0689efc97d159e4c57c9"
+        }
+      ],
+      "owner": "@putnami/cli",
+      "tests": [
+        "tooling/cli/internal/commands/lifecycle/projects_create_goframework_test.go"
+      ],
+      "reason": "Asks the @latest endpoint of the module proxies GOPROXY names, or of the module origin a go-import mod tag names, for the go.putnami.dev/app version a scaffolded project pins, as the go command does. The wire contract belongs to the Go module proxy protocol, so no Putnami provider declaration can generate this client."
+    },
+    {
+      "authority": "go.dev release index and the GitHub REST releases API (docs.github.com/rest/releases)",
+      "adapter": "tooling/cli/internal/commands/versioncmd/toolchain_lock.go",
+      "callsites": [
+        {
+          "path": "tooling/cli/internal/commands/versioncmd/toolchain_lock.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "f736bbdc032e15da7c16441dd56689e16321ab336cc5ce10cb86c137d3764ee4"
+        }
+      ],
+      "owner": "@putnami/cli",
+      "tests": [
+        "tooling/cli/internal/commands/versioncmd/toolchain_lock_test.go"
+      ],
+      "reason": "Reads the published Go and Bun toolchain releases the lock pins."
+    },
+    {
+      "authority": "Putnami platform endpoints (protocols/platform: /readyz, /version) and the putnami.http-routes.v1 routes of the workload under qualification, reached at the base URL the user names with --target",
+      "adapter": "tooling/cli/internal/qualify/target.go",
+      "callsites": [
+        {
+          "path": "tooling/cli/internal/qualify/target.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "761ff386b52763c9e418417c7f54a75f868fd5f4174fbefc1f9dd5bff6140818"
+        },
+        {
+          "path": "tooling/cli/internal/qualify/target.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "f433234df9337f888a6189d4215feaa161384988514dda62ab442d216c602a94"
+        },
+        {
+          "path": "tooling/cli/internal/qualify/target.go",
+          "transport": "http",
+          "symbol": "http.Transport",
+          "fingerprint": "16b2cdf891557af6c72b1338ba38cce6f6a9b747f4c5f1ec14f61c4c68c5582a"
+        }
+      ],
+      "owner": "@putnami/cli",
+      "tests": [
+        "tooling/cli/internal/cli/registry_qualify_test.go",
+        "tooling/cli/internal/qualify/execute_test.go"
+      ],
+      "reason": "`putnami qualify` smoke-tests whatever deployment the user names: the platform surface is a protocol every runtime serves, and the requests are derived from that workload's own route inventory, so no provider declaration can generate one client for every qualified workload."
+    },
+    {
+      "authority": "OpenTelemetry OTLP/HTTP v1 (opentelemetry.io/docs/specs/otlp), mirrored by protocols/telemetry",
+      "adapter": "tooling/cli/internal/telemetry/sender.go",
+      "callsites": [
+        {
+          "path": "tooling/cli/internal/telemetry/sender.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "ed832e2f69b769a36d2e440181125cede1f2c975f4bd814372a2941e2515fd34"
+        },
+        {
+          "path": "tooling/cli/internal/telemetry/sender.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "30df63dd1b4fd1194f0c86eb039fdc9bde2ff9ea8549087985f5e4e3a7b920fd"
+        }
+      ],
+      "owner": "@putnami/cli",
+      "tests": [
+        "tooling/cli/internal/telemetry/sender_test.go"
+      ],
+      "reason": "Exports CLI usage records over OTLP/HTTP. The wire contract belongs to OpenTelemetry, so no Putnami provider declaration can generate this client."
+    }
+  ]
+}

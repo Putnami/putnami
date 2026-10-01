@@ -1,0 +1,229 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-architecture.json",
+  "title": "Putnami ARC/DARC domain manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "domain", "owner", "projects", "exports", "imports"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "protocolVersion": { "const": 1 },
+    "domain": { "$ref": "#/$defs/domain" },
+    "owner": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "projects": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/project" }
+    },
+    "owns": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ownedConcept" }
+    },
+    "exports": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/export" }
+    },
+    "imports": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/import" }
+    }
+  },
+  "$defs": {
+    "domain": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)*$"
+    },
+    "semanticId": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z0-9][a-z0-9_-]*)+$"
+    },
+    "contractId": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z0-9][a-z0-9_-]*)+\\.v[1-9][0-9]*$"
+    },
+    "factName": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+    },
+    "project": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 1024,
+      "pattern": "^/[^/]+(?:/[^/]+)*$"
+    },
+    "status": {
+      "enum": ["planned", "active", "legacy", "deprecated"]
+    },
+    "mode": {
+      "enum": ["reference", "query", "snapshot", "projection", "command"]
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "availability"],
+      "properties": {
+        "kind": { "enum": ["none", "in-process", "api", "event", "file"] },
+        "contract": { "$ref": "#/$defs/contractId" },
+        "availability": { "$ref": "#/$defs/status" }
+      }
+    },
+    "ownedConcept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "description"],
+      "properties": {
+        "id": { "$ref": "#/$defs/semanticId" },
+        "kind": { "enum": ["fact", "model", "schema", "api", "event"] },
+        "description": { "type": "string", "minLength": 1, "maxLength": 2048 }
+      }
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "authority"],
+      "properties": {
+        "name": { "$ref": "#/$defs/factName" },
+        "authority": { "$ref": "#/$defs/domain" },
+        "classification": { "enum": ["public", "internal", "confidential", "restricted"] },
+        "personalData": { "enum": ["none", "personal", "sensitive"] }
+      },
+      "oneOf": [
+        { "required": ["classification", "personalData"] },
+        {
+          "not": {
+            "anyOf": [
+              { "required": ["classification"] },
+              { "required": ["personalData"] }
+            ]
+          }
+        }
+      ]
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "minimumConsumerVersion"],
+      "properties": {
+        "strategy": { "enum": ["additive", "versioned", "breaking-with-migration"] },
+        "minimumConsumerVersion": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "export": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "status", "description", "facts", "modes", "compatibility"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contractId" },
+        "version": { "type": "integer", "minimum": 1 },
+        "status": { "$ref": "#/$defs/status" },
+        "description": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "facts": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/fact" } },
+        "modes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/mode" } },
+        "compatibility": { "$ref": "#/$defs/compatibility" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "modes": {
+                "contains": { "enum": ["query", "snapshot", "projection", "command"] }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "facts": {
+                "items": { "required": ["classification", "personalData"] }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "exportReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "export"],
+      "properties": {
+        "domain": { "$ref": "#/$defs/domain" },
+        "export": { "$ref": "#/$defs/contractId" }
+      }
+    },
+    "consistency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxStaleness", "onMissing", "onStale", "ordering", "sourceVersion", "idempotencyKey", "lateEvents"],
+      "properties": {
+        "maxStaleness": { "type": "string", "minLength": 2, "maxLength": 64 },
+        "onMissing": { "enum": ["fail-open", "fail-closed", "unavailable"] },
+        "onStale": { "enum": ["fail-open", "fail-closed", "use-stale"] },
+        "ordering": { "enum": ["none", "source-version", "source-sequence", "event-time"] },
+        "sourceVersion": { "$ref": "#/$defs/factName" },
+        "idempotencyKey": { "$ref": "#/$defs/factName" },
+        "lateEvents": { "enum": ["ignore-older", "reject", "apply"] }
+      }
+    },
+    "deletion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy"],
+      "properties": {
+        "strategy": { "enum": ["tombstone", "hard-delete", "retain", "not-applicable"] },
+        "tombstoneField": { "$ref": "#/$defs/factName" }
+      }
+    },
+    "localModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "sourceIdentity", "projectedFields", "provenanceField", "observedAtField", "freshnessField", "writer", "rebuildable", "rebuild"],
+      "properties": {
+        "name": { "$ref": "#/$defs/semanticId" },
+        "kind": { "enum": ["projection", "snapshot", "reference"] },
+        "sourceIdentity": { "$ref": "#/$defs/factName" },
+        "projectedFields": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/factName" } },
+        "localFields": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/factName" } },
+        "provenanceField": { "$ref": "#/$defs/factName" },
+        "observedAtField": { "$ref": "#/$defs/factName" },
+        "freshnessField": { "$ref": "#/$defs/factName" },
+        "writer": { "$ref": "#/$defs/semanticId" },
+        "rebuildable": { "type": "boolean" },
+        "rebuild": { "enum": ["bootstrap", "replay", "bootstrap-and-replay", "not-applicable"] }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "consumerProject", "producerProject"],
+      "properties": {
+        "kind": { "const": "project-dependency" },
+        "consumerProject": { "$ref": "#/$defs/project" },
+        "producerProject": { "$ref": "#/$defs/project" }
+      }
+    },
+    "import": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "from", "as", "mode", "status", "facts", "justification"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contractId" },
+        "version": { "type": "integer", "minimum": 1 },
+        "from": { "$ref": "#/$defs/exportReference" },
+        "as": { "$ref": "#/$defs/semanticId" },
+        "mode": { "$ref": "#/$defs/mode" },
+        "status": { "$ref": "#/$defs/status" },
+        "facts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/factName" } },
+        "transport": { "$ref": "#/$defs/transport" },
+        "bootstrap": { "$ref": "#/$defs/transport" },
+        "updates": { "$ref": "#/$defs/transport" },
+        "consistency": { "$ref": "#/$defs/consistency" },
+        "deletion": { "$ref": "#/$defs/deletion" },
+        "localModel": { "$ref": "#/$defs/localModel" },
+        "bindings": { "type": "array", "items": { "$ref": "#/$defs/binding" } },
+        "justification": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    }
+  }
+}

@@ -1,0 +1,235 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "observability",
+  "owner": "observability",
+  "projects": [
+    "/sites/telemetry.putnami.dev"
+  ],
+  "owns": [
+    {
+      "id": "observability.cli-usage-aggregates",
+      "kind": "model",
+      "description": "Daily anonymous CLI-usage aggregates. No command argument, device id, or IP is ever reflected; retention and bucketing policy are local authority."
+    }
+  ],
+  "exports": [
+    {
+      "id": "observability.usage-ingest.v1",
+      "version": 1,
+      "status": "active",
+      "description": "The anonymous CLI-usage ingest: OTLP/JSON log records accepted only after sanitization, with origin=cli-anon stamped unspoofably at the resource level and every caller-supplied origin dropped.",
+      "facts": [
+        {
+          "name": "usage_ingest",
+          "authority": "observability",
+          "classification": "internal",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "command"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    }
+  ],
+  "imports": [
+    {
+      "id": "observability.application-runtime.v1",
+      "version": 1,
+      "from": {
+        "domain": "go-framework",
+        "export": "go-framework.application-runtime.v1"
+      },
+      "as": "observability.application-runtime",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "go_application_runtime_api"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/app"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/cache"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/client"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/config"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/ctxutil"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/errors"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/http"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/inject"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/logger"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/migration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/schema"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/security"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/telemetry"
+        }
+      ],
+      "justification": "The telemetry receiver is an ordinary Putnami Go application: it boots on the app lifecycle, serves its ingest over the framework HTTP runtime, stores aggregates through the framework database and migration runtime, and reports itself through the framework telemetry runtime. It consumes the public go.putnami.dev API exactly as a tenant workload does and reaches into no framework internal."
+    },
+    {
+      "id": "observability.protocol-contracts.v1",
+      "version": 1,
+      "from": {
+        "domain": "protocols",
+        "export": "protocols.wire-contracts.v1"
+      },
+      "as": "observability.protocol-contracts",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "wire_contract_definitions"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/clientcontract"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/config"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/contracts"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/http-routes"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/identity"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/keyring"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/migration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/telemetry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/protocols/transaction"
+        }
+      ],
+      "justification": "The telemetry workload is an ordinary Putnami Go application; it consumes the shared strict contract packages like any tenant, never a private parse."
+    }
+  ]
+}

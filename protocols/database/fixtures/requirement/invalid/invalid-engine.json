@@ -1,0 +1,7 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-database.json",
+  "protocolVersion": 1,
+  "databases": {
+    "auth": { "engine": "mongo", "schema": "iam" }
+  }
+}

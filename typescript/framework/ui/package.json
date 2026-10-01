@@ -1,0 +1,42 @@
+{
+  "name": "@putnami/ui",
+  "version": "0.0.0",
+  "description": "UI component library with Emotion styling",
+  "keywords": [
+    "ui",
+    "components",
+    "react",
+    "emotion",
+    "design-system"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/ui"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@emotion/cache": "^11.14.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@putnami/web": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/utils": "workspace:*",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.2.3"
+  },
+  "private": false
+}

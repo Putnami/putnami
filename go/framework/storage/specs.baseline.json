@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/object-storage#backend-contract",
+    "go/object-storage#constraints",
+    "go/object-storage#deadlines-and-streams",
+    "go/object-storage#isolation",
+    "go/object-storage#signed-access"
+  ]
+}

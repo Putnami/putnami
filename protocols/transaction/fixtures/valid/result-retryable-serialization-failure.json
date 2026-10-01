@@ -1,0 +1,7 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-transaction-result.json",
+  "protocolVersion": 1,
+  "outcome": "retryable-serialization-failure",
+  "retryable": true,
+  "message": "could not serialize access due to concurrent update"
+}

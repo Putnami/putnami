@@ -1,0 +1,229 @@
+{
+  "$comment": "Shared response-field invalidation vectors (ADR 0007). The Go and TypeScript runtimes must render every tag byte for byte. value is the JSON text of the value a consumer passes to the invalidation; a runtime reads it into its own native value (a string, an integer, a boolean) before rendering. responses[].body is the JSON text of a stored success body; tags is what each declared invalidation field tags it with, and a field absent from tags tags nothing. propertySchemas pins which response property schemas an invalidation field may name: comparable is true when both runtimes tag the same value, and every contract check (both strict readers and both providers) refuses a field whose schema is not comparable.",
+  "values": [
+    {
+      "name": "a string renders as its JSON string",
+      "value": "\"p1\"",
+      "tag": "\"p1\""
+    },
+    {
+      "name": "a string escapes the quote, the backslash and the C0 controls the way JSON.stringify does",
+      "value": "\"é \\\"q\\\" \\\\ \\n\\u0001 /\"",
+      "tag": "\"é \\\"q\\\" \\\\ \\n\\u0001 /\""
+    },
+    {
+      "name": "the empty string is a value",
+      "value": "\"\"",
+      "tag": "\"\""
+    },
+    {
+      "name": "an integer renders as its decimal digits",
+      "value": "42",
+      "tag": "42"
+    },
+    {
+      "name": "a negative integer keeps its sign",
+      "value": "-7",
+      "tag": "-7"
+    },
+    {
+      "name": "zero has no sign",
+      "value": "-0",
+      "tag": "0"
+    },
+    {
+      "name": "a wide unsigned integer keeps every digit",
+      "value": "18446744073709551615",
+      "tag": "18446744073709551615"
+    },
+    {
+      "name": "the widest signed integer keeps every digit",
+      "value": "-9223372036854775808",
+      "tag": "-9223372036854775808"
+    },
+    {
+      "name": "true",
+      "value": "true",
+      "tag": "true"
+    },
+    {
+      "name": "false",
+      "value": "false",
+      "tag": "false"
+    }
+  ],
+  "refused": [
+    {
+      "name": "a fraction has no lexeme a TypeScript runtime keeps",
+      "value": "1.5"
+    },
+    {
+      "name": "null matches nothing a response can be tagged with",
+      "value": "null"
+    },
+    {
+      "name": "an array is not a scalar",
+      "value": "[\"p1\"]"
+    },
+    {
+      "name": "an object is not a scalar",
+      "value": "{\"id\":\"p1\"}"
+    }
+  ],
+  "responses": [
+    {
+      "name": "each declared field tags the stored answer with its canonical value; null, absent, fractional and composite values tag nothing",
+      "invalidationFields": [
+        "principalId",
+        "tenant",
+        "version",
+        "active",
+        "zero",
+        "note",
+        "scopes",
+        "owner",
+        "score",
+        "exponent",
+        "missing"
+      ],
+      "body": "{\"principalId\":\"p1\",\"tenant\":\"t\\u00e9\\n\",\"version\":12345678901234567890,\"active\":false,\"zero\":-0,\"note\":null,\"scopes\":[\"a\"],\"owner\":{\"id\":\"p1\"},\"score\":1.50,\"exponent\":1e2}",
+      "tags": {
+        "principalId": "\"p1\"",
+        "tenant": "\"té\\n\"",
+        "version": "12345678901234567890",
+        "active": "false",
+        "zero": "0"
+      }
+    },
+    {
+      "name": "only the declared fields tag the answer",
+      "invalidationFields": [
+        "principalId"
+      ],
+      "body": "{\"principalId\":\"p2\",\"issuer\":\"https://id.example\",\"subject\":\"s-1\"}",
+      "tags": {
+        "principalId": "\"p2\""
+      }
+    },
+    {
+      "name": "a body that is not a JSON object tags nothing",
+      "invalidationFields": [
+        "principalId"
+      ],
+      "body": "[{\"principalId\":\"p1\"}]",
+      "tags": {}
+    }
+  ],
+  "propertySchemas": [
+    {
+      "name": "a string is compared as its JSON string",
+      "schema": {
+        "type": "string"
+      },
+      "comparable": true
+    },
+    {
+      "name": "a formatted string stays a string in both runtimes",
+      "schema": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "comparable": true
+    },
+    {
+      "name": "a string enumeration is a string",
+      "schema": {
+        "type": "string",
+        "enum": [
+          "active",
+          "revoked"
+        ]
+      },
+      "comparable": true
+    },
+    {
+      "name": "an integer of any width is compared as its digits",
+      "schema": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0,
+        "maximum": 18446744073709551615
+      },
+      "comparable": true
+    },
+    {
+      "name": "a nullable boolean is a boolean; null tags nothing",
+      "schema": {
+        "type": "boolean",
+        "nullable": true
+      },
+      "comparable": true
+    },
+    {
+      "name": "base64 octets decode to a byte array in TypeScript, which no invalidation value can equal",
+      "schema": {
+        "type": "string",
+        "format": "byte"
+      },
+      "comparable": false
+    },
+    {
+      "name": "raw octets are no value either runtime compares",
+      "schema": {
+        "type": "string",
+        "format": "binary"
+      },
+      "comparable": false
+    },
+    {
+      "name": "a number is a double in TypeScript, which keeps no lexeme",
+      "schema": {
+        "type": "number"
+      },
+      "comparable": false
+    },
+    {
+      "name": "an array names no single value",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "comparable": false
+    },
+    {
+      "name": "an object names no single value",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "comparable": false
+    },
+    {
+      "name": "a union names no single kind",
+      "schema": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "comparable": false
+    },
+    {
+      "name": "opaque JSON names no single kind",
+      "schema": {
+        "x-putnami-json": "any"
+      },
+      "comparable": false
+    }
+  ]
+}

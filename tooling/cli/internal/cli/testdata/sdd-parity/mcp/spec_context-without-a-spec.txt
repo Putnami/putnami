@@ -1,0 +1,37 @@
+isError true
+--- block 0 ---
+{
+  "revision": {
+    "kind": "worktree",
+    "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08"
+  },
+  "feature": "shipping/labels",
+  "source": {},
+  "declarations": [
+    {
+      "kind": "manifest",
+      "source": "shipping/putnami.features.json",
+      "project": "@acme/shipping",
+      "name": "Shipping labels",
+      "outcome": "Operators print shipping labels",
+      "owner": "shipping",
+      "type": "feature",
+      "target": "modeled",
+      "provenance": {
+        "path": "shipping/putnami.features.json",
+        "symbol": "features[0]"
+      }
+    }
+  ],
+  "decisions": [],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "specs.missing_spec",
+      "message": "feature \"shipping/labels\" has no durable spec; create one with `putnami specs init shipping/labels`",
+      "field": "feature"
+    }
+  ]
+}
+--- block 1 ---
+feature "shipping/labels" has no spec under specs/

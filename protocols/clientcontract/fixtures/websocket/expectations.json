@@ -1,0 +1,22 @@
+{
+  "valid": [
+    "bidirectional-half-close.json",
+    "cancel-after-open.json",
+    "client-stream-empty-proto.json",
+    "error-before-ready.json",
+    "heartbeat-before-ready.json",
+    "server-resume-wide-sequence.json",
+    "server-stream.json"
+  ],
+  "invalid": {
+    "cancel-before-init.json": "client_contract.invalid_transport",
+    "client-resume.json": "client_contract.invalid_resilience",
+    "data-before-ready.json": "client_contract.invalid_transport",
+    "ready-resumed-undeclared.json": "client_contract.invalid_resilience",
+    "ready-resumed-without-token.json": "client_contract.required",
+    "secret-shaped-unknown-field.json": "client_contract.parse_error",
+    "sequence-overflow.json": "client_contract.invalid_transport",
+    "server-half-close.json": "client_contract.invalid_transport",
+    "server-stream-result-payload.json": "client_contract.invalid_transport"
+  }
+}

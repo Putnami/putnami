@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-doctor.json",
+  "protocolVersion": 1,
+  "profile": "staging",
+  "findings": [
+    {
+      "code": "doctor.insecure_transport",
+      "severity": "high",
+      "profile": "production",
+      "project": "go.putnami.dev/example/gateway",
+      "message": "the metrics endpoint is served over plaintext HTTP",
+      "remediation": "Require TLS/HTTPS for this endpoint."
+    }
+  ],
+  "summary": { "findings": 1, "info": 0, "warning": 0, "high": 1, "critical": 0, "waived": 0 }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "build": {
+      "run": [
+        { "id": "esm", "task": "build-esm" },
+        { "id": "cjs", "task": "build-cjs" }
+      ]
+    }
+  },
+  "tasks": {
+    "build-esm": {
+      "kind": "command",
+      "command": "echo",
+      "declares": {
+        "outputs": {
+          "dist": { "kind": "directory", "path": "dist" }
+        }
+      }
+    },
+    "build-cjs": {
+      "kind": "command",
+      "command": "echo",
+      "declares": {
+        "outputs": {
+          "dist": { "kind": "directory", "path": "./dist/" }
+        }
+      }
+    }
+  }
+}

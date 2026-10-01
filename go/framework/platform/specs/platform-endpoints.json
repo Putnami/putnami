@@ -1,0 +1,58 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/platform-endpoints",
+  "outcomes": [
+    "Every Go workload answers the same operational paths, so one orchestrator configuration works across services",
+    "A dependency that reports its own health appears on the probe endpoints without extra wiring",
+    "A workload that declares a required dependency but never wires it up is reported unready rather than accepted",
+    "A slow or hung probe delays the answer by a bounded amount instead of holding the endpoint open"
+  ],
+  "nonGoals": [
+    "Authenticating the operational endpoints; they mount unauthenticated and are expected to sit on a trusted or prefixed surface",
+    "Defining what makes a dependency healthy, which each probe owns",
+    "Exporting metrics directly: the module takes no OpenTelemetry dependency and offers a callback seam instead",
+    "Promising strict compatibility between every pre-1.0 minor release"
+  ],
+  "requirements": [
+    {
+      "id": "endpoint-set",
+      "text": "The plugin mounts liveness, health, readiness, and version paths under the configured prefix, and mounts profiling handlers only when the workload enables them explicitly."
+    },
+    {
+      "id": "liveness-is-trivial",
+      "text": "The liveness path runs no probes and consults no running flag, so it answers success whenever the process can serve a request and never causes a restart because a dependency is slow."
+    },
+    {
+      "id": "lifecycle-state",
+      "text": "The health and readiness aggregates report unavailable before the application starts and after it stops, and report degraded with per-probe detail when any probe fails."
+    },
+    {
+      "id": "deferred-discovery",
+      "text": "Probe discovery walks the module tree on the first aggregate request rather than during configure, so a probe contributed by a plugin configured later is still found, and an explicitly registered probe is never overwritten by a discovered one of the same name."
+    },
+    {
+      "id": "probe-names",
+      "text": "Probe names are validated against the cross-language probe-name pattern when registered explicitly, and a discovered or required name that violates it fails application start rather than emitting an envelope the protocol's own validator would reject."
+    },
+    {
+      "id": "bounded-probes",
+      "text": "Probes run in parallel, each under its own timeout, and the aggregate answers after a bounded grace period even when a probe ignores cancellation."
+    },
+    {
+      "id": "required-probes",
+      "text": "A readiness probe named as required but never registered or discovered makes readiness degraded with a synthesized failing entry, while health deliberately ignores the required list."
+    },
+    {
+      "id": "error-redaction",
+      "text": "When error redaction is enabled a failing probe reports a generic message to the caller while the real cause is logged server-side, so unauthenticated endpoints do not disclose internal topology."
+    },
+    {
+      "id": "version-fallback",
+      "text": "The version path returns the configured build metadata, and empty fields fall back to the binary's embedded build information rather than being reported as known-empty."
+    }
+  ],
+  "decisions": [
+    "go/framework/platform/doc/adr/0001-probe-discovery-happens-on-the-request-path.md"
+  ]
+}

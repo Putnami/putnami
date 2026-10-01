@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "route": "/",
+      "mode": "ssg",
+      "hydration": "islands",
+      "clientJsBytes": 76787,
+      "diProvenStatic": true
+    },
+    {
+      "route": "/tasks",
+      "mode": "ssr",
+      "hydration": "full",
+      "clientJsBytes": 99029
+    },
+    {
+      "route": "/tasks/:id",
+      "mode": "ssr",
+      "hydration": "full",
+      "clientJsBytes": 99029
+    },
+    {
+      "route": "/tasks/new",
+      "mode": "ssr",
+      "hydration": "full",
+      "clientJsBytes": 99029
+    }
+  ],
+  "islands": [
+    {
+      "id": "Counter",
+      "strategy": "visible"
+    }
+  ],
+  "bundles": {
+    "hydrateBytes": 99029,
+    "islandsBytes": 76787
+  },
+  "totals": {
+    "routes": 4,
+    "ssr": 3,
+    "ssg": 1,
+    "isr": 0,
+    "islands": 1,
+    "maxClientJsBytes": 99029
+  }
+}

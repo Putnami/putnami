@@ -1,0 +1,146 @@
+putnami 0.0.0-golden — polyglot build orchestrator
+
+Usage:
+  putnami <command[,command...]> [options]
+
+Build (from extensions):
+  build, test, lint, serve, run, format, package, publish, deploy, generate
+  Multi-command: putnami lint,test,build --impacted
+
+CI:
+  change-plan                  Emit an immutable impacted CI ChangePlan
+  ci init                      Create a safe putnami.ci.json version 3 contract
+  ci validate                  Validate CI intent and workspace graph references
+  ci fmt                       Canonicalize putnami.ci.json
+  ci explain                   Explain first-match CI intent for local Source assumptions
+
+Distribution:
+  channel set|status           Move a distribution channel and report how far it is served
+
+Projects:
+  projects list                List canonical workspace projects
+  projects create              Create a project from template
+  projects describe            Show project info
+  projects sync                Sync projects from disk
+  projects tag                 Manage project tags
+  scopes list                  List workspace scopes (projects, groups, tags)
+
+Workspace:
+  init                         Initialize a new workspace
+  install                      Install extensions and dependencies
+  upgrade                      Upgrade CLI, extensions, and dependencies
+  pin                          Pin the CLI version this workspace uses
+  workspace describe           Describe the active workspace
+  version get|tag|list|use     Versions derived from git, release tags, and installed CLI binaries
+  infra plan                   Plan workspace infra (--output=jsonl)
+
+Extensions & Templates:
+  extensions install           Install extensions from config
+  extensions list              List installed extensions
+  extensions update            Update extensions
+  extensions remove            Remove an extension
+  templates install            Install templates from config
+  templates list               List installed templates
+  templates update             Update templates
+  templates remove             Remove a template
+
+Dependencies:
+  deps install                 Install project dependencies
+  cache clean                  Clear this repo's shared build cache
+  cache gc                     Garbage-collect global caches to their budgets
+  cache verify                 Verify cache determinism and restore equivalence
+
+Configuration:
+  config show                  Show effective configuration
+  config set                   Set a configuration value
+  context generate             Regenerate AI context
+  context map                  Build or print the workspace orientation map
+
+Diagnostics:
+  doctor                       Preflight production readiness under a deployment profile
+  tree fingerprint             Print the digest identifying this worktree's exact state
+  tree verify                  Check local workflow evidence against this worktree
+  sessions list                List recent execution sessions
+  sessions inspect             Inspect a specific session
+  sessions replay              Resume delivery of a retained execution session
+  sessions export              Export recorded sessions as JSONL
+  sessions summary             Summarize recorded sessions, one row per run
+  report                       Read back a run's report
+
+Execution:
+  compose                      Serve a workload with the workloads it runs with
+  qualify                      Run a workload's derived smoke contract against a target and emit one verdict
+
+Migration:
+  migrate vnext                Migrate putnami.lock.json to the current format
+  migrate agent-content        Move superseded agent artifacts to an extension's agent content
+
+Authoring:
+  dev extension validate       Validate an extension manifest
+  dev template <action>        Validate, test, or package a template
+
+Agents:
+  mcp                          Run the MCP server over stdio for AI agent harnesses
+  mcp install                  Register the MCP server in .mcp.json for agent IDEs
+
+Other:
+  telemetry on|off|status|show Manage anonymous telemetry
+  completion <shell>           Generate shell completions (bash, zsh, fish)
+
+Common:
+  -v, --verbose                Show job results and diagnostics
+  -d, --debug                  Stream all events in real-time
+  -w, --watch                  Re-run on file changes
+  --plan                       Show execution plan without running
+  -h, --help                   Show help
+
+Project Selection:
+  --all                        All projects
+  --impacted                   Projects affected by git changes
+  --projects <list>            Comma-separated project names
+  --tag <tags>                 Filter by tags
+  --exclude-tag <tags>         Exclude by tags
+  --exclude <names>            Exclude by name
+  --baseline <branch>          Custom git baseline for --impacted
+  --impacted-strict            Fail when baseline can't be resolved
+
+Execution:
+  --where <placement>          Execution placement: local | remote (local when no runner provider is installed)
+  --providers <list>           Credentials to ask the credential provider for: install, publish (comma list)
+  --credential-fd <n>          Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2
+  --no-cache                   Force re-execution (skip cache)
+  --no-cache-projects <list>   Force re-execution of these projects only
+  --cache-trust <policy>       Remote cache trust: ci | any | none
+  --continue-on-error          Don't abort on first failure
+  --max-parallel <mode|n>      Parallelism: auto | eco | max | number
+  --resource <name=units>      Budget for a named shared resource (repeatable)
+  --cpu-policy <policy>        CPU ceiling policy: critical-path | measured
+  --retry <n>                  Retry transient failures
+  --retry-failed               Re-run tasks whose identical failure is cached
+  --profile <profile>          Deployment profile: dev | test | production
+  --dry-run                    Show changes without applying
+
+Output:
+  --output <format>            Output format: text | json | jsonl | cloud-logging
+  --json                       Shorthand for --output=json
+  --quiet                      Suppress non-error output
+  --color                      Force color output
+  --no-color                   Disable color output
+
+Advanced:
+  --trace-profile <path>       Collect trace events (Chrome trace format)
+
+Default Selection:
+  no target            Feature branch: impacted vs trunk; main/master: local marker, then remote cache marker when active, otherwise all
+
+Positional:
+  .                    Current directory scope (project or subtree)
+
+Aliases:
+  b=build  t=test  l=lint  s=serve  f=format  p=publish  P=publish  d=deploy  D=deploy
+
+Help:
+  putnami help <command>   Command help
+  putnami help --man       Man page format
+  putnami help --markdown  Markdown format
+

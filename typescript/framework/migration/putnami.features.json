@@ -1,0 +1,140 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/migration-orchestration",
+      "type": "feature",
+      "name": "TypeScript migration orchestration",
+      "outcome": "A TypeScript application collects the migrations its plugins contribute, runs them through one backend-free contract with a reproducible cross-kind order, and derives the infrastructure they need instead of restating it",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "backend-free",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "no-source-module-imports-a-driver-or-opens-a-connection",
+              "the-package-depends-only-on-the-framework-runtime"
+            ]
+          }
+        },
+        {
+          "id": "compatible-marker-parity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["compatible-bundle-digest-matches-go"]
+          }
+        },
+        {
+          "id": "cross-language-bundle",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bundle-round-trips-self-contained",
+              "a-payload-path-escaping-the-bundle-root-is-rejected",
+              "a-payload-whose-bytes-do-not-match-the-pinned-hash-is-rejected",
+              "the-bundle-digest-matches-the-shared-golden-fixture",
+              "the-digest-ignores-release-provenance-and-input-order",
+              "the-producer-output-matches-the-shared-golden-fixture"
+            ]
+          }
+        },
+        {
+          "id": "defensive-reads",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["reading-the-sources-for-a-kind-returns-a-copy"]
+          }
+        },
+        {
+          "id": "deterministic-kind-order",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "cross-kind-iteration-follows-that-same-order",
+              "kinds-are-enumerated-in-lexicographic-order",
+              "per-kind-reports-aggregate-in-that-order"
+            ]
+          }
+        },
+        {
+          "id": "infra-aggregation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-source-without-an-infra-footprint-is-skipped",
+              "a-stale-sidecar-is-removed-when-nothing-is-declared",
+              "different-engines-emit-separate-entries",
+              "infra-requirements-aggregate-across-contributed-sources",
+              "one-sql-source-emits-one-database-entry",
+              "re-emitting-the-same-input-yields-identical-bytes",
+              "schemas-are-de-duplicated-and-databases-sorted",
+              "the-sidecar-is-written-atomically-and-parseably",
+              "two-sources-for-one-database-union-and-sort-their-schemas",
+              "zero-sources-contribute-nothing"
+            ]
+          }
+        },
+        {
+          "id": "one-runner-per-kind",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-second-runner-for-a-kind-is-rejected"]
+          }
+        },
+        {
+          "id": "orphan-sources-fail",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-source-without-a-runner-fails-by-default",
+              "an-explicit-apply-for-an-unknown-kind-fails",
+              "the-allow-source-only-escape-hatch-tolerates-orphans",
+              "the-error-names-every-contributing-namespace"
+            ]
+          }
+        },
+        {
+          "id": "registry-is-per-boot",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["no-module-level-registry-carries-state-between-boots"]
+          }
+        },
+        {
+          "id": "source-validation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-source-with-a-blank-namespace-is-rejected-at-contribution",
+              "a-source-with-an-empty-kind-is-rejected-at-contribution"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "python",
+  "features": [
+    {
+      "id": "python/example-library-utilities",
+      "type": "feature",
+      "name": "Python example library utilities",
+      "outcome": "The Python sample library demonstrates a Putnami-managed package whose utility behavior is protected by executable spec checks",
+      "owner": "python",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "clamp-bounds",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "clamp-clamps-out-of-range-values",
+              "clamp-returns-a-value-already-inside-the-range"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

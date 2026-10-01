@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "example/security-defaults-set",
+  "options": {
+    "generate": {
+      "schema": true
+    }
+  }
+}

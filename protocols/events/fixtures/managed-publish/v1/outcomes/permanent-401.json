@@ -1,0 +1,16 @@
+{
+  "name": "permanent-401",
+  "request": { "id": "evt-outcome-1", "topic": "orders.created" },
+  "input": {
+    "http": {
+      "status": 401,
+      "body": {
+        "protocol": "putnami.events.v1",
+        "code": "unauthorized",
+        "message": "Workload identity token is invalid.",
+        "retryable": false
+      }
+    }
+  },
+  "expected": { "class": "permanent", "action": "fail" }
+}

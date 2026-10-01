@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-agent-context.json",
+  "protocolVersion": 1,
+  "identity": {
+    "id": "/go/samples/library",
+    "name": "go.putnami.dev/examples/library",
+    "path": "go/samples/library"
+  },
+  "provenance": {
+    "workspaceRevision": "deadbeef",
+    "generator": { "name": "putnami", "version": "0.1.0" },
+    "aggregationMethod": "inline"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "protocol": "putnami.events.v1",
+  "code": "invalid_cursor",
+  "message": "Cursor is no longer available.",
+  "retryable": false,
+  "details": {
+    "topic": "user.updated"
+  }
+}

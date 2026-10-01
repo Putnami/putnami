@@ -1,0 +1,50 @@
+{
+  "name": "@putnami/web",
+  "version": "0.0.0",
+  "description": "React integration with SSR support, client-side hydration, and routing utilities",
+  "bin": {
+    "putnami-react-generate": "./bin/generate.ts",
+    "putnami-web-manifest-diff": "./bin/manifest-diff.ts",
+    "putnami-web-manifest-budget": "./bin/manifest-budget.ts"
+  },
+  "keywords": [
+    "react",
+    "ssr",
+    "server-side-rendering",
+    "hydration",
+    "routing"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/web"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "browser": "./src/index.browser.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "browser": {
+    "./src/client/document/document.helper.ts": "./src/client/document/document.helper.browser.ts"
+  },
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/utils": "workspace:*",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-router": "^7.14.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.3",
+    "@types/react-dom": "^19.2.3"
+  },
+  "private": false
+}

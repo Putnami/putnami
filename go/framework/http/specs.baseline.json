@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/http-services#bounded-streams",
+    "go/http-services#graceful-shutdown",
+    "go/http-services#method-fallbacks",
+    "go/http-services#middleware-order",
+    "go/http-services#readiness-marker",
+    "go/http-services#request-scope",
+    "go/http-services#routing",
+    "go/http-services#websocket-framing"
+  ]
+}

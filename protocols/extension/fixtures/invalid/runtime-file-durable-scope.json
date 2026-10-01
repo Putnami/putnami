@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/runtime-file-durable-scope",
+  "commands": {
+    "test": { "run": [{ "id": "setup", "task": "test-setup" }] }
+  },
+  "tasks": {
+    "test-setup": {
+      "kind": "command",
+      "command": "echo",
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "socket": { "kind": "runtime-file", "path": "database/socket.path" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "worker" } }
+        ]
+      },
+      "scopeMetrics": [
+        {
+          "scope": { "name": "putnami" },
+          "metrics": [
+            {
+              "name": "jobs.processed",
+              "sum": {
+                "dataPoints": [
+                  { "timeUnixNano": "1700000000000000000", "asInt": "1" }
+                ],
+                "aggregationTemporality": 1,
+                "isMonotonic": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

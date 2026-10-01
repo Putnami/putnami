@@ -1,0 +1,28 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/api-contracts#binary-payloads",
+    "go/api-contracts#body-methods",
+    "go/api-contracts#build-time-artifacts",
+    "go/api-contracts#catch-all-paths",
+    "go/api-contracts#connect-descriptor-parity",
+    "go/api-contracts#declared-connect-encoding-order",
+    "go/api-contracts#declared-stream-resume",
+    "go/api-contracts#declared-transport-order",
+    "go/api-contracts#document-only",
+    "go/api-contracts#first-party-websocket-streams",
+    "go/api-contracts#generated-from-contract",
+    "go/api-contracts#generation-refuses-unhonorable-declarations",
+    "go/api-contracts#json-body-fidelity",
+    "go/api-contracts#late-route-discovery",
+    "go/api-contracts#optional-fields",
+    "go/api-contracts#producer-attribution",
+    "go/api-contracts#shared-contract-source",
+    "go/api-contracts#single-declaration",
+    "go/api-contracts#spec-disclosure",
+    "go/api-contracts#stable-operation-identity",
+    "go/api-contracts#validation-pipeline",
+    "go/api-contracts#websocket-stream-emission"
+  ]
+}

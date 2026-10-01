@@ -1,0 +1,47 @@
+{
+  "operationId": "widgets.watch",
+  "stream": "server",
+  "encoding": "json",
+  "idempotency": "safe",
+  "resume": true,
+  "maxFrameBytes": 4096,
+  "maxBufferedMessages": 8,
+  "steps": [
+    {
+      "direction": "client-to-server",
+      "frame": {
+        "v": 1,
+        "type": "init",
+        "operationId": "widgets.watch",
+        "clientId": "fixtures-consumer",
+        "deadlineUnixMs": "1800000000000",
+        "budgetMs": "60000",
+        "credentials": [{ "profile": "service", "value": "Bearer fixture-token" }],
+        "headers": [{ "name": "X-Correlation-Key", "values": ["fixture-call"] }],
+        "context": {
+          "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+          "tracestate": "vendor=opaque",
+          "baggage": "tenant=fixture",
+          "requestId": "request-1"
+        },
+        "request": { "encoding": "json", "value": { "cursor": "0" } }
+      }
+    },
+    {
+      "direction": "server-to-client",
+      "frame": { "v": 1, "type": "ready", "resumed": false, "resumeToken": "fixture-resume-token-1" }
+    },
+    {
+      "direction": "server-to-client",
+      "frame": {
+        "v": 1,
+        "type": "message",
+        "sequence": "1",
+        "payload": { "encoding": "json", "value": "AAE=" }
+      }
+    },
+    { "direction": "client-to-server", "frame": { "v": 1, "type": "ping", "nonce": "heartbeat-1" } },
+    { "direction": "server-to-client", "frame": { "v": 1, "type": "pong", "nonce": "heartbeat-1" } },
+    { "direction": "server-to-client", "frame": { "v": 1, "type": "result" } }
+  ]
+}

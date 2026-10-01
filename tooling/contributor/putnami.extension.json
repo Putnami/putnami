@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/contributor",
+  "cliContract": 5,
+  "agentContent": {
+    "path": "content",
+    "source": "src",
+    "supersedes": [
+      "@putnami/agent-workflows",
+      "@putnami/maintainer-workflows"
+    ]
+  }
+}

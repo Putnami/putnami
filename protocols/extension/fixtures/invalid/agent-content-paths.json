@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/escape",
+  "cliContract": 5,
+  "agentContent": {
+    "path": "../outside",
+    "source": "/abs/source"
+  }
+}

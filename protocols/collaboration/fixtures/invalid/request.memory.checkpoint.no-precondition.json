@@ -1,0 +1,6 @@
+{
+  "mission": "42",
+  "precondition": {},
+  "idempotencyKey": "k1",
+  "content": "x"
+}

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Epic"
+  short_description: "Qualify an epic on one integration lane"
+  default_prompt: "Use $epic to plan, implement, locally qualify, and hand off this epic."
+policy:
+  allow_implicit_invocation: false

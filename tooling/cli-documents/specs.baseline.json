@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "cli/release-rehearsal#canonical-migration-evidence",
+    "cli/release-rehearsal#declarative-plan",
+    "cli/release-rehearsal#keyed-verdict-inputs",
+    "cli/release-rehearsal#named-blockers",
+    "cli/release-rehearsal#no-vacuous-check",
+    "cli/release-rehearsal#provenance-contract",
+    "cli/release-rehearsal#publish-order-coverage",
+    "cli/release-rehearsal#read-only-rehearsal",
+    "cli/release-rehearsal#recorded-verdict",
+    "cli/release-rehearsal#reused-scrub",
+    "cli/release-rehearsal#rollback-completeness",
+    "cli/release-rehearsal#stable-recorded-fields",
+    "cli/release-rehearsal#ten-evidence-items"
+  ]
+}

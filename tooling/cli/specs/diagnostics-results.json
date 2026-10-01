@@ -1,0 +1,88 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/diagnostics-results",
+  "outcomes": [
+    "A failed run tells a user what failed, where it failed, and which command can reveal the full structured record",
+    "A production-profile run fails closed before execution when readiness diagnostics block it",
+    "An agent can retrieve the latest run diagnostics without spending time rerunning the jobs",
+    "A measurement consumer can collect a worktree's recorded sessions, in the order they ran, before the worktree is deleted or the store prunes them",
+    "A reader of a recorded session can tell which worktree it ran against by comparing one digest, instead of recomputing it against a tree that may have moved",
+    "A ledger or benchmark reads what each recorded run cost, over which selection, without writing its own reduction and without counting a nested run as a gate",
+    "A reader of a recorded session can tell why a task executed or reused a result from the input digest it was keyed on, without re-running the engine",
+    "A runner can identify the actual invocation's recorded plan before its tasks start, without repeating preparation in a separate planning invocation"
+  ],
+  "nonGoals": [
+    "Treating advisory repository hygiene findings as production blockers",
+    "Publishing secrets, configuration values, or absolute private paths in diagnostics",
+    "Making human terminal text a machine parsing contract",
+    "Making a recorded session outlive the worktree it was written in; retention bounds the store, not the worktree"
+  ],
+  "requirements": [
+    {
+      "id": "located-diagnostics",
+      "text": "Structured task diagnostics retain severity, code, message, and normalized file, line, and column locations through task and session results."
+    },
+    {
+      "id": "failure-presentation",
+      "text": "Human failure output prioritizes located diagnostics, bounds the live presentation, and points to structured output for the complete record."
+    },
+    {
+      "id": "bounded-test-output",
+      "text": "Go and TypeScript test tasks use the same pass, fail and skip summary vocabulary; causal failure diagnostics obey the CLI report count and message limits with explicit omission accounting, while attributed transcript log events survive batch splitting as session detail."
+    },
+    {
+      "id": "doctor-gate",
+      "text": "Doctor is read-only and deterministic; production runs stop before execution on unwaived high or critical findings and fail closed when the gate is unavailable or malformed."
+    },
+    {
+      "id": "doctor-names-a-missing-readme",
+      "text": "Doctor reports a project that has no README.md at its root as an advisory doctor.missing_readme finding, whose remediation names the purpose, commands and documentation a README states. A template project, which ships README.md.template for the project it renders, and a generated client project are exempt."
+    },
+    {
+      "id": "redaction",
+      "text": "Doctor and run diagnostics never reveal configuration values, credentials, or private source contents."
+    },
+    {
+      "id": "diagnostic-recall",
+      "text": "The MCP diagnostic reader returns the complete diagnostics from the latest executed run in the same server session and never reruns work."
+    },
+    {
+      "id": "terminal-outcome",
+      "text": "Success, failure, usage, authentication, API, and interruption outcomes map to stable documented exit codes and machine-result statuses."
+    },
+    {
+      "id": "bounded-machine-detail",
+      "text": "Machine JSONL suppresses debug task detail in normal mode, admits it in verbose mode under fixed deterministic budgets, protects failure capacity, reports exact elision, applies terminal-safe redaction, and retains a complete sanitized session artifact without changing task or run semantics."
+    },
+    {
+      "id": "opening-session-identity",
+      "text": "The opening scheduler:parallel event carries optional event.sessionId after its v2 plan is written and before tasks start. Verification and publish-containing runs use the same path and prepare once. Live and retained streams agree; sessionless schedulers omit the ID. Readers bind their invocation's event to .putnami/sessions/<sessionId>/plan.json as advisory, untrusted input. Envelopes, budgets, nested attribution and verdicts are unchanged; missing or elided events provide no early evidence."
+    },
+    {
+      "id": "session-record-durability",
+      "text": "Export emits every recorded session still present, oldest first by recorded start time, deduplicated by session id, forwarding the recorded document verbatim so a member a newer producer added survives. --since filters on the recorded start time and is inclusive at the boundary. Retention is configurable per workspace and its default is unchanged."
+    },
+    {
+      "id": "gated-tree-identity",
+      "text": "`putnami tree fingerprint` prints one digest covering HEAD, the bytes at every tracked path that differs from it (recursing through submodules), and the content of every untracked non-ignored file, from anywhere inside the worktree and without a workspace. A recorded session carries that same digest, captured before its first task ran, together with the dirty verdict and the head it was taken against. A producer that cannot determine the tree records no tree block rather than claiming a clean one."
+    },
+    {
+      "id": "local-evidence-verification",
+      "text": "`putnami tree verify` checks an execute run's local evidence against the worktree it runs in and prints one JSON verdict on stdout, whatever the output mode, without a workspace. A failure, a bare call included, prints {\"verdict\":\"not-verified\",\"reason\":...} on one line, exits 1 and writes nothing on stderr. Evidence is read as fatal UTF-8, an object that repeats a member is refused, and every path resolves against the Git top level."
+    },
+    {
+      "id": "session-summary-view",
+      "text": "Summary reduces each recorded session to one row: id, start, commands, selection, tasks total/executed/reused, run.cpu.actualMs, wall and outcome, in export's order and with its deduplication. A run a task spawned names its parent and is marked nested, never counted as a run of its own: --command keeps top-level sessions whose command set is exactly the named list, in any order, and never a nested run whatever it ran. Structured output carries the rows as an array at every count."
+    },
+    {
+      "id": "task-input-digest",
+      "text": "Every task record that reached a verdict carries inputDigest: the cache key it was keyed on, spelled sha256: and 64 lowercase hex, so it moves exactly when the key does. A skipped record and a task with no cache identity carry none. Summary --by-digest groups the selected sessions' records by digest in first-recorded order, with records, executed, reused and failed counts and each occurrence's session and reuse; records without a digest are counted apart."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md",
+    "tooling/cli/doc/adr/0002-cli-vnext-contracts.md",
+    "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md"
+  ]
+}

@@ -1,0 +1,129 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-feature-evidence.json",
+  "title": "Putnami feature evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "evidence"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "protocolVersion": {
+      "$comment": "Readers require the exact JSON integer token 1; 1.0 and 1e0 are invalid.",
+      "type": "integer",
+      "const": 1
+    },
+    "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidenceRecord" } }
+  },
+  "$defs": {
+    "featureID": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)+$"
+    },
+    "segmentID": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "stage": {
+      "type": "string",
+      "enum": ["coded", "wired", "default-on", "live-verified", "design-partner-proven", "ga"]
+    },
+    "issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["framework", "build", "test", "delivery", "runtime", "human"] },
+        "id": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "root": { "type": "string", "enum": ["workspace", "project", "package"] },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "binding"],
+      "properties": {
+        "root": { "$ref": "#/$defs/root" },
+        "ownerProject": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "package": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "binding": { "type": "string", "pattern": "^source-v1:sha256:[0-9a-f]{64}$" },
+        "environment": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" }
+      },
+      "oneOf": [
+        { "properties": { "root": { "const": "workspace" } }, "not": { "anyOf": [{ "required": ["ownerProject"] }, { "required": ["package"] }, { "required": ["version"] }] } },
+        { "properties": { "root": { "const": "project" } }, "required": ["ownerProject"], "not": { "anyOf": [{ "required": ["package"] }, { "required": ["version"] }] } },
+        { "properties": { "root": { "const": "package" } }, "required": ["package", "version"], "not": { "required": ["ownerProject"] } }
+      ]
+    },
+    "contribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ownerProject", "kind", "key"],
+      "properties": {
+        "ownerProject": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["config", "schema", "discoverer", "migration", "infra", "health", "lifecycle", "package", "requiredCapability"] },
+        "subkind": { "type": "string", "minLength": 1 },
+        "key": { "type": "string", "minLength": 1 }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim"],
+      "properties": {
+        "claim": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["capability", "artifact", "attestation"] },
+        "contribution": { "$ref": "#/$defs/contribution" },
+        "artifact": { "$ref": "#/$defs/artifact" },
+        "attestation": { "$ref": "#/$defs/attestation" }
+      },
+      "oneOf": [
+        { "properties": { "kind": { "const": "capability" } }, "required": ["contribution"], "not": { "anyOf": [{ "required": ["artifact"] }, { "required": ["attestation"] }] } },
+        { "properties": { "kind": { "const": "artifact" } }, "required": ["artifact"], "not": { "anyOf": [{ "required": ["contribution"] }, { "required": ["attestation"] }] } },
+        { "properties": { "kind": { "const": "attestation" } }, "required": ["attestation"], "not": { "anyOf": [{ "required": ["contribution"] }, { "required": ["artifact"] }] } }
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "path"],
+      "properties": {
+        "root": { "$ref": "#/$defs/root" },
+        "path": { "type": "string", "minLength": 1 },
+        "symbol": { "type": "string", "maxLength": 512 }
+      }
+    },
+    "evidenceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "feature", "requirement", "stage", "outcome", "issuer", "source", "subject", "provenance"],
+      "properties": {
+        "id": { "$ref": "#/$defs/featureID" },
+        "feature": { "$ref": "#/$defs/featureID" },
+        "requirement": { "$ref": "#/$defs/segmentID" },
+        "stage": { "$ref": "#/$defs/stage" },
+        "outcome": { "type": "string", "enum": ["supports", "contradicts"] },
+        "issuer": { "$ref": "#/$defs/issuer" },
+        "source": { "$ref": "#/$defs/source" },
+        "subject": { "$ref": "#/$defs/subject" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "persistent": { "type": "boolean" },
+        "observedAt": { "type": "string", "format": "date-time" },
+        "observedRepositoryRevision": { "type": "string", "pattern": "^git:(?:[0-9a-f]{40}|[0-9a-f]{64})$" }
+      }
+    }
+  }
+}

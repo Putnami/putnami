@@ -1,0 +1,122 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature-evidence.json",
+  "protocolVersion": 1,
+  "evidence": [
+    {
+      "id": "billing/evidence-availability-coded",
+      "feature": "billing/availability",
+      "requirement": "implementation",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "framework",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/example/billing",
+        "binding": "source-v1:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/example/billing",
+          "kind": "config",
+          "key": "billing.enabled"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "billing.go",
+        "symbol": "BillingConfig"
+      }
+    },
+    {
+      "id": "billing/evidence-availability-review",
+      "feature": "billing/availability",
+      "requirement": "availability-review",
+      "stage": "design-partner-proven",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "human",
+        "id": "product/billing"
+      },
+      "source": {
+        "root": "workspace",
+        "binding": "source-v1:sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "environment": "design-partner"
+      },
+      "subject": {
+        "kind": "attestation",
+        "attestation": {
+          "claim": "availability"
+        }
+      },
+      "provenance": {
+        "root": "workspace",
+        "path": "schema/feature-evidence/availability.json"
+      },
+      "persistent": true,
+      "observedAt": "2026-08-10T10:00:00Z",
+      "observedRepositoryRevision": "git:1111111111111111111111111111111111111111"
+    },
+    {
+      "id": "billing/evidence-invoice-coded",
+      "feature": "billing/invoice-export",
+      "requirement": "implementation",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/example/billing",
+        "binding": "source-v1:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/example/billing",
+          "kind": "migration",
+          "subkind": "sql",
+          "key": "billing"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "migrations.go",
+        "symbol": "BillingMigrations"
+      }
+    },
+    {
+      "id": "billing/evidence-invoice-wired",
+      "feature": "billing/invoice-export",
+      "requirement": "integration-test",
+      "stage": "wired",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "test",
+        "id": "billing/integration"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/example/billing",
+        "binding": "source-v1:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "subject": {
+        "kind": "artifact",
+        "artifact": {
+          "path": "test-results/invoice-export.json",
+          "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "invoice_export_test.go",
+        "symbol": "TestInvoiceExport"
+      }
+    }
+  ]
+}

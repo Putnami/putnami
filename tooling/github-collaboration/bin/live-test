@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Runs the GitHub collaboration provider's contract scenarios against a real
+# GitHub repository, with the credential gh or GH_TOKEN provides.
+#
+# The repository must be a disposable test repository carrying the topic
+# putnami-collaboration-live-test: the run opens issues, branches, commits and
+# pull requests there, and closes or deletes what it opened when it ends. The
+# test refuses any repository without that topic.
+set -euo pipefail
+
+if [ "$#" -ne 1 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+  printf '%s\n' "usage: live-test <owner/name>" \
+    "Runs TestLiveGitHub against the named disposable repository (topic putnami-collaboration-live-test)." >&2
+  [ "$#" -eq 1 ] && exit 0
+  exit 2
+fi
+case "$1" in
+  */*) ;;
+  *) printf 'live-test: %s is not owner/name\n' "$1" >&2; exit 2 ;;
+esac
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+cli=putnami
+if [ -x "$root/putnamiw" ]; then
+  cli="$root/putnamiw"
+fi
+cd "$root"
+PUTNAMI_GITHUB_COLLAB_LIVE_REPO="$1" exec "$cli" test --projects @putnami/github-collaboration \
+  --no-cache --count 1 --run '^TestLiveGitHub$' --no-enforce-coverage --test-verbose

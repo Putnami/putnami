@@ -1,0 +1,498 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-support.json",
+  "protocolVersion": 1,
+  "entries": [
+    {
+      "id": "cli/windows-consumers",
+      "kind": "feature",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/analytics",
+      "kind": "package",
+      "status": "preview",
+      "parity": "unsupported"
+    },
+    {
+      "id": "@putnami/application",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/cli",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/cli-protocol",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/client",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/clientgen",
+      "kind": "package",
+      "status": "preview"
+    },
+    {
+      "id": "@putnami/contributor",
+      "kind": "package",
+      "status": "preview",
+      "parity": "unsupported"
+    },
+    {
+      "id": "@putnami/database",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/document",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/events",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/github-collaboration",
+      "kind": "package",
+      "status": "preview",
+      "parity": "unsupported"
+    },
+    {
+      "id": "@putnami/go",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/local-collaboration",
+      "kind": "package",
+      "status": "preview",
+      "parity": "unsupported"
+    },
+    {
+      "id": "@putnami/memory-store",
+      "kind": "package",
+      "status": "preview",
+      "parity": "unsupported"
+    },
+    {
+      "id": "@putnami/migration",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/python",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
+      "id": "@putnami/runtime",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/scaffold",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/sdd",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
+      "id": "@putnami/spectest",
+      "kind": "package",
+      "status": "preview"
+    },
+    {
+      "id": "@putnami/storage",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/typescript",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/ui",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/utils",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "@putnami/web",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go-library",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go-server",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/api",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/app",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/cache",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/client",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/config",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/ctxutil",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/database",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/errors",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/events",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/grpc",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/http",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/inject",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/keyringstore",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/logger",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/migratecli",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/migration",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/openapi",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/parallel",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/platform",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/proto",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/schema",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/security",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/storage",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/telemetry",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "putnami-extension-sdk",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "python-library",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
+      "id": "python-server",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
+      "id": "typescript-library",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "typescript-server",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "typescript-web",
+      "kind": "package",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/agentcontext",
+      "kind": "protocol",
+      "status": "preview",
+      "parity": "unsupported"
+    },
+    {
+      "id": "go.putnami.dev/protocol/analytics",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/architecture",
+      "kind": "protocol",
+      "status": "experimental",
+      "default": false
+    },
+    {
+      "id": "go.putnami.dev/protocol/cache",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/capabilities",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/ci",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/cli",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/clientcontract",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/config",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/contracts",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/database",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/diagnostic",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/distribution",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/doctor",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/events",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/extension",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/features",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/gomod",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/http-routes",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/identity",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/infra",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/job",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/keyring",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/migration",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/oci",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/platform",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/qualify",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/registry",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/runner",
+      "kind": "protocol",
+      "status": "preview",
+      "parity": "unsupported"
+    },
+    {
+      "id": "go.putnami.dev/protocol/runtime",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/sitecontent",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/storage",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/support",
+      "kind": "protocol",
+      "status": "preview",
+      "parity": "unsupported"
+    },
+    {
+      "id": "go.putnami.dev/protocol/telemetry",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/template",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/transaction",
+      "kind": "protocol",
+      "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/protocol/workspace",
+      "kind": "protocol",
+      "status": "stable"
+    }
+  ]
+}

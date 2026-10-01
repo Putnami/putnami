@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/ui-system#external-link-containment",
+    "typescript/ui-system#focus-boundary",
+    "typescript/ui-system#interactive-semantics",
+    "typescript/ui-system#keyboard-and-dismissal",
+    "typescript/ui-system#mode-reactive-colors",
+    "typescript/ui-system#responsive-layout",
+    "typescript/ui-system#rich-content-sanitization",
+    "typescript/ui-system#ssr-color-mode"
+  ]
+}

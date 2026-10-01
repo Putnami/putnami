@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/protocol/sitecontent/site-content-bundle.json",
+  "title": "Putnami Site Content Bundle Manifest",
+  "description": "Closed manifest shape for site-content-bundle/v1: a digest-addressed tar.gz payload mounted into a Putnami site URL tree. Adding any manifest field requires a format-major bump.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "name", "mounts", "source", "files"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "formatVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Bundle format version. Consumers ignore bundles with a newer major."
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+      "description": "Stable logical bundle identifier."
+    },
+    "mounts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/mount" },
+      "description": "Site URL prefixes owned by this bundle. Overlap is invalid and enforced by protocol helpers."
+    },
+    "source": { "$ref": "#/$defs/source" },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/file" },
+      "description": "Every regular file in the tar.gz payload."
+    }
+  },
+  "$defs": {
+    "mount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["urlPrefix"],
+      "properties": {
+        "urlPrefix": {
+          "type": "string",
+          "pattern": "^/[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)*$",
+          "description": "Absolute normalized site URL path prefix. Root '/' and trailing slashes are not valid bundle mounts."
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo", "commit"],
+      "properties": {
+        "repo": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source repository identifier or URL."
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^\\S+$",
+          "description": "Whitespace-free source commit or immutable ref."
+        }
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)(?!.*\\\\)(?!.*\\/$).+$",
+          "description": "Payload-relative forward-slash path. It must fall under a declared mount when served at '/' + path."
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "sha256 digest as 64 lowercase hex characters."
+        }
+      }
+    }
+  }
+}

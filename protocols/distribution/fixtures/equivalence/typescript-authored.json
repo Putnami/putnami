@@ -1,0 +1,76 @@
+{
+  "members": [
+    {
+      "selectionFingerprint": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "sourceRevision": "8d5edb7513d93b9165ba2a7cb48466d022fc3f63",
+      "dependencies": [
+        {
+          "version": "0.3.0-8d5edb751",
+          "coordinate": "@putnami/core",
+          "ecosystem": "npm"
+        }
+      ],
+      "artifactDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "version": "0.3.0-8d5edb751",
+      "coordinate": "@putnami/web",
+      "ecosystem": "npm"
+    },
+    {
+      "selectionFingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "sourceRevision": "8d5edb7513d93b9165ba2a7cb48466d022fc3f63",
+      "dependencies": [
+        {
+          "version": "0.3.0-8d5edb751",
+          "coordinate": "@putnami/web",
+          "ecosystem": "npm"
+        }
+      ],
+      "artifactDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "version": "0.3.0-8d5edb751",
+      "coordinate": "putnami/sites/putnami.dev",
+      "ecosystem": "oci"
+    },
+    {
+      "platforms": {
+        "darwin/arm64": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "linux/amd64": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+      },
+      "selectionFingerprint": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "sourceRevision": "8d5edb7513d93b9165ba2a7cb48466d022fc3f63",
+      "dependencies": [],
+      "artifactDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "version": "0.3.0-8d5edb751",
+      "coordinate": "putnami/cli",
+      "ecosystem": "archive"
+    },
+    {
+      "selectionFingerprint": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "sourceRevision": "8d5edb7513d93b9165ba2a7cb48466d022fc3f63",
+      "dependencies": [],
+      "artifactDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "version": "0.3.0-8d5edb751",
+      "coordinate": "putnami/sites/putnami.dev/config",
+      "ecosystem": "put"
+    },
+    {
+      "selectionFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "sourceRevision": "8d5edb7513d93b9165ba2a7cb48466d022fc3f63",
+      "dependencies": [],
+      "artifactDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "version": "v0.3.0-8d5edb751",
+      "coordinate": "go.putnami.dev/app",
+      "ecosystem": "go"
+    },
+    {
+      "selectionFingerprint": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "sourceRevision": "8d5edb7513d93b9165ba2a7cb48466d022fc3f63",
+      "dependencies": [],
+      "artifactDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "version": "0.3.0-8d5edb751",
+      "coordinate": "@putnami/core",
+      "ecosystem": "npm"
+    }
+  ],
+  "namespace": "putnami",
+  "protocolVersion": 2
+}

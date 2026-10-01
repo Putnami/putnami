@@ -1,0 +1,127 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-ci.json",
+  "version": 3,
+  "commands": [
+    "lint",
+    "test",
+    "build",
+    "validate",
+    {
+      "name": "audit",
+      "failOnError": false
+    }
+  ],
+  "flags": [
+    "--enforce-coverage"
+  ],
+  "runner": {
+    "timeoutMinutes": 45
+  },
+  "distribution": {
+    "namespace": "putnami",
+    "visibility": "internal",
+    "memberAttribution": true,
+    "memberSourceTree": true,
+    "registries": {
+      "npm": {
+        "visibility": "internal",
+        "mirror": {
+          "to": "https://registry.npmjs.org"
+        }
+      },
+      "oci": {
+        "visibility": "internal",
+        "mirror": {
+          "to": "docker.io/putnami"
+        }
+      }
+    },
+    "channels": {
+      "canary": {
+        "visibility": "internal"
+      },
+      "latest": {
+        "visibility": "public",
+        "protected": true
+      },
+      "rc": {
+        "visibility": "internal"
+      }
+    },
+    "versions": {
+      "stable": "public",
+      "prerelease": "internal"
+    },
+    "members": [
+      {
+        "select": "tag:public-lib",
+        "visibility": "public"
+      },
+      {
+        "select": [
+          "group:experimental",
+          "scope:/typescript"
+        ],
+        "visibility": "internal"
+      }
+    ]
+  },
+  "rules": [
+    {
+      "branches": "main",
+      "publish": [
+        "canary",
+        "staging"
+      ]
+    },
+    {
+      "branches": "release/*",
+      "publish": [
+        "rc"
+      ]
+    },
+    {
+      "tags": "wip/*",
+      "publish": false
+    },
+    {
+      "pullRequests": true,
+      "publish": [
+        "pr-{number}"
+      ]
+    }
+  ],
+  "envs": {
+    "local": {},
+    "prod": {
+      "channel": "latest",
+      "constraints": {
+        "approval": "manual"
+      },
+      "workloads": [
+        {
+          "select": "tag:api",
+          "rollout": {
+            "strategy": "progressive",
+            "steps": [
+              10,
+              100
+            ],
+            "advance": "manual",
+            "abortOn": "readyz"
+          }
+        },
+        {
+          "select": "group:experimental",
+          "channel": "canary"
+        },
+        {
+          "select": "tag:web"
+        }
+      ]
+    },
+    "staging": {
+      "channel": "canary"
+    }
+  }
+}

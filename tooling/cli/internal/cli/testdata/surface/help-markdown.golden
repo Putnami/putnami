@@ -1,0 +1,1483 @@
+# putnami
+
+> polyglot build orchestrator — v0.0.0-golden
+
+## Usage
+
+```
+putnami <command[,command...]> [options]
+```
+
+## Build Commands
+
+| Command | Description |
+|---------|-------------|
+| `putnami build` | Compile or transpile project sources into runnable or distributable outputs |
+| `putnami test` | Run the project's tests, emitting test counts and coverage metrics |
+| `putnami lint` | Check code for style and correctness findings, emitting per-issue diagnostics |
+| `putnami serve` | Run the project's dev server until interrupted |
+| `putnami run` | Execute the project once and exit |
+| `putnami format` | Rewrite sources into canonical formatting |
+| `putnami package` | Assemble distributable artifacts for the project's publish channels |
+| `putnami publish` | Push packaged artifacts to registries |
+| `putnami deploy` | Converge a cloud environment on the workload's aggregated infra manifest |
+| `putnami generate` | Run code generators |
+
+Multi-command: `putnami lint,test,build --impacted`
+
+## Common Options
+
+| Flag | Description |
+|------|-------------|
+| `--verbose`, `-v` | Show job results and diagnostics |
+| `--debug`, `-d` | Stream all events in real-time |
+| `--watch`, `-w` | Re-run on file changes |
+| `--plan` | Show execution plan without running |
+| `--help`, `-h` | Show help |
+
+## Project Selection Options
+
+| Flag | Description |
+|------|-------------|
+| `--all` | All projects |
+| `--impacted` | Projects affected by git changes |
+| `--projects` <list> | Comma-separated project names |
+| `--tag` <tags> | Filter by tags |
+| `--exclude-tag` <tags> | Exclude by tags |
+| `--exclude` <names> | Exclude by name |
+| `--baseline` <branch> | Custom git baseline for --impacted |
+| `--impacted-strict` | Fail when baseline can't be resolved |
+
+## Execution Options
+
+| Flag | Description |
+|------|-------------|
+| `--where` <placement> | Execution placement: local | remote (local when no runner provider is installed) |
+| `--providers` <list> | Credentials to ask the credential provider for: install, publish (comma list) |
+| `--credential-fd` <n> | Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2 |
+| `--no-cache` | Force re-execution (skip cache) |
+| `--no-cache-projects` <list> | Force re-execution of these projects only |
+| `--cache-trust` <policy> | Remote cache trust: ci | any | none |
+| `--continue-on-error` | Don't abort on first failure |
+| `--max-parallel` <mode|n> | Parallelism: auto | eco | max | number |
+| `--resource` <name=units> | Budget for a named shared resource (repeatable) |
+| `--cpu-policy` <policy> | CPU ceiling policy: critical-path | measured |
+| `--retry` <n> | Retry transient failures |
+| `--retry-failed` | Re-run tasks whose identical failure is cached |
+| `--profile` <profile> | Deployment profile: dev | test | production |
+| `--dry-run` | Show changes without applying |
+
+## Output Options
+
+| Flag | Description |
+|------|-------------|
+| `--output` <format> | Output format: text | json | jsonl | cloud-logging |
+| `--json` | Shorthand for --output=json |
+| `--quiet` | Suppress non-error output |
+| `--color` | Force color output |
+| `--no-color` | Disable color output |
+
+## Advanced Options
+
+| Flag | Description |
+|------|-------------|
+| `--trace-profile` <path> | Collect trace events (Chrome trace format) |
+
+## Default Project Selection
+
+With no project target, feature branches run impacted projects vs trunk. On `main` or `master`, Putnami checks the local same-command/params marker first, then an active remote-cache successful-run marker, and falls back to all projects when no usable marker exists.
+
+## Positional Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `.` | Current directory scope (project or subtree) |
+
+## CI
+
+| Command | Description |
+|---------|-------------|
+| `putnami change-plan` | Emit an immutable impacted CI ChangePlan |
+| `putnami ci init` | Create a safe putnami.ci.json version 3 contract |
+| `putnami ci validate` | Validate CI intent and workspace graph references |
+| `putnami ci fmt` | Canonicalize putnami.ci.json |
+| `putnami ci explain` | Explain first-match CI intent for local Source assumptions |
+
+## Distribution
+
+| Command | Description |
+|---------|-------------|
+| `putnami channel set|status` | Move a distribution channel and report how far it is served |
+
+## Projects
+
+| Command | Description |
+|---------|-------------|
+| `putnami projects list` | List canonical workspace projects |
+| `putnami projects create` | Create a project from template |
+| `putnami projects describe` | Show project info |
+| `putnami projects sync` | Sync projects from disk |
+| `putnami projects tag` | Manage project tags |
+| `putnami scopes list` | List workspace scopes (projects, groups, tags) |
+
+## Workspace
+
+| Command | Description |
+|---------|-------------|
+| `putnami init` | Initialize a new workspace |
+| `putnami install` | Install extensions and dependencies |
+| `putnami upgrade` | Upgrade CLI, extensions, and dependencies |
+| `putnami pin` | Pin the CLI version this workspace uses |
+| `putnami workspace describe` | Describe the active workspace |
+| `putnami version get|tag|list|use` | Versions derived from git, release tags, and installed CLI binaries |
+| `putnami infra plan` | Plan workspace infra (--output=jsonl) |
+
+## Extensions & Templates
+
+| Command | Description |
+|---------|-------------|
+| `putnami extensions install` | Install extensions from config |
+| `putnami extensions list` | List installed extensions |
+| `putnami extensions update` | Update extensions |
+| `putnami extensions remove` | Remove an extension |
+| `putnami templates install` | Install templates from config |
+| `putnami templates list` | List installed templates |
+| `putnami templates update` | Update templates |
+| `putnami templates remove` | Remove a template |
+
+## Dependencies
+
+| Command | Description |
+|---------|-------------|
+| `putnami deps install` | Install project dependencies |
+| `putnami cache clean` | Clear this repo's shared build cache |
+| `putnami cache gc` | Garbage-collect global caches to their budgets |
+| `putnami cache verify` | Verify cache determinism and restore equivalence |
+
+## Configuration
+
+| Command | Description |
+|---------|-------------|
+| `putnami config show` | Show effective configuration |
+| `putnami config set` | Set a configuration value |
+| `putnami context generate` | Regenerate AI context |
+| `putnami context map` | Build or print the workspace orientation map |
+
+## Diagnostics
+
+| Command | Description |
+|---------|-------------|
+| `putnami doctor` | Preflight production readiness under a deployment profile |
+| `putnami tree fingerprint` | Print the digest identifying this worktree's exact state |
+| `putnami tree verify` | Check local workflow evidence against this worktree |
+| `putnami sessions list` | List recent execution sessions |
+| `putnami sessions inspect` | Inspect a specific session |
+| `putnami sessions replay` | Resume delivery of a retained execution session |
+| `putnami sessions export` | Export recorded sessions as JSONL |
+| `putnami sessions summary` | Summarize recorded sessions, one row per run |
+| `putnami report` | Read back a run's report |
+
+## Execution
+
+| Command | Description |
+|---------|-------------|
+| `putnami compose` | Serve a workload with the workloads it runs with |
+| `putnami qualify` | Run a workload's derived smoke contract against a target and emit one verdict |
+
+## Migration
+
+| Command | Description |
+|---------|-------------|
+| `putnami migrate vnext` | Migrate putnami.lock.json to the current format |
+| `putnami migrate agent-content` | Move superseded agent artifacts to an extension's agent content |
+
+## Authoring
+
+| Command | Description |
+|---------|-------------|
+| `putnami dev extension validate` | Validate an extension manifest |
+| `putnami dev template <action>` | Validate, test, or package a template |
+
+## Agents
+
+| Command | Description |
+|---------|-------------|
+| `putnami mcp` | Run the MCP server over stdio for AI agent harnesses |
+| `putnami mcp install` | Register the MCP server in .mcp.json for agent IDEs |
+
+## Other
+
+| Command | Description |
+|---------|-------------|
+| `putnami telemetry on|off|status|show` | Manage anonymous telemetry |
+| `putnami completion <shell>` | Generate shell completions (bash, zsh, fish) |
+
+## Command Reference
+
+### `putnami change-plan`
+
+Emit a deterministic admission plan of the CI quality gate for the exact commit delta from --base to the checked-out HEAD. The worktree must be clean and --base must be a HEAD ancestor, so Cloud can recompute the document's digest from immutable repository state. Source contents, environment values, secrets, command arguments, and output paths are never emitted
+
+**Usage**
+
+```
+putnami change-plan --base <commit> [--head <commit>] [--no-cache] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--base` <commit> | Required base commit or ref; emitted as its full immutable commit SHA |
+| `--head` <commit> | Optional head commit or ref; it must resolve to the checked-out HEAD |
+
+**Examples**
+
+- `putnami change-plan --base origin/main --output=json`
+- `putnami change-plan --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl`
+
+### `putnami ci init`
+
+Create putnami.ci.json beside putnami.workspace.json using discovered framework graph jobs, with no distribution and no environment, so it requests no publish or deploy authority
+
+**Usage**
+
+```
+putnami ci init [--force] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--force` | Replace an existing putnami.ci.json |
+
+**Examples**
+
+- `putnami ci init`
+- `putnami ci init --output=json`
+
+### `putnami ci validate`
+
+Strictly validate putnami.ci.json, resolve its command references against discovered workspace jobs, refuse distribution and envs without an installed release-set provider, and report its canonical digest without contacting Putnami Cloud
+
+**Usage**
+
+```
+putnami ci validate [--output <format>]
+```
+
+**Examples**
+
+- `putnami ci validate`
+- `putnami ci validate --output=json`
+
+### `putnami ci fmt`
+
+Validate and canonicalize putnami.ci.json while preserving semantic rule order; --check is read-only and fails when bytes differ
+
+**Usage**
+
+```
+putnami ci fmt [--check] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--check` | Check canonical formatting without writing |
+
+**Examples**
+
+- `putnami ci fmt`
+- `putnami ci fmt --check`
+
+### `putnami ci explain`
+
+Evaluate ordered rules locally and report the commands and flags the run executes, the matching rule or the implicit tag convention, the channels a publish advances, and the environments that follow each of them. Trust, entitlements, secrets, and remote authorization remain explicitly unresolved
+
+**Usage**
+
+```
+putnami ci explain --event <push|tag|pull_request> [--branch <branch>] [--tag <tag>] [--pr <number>] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--event` <push|tag|pull_request> | Normalized Source event assumption |
+| `--branch` <branch> | Updated push branch or pull-request head branch |
+| `--tag` <tag> | Created tag, for --event tag |
+| `--pr` <number> | Pull-request number used to render the closed channel placeholder |
+
+**Examples**
+
+- `putnami ci explain --event push --branch main --output=json`
+- `putnami ci explain --event tag --tag ts/v0.3.0`
+- `putnami ci explain --event pull_request --branch feature/x --pr 42`
+
+### `putnami channel`
+
+Move a channel to a release set that already exists, and report the head each registry has applied. Both are metadata operations: they publish nothing, build nothing, and check nothing out
+
+**Usage**
+
+```
+putnami channel <set|status>
+```
+
+**Examples**
+
+- `putnami channel set latest --from canary`
+- `putnami channel status latest --wait 2m`
+
+### `putnami channel set`
+
+Point a channel at a release set that already exists, taken from another channel or named by its immutable id. Promotion and rollback are this one command: no publisher runs, no artifact is uploaded, and the move is compare-and-swapped against the channel's current head
+
+**Usage**
+
+```
+putnami channel set <channel> --from <channel|rs_id> [--expected <rs_id>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--from` <channel|rs_id> | The channel whose head is re-released, or the immutable release-set id to point at |
+| `--expected` <rs_id> | The id the channel must currently name; without it the channel's current head is read and used |
+
+**Examples**
+
+- `putnami channel set latest --from canary`
+- `putnami channel set latest --from rs_<64-lowercase-hex>`
+- `putnami channel set canary --from ts-v0.3.0 --expected rs_<64-lowercase-hex>`
+
+### `putnami channel status`
+
+Report a channel's accepted head and the generation each registry has applied. It exits non-zero while any registry is behind, so a pipeline waits for the channel to be served instead of assuming it
+
+**Usage**
+
+```
+putnami channel status <channel> [--wait <duration>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--wait` <duration> | Poll every 2s until every registry has applied the accepted head, or this Go duration elapses |
+
+**Examples**
+
+- `putnami channel status latest`
+- `putnami channel status canary --wait 2m`
+
+### `putnami projects list`
+
+List every project in the loaded workspace graph with its canonical name, path, type, and tags; use projects describe for dependencies, dependents, extensions, and metadata
+
+**Usage**
+
+```
+putnami projects list [--output <format>]
+```
+
+**Examples**
+
+- `putnami projects list`
+- `putnami projects list --output=jsonl`
+
+### `putnami projects create`
+
+Create a project from template
+
+**Usage**
+
+```
+putnami projects create <name> --template <template> [--path <path>] [--force]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--template` <template> | Template to scaffold from |
+| `--path` <path> | Workspace-relative project path |
+| `--force` | Overwrite an existing project directory |
+
+**Examples**
+
+- `putnami projects create my-app --template typescript-web`
+- `putnami projects create my-app --template typescript-web --path apps/my-app`
+
+### `putnami projects describe`
+
+Show detailed project information including dependencies, extensions, and configuration
+
+**Usage**
+
+```
+putnami projects describe <name> [--output <format>]
+```
+
+**Examples**
+
+- `putnami projects describe my-app`
+- `putnami projects describe my-app --output=jsonl`
+
+### `putnami projects sync`
+
+Sync project references from disk into workspace configuration
+
+**Usage**
+
+```
+putnami projects sync [--prune] [--skip-install] [--dry-run]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--prune` | Drop config entries whose project directory no longer exists |
+| `--skip-install` | Do not run dependency installation after syncing |
+
+**Examples**
+
+- `putnami projects sync`
+- `putnami projects sync --dry-run`
+
+### `putnami projects tag`
+
+Add or manage tags on a project
+
+**Usage**
+
+```
+putnami projects tag <name> <tag> [--set] [--remove]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--set` | Replace the project's tags with the given list |
+| `--remove` | Remove the given tags from the project |
+
+**Examples**
+
+- `putnami projects tag my-app frontend`
+
+### `putnami scopes list`
+
+List workspace scopes with their projects, groups, and tags
+
+**Usage**
+
+```
+putnami scopes list [--output <format>]
+```
+
+**Examples**
+
+- `putnami scopes list`
+- `putnami scopes list --output=jsonl`
+
+### `putnami install`
+
+Run workspace-level installation: extensions, templates (if configured), and dependencies
+
+**Usage**
+
+```
+putnami install [--latest]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--latest` | Ignore the lock file and resolve the latest extension and template versions |
+
+**Examples**
+
+- `putnami install`
+
+### `putnami upgrade`
+
+Upgrade the CLI, extensions, templates, and framework dependencies in one command; a channel resolves on each ecosystem's own registry
+
+**Usage**
+
+```
+putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|canary>] [--release <rs_id> --namespace <namespace>] [--version <version>] [--from-source] [--dry-run]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--global` | Upgrade the global CLI in ~/.putnami/bin instead of the workspace pin; inside a workspace the other phases still run, outside one only the CLI is upgraded (alias: -g) |
+| `--cli` | Only upgrade the CLI binary |
+| `--extensions` | Only upgrade extensions and templates |
+| `--deps` | Only upgrade framework dependencies |
+| `--channel` <channel> | Resolve a release channel (stable by default; canary for latest prerelease) |
+| `--release` <rs_id> | Use one immutable release-set snapshot for npm and Go dependencies (needs --namespace) |
+| `--namespace` <namespace> | Release-set namespace that published the --release id; accepted only with --release |
+| `--version` <version> | Use an exact Putnami release version |
+| `--from-source` | Build the CLI from this workspace's source and install it as the active binary, bypassing the download channel (self-host escape hatch; combine with --global to replace the global CLI) |
+| `--dry-run` | Resolve and print the upgrade plan without modifying files |
+
+**Examples**
+
+- `putnami upgrade`
+- `putnami upgrade --global`
+- `putnami upgrade --channel canary`
+- `putnami upgrade --release rs_<64-lowercase-hex> --namespace putnami`
+- `putnami upgrade --deps --version 1.2.3`
+- `putnami upgrade --from-source --global`
+
+### `putnami pin`
+
+Pin the putnami CLI version this workspace uses, recording its per-platform digest in putnami.lock.json so `putnami` resolves and verifies the exact binary
+
+**Usage**
+
+```
+putnami pin [<version>] [--remove]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--remove` | Remove the CLI version pin |
+
+**Examples**
+
+- `putnami pin 1.2.3`
+- `putnami pin`
+- `putnami pin --remove`
+
+### `putnami workspace init`
+
+Initialize a new workspace
+
+**Usage**
+
+```
+putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--force]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--workspace` <name> | Workspace name override |
+| `--extension` <ts|go|py> | Default extension to install |
+| `--project` <name> | Create an initial project |
+| `--project-path` <path> | Workspace-relative path for the initial project |
+| `--force` | Reinitialize an existing workspace |
+
+**Examples**
+
+- `putnami init`
+- `putnami init --project my-app`
+- `putnami init --project my-app --project-path apps/my-app`
+
+### `putnami workspace describe`
+
+Confirm the active workspace and show its name, version, project count, extension count, and configuration summary before selecting work
+
+**Usage**
+
+```
+putnami workspace describe [--output <format>]
+```
+
+**Examples**
+
+- `putnami workspace describe`
+- `putnami workspace describe --output=jsonl`
+
+### `putnami version`
+
+Show the version each line is at (get), release a line (tag), and manage the installed CLI binaries (list/use)
+
+**Usage**
+
+```
+putnami version <get|tag|list|use>
+```
+
+**Examples**
+
+- `putnami version get`
+- `putnami version tag --scope typescript --dry-run`
+- `putnami version tag --scope tooling --yes --push`
+- `putnami version list --global`
+- `putnami version use go-dev`
+
+### `putnami version get`
+
+Show the version every version line is at, derived from its git tags
+
+**Usage**
+
+```
+putnami version get [--scope <line>] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--scope` <line> | Report only this version line, by its scope path |
+
+**Examples**
+
+- `putnami version get`
+- `putnami version get --scope typescript`
+- `putnami version get --output=jsonl`
+
+### `putnami version tag`
+
+Release a version line: regenerate its changelog, create the release commit, then the annotated tag on it
+
+**Usage**
+
+```
+putnami version tag [<tag>] [--scope <line>] [--push] [--dry-run] [--yes]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--scope` <line> | The version line to release, by its scope path (required when the workspace declares several) |
+| `--push` | Push the release commit and the tag to origin |
+| `--dry-run` | Print the proposed tag and changelog without writing anything |
+| `--yes` | Skip the confirmation and create the release commit and tag |
+
+**Examples**
+
+- `putnami version tag --scope typescript --dry-run`
+- `putnami version tag --scope tooling --yes --push`
+- `putnami version tag tooling/v0.3.0 --scope tooling --yes`
+
+### `putnami version list`
+
+List the installed putnami CLI binaries in .putnami/bin (or ~/.putnami/bin with --global) and mark the active one
+
+**Usage**
+
+```
+putnami version list [--global]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--global` | List binaries in ~/.putnami/bin instead of the workspace (alias: -g) |
+
+**Examples**
+
+- `putnami version list`
+- `putnami version list --global`
+
+### `putnami version use`
+
+Switch the active putnami CLI binary to an installed putnami-<name> (e.g. one built by `upgrade --from-source`)
+
+**Usage**
+
+```
+putnami version use <name> [--global]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--global` | Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g) |
+
+**Examples**
+
+- `putnami version use go-dev`
+- `putnami version use go-source-1a2b3c4 --global`
+
+### `putnami infra plan`
+
+Show the aggregated infrastructure plan inferred from project descriptors
+
+**Usage**
+
+```
+putnami infra plan [--output <format>]
+```
+
+**Examples**
+
+- `putnami infra plan`
+- `putnami infra plan --output=jsonl`
+
+### `putnami extensions install`
+
+Install extensions from workspace configuration and run extension install hooks
+
+**Usage**
+
+```
+putnami extensions install [name] [--latest] [--user] [--platform <os/arch>] [--dest <dir>] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--latest` | Ignore the lock file and resolve the latest versions |
+| `--user` | Pin one registry extension in the user scope (~/.putnami/user) so its commands run outside any workspace |
+| `--platform` <os/arch> | Materialize artifacts for another platform (skips install hooks and the lock write) |
+| `--dest` <dir> | Materialize into this artifact-store root instead of the machine-global one |
+
+**Examples**
+
+- `putnami extensions install`
+- `putnami extensions install --output=jsonl`
+- `putnami extensions install --platform linux/amd64 --dest ./.gen/warm-artifacts`
+- `putnami extensions install --user @acme/audit`
+
+### `putnami extensions list`
+
+List installed extensions with their jobs and activation files
+
+**Usage**
+
+```
+putnami extensions list [--user] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--user` | List the extensions pinned in the user scope (~/.putnami/user) instead of the workspace |
+
+**Examples**
+
+- `putnami extensions list`
+- `putnami extensions list --output=jsonl`
+- `putnami extensions list --user`
+
+### `putnami extensions update`
+
+Update extensions to latest compatible versions
+
+**Usage**
+
+```
+putnami extensions update [name] [--output <format>]
+```
+
+**Examples**
+
+- `putnami extensions update`
+- `putnami extensions update --output=jsonl`
+
+### `putnami extensions remove`
+
+Remove an installed extension
+
+**Usage**
+
+```
+putnami extensions remove <name> [--user]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--user` | Remove the extension from the user scope (~/.putnami/user) instead of the workspace |
+
+**Examples**
+
+- `putnami extensions remove @putnami/go`
+- `putnami extensions remove @acme/audit --user`
+
+### `putnami templates install`
+
+Install templates from workspace configuration
+
+**Usage**
+
+```
+putnami templates install [name] [--latest] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--latest` | Ignore the lock file and resolve the latest versions |
+
+**Examples**
+
+- `putnami templates install`
+- `putnami templates install go-server`
+- `putnami templates install --output=jsonl`
+
+### `putnami templates list`
+
+List configured and discovered templates
+
+**Usage**
+
+```
+putnami templates list [--output <format>]
+```
+
+**Examples**
+
+- `putnami templates list`
+- `putnami templates list --output=jsonl`
+
+### `putnami templates update`
+
+Update templates to latest compatible versions
+
+**Usage**
+
+```
+putnami templates update [name] [--output <format>]
+```
+
+**Examples**
+
+- `putnami templates update`
+- `putnami templates update --output=jsonl`
+
+### `putnami templates remove`
+
+Remove an installed template
+
+**Usage**
+
+```
+putnami templates remove <name>
+```
+
+**Examples**
+
+- `putnami templates remove go-server`
+
+### `putnami deps install`
+
+Install project dependencies by delegating to extension-provided installers
+
+**Usage**
+
+```
+putnami deps install [--tag <tags>] [--exclude-tag <tags>]
+```
+
+**Examples**
+
+- `putnami deps install`
+- `putnami deps install --tag go`
+
+### `putnami cache clean`
+
+Delete cached build artifacts from this repo's shared store (affects all worktrees of the repo); --all clears every repo's store
+
+**Usage**
+
+```
+putnami cache clean [--all]
+```
+
+**Examples**
+
+- `putnami cache clean`
+- `putnami cache clean --all`
+
+### `putnami cache gc`
+
+Garbage-collect the machine-global build, Go, Bun, and binary stores down to their byte budgets
+
+**Usage**
+
+```
+putnami cache gc
+```
+
+**Examples**
+
+- `putnami cache gc`
+
+### `putnami cache verify`
+
+Run lint, test, and build twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing
+
+**Usage**
+
+```
+putnami cache verify [--projects <selector> | --impacted | --all] [--output <format>]
+```
+
+**Examples**
+
+- `putnami cache verify --projects /my/project`
+- `putnami cache verify --all --output=jsonl`
+
+### `putnami config show`
+
+Display the fully merged configuration (global + workspace + local scopes)
+
+**Usage**
+
+```
+putnami config show [--output <format>]
+```
+
+**Examples**
+
+- `putnami config show`
+- `putnami config show --output=jsonl`
+
+### `putnami config set`
+
+Set a configuration value in the workspace config
+
+**Usage**
+
+```
+putnami config set <key> <value>
+```
+
+**Examples**
+
+- `putnami config set maxParallel 4`
+
+### `putnami context generate`
+
+Regenerate the Putnami guidance block in CLAUDE.md and AGENTS.md, and the agent skills the workspace declares by in-tree path. Bytes outside the block are never touched; an edited block is preserved and reported, and --force rewrites that block only. No other file is written: run `putnami mcp install` to register the MCP server
+
+**Usage**
+
+```
+putnami context generate [--force]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--force` | Rewrite a guidance block that was edited or written by an older release |
+
+**Examples**
+
+- `putnami context generate`
+- `putnami context generate --force`
+
+### `putnami context map`
+
+Regenerate the ephemeral workspace map under .putnami/context-map/ (repo-map.json and repo-map.md) from committed artifacts (project manifests, schema/openapi.json, schema/config.jsonschema.json, READMEs, and the workspace docs tree). Byte-deterministic on an unchanged tree, gitignored, and never committed. --print renders it to stdout and writes nothing. `putnami build` refreshes it automatically outside CI; set PUTNAMI_CONTEXT_MAP=off|write to override. Agents get the same document fresh from the MCP workspace_map tool
+
+**Usage**
+
+```
+putnami context map [--print[=json|md]] [--projects <list>] [--impacted] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--print` | Render the map to stdout (md by default, or json) and write nothing |
+
+**Examples**
+
+- `putnami context map`
+- `putnami context map --print`
+- `putnami context map --print=json`
+- `putnami context map --impacted`
+
+### `putnami doctor`
+
+Run a read-only production-readiness preflight over the selected projects: derives production-safety findings (incomplete capabilities, missing required config, invalid committed schemas, config shadowing) from committed manifests and grades them by deployment profile. Under --profile production a high/critical finding fails with exit 2; dev/test stay advisory. Config values are never read or emitted
+
+**Usage**
+
+```
+putnami doctor [--profile <dev|test|production>] [--project <selector>] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--profile` <profile> | Deployment profile to evaluate under (dev|test|production); production is strictest |
+| `--project` <selector> | Project ID, path, or name (comma-separated); default is every workspace project |
+
+**Examples**
+
+- `putnami doctor`
+- `putnami doctor --profile production`
+- `putnami doctor --profile production --project /tooling/cli`
+- `putnami doctor --profile production --output=jsonl`
+
+### `putnami tree fingerprint`
+
+Print one digest covering HEAD, the tracked diff against it, and the content of every untracked non-ignored file. It exists because "the same files are dirty" is not "the same bytes are on disk": git status reports paths and status codes, so an agent that gates a tree and then edits a file it had already dirtied leaves that output identical. Human output is the bare digest; --output=json adds dirty and headSHA, the same members a recorded session's tree block carries. Reads the repository and writes nothing, and needs no workspace
+
+**Usage**
+
+```
+putnami tree fingerprint [--output <format>]
+```
+
+**Examples**
+
+- `putnami tree fingerprint`
+- `putnami tree fingerprint --output=json`
+
+### `putnami tree verify`
+
+Check the local evidence of an execute run against the worktree it runs in, and print one JSON verdict. --record verifies a dossier: its tree binding, changed files, policy files, consulted scopes, independent review, gate, qualification verdicts and acceptance evidence. --snapshot prints the dossier skeleton for the current tree, --ref prints a file reference with its SHA-256, and --gate checks that a recorded gate session and report can replace the gate the PR finalizer would run. A gate must cover the native impacted plan, which the workspace CLI of the checked repository answers as a dry run. Paths resolve against the Git top level. A failure prints {"verdict":"not-verified","reason":...} on one line and exits 1 with nothing on stderr; --output does not change the document. It is a consistency check, not a signed review or an access boundary, and it writes nothing
+
+**Usage**
+
+```
+putnami tree verify (--record <file> | --snapshot | --ref <file> | --gate <session> --report <report>) [--base <rev>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--record` <file> | Verify the dossier this file holds and print the verified verdict |
+| `--snapshot` | Print the dossier skeleton for the current tree |
+| `--ref` <file> | Print the reference to this file: its path as given and its SHA-256 |
+| `--gate` <session> | Check that the recorded gate session can replace the finalizer's gate |
+| `--report` <report> | Session report of the --gate session |
+| `--base` <rev> | Base revision; default origin/main for --snapshot and --gate, and for --record the base the dossier must name |
+
+**Examples**
+
+- `putnami tree verify --snapshot --base origin/main`
+- `putnami tree verify --record .context/dossier.json`
+- `putnami tree verify --gate .putnami/sessions/<id>/session.json --report .putnami/reports/<id>.json`
+
+### `putnami compose`
+
+Start the selected workload and the transitive closure of its runsWith projects in one invocation. Every process binds an ephemeral port and answers behind a local reverse proxy whose URL stays stable across restarts; dependency URLs travel through the clients config block and databases declared in infra/requirements.json are provisioned per composition. Dependencies run production-mode without watch; the target watches by default. Stops every owned process, proxy and database on exit; the next invocation reaps what an ungraceful death left behind
+
+**Usage**
+
+```
+putnami compose <project> [--port <n>] [--no-watch] [--ready-timeout <duration>] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--port` <n> | Proxy port of the target; default options.serve.port then 3000; 0 picks an ephemeral port |
+| `--no-watch` | Run the target production-mode without watch, like its dependencies |
+| `--ready-timeout` <duration> | Deadline for each member's typed ready event; default 60s |
+
+**Examples**
+
+- `putnami compose @example/go-items-consumer`
+- `putnami compose /typescript/samples/06-database --port 0 --output=json`
+
+### `putnami qualify`
+
+Derive the smoke contract from the workload's route inventory, execute it against --target (local composes the workload with compose; a URL is any deployed environment), and print one verdict bound to the tested tree or to the deployed sha. Fails closed: unsupported, not_run, timed_out, canceled, target_unreachable, digest_mismatch and composition_failed are distinct from passed and exit non-zero
+
+**Usage**
+
+```
+putnami qualify <project> --target <local|url> [--expect-sha <sha>] [--platform-prefix <path>] [--ready-timeout <duration>] [--request-timeout <duration>] [--print-contract] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--target` <local|url> | local composes the workload on this machine; an http(s) URL is a running deployment |
+| `--expect-sha` <sha> | Required with a URL target: the git sha the deployment must report on /version |
+| `--platform-prefix` <path> | Prefix under which /readyz and /version are mounted; default: where the route inventory declares both, else the root |
+| `--ready-timeout` <duration> | Deadline for readiness; default 60s |
+| `--request-timeout` <duration> | Deadline per smoke request; default 5s |
+| `--print-contract` | Print the derived contract and exit without a target |
+
+**Examples**
+
+- `putnami qualify /go/samples/migrations-feature --target local`
+- `putnami qualify @example/06-database --target https://pr-123.preview.example --expect-sha 3cc91b658`
+- `putnami qualify /go/samples/migrations-feature --print-contract --output=json`
+
+### `putnami sessions list`
+
+Show recent execution sessions with timing and status. --revision keeps the sessions whose recorded tree sat on the named commit (a lowercase hex prefix of its id, 7 to 64 characters) and adds the head commit and the actual placement to each row, so a new session can find what judged a given revision; a session that recorded no tree never matches. --output=jsonl rows carry revision and placement when the record states them
+
+**Usage**
+
+```
+putnami sessions list [--revision <sha>] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--revision` <sha> | Keep only sessions whose recorded tree sat on this commit; a lowercase hex prefix of the commit id, never a ref name |
+
+**Examples**
+
+- `putnami sessions list`
+- `putnami sessions list --revision 7194fc3537`
+- `putnami sessions list --output=jsonl`
+
+### `putnami sessions inspect`
+
+Show full details and event stream for a specific session. --run names a remote attempt instead of a session: the attempt reference or submission key printed when a --where remote run was submitted, resolved through the durable attempt records under .putnami/runner/attempts. An attempt whose session is already imported is shown from the local store; one that is not (the CLI died mid-run, the import failed) is resumed through the workspace's runner provider from the persisted cursor and imported through the same path, and nothing is ever resubmitted. Ctrl-C during a resumed follow cancels the attempt within bounded time
+
+**Usage**
+
+```
+putnami sessions inspect [<id>] [--run <ref>] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--run` <ref> | Inspect the session of a remote attempt by its attempt reference or submission key, resuming the attempt first when it was never imported |
+
+**Examples**
+
+- `putnami sessions inspect abc123`
+- `putnami sessions inspect latest`
+- `putnami sessions inspect --run fixture-attempt-42`
+
+### `putnami sessions replay`
+
+Replay retained session artifacts through each explicitly selected reporter extension (session-reporter, log-reporter) that has not delivered them. Each resumes from its own acknowledgement cursor with fresh reporter credentials, without running graph work. Incomplete delivery returns an error and keeps the bounded checkpoint for another replay
+
+**Usage**
+
+```
+putnami sessions replay --session <id>
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--session` <id> | Exact retained session id; latest is not accepted |
+
+**Examples**
+
+- `putnami sessions replay --session 20260914-120000-abc123`
+
+### `putnami sessions export`
+
+Stream every session document still present under .putnami/sessions, one per line, oldest first, deduplicated by session id. Each line is the recorded document forwarded verbatim (only whitespace is folded), so every line declares its own protocolVersion and a record written by a pre-v2 CLI keeps the version-1 shape. A session with no session.json, and a document that does not parse, are skipped rather than failing the command. The store is pruned and a worktree is disposable, so this is how per-run CPU, task counts and cache reuse leave a worktree before it disappears
+
+**Usage**
+
+```
+putnami sessions export [--since <timestamp>] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--since` <timestamp> | Keep only records whose recorded start time is at or after this RFC 3339 timestamp; a record with no readable start time is not emitted |
+
+**Examples**
+
+- `putnami sessions export > sessions.jsonl`
+- `putnami sessions export --since 2026-09-01T00:00:00Z`
+
+### `putnami sessions summary`
+
+Reduce every session this worktree recorded to one row: session id, start time, commands, selection, task total/executed/reused, run.cpu.actualMs, wall and outcome. It shares `sessions export`'s ordering and deduplication, so a store reached through a worktree symlink still counts each run once. A run a task spawned — a validation guard that builds what it checks is the canonical case — carries the session that spawned it and is marked nested, so it is never mistaken for a second gate. --command keeps TOP-LEVEL sessions whose recorded command set is EXACTLY the one named, order-insensitive: a nested run never matches whatever it ran, so a guard that ran the full gate cannot be counted as a second gate. --by-digest regroups the selected sessions' task records by their input digest — the cache key each task was keyed on — with how many records carry it and how many executed, reused or failed, so a reader tells why a task ran without re-running it. With --output=json the rows travel as the shared result envelope's data array at every count — an empty result is an empty array, and a single result is not a bare object
+
+**Usage**
+
+```
+putnami sessions summary [--since <timestamp>] [--command <list>] [--by-digest] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--since` <timestamp> | Keep only records whose recorded start time is at or after this RFC 3339 timestamp; a record with no readable start time is not listed |
+| `--command` <list> | Keep only top-level sessions whose recorded command set is exactly this comma-separated list, in any order; a nested run never matches |
+| `--by-digest` | Group the selected sessions' task records by input digest: records per digest, and how many executed, reused or failed |
+
+**Examples**
+
+- `putnami sessions summary`
+- `putnami sessions summary --since 2026-09-13T00:00:00Z`
+- `putnami sessions summary --command lint,test,build,validate`
+- `putnami sessions summary --by-digest`
+- `putnami sessions summary --output=json`
+
+### `putnami report`
+
+Print the bounded synthesis a finished run recorded under .putnami/reports: the newest CLI-driven run's by default, or the one named by --session. With --output=json the recorded document is printed as-is, unwrapped, because it is the contract a consumer binds to. An interrupted run records no report, so a consumer that files a report against a commit verifies its git.sha rather than trusting recency
+
+**Usage**
+
+```
+putnami report [--session <id>] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--session` <id> | Report to read, by session ID (default: the newest CLI-driven run's) |
+
+**Examples**
+
+- `putnami report`
+- `putnami report --session 20260723-002049-9108d9`
+- `putnami report --output=json`
+
+### `putnami migrate vnext`
+
+Check or atomically migrate putnami.lock.json to the current format while preserving pins and recording any missing installed extension task-contract metadata
+
+**Usage**
+
+```
+putnami migrate vnext [--check] [--apply] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--check` | Report the pending migration without writing (default); exits non-zero when a migration is needed |
+| `--apply` | Perform the migration, atomically and idempotently |
+
+**Examples**
+
+- `putnami migrate vnext --check`
+- `putnami migrate vnext --check --output=json`
+- `putnami migrate vnext --apply`
+
+### `putnami migrate agent-content`
+
+Check, apply or roll back the move of separately declared agent artifacts that an installed extension's agent content supersedes: their declarations, pins and ownership records move to the extension, and every file the content adds, changes or removes is listed before anything is written
+
+**Usage**
+
+```
+putnami migrate agent-content <extension> [--check] [--apply] [--rollback] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--check` | Plan the migration without writing (default); exits non-zero when a migration is pending |
+| `--apply` | Perform the migration, or finish one that stopped |
+| `--rollback` | Restore the declarations, pins, ownership records and files recorded before the migration |
+
+**Examples**
+
+- `putnami migrate agent-content @putnami/contributor`
+- `putnami migrate agent-content @putnami/contributor --apply`
+- `putnami migrate agent-content @putnami/contributor --rollback`
+
+### `putnami dev extension`
+
+Develop extensions: validate manifests against the protocol
+
+**Usage**
+
+```
+putnami dev extension validate [path]
+```
+
+**Examples**
+
+- `putnami dev extension validate`
+- `putnami dev extension validate ./my-extension/`
+
+### `putnami dev template`
+
+Develop and package templates: validate manifests, test rendering output, or package for distribution
+
+**Usage**
+
+```
+putnami dev template <validate|test|package> [path] [--skip-build] [--keep] [--version <version>] [--stable]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--skip-build` | With test: render the template without running build and test on it |
+| `--keep` | With test: keep the rendered temporary workspace for inspection |
+| `--version` <version> | With package: version to stamp on the produced archive |
+| `--stable` | With package: publish under a stable version instead of a prerelease |
+
+**Examples**
+
+- `putnami dev template validate`
+- `putnami dev template validate ./my-template/`
+- `putnami dev template test`
+- `putnami dev template package`
+
+### `putnami mcp`
+
+Run the Model Context Protocol server over stdio so an AI agent harness can discover projects, context, ownership, impact, plans, and diagnostics through 11 typed core tools (list_projects, describe_project, agent_context, workspace_map, deps, find_owner, why_impacted, topo_sort, impacted, run_jobs, get_diagnostics) and the workspace://context resource. All except run_jobs are read-only; run_jobs is the only mutating core tool, supports dry-run planning, and refuses long-lived or externally mutating execution. Spawned by the client; speaks JSON-RPC 2.0 on stdin/stdout and exits with the session. Before it serves, it brings the workspace's agent workflows to the version the lock pins, from the local artifact store only, and reports what it cannot reconcile as a warning on stderr. Optional request provenance is disabled by default; set PUTNAMI_AGENT_IDENTITY=1 and explicitly set PUTNAMI_AGENT_MODEL in the MCP server environment to propagate bounded harness/model headers.
+
+**Usage**
+
+```
+putnami mcp [install]
+```
+
+**Examples**
+
+- `putnami mcp`
+- `putnami mcp install`
+
+### `putnami mcp install`
+
+Write the putnami entry into .mcp.json at the workspace root so agent IDEs (Claude Code, Cursor, VS Code) auto-discover the MCP server. init, install and upgrade already add a missing entry; this explicit write is the only one that also rewrites a diverged putnami entry. Merge-aware: other servers and unknown keys are preserved, and an unparseable file is refused untouched.
+
+**Usage**
+
+```
+putnami mcp install
+```
+
+**Examples**
+
+- `putnami mcp install`
+
+### `putnami telemetry on`
+
+Enable anonymous usage telemetry
+
+**Usage**
+
+```
+putnami telemetry on
+```
+
+### `putnami telemetry off`
+
+Disable anonymous usage telemetry
+
+**Usage**
+
+```
+putnami telemetry off
+```
+
+### `putnami telemetry status`
+
+Check current telemetry settings
+
+**Usage**
+
+```
+putnami telemetry status
+```
+
+### `putnami telemetry show`
+
+View buffered telemetry events pending flush
+
+**Usage**
+
+```
+putnami telemetry show [--output <format>]
+```
+
+### `putnami completion`
+
+Generate a shell completion script for bash, zsh, or fish; source it or install it where the shell looks for completions
+
+**Usage**
+
+```
+putnami completion <bash|zsh|fish>
+```
+
+**Examples**
+
+- `putnami completion bash`
+- `putnami completion zsh`
+- `putnami completion fish`
+
+### `putnami help`
+
+Show help for putnami, for one command, or for the whole CLI in man or Markdown format
+
+**Usage**
+
+```
+putnami help [<command>] [<subcommand>] [--man] [--markdown]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--man` | Render the full reference as a man page |
+| `--markdown` | Render the full reference as Markdown |
+
+**Examples**
+
+- `putnami help`
+- `putnami help projects list`
+- `putnami help --man`
+- `putnami help --markdown`
+
+## Aliases
+
+`b`=build, `t`=test, `l`=lint, `s`=serve, `f`=format, `p`=publish, `P`=publish, `d`=deploy, `D`=deploy
+
+## Exit Codes
+
+| Code | Meaning |
+|------|----------|
+| 0 | Success |
+| 1 | Failure — a job/build/test failed, or an unexpected internal error |
+| 2 | Usage — bad flags/args, unknown command, no jobs matched, or validation error |
+| 3 | Auth — authentication or authorization failed |
+| 4 | API — a remote or upstream API call failed |
+| 130 | Interrupted by signal |
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `PUTNAMI_OUTPUT` | Default output format |
+| `PUTNAMI_VERBOSE` | Enable verbose output |
+| `PUTNAMI_QUIET` | Suppress non-error output |
+| `PUTNAMI_CACHE_TRUST` | Remote cache trust policy (`ci`, `any`, or `none`); also exported to every job |
+| `PUTNAMI_CACHE_OBJECT_SOCKET` | Set BY the CLI for each job: the cache provider's object-cache socket |
+| `PUTNAMI_NO_COLOR` | Disable color output |
+| `NO_COLOR` | Standard no-color convention |

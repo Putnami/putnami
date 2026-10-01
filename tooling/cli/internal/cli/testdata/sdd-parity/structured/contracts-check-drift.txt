@@ -1,0 +1,25 @@
+exit 2
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "contracts check",
+  "status": "failure",
+  "exitCode": 2,
+  "data": {
+    "project": "/billing",
+    "manifest": "go.putnami.dev/acme/billing",
+    "outcome": "drift",
+    "drift": [
+      {
+        "path": "schema/contracts.gen.go",
+        "reason": "stale"
+      }
+    ]
+  },
+  "error": {
+    "code": "usage",
+    "message": "contracts check found 1 drifted artifact(s); run `putnami contracts generate`"
+  }
+}
+--- stderr ---
+putnami: contracts check found 1 drifted artifact(s); run `putnami contracts generate`

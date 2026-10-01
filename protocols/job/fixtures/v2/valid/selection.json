@@ -1,0 +1,33 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/apps/console/validate",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {"name": "putnami"},
+  "project": {
+    "name": "@acme/console",
+    "path": "apps/console",
+    "fullPath": "/ws/apps/console"
+  },
+  "selection": {
+    "mode": "impacted",
+    "scoped": true,
+    "baseline": "origin/main",
+    "baselineSource": "upstream",
+    "projects": ["/apps/console", "/libs/widget"]
+  },
+  "selectedProjects": [
+    {"id": "/apps/console", "name": "@acme/console", "path": "apps/console", "fullPath": "/ws/apps/console"},
+    {"id": "/libs/widget", "name": "@acme/widget", "path": "libs/widget", "fullPath": "/ws/libs/widget"}
+  ],
+  "extension": {"name": "@putnami/sdd", "root": "/ws/tooling/sdd-extension"},
+  "job": {"name": "validate"},
+  "identity": {
+    "key": "/apps/console:validate~specs",
+    "scope": "project",
+    "project": {"id": "/apps/console", "name": "@acme/console"},
+    "task": {"name": "validate~specs", "command": "validate", "kind": "validate"},
+    "provider": {"extension": "@putnami/sdd"}
+  },
+  "params": {}
+}

@@ -1,0 +1,39 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "OAuth 2.0 Token Introspection, RFC 7662",
+      "adapter": "go/framework/security/introspect.go",
+      "callsites": [
+        {
+          "path": "go/framework/security/introspect.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "38c42a1f0dcdb0e87e5ebb9d0e78378ae47311da8a5a4647ddec41938bb08907"
+        }
+      ],
+      "owner": "go.putnami.dev/security",
+      "tests": [
+        "go/framework/security/introspect_test.go"
+      ],
+      "reason": "Posts an opaque bearer token to the identity provider\u2019s introspection endpoint. The contract belongs to the provider."
+    },
+    {
+      "authority": "JSON Web Key Set, RFC 7517, and OpenID Connect Discovery 1.0",
+      "adapter": "go/framework/security/jwks.go",
+      "callsites": [
+        {
+          "path": "go/framework/security/jwks.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "8a0078bf36f7de668eba9e70192c41c65c1c4131256283745a13d3d6e971b328"
+        }
+      ],
+      "owner": "go.putnami.dev/security",
+      "tests": [
+        "go/framework/security/jwks_test.go"
+      ],
+      "reason": "Fetches the identity provider\u2019s signing keys."
+    }
+  ]
+}

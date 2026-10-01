@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@example/go-items-consumer",
+  "description": "TypeScript consumer of the Go Items provider: the Go→TS cell of the cross-language REST JSON matrix",
+  "tags": ["ts", "e2e"],
+  "extensions": ["/typescript/extension"],
+  "dependencies": ["/go/samples/service-to-service", "/go/samples/service-to-service/clients/ts"],
+  "runsWith": ["/go/samples/service-to-service"],
+  "options": {
+    "serve": {
+      "port": 3911
+    },
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0,
+      "filePatterns": ["../*.go", "../service/**", "../schema/**", "../go.mod", "../go.sum", "../putnami.json"]
+    }
+  },
+  "featureAuthority": {
+    "none": "A sample consumer exercising the provider-owned items/manage feature; it owns no separate user outcome."
+  }
+}

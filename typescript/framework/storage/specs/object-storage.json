@@ -1,0 +1,62 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/object-storage",
+  "outcomes": [
+    "Code written against a bucket runs unchanged on the in-memory backend in tests, the filesystem locally, and object storage in production",
+    "A browser uploads and downloads directly through a signed URL that expires, without the application handing out a credential",
+    "A key supplied by a user cannot reach an object the bucket does not own",
+    "A project's buckets and their access levels are derived from the declarations in code",
+    "An operator is told when a bucket serves every object to anonymous readers"
+  ],
+  "nonGoals": [
+    "Depending on a cloud SDK: the S3 backend is built on the runtime's own client and the remote backend on plain HTTP",
+    "Cross-bucket or cross-backend transactions",
+    "Guaranteeing anything about an object concurrently being written by a process outside this API",
+    "Promising that a pre-1.0 minor release keeps the previous storage contract",
+    "Running the shared backend contract against the S3 backend: it keeps an endpoint-gated integration suite until the shared suite stops assuming a fixed bucket name and a destructive reset"
+  ],
+  "requirements": [
+    {
+      "id": "one-contract",
+      "text": "Every backend answers the shared contract identically: `get` of a missing object or missing bucket returns null, `delete` of a missing key is a no-op, `copy` of a missing source throws a `StorageError` with code `NOT_FOUND`, an overwrite replaces the object, and a zero-byte object round-trips with size 0."
+    },
+    {
+      "id": "typed-shapes",
+      "text": "The contract's declared types are the runtime types on every backend: a listed object's `lastModified` is a `Date`, including on the remote backend where it arrives as JSON, and an unparseable timestamp is omitted rather than surfaced as an invalid date."
+    },
+    {
+      "id": "key-safety",
+      "text": "An empty key, a key containing a null byte, an absolute key, and any key with a `..` segment are rejected before any I/O, on every key-taking method including signed-URL minting, and each key segment is percent-encoded so a key cannot inject a query string, a fragment, or an extra path separator into a request URL."
+    },
+    {
+      "id": "signed-url-binding",
+      "text": "A signed URL is bound to its method, bucket, and key and carries an expiry: a token minted for upload does not authorize download, a token for one bucket or key does not authorize another, an expired token is refused, and a forged or unsigned token is refused."
+    },
+    {
+      "id": "bounded-expiry",
+      "text": "A signed URL expiry defaults to 15 minutes when unspecified and is refused beyond the 7-day maximum."
+    },
+    {
+      "id": "upload-constraints",
+      "text": "A bucket's declared maximum size and allowed MIME types are enforced on upload, including for a streamed body, which is rejected while streaming once it exceeds the limit rather than after being buffered. A signed upload URL is refused unless its content type is on the bucket's MIME allowlist."
+    },
+    {
+      "id": "error-body-not-serialized",
+      "text": "A remote error keeps the server's response body on a non-enumerable, truncated property, so serializing or logging the error cannot leak server internals."
+    },
+    {
+      "id": "declared-infrastructure",
+      "text": "A project's registered buckets are emitted to its infra requirements sidecar — one sorted entry per bucket with its access level and retention — and a stale sidecar is removed when the registry becomes empty."
+    },
+    {
+      "id": "public-bucket-warning",
+      "text": "Starting an application that declares a public bucket logs a warning naming those buckets, because a public bucket serves every object it holds to anonymous readers."
+    },
+    {
+      "id": "backend-lifecycle",
+      "text": "Backends are shared between the clients that resolve them and are closed only when the last managed client is removed, so one client's shutdown does not break another's."
+    }
+  ],
+  "decisions": ["typescript/framework/storage/doc/adr/0001-one-bucket-contract-across-backends.md"]
+}

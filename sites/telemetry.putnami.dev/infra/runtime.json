@@ -1,0 +1,12 @@
+{
+  "ingress": {
+    "domains": ["telemetry.putnami.dev"]
+  },
+  "scaling": {
+    "max": 1,
+    "concurrency": 100
+  },
+  "security": {
+    "platformAuth": "disabled"
+  }
+}

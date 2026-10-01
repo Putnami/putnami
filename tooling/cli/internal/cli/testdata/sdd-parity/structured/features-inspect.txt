@@ -1,0 +1,31 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "features inspect",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "diagnostics": [],
+    "feature": {
+      "current": "modeled",
+      "id": "billing/invoice",
+      "name": "Invoice export",
+      "outcome": "Customers export issued invoices",
+      "owner": "billing",
+      "relations": [],
+      "requirements": [],
+      "source": "billing/putnami.features.json",
+      "target": "modeled",
+      "type": "feature"
+    },
+    "relatedUnclassified": [],
+    "requested": "billing/invoice",
+    "revision": {
+      "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08",
+      "kind": "worktree"
+    },
+    "sourceBindings": []
+  }
+}
+--- stderr ---

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/dependency-injection#cleanup",
+    "go/dependency-injection#lifetimes",
+    "go/dependency-injection#resolution",
+    "go/dependency-injection#startup"
+  ]
+}

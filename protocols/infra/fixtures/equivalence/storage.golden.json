@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "storage": [
+    {
+      "name": "audit-logs",
+      "access": "readwrite",
+      "retention": "30d"
+    },
+    {
+      "name": "avatars",
+      "access": "readwrite",
+      "retention": "90d"
+    },
+    {
+      "name": "uploads",
+      "access": "readwrite"
+    }
+  ]
+}

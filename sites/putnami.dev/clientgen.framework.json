@@ -1,0 +1,55 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "putnami.dev",
+      "status": "pending-provider-contract",
+      "adapter": "sites/putnami.dev/src/lib/content/registry.ts",
+      "callsites": [
+        {
+          "path": "sites/putnami.dev/src/lib/content/registry.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "4994f147a0133e8a8db4e997167df6422c7ef3cc69ca76c0b791ad559ed17f4f"
+        }
+      ],
+      "owner": "putnami.dev",
+      "tests": ["sites/putnami.dev/test/content-bundle.test.ts"],
+      "reason": "Reads documentation content bundles from the put registry. First-party registry; no provider declares a client for protocols/distribution yet.",
+      "operations": ["distribution.blob", "distribution.manifest"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    },
+    {
+      "runtime": "putnami.dev",
+      "status": "transport-primitive",
+      "adapter": "sites/putnami.dev/src/lib/page-markdown.ts",
+      "callsites": [
+        {
+          "path": "sites/putnami.dev/src/lib/page-markdown.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "0b6b79e022a4a23f790b963790ce43caf4c7a13b744301619237949c1f6f3616"
+        }
+      ],
+      "owner": "putnami.dev",
+      "tests": ["sites/putnami.dev/test/http-routes.test.ts"],
+      "reason": "Same-origin fetch of the site\u2019s own /doc-markdown route from the browser bundle."
+    },
+    {
+      "runtime": "putnami.dev",
+      "status": "transport-primitive",
+      "adapter": "sites/putnami.dev/src/lib/search/load-index.ts",
+      "callsites": [
+        {
+          "path": "sites/putnami.dev/src/lib/search/load-index.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "b7688a830cc62bd9c99acb0222e0f6b55a2a0839d3f84537e2ce66e0a251bbf7"
+        }
+      ],
+      "owner": "putnami.dev",
+      "tests": ["sites/putnami.dev/test/search.test.ts"],
+      "reason": "Same-origin fetch of the static search index the site build emits."
+    }
+  ]
+}

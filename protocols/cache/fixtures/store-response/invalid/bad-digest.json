@@ -1,0 +1,7 @@
+{
+  "protocolVersion": 1,
+  "key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "uploads": [
+    { "digest": "sha256:short", "url": "https://cas.example/up/y", "method": "PUT" }
+  ]
+}

@@ -1,0 +1,10 @@
+exit 0
+--- stdout ---
+
+  Architecture validation passed
+  2 domain(s) · 1 export(s) · 1 import(s)
+  Edges: 1 declared · 1 observed · 0 finding(s)
+  Baseline: git:7c5122267ea7854954d543e1eda0a15c7cc56b08 (main; prior file loaded)
+  Diagnostics: 0 error(s) · 0 warning(s) · 0 info
+
+--- stderr ---

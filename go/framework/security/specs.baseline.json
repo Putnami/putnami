@@ -1,0 +1,12 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/authentication-authorization#authorization-decision",
+    "go/authentication-authorization#credential-validation",
+    "go/authentication-authorization#fail-closed-configuration",
+    "go/authentication-authorization#jwks-overlap-and-revocation",
+    "go/authentication-authorization#password-secret-policy",
+    "go/authentication-authorization#secret-non-disclosure"
+  ]
+}

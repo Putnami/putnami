@@ -1,0 +1,12 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/examples/library",
+  "tags": ["sample", "e2e"],
+  "extensions": ["/go/extension"],
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    }
+  }
+}

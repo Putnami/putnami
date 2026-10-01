@@ -1,0 +1,33 @@
+{
+  "irVersion": 1,
+  "transport": "http",
+  "services": [
+    {
+      "name": "ThingsService",
+      "className": "ThingsClient",
+      "methods": [
+        {
+          "name": "respFirst",
+          "operationId": "respFirst",
+          "httpMethod": "GET",
+          "path": "/things/first",
+          "response": [{ "name": "a", "tsType": "string", "optional": false, "array": false }]
+        },
+        {
+          "name": "respSecond",
+          "operationId": "respSecond",
+          "httpMethod": "GET",
+          "path": "/things/second",
+          "response": [{ "name": "b", "tsType": "number", "optional": false, "array": false }]
+        },
+        {
+          "name": "respThird",
+          "operationId": "respThird",
+          "httpMethod": "GET",
+          "path": "/things/third",
+          "response": [{ "name": "c", "tsType": "boolean", "optional": false, "array": false }]
+        }
+      ]
+    }
+  ]
+}

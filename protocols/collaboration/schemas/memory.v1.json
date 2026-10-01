@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/putnami-collaboration-memory.v1.json",
+  "title": "Putnami memory contract, version 1",
+  "description": "Request (<operation>Input) and result (<operation>Result) documents of every memory v1 operation. Required: context, mission, checkpoint. Optional: search. Memory is contextual data: it never carries a verdict and never overrides a repository decision or a producer's evidence.",
+  "$defs": {
+    "identity": {
+      "type": "object",
+      "description": "Where a record belongs. An absent member does not narrow; the orchestrator fills workspace from the workspace it serves.",
+      "additionalProperties": false,
+      "properties": {
+        "workspace": { "$ref": "collaboration.json#/$defs/token" },
+        "repository": { "$ref": "collaboration.json#/$defs/token" },
+        "scope": { "$ref": "collaboration.json#/$defs/token" },
+        "mission": { "$ref": "collaboration.json#/$defs/token" }
+      }
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["mission", "note"]
+    },
+    "evidence": {
+      "type": "object",
+      "description": "A reference to a gate, review or qualification record. A reference only: it proves nothing the referenced record does not.",
+      "additionalProperties": false,
+      "required": ["kind", "locator"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["gate", "other", "qualify", "review", "session"] },
+        "locator": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "revision", "kind", "identity", "content", "provenance", "freshness"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "revision": { "$ref": "collaboration.json#/$defs/token" },
+        "kind": { "$ref": "#/$defs/kind" },
+        "identity": { "$ref": "#/$defs/identity" },
+        "title": { "type": "string", "maxLength": 256 },
+        "content": { "type": "string", "maxLength": 65536 },
+        "sources": { "type": "array", "maxItems": 100, "items": { "$ref": "collaboration.json#/$defs/ref" } },
+        "evidence": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/evidence" } },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["recordedAt"],
+          "properties": {
+            "recordedAt": { "$ref": "collaboration.json#/$defs/timestamp" },
+            "recordedBy": { "$ref": "collaboration.json#/$defs/token" }
+          }
+        },
+        "freshness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["updatedAt", "retrievedAt"],
+          "properties": {
+            "updatedAt": { "$ref": "collaboration.json#/$defs/timestamp" },
+            "retrievedAt": { "$ref": "collaboration.json#/$defs/timestamp" }
+          }
+        }
+      }
+    },
+    "contextInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "identity": { "$ref": "#/$defs/identity" },
+        "kinds": { "type": "array", "items": { "$ref": "#/$defs/kind" } },
+        "projects": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "type": "string" },
+          "description": "Project ids or names the context is about. Resolved by the orchestrator."
+        },
+        "impacted": { "type": "boolean", "description": "The projects the current change reaches, instead of projects." },
+        "baseline": { "type": "string", "description": "Git baseline for impacted." },
+        "page": { "$ref": "collaboration.json#/$defs/pageRequest" }
+      }
+    },
+    "contextResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items", "page"],
+      "properties": {
+        "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/record" } },
+        "page": { "$ref": "collaboration.json#/$defs/page" }
+      }
+    },
+    "searchInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query"],
+      "properties": {
+        "query": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "identity": { "$ref": "#/$defs/identity" },
+        "kinds": { "type": "array", "items": { "$ref": "#/$defs/kind" } },
+        "projects": { "type": "array", "maxItems": 100, "items": { "type": "string" } },
+        "impacted": { "type": "boolean" },
+        "baseline": { "type": "string" },
+        "page": { "$ref": "collaboration.json#/$defs/pageRequest" }
+      }
+    },
+    "searchResult": { "$ref": "#/$defs/contextResult" },
+    "missionInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mission"],
+      "properties": {
+        "mission": { "$ref": "collaboration.json#/$defs/token" },
+        "identity": { "$ref": "#/$defs/identity" }
+      }
+    },
+    "missionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record"],
+      "properties": {
+        "record": { "$ref": "#/$defs/record" }
+      }
+    },
+    "precondition": {
+      "type": "object",
+      "description": "Exactly one of expectedRevision and mustNotExist.",
+      "additionalProperties": false,
+      "properties": {
+        "expectedRevision": { "$ref": "collaboration.json#/$defs/token" },
+        "mustNotExist": { "type": "boolean" }
+      }
+    },
+    "checkpointInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mission", "precondition", "idempotencyKey", "content"],
+      "properties": {
+        "mission": { "$ref": "collaboration.json#/$defs/token" },
+        "identity": { "$ref": "#/$defs/identity" },
+        "precondition": { "$ref": "#/$defs/precondition" },
+        "idempotencyKey": { "$ref": "collaboration.json#/$defs/idempotencyKey" },
+        "title": { "type": "string", "maxLength": 256 },
+        "content": { "type": "string", "minLength": 1, "maxLength": 65536 },
+        "sources": { "type": "array", "maxItems": 100, "items": { "$ref": "collaboration.json#/$defs/ref" } },
+        "evidence": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "checkpointResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record", "replayed"],
+      "properties": {
+        "record": { "$ref": "#/$defs/record" },
+        "replayed": { "type": "boolean", "description": "True when the idempotency key matched the write that produced the current revision, so nothing was written again." }
+      }
+    }
+  }
+}

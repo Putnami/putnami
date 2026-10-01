@@ -1,0 +1,140 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "architecture snapshot",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "baseline": {
+      "commit": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08",
+      "compared": true,
+      "priorFile": true,
+      "requested": "main"
+    },
+    "diagnostics": [],
+    "snapshot": {
+      "$schema": "https://putnami.dev/schemas/putnami-architecture-snapshot.json",
+      "coverage": {
+        "database": "not-detected",
+        "domainAccess": "not-detected",
+        "events": "not-detected",
+        "http": "not-detected",
+        "projectDependencies": "enforced-for-mapped-projects"
+      },
+      "evidence": [],
+      "findings": [],
+      "graph": {
+        "domains": [
+          {
+            "exports": [],
+            "id": "billing",
+            "imports": [
+              {
+                "as": "billing.shipping-label",
+                "bindings": [
+                  {
+                    "consumerProject": "/billing",
+                    "kind": "project-dependency",
+                    "producerProject": "/shipping"
+                  }
+                ],
+                "facts": [
+                  "id"
+                ],
+                "from": {
+                  "domain": "shipping",
+                  "export": "shipping.label.v1"
+                },
+                "id": "billing.shipping-label.v1",
+                "justification": "Billing stores the authoritative shipping label identity only",
+                "mode": "reference",
+                "status": "active",
+                "version": 1
+              }
+            ],
+            "owner": "billing-team",
+            "owns": [],
+            "projects": [
+              "/billing"
+            ],
+            "source": "billing/putnami.architecture.json"
+          },
+          {
+            "exports": [
+              {
+                "compatibility": {
+                  "minimumConsumerVersion": 1,
+                  "strategy": "additive"
+                },
+                "description": "Stable shipping label reference.",
+                "facts": [
+                  {
+                    "authority": "shipping",
+                    "classification": "internal",
+                    "name": "id",
+                    "personalData": "none"
+                  }
+                ],
+                "id": "shipping.label.v1",
+                "modes": [
+                  "reference"
+                ],
+                "status": "active",
+                "version": 1
+              }
+            ],
+            "id": "shipping",
+            "imports": [],
+            "owner": "shipping-team",
+            "owns": [],
+            "projects": [
+              "/shipping"
+            ],
+            "source": "shipping/putnami.architecture.json"
+          }
+        ],
+        "edges": [
+          {
+            "bindings": [
+              {
+                "consumerProject": "/billing",
+                "kind": "project-dependency",
+                "producerProject": "/shipping"
+              }
+            ],
+            "consumerDomain": "billing",
+            "export": "shipping.label.v1",
+            "facts": [
+              "id"
+            ],
+            "id": "billing.shipping-label.v1",
+            "mode": "reference",
+            "producerDomain": "shipping",
+            "status": "active"
+          }
+        ]
+      },
+      "observed": [
+        {
+          "consumerDomain": "billing",
+          "consumerProject": "/billing",
+          "kind": "project-dependency",
+          "producerDomain": "shipping",
+          "producerProject": "/shipping"
+        }
+      ],
+      "protocolVersion": 1,
+      "ratchet": {
+        "baselineGrowth": 0,
+        "expiredWaiver": 0,
+        "knownDebt": 0,
+        "new": 0,
+        "staleBaseline": 0,
+        "staleWaiver": 0,
+        "waived": 0
+      }
+    }
+  }
+}
+--- stderr ---

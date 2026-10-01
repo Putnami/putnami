@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "results": [
+    {
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "hit": true,
+      "result": { "status": "success" },
+      "manifest": { "files": [ { "path": "dist/index.js", "digest": "sha256:zzz", "mode": 420 } ] }
+    }
+  ]
+}

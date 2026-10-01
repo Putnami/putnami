@@ -1,0 +1,12 @@
+{
+  "group": "billing",
+  "distribution": "competing",
+  "maxRetries": 5,
+  "maxBackoffMs": 30000,
+  "timeoutMs": 15000,
+  "concurrency": 4,
+  "queueLimit": 100,
+  "overflow": "drop",
+  "dlq": true,
+  "ack": "manual"
+}

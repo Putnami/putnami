@@ -1,0 +1,11 @@
+{
+  "name": "ambiguous-timeout",
+  "request": { "id": "evt-outcome-1", "topic": "orders.created" },
+  "input": { "transportError": "timeout" },
+  "expected": {
+    "class": "ambiguous",
+    "action": "retry",
+    "sameRoute": true,
+    "sameRequestBytes": true
+  }
+}

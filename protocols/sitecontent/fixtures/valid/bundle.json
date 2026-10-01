@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/protocol/sitecontent/site-content-bundle.json",
+  "formatVersion": "1.0",
+  "name": "cloud-docs",
+  "mounts": [
+    { "urlPrefix": "/docs/cloud" }
+  ],
+  "source": {
+    "repo": "acme-platform",
+    "commit": "abc123"
+  },
+  "files": [
+    {
+      "path": "docs/cloud/index.html",
+      "digest": "1a31f208b4e0b7759528b7af8580d7beb300ba849259987113d8b8d7718ff4a5"
+    },
+    {
+      "path": "docs/cloud/guides/start.md",
+      "digest": "12442db336c4ffa46525044d6e8ad4addd85359bea060b780b62470d458375df"
+    }
+  ]
+}

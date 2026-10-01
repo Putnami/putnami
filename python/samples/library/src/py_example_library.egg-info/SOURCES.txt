@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/py_example_library.egg-info/PKG-INFO
+src/py_example_library.egg-info/SOURCES.txt
+src/py_example_library.egg-info/dependency_links.txt
+src/py_example_library.egg-info/requires.txt
+src/py_example_library.egg-info/top_level.txt
+src/pylib/__init__.py
+src/pylib/math.py
+src/pylib/strings.py
+tests/test_math.py
+tests/test_strings.py

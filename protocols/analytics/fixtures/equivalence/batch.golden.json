@@ -1,0 +1,41 @@
+{
+  "protocolVersion": 1,
+  "sentAt": "2026-09-02T10:00:00.000Z",
+  "events": [
+    {
+      "eventId": "0199116c-9000-7a1b-9c2d-3e4f5a6b7c01",
+      "name": "page_view",
+      "clientTs": "2026-09-02T09:59:58.250Z",
+      "seq": 1,
+      "sessionId": "0199116c-8e00-7a1b-8c2d-3e4f5a6b7c00",
+      "engagementMs": 12500,
+      "viewportClass": "lg",
+      "language": "fr-FR",
+      "page": {
+        "path": "/tasks/42",
+        "route": "/tasks/[id]",
+        "referrer": "https://www.google.com/search?q=putnami",
+        "utm": {
+          "source": "google",
+          "medium": "cpc",
+          "campaign": "launch-2026",
+          "content": "hero-cta",
+          "term": "putnami+framework"
+        }
+      }
+    },
+    {
+      "eventId": "0199116c-9100-7a1b-ac2d-3e4f5a6b7c02",
+      "name": "action",
+      "clientTs": "2026-09-02T09:59:57.750Z",
+      "seq": 2,
+      "sessionId": "0199116c-8e00-7a1b-8c2d-3e4f5a6b7c00",
+      "action": "signup_click",
+      "props": {
+        "plan": "pro",
+        "seats": 3,
+        "trial": true
+      }
+    }
+  ]
+}

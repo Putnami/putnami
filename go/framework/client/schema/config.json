@@ -1,0 +1,129 @@
+{
+  "appName": "go.putnami.dev/client",
+  "version": "0.0.0",
+  "schemaHash": "sha256:1972ac386ea868e0",
+  "configs": [
+    {
+      "path": "clients",
+      "fields": [
+        {
+          "name": "clientId",
+          "type": "string",
+          "env": "PUTNAMI_CLIENT_ID"
+        },
+        {
+          "name": "services",
+          "type": "map",
+          "keys": "string",
+          "values": {
+            "name": "",
+            "type": "object",
+            "fields": [
+              {
+                "name": "url",
+                "type": "string"
+              },
+              {
+                "name": "clientId",
+                "type": "string"
+              },
+              {
+                "name": "credentials",
+                "type": "map",
+                "keys": "string",
+                "values": {
+                  "name": "",
+                  "type": "object",
+                  "fields": [
+                    {
+                      "name": "source",
+                      "type": "string"
+                    },
+                    {
+                      "name": "audience",
+                      "type": "string"
+                    },
+                    {
+                      "name": "tokenUrl",
+                      "type": "string"
+                    },
+                    {
+                      "name": "clientId",
+                      "type": "string"
+                    },
+                    {
+                      "name": "clientSecret",
+                      "type": "string",
+                      "sensitive": true
+                    },
+                    {
+                      "name": "grantType",
+                      "type": "string"
+                    },
+                    {
+                      "name": "tokenRequestFormat",
+                      "type": "string"
+                    },
+                    {
+                      "name": "parameters",
+                      "type": "map",
+                      "sensitive": true,
+                      "keys": "string",
+                      "values": {
+                        "name": "",
+                        "type": "string"
+                      }
+                    },
+                    {
+                      "name": "assertionSource",
+                      "type": "string"
+                    },
+                    {
+                      "name": "assertionAudience",
+                      "type": "string"
+                    },
+                    {
+                      "name": "assertion",
+                      "type": "string",
+                      "sensitive": true
+                    },
+                    {
+                      "name": "value",
+                      "type": "string",
+                      "sensitive": true
+                    },
+                    {
+                      "name": "metadataUrl",
+                      "type": "string"
+                    },
+                    {
+                      "name": "allowInsecure",
+                      "type": "bool"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "headers",
+                "type": "map",
+                "keys": "string",
+                "values": {
+                  "name": "",
+                  "type": "string"
+                }
+              },
+              {
+                "name": "allowInsecure",
+                "type": "bool"
+              },
+              {
+                "name": "carryRemoteMessage",
+                "type": "bool"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

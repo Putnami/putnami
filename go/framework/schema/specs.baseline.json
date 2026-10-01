@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/struct-validation#absent-fields",
+    "go/struct-validation#custom-constraints",
+    "go/struct-validation#declaration-faults",
+    "go/struct-validation#decoded-json-fidelity",
+    "go/struct-validation#error-labels",
+    "go/struct-validation#length-in-runes",
+    "go/struct-validation#no-panic-on-bad-type",
+    "go/struct-validation#opt-in-coercion",
+    "go/struct-validation#url-scheme-allowlist",
+    "go/struct-validation#validated-data-only"
+  ]
+}

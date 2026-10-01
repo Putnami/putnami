@@ -1,0 +1,13 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": { "attributes": [] },
+      "scopeMetrics": [
+        {
+          "scope": { "name": "putnami" },
+          "metrics": [{ "name": "orphan" }]
+        }
+      ]
+    }
+  ]
+}

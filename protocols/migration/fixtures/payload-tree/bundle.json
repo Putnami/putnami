@@ -1,0 +1,35 @@
+{
+  "protocol": "migration-bundle.v1",
+  "appName": "wealth",
+  "source": "go/samples/wealth",
+  "version": "1.4.0",
+  "git": {
+    "revision": "9f1c2ab",
+    "branch": "main"
+  },
+  "imageDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "digest": "247b5fee5c0759be172e8512b9a1ec788c48540f6a21456b1643674d55d39a45",
+  "generatedAt": "2026-06-04T12:00:00Z",
+  "operations": [
+    {
+      "kind": "sql",
+      "target": "default",
+      "namespace": "iam",
+      "name": "iam/0001_create_users",
+      "orderKey": "iam/0001_create_users",
+      "up": {
+        "path": "payload/sql/default/iam/0001_create_users.up.sql",
+        "hash": "2a6f3104267a8f281fe6e1f5bee5de0f4238c5e14292294a81c5d2cd0e7ff11e"
+      },
+      "down": {
+        "path": "payload/sql/default/iam/0001_create_users.down.sql",
+        "hash": "2ff4c782212803e1bb88cea47c4d4790fb4e9cbbf8890be9bb3d951edcd4f000"
+      },
+      "safety": "safe-online",
+      "capabilities": {
+        "transactional": true,
+        "reversible": true
+      }
+    }
+  ]
+}

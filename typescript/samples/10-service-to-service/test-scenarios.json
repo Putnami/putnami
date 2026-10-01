@@ -1,0 +1,2061 @@
+{
+  "$comment": "Machine index of the cross-language client matrix whose PROVIDER is the TypeScript Items sample. `scenarios` names one test per proven scenario; `coverage` states, for every cell of the matrix and every scenario family, whether it is proven (`pass`), inapplicable with the rule that makes it so (`n/a`), or absent with the reason (`missing`). `test` is <file>:<test name>, relative to this project. Nothing here is evidence by itself: the tests it names are, and test/matrix-index.test.ts checks that every reference resolves.",
+  "protocolVersion": 2,
+  "matrix": "client-matrix",
+  "provider": {
+    "project": "@example/10-service-to-service",
+    "language": "ts",
+    "service": "catalog.items"
+  },
+  "consumers": [
+    {
+      "target": "ts",
+      "project": "@example/10-service-to-service",
+      "root": "test"
+    },
+    {
+      "target": "go",
+      "project": "go.putnami.dev/examples/ts-items-client",
+      "root": "clients/go"
+    }
+  ],
+  "cells": [
+    {
+      "id": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json"
+    },
+    {
+      "id": "rest-binary",
+      "transport": "rest-json",
+      "encoding": "octet-stream"
+    },
+    {
+      "id": "connect-unary-json",
+      "transport": "connect",
+      "encoding": "json"
+    },
+    {
+      "id": "connect-unary-proto",
+      "transport": "connect",
+      "encoding": "proto"
+    },
+    {
+      "id": "connect-stream",
+      "transport": "connect",
+      "encoding": "proto"
+    },
+    {
+      "id": "sse",
+      "transport": "sse",
+      "encoding": "json"
+    },
+    {
+      "id": "ws-server",
+      "transport": "websocket",
+      "encoding": "json"
+    },
+    {
+      "id": "ws-client",
+      "transport": "websocket",
+      "encoding": "json"
+    },
+    {
+      "id": "ws-bidi",
+      "transport": "websocket",
+      "encoding": "json"
+    }
+  ],
+  "families": [
+    {
+      "id": "auth",
+      "covers": "anonymous, service credentials with expiry and refresh, forwarded user identity, api key, secondary credential, AND/OR without downgrade"
+    },
+    {
+      "id": "result",
+      "covers": "success, schema, presence, bytes, exact numbers, declared retryability, unknown remote error, invalid response, redacted details"
+    },
+    {
+      "id": "policy",
+      "covers": "budgets, per attempt, cancellation and limits, idempotency, circuit; for streams admission, idle, queues, terminal, half-close, backpressure, heartbeat"
+    },
+    {
+      "id": "observability",
+      "covers": "W3C context and deadline from a real inbound context, spans and metrics without double counting, no secret, payload, query string or unbounded label, shutdown on both sides, connections released, late calls refused"
+    },
+    {
+      "id": "generation",
+      "covers": "deterministic regeneration and contract-break detection"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "ts-ts.rest-json.result.typed-200",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should list items via the generated typed client",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.result.declared-query-string-and-header",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should carry the declared query string and request header",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.result.presence-is-preserved",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should keep an absent optional property absent and a present one present",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.result.typed-write-and-read-back",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "idempotent",
+      "test": "test/client.test.ts:should create an item with a typed body and read it back",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.result.declared-error-is-typed",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should narrow the declared 404 to its generated type with the stable code",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.result.unknown-remote-error",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should read an undeclared remote failure as one, with its status and none of its prose",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.result.invalid-response-is-refused",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should reject a response that does not honor the declared schema",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.result.the-provider-is-its-own-consumer",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should resolve the typed client in the consumer endpoint without manual HTTP wiring",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.auth.and-alternative-carries-both",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key+named-header",
+      "policy": "safe",
+      "test": "test/identity.test.ts:carries both credentials of one alternative together",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.auth.and-alternative-never-downgrades",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key+named-header",
+      "policy": "safe",
+      "test": "test/identity.test.ts:refuses a half-satisfied alternative before the request leaves the consumer",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.auth.forwarded-user-from-a-real-inbound-request",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "forwarded-user",
+      "policy": "safe",
+      "test": "test/identity.test.ts:names the user the consumer forwarded from its own inbound request",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.auth.absent-inbound-identity-never-calls",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "forwarded-user",
+      "policy": "safe",
+      "test": "test/identity.test.ts:never calls anonymously when the inbound request carries no identity",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.auth.forwarding-is-opt-in",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "forwarded-user",
+      "policy": "safe",
+      "test": "test/identity.test.ts:forwards nothing when the binding never opted in",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.auth.a-credential-reaches-only-its-operation",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "forwarded-user",
+      "policy": "safe",
+      "test": "test/identity.test.ts:sends a forwarded token only to the operation that declares it",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.policy.declared-retry-repeats-one-request-identity",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "idempotent",
+      "test": "test/policy.test.ts:repeats the same request identity across the declared attempts",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.policy.declared-attempts-are-a-bound",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "idempotent",
+      "test": "test/policy.test.ts:treats the declared attempt count as a bound",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.policy.declared-budget-ends-a-silent-attempt",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "idempotent",
+      "test": "test/policy.test.ts:ends an attempt that never answers on the declared budget",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.policy.declared-circuit-stops-calling",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "idempotent",
+      "test": "test/policy.test.ts:stops calling once the declared failure threshold opens the circuit",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-json.observability.trace-and-metrics-of-a-rest-call",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/observability.test.ts:continues an incoming trace into both wires, measures each call once and exports no secret",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-binary.result.every-octet-round-trips",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-binary",
+      "transport": "rest-json",
+      "encoding": "octet-stream",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/binary.test.ts:carries every octet through the declared echo",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-binary.result.declared-error-is-typed",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-binary",
+      "transport": "rest-json",
+      "encoding": "octet-stream",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/binary.test.ts:still declares its typed error on a binary endpoint",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-binary.result.bound-and-media-type-refusals-are-declared",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-binary",
+      "transport": "rest-json",
+      "encoding": "octet-stream",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/binary.test.ts:declares the two refusals a bounded octet body adds, and a client reads them typed",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-binary.auth.path-parameter-and-credential-compose",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-binary",
+      "transport": "rest-json",
+      "encoding": "octet-stream",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/binary.test.ts:composes a path parameter and the declared credential with a raw octet response",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-binary.policy.bound-refused-before-the-source-is-drained",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-binary",
+      "transport": "rest-json",
+      "encoding": "octet-stream",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/binary.test.ts:accepts a stream source and refuses one past the declared bound",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.rest-binary.observability.traced-and-measured-without-its-octets",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "rest-binary",
+      "transport": "rest-json",
+      "encoding": "octet-stream",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/observability.test.ts:traces a raw octet call and measures it once without exporting its octets",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.connect-unary-json.result.second-declared-encoding-carries-exact-values",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "connect-unary-json",
+      "transport": "connect",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should carry the same quote over Connect JSON through a client emitted with JSON first",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.connect-unary-json.result.declared-json-first-order-is-the-dispatched-wire",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "connect-unary-json",
+      "transport": "connect",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should carry the snapshot over Connect JSON, the encoding its operation declares first",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.connect-unary-json.auth.refused-credential-reaches-the-consumer",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "connect-unary-json",
+      "transport": "connect",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should refuse a Connect call whose credential the provider rejects",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.connect-unary-json.generation.declared-order-decides-the-emitted-dispatch",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "connect-unary-json",
+      "transport": "connect",
+      "encoding": "json",
+      "family": "generation",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should carry the same quote over Connect JSON through a client emitted with JSON first",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.connect-unary-json.observability.trace-and-metrics-of-a-connect-call",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "connect-unary-json",
+      "transport": "connect",
+      "encoding": "json",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/observability.test.ts:continues an incoming trace into both wires, measures each call once and exports no secret",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.connect-unary-proto.result.first-declared-encoding-carries-exact-values",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "connect-unary-proto",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should carry a quote and its ticks over Connect protobuf, the first declared encoding",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.connect-unary-proto.result.declared-error-carries-its-declared-details",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "connect-unary-proto",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should narrow a declared Connect error to its generated type with its declared details",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.connect-unary-proto.auth.refused-credential-reaches-the-consumer",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "connect-unary-proto",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should refuse a Connect call whose credential the provider rejects",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.connect-unary-proto.observability.late-call-after-shutdown-is-refused",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "connect-unary-proto",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should refuse every call through a retained client once its application stopped",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.connect-stream.result.enveloped-messages-and-one-terminal",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "connect-stream",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should carry a quote and its ticks over Connect protobuf, the first declared encoding",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.connect-stream.result.the-second-encoding-streams-too",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "connect-stream",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should carry the same quote over Connect JSON through a client emitted with JSON first",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.connect-stream.auth.refused-credential-before-any-message",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "connect-stream",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should refuse a Connect call whose credential the provider rejects",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.sse.result.declared-messages-and-clean-terminal",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "sse",
+      "transport": "sse",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should stream the declared server stream through the generated client",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.sse.result.declared-terminal-error-is-typed",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "sse",
+      "transport": "sse",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should narrow the declared stream 404 to its generated type",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.sse.auth.refused-credential-before-any-message",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "sse",
+      "transport": "sse",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should refuse a stream whose credential the provider rejects, before any message",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.sse.policy.consumer-cancellation-ends-the-stream",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "sse",
+      "transport": "sse",
+      "encoding": "json",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should end a followed stream on consumer cancellation",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.sse.policy.cursor-continuation-across-an-instance-change",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "sse",
+      "transport": "sse",
+      "encoding": "json",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/continuation.test.ts:continues on another instance after the last change the consumer received",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.sse.result.refused-position-is-typed",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "sse",
+      "transport": "sse",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/continuation.test.ts:reads a position the provider never issued as its typed refusal",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.sse.observability.one-traced-call-measured-at-its-terminal",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "sse",
+      "transport": "sse",
+      "encoding": "json",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/observability.test.ts:measures each generated stream once at its terminal, under the transport that carried it",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-server.result.declared-order-picks-the-socket",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-server",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should follow the declared websocket-first order on a server stream",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-server.auth.refused-credential-before-any-message",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-server",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/client.test.ts:should refuse a websocket server stream whose credential the provider rejects",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-server.observability.one-traced-call-measured-at-its-terminal",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-server",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "test/observability.test.ts:measures each generated stream once at its terminal, under the transport that carried it",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-client.result.one-declared-result",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-client",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/client.test.ts:should carry a client stream to its single declared result",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-client.result.declared-terminal-error-is-typed",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-client",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/client.test.ts:should narrow a declared duplex terminal error to its generated type",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-client.auth.refused-credential-before-any-message",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-client",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/client.test.ts:should refuse a duplex stream whose credential the provider rejects, before any message",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-client.policy.a-burst-past-the-queue-is-refused-not-dropped",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-client",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/client.test.ts:should refuse a burst past the declared queue depth instead of dropping it",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-client.policy.half-close-is-idempotent",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-client",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/client.test.ts:should carry a client stream to its single declared result",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-client.observability.one-traced-call-measured-at-its-terminal",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-client",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/observability.test.ts:measures each generated stream once at its terminal, under the transport that carried it",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-bidi.result.conversation-outlives-the-half-close",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-bidi",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/client.test.ts:should outlive the consumer half-close on a bidirectional stream",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-bidi.auth.refused-credential-before-any-turn",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-bidi",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/client.test.ts:should refuse a bidirectional stream whose credential the provider rejects",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-bidi.policy.consumer-cancellation-ends-the-conversation",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-bidi",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/client.test.ts:should end a bidirectional stream on consumer cancellation",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.ws-bidi.observability.one-traced-call-measured-at-its-terminal",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "ws-bidi",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "test/observability.test.ts:measures each generated stream once at its terminal, under the transport that carried it",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-json.result.typed-200-with-query-and-header",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "result",
+      "auth": "anonymous",
+      "policy": "safe",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderAnswersTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-json.result.typed-write-read-back-and-presence",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "result",
+      "auth": "anonymous",
+      "policy": "idempotent",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderRoundTripsATypedBodyAndNestedModel",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-json.result.declared-error-is-typed",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "result",
+      "auth": "anonymous",
+      "policy": "safe",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderDeclaredErrorArrivesTypedInGo",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-json.result.unknown-remote-error",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "result",
+      "auth": "anonymous",
+      "policy": "safe",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderUndeclaredFailureArrivesUntypedInGo",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-json.auth.and-alternative-carries-both",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key+named-header",
+      "policy": "safe",
+      "test": "clients/go/identity_foreign_provider_test.go:TestTypeScriptProviderRequiresBothCredentialsOfOneAlternative",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-json.auth.and-alternative-never-downgrades",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key+named-header",
+      "policy": "safe",
+      "test": "clients/go/identity_foreign_provider_test.go:TestTypeScriptProviderNeverSeesAHalfSatisfiedAlternative",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-json.auth.forwarded-user-from-a-real-inbound-request",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "forwarded-user",
+      "policy": "safe",
+      "test": "clients/go/identity_foreign_provider_test.go:TestTypeScriptProviderNamesTheUserTheGoConsumerForwarded",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-json.auth.absent-inbound-identity-never-calls",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "forwarded-user",
+      "policy": "safe",
+      "test": "clients/go/identity_foreign_provider_test.go:TestTypeScriptProviderIsNeverCalledWithoutAnInboundIdentity",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-json.observability.trace-and-metrics-of-a-rest-call",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/observability_foreign_provider_test.go:TestGeneratedCallsToTheTypeScriptProviderContinueTheTraceAndAreMeasuredOnce",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-json.observability.late-call-after-shutdown-is-refused",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-json",
+      "transport": "rest-json",
+      "encoding": "json",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/lifecycle_foreign_provider_test.go:TestARetainedGoClientRefusesEveryCallAfterItsApplicationStopped",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-binary.result.every-octet-round-trips",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-binary",
+      "transport": "rest-json",
+      "encoding": "octet-stream",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderCarriesRawOctetsToTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-binary.policy.bound-refused-before-dispatch",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-binary",
+      "transport": "rest-json",
+      "encoding": "octet-stream",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderCarriesRawOctetsToTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-binary.auth.unbound-credential-never-dispatches",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-binary",
+      "transport": "rest-json",
+      "encoding": "octet-stream",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderRefusesARawOctetReadWithNoCredential",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.rest-binary.observability.traced-and-measured-without-its-octets",
+      "provider": "ts",
+      "target": "go",
+      "cell": "rest-binary",
+      "transport": "rest-json",
+      "encoding": "octet-stream",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "clients/go/binary_observability_foreign_provider_test.go:TestARawOctetCallToTheTypeScriptProviderIsTracedAndMeasuredWithoutItsOctets",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.connect-unary-json.result.declared-json-first-order-carries-exact-values",
+      "provider": "ts",
+      "target": "go",
+      "cell": "connect-unary-json",
+      "transport": "connect",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/connect_json_foreign_provider_test.go:TestTypeScriptProviderAnswersTheGeneratedGoClientOverConnectJSON",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.connect-unary-json.result.declared-error-carries-its-declared-details",
+      "provider": "ts",
+      "target": "go",
+      "cell": "connect-unary-json",
+      "transport": "connect",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/connect_json_foreign_provider_test.go:TestTypeScriptProviderAnswersTheGeneratedGoClientOverConnectJSON",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.connect-unary-json.auth.refused-credential-reaches-the-consumer",
+      "provider": "ts",
+      "target": "go",
+      "cell": "connect-unary-json",
+      "transport": "connect",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/connect_json_foreign_provider_test.go:TestTypeScriptProviderConnectJSONRefusalReachesTheGoConsumer",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.connect-unary-json.observability.trace-and-metrics-of-a-connect-json-call",
+      "provider": "ts",
+      "target": "go",
+      "cell": "connect-unary-json",
+      "transport": "connect",
+      "encoding": "json",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/connect_json_foreign_provider_test.go:TestAConnectJSONCallToTheTypeScriptProviderContinuesTheTraceAndIsMeasuredOnce",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.connect-unary-proto.result.first-declared-encoding-carries-exact-values",
+      "provider": "ts",
+      "target": "go",
+      "cell": "connect-unary-proto",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/connect_foreign_provider_test.go:TestTypeScriptProviderAnswersTheGeneratedGoClientOverConnect",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.connect-unary-proto.result.declared-error-carries-its-declared-details",
+      "provider": "ts",
+      "target": "go",
+      "cell": "connect-unary-proto",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/connect_foreign_provider_test.go:TestTypeScriptProviderAnswersTheGeneratedGoClientOverConnect",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.connect-unary-proto.auth.refused-credential-reaches-the-consumer",
+      "provider": "ts",
+      "target": "go",
+      "cell": "connect-unary-proto",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/identity_foreign_provider_test.go:TestTypeScriptProviderConnectRefusalReachesTheGoConsumer",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.connect-unary-proto.observability.trace-and-metrics-of-a-connect-call",
+      "provider": "ts",
+      "target": "go",
+      "cell": "connect-unary-proto",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/observability_foreign_provider_test.go:TestGeneratedCallsToTheTypeScriptProviderContinueTheTraceAndAreMeasuredOnce",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.connect-unary-proto.observability.late-call-after-shutdown-is-refused",
+      "provider": "ts",
+      "target": "go",
+      "cell": "connect-unary-proto",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "observability",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/lifecycle_foreign_provider_test.go:TestARetainedGoClientRefusesEveryCallAfterItsApplicationStopped",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.connect-stream.result.enveloped-messages-and-one-terminal",
+      "provider": "ts",
+      "target": "go",
+      "cell": "connect-stream",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/connect_foreign_provider_test.go:TestTypeScriptProviderAnswersTheGeneratedGoClientOverConnect",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.connect-stream.auth.refused-credential-before-any-message",
+      "provider": "ts",
+      "target": "go",
+      "cell": "connect-stream",
+      "transport": "connect",
+      "encoding": "proto",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/identity_foreign_provider_test.go:TestTypeScriptProviderConnectRefusalReachesTheGoConsumer",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.sse.result.declared-messages-and-typed-terminal",
+      "provider": "ts",
+      "target": "go",
+      "cell": "sse",
+      "transport": "sse",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderServerStreamReachesTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.sse.auth.refused-credential-before-any-message",
+      "provider": "ts",
+      "target": "go",
+      "cell": "sse",
+      "transport": "sse",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderServerStreamReachesTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.sse.policy.consumer-cancellation-ends-the-stream",
+      "provider": "ts",
+      "target": "go",
+      "cell": "sse",
+      "transport": "sse",
+      "encoding": "json",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderServerStreamReachesTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.sse.policy.cursor-continuation-across-an-instance-change",
+      "provider": "ts",
+      "target": "go",
+      "cell": "sse",
+      "transport": "sse",
+      "encoding": "json",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/continuation_foreign_provider_test.go:TestTypeScriptProviderChangeFeedContinuesOnAnotherProcessForTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.sse.result.refused-position-is-typed",
+      "provider": "ts",
+      "target": "go",
+      "cell": "sse",
+      "transport": "sse",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/continuation_foreign_provider_test.go:TestTypeScriptProviderRefusesAPositionItNeverIssuedAsATypedError",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.ws-server.result.declared-order-picks-the-socket",
+      "provider": "ts",
+      "target": "go",
+      "cell": "ws-server",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderWebSocketStreamsReachTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.ws-server.auth.refused-credential-before-any-message",
+      "provider": "ts",
+      "target": "go",
+      "cell": "ws-server",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "safe",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderWebSocketStreamsReachTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.ws-client.result.one-declared-result",
+      "provider": "ts",
+      "target": "go",
+      "cell": "ws-client",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderWebSocketStreamsReachTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.ws-client.auth.refused-credential-before-any-message",
+      "provider": "ts",
+      "target": "go",
+      "cell": "ws-client",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderWebSocketStreamsReachTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.ws-bidi.result.conversation-outlives-the-half-close",
+      "provider": "ts",
+      "target": "go",
+      "cell": "ws-bidi",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "result",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderWebSocketStreamsReachTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.ws-bidi.auth.refused-credential-before-any-turn",
+      "provider": "ts",
+      "target": "go",
+      "cell": "ws-bidi",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "auth",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderWebSocketStreamsReachTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-go.ws-bidi.policy.consumer-cancellation-ends-the-conversation",
+      "provider": "ts",
+      "target": "go",
+      "cell": "ws-bidi",
+      "transport": "websocket",
+      "encoding": "json",
+      "family": "policy",
+      "auth": "api-key",
+      "policy": "non-idempotent",
+      "test": "clients/go/foreign_provider_test.go:TestTypeScriptProviderWebSocketStreamsReachTheGeneratedGoClient",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.contract.generation.the-emitted-surface-matches-the-committed-one",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "contract",
+      "transport": "n/a",
+      "encoding": "n/a",
+      "family": "generation",
+      "auth": "n/a",
+      "policy": "n/a",
+      "test": "test/generation.test.ts:renders the same file set and the same operations as what is committed",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.contract.generation.the-manifest-owns-the-current-contract-and-bytes",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "contract",
+      "transport": "n/a",
+      "encoding": "n/a",
+      "family": "generation",
+      "auth": "n/a",
+      "policy": "n/a",
+      "test": "test/generation.test.ts:binds the committed bytes to the contract they came from",
+      "result": "pass"
+    },
+    {
+      "id": "ts-ts.contract.generation.a-removed-operation-is-detected",
+      "provider": "ts",
+      "target": "ts",
+      "cell": "contract",
+      "transport": "n/a",
+      "encoding": "n/a",
+      "family": "generation",
+      "auth": "n/a",
+      "policy": "n/a",
+      "test": "test/generation.test.ts:detects a contract break instead of rendering through it",
+      "result": "pass"
+    }
+  ],
+  "coverage": [
+    {
+      "target": "ts",
+      "cell": "rest-json",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": [
+        "ts-ts.rest-json.auth.and-alternative-carries-both",
+        "ts-ts.rest-json.auth.and-alternative-never-downgrades",
+        "ts-ts.rest-json.auth.forwarded-user-from-a-real-inbound-request",
+        "ts-ts.rest-json.auth.absent-inbound-identity-never-calls",
+        "ts-ts.rest-json.auth.forwarding-is-opt-in",
+        "ts-ts.rest-json.auth.a-credential-reaches-only-its-operation"
+      ]
+    },
+    {
+      "target": "ts",
+      "cell": "rest-json",
+      "family": "result",
+      "status": "pass",
+      "scenarios": [
+        "ts-ts.rest-json.result.typed-200",
+        "ts-ts.rest-json.result.declared-query-string-and-header",
+        "ts-ts.rest-json.result.presence-is-preserved",
+        "ts-ts.rest-json.result.typed-write-and-read-back",
+        "ts-ts.rest-json.result.declared-error-is-typed",
+        "ts-ts.rest-json.result.unknown-remote-error",
+        "ts-ts.rest-json.result.invalid-response-is-refused",
+        "ts-ts.rest-json.result.the-provider-is-its-own-consumer"
+      ]
+    },
+    {
+      "target": "ts",
+      "cell": "rest-json",
+      "family": "policy",
+      "status": "pass",
+      "scenarios": [
+        "ts-ts.rest-json.policy.declared-retry-repeats-one-request-identity",
+        "ts-ts.rest-json.policy.declared-attempts-are-a-bound",
+        "ts-ts.rest-json.policy.declared-budget-ends-a-silent-attempt",
+        "ts-ts.rest-json.policy.declared-circuit-stops-calling"
+      ]
+    },
+    {
+      "target": "ts",
+      "cell": "rest-json",
+      "family": "observability",
+      "status": "pass",
+      "scenarios": ["ts-ts.rest-json.observability.trace-and-metrics-of-a-rest-call"]
+    },
+    {
+      "target": "ts",
+      "cell": "rest-json",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "ts",
+      "cell": "rest-binary",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-ts.rest-binary.auth.path-parameter-and-credential-compose"]
+    },
+    {
+      "target": "ts",
+      "cell": "rest-binary",
+      "family": "result",
+      "status": "pass",
+      "scenarios": [
+        "ts-ts.rest-binary.result.every-octet-round-trips",
+        "ts-ts.rest-binary.result.declared-error-is-typed",
+        "ts-ts.rest-binary.result.bound-and-media-type-refusals-are-declared"
+      ]
+    },
+    {
+      "target": "ts",
+      "cell": "rest-binary",
+      "family": "policy",
+      "status": "pass",
+      "scenarios": ["ts-ts.rest-binary.policy.bound-refused-before-the-source-is-drained"]
+    },
+    {
+      "target": "ts",
+      "cell": "rest-binary",
+      "family": "observability",
+      "status": "pass",
+      "scenarios": ["ts-ts.rest-binary.observability.traced-and-measured-without-its-octets"]
+    },
+    {
+      "target": "ts",
+      "cell": "rest-binary",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "ts",
+      "cell": "connect-unary-json",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-ts.connect-unary-json.auth.refused-credential-reaches-the-consumer"]
+    },
+    {
+      "target": "ts",
+      "cell": "connect-unary-json",
+      "family": "result",
+      "status": "pass",
+      "scenarios": [
+        "ts-ts.connect-unary-json.result.second-declared-encoding-carries-exact-values",
+        "ts-ts.connect-unary-json.result.declared-json-first-order-is-the-dispatched-wire"
+      ]
+    },
+    {
+      "target": "ts",
+      "cell": "connect-unary-json",
+      "family": "policy",
+      "status": "missing",
+      "note": "Same as the protobuf cell: the declared request policy is carried by a REST operation."
+    },
+    {
+      "target": "ts",
+      "cell": "connect-unary-json",
+      "family": "observability",
+      "status": "pass",
+      "scenarios": ["ts-ts.connect-unary-json.observability.trace-and-metrics-of-a-connect-call"]
+    },
+    {
+      "target": "ts",
+      "cell": "connect-unary-json",
+      "family": "generation",
+      "status": "pass",
+      "scenarios": ["ts-ts.connect-unary-json.generation.declared-order-decides-the-emitted-dispatch"]
+    },
+    {
+      "target": "ts",
+      "cell": "connect-unary-proto",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-ts.connect-unary-proto.auth.refused-credential-reaches-the-consumer"]
+    },
+    {
+      "target": "ts",
+      "cell": "connect-unary-proto",
+      "family": "result",
+      "status": "pass",
+      "scenarios": [
+        "ts-ts.connect-unary-proto.result.first-declared-encoding-carries-exact-values",
+        "ts-ts.connect-unary-proto.result.declared-error-carries-its-declared-details"
+      ]
+    },
+    {
+      "target": "ts",
+      "cell": "connect-unary-proto",
+      "family": "policy",
+      "status": "missing",
+      "note": "Same as the Go consumer of this provider."
+    },
+    {
+      "target": "ts",
+      "cell": "connect-unary-proto",
+      "family": "observability",
+      "status": "pass",
+      "scenarios": ["ts-ts.connect-unary-proto.observability.late-call-after-shutdown-is-refused"]
+    },
+    {
+      "target": "ts",
+      "cell": "connect-unary-proto",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "ts",
+      "cell": "connect-stream",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-ts.connect-stream.auth.refused-credential-before-any-message"]
+    },
+    {
+      "target": "ts",
+      "cell": "connect-stream",
+      "family": "result",
+      "status": "pass",
+      "scenarios": [
+        "ts-ts.connect-stream.result.enveloped-messages-and-one-terminal",
+        "ts-ts.connect-stream.result.the-second-encoding-streams-too"
+      ]
+    },
+    {
+      "target": "ts",
+      "cell": "connect-stream",
+      "family": "policy",
+      "status": "missing",
+      "note": "Same as the Go consumer of this provider."
+    },
+    {
+      "target": "ts",
+      "cell": "connect-stream",
+      "family": "observability",
+      "status": "missing",
+      "note": "The TypeScript observability cell measures the unary wires only. The TypeScript client's stream telemetry has no cell in either sample."
+    },
+    {
+      "target": "ts",
+      "cell": "connect-stream",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "ts",
+      "cell": "sse",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-ts.sse.auth.refused-credential-before-any-message"]
+    },
+    {
+      "target": "ts",
+      "cell": "sse",
+      "family": "result",
+      "status": "pass",
+      "scenarios": [
+        "ts-ts.sse.result.declared-messages-and-clean-terminal",
+        "ts-ts.sse.result.declared-terminal-error-is-typed",
+        "ts-ts.sse.result.refused-position-is-typed"
+      ]
+    },
+    {
+      "target": "ts",
+      "cell": "sse",
+      "family": "policy",
+      "status": "pass",
+      "scenarios": [
+        "ts-ts.sse.policy.consumer-cancellation-ends-the-stream",
+        "ts-ts.sse.policy.cursor-continuation-across-an-instance-change"
+      ]
+    },
+    {
+      "target": "ts",
+      "cell": "sse",
+      "family": "observability",
+      "status": "pass",
+      "scenarios": ["ts-ts.sse.observability.one-traced-call-measured-at-its-terminal"]
+    },
+    {
+      "target": "ts",
+      "cell": "sse",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "ts",
+      "cell": "ws-server",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-ts.ws-server.auth.refused-credential-before-any-message"]
+    },
+    {
+      "target": "ts",
+      "cell": "ws-server",
+      "family": "result",
+      "status": "pass",
+      "scenarios": ["ts-ts.ws-server.result.declared-order-picks-the-socket"]
+    },
+    {
+      "target": "ts",
+      "cell": "ws-server",
+      "family": "policy",
+      "status": "missing",
+      "note": "Same as the Go consumer of this provider."
+    },
+    {
+      "target": "ts",
+      "cell": "ws-server",
+      "family": "observability",
+      "status": "pass",
+      "scenarios": ["ts-ts.ws-server.observability.one-traced-call-measured-at-its-terminal"]
+    },
+    {
+      "target": "ts",
+      "cell": "ws-server",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "ts",
+      "cell": "ws-client",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-ts.ws-client.auth.refused-credential-before-any-message"]
+    },
+    {
+      "target": "ts",
+      "cell": "ws-client",
+      "family": "result",
+      "status": "pass",
+      "scenarios": [
+        "ts-ts.ws-client.result.one-declared-result",
+        "ts-ts.ws-client.result.declared-terminal-error-is-typed"
+      ]
+    },
+    {
+      "target": "ts",
+      "cell": "ws-client",
+      "family": "policy",
+      "status": "pass",
+      "scenarios": [
+        "ts-ts.ws-client.policy.a-burst-past-the-queue-is-refused-not-dropped",
+        "ts-ts.ws-client.policy.half-close-is-idempotent"
+      ]
+    },
+    {
+      "target": "ts",
+      "cell": "ws-client",
+      "family": "observability",
+      "status": "pass",
+      "scenarios": ["ts-ts.ws-client.observability.one-traced-call-measured-at-its-terminal"]
+    },
+    {
+      "target": "ts",
+      "cell": "ws-client",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "ts",
+      "cell": "ws-bidi",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-ts.ws-bidi.auth.refused-credential-before-any-turn"]
+    },
+    {
+      "target": "ts",
+      "cell": "ws-bidi",
+      "family": "result",
+      "status": "pass",
+      "scenarios": ["ts-ts.ws-bidi.result.conversation-outlives-the-half-close"]
+    },
+    {
+      "target": "ts",
+      "cell": "ws-bidi",
+      "family": "policy",
+      "status": "pass",
+      "scenarios": ["ts-ts.ws-bidi.policy.consumer-cancellation-ends-the-conversation"]
+    },
+    {
+      "target": "ts",
+      "cell": "ws-bidi",
+      "family": "observability",
+      "status": "pass",
+      "scenarios": ["ts-ts.ws-bidi.observability.one-traced-call-measured-at-its-terminal"]
+    },
+    {
+      "target": "ts",
+      "cell": "ws-bidi",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "go",
+      "cell": "rest-json",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": [
+        "ts-go.rest-json.auth.and-alternative-carries-both",
+        "ts-go.rest-json.auth.and-alternative-never-downgrades",
+        "ts-go.rest-json.auth.forwarded-user-from-a-real-inbound-request",
+        "ts-go.rest-json.auth.absent-inbound-identity-never-calls"
+      ]
+    },
+    {
+      "target": "go",
+      "cell": "rest-json",
+      "family": "result",
+      "status": "pass",
+      "scenarios": [
+        "ts-go.rest-json.result.typed-200-with-query-and-header",
+        "ts-go.rest-json.result.typed-write-read-back-and-presence",
+        "ts-go.rest-json.result.declared-error-is-typed",
+        "ts-go.rest-json.result.unknown-remote-error"
+      ]
+    },
+    {
+      "target": "go",
+      "cell": "rest-json",
+      "family": "policy",
+      "status": "missing",
+      "note": "The declared request policy of the create operation is exercised against this provider's contract by the TypeScript consumer (test/policy.test.ts). The Go client's own policy cell runs against the Go provider (go/samples/service-to-service/consumer/consumer_policy_test.go)."
+    },
+    {
+      "target": "go",
+      "cell": "rest-json",
+      "family": "observability",
+      "status": "pass",
+      "scenarios": [
+        "ts-go.rest-json.observability.trace-and-metrics-of-a-rest-call",
+        "ts-go.rest-json.observability.late-call-after-shutdown-is-refused"
+      ]
+    },
+    {
+      "target": "go",
+      "cell": "rest-json",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "go",
+      "cell": "rest-binary",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-go.rest-binary.auth.unbound-credential-never-dispatches"]
+    },
+    {
+      "target": "go",
+      "cell": "rest-binary",
+      "family": "result",
+      "status": "pass",
+      "scenarios": ["ts-go.rest-binary.result.every-octet-round-trips"]
+    },
+    {
+      "target": "go",
+      "cell": "rest-binary",
+      "family": "policy",
+      "status": "pass",
+      "scenarios": ["ts-go.rest-binary.policy.bound-refused-before-dispatch"]
+    },
+    {
+      "target": "go",
+      "cell": "rest-binary",
+      "family": "observability",
+      "status": "pass",
+      "scenarios": ["ts-go.rest-binary.observability.traced-and-measured-without-its-octets"]
+    },
+    {
+      "target": "go",
+      "cell": "rest-binary",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "go",
+      "cell": "connect-unary-json",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-go.connect-unary-json.auth.refused-credential-reaches-the-consumer"]
+    },
+    {
+      "target": "go",
+      "cell": "connect-unary-json",
+      "family": "result",
+      "status": "pass",
+      "scenarios": [
+        "ts-go.connect-unary-json.result.declared-json-first-order-carries-exact-values",
+        "ts-go.connect-unary-json.result.declared-error-carries-its-declared-details"
+      ]
+    },
+    {
+      "target": "go",
+      "cell": "connect-unary-json",
+      "family": "policy",
+      "status": "missing",
+      "note": "The declared request policy is carried by the create operation, which is REST; no Connect operation of this provider declares one."
+    },
+    {
+      "target": "go",
+      "cell": "connect-unary-json",
+      "family": "observability",
+      "status": "pass",
+      "scenarios": ["ts-go.connect-unary-json.observability.trace-and-metrics-of-a-connect-json-call"]
+    },
+    {
+      "target": "go",
+      "cell": "connect-unary-json",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "go",
+      "cell": "connect-unary-proto",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-go.connect-unary-proto.auth.refused-credential-reaches-the-consumer"]
+    },
+    {
+      "target": "go",
+      "cell": "connect-unary-proto",
+      "family": "result",
+      "status": "pass",
+      "scenarios": [
+        "ts-go.connect-unary-proto.result.first-declared-encoding-carries-exact-values",
+        "ts-go.connect-unary-proto.result.declared-error-carries-its-declared-details"
+      ]
+    },
+    {
+      "target": "go",
+      "cell": "connect-unary-proto",
+      "family": "policy",
+      "status": "missing",
+      "note": "The declared request policy is carried by the create operation, which is REST; no Connect operation of this provider declares one."
+    },
+    {
+      "target": "go",
+      "cell": "connect-unary-proto",
+      "family": "observability",
+      "status": "pass",
+      "scenarios": [
+        "ts-go.connect-unary-proto.observability.trace-and-metrics-of-a-connect-call",
+        "ts-go.connect-unary-proto.observability.late-call-after-shutdown-is-refused"
+      ]
+    },
+    {
+      "target": "go",
+      "cell": "connect-unary-proto",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "go",
+      "cell": "connect-stream",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-go.connect-stream.auth.refused-credential-before-any-message"]
+    },
+    {
+      "target": "go",
+      "cell": "connect-stream",
+      "family": "result",
+      "status": "pass",
+      "scenarios": ["ts-go.connect-stream.result.enveloped-messages-and-one-terminal"]
+    },
+    {
+      "target": "go",
+      "cell": "connect-stream",
+      "family": "policy",
+      "status": "missing",
+      "note": "No cancellation or budget scenario exists on the Connect stream; the ticks feed is finite and ends on its own terminal."
+    },
+    {
+      "target": "go",
+      "cell": "connect-stream",
+      "family": "observability",
+      "status": "missing",
+      "note": "Stream telemetry is proven for the Go client against the Go provider (consumer/consumer_observability_test.go), which opens the declared feeds inside the traced request."
+    },
+    {
+      "target": "go",
+      "cell": "connect-stream",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "go",
+      "cell": "sse",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-go.sse.auth.refused-credential-before-any-message"]
+    },
+    {
+      "target": "go",
+      "cell": "sse",
+      "family": "result",
+      "status": "pass",
+      "scenarios": [
+        "ts-go.sse.result.declared-messages-and-typed-terminal",
+        "ts-go.sse.result.refused-position-is-typed"
+      ]
+    },
+    {
+      "target": "go",
+      "cell": "sse",
+      "family": "policy",
+      "status": "pass",
+      "scenarios": [
+        "ts-go.sse.policy.consumer-cancellation-ends-the-stream",
+        "ts-go.sse.policy.cursor-continuation-across-an-instance-change"
+      ]
+    },
+    {
+      "target": "go",
+      "cell": "sse",
+      "family": "observability",
+      "status": "missing",
+      "note": "Same as the Connect stream cell of this consumer."
+    },
+    {
+      "target": "go",
+      "cell": "sse",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract; the contract-level rows carry it."
+    },
+    {
+      "target": "go",
+      "cell": "ws-server",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-go.ws-server.auth.refused-credential-before-any-message"]
+    },
+    {
+      "target": "go",
+      "cell": "ws-server",
+      "family": "result",
+      "status": "pass",
+      "scenarios": ["ts-go.ws-server.result.declared-order-picks-the-socket"]
+    },
+    {
+      "target": "go",
+      "cell": "ws-server",
+      "family": "policy",
+      "status": "missing",
+      "note": "The declared revision feed is finite and has no follow mode, so a cancellation mid-stream has no deterministic point. The SSE cell, whose feed does follow, carries cancellation."
+    },
+    {
+      "target": "go",
+      "cell": "ws-server",
+      "family": "observability",
+      "status": "missing",
+      "note": "Same as the Connect stream cell of this consumer."
+    },
+    {
+      "target": "go",
+      "cell": "ws-server",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "go",
+      "cell": "ws-client",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-go.ws-client.auth.refused-credential-before-any-message"]
+    },
+    {
+      "target": "go",
+      "cell": "ws-client",
+      "family": "result",
+      "status": "pass",
+      "scenarios": ["ts-go.ws-client.result.one-declared-result"]
+    },
+    {
+      "target": "go",
+      "cell": "ws-client",
+      "family": "policy",
+      "status": "missing",
+      "note": "The Go consumer of this provider reads the single declared result and the typed terminal; the queue-depth burst and the idempotent half-close are asserted by the TypeScript consumer of this provider and by both consumers of the Go provider."
+    },
+    {
+      "target": "go",
+      "cell": "ws-client",
+      "family": "observability",
+      "status": "missing",
+      "note": "Same as the Connect stream cell of this consumer."
+    },
+    {
+      "target": "go",
+      "cell": "ws-client",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    },
+    {
+      "target": "go",
+      "cell": "ws-bidi",
+      "family": "auth",
+      "status": "pass",
+      "scenarios": ["ts-go.ws-bidi.auth.refused-credential-before-any-turn"]
+    },
+    {
+      "target": "go",
+      "cell": "ws-bidi",
+      "family": "result",
+      "status": "pass",
+      "scenarios": ["ts-go.ws-bidi.result.conversation-outlives-the-half-close"]
+    },
+    {
+      "target": "go",
+      "cell": "ws-bidi",
+      "family": "policy",
+      "status": "pass",
+      "scenarios": ["ts-go.ws-bidi.policy.consumer-cancellation-ends-the-conversation"]
+    },
+    {
+      "target": "go",
+      "cell": "ws-bidi",
+      "family": "observability",
+      "status": "missing",
+      "note": "Same as the Connect stream cell of this consumer."
+    },
+    {
+      "target": "go",
+      "cell": "ws-bidi",
+      "family": "generation",
+      "status": "n/a",
+      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+    }
+  ]
+}

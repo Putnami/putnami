@@ -1,0 +1,7 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "billing/invoicing",
+  "outcomes": ["Customers issue an invoice for a completed purchase"],
+  "requirements": []
+}

@@ -1,0 +1,21 @@
+{
+  "protocol": "putnami.transaction.v1",
+  "suite": "putnami.transaction.conformance.v1",
+  "protocolVersion": 1,
+  "cases": [
+    {
+      "id": "bad.primitive",
+      "level": "required",
+      "setup": { "tables": [{ "name": "t", "columns": [{ "name": "id", "type": "text", "primaryKey": true }] }] },
+      "operations": [
+        {
+          "id": "op",
+          "table": "t",
+          "primitive": "teleport",
+          "args": { "keyColumn": "id", "key": "x" },
+          "expect": "applied"
+        }
+      ]
+    }
+  ]
+}

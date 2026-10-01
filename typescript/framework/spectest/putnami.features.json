@@ -1,0 +1,44 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/spec-test-binding",
+      "type": "feature",
+      "name": "TypeScript spec-test binding",
+      "outcome": "A TypeScript author binds an ordinary bun test to a declared spec check, and the executable-spec gate resolves the resulting evidence exactly as it resolves the Go and Python runtimes'",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "honest-verdict",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-recorded-verdict-is-the-one-the-runner-observed"]
+          }
+        },
+        {
+          "id": "inert-without-the-adapter",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["no-fragment-directory-means-no-writes-and-the-same-verdicts"]
+          }
+        },
+        {
+          "id": "verdict-or-measurement",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-fragment-never-carries-both-a-verdict-and-a-measurement"]
+          }
+        }
+      ]
+    }
+  ]
+}

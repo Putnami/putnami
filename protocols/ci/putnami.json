@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/protocol/ci",
+  "visibility": "public",
+  "tags": ["go", "protocol"],
+  "extensions": ["/go/extension"],
+  "publish": ["go"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "test": {
+      "filePatterns": ["fixtures/**", "schemas/**"]
+    },
+    "publish": {
+      "archives": false
+    }
+  },
+  "featureAuthority": {
+    "none": "The user outcome is owned by the `putnami ci` command surface and the plane that executes its requests."
+  }
+}

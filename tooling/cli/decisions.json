@@ -1,0 +1,90 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decisions.json",
+  "protocolVersion": 1,
+  "decisions": [
+    {
+      "id": "D-W1",
+      "statement": "Windows support targets windows/amd64 on Windows 10 1803 or later and Windows 11; windows/arm64 is added only when a host can prove it",
+      "settled": "2026-09-26",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-W10",
+      "statement": "cross-process locks use LockFileEx on Windows and flock on Unix; a no-op lock never ships, and scratch reclamation through an inherited lock is off on Windows",
+      "settled": "2026-09-26",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-W11",
+      "statement": "Windows support is proven on an on-demand Windows VM created for each QA run and deleted after it; the contributor gate runs GOOS=windows go vet on every go.work module",
+      "settled": "2026-09-26",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-W12",
+      "statement": "on Windows, the Microsoft Visual C++ runtime (vcruntime140.dll) that Biome needs is a documented prerequisite that doctor checks; Putnami neither bundles nor installs it",
+      "settled": "2026-09-28",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-W2",
+      "statement": "release archives stay .tar.gz on every platform, with the Windows binary at compiled/<name>.exe; every extractor in the CLI reads tar.gz only",
+      "settled": "2026-09-26",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-W3",
+      "statement": "workspace hooks run through sh -c on every platform; on Windows, sh from Git for Windows is a documented prerequisite and the CLI names it when missing",
+      "settled": "2026-09-26",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-W4",
+      "statement": "workspaces check out with LF line endings through a .gitattributes the scaffold writes and doctor checks; the content hasher never normalizes line endings",
+      "settled": "2026-09-26",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-W5",
+      "statement": "the cache key carries an OS-class field only on Windows, so Linux and macOS keys stay byte-identical; hashed relative paths use slash form and slash order",
+      "settled": "2026-09-26",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-W6",
+      "statement": "Windows uses directory junctions where Unix uses directory symlinks, with no Developer Mode requirement; replacing a link is remove-then-create under the lock",
+      "settled": "2026-09-26",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-W7",
+      "statement": "the Putnami home resolves through os.UserHomeDir on every platform, which is the non-roaming %USERPROFILE%\\.putnami on Windows",
+      "settled": "2026-09-26",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-W8",
+      "statement": "on Windows, LongPathsEnabled and Git core.longpaths are prerequisites that doctor checks; the store layout is not shortened for Windows",
+      "settled": "2026-09-26",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-W9",
+      "statement": "on Windows, process trees run in a Job Object with KILL_ON_JOB_CLOSE; graceful stop sends CTRL_BREAK_EVENT, then terminates the job after the grace period",
+      "settled": "2026-09-26",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/release-rehearsal",
+  "outcomes": [
+    "A release approver can run one repeatable, read-only rehearsal over the current tree and read an explicit GO or NO-GO verdict for the intended public release",
+    "Every required release evidence item is a checked result rather than a claim, and a missing input is reported as a blocker naming the input and the issue that owns it",
+    "The publish order, the rollback point and reversal for each step, the fresh-root metadata, and the label and domain bootstrap set are reviewed data that the gate validates against the tree"
+  ],
+  "nonGoals": [
+    "Performing the private-archive to public-root switch, which stays the final human-approved operation outside the rehearsal",
+    "Building, publishing, tagging, pushing, rewriting history, or changing repository visibility",
+    "Verifying digests or provenance over built binaries, which belongs to the installer and release smoke",
+    "Failing the build when the release is not ready: NO-GO is a recordable result"
+  ],
+  "requirements": [
+    {
+      "id": "read-only-rehearsal",
+      "text": "The rehearsal reads the candidate cut and the files that decide the verdict. It mutates no file, publishes nothing, and neither tags, pushes, rewrites history nor changes repository visibility, and that property is enforced over its own source. It enumerates the candidate cut through the public-cut helpers, which run git to list it, so the guarantee is that nothing it runs can change the tree, not that it spawns no process."
+    },
+    {
+      "id": "ten-evidence-items",
+      "text": "The gate owns the fixed set of required evidence items: version and artifact manifest, checksums and provenance, support report, migration report, scrub result, golden-path result, governance checklist, label/scope bootstrap plan, publish order, and rollback plan. The release plan may not add, rename or drop one."
+    },
+    {
+      "id": "no-vacuous-check",
+      "text": "A check with neither an assertion nor a declared requirement is reported as proving nothing, so an evidence item can never pass by being empty."
+    },
+    {
+      "id": "recorded-verdict",
+      "text": "The verdict is rendered deterministically for a tree and compared with the committed report. The gate fails when the recorded verdict no longer matches the tree, never because a check is blocked."
+    },
+    {
+      "id": "named-blockers",
+      "text": "Every blocked check names the missing input in plain language and the issue that owns it, so a NO-GO is actionable without reading the gate."
+    },
+    {
+      "id": "reused-scrub",
+      "text": "The scrub result comes from the existing public-cut scanner, its committed baseline and its allowlist, over the same candidate enumeration, so the two gates never disagree about the tree."
+    },
+    {
+      "id": "publish-order-coverage",
+      "text": "Every artifact and channel pair resolved from the candidate cut is claimed by exactly one publish step or by one recorded exclusion, and every declared artifact pattern matches at least one artifact."
+    },
+    {
+      "id": "rollback-completeness",
+      "text": "Every publish step names a rollback point and its exact reversal, every exclusion records a reason, and the final private-archive to public-root switch stays excluded with a named human owner, rollback point and reversal."
+    },
+    {
+      "id": "stable-recorded-fields",
+      "text": "The recorded verdict carries check identities, statuses, blocking inputs and owners. Point-in-time counts are reported to the operator but stay out of the recorded block."
+    },
+    {
+      "id": "declarative-plan",
+      "text": "The release plan is reviewed data with unknown fields rejected, so no plan field can introduce an executable step into the rehearsal."
+    },
+    {
+      "id": "keyed-verdict-inputs",
+      "text": "Every file that can move the verdict — the recorded report, the release plan, the files a check reads, and the target of every declared requirement — is a declared cache-key input of the owning project, so a changed tree can never be answered from a cached run of the drift check. The gate asserts that coverage against the matcher the cache key itself uses."
+    },
+    {
+      "id": "provenance-contract",
+      "text": "Checksums and provenance pass only while the durable policy names SHA-256, the authoritative registry response headers, builder identity, the current signature policy, the actual reproducibility boundary and immutable rollback, and while the installer plus release smoke retain their fail-closed verification paths."
+    },
+    {
+      "id": "canonical-migration-evidence",
+      "text": "Migration evidence is the canonical compatibility guide and accepted budget decision plus the lock, machine-result and extension-contract prior-release corpora. Every corpus is non-empty, every fixture has re-derivable provenance, and its recorded SHA-256 matches the candidate bytes."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0009-release-rehearsal-recorded-verdict.md",
+    "tooling/cli/doc/adr/0010-compatibility-budget.md",
+    "tooling/cli/doc/adr/0012-install-trust-and-release-smoke.md"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/apps/console/test",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {"name": "putnami"},
+  "project": {
+    "name": "@acme/console",
+    "path": "apps/console",
+    "fullPath": "/ws/apps/console"
+  },
+  "selection": {
+    "mode": "impacted",
+    "scoped": true,
+    "baseline": "origin/main",
+    "baselineSource": "upstream",
+    "projects": ["/apps/console", "/libs/widget"],
+    "releaseSetProjects": ["/apps/console"]
+  },
+  "extension": {"name": "@putnami/test", "root": "/ws/tooling/test-extension"},
+  "job": {"name": "test"},
+  "identity": {
+    "key": "/apps/console:test~test",
+    "scope": "project",
+    "project": {"id": "/apps/console", "name": "@acme/console"},
+    "task": {"name": "test~test", "command": "test", "kind": "test"},
+    "provider": {"extension": "@putnami/test"}
+  },
+  "params": {}
+}

@@ -1,0 +1,42 @@
+# Repository defaults for Codex. Callers may raise the Astra reasoning effort,
+# but Putnami workflows must not switch away from the exact Astra model.
+model = "gpt-6-astra"
+model_reasoning_effort = "xhigh"
+review_model = "gpt-6-astra"
+
+[features]
+multi_agent = true
+
+[mcp_servers.putnami]
+command = "./putnamiw"
+args = ["mcp"]
+enabled = true
+required = true
+default_tools_approval_mode = "auto"
+
+[mcp_servers.putnami.tools.run_jobs]
+approval_mode = "prompt"
+
+[agents."epic-analyst"]
+description = "Read-only GPT-6 Astra analyst for epic decomposition, integration diagnosis, and whole-epic review."
+config_file = "agents/epic-analyst.toml"
+
+[agents."fix-heavy"]
+description = "GPT-6 Sol implementation worker for high-risk fixes involving invariants, security, concurrency, or protocols."
+config_file = "agents/fix-heavy.toml"
+
+[agents."fix-light"]
+description = "GPT-6 Luna implementation worker for prescribed mechanical fixes with escalation on scope growth."
+config_file = "agents/fix-light.toml"
+
+[agents."fix-standard"]
+description = "GPT-6 Sol implementation worker for settled multi-file fixes following established repository patterns."
+config_file = "agents/fix-standard.toml"
+
+[agents."prune-triage"]
+description = "Read-only GPT-6 Astra triage worker for /audit --prune: apply / verdict / drop per removal candidate, against every consumer repository."
+config_file = "agents/prune-triage.toml"
+
+[agents."prune-apply"]
+description = "GPT-6 Luna edit worker for /audit --prune: applies one typology of prescribed removals and runs the --projects gate."
+config_file = "agents/prune-apply.toml"

@@ -1,0 +1,60 @@
+{
+  "protocolVersion": 2,
+  "tool": "run_jobs",
+  "commands": [
+    "build",
+    "test",
+    "lint"
+  ],
+  "run": {
+    "outcome": "failure",
+    "exitCode": 1,
+    "counts": {
+      "total": 8,
+      "succeeded": 5,
+      "failed": 1,
+      "canceled": 1,
+      "skipped": 1
+    },
+    "reuse": {
+      "localCache": 1,
+      "remoteCache": 1,
+      "coalesced": 1
+    },
+    "durationMs": 0,
+    "failures": [
+      {
+        "identity": {
+          "key": "/services/api:test",
+          "scope": "project",
+          "project": {
+            "id": "/services/api",
+            "name": "@acme/api"
+          },
+          "task": {
+            "name": "test",
+            "command": "test",
+            "kind": "test"
+          },
+          "provider": {
+            "extension": "go"
+          }
+        },
+        "error": {
+          "code": "failure",
+          "message": "2 assertions failed"
+        },
+        "diagnostics": [
+          {
+            "severity": "error",
+            "message": "expected 3, got 4",
+            "code": "ASSERT",
+            "file": "internal/sum/sum_test.go",
+            "line": 42,
+            "column": 3
+          }
+        ]
+      }
+    ]
+  }
+}

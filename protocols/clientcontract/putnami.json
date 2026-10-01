@@ -1,0 +1,21 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/protocol/clientcontract",
+  "visibility": "public",
+  "tags": ["go", "protocol"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
+  "publish": ["go"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "test": {
+      "filePatterns": ["fixtures/**", "schemas/**"]
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

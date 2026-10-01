@@ -1,0 +1,20 @@
+{
+  "targets": [
+    "ts",
+    "go"
+  ],
+  "ts": {
+    "output": "clients/ts",
+    "packageName": "@demo/widgets-client"
+  },
+  "go": {
+    "output": "clients/go",
+    "modulePath": "github.com/demo/widgets/clients/go",
+    "packageName": "widgetsclient",
+    "clientName": "WidgetsClient",
+    "omitOperations": [
+      "deployWidget",
+      "listWidgets"
+    ]
+  }
+}

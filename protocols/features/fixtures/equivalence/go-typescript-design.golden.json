@@ -1,0 +1,113 @@
+{
+  "compatibility": "provisional",
+  "project": "tasks",
+  "nodes": [
+    {
+      "id": "config:tasks",
+      "kind": "config",
+      "name": "tasks",
+      "properties": {
+        "path": "tasks"
+      }
+    },
+    {
+      "id": "feature:tasks/manage",
+      "kind": "feature",
+      "name": "Task management",
+      "properties": {
+        "outcome": "Users can manage tasks",
+        "owner": "samples"
+      }
+    },
+    {
+      "id": "infra:database:tasks",
+      "kind": "infra",
+      "name": "tasks",
+      "properties": {
+        "kind": "database"
+      }
+    },
+    {
+      "id": "lifecycle:configure:module:tasks/tasks",
+      "kind": "lifecycle",
+      "name": "configure",
+      "properties": {
+        "phase": "configure"
+      }
+    },
+    {
+      "id": "lifecycle:start:module:tasks/tasks",
+      "kind": "lifecycle",
+      "name": "start",
+      "properties": {
+        "phase": "start"
+      }
+    },
+    {
+      "id": "lifecycle:stop:module:tasks/tasks",
+      "kind": "lifecycle",
+      "name": "stop",
+      "properties": {
+        "phase": "stop"
+      }
+    },
+    {
+      "id": "module:tasks/tasks",
+      "kind": "module",
+      "name": "tasks"
+    },
+    {
+      "id": "test:integration:tasks/create",
+      "kind": "test",
+      "name": "tasks/create",
+      "properties": {
+        "kind": "integration",
+        "proves": "tasks/manage#creation#task-create-flow"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "feature:tasks/manage",
+      "to": "module:tasks/tasks",
+      "kind": "implementedBy",
+      "authority": "exact"
+    },
+    {
+      "from": "module:tasks/tasks",
+      "to": "config:tasks",
+      "kind": "contains",
+      "authority": "exact"
+    },
+    {
+      "from": "module:tasks/tasks",
+      "to": "infra:database:tasks",
+      "kind": "contains",
+      "authority": "exact"
+    },
+    {
+      "from": "module:tasks/tasks",
+      "to": "lifecycle:configure:module:tasks/tasks",
+      "kind": "contains",
+      "authority": "exact"
+    },
+    {
+      "from": "module:tasks/tasks",
+      "to": "lifecycle:start:module:tasks/tasks",
+      "kind": "contains",
+      "authority": "exact"
+    },
+    {
+      "from": "module:tasks/tasks",
+      "to": "lifecycle:stop:module:tasks/tasks",
+      "kind": "contains",
+      "authority": "exact"
+    },
+    {
+      "from": "module:tasks/tasks",
+      "to": "test:integration:tasks/create",
+      "kind": "contains",
+      "authority": "exact"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@putnami/spectest",
+  "version": "0.0.0",
+  "description": "Executable-spec test binding for Bun: specTest declares which feature requirement check a test proves and records the observation for the spec gate",
+  "keywords": [
+    "sdd",
+    "spec",
+    "testing"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/spectest"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    }
+  },
+  "private": false
+}

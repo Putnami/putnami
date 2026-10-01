@@ -1,0 +1,118 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities-v2.json",
+  "protocolVersion": 2,
+  "project": "consumer",
+  "packages": [
+    {
+      "identity": {
+        "ownerProject": "consumer",
+        "kind": "package",
+        "key": "consumer"
+      },
+      "package": "consumer",
+      "provenance": {
+        "project": "consumer",
+        "package": "consumer",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "package.json"
+        }
+      }
+    }
+  ],
+  "domainAccess": [
+    {
+      "identity": {
+        "ownerProject": "consumer",
+        "kind": "domainAccess",
+        "subkind": "command",
+        "key": "consumer.producer-command.v1"
+      },
+      "import": "consumer.producer-command.v1",
+      "mode": "command",
+      "status": "active",
+      "transports": [
+        {
+          "role": "transport",
+          "kind": "event",
+          "contract": "putnami.usage.v1",
+          "availability": "active"
+        }
+      ],
+      "provenance": {
+        "project": "consumer",
+        "package": "consumer",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "package.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "consumer",
+        "kind": "domainAccess",
+        "subkind": "projection",
+        "key": "consumer.producer-projection.v1"
+      },
+      "import": "consumer.producer-projection.v1",
+      "mode": "projection",
+      "status": "active",
+      "transports": [
+        {
+          "role": "bootstrap",
+          "kind": "in-process",
+          "contract": "putnami.probe.v1",
+          "availability": "active"
+        },
+        {
+          "role": "updates",
+          "kind": "in-process",
+          "contract": "putnami.probe.v1",
+          "availability": "active"
+        }
+      ],
+      "enforced": {
+        "maxStaleness": "24h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "lateEvents": "ignore-older",
+        "deletion": "not-applicable",
+        "writer": "consumer.loader",
+        "rebuild": "bootstrap"
+      },
+      "provenance": {
+        "project": "consumer",
+        "package": "consumer",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "package.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "consumer",
+        "kind": "domainAccess",
+        "subkind": "reference",
+        "key": "consumer.producer-reference.v1"
+      },
+      "import": "consumer.producer-reference.v1",
+      "mode": "reference",
+      "status": "active",
+      "provenance": {
+        "project": "consumer",
+        "package": "consumer",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "package.json"
+        }
+      }
+    }
+  ]
+}

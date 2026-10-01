@@ -1,0 +1,17 @@
+exit 0
+--- stdout ---
+
+  Would create shipping/specs/labels.json (@acme/shipping)
+  Revision: worktree @ git:7c5122267ea7854954d543e1eda0a15c7cc56b08
+
+    {
+      "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+      "protocolVersion": 1,
+      "feature": "shipping/labels",
+      "outcomes": [
+        "Operators print shipping labels"
+      ],
+      "requirements": []
+    }
+
+--- stderr ---

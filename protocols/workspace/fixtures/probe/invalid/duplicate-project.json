@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "projects": [
+    { "path": "go/framework/http" },
+    { "path": "./go/framework/http" }
+  ]
+}

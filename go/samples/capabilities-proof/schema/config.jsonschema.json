@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "proof": {
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string",
+          "x-sensitive": true
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "proof"
+  ],
+  "title": "go.putnami.dev/examples/capabilities-proof config",
+  "type": "object"
+}

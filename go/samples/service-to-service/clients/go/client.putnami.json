@@ -1,0 +1,492 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "items",
+    "audience": "urn:putnami:items"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/examples/service-to-service/clients/go",
+    "clients": [
+      {
+        "service": "items",
+        "clientSymbol": "ItemsClient",
+        "bindingSymbol": "RegisterItemsClient"
+      }
+    ]
+  },
+  "contractSha256": "cb16618e97a9c016dffce0e83213b173208bbfd06d2d06dcd0064beac2c07609",
+  "operations": [
+    {
+      "operationId": "getBlobs_Id",
+      "service": "items",
+      "methodSymbol": "GetBlobs",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/blobs/{id}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getCredential-check",
+      "service": "items",
+      "methodSymbol": "ListCredentialCheck",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/credential-check",
+          "encoding": "json"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/ListCredentialCheck",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/ListCredentialCheck"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/ListCredentialCheck",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/ListCredentialCheck"
+        }
+      ]
+    },
+    {
+      "operationId": "getItems",
+      "service": "items",
+      "methodSymbol": "ListItems",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/items",
+          "encoding": "json"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/ListItems",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/ListItems"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/ListItems",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/ListItems"
+        }
+      ]
+    },
+    {
+      "operationId": "getItems_Changes",
+      "service": "items",
+      "methodSymbol": "ListItemsChanges",
+      "stream": "server",
+      "transports": [
+        {
+          "protocol": "sse",
+          "path": "/items/changes",
+          "encoding": "json",
+          "sse": {
+            "continuation": {
+              "mode": "cursor",
+              "cursor": {
+                "outputField": "cursor",
+                "queryParameter": "cursor"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "operationId": "getItems_Id",
+      "service": "items",
+      "methodSymbol": "GetItems",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/items/{id}",
+          "encoding": "json"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/GetItems",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/GetItems"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/GetItems",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/GetItems"
+        }
+      ]
+    },
+    {
+      "operationId": "getItems_Id_Adjust",
+      "service": "items",
+      "methodSymbol": "GetItemsAdjust",
+      "stream": "client",
+      "transports": [
+        {
+          "protocol": "websocket",
+          "path": "/items/{id}/adjust",
+          "encoding": "json",
+          "websocket": {
+            "subprotocol": "putnami.service.v1",
+            "resume": false
+          }
+        }
+      ]
+    },
+    {
+      "operationId": "getItems_Id_History",
+      "service": "items",
+      "methodSymbol": "GetItemsHistory",
+      "stream": "server",
+      "transports": [
+        {
+          "protocol": "websocket",
+          "path": "/items/{id}/history",
+          "encoding": "json",
+          "websocket": {
+            "subprotocol": "putnami.service.v1",
+            "resume": true
+          }
+        },
+        {
+          "protocol": "sse",
+          "path": "/items/{id}/history",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getItems_Id_Negotiate",
+      "service": "items",
+      "methodSymbol": "GetItemsNegotiate",
+      "stream": "bidirectional",
+      "transports": [
+        {
+          "protocol": "websocket",
+          "path": "/items/{id}/negotiate",
+          "encoding": "json",
+          "websocket": {
+            "subprotocol": "putnami.service.v1",
+            "resume": false
+          }
+        }
+      ]
+    },
+    {
+      "operationId": "getItems_Id_Watch",
+      "service": "items",
+      "methodSymbol": "GetItemsWatch",
+      "stream": "server",
+      "transports": [
+        {
+          "protocol": "sse",
+          "path": "/items/{id}/watch",
+          "encoding": "json"
+        },
+        {
+          "protocol": "websocket",
+          "path": "/items/{id}/watch",
+          "encoding": "json",
+          "websocket": {
+            "subprotocol": "putnami.service.v1",
+            "resume": false
+          }
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/GetItemsWatch",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/GetItemsWatch"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/GetItemsWatch",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/GetItemsWatch"
+        }
+      ]
+    },
+    {
+      "operationId": "getQuotes_Id",
+      "service": "items",
+      "methodSymbol": "GetQuotes",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/GetQuotes",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/GetQuotes"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/GetQuotes",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/GetQuotes"
+        }
+      ]
+    },
+    {
+      "operationId": "getQuotes_Id_Snapshot",
+      "service": "items",
+      "methodSymbol": "GetQuotesSnapshot",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/GetQuotesSnapshot",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/GetQuotesSnapshot"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/GetQuotesSnapshot",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/GetQuotesSnapshot"
+        }
+      ]
+    },
+    {
+      "operationId": "getQuotes_Id_Ticks",
+      "service": "items",
+      "methodSymbol": "GetQuotesTicks",
+      "stream": "server",
+      "transports": [
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/GetQuotesTicks",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/GetQuotesTicks"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/GetQuotesTicks",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/GetQuotesTicks"
+        }
+      ]
+    },
+    {
+      "operationId": "getTenant-check",
+      "service": "items",
+      "methodSymbol": "ListTenantCheck",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/tenant-check",
+          "encoding": "json"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/ListTenantCheck",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/ListTenantCheck"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/ListTenantCheck",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/ListTenantCheck"
+        }
+      ]
+    },
+    {
+      "operationId": "getWhoami",
+      "service": "items",
+      "methodSymbol": "ListWhoami",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/whoami",
+          "encoding": "json"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/ListWhoami",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/ListWhoami"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/ListWhoami",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/ListWhoami"
+        }
+      ]
+    },
+    {
+      "operationId": "postAudit",
+      "service": "items",
+      "methodSymbol": "CreateAudit",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/audit",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postBlobs_Echo",
+      "service": "items",
+      "methodSymbol": "CreateBlobsEcho",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/blobs/echo",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postBody-counter",
+      "service": "items",
+      "methodSymbol": "CreateBodyCounter",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/body-counter",
+          "encoding": "json"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/CreateBodyCounter",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/CreateBodyCounter"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/CreateBodyCounter",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/CreateBodyCounter"
+        }
+      ]
+    },
+    {
+      "operationId": "postBody-fidelity",
+      "service": "items",
+      "methodSymbol": "CreateBodyFidelity",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/body-fidelity",
+          "encoding": "json"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/CreateBodyFidelity",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/CreateBodyFidelity"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/CreateBodyFidelity",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/CreateBodyFidelity"
+        }
+      ]
+    },
+    {
+      "operationId": "postBody-nullable",
+      "service": "items",
+      "methodSymbol": "CreateBodyNullable",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/body-nullable",
+          "encoding": "json"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/CreateBodyNullable",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/CreateBodyNullable"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/CreateBodyNullable",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/CreateBodyNullable"
+        }
+      ]
+    },
+    {
+      "operationId": "postBody-values",
+      "service": "items",
+      "methodSymbol": "CreateBodyValues",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/body-values",
+          "encoding": "json"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/CreateBodyValues",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/CreateBodyValues"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/CreateBodyValues",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/CreateBodyValues"
+        }
+      ]
+    },
+    {
+      "operationId": "postItems",
+      "service": "items",
+      "methodSymbol": "CreateItems",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/items",
+          "encoding": "json"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/CreateItems",
+          "encoding": "json",
+          "protobufMethod": "/items.v1.ApiService/CreateItems"
+        },
+        {
+          "protocol": "connect",
+          "path": "/items.v1.ApiService/CreateItems",
+          "encoding": "proto",
+          "protobufMethod": "/items.v1.ApiService/CreateItems"
+        }
+      ]
+    }
+  ],
+  "runtimeCapabilities": [
+    "sse-continuation"
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "6350f246ef000f46f025a27f8a8c7b3fd2edff416a782d78fa6054475d38c3cb"
+    }
+  ]
+}

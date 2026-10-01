@@ -1,0 +1,356 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "ts",
+  "service": {
+    "id": "catalog.items",
+    "audience": "api://catalog.items"
+  },
+  "binding": {
+    "importPath": "@example/items-client",
+    "clients": [
+      {
+        "service": "BlobsService",
+        "clientSymbol": "BlobsClient",
+        "bindingSymbol": "registerBlobsClient"
+      },
+      {
+        "service": "ItemsService",
+        "clientSymbol": "ItemsClient",
+        "bindingSymbol": "registerItemsClient"
+      },
+      {
+        "service": "ProxyService",
+        "clientSymbol": "ProxyClient",
+        "bindingSymbol": "registerProxyClient"
+      },
+      {
+        "service": "QuotesService",
+        "clientSymbol": "QuotesClient",
+        "bindingSymbol": "registerQuotesClient"
+      },
+      {
+        "service": "TenantCheckService",
+        "clientSymbol": "TenantCheckClient",
+        "bindingSymbol": "registerTenantCheckClient"
+      },
+      {
+        "service": "WhoamiService",
+        "clientSymbol": "WhoamiClient",
+        "bindingSymbol": "registerWhoamiClient"
+      }
+    ]
+  },
+  "contractSha256": "df3d42b40e3118a22c87b6fbcf1232ef39450c3a82431dfe9efb47681e4f85ac",
+  "operations": [
+    {
+      "operationId": "getBlobs_id",
+      "service": "BlobsService",
+      "methodSymbol": "getBlobs_id",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/blobs/{id}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getItems",
+      "service": "ItemsService",
+      "methodSymbol": "getItems",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/items",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getItemsChanges",
+      "service": "ItemsService",
+      "methodSymbol": "getItemsChanges",
+      "stream": "server",
+      "transports": [
+        {
+          "protocol": "sse",
+          "path": "/items/changes",
+          "encoding": "json",
+          "sse": {
+            "continuation": {
+              "mode": "cursor",
+              "cursor": {
+                "outputField": "cursor",
+                "queryParameter": "cursor"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "operationId": "getItems_id",
+      "service": "ItemsService",
+      "methodSymbol": "getItems_id",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/items/{id}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getItems_idAdjust",
+      "service": "ItemsService",
+      "methodSymbol": "getItems_idAdjust",
+      "stream": "client",
+      "transports": [
+        {
+          "protocol": "websocket",
+          "path": "/items/{id}/adjust",
+          "encoding": "json",
+          "websocket": {
+            "subprotocol": "putnami.service.v1",
+            "resume": false
+          }
+        }
+      ]
+    },
+    {
+      "operationId": "getItems_idHistory",
+      "service": "ItemsService",
+      "methodSymbol": "getItems_idHistory",
+      "stream": "server",
+      "transports": [
+        {
+          "protocol": "websocket",
+          "path": "/items/{id}/history",
+          "encoding": "json",
+          "websocket": {
+            "subprotocol": "putnami.service.v1",
+            "resume": true
+          }
+        },
+        {
+          "protocol": "sse",
+          "path": "/items/{id}/history",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getItems_idNegotiate",
+      "service": "ItemsService",
+      "methodSymbol": "getItems_idNegotiate",
+      "stream": "bidirectional",
+      "transports": [
+        {
+          "protocol": "websocket",
+          "path": "/items/{id}/negotiate",
+          "encoding": "json",
+          "websocket": {
+            "subprotocol": "putnami.service.v1",
+            "resume": false
+          }
+        }
+      ]
+    },
+    {
+      "operationId": "getItems_idWatch",
+      "service": "ItemsService",
+      "methodSymbol": "getItems_idWatch",
+      "stream": "server",
+      "transports": [
+        {
+          "protocol": "sse",
+          "path": "/items/{id}/watch",
+          "encoding": "json"
+        },
+        {
+          "protocol": "websocket",
+          "path": "/items/{id}/watch",
+          "encoding": "json",
+          "websocket": {
+            "subprotocol": "putnami.service.v1",
+            "resume": false
+          }
+        }
+      ]
+    },
+    {
+      "operationId": "getProxy",
+      "service": "ProxyService",
+      "methodSymbol": "getProxy",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/proxy",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getQuotes_id",
+      "service": "QuotesService",
+      "methodSymbol": "getQuotes_id",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "connect",
+          "path": "/catalog.items.v1.QuotesService/GetQuotesById",
+          "encoding": "proto",
+          "protobufMethod": "/catalog.items.v1.QuotesService/GetQuotesById"
+        },
+        {
+          "protocol": "connect",
+          "path": "/catalog.items.v1.QuotesService/GetQuotesById",
+          "encoding": "json",
+          "protobufMethod": "/catalog.items.v1.QuotesService/GetQuotesById"
+        }
+      ]
+    },
+    {
+      "operationId": "getQuotes_idSnapshot",
+      "service": "QuotesService",
+      "methodSymbol": "getQuotes_idSnapshot",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "connect",
+          "path": "/catalog.items.v1.QuotesService/ListQuotesByIdSnapshot",
+          "encoding": "json",
+          "protobufMethod": "/catalog.items.v1.QuotesService/ListQuotesByIdSnapshot"
+        },
+        {
+          "protocol": "connect",
+          "path": "/catalog.items.v1.QuotesService/ListQuotesByIdSnapshot",
+          "encoding": "proto",
+          "protobufMethod": "/catalog.items.v1.QuotesService/ListQuotesByIdSnapshot"
+        }
+      ]
+    },
+    {
+      "operationId": "getQuotes_idTicks",
+      "service": "QuotesService",
+      "methodSymbol": "getQuotes_idTicks",
+      "stream": "server",
+      "transports": [
+        {
+          "protocol": "connect",
+          "path": "/catalog.items.v1.QuotesService/ListQuotesByIdTicks",
+          "encoding": "proto",
+          "protobufMethod": "/catalog.items.v1.QuotesService/ListQuotesByIdTicks"
+        },
+        {
+          "protocol": "connect",
+          "path": "/catalog.items.v1.QuotesService/ListQuotesByIdTicks",
+          "encoding": "json",
+          "protobufMethod": "/catalog.items.v1.QuotesService/ListQuotesByIdTicks"
+        }
+      ]
+    },
+    {
+      "operationId": "getTenant-check",
+      "service": "TenantCheckService",
+      "methodSymbol": "getTenant_check",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/tenant-check",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getWhoami",
+      "service": "WhoamiService",
+      "methodSymbol": "getWhoami",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/whoami",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postBlobsEcho",
+      "service": "BlobsService",
+      "methodSymbol": "postBlobsEcho",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/blobs/echo",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postItems",
+      "service": "ItemsService",
+      "methodSymbol": "postItems",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/items",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "runtimeCapabilities": [
+    "sse-continuation"
+  ],
+  "files": [
+    {
+      "path": "package.json",
+      "sha256": "4b1b08ad239de1a165ebb01780237b97f9ad81567432f58743f875dcf75087bd"
+    },
+    {
+      "path": "src/blobs-client.ts",
+      "sha256": "93130fd6fce1a481f11e5069e3056e3be832ba7a8ddd384c44ae697c7de29cf0"
+    },
+    {
+      "path": "src/index.ts",
+      "sha256": "3e354b3e2b946babdfb1f91e39f1ac14d5498d4bde45816c6384ae5f713fa4ab"
+    },
+    {
+      "path": "src/items-client.ts",
+      "sha256": "71ed27bcdeebdec1657f6c758c09168c283edf95539e5bdfc0a5d7bca7354f26"
+    },
+    {
+      "path": "src/proxy-client.ts",
+      "sha256": "edf007e7b57f45df45d76d736ecd4be8e3ca45de0b779e1d6c3466f9d8224931"
+    },
+    {
+      "path": "src/quotes-client.ts",
+      "sha256": "789aae1115865e88f6430a5c6d72f39d9cd7434e24f7d8e94ecf4780d3e72c99"
+    },
+    {
+      "path": "src/tenant-check-client.ts",
+      "sha256": "0ff334f570a5b09d5b0a80c0fe73dce384d4416a7a1dcee3fc508456970f4765"
+    },
+    {
+      "path": "src/types.ts",
+      "sha256": "18318b5e1f3ec179ffd234d605b298a348e0e5726f2befd20b0c0e4cc5528f04"
+    },
+    {
+      "path": "src/whoami-client.ts",
+      "sha256": "d195320772adcd0389495513c241626e5ff873f483afa5b85250cefb417ba348"
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "e8644a39c560a0ba22f732b97f5e4901cf7a667307c5ba5d0eb770daf3f9570b"
+    }
+  ]
+}

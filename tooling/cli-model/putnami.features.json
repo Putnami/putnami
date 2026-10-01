@@ -1,0 +1,130 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "features": [
+    {
+      "id": "cli/workspace-model",
+      "type": "feature",
+      "name": "CLI workspace model",
+      "outcome": "Every consumer of the CLI's workspace model sees one deterministic answer for what a target expression selects, what depends on what, and what a change reaches — from a pure library the engine cannot reach back into",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "target-expression-grammar",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "exact-ids-and-paths-resolve",
+              "wildcards-resolve",
+              "aliases-and-groups-resolve",
+              "unions-preserve-order-and-dedupe",
+              "subtraction-removes-its-operand",
+              "an-unknown-target-is-an-error"
+            ]
+          }
+        },
+        {
+          "id": "selection-filters",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "name-and-tag-filters-compose",
+              "explicit-excludes-always-apply",
+              "direct-targets-and-includes-override-default-excludes"
+            ]
+          }
+        },
+        {
+          "id": "dependency-graph",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "transitive-closures-are-deterministic",
+              "topological-order-is-stable",
+              "a-declared-cycle-is-reported"
+            ]
+          }
+        },
+        {
+          "id": "change-impact",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "owners-resolve-by-project-and-asset-paths",
+              "nearest-project-owns-a-nested-path",
+              "impact-includes-the-transitive-dependent-closure",
+              "implicit-scope-edges-order-without-propagating-impact",
+              "a-scope-config-selects-every-project-that-inherits-it",
+              "extension-consumers-run-the-changed-extension-tasks",
+              "a-change-selects-only-the-tasks-that-read-it",
+              "workspace-input-patterns-widen-to-every-project"
+            ]
+          }
+        },
+        {
+          "id": "canonical-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "ids-derive-from-workspace-relative-paths",
+              "grouped-paths-resolve-to-logical-ids",
+              "legacy-names-resolve-as-a-fallback"
+            ]
+          }
+        },
+        {
+          "id": "model-purity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-module-requires-only-protocol-modules",
+              "no-source-imports-the-cli"
+            ]
+          }
+        },
+        {
+          "id": "import-visibility",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-edge-carries-the-manifest-family-it-came-from",
+              "an-import-inside-one-scope-is-allowed",
+              "a-cross-scope-import-of-a-scope-private-project-is-reported",
+              "a-public-project-a-generated-client-and-a-contract-edge-are-allowed"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

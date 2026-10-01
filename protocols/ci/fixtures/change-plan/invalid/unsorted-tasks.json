@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "generator": {
+    "name": "putnami",
+    "version": "0.3.0-8d5edb751"
+  },
+  "repository": {
+    "remote": "origin",
+    "url": "https://example.test/org/repo.git"
+  },
+  "baseSHA": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+  "headSHA": "8d5edb7513d93b9165ba2a7cb48466d022fc3f63",
+  "changedFiles": [
+    "docs/R\u0026D \u003cnotes\u003e.md",
+    "docs/café.md",
+    "libs/lib/lib.go"
+  ],
+  "impact": {
+    "directProjects": [
+      {
+        "id": "/libs/lib",
+        "name": "@example/lib",
+        "path": "libs/lib"
+      }
+    ],
+    "projects": [
+      {
+        "id": "/apps/app",
+        "name": "app",
+        "path": "apps/app"
+      },
+      {
+        "id": "/apps/web",
+        "name": "@example/web",
+        "path": "apps/web"
+      },
+      {
+        "id": "/libs/lib",
+        "name": "@example/lib",
+        "path": "libs/lib"
+      }
+    ],
+    "transitiveDependents": [
+      {
+        "id": "/apps/app",
+        "name": "app",
+        "path": "apps/app"
+      },
+      {
+        "id": "/apps/web",
+        "name": "@example/web",
+        "path": "apps/web"
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "identity": {
+        "key": "/apps/web:build",
+        "scope": "project",
+        "project": {
+          "id": "/apps/web",
+          "name": "@example/web"
+        },
+        "task": {
+          "name": "build",
+          "command": "build",
+          "kind": "build"
+        },
+        "provider": {
+          "extension": "@putnami/typescript"
+        }
+      },
+      "deadlineMs": 900000,
+      "resourceClass": {
+        "heavy": false,
+        "cpuWeight": 2.5,
+        "reads": [
+          {
+            "id": "sources",
+            "scope": "project"
+          }
+        ],
+        "writes": [
+          {
+            "id": "gen",
+            "scope": "project"
+          },
+          {
+            "id": "workspace-clients",
+            "scope": "workspace"
+          }
+        ]
+      },
+      "dependsOn": [
+        "/apps/app:test~test",
+        "/libs/lib:build~compile"
+      ]
+    },
+    {
+      "identity": {
+        "key": "/apps/app:test~test",
+        "scope": "project",
+        "project": {
+          "id": "/apps/app",
+          "name": "app"
+        },
+        "task": {
+          "name": "test~test",
+          "command": "test",
+          "step": "test",
+          "kind": "test-exec"
+        },
+        "provider": {
+          "extension": "@putnami/go",
+          "version": "1.4.0"
+        }
+      },
+      "deadlineMs": 300000,
+      "resourceClass": {
+        "heavy": true,
+        "cpuWeight": 1,
+        "reads": [
+          {
+            "id": "gen",
+            "scope": "project"
+          },
+          {
+            "id": "sources",
+            "scope": "project"
+          },
+          {
+            "id": "workspace-sources",
+            "scope": "workspace"
+          }
+        ]
+      },
+      "dependsOn": [
+        "/libs/lib:build~compile"
+      ],
+      "serializeAfter": [
+        "/apps/app:build~generate"
+      ],
+      "contractDigest": "tc1:09ebcd7a00078f920c0206b21ac7191e2782f3f97c783fe1c2f677f37f5657ae"
+    },
+    {
+      "identity": {
+        "key": "/libs/lib:build~compile",
+        "scope": "project",
+        "project": {
+          "id": "/libs/lib",
+          "name": "@example/lib"
+        },
+        "task": {
+          "name": "build~compile",
+          "command": "build",
+          "step": "compile",
+          "kind": "build-compile"
+        },
+        "provider": {
+          "extension": "@putnami/go",
+          "version": "1.4.0"
+        }
+      },
+      "deadlineMs": 600000,
+      "resourceClass": {
+        "heavy": false,
+        "cpuWeight": 0.5
+      },
+      "contractDigest": "tc1:5f1c0ffee5f1c0ffee5f1c0ffee5f1c0ffee5f1c0ffee5f1c0ffee5f1c0ffe"
+    }
+  ],
+  "cache": {
+    "status": "available",
+    "entries": [
+      {
+        "taskKey": "/apps/app:test~test",
+        "key": "1f0e9d8c7b6a59483726150f1e2d3c4b5a69788796a5b4c3d2e1f00112233445",
+        "present": true
+      },
+      {
+        "taskKey": "/libs/lib:build~compile",
+        "key": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "present": false
+      }
+    ]
+  },
+  "digest": "sha256:b44bf6f349ee5f1b40e1f5046bb843fb9ce052e8f9976ec5e966079a3fb7a745"
+}

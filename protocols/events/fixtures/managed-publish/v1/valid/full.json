@@ -1,0 +1,19 @@
+{
+  "protocol": "putnami.events.v1",
+  "type": "publish",
+  "id": "evt-01JAZ6Y5K1W8FQ2CP3R4T5V6X8",
+  "dedupeKey": "invoice-issued:invoice-456",
+  "topic": "billing.invoice.issued",
+  "topicVersion": "2026-07-01",
+  "payload": {
+    "invoiceId": "invoice-456",
+    "amount": 4200,
+    "currency": "EUR"
+  },
+  "key": "customer-789",
+  "attributes": {
+    "region": "eu-west1",
+    "source_component": "billing"
+  },
+  "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
+}

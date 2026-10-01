@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "events": {
+    "publishes": [
+      "order.created",
+      "order.shipped"
+    ],
+    "subscribes": [
+      "payment.settled"
+    ]
+  }
+}

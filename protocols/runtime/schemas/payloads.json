@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/protocol/runtime/payloads.json",
+  "title": "Putnami Typed Per-Verb Payloads (v1)",
+  "description": "Canonical payloads verb jobs carry inside generic runtime events: test/coverage/lint summaries, per-test cases and the Distribution-owned release-set outcome in result data, publish records in artifact extras. Producers may add fields; consumers must ignore unknown ones.",
+  "$defs": {
+    "ReleaseSetPublishOutcome": {
+      "description": "The sole successful distribution/release-set/v2 publish outcome, carried under result data.releaseSet. Its fields are owned only by the Distribution protocol.",
+      "$ref": "https://putnami.dev/schemas/distribution-release-set-publish-outcome-v2.json"
+    },
+    "TestSummary": {
+      "description": "Test outcome, carried in result data under 'testSummary'.",
+      "type": "object",
+      "required": ["total", "passed", "failed", "skipped"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "failureDetailsTruncated": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Causal failure diagnostics omitted by the bounded presentation profile. The complete transcript remains in log events."
+        }
+      }
+    },
+    "TestCases": {
+      "description": "One entry per test case a test job ran, carried in result data under 'testCases' beside 'testSummary'. The entry shape and its bounds, including the per-task cap (testCaseMaxPerTask), are owned by the CLI result contract and not restated here: the CLI writes each entry as one test:case session-stream record. A runtime without structured per-case output omits the member.",
+      "type": "array",
+      "items": { "$ref": "https://putnami.dev/schemas/putnami-cli-result-v2.json#/$defs/testCase" }
+    },
+    "TestCasesDropped": {
+      "description": "How many test cases the job left out of 'testCases' to respect its bounds, carried in result data under 'testCasesDropped'. Present only when the job left cases out.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "CoverageSummary": {
+      "description": "Coverage outcome, carried in result data under 'coverageSummary'. Percentage at a declared granularity; languages measure differently (Go: statements, TypeScript: lines), so consumers must not mix counts across granularities.",
+      "type": "object",
+      "required": ["percentage", "granularity"],
+      "properties": {
+        "percentage": { "type": "number", "minimum": 0, "maximum": 100 },
+        "granularity": { "type": "string", "enum": ["statements", "lines", "functions", "branches"] },
+        "covered": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 },
+        "threshold": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "LintSummary": {
+      "description": "Lint outcome, carried in result data under 'lintSummary'. Individual findings travel as per-issue diagnostic events; a single aggregate diagnostic of raw tool output is not conformant.",
+      "type": "object",
+      "required": ["errors"],
+      "properties": {
+        "errors": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 },
+        "infos": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "PublishRecord": {
+      "description": "Published-artifact metadata, carried as extra top-level fields on a kind='published' artifact event.",
+      "type": "object",
+      "required": ["registry", "name"],
+      "properties": {
+        "registry": { "type": "string", "description": "npm, docker, go, ..." },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "dryRun": { "type": "boolean" }
+      }
+    }
+  }
+}

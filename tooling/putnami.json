@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "includes": [
+    "cli",
+    "cli-documents",
+    "cli-model",
+    "clientgen-extension",
+    "contributor",
+    "extension-sdk",
+    "github-collaboration",
+    "local-collaboration",
+    "memory-store",
+    "scaffold",
+    "sdd-extension"
+  ],
+  "line": {}
+}

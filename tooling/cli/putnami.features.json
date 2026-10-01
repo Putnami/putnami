@@ -1,0 +1,2717 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "features": [
+    {
+      "id": "cli/portable-runner",
+      "type": "feature",
+      "name": "Portable runner",
+      "outcome": "A user can run an ordinary verification command locally or through an optional runner provider by changing one placement option, and receives the same canonical session either way",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "optional-placement",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["absent-provider-runs-once-locally"]
+          }
+        },
+        {
+          "id": "immutable-source",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["captured-worktree-bytes-survive-later-edits"]
+          }
+        },
+        {
+          "id": "portable-request",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "unsupported-shapes-rejected-before-submission",
+              "unready-provider-is-an-error-not-a-fallback",
+              "executing-engine-refuses-divergent-plan"
+            ]
+          }
+        },
+        {
+          "id": "isolated-execution",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "dirty-snapshot-executes-remotely-and-imports",
+              "remote-failure-keeps-exit-code-and-message",
+              "impacted-selection-frozen",
+              "edit-after-submit-has-no-effect"
+            ]
+          }
+        },
+        {
+          "id": "durable-lifecycle",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "lost-acknowledgement-resolves-by-key",
+              "duplicate-submit-is-one-attempt",
+              "cli-restart-resumes-by-reference",
+              "stream-disconnect-replays-from-cursor",
+              "interrupt-cancels-and-cleans-up",
+              "expired-artifacts-surfaced-not-rerun",
+              "corrupt-import-keeps-remote-verdict",
+              "nested-sessions-accounted-once",
+              "sessions-list-finds-judged-revision",
+              "provider-exit-is-seen-while-a-child-holds-output"
+            ]
+          }
+        },
+        {
+          "id": "input-admission",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "required-ignored-input-is-bound",
+              "capture-binds-only-ignored-paths",
+              "env-keyed-task-refused-before-submission",
+              "executing-engine-refuses-divergent-bound-set",
+              "second-snapshot-transfers-only-changed-blobs",
+              "undeclared-fallback-inputs-are-reported-not-bound"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/native-session-reporting",
+      "type": "feature",
+      "name": "Native execution session reporting",
+      "outcome": "Each explicitly selected reporter receives live execution facts, the session reporter also receives the persisted terminal session, and each resumes delivery without rebuilding work",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        { "id": "engine-lifecycle", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["live-events-and-finalized-success-failure-cancellation", "stream-subscribers-leave-recorded-bytes-unchanged", "a-killed-subscriber-keeps-the-verdict-and-records-partial-evidence", "reporting-capabilities-deliver-and-fail-independently"] } },
+        { "id": "durable-replay", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["outage-retains-identical-frame-and-replay-runs-no-workload", "replay-resumes-only-undelivered-capabilities"] } },
+        { "id": "credential-boundary", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["explicit-secret-is-withheld-from-hooks-and-tasks", "each-token-reaches-only-its-own-provider"] } },
+        { "id": "bounded-transport", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["writes-reads-retries-and-finalization-are-bounded", "pending-retention-honors-session-policy-and-active-locks", "live-chunks-wait-for-a-full-frame-or-the-interval", "log-reporter-chunks-wait-for-a-full-frame-or-two-seconds"] } }
+      ]
+    },
+    {
+      "id": "cli/workspace-discovery-selection",
+      "type": "feature",
+      "name": "Workspace discovery and selection",
+      "outcome": "A user can find the workspace and its projects, then select the exact project, scope, target, or impacted closure intended for a command",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "workspace-root",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "discovery-walks-up-to-a-supported-marker",
+              "the-discovered-root-is-canonicalized",
+              "a-missing-workspace-yields-an-actionable-init-error"
+            ]
+          }
+        },
+        {
+          "id": "project-inventory",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "listing-and-description-serve-the-loaded-graph",
+              "identities-and-dependencies-come-from-discovery"
+            ]
+          }
+        },
+        {
+          "id": "target-selection",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "flag-and-wire-selection-share-one-resolver",
+              "an-empty-selection-is-a-usage-error"
+            ]
+          }
+        },
+        {
+          "id": "impacted-closure",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "changed-files-select-owners-and-transitive-dependents",
+              "renames-and-assets-select-every-owner"
+            ]
+          }
+        },
+        {
+          "id": "safe-baseline",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-feature-branch-compares-with-the-trunk",
+              "trunk-builds-use-the-last-build-or-all",
+              "the-workspace-configured-baseline-wins"
+            ]
+          }
+        },
+        {
+          "id": "version-lines-are-scopes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "nearest-ancestor-line-wins",
+              "nested-line-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "registries-keyed-by-ecosystem",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "project-override-replaces-the-entry"
+            ]
+          }
+        },
+        {
+          "id": "registry-pin-wins",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-pin-by-name-loads-the-published-build",
+              "an-explicit-path-keeps-the-project-manifest",
+              "an-unloaded-pin-keeps-the-project-manifest"
+            ]
+          }
+        },
+        {
+          "id": "starters-declare-their-registries",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-typescript-starter-declares-the-putnami-npm-scope",
+              "reinit-keeps-a-declared-registries-entry"
+            ]
+          }
+        },
+        {
+          "id": "import-visibility-check",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-check-runs-on-the-synchronized-graph",
+              "enforce-is-the-default-and-a-declared-report-changes-no-exit-code",
+              "enforce-refuses-the-graph-and-keeps-the-repair-commands-reachable"
+            ]
+          }
+        },
+        {
+          "id": "declared-edge-check",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-declaration-without-an-import-is-reported",
+              "an-import-backed-edge-is-not-reported",
+              "enforce-refuses-the-graph-and-report-is-the-default",
+              "a-declared-input-backs-an-edge-and-unattributed-projects-are-skipped",
+              "the-advice-promises-only-the-repair-prune-makes",
+              "prune-names-the-hand-edit-for-a-manifest-it-keeps"
+            ]
+          }
+        },
+        {
+          "id": "change-shape-report",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-change-is-sized-by-category-and-changes-no-exit-code",
+              "unrelated-areas-warn-unless-an-epic-declares-them"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/context-mcp-discovery",
+      "type": "feature",
+      "name": "Context and MCP discovery",
+      "outcome": "A user or agent can discover workspace structure and project context through public CLI and MCP surfaces that share one authority, and an extension can contribute a workspace-answering tool without re-deriving any of it",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "generated-context",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-human-constraints-file-is-preserved",
+              "an-existing-entrypoint-keeps-every-byte-outside-the-block",
+              "an-edited-block-is-preserved",
+              "init-writes-the-guidance-block",
+              "context-generation-writes-no-mcp-registration"
+            ]
+          }
+        },
+        {
+          "id": "implicit-mcp-registration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-entry-is-added-and-everything-else-is-kept",
+              "a-diverged-entry-is-kept-byte-for-byte",
+              "an-unparseable-file-is-a-warning-and-stays-untouched",
+              "install-registers-and-the-first-use-bootstrap-does-not",
+              "init-registers-the-mcp-server"
+            ]
+          }
+        },
+        {
+          "id": "workspace-map",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "printing-the-map-writes-nothing",
+              "mcp-rebuilds-the-same-projection-in-memory"
+            ]
+          }
+        },
+        {
+          "id": "extension-tool-workspace-facts",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declaring-tool-receives-the-resolved-view",
+              "a-non-declaring-tool-receives-neither",
+              "unknown-selectors-and-missing-resolvers-fail-closed"
+            ]
+          }
+        },
+        {
+          "id": "mcp-description",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-tool-advertises-description-schema-and-annotations",
+              "the-access-contract-matches-the-baseline"
+            ]
+          }
+        },
+        {
+          "id": "mcp-equivalence",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "impacted-matches-the-cli-resolution",
+              "graph-tools-answer-from-the-loaded-workspace",
+              "graph-tools-report-the-recorded-view-they-answered-from"
+            ]
+          }
+        },
+        {
+          "id": "mcp-side-effect-boundary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "dry-run-executes-nothing",
+              "long-lived-and-externally-mutating-jobs-are-refused"
+            ]
+          }
+        },
+        {
+          "id": "read-preparation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "cold-and-warm-reads-use-the-exact-lock-without-full-install",
+              "automatic-reads-never-invoke-cloud-credential-minting",
+              "offline-missing-artifacts-degrade-explicitly-without-latest",
+              "failed-exact-preparation-never-exposes-an-ambient-extension",
+              "human-and-agent-artifact-ownership-files-are-preserved"
+            ]
+          }
+        },
+        {
+          "id": "live-extension-guidance",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "initialize-is-self-contained-and-carries-exact-locked-guidance",
+              "versioned-resources-serve-exact-bytes-or-an-explicit-offline-status",
+              "the-cli-and-mcp-consume-the-same-lock-faithful-ai-bytes",
+              "initialize-instructions-are-bounded-across-every-extension"
+            ]
+          }
+        },
+        {
+          "id": "host-session-launcher",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "installer-registers-supported-hosts-with-a-stable-session-launcher",
+              "existing-host-config-is-preserved",
+              "launcher-enters-the-host-workspace-before-pin-resolution",
+              "host-registration-can-be-declined",
+              "host-definition-recognition-survives-host-formatting",
+              "mcp-registration-is-explicit-and-merge-aware"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/job-planning-execution",
+      "type": "feature",
+      "name": "Job planning and execution",
+      "outcome": "A user can select public jobs, preview their dependency plan, execute them through one engine, and receive a stable result",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "command-catalog",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-catalog-is-unique-rooted-and-well-formed",
+              "the-registry-and-catalog-agree"
+            ]
+          }
+        },
+        {
+          "id": "selection-before-plan",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-selection-applies-to-every-command",
+              "a-channel-publish-narrows-itself-alone"
+            ]
+          }
+        },
+        {
+          "id": "dependency-plan",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-dag-is-deterministic",
+              "write-serialization-stays-separate-from-functional-deps",
+              "a-missing-selected-command-is-rejected",
+              "runner-publication-functional-gates"
+            ]
+          }
+        },
+        {
+          "id": "preview-no-effects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "plan-only-and-dry-runs-execute-nothing",
+              "only-declared-dry-run-simulations-survive",
+              "machine-previews-are-typed-plans-not-runs"
+            ]
+          }
+        },
+        {
+          "id": "single-engine",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-the-engine-runs-jobs",
+              "the-scheduler-seam-is-package-private"
+            ]
+          }
+        },
+        {
+          "id": "canonical-result",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-scheduler-populates-the-canonical-session",
+              "machine-surfaces-reduce-through-the-canonical-model"
+            ]
+          }
+        },
+        {
+          "id": "declared-output-cache-boundary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "local-docker-candidate-is-task-owned-cache-eligible",
+              "a-restored-package-output-carries-the-channel-it-recorded",
+              "restored-docker-candidate-feeds-selected-publish"
+            ]
+          }
+        },
+        {
+          "id": "git-candidate-inputs",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "candidate-bytes-and-membership-determine-the-key",
+              "candidate-enumeration-failure-never-produces-a-key"
+            ]
+          }
+        },
+        {
+          "id": "release-set-channel-advance",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-listed-head-is-resolved-once",
+              "an-empty-channel-releases-with-a-null-expectation",
+              "a-conflict-on-one-channel-writes-nothing",
+              "selection-fingerprint-follows-the-package-key",
+              "distinct-package-provider-fingerprint-follows-real-package-key",
+              "an-empty-channel-measures-against-the-named-baseline",
+              "an-advanced-channel-with-a-head-ignores-the-baseline",
+              "a-baseline-channel-that-cannot-be-read-is-refused",
+              "a-first-publish-against-a-baseline-uploads-only-what-changed"
+            ]
+          }
+        },
+        {
+          "id": "release-set-attribution-opt-in",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "default-plan-and-set-decode-under-a-pre-attribution-strict-reader",
+              "opted-in-plan-records-project-and-kind",
+              "opted-in-plan-attributes-carried-over-members",
+              "inherited-member-keeps-head-attribution"
+            ]
+          }
+        },
+        {
+          "id": "release-set-source-tree-opt-in",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "default-plan-and-set-carry-no-source-tree",
+              "opted-in-plan-records-the-head-tree-on-republished-members",
+              "inherited-member-keeps-head-source-tree",
+              "clean-checkout-records-head-tree-whatever-the-bound-revision",
+              "commit-drops-a-tree-the-checkout-no-longer-holds"
+            ]
+          }
+        },
+        {
+          "id": "release-set-members-by-ecosystem",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-project-yields-several-members",
+              "member-plans-its-declaring-publisher",
+              "selected-member-routes-exact-artifact-steps",
+              "mixed-publication-retains-verification-without-extra-writes"
+            ]
+          }
+        },
+        {
+          "id": "private-selected-publication-handoff",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "canonical-selected-plan-without-credentials",
+              "private-callback-and-exact-ack",
+              "no-handoff-for-preview-or-dry-run",
+              "member-less-plan-arms-the-head-confirming-release"
+            ]
+          }
+        },
+        {
+          "id": "generated-output-drift",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-path-from-output-is-judged-inside-the-project-reference",
+              "a-restored-entry-is-judged-against-the-checkout-it-lands-in",
+              "an-executed-task-fails-on-stale-bytes-and-passes-on-equal-bytes",
+              "the-reference-and-the-verdict-never-reach-the-cache-key-or-the-failure-cache",
+              "warn-reports-without-failing"
+            ]
+          }
+        },
+        {
+          "id": "spec-gate-evidence-scope",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unplanned-attester-resolves-from-its-cache-entry",
+              "a-direct-dependent-attester-resolves-from-its-cache-entry",
+              "transitive-dependents-stay-out-of-the-candidate-set",
+              "a-consulted-source-that-did-not-support-the-check-still-blocks",
+              "an-exhausted-evidence-scope-blocks-and-says-so",
+              "unresolvable-evidence-warns-with-the-attesting-projects-named",
+              "a-resolved-session-consults-no-cache"
+            ]
+          }
+        },
+        {
+          "id": "scoped-cache-bypass",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "no-cache-projects-is-execution-policy-only",
+              "a-selector-that-matches-nothing-fails-the-run",
+              "only-the-named-projects-and-their-dependents-lose-the-cache",
+              "a-bypassed-task-is-neither-served-nor-published"
+            ]
+          }
+        },
+        {
+          "id": "concurrent-session-output-exclusion",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-second-session-waits-for-the-task-output-holder",
+              "a-restore-waits-for-the-task-output-holder",
+              "locks-are-taken-in-one-global-order",
+              "the-wait-names-the-holder-and-ends-on-cancellation",
+              "a-nested-session-reenters-only-its-ancestors-locks"
+            ]
+          }
+        },
+        {
+          "id": "scratch-generation-retention",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "expired-generations-reclaim-arbitrary-orphans",
+              "active-and-nested-consumers-retain-the-generation",
+              "a-detached-child-retains-its-lease",
+              "only-an-active-consumer-skips-reclamation-silently",
+              "reaping-never-follows-symlinks",
+              "failed-reclamation-is-retried"
+            ]
+          }
+        },
+        {
+          "id": "failure-replay-cache",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unchanged-failure-replays-without-executing",
+              "a-replayed-failure-blocks-its-dependents",
+              "a-replayed-failure-reports-its-provenance-and-original-output",
+              "only-a-failure-the-key-explains-is-recorded",
+              "one-run-counts-one-observation-per-key",
+              "a-recorded-failure-stays-local",
+              "a-success-clears-the-recorded-failure",
+              "a-success-clears-the-recorded-failure-under-a-cache-bypass",
+              "a-task-keys-the-same-under-every-selection",
+              "a-changed-input-runs-again",
+              "retry-failed-forces-re-execution",
+              "retry-failed-is-execution-policy-only"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/diagnostics-results",
+      "type": "feature",
+      "name": "Diagnostics and results",
+      "outcome": "A user or agent can diagnose a failed or unsafe run from structured diagnostics, doctor guidance, session reports, and stable exit outcomes, and can collect and summarize the recorded sessions before a disposable worktree takes them with it",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "located-diagnostics",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "severity-code-and-location-extract",
+              "locations-normalize-and-survive-to-results"
+            ]
+          }
+        },
+        {
+          "id": "failure-presentation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "human-failure-output-is-prioritized-and-bounded"
+            ]
+          }
+        },
+        {
+          "id": "bounded-test-output",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "report-diagnostics-obey-limits-with-omission-accounting",
+              "attributed-events-survive-batch-splitting"
+            ]
+          }
+        },
+        {
+          "id": "doctor-gate",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "doctor-is-deterministic",
+              "production-blocks-unwaived-and-fails-closed"
+            ]
+          }
+        },
+        {
+          "id": "doctor-names-a-missing-readme",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "doctor-reports-a-project-without-a-readme",
+              "templates-and-generated-clients-are-exempt"
+            ]
+          }
+        },
+        {
+          "id": "redaction",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "doctor-and-run-diagnostics-redact-secrets"
+            ]
+          }
+        },
+        {
+          "id": "diagnostic-recall",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-latest-executed-run-is-recalled-without-rerunning",
+              "a-dry-run-never-replaces-the-recall"
+            ]
+          }
+        },
+        {
+          "id": "terminal-outcome",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "errors-map-to-stable-exit-codes",
+              "session-exit-derives-from-the-canonical-reduction",
+              "an-interrupt-is-a-distinct-aborted-status"
+            ]
+          }
+        },
+        {
+          "id": "bounded-machine-detail",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-stream-is-bounded-failure-first-sanitized-and-recorded",
+              "normal-suppresses-and-verbose-admits-debug-detail",
+              "failure-capacity-is-reserved-after-exhaustion"
+            ]
+          }
+        },
+        {
+          "id": "opening-session-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-opening-event-names-the-written-plan-before-tasks-and-prepares-once",
+              "sessionless-scheduler-events-omit-session-identity"
+            ]
+          }
+        },
+        {
+          "id": "session-record-durability",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "recorded-sessions-export-verbatim-oldest-first-and-deduplicated",
+              "the-export-order-comes-from-the-recorded-start-not-the-session-id",
+              "since-filters-on-the-recorded-start-inclusively",
+              "retention-is-configurable-and-its-default-is-unchanged"
+            ]
+          }
+        },
+        {
+          "id": "gated-tree-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-digest-covers-head-the-tracked-diff-and-untracked-content",
+              "a-recorded-session-names-the-tree-it-opened-on",
+              "a-producer-that-cannot-determine-the-tree-records-nothing"
+            ]
+          }
+        },
+        {
+          "id": "local-evidence-verification",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bare-call-is-a-not-verified-verdict-on-stdout-alone",
+              "a-verdict-reaches-stdout-untouched-in-every-output-mode",
+              "evidence-is-read-strictly-against-the-git-top-level"
+            ]
+          }
+        },
+        {
+          "id": "session-summary-view",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-row-per-session-oldest-first-and-deduplicated",
+              "nested-runs-are-marked-and-never-counted-as-gates",
+              "rows-carry-tasks-cpu-wall-selection-and-outcome"
+            ]
+          }
+        },
+        {
+          "id": "task-input-digest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "same-tree-same-digest-touched-input-moves-only-its-consumers",
+              "absent-on-skipped-present-on-every-reuse-kind",
+              "summary-groups-records-by-digest"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/canonical-workspace-guidance",
+      "type": "feature",
+      "name": "Canonical workspace guidance",
+      "outcome": "A new contributor can discover the supported commands, choose the correct validation gate, use MCP appropriately, and recover from failures using generated and public guidance",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "generated-help",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-rendered-help-surface-is-pinned",
+              "command-help-includes-structured-and-extension-flags"
+            ]
+          }
+        },
+        {
+          "id": "onboarding-path",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-canonical-guide-covers-the-catalog",
+              "generated-context-presents-the-workflow-path"
+            ]
+          }
+        },
+        {
+          "id": "generated-agent-guidance",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "generated-bootstrap-routes-to-live-mcp-guidance",
+              "stale-or-absent-context-is-reported-for-fallback",
+              "the-default-gate-follows-the-sdd-declaration"
+            ]
+          }
+        },
+        {
+          "id": "support-maturity-separation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "stability-and-maturity-are-stated-separately"
+            ]
+          }
+        },
+        {
+          "id": "internal-model-boundary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-guide-declares-cli-model-internal"
+            ]
+          }
+        },
+        {
+          "id": "experimental-python",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "python-is-documented-experimental-and-opt-in"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/agent-workflow-lifecycle",
+      "type": "feature",
+      "name": "Agent workflow lifecycle",
+      "outcome": "A workspace that opts into an extension's agent content receives the files of the extension release it pinned through init, install and upgrade, and never loses a file it owns",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "optin",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-absent-declaration-skips-the-phase"
+            ]
+          }
+        },
+        {
+          "id": "legacy-declarations-refused",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-pass-refuses-a-legacy-entry-and-names-the-migration",
+              "install-and-upgrade-refuse-legacy-state-with-nothing-written"
+            ]
+          }
+        },
+        {
+          "id": "record-last",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failure-leaves-files-and-record-untouched"
+            ]
+          }
+        },
+        {
+          "id": "collision-aborts",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-collision-aborts-before-the-first-write"
+            ]
+          }
+        },
+        {
+          "id": "no-secret-leak",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "failure-messages-redact-credentials-and-locations"
+            ]
+          }
+        },
+        {
+          "id": "idempotent",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-repeated-run-changes-no-byte"
+            ]
+          }
+        },
+        {
+          "id": "explicit-v4-migration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "vnext-check-and-apply-are-explicit-and-idempotent"
+            ]
+          }
+        },
+        {
+          "id": "reinit-preserves-optin",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-force-unions-the-declaration"
+            ]
+          }
+        },
+        {
+          "id": "session-start-reconcile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-mcp-server-reconciles-before-serving-and-starts-on-failure",
+              "a-record-at-the-pinned-release-writes-nothing"
+            ]
+          }
+        },
+        {
+          "id": "undeclared-artifact-retired",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "upgrade-removes-a-withdrawn-owners-files-pin-and-record",
+              "an-edited-file-is-released-not-overwritten"
+            ]
+          }
+        },
+        {
+          "id": "extension-agent-content",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-opted-in-extension-installs-upgrades-and-retires-its-content",
+              "an-extension-without-the-opt-in-activates-nothing",
+              "the-first-run-pass-restores-pinned-extension-content",
+              "a-local-extension-builds-its-content-and-is-never-pinned"
+            ]
+          }
+        },
+        {
+          "id": "extension-agent-content-integrity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "extension-content-collisions-abort-before-the-first-write",
+              "extension-content-is-bound-to-the-extension-pin",
+              "an-interrupted-extension-content-run-converges"
+            ]
+          }
+        },
+        {
+          "id": "npm-extension-agent-content",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-npm-extension-content-comes-from-the-package-its-commands-load-from",
+              "install-and-upgrade-read-npm-content-after-the-package-manager",
+              "a-second-source-for-one-extension-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "superseded-owners-refused",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-clone-that-still-records-a-superseded-artifact-is-refused",
+              "a-clone-that-pulled-the-migration-converges-with-apply"
+            ]
+          }
+        },
+        {
+          "id": "agent-content-migration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "check-lists-the-mechanical-and-the-semantic-change",
+              "apply-moves-declarations-pins-and-ownership",
+              "a-clone-without-records-adopts-only-identical-bytes",
+              "in-tree-artifacts-move-to-a-local-extension",
+              "a-backend-substitution-changes-no-content"
+            ]
+          }
+        },
+        {
+          "id": "agent-content-migration-safety",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "user-edits-block-or-are-released",
+              "duplicate-ownership-is-refused",
+              "a-stopped-migration-resumes-or-rolls-back",
+              "rollback-restores-the-previous-state",
+              "unsupported-releases-fail-clearly",
+              "concurrent-migrations-are-refused"
+            ]
+          }
+        },
+        {
+          "id": "starter-opts-into-contributor",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-built-in-starter-opts-into-the-contributor-extension",
+              "init-installs-the-extension-and-its-content",
+              "a-failed-starter-install-points-at-install"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/sdd-extraction",
+      "type": "feature",
+      "name": "SDD extraction parity",
+      "outcome": "The extracted SDD surfaces answer byte-for-byte what the built-in CLI answered before deletion, and the extension binary knows the workspace only through the wire",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "recorded-parity-with-the-replaced-surface",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-subcommand-matches-the-recorded-builtin-byte-for-byte",
+              "the-human-output-matches-the-recorded-builtin",
+              "the-recording-covers-every-case-and-nothing-else",
+              "the-parity-cases-cover-the-whole-inventory",
+              "the-baseline-actually-reaches-the-extension"
+            ]
+          }
+        },
+        {
+          "id": "wire-only-workspace-knowledge",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-extension-module-never-replaces-into-tooling-cli",
+              "the-extension-source-never-imports-cli-internals-or-execs-putnami"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/toolchain-lock",
+      "type": "feature",
+      "name": "Reproducible toolchain lock",
+      "outcome": "Install and pin record verifiable toolchain metadata only for runtimes Putnami actually provisions",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "supported-runtimes-only",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-go-and-bun-declarations-are-locked"
+            ]
+          }
+        },
+        {
+          "id": "verified-release-metadata",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-and-bun-pins-carry-version-source-and-digests"
+            ]
+          }
+        },
+        {
+          "id": "extension-resolved-pins-survive",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "install-keeps-a-pin-a-declared-extension-prepares-with",
+              "refresh-keeps-only-pins-a-declared-extension-resolves"
+            ]
+          }
+        },
+        {
+          "id": "init-records-pins",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-refreshes-the-lock-after-its-last-dependency-install"
+            ]
+          }
+        },
+        {
+          "id": "implicit-install-fills-missing-pins",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-pin-is-filled-and-every-other-entry-is-kept",
+              "the-first-use-install-fills-pins-and-an-explicit-install-refreshes"
+            ]
+          }
+        },
+        {
+          "id": "create-installs-a-missing-go",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-lifecycle-command-resolves-run-toolchains-like-a-task",
+              "create-pins-and-installs-go-before-it-sets-the-project-up",
+              "create-runs-the-pinned-go-before-another-on-path",
+              "create-names-the-retry-when-no-go-results",
+              "init-and-create-install-the-pinned-go-through-the-engine"
+            ]
+          }
+        },
+        {
+          "id": "create-reports-a-failed-install",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "create-keeps-the-project-and-names-deps-install-when-the-go-install-fails"
+            ]
+          }
+        },
+        {
+          "id": "create-fails-when-go-mod-tidy-fails",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "create-keeps-the-project-and-quotes-tidy-when-go-mod-tidy-fails"
+            ]
+          }
+        },
+        {
+          "id": "create-resolves-the-go-framework-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "create-pins-the-framework-version-goproxy-answers",
+              "create-writes-nothing-and-names-the-fix-when-no-proxy-answers",
+              "the-lookup-passes-a-404-to-the-next-proxy-as-go-does",
+              "the-lookup-reads-a-private-module-from-its-origin-as-go-does",
+              "the-lookup-sends-the-credentials-go-would-and-prints-none"
+            ]
+          }
+        },
+        {
+          "id": "install-pins-before-installers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "explicit-install-pins-before-the-installers-run",
+              "a-declaration-the-lock-does-not-match-is-repinned"
+            ]
+          }
+        },
+        {
+          "id": "deps-run-the-pinned-go",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "deps-add-and-remove-run-the-pinned-go",
+              "deps-add-installs-the-pinned-go-first"
+            ]
+          }
+        },
+        {
+          "id": "deps-report-a-failed-install",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "deps-add-and-remove-edit-and-name-deps-install-when-the-go-install-fails",
+              "deps-prune-edits-every-module-and-names-deps-install-when-the-go-install-fails"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/ci-document",
+      "type": "feature",
+      "name": "CI document",
+      "outcome": "A repository declares in one reviewed file the commands its CI runs, the channels a branch, a tag, or a pull request publishes, and the environments that follow those channels, and the CLI tells it what that means before anything runs",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "commands-not-gate",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "guidance-follows-blocking-commands",
+              "init-seeds-commands"
+            ]
+          }
+        },
+        {
+          "id": "rules-and-triggers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "protected-channel-is-refused",
+              "tag-publishes-by-convention",
+              "explain-reports-the-baseline-channel",
+              "an-unreadable-baseline-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "environments-follow-channels",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "explain-lists-followers"
+            ]
+          }
+        },
+        {
+          "id": "channel-lifetime-is-declared",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-inapplicable-lifetime-is-refused",
+              "explain-reports-the-declared-lifetime"
+            ]
+          }
+        },
+        {
+          "id": "provider-sections-need-a-provider",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "validate-refuses-without-provider"
+            ]
+          }
+        },
+        {
+          "id": "review-guidance-is-bounded-intent",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "review-profile-validates-without-provider",
+              "review-authority-fields-are-refused"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/version-from-git",
+      "type": "feature",
+      "name": "Versions derived from git",
+      "outcome": "A user gets the exact version every version line is at, derived from the line's git tags and the conventional commits that touch it, and releases a line with one command that writes its changelog, its release commit, and its tag",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "tag-sets-the-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "tagged-commit-uses-the-tag-version",
+              "dirty-tree-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "conventional-advance",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "docs-commit-still-advances-a-patch",
+              "feat-advances-minor-before-one",
+              "breaking-advances-minor-before-one-major-after"
+            ]
+          }
+        },
+        {
+          "id": "full-clone-required",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "shallow-clone-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "release-commit-then-tag",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "changelog-is-in-the-tagged-commit"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/channels",
+      "type": "feature",
+      "name": "Distribution channels",
+      "outcome": "A user moves the CLI, the extensions, and the framework dependencies onto a distribution channel through the registries the workspace declares, with the credential that channel needs",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "archives-follow-the-put-projection",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "archive-download-sends-the-credential",
+              "private-cli-pin-and-cold-launch-use-the-native-registry",
+              "pin-mints-its-credential-and-names-the-credential-command-on-refusal",
+              "branch-selector-is-gone"
+            ]
+          }
+        },
+        {
+          "id": "tagged-publish-is-a-cohort",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "cohort-selects-every-line-member",
+              "immutable-channel-is-requested"
+            ]
+          }
+        },
+        {
+          "id": "protected-channels",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "publish-refuses-a-protected-channel"
+            ]
+          }
+        },
+        {
+          "id": "channel-set-is-metadata-only",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "channel-set-calls-the-provider-once"
+            ]
+          }
+        },
+        {
+          "id": "visibility-is-carried-not-computed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "chain-resolves-selectors-to-coordinates"
+            ]
+          }
+        },
+        {
+          "id": "project-declares-its-distribution-visibility",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "putnami-json-declares-the-member-level"
+            ]
+          }
+        },
+        {
+          "id": "mirror-intent-follows-the-release",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "already-current-release-carries-mirror-intent"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/deploy-environments",
+      "type": "feature",
+      "name": "Deploy environments",
+      "outcome": "A user synchronizes a declared environment on the release set its channel points at, with each workload receiving the exact members it owns",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "deploy-follows-the-environment-channel",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "env-channel-is-resolved-once",
+              "workload-rules-select-first-match",
+              "deploy-jobs-receive-the-members",
+              "one-deploy-task-carries-every-workload-it-covers"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/workspace-initialization",
+      "type": "feature",
+      "name": "Lazy workspace initialization",
+      "outcome": "A fresh worktree provides its workspace graph to MCP without a full installation, while installation restores independent artifacts concurrently and reports completed actions compactly",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "graph-readiness",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "cold-mcp-prepares-the-provider-index-without-install",
+              "concurrent-preparation-shares-one-index-refresh",
+              "mcp-reloads-an-index-created-after-startup"
+            ]
+          }
+        },
+        {
+          "id": "parallel-probes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "parallel-probes-merge-deterministically"
+            ]
+          }
+        },
+        {
+          "id": "parallel-artifacts",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "parallel-restoration-commits-results-in-stable-order"
+            ]
+          }
+        },
+        {
+          "id": "compact-progress",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "default-install-shows-only-completed-actions",
+              "verbose-and-failures-retain-diagnostics",
+              "implicit-install-preserves-machine-stdout"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/runtime-toolchain-pinning",
+      "type": "feature",
+      "name": "Lock-pinned extension runtime toolchains",
+      "outcome": "An extension prepares its runtime and runs its tasks with the exact toolchain the workspace lock pins, and results are keyed under that identity",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "exact-lock-resolution",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-mismatching-ambient-binary-is-never-substituted",
+              "an-optional-mismatch-publishes-an-empty-binding"
+            ]
+          }
+        },
+        {
+          "id": "minimal-child-environment",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-pinned-tool-answers-every-bare-name-lookup",
+              "a-home-candidate-resolves-without-home-in-the-environment"
+            ]
+          }
+        },
+        {
+          "id": "identity-keys-results",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-cache-key-follows-the-resolved-identity",
+              "a-prepared-runtime-digest-follows-the-resolved-identity"
+            ]
+          }
+        },
+        {
+          "id": "workspace-installed-candidates",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-environment-candidate-finds-a-tool-inside-the-workspace",
+              "the-fetch-provisions-like-the-install"
+            ]
+          }
+        },
+        {
+          "id": "provisioning-runs-unpinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-install-resolves-an-unusable-pin-unavailable",
+              "another-command-never-runs-on-a-provisioning-resolution",
+              "install-runs-on-a-lock-that-does-not-pin-the-toolchain-yet",
+              "a-local-extension-prepares-unpinned-only-in-a-provisioning-run"
+            ]
+          }
+        },
+        {
+          "id": "unplanned-toolchains-do-not-stop-the-run",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-a-planned-job-fails-on-an-unsatisfied-toolchain",
+              "a-build-with-no-project-of-the-extension-runs-without-its-pin",
+              "planning-fails-before-any-key-when-a-planned-job-needs-an-unresolved-toolchain"
+            ]
+          }
+        },
+        {
+          "id": "provisioning-reports-the-installed-toolchain",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-toolchain-the-install-provided-is-reported-at-info",
+              "a-toolchain-still-missing-after-the-install-keeps-the-warning",
+              "a-run-without-workspace-install-reports-nothing",
+              "a-run-that-plans-no-job-keeps-the-warning"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/engine-provenance",
+      "type": "feature",
+      "name": "Engine provenance",
+      "outcome": "A workspace states which putnami engine may run against it, and a workspace that builds its own engine refuses every binary it did not produce",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "source-workspace-declaration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-source-sentinel-round-trips-and-a-metadata-refresh-leaves-it-intact"
+            ]
+          }
+        },
+        {
+          "id": "foreign-engine-refused",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-binary-not-built-from-this-tree-is-refused-with-the-putnamiw-recovery"
+            ]
+          }
+        },
+        {
+          "id": "content-keyed-source-build",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-edit-anywhere-in-the-keyed-pathspec-rebuilds-and-an-unchanged-tree-reuses"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/workload-qualification",
+      "type": "feature",
+      "name": "Workload qualification",
+      "outcome": "A user or agent runs a changed workload the way it is shipped, with the workloads and databases it needs, from one command, and proves with one derived smoke contract and one fail-closed verdict that it boots and serves real requests on the tree or deployed build it names",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "runs-with-closure-served-behind-stable-proxies",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-closure-is-transitive-runs-with-in-topological-order",
+              "an-unserveable-member-is-refused-before-anything-starts",
+              "the-proxy-answers-unavailable-until-the-backend-is-known",
+              "dependants-reach-a-provider-through-its-injected-proxy-url"
+            ]
+          }
+        },
+        {
+          "id": "ephemeral-databases-per-composition",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-datasource-gets-a-database-created-and-dropped-with-the-composition",
+              "a-provided-server-is-shared-and-reported-as-isolation-none"
+            ]
+          }
+        },
+        {
+          "id": "typed-readiness-bounds-every-member",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-member-starts-only-after-the-one-before-it-announced-readiness",
+              "a-member-that-never-announces-readiness-fails-naming-member-and-phase"
+            ]
+          }
+        },
+        {
+          "id": "ungraceful-death-is-reaped-by-the-next-invocation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-orphan-is-reaped-only-when-its-lock-is-free-and-its-owner-dead",
+              "a-killed-composition-leaves-a-lease-the-next-invocation-reaps"
+            ]
+          }
+        },
+        {
+          "id": "injected-configuration-never-reaches-output",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-document-carries-urls-and-bindings-and-the-status-carries-section-names-only"
+            ]
+          }
+        },
+        {
+          "id": "smoke-is-derived-from-the-route-inventory",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["exact-public-read-only-routes-sorted-and-capped", "platform-and-reserved-paths-are-never-requested", "the-platform-prefix-is-read-from-the-inventory"]
+          }
+        },
+        {
+          "id": "no-derivable-request-is-unsupported-not-success",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-missing-inventory-is-unsupported-with-a-build-remedy", "an-empty-contract-never-passes"]
+          }
+        },
+        {
+          "id": "remote-verdict-binds-to-the-deployed-sha",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-matching-sha-passes",
+              "a-wrong-or-missing-sha-is-digest-mismatch",
+              "a-url-target-without-expect-sha-is-a-usage-error"
+            ]
+          }
+        },
+        {
+          "id": "local-verdict-binds-to-the-exact-worktree",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-local-verdict-names-the-worktree-it-composed-and-a-clean-teardown",
+              "a-worktree-that-changes-before-the-workload-is-ready-is-digest-mismatch",
+              "a-composition-failure-names-the-member-and-still-tears-down",
+              "canceling-a-local-run-tears-the-composition-down",
+              "expect-sha-with-a-local-target-is-a-usage-error"
+            ]
+          }
+        },
+        {
+          "id": "every-non-pass-state-exits-non-zero",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "passed-exits-zero-and-every-other-state-exits-one",
+              "the-verdict-rides-the-failure-envelope",
+              "a-server-error-fails-the-smoke"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/collaboration-providers",
+      "type": "feature",
+      "name": "Collaboration provider contracts",
+      "outcome": "A workspace binds its task, change-proposal and memory backends independently, and a user, a script or an agent calls the same versioned operations through the CLI or MCP without knowing which backend answers, while a missing binding or capability, a refused precondition and an uncertain write are stated rather than hidden",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "explicit-binding",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unbound-contract-is-unsupported-and-names-the-binding",
+              "an-ambiguous-binding-is-refused",
+              "a-missing-or-disabled-provider-is-unavailable",
+              "candidates-are-reported-never-selected"
+            ]
+          }
+        },
+        {
+          "id": "capability-discovery",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "capabilities-report-every-operation-and-its-support",
+              "an-unsupported-version-or-incomplete-provider-is-refused",
+              "an-optional-operation-the-provider-lacks-is-unsupported",
+              "a-precondition-the-provider-cannot-enforce-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "one-route-two-entry-paths",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-and-mcp-return-the-same-envelope",
+              "provider-tools-are-reachable-only-through-the-binding",
+              "settings-and-selection-reach-the-provider"
+            ]
+          }
+        },
+        {
+          "id": "truthful-annotations",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "routed-tools-carry-the-contract-access",
+              "a-provider-whose-annotations-disagree-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "bounded-pages",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "empty-and-paginated-results",
+              "an-oversized-page-is-refused",
+              "a-page-above-the-document-bound-asks-for-a-smaller-page-size"
+            ]
+          }
+        },
+        {
+          "id": "exact-identity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-proposal-for-another-head-is-refused",
+              "a-mutation-answering-for-another-item-is-unresolved"
+            ]
+          }
+        },
+        {
+          "id": "uncertain-writes-are-unresolved",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-timed-out-read-is-unavailable-and-retryable",
+              "a-timed-out-or-canceled-mutation-is-unresolved",
+              "a-crashed-mutation-is-unresolved-with-a-reconciliation"
+            ]
+          }
+        },
+        {
+          "id": "no-credential-leakage",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "provider-stderr-never-reaches-an-envelope",
+              "credential-values-are-redacted",
+              "credential-settings-are-refused"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/contributor-workflows",
+      "type": "feature",
+      "name": "Contributor workflows",
+      "outcome": "A workspace opts into one contributor extension and receives the complete plan, execute, fix, epic, check, review and delivery workflows on every supported agent host, reaching its tasks, proposals and memory only through the providers it binds and following the conventions its own policy declares",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "one-contributor-extension",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-skill-and-worker-renders-on-both-hosts",
+              "the-repository-runs-the-content-it-distributes"
+            ]
+          }
+        },
+        {
+          "id": "explicit-only-invocation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["explicit-only-skills-declare-it-on-both-hosts"]
+          }
+        },
+        {
+          "id": "entry-point-aliases",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["each-alias-names-an-existing-canonical-skill"]
+          }
+        },
+        {
+          "id": "provider-neutral-content",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "no-backend-client-label-or-memory-identity",
+              "the-declared-policy-refuses-provider-specific-content"
+            ]
+          }
+        },
+        {
+          "id": "provider-neutral-publication",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-finalizer-publishes-through-the-contracts",
+              "the-read-back-carries-what-the-upsert-answered",
+              "an-unresolved-write-stops-without-a-retry",
+              "the-language-rule-reads-tasks-through-the-contract"
+            ]
+          }
+        },
+        {
+          "id": "repository-policy",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-policy-selects-the-delivered-state-reference-and-language",
+              "instructions-name-worker-profiles-not-models"
+            ]
+          }
+        },
+        {
+          "id": "squash-ready-publication",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-draft-opens-before-the-first-edit",
+              "the-body-is-the-squash-message",
+              "no-publication-names-an-agent",
+              "a-loaded-machine-gates-on-hosted-checks"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/windows-consumers",
+      "type": "feature",
+      "name": "Windows consumer install and golden path",
+      "outcome": "A user on Windows 10 version 1803 or later or Windows 11, on amd64, installs the CLI with one PowerShell line that verifies what it downloads and needs no administrator rights, then initializes and serves the TypeScript starter as on macOS and Linux, with every Windows prerequisite named where it is missing",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "powershell-installer-trust",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-download-is-verified-before-it-is-used",
+              "the-installer-never-elevates"
+            ]
+          }
+        },
+        {
+          "id": "windows-shells-get-the-powershell-installer",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["install-sh-sends-a-windows-shell-to-install-ps1"]
+          }
+        },
+        {
+          "id": "one-binary-switch-on-windows",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-installer-follows-the-switch-contract",
+              "a-running-cli-is-replaced-by-a-rename-aside",
+              "a-failed-move-in-restores-the-old-binary",
+              "a-failed-restore-names-the-kept-binary"
+            ]
+          }
+        },
+        {
+          "id": "windows-executables-by-name",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "pin-records-windows-amd64-from-any-host",
+              "pin-reads-the-windows-archive-executable",
+              "an-installed-runtime-resolves-under-its-exe-name",
+              "an-unsuffixed-runtime-is-named-not-run"
+            ]
+          }
+        },
+        {
+          "id": "lf-checkout-policy",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-writes-the-lf-policy",
+              "init-keeps-an-existing-gitattributes",
+              "doctor-names-crlf-files-with-the-fix"
+            ]
+          }
+        },
+        {
+          "id": "windows-release-smoke",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-windows-smoke-runs-the-public-commands",
+              "the-windows-smoke-runs-the-one-liner-as-script-text",
+              "the-windows-smoke-takes-the-inputs-of-the-shell-smoke",
+              "the-windows-smoke-runs-in-a-neutral-environment",
+              "the-windows-smoke-names-prerequisites-before-any-request",
+              "the-windows-smoke-fails-under-the-legs-of-the-shell-smoke",
+              "the-windows-smoke-stops-the-server-with-ctrl-break"
+            ]
+          }
+        },
+        {
+          "id": "windows-prerequisites-are-named",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "doctor-names-each-long-path-setting-with-its-fix",
+              "doctor-names-a-missing-visual-cpp-runtime-with-its-fix",
+              "a-missing-sh-names-git-for-windows"
+            ]
+          }
+        },
+        {
+          "id": "providers-run-the-prepared-runtime",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cache-provider-launches-the-prepared-runtime",
+              "an-unprepared-cache-provider-runtime-builds-locally-with-a-notice",
+              "a-runner-provider-launches-the-prepared-runtime"
+            ]
+          }
+        },
+        {
+          "id": "powershell-installer-run-form",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-site-bakes-one-line-of-install-ps1",
+              "the-run-form-holds-the-rules-of-install-sh",
+              "the-run-form-resolves-before-installing",
+              "the-run-form-refuses-before-installing",
+              "the-run-form-pins-like-install-sh",
+              "a-failed-pin-does-not-run-the-command",
+              "the-run-form-runs-the-command-in-the-callers-directory",
+              "the-run-form-ends-with-the-commands-status",
+              "the-run-form-exits-only-from-a-file",
+              "the-docs-give-the-tested-windows-run-forms"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/credential-provider",
+      "type": "feature",
+      "name": "Credential provider for registry downloads",
+      "outcome": "A user who turns on --providers install gets the archive downloads of that process authenticated by the workspace's one credential provider, asked once per purpose and sent only to the hosts its credential names, while a workspace without a provider behaves as before",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "providers-are-opt-in",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "flag-off-launches-nothing",
+              "flag-wins-over-the-environment",
+              "bound-request-decides-alone",
+              "choice-holds-for-one-process",
+              "remote-providers-need-the-capability"
+            ]
+          }
+        },
+        {
+          "id": "one-provider-or-none",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "absent-provider-stays-native",
+              "two-declarers-fail-the-first-download",
+              "errors-name-their-source"
+            ]
+          }
+        },
+        {
+          "id": "bearer-only-for-its-hosts",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bearer-reaches-only-its-hosts",
+              "one-call-per-purpose",
+              "refresh-before-expiry"
+            ]
+          }
+        },
+        {
+          "id": "refusal-never-falls-back",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "refusal-fails-every-request-of-its-purpose",
+              "failure-retries-after-the-backoff",
+              "late-answer-before-exit-is-heard",
+              "exit-is-seen-while-a-child-holds-output"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/credential-custody",
+      "type": "feature",
+      "name": "Credential custody on hosted runs",
+      "outcome": "A hosted runner that passes the run credential on --credential-fd gets a run in which no repository-controlled process can read a credential, and a cold install of a private pin that works from an empty store, while a run without the flag behaves as before",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "credential-on-a-descriptor",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "descriptor-read-once-and-closed",
+              "unusable-descriptor-is-a-usage-error",
+              "relaunch-keeps-the-descriptor",
+              "bound-request-accepts-only-the-descriptor",
+              "older-pin-is-refused",
+              "bootstrap-provider-serves-only-the-locked-downloads"
+            ]
+          }
+        },
+        {
+          "id": "providers-receive-it-over-rpc",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "credential-provider-initialize-carries-it",
+              "cache-provider-authenticates-after-the-capability"
+            ]
+          }
+        },
+        {
+          "id": "fetch-before-repository-code",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "fetch-completes-before-install",
+              "only-fetch-gets-the-job-credential",
+              "every-other-job-runs-offline"
+            ]
+          }
+        },
+        {
+          "id": "hostile-process-finds-nothing",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "hostile-hook-and-test-find-nothing",
+              "hosted-run-runs-only-store-installed-extensions",
+              "hosted-run-ignores-the-workspace-registry",
+              "hosted-run-probes-no-workspace-toolchain",
+              "no-credential-after-repository-code"
+            ]
+          }
+        },
+        {
+          "id": "cold-install-leaves-locks-unchanged",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "private-pin-installs-cold",
+              "hosted-install-writes-no-lock"
+            ]
+          }
+        },
+        {
+          "id": "flag-off-changes-nothing",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "flag-off-job-env-unchanged"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

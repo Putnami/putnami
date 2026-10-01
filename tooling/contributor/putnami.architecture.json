@@ -1,0 +1,46 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "agent-workflows",
+  "owner": "tooling",
+  "projects": [
+    "/tooling/contributor"
+  ],
+  "owns": [
+    {
+      "id": "agent-workflows.public-agent-workflows",
+      "kind": "model",
+      "description": "The agent workflows Putnami publishes and consumes: the agent content of the @putnami/contributor extension, with its source skills and worker bodies, the host metadata written beside them, the discovery layout, and the declared content policy that decides what may ship under the extension's identity. The repository-root .agents, .claude, and .codex trees are generated from this source; only the audit skill and host policy files stay outside this authority."
+    }
+  ],
+  "exports": [
+    {
+      "id": "agent-workflows.artifact-source.v1",
+      "version": 1,
+      "status": "active",
+      "description": "One extension's packageable agent-content source: the closed src/ layout, the extension identity, and the content policy declared in the project. A packager reads it to produce the distributable archive; nothing here decides how the archive is built or published.",
+      "facts": [
+        {
+          "name": "agent_artifact_content_policy",
+          "authority": "agent-workflows",
+          "classification": "public",
+          "personalData": "none"
+        },
+        {
+          "name": "agent_workflow_content",
+          "authority": "agent-workflows",
+          "classification": "public",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "reference"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    }
+  ],
+  "imports": []
+}

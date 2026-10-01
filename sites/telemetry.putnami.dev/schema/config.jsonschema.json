@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "receiver": {
+      "additionalProperties": false,
+      "properties": {
+        "aggregateAudience": {
+          "type": "string",
+          "x-env": "TELEMETRY_AGGREGATE_AUDIENCE"
+        },
+        "aggregateCallers": {
+          "type": "string",
+          "x-env": "TELEMETRY_AGGREGATE_CALLERS"
+        },
+        "aggregateIssuer": {
+          "type": "string",
+          "x-env": "TELEMETRY_AGGREGATE_ISSUER"
+        },
+        "collectorEndpoint": {
+          "type": "string",
+          "x-env": "TELEMETRY_COLLECTOR_ENDPOINT"
+        },
+        "globalQps": {
+          "type": "integer",
+          "x-env": "TELEMETRY_GLOBAL_QPS"
+        },
+        "perIpPerMinute": {
+          "type": "integer",
+          "x-env": "TELEMETRY_PER_IP_PER_MINUTE"
+        },
+        "trustedProxies": {
+          "type": "string",
+          "x-env": "TELEMETRY_TRUSTED_PROXIES"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "receiver"
+  ],
+  "title": "telemetry.putnami.dev config",
+  "type": "object"
+}

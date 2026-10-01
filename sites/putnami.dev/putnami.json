@@ -1,0 +1,76 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "putnami.dev",
+  "tags": ["web", "ts"],
+  "extensions": ["@putnami/typescript", "/tooling/sdd-extension"],
+  "options": {
+    "@putnami/cloud:publish-migration": { "namespace": "putnami" },
+    "@putnami/cloud:publish-config": { "namespace": "putnami" },
+    "package": {
+      "docker": true,
+      "port": 8080
+    },
+    "publish": {
+      "docker": true
+    },
+    "generate": {
+      "capabilities": true,
+      "assets": [
+        {
+          "from": "/tooling/cli/scripts/install.sh",
+          "to": "public/install.sh"
+        },
+        {
+          "from": "/tooling/cli/scripts/install-commands.txt",
+          "to": "public/install-commands.txt"
+        },
+        {
+          "from": "/tooling/cli/scripts/install.ps1",
+          "to": "public/install.ps1"
+        },
+        {
+          "from": "/sites/putnami.dev/doc",
+          "to": "public/docs"
+        },
+        {
+          "from": "/tooling/doc",
+          "to": "public/docs/08-tooling-&-workspace"
+        },
+        {
+          "from": "/tooling/sdd-extension/doc",
+          "to": "public/docs/07-spec-driven-development"
+        },
+        {
+          "from": "/typescript/doc/framework",
+          "to": "public/docs/09-frameworks/01-typescript"
+        },
+        {
+          "from": "/go/doc/framework",
+          "to": "public/docs/09-frameworks/02-go"
+        },
+        {
+          "from": "/python/doc/framework",
+          "to": "public/docs/09-frameworks/03-python"
+        },
+        {
+          "from": "/LICENSE.md",
+          "to": "public/LICENSE.md"
+        }
+      ]
+    },
+    "/typescript/extension": {
+      "filePatterns": ["doc/**/*", "content.lock.json", "../../putnami.support.json"]
+    },
+    "@putnami/cloud": {
+      "deploy": {
+        "enforceHttpRoutes": true,
+        "enabled": true
+      }
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

@@ -1,0 +1,194 @@
+version: "2"
+
+run:
+  # FALLBACK TOOL DEADLINE — must stay STRICTLY BELOW the shipped scheduler
+  # deadline of every manifest task that runs golangci-lint
+  # (lint-golangci-fix and lint-golangci-readonly, both 600000ms). Pinned by
+  # TestGolangciToolDeadlineStaysBelowItsSchedulerDeadline in
+  # cmd/putnami-go/manifest_contract_test.go.
+  #
+  # Why it matters: this used to be 5m, exactly equal to the then-300s
+  # scheduler deadline. Equal deadlines cannot both win, and the scheduler
+  # always does — its clock starts at process spawn, golangci's only when `run`
+  # begins — so a slow lint died as an opaque `job timed out` instead of
+  # golangci's own "Timeout exceeded: try increasing it by passing --timeout".
+  # The 2m gap is the budget for everything inside the scheduler's clock but
+  # outside this one: runtime spawn and handshake, resolving/installing the
+  # pinned binary, the `fmt --diff` gate the fixing path runs first (7.7s cold
+  # on 10 cores, and CI runners are CPU-quota limited), diagnostic parsing and
+  # result reporting.
+  #
+  # At runtime the CLI exports the resolved task deadline (including an n× batch
+  # leader deadline) as PUTNAMI_TASK_DEADLINE_MS. Unless the user explicitly
+  # passes --timeout, the Go extension derives and passes a smaller --timeout
+  # from that value, so the tool remains below the scheduler for per-project
+  # overrides and batches too. This static value remains the fallback for a
+  # direct golangci invocation or a runtime that receives no scheduler deadline.
+  timeout: 8m
+  tests: true
+  # Path patterns (exclusions.paths, exclusions.rules[].path) match paths
+  # relative to the directory golangci-lint runs in, not to this file, which
+  # sits in the extension's install directory outside the workspace. That is
+  # the project directory, or the go.work directory of a batch; a batch runs a
+  # project whose go.work-relative path an exclusion matches from the project
+  # directory instead.
+  relative-path-mode: wd
+  go: "1.25"
+  allow-parallel-runners: true
+
+output:
+  formats:
+    text:
+      print-linter-name: true
+
+linters:
+  default: none
+  enable:
+    # correctness / bugs
+    - govet
+    - errcheck
+    - unused
+    - ineffassign
+    - errorlint
+
+    # Disabled:
+    # - nilerr: high false-positive rate in command patterns that return status strings
+    #   instead of Go errors (e.g. return "FAILED", nil, nil after checking err != nil)
+
+    # code hygiene
+    - revive
+    - misspell
+    - unconvert
+    - unparam
+    - prealloc
+
+    # security (tuned below for application/CLI context)
+    - gosec
+
+    # style (moderate)
+    - gocritic
+    - bidichk
+
+  settings:
+    govet:
+      enable-all: false
+      enable:
+        - assign
+        - atomic
+        - bools
+        - composites
+        - copylocks
+        - errorsas
+        - httpresponse
+        - loopclosure
+        - lostcancel
+        - nilfunc
+        - printf
+        - shift
+        - sortslice
+        - stdmethods
+        - stringintconv
+        - tests
+        - unmarshal
+        - unreachable
+        - unsafeptr
+        - unusedresult
+
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+      exclude-functions:
+        # I/O to stdout/stderr — non-recoverable in a CLI
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        # Best-effort directory creation
+        - os.MkdirAll
+        # Cleanup / close — errors are non-critical
+        - (*os.File).Close
+        - (io.Closer).Close
+        # Removal / cleanup — best-effort
+        - os.Remove
+        - os.RemoveAll
+        # Best-effort file writes (version stamps, caches, copies)
+        - os.WriteFile
+        # Environment setup — non-recoverable
+        - os.Setenv
+        # File walking — errors handled via callback
+        - path/filepath.Walk
+        - path/filepath.WalkDir
+
+    revive:
+      severity: warning
+      rules:
+        - name: blank-imports
+        - name: early-return
+        - name: errorf
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: var-declaration
+        - name: var-naming
+
+    misspell:
+      locale: US
+
+    gosec:
+      excludes:
+        # G104: errcheck already covers unchecked errors with fine-grained exclude-functions;
+        #       gosec G104 duplicates it without the control
+        - G104
+        # G301/G302/G306: Application/CLI tools create directories (0755) and files (0644) with
+        #                 standard permissions; requiring 0750/0600 is only relevant for secrets
+        - G301
+        - G302
+        - G306
+        # G204: Build tools and CLI tools spawn subprocesses by design
+        - G204
+        # G304: Variable file paths are fundamental to any tool that reads config/data files
+        - G304
+        # G703: Same as G304 but for writes — build tools write to user-provided workspace paths
+        - G703
+        # G404: Non-crypto random is fine for non-security purposes
+        - G404
+
+    gocritic:
+      disabled-checks:
+        # Style preference, not a correctness issue
+        - ifElseChain
+
+  exclusions:
+    generated: lax
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+          - revive
+      - text: "var-naming:"
+        linters:
+          - revive
+      # Internal packages don't need doc comments on exported symbols
+      - path: internal/
+        text: "exported:"
+        linters:
+          - revive
+    # Each pattern matches a whole directory name below the run directory and
+    # never a `..` segment, which a path through a symlinked run directory
+    # starts with. `build` and `bin` are not excluded: they name Go packages,
+    # and an output directory holds no Go file.
+    paths:
+      - ^([^/]*[^./][^/]*/)*vendor(/|$)
+      - ^([^/]*[^./][^/]*/)*node_modules(/|$)
+      - ^([^/]*[^./][^/]*/)*dist(/|$)
+      - ^([^/]*[^./][^/]*/)*\.putnami(/|$)
+
+formatters:
+  enable:
+    - goimports
+    - gofmt

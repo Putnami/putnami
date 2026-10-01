@@ -1,0 +1,501 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/application-lifecycle",
+      "type": "feature",
+      "name": "TypeScript application lifecycle",
+      "outcome": "TypeScript workloads compose plugins and modules into one bounded build, startup, and shutdown lifecycle that never leaves a half-started process behind",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "bootstrap-guard",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-construction-time-failure-logs-once-and-exits-non-zero",
+              "a-re-thrown-primitive-is-not-double-logged",
+              "a-start-phase-failure-is-not-double-logged",
+              "a-successful-bootstrap-neither-logs-nor-exits",
+              "an-async-factory-rejection-is-reported-the-same-way"
+            ]
+          }
+        },
+        {
+          "id": "build-only-generation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-plugin-without-generate-is-skipped",
+              "build-runs-generate-on-every-plugin",
+              "generate-runs-during-build",
+              "post-generate-assets-and-exports-reach-the-build-result",
+              "post-generate-runs-only-after-the-generate-barrier",
+              "start-never-invokes-generate"
+            ]
+          }
+        },
+        {
+          "id": "capability-publication",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-generation-leaves-no-stale-capability-manifest",
+              "a-failed-migration-artifact-emission-fails-the-build",
+              "the-migration-bundle-keys-on-the-putnami-project-identity",
+              "a-build-without-a-project-identity-leaves-the-hook-bundle-untouched",
+              "migration-artifact-publication-can-be-disabled"
+            ]
+          }
+        },
+        {
+          "id": "composition-invalidation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-module-mounted-after-the-context-was-read-is-still-present",
+              "a-plugin-added-during-warmup-is-still-started",
+              "a-plugin-added-via-ensure-is-not-warmed-up-twice",
+              "a-provider-registered-after-the-context-was-read-is-still-present",
+              "provide-invalidates-the-context",
+              "use-invalidates-the-context"
+            ]
+          }
+        },
+        {
+          "id": "darc-runtime-enforcement",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-shared-behavior-corpus-is-answered-case-for-case",
+              "the-shared-contract-validation-corpus-is-answered-case-for-case"
+            ]
+          }
+        },
+        {
+          "id": "darc-runtime-evidence",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-that-enforces-nothing-emits-no-rows",
+              "a-registered-component-contributes-exactly-one-row",
+              "an-evidence-row-carries-the-declared-contract-verbatim",
+              "the-emitted-evidence-rows-are-deterministic-bytes",
+              "the-emitted-manifest-carries-the-domain-access-rows",
+              "the-emitted-manifest-is-the-one-the-go-detector-reads-back"
+            ]
+          }
+        },
+        {
+          "id": "failed-start-unwind",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-start-stops-started-plugins-closes-the-container-and-leaves-it-not-running",
+              "a-plugin-whose-start-rejected-is-not-stopped",
+              "a-startup-failure-is-re-thrown-to-the-caller",
+              "every-additional-concurrent-failure-is-logged-and-the-first-is-thrown"
+            ]
+          }
+        },
+        {
+          "id": "phase-order",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-plugin-is-started",
+              "every-plugin-is-warmed-up",
+              "migrate-hooks-run-after-warmup-and-before-plugin-start",
+              "sub-module-plugins-are-started-too",
+              "sub-module-plugins-are-warmed-up-too",
+              "the-owning-module-is-passed-to-each-lifecycle-method",
+              "the-runner-goes-last",
+              "warmup-runs-before-start"
+            ]
+          }
+        },
+        {
+          "id": "requirement-validation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-sibling-modules-plugin-is-not-visible",
+              "an-unsatisfied-module-requirement-fails-at-composition",
+              "private-visibility-is-enforced-across-modules"
+            ]
+          }
+        },
+        {
+          "id": "route-loader-activation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-scanning-api-plugin-exports-its-own-route-loader",
+              "each-api-plugin-resolves-only-its-own-route-loader-in-a-package",
+              "a-plugin-that-does-not-scan-resolves-no-route-loader",
+              "every-loading-static-plugin-exports-its-own-route-loader",
+              "a-single-static-plugin-keeps-its-historical-loader",
+              "each-static-plugin-serves-its-own-files-in-a-package"
+            ]
+          }
+        },
+        {
+          "id": "shutdown-order",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-plugin-is-stopped",
+              "shutdown-hooks-are-collected-from-sub-modules",
+              "shutdown-hooks-run-in-reverse-registration-order",
+              "stopping-a-stopped-application-does-nothing",
+              "sub-module-plugins-stop-in-reverse-module-tree-order",
+              "the-container-is-cleaned-up-after-stop"
+            ]
+          }
+        },
+        {
+          "id": "signal-shutdown",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-hung-drain-force-exits-non-zero-at-the-deadline",
+              "a-rejected-drain-exits-non-zero",
+              "a-resolved-drain-exits-zero",
+              "a-second-signal-does-not-start-a-second-stop"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "typescript/server-streams",
+      "type": "feature",
+      "name": "TypeScript server streams",
+      "outcome": "A TypeScript provider serves a declared server stream over SSE with admission decided before the first body byte and every byte it writes bounded",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "sse-admission-and-bounds",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-request-body-is-refused-before-any-event",
+              "an-invalid-query-reaches-the-caller-as-a-non-2xx",
+              "the-declared-queue-depth-and-frame-size-bound-the-producer",
+              "a-liveness-comment-carries-no-data"
+            ]
+          }
+        },
+        {
+          "id": "negotiated-sse-wire",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-negotiated-sse-stream-is-acknowledged-and-ends-with-complete",
+              "an-sse-request-that-does-not-negotiate-keeps-the-legacy-framing",
+              "a-failed-or-canceled-negotiated-stream-never-ends-with-complete",
+              "a-draining-provider-ends-a-negotiated-stream-without-a-terminal",
+              "a-restarted-provider-serves-negotiated-streams-again"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "typescript/api-contracts",
+      "type": "feature",
+      "name": "TypeScript API contracts",
+      "outcome": "A TypeScript provider declares an operation or a stream once and serves it over every transport its published contract advertises, admitting a first-party WebSocket caller through the first frame rather than through headers a browser cannot set",
+      "owner": "typescript",
+      "target": "modeled",
+      "relations": [
+        {
+          "kind": "dependsOn",
+          "target": "client-contract/first-party-generated-clients"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "client-contract-conformance",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unhandled-framework-exception-serializes-as-the-stable-envelope",
+              "an-unrepresentable-corpus-semantic-is-refused-at-registration",
+              "the-corpus-service-contract-and-operation-policy-project-losslessly"
+            ]
+          }
+        },
+        {
+          "id": "declared-response-cache",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-cache-policy-is-published-in-the-operation-contract",
+              "a-cache-on-a-non-idempotent-operation-or-an-undeclared-key-field-is-refused-at-publication",
+              "an-invalidation-field-naming-no-scalar-response-property-is-refused-at-publication"
+            ]
+          }
+        },
+        {
+          "id": "connect-descriptors",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-contract-int-projects-to-int64-in-the-descriptor",
+              "a-oneof-refuses-two-members-and-resolves-a-malformed-message-to-the-last",
+              "an-enum-reserves-zero-for-unspecified-and-numbers-members-from-one",
+              "explicit-presence-keeps-a-zero-on-the-wire-and-an-absence-absent",
+              "implicit-presence-omits-the-zero-value-and-restores-it",
+              "the-descriptor-carries-the-emitter-json-name-for-every-field"
+            ]
+          }
+        },
+        {
+          "id": "connect-protocol-conformance",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-published-binary-error-detail-decodes-to-the-message-it-names",
+              "a-unary-failure-is-a-json-error-body-under-a-non-200-status",
+              "no-status-this-provider-raises-produces-an-undefined-connect-code",
+              "the-corpus-carries-the-sixteen-codes-the-specification-defines",
+              "the-envelope-header-matches-the-published-golden-frame"
+            ]
+          }
+        },
+        {
+          "id": "first-party-websocket-streams",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bidirectional-stream-outlives-the-client-half-close",
+              "a-client-stream-returns-its-single-declared-value",
+              "a-declared-handler-error-carries-its-stable-code-and-details",
+              "a-frame-before-init-runs-no-handler",
+              "a-resume-the-transport-does-not-declare-is-refused-before-the-encoding-limit",
+              "admission-is-re-checked-after-an-asynchronous-credential-check",
+              "an-undeclared-encoding-is-refused-at-admission",
+              "an-unsatisfied-security-alternative-is-refused-before-the-handler",
+              "an-unspeakable-subprotocol-is-refused-at-the-upgrade",
+              "application-shutdown-ends-a-live-stream-with-a-typed-terminal",
+              "the-declared-budgets-bound-admission-idleness-and-frame-size",
+              "the-inbound-queue-bound-ends-the-stream-instead-of-dropping",
+              "the-init-frame-is-the-only-admission-channel"
+            ]
+          }
+        },
+        {
+          "id": "websocket-wire-conformance",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-duplicate-key-or-a-json-null-is-refused-like-the-go-parser-refuses-it",
+              "every-emitted-frame-is-read-back-by-the-published-parser",
+              "the-corpus-invalid-scenes-are-refused-with-the-declared-code",
+              "the-corpus-valid-scenes-are-accepted",
+              "the-frame-vocabulary-matches-the-published-schema"
+            ]
+          }
+        },
+        {
+          "id": "declared-stream-resume",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-continuation-runs-the-endpoint-security-chain-again",
+              "a-resume-grant-expires-at-its-bound",
+              "a-resume-grant-is-bound-to-the-operation-and-identity-that-earned-it",
+              "a-resume-grant-is-spent-by-its-single-redemption",
+              "a-resume-position-ahead-of-what-the-provider-delivered-is-refused",
+              "a-resumed-server-stream-continues-the-sequence-it-left",
+              "a-stream-stops-being-resumable-once-its-budget-is-spent",
+              "the-live-grants-of-one-endpoint-are-bounded"
+            ]
+          }
+        },
+        {
+          "id": "streamed-binary-payloads",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "raw-http-streams-publish-wildcard-content-with-a-bound",
+              "raw-http-streams-preserve-readers-and-concrete-media-types",
+              "raw-http-streams-release-the-request-scope-at-body-completion"
+            ]
+          }
+        },
+        {
+          "id": "binary-payloads",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-raw-octet-payload-is-published-with-its-media-type-and-bound",
+              "a-declared-raw-octet-body-reaches-the-handler-unchanged",
+              "an-oversized-raw-octet-request-is-refused-before-the-body-is-read",
+              "an-undeclared-request-media-type-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "declared-connect-encoding-order",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-connect-encoding-order-cannot-publish-an-encoding-the-plugin-does-not-serve",
+              "a-declared-connect-encoding-order-is-the-published-order"
+            ]
+          }
+        },
+        {
+          "id": "optional-credential",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-anonymous-alternative-is-refused-unless-the-endpoint-is-optional-and-it-comes-last",
+              "an-optional-endpoint-publishes-its-credential-then-the-anonymous-alternative",
+              "an-optional-endpoint-serves-an-anonymous-caller-and-refuses-an-unresolved-credential"
+            ]
+          }
+        },
+        {
+          "id": "provider-owned-websocket-wires",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-byte-stream-carries-raw-octets-after-an-upgrade-admission",
+              "a-typed-provider-wire-carries-json-frames-under-its-declared-subprotocol",
+              "the-contract-publishes-the-provider-owned-wire-as-the-only-transport",
+              "a-provider-owned-wire-that-cannot-be-published-is-refused-at-registration"
+            ]
+          }
+        },
+        {
+          "id": "external-contract-operations",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-external-route-is-published-with-its-authority-and-no-client-metadata",
+              "an-external-route-is-absent-from-the-protobuf-service",
+              "an-external-route-publishes-the-schemas-its-standard-owns",
+              "a-contradictory-external-declaration-is-refused-at-registration",
+              "a-contradictory-external-declaration-is-refused-at-generation",
+              "an-external-route-is-served-by-the-standard-pipeline"
+            ]
+          }
+        },
+        {
+          "id": "contract-scope",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "registered-routes-are-published-in-the-build-time-document",
+              "every-api-plugin-of-the-module-is-published-in-one-document",
+              "api-plugins-that-disagree-on-the-client-contract-are-refused-at-generation",
+              "build-time-and-runtime-documents-agree-on-module-paths"
+            ]
+          }
+        },
+        {
+          "id": "document-slots",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-openapi-document-writes-its-own-output",
+              "an-application-publishes-at-most-one-client-contract"
+            ]
+          }
+        },
+        {
+          "id": "declared-sse-continuation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-sse-continuation-is-published-on-the-sse-transport",
+              "an-sse-continuation-is-refused-on-every-shape-that-cannot-carry-it",
+              "a-cursor-names-a-required-plain-string-output-field-and-a-declared-query-parameter"
+            ]
+          }
+        },
+        {
+          "id": "declared-error-details",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-contract-publishes-the-declared-details-schema-for-that-code-only",
+              "the-implicit-codes-refuse-a-declared-details-body",
+              "a-codes-declared-details-take-precedence-over-a-throws-schema-for-its-status",
+              "the-provider-answers-the-declared-details-in-the-first-party-envelope"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/local-collaboration",
+  "tags": [
+    "go",
+    "extension"
+  ],
+  "extensions": [
+    "/go/extension"
+  ],
+  "options": {
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-local-collaboration",
+      "version-var": "main.runtimeVersion"
+    },
+    "test": {
+      "filePatterns": [
+        "putnami.extension.json"
+      ]
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true
+    }
+  },
+  "featureAuthority": {
+    "owner": "cli/collaboration-providers"
+  }
+}

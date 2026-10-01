@@ -1,0 +1,49 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/multi-command",
+  "commands": {
+    "build": {
+      "description": "Build the project",
+      "run": [
+        { "id": "compile", "task": "compile-exec" },
+        { "id": "bundle", "task": "bundle-exec", "dependsOn": ["compile"] }
+      ]
+    },
+    "test": {
+      "description": "Run tests",
+      "run": [{ "id": "test", "task": "test-exec" }]
+    },
+    "lint": {
+      "description": "Lint the code",
+      "run": [{ "id": "lint", "task": "lint-exec" }]
+    }
+  },
+  "tasks": {
+    "compile-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["compiling"],
+      "inputs": {
+        "sources": { "from": "project", "files": ["src/**/*.ts"] },
+        "config": { "from": "project", "files": ["tsconfig.json"] },
+        "node_env": { "from": "env" },
+        "target": { "from": "params" }
+      }
+    },
+    "bundle-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["bundling"]
+    },
+    "test-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["testing"]
+    },
+    "lint-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["linting"]
+    }
+  }
+}

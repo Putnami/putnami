@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/runtime-invalid-paths",
+  "runtime": {
+    "executable": "../outside/bin/sample",
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "inputs": ["/etc/passwd"]
+    }
+  },
+  "commands": {
+    "build": { "run": [{ "id": "build", "task": "build-exec" }] }
+  },
+  "tasks": {
+    "build-exec": { "kind": "command", "command": "echo" }
+  }
+}

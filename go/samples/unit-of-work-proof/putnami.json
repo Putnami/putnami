@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/examples/unit-of-work-proof",
+  "description": "Go example: executable proof for unit-of-work and consume-once primitives — a device code redeemed exactly once via ConsumeOnce, and an all-or-nothing signing-key rotation via Rotate inside WithTx. The live database portion is gated behind DATABASE_TEST_BINDINGS.",
+  "tags": ["go", "e2e"],
+  "extensions": ["/go/extension"],
+  "featureAuthority": {"owner": "go/persistence-transactions"},
+  "dependencies": [
+    "/go/framework/database",
+    "/go/framework/errors",
+    "/protocols/transaction"
+  ],
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    }
+  }
+}

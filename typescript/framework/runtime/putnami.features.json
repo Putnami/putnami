@@ -1,0 +1,207 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/dependency-injection",
+      "type": "feature",
+      "name": "TypeScript dependency injection",
+      "outcome": "TypeScript workloads resolve their services from one container tree whose lifetimes, visibility, and disposal order are decided at composition time rather than at first use",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "graph-validation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unresolvable-dependency-fails-start",
+              "a-dependency-cycle-fails-start",
+              "an-unmet-module-requirement-fails",
+              "validation-runs-before-any-instance-is-constructed"
+            ]
+          }
+        },
+        {
+          "id": "singleton-identity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["singleton-single-construction", "singleton-concurrent-async-once"]
+          }
+        },
+        {
+          "id": "scope-isolation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-scoped-provider-is-one-instance-per-scope", "concurrent-scopes-never-share-an-instance"]
+          }
+        },
+        {
+          "id": "private-visibility",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-mounted-private-provider-is-unreachable-from-the-root",
+              "a-mounted-private-provider-never-leaks-through-list"
+            ]
+          }
+        },
+        {
+          "id": "disposal-order",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["onclose-hooks-run-in-reverse-construction-order", "resolving-after-close-fails"]
+          }
+        },
+        {
+          "id": "one-shot-lifecycle",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "starting-twice-raises-a-named-error",
+              "closing-before-start-raises-a-named-error",
+              "resolving-before-start-raises-a-named-error"
+            ]
+          }
+        },
+        {
+          "id": "root-surface",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-root-barrel-exposes-the-stable-inject-surface",
+              "the-root-barrel-hides-test-doubles",
+              "the-root-barrel-hides-container-escape-hatches",
+              "test-doubles-are-reachable-from-the-testing-subpath",
+              "escape-hatches-are-reachable-from-the-inject-subpath"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "typescript/typed-configuration",
+      "type": "feature",
+      "name": "TypeScript typed configuration",
+      "outcome": "TypeScript workloads read validated, environment-aware configuration whose precedence is fixed and whose secret values never reach a log, an error, or a config dump",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "source-precedence",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-five-built-in-sources-are-registered",
+              "config-data-outranks-file-sources",
+              "a-higher-priority-source-wins-the-merge",
+              "three-sources-merge-in-priority-order",
+              "a-registered-extension-source-can-outrank-the-defaults"
+            ]
+          }
+        },
+        {
+          "id": "env-fills-gaps",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["an-env-descriptor-supplies-a-missing-value", "a-file-value-overrides-the-environment-variable"]
+          }
+        },
+        {
+          "id": "fail-loud",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-missing-required-field-fails-the-read", "a-type-mismatch-fails-the-read"]
+          }
+        },
+        {
+          "id": "secret-redaction",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-sensitive-field-is-redacted-in-validation-errors",
+              "a-sensitive-field-is-redacted-in-the-config-description",
+              "a-nested-sensitive-field-is-redacted-too"
+            ]
+          }
+        },
+        {
+          "id": "secret-names-only",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-carries-sorted-secret-names",
+              "secret-names-are-canonicalized-to-the-infra-grammar",
+              "a-stale-sidecar-is-removed-when-no-secret-remains"
+            ]
+          }
+        },
+        {
+          "id": "untrusted-input",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-proto-key-cannot-pollute-object-prototype",
+              "constructor-and-prototype-keys-cannot-pollute-object-prototype"
+            ]
+          }
+        },
+        {
+          "id": "contributed-paths",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-contributed-block-registers-under-its-own-path",
+              "re-registering-the-identical-definition-is-a-no-op",
+              "a-different-definition-claiming-the-same-path-fails"
+            ]
+          }
+        },
+        {
+          "id": "browser-surface",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "declared-defaults-apply-in-the-browser",
+              "call-site-overrides-apply-in-the-browser",
+              "the-browser-entry-reports-the-browser-environment",
+              "the-browser-entry-reads-no-server-config-source",
+              "a-missing-required-field-does-not-throw-in-the-browser"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

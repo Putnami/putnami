@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-storage.json",
+  "title": "Putnami Storage Resources (manifest)",
+  "description": "A project's declared object/blob storage resources. Provider-neutral: a deployer maps each resource onto a concrete backend, provisions it, and injects a binding (see putnami-storage-binding.json). The protocol does not proxy object bytes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "protocolVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Current storage-protocol version."
+    },
+    "resources": {
+      "type": "array",
+      "description": "Object/blob storage resources this project requires.",
+      "items": { "$ref": "#/$defs/resource" }
+    }
+  },
+  "$defs": {
+    "resourceName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_./-]{0,63}$",
+      "description": "Canonical resource identifier: lowercase letters, digits, '-', '_', '.', '/'; 1–64 chars."
+    },
+    "access": {
+      "type": "string",
+      "enum": ["read", "write", "readwrite"],
+      "description": "Access level the workload needs; drives the IAM grant scope a deployer provisions. Closed enum; adding a value requires a protocol version bump."
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["project", "workspace", "environment", "runtime"],
+      "description": "Isolation boundary the resource is owned at. Closed enum; adding a value requires a protocol version bump."
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "description": "One provider-neutral object/blob storage requirement.",
+      "properties": {
+        "name":       { "$ref": "#/$defs/resourceName" },
+        "access":     { "$ref": "#/$defs/access" },
+        "scope":      { "$ref": "#/$defs/scope" },
+        "signedUrls": {
+          "type": "boolean",
+          "description": "Whether the workload needs signed-URL capability (clients transfer bytes directly to the provider via time-limited URLs)."
+        },
+        "public": {
+          "type": "boolean",
+          "description": "Whether objects need public (unauthenticated) read access."
+        },
+        "retention": {
+          "type": "string",
+          "description": "Free-form retention string (e.g. \"30d\"). Format is deployer-defined."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,1 @@
+{ "protocolVersion": 2, "urlTemplate": "https://cas.example/blob/{digest}", "method": "PUT" }

@@ -1,0 +1,393 @@
+{
+  "protocol": "putnami.logging.v1",
+  "suite": "putnami.logging.conformance.v1",
+  "protocolVersion": 1,
+  "tokens": {
+    "<iso8601-millis-utc>": "string matching ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+    "<number>": "any JSON number",
+    "<string>": "any non-empty JSON string"
+  },
+  "cases": [
+    {
+      "id": "http.terminal.success",
+      "level": "required",
+      "boundary": "http",
+      "summary": "HTTP terminal record for a 2xx response: one INFO record with the http group and top-level traceId.",
+      "drive": {
+        "route": "GET /conformance/orders",
+        "handler": "return 200",
+        "middleware": "request-id/trace + logging middleware installed"
+      },
+      "record": {
+        "severity": "INFO",
+        "message": "[GET] /conformance/orders",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "http",
+        "traceId": "<string>",
+        "http": {
+          "method": "GET",
+          "routePath": "/conformance/orders",
+          "status": 200,
+          "outcome": "success",
+          "durationMs": "<number>"
+        }
+      }
+    },
+    {
+      "id": "http.terminal.5xx",
+      "level": "required",
+      "boundary": "http",
+      "summary": "HTTP terminal record for a handler failure mapped to 500: ERROR severity, structured error, no error text in the message.",
+      "drive": {
+        "route": "GET /conformance/orders",
+        "handler": "throw/return error with message 'boom' mapped to a 500 response",
+        "middleware": "request-id/trace + logging middleware installed"
+      },
+      "record": {
+        "severity": "ERROR",
+        "message": "[GET] /conformance/orders",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "http",
+        "traceId": "<string>",
+        "http": {
+          "method": "GET",
+          "routePath": "/conformance/orders",
+          "status": 500,
+          "outcome": "failure",
+          "durationMs": "<number>"
+        },
+        "error": {
+          "$open": true,
+          "name": "<string>",
+          "message": "boom"
+        }
+      }
+    },
+    {
+      "id": "http.terminal.success-with-publishes",
+      "level": "recommended",
+      "boundary": "http",
+      "summary": "Accumulation: two event publishes inside one request surface on the HTTP terminal record as an appended list plus an incremented counter.",
+      "drive": {
+        "route": "POST /conformance/orders",
+        "handler": "publish 'logging.conformance.orders' twice, return 200",
+        "middleware": "request-id/trace + logging middleware installed"
+      },
+      "record": {
+        "severity": "INFO",
+        "message": "[POST] /conformance/orders",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "http",
+        "traceId": "<string>",
+        "http": {
+          "method": "POST",
+          "routePath": "/conformance/orders",
+          "status": 200,
+          "outcome": "success",
+          "durationMs": "<number>"
+        },
+        "event": {
+          "publishCount": 2,
+          "publishes": [
+            { "topic": "logging.conformance.orders", "messageId": "<string>" },
+            { "topic": "logging.conformance.orders", "messageId": "<string>" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "event.terminal.success",
+      "level": "required",
+      "boundary": "event",
+      "summary": "Event terminal record for a handled delivery: one INFO record per delivery with the event group.",
+      "drive": {
+        "topic": "logging.conformance.orders",
+        "handler": "acknowledge",
+        "transport": "memory broker"
+      },
+      "record": {
+        "severity": "INFO",
+        "message": "message handled",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "events.handler",
+        "traceId": "<string>",
+        "event": {
+          "topic": "logging.conformance.orders",
+          "messageId": "<string>",
+          "attempt": 1,
+          "outcome": "success",
+          "durationMs": "<number>"
+        }
+      }
+    },
+    {
+      "id": "event.terminal.failure",
+      "level": "required",
+      "boundary": "event",
+      "summary": "Event terminal record for a failed delivery: ERROR severity with the same event group shape plus a structured error.",
+      "drive": {
+        "topic": "logging.conformance.orders",
+        "handler": "throw error with message 'conformance handler failure'",
+        "transport": "memory broker, no retries"
+      },
+      "record": {
+        "severity": "ERROR",
+        "message": "message handling failed",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "events.handler",
+        "traceId": "<string>",
+        "event": {
+          "topic": "logging.conformance.orders",
+          "messageId": "<string>",
+          "attempt": 1,
+          "outcome": "failure",
+          "durationMs": "<number>"
+        },
+        "error": {
+          "$open": true,
+          "name": "<string>",
+          "message": "conformance handler failure"
+        }
+      }
+    },
+    {
+      "id": "event.terminal.retry",
+      "level": "required",
+      "boundary": "event",
+      "summary": "Retry record when a failed delivery is rescheduled: WARNING with attempt/nextAttempt/maxRetries and the structured error.",
+      "drive": {
+        "topic": "logging.conformance.orders",
+        "handler": "always throw error with message 'conformance handler failure'",
+        "transport": "memory broker, maxRetries 2, DLQ enabled with subscriber",
+        "pick": "the retry record emitted after the first failed delivery"
+      },
+      "record": {
+        "severity": "WARNING",
+        "message": "message retry scheduled",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "events.broker",
+        "traceId": "<string>",
+        "event": {
+          "topic": "logging.conformance.orders",
+          "messageId": "<string>",
+          "attempt": 1,
+          "nextAttempt": 2,
+          "delayMs": "<number>",
+          "maxRetries": 2,
+          "outcome": "failure"
+        },
+        "error": {
+          "$open": true,
+          "name": "<string>",
+          "message": "conformance handler failure"
+        }
+      }
+    },
+    {
+      "id": "event.terminal.dlq",
+      "level": "required",
+      "boundary": "event",
+      "summary": "Dead-letter record after retries are exhausted: ERROR reporting the true final attempt count (no off-by-one) and the DLQ topic. Emitted only once the dead-letter has been ACCEPTED, and never alongside a 'message dropped' record for the same message.",
+      "drive": {
+        "topic": "logging.conformance.orders",
+        "handler": "always throw error with message 'conformance handler failure'",
+        "transport": "memory broker, maxRetries 2, DLQ enabled with subscriber",
+        "pick": "the dead-letter record emitted after the second (final) failed delivery",
+        "sequence": "enqueue first, then report exactly ONE message-level outcome: 'message dead-lettered' when at least one dead-letter target accepted, otherwise a single 'message dropped' with reason dlq_enqueue_failed. A message never claims both, and a per-target refusal is not a message-level drop when another target accepted."
+      },
+      "record": {
+        "severity": "ERROR",
+        "message": "message dead-lettered",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "events.broker",
+        "traceId": "<string>",
+        "event": {
+          "topic": "logging.conformance.orders",
+          "messageId": "<string>",
+          "attempt": 2,
+          "dlqTopic": "logging.conformance.orders.dlq",
+          "outcome": "failure"
+        },
+        "error": {
+          "$open": true,
+          "name": "<string>",
+          "message": "conformance handler failure"
+        }
+      }
+    },
+    {
+      "id": "db.query.success",
+      "level": "required",
+      "boundary": "database",
+      "summary": "Successful query record: DEBUG with the database group carrying both duration units. The group is $open for the runtime layer difference (TS adds table).",
+      "drive": {
+        "operation": "SELECT 1 (or the runtime's equivalent smallest read)",
+        "gating": "same integration gating as the transaction conformance corpus"
+      },
+      "record": {
+        "severity": "DEBUG",
+        "message": "query executed",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "database",
+        "database": {
+          "$open": true,
+          "operation": "<string>",
+          "datasource": "<string>",
+          "durationMs": "<number>",
+          "durationUs": "<number>",
+          "outcome": "success"
+        }
+      }
+    },
+    {
+      "id": "db.query.failure",
+      "level": "required",
+      "boundary": "database",
+      "summary": "Failed query record: WARNING (not ERROR — the pool reports outcome and propagates; the boundary owns ERROR) with a structured error.",
+      "drive": {
+        "operation": "syntactically invalid SQL",
+        "gating": "same integration gating as the transaction conformance corpus"
+      },
+      "record": {
+        "severity": "WARNING",
+        "message": "query failed",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "database",
+        "database": {
+          "$open": true,
+          "operation": "<string>",
+          "datasource": "<string>",
+          "durationMs": "<number>",
+          "durationUs": "<number>",
+          "outcome": "failure"
+        },
+        "error": {
+          "$open": true,
+          "name": "<string>",
+          "message": "<string>"
+        }
+      }
+    },
+    {
+      "id": "db.query.slow",
+      "level": "required",
+      "boundary": "database",
+      "summary": "Slow-query record: WARNING with thresholdMs; the query itself succeeded.",
+      "drive": {
+        "operation": "pg_sleep-style query with slow-query threshold configured at 1ms",
+        "gating": "same integration gating as the transaction conformance corpus"
+      },
+      "record": {
+        "severity": "WARNING",
+        "message": "slow query",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "database",
+        "database": {
+          "$open": true,
+          "operation": "<string>",
+          "datasource": "<string>",
+          "durationMs": "<number>",
+          "durationUs": "<number>",
+          "thresholdMs": 1,
+          "outcome": "success"
+        }
+      }
+    },
+    {
+      "id": "db.tx.commit",
+      "level": "required",
+      "boundary": "database",
+      "summary": "Committed transaction record: DEBUG with outcome success.",
+      "drive": {
+        "operation": "transaction with one write, committed",
+        "gating": "same integration gating as the transaction conformance corpus"
+      },
+      "record": {
+        "severity": "DEBUG",
+        "message": "transaction committed",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "database",
+        "database": {
+          "datasource": "<string>",
+          "outcome": "success",
+          "durationMs": "<number>",
+          "durationUs": "<number>",
+          "retries": 0
+        }
+      }
+    },
+    {
+      "id": "db.tx.rollback",
+      "level": "required",
+      "boundary": "database",
+      "summary": "Rolled-back transaction record: WARNING with outcome failure and the classified rollbackCause only — never raw error text.",
+      "drive": {
+        "operation": "transaction whose callback errors, rolling back",
+        "gating": "same integration gating as the transaction conformance corpus"
+      },
+      "record": {
+        "severity": "WARNING",
+        "message": "transaction rolled back",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "database",
+        "database": {
+          "datasource": "<string>",
+          "outcome": "failure",
+          "durationMs": "<number>",
+          "durationUs": "<number>",
+          "retries": 0,
+          "rollbackCause": "<string>"
+        }
+      }
+    },
+    {
+      "id": "migration.applied",
+      "level": "required",
+      "boundary": "migration",
+      "summary": "Per-migration terminal record on success: INFO with the migration group and duration.",
+      "drive": {
+        "migration": "one applying SQL migration named 0001_conformance",
+        "gating": "none: driven through the real migrator over a DB-free recording connection in both runtimes"
+      },
+      "record": {
+        "severity": "INFO",
+        "message": "migration applied",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "database.migration",
+        "migration": {
+          "name": "0001_conformance",
+          "datasource": "<string>",
+          "durationMs": "<number>",
+          "outcome": "success"
+        }
+      }
+    },
+    {
+      "id": "migration.failed",
+      "level": "required",
+      "boundary": "migration",
+      "summary": "Per-migration terminal record on failure: ERROR with a structured error; the run still aborts by throwing/returning.",
+      "drive": {
+        "migration": "one failing SQL migration named 0002_conformance_failing",
+        "gating": "none: driven through the real migrator over a DB-free recording connection in both runtimes"
+      },
+      "record": {
+        "severity": "ERROR",
+        "message": "migration failed",
+        "timestamp": "<iso8601-millis-utc>",
+        "logger": "database.migration",
+        "migration": {
+          "name": "0002_conformance_failing",
+          "datasource": "<string>",
+          "durationMs": "<number>",
+          "outcome": "failure"
+        },
+        "error": {
+          "$open": true,
+          "name": "<string>",
+          "message": "<string>"
+        }
+      }
+    }
+  ]
+}

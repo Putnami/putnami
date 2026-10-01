@@ -1,0 +1,24 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/examples/simple-api",
+  "description": "Go example: minimal HTTP API demonstrating the framework happy path",
+  "tags": ["go", "e2e"],
+  "extensions": ["/go/extension"],
+  "featureAuthority": {"owner": "go/http-services"},
+  "dependencies": [
+    "/go/framework/app",
+    "/go/framework/errors",
+    "/go/framework/http",
+    "/go/framework/inject",
+    "/go/framework/logger"
+  ],
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    },
+    "serve": {
+      "port": 3802
+    }
+  }
+}

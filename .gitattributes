@@ -1,0 +1,5 @@
+# Check text out with LF endings on every platform (decision D-W4).
+* text=auto eol=lf
+
+# Recorded HTTP exchanges keep their wire bytes, CRLF included.
+*.http -text

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/ui-system",
+  "outcomes": [
+    "A React application composes layout, typography, form, feedback, overlay, navigation, and data-display primitives from one theme vocabulary",
+    "The first server-rendered color mode agrees with browser hydration and a later mode switch updates existing components",
+    "Keyboard and assistive-technology users receive explicit semantics, bounded focus, and predictable dismissal behavior from interactive primitives",
+    "Pre-rendered markdown can be displayed without executing hostile markup"
+  ],
+  "nonGoals": [
+    "A guarantee that every composition of the primitives is accessible without application-level labels, focus order, or content decisions",
+    "A markdown parser, arbitrary HTML sandbox, or permission to pass unsanitized strings to dangerouslySetInnerHTML",
+    "Owning route authorization or server data loading, which belong to @putnami/web and @putnami/application",
+    "Promising compatibility across every pre-1.0 minor release"
+  ],
+  "requirements": [
+    {
+      "id": "ssr-color-mode",
+      "text": "ThemeProvider emits one storage-failure-tolerant bootstrap script that resolves light, dark, or system preference before paint, and hydration recognizes rather than duplicates that script."
+    },
+    {
+      "id": "mode-reactive-colors",
+      "text": "Mode-dependent component colors use semantic CSS custom properties, so server and browser emit the same class and changing data-color-mode updates already-rendered components without a class rewrite."
+    },
+    {
+      "id": "responsive-layout",
+      "text": "Responsive array props are mobile-first: the first value is the base declaration, later values map in order to every declared breakpoint, null entries are skipped, and surplus values are ignored."
+    },
+    {
+      "id": "interactive-semantics",
+      "text": "Loading controls expose busy and disabled state, overlays expose dialog semantics only while open, and tabs publish tablist, tab, tabpanel, selection, and roving-tabindex state."
+    },
+    {
+      "id": "focus-boundary",
+      "text": "Modal focus trapping filters disabled, aria-hidden, and negative-tabindex nodes, wraps at either edge, restores an escaped focus target, and falls back to the surface when no descendant is focusable."
+    },
+    {
+      "id": "keyboard-and-dismissal",
+      "text": "Tabs move and wrap across enabled items with Arrow, Home, and End keys, while dismissible surfaces recognize Escape and outside clicks without dismissing through an unattached or triggering node."
+    },
+    {
+      "id": "rich-content-sanitization",
+      "text": "MarkdownRenderer sanitizes every HTML string through an allowlist that removes executable elements, event handlers, unsafe styles, comments, and obfuscated dangerous URL schemes while preserving documented structural, code, data, and aria markup."
+    },
+    {
+      "id": "external-link-containment",
+      "text": "Sanitized links opened in a new browsing context receive noopener, while rejected URLs lose the target attribute without dropping their visible text."
+    }
+  ],
+  "decisions": [
+    "typescript/framework/ui/doc/adr/0001-color-mode-is-a-css-state-not-a-render-branch.md",
+    "typescript/framework/ui/doc/adr/0002-rich-content-crosses-one-allowlist-boundary.md"
+  ]
+}

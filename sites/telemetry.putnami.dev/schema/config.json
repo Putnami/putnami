@@ -1,0 +1,47 @@
+{
+  "appName": "telemetry.putnami.dev",
+  "version": "0.0.0",
+  "schemaHash": "sha256:98a7bafd75c95135",
+  "configs": [
+    {
+      "path": "receiver",
+      "fields": [
+        {
+          "name": "collectorEndpoint",
+          "type": "string",
+          "env": "TELEMETRY_COLLECTOR_ENDPOINT"
+        },
+        {
+          "name": "trustedProxies",
+          "type": "string",
+          "env": "TELEMETRY_TRUSTED_PROXIES"
+        },
+        {
+          "name": "perIpPerMinute",
+          "type": "int",
+          "env": "TELEMETRY_PER_IP_PER_MINUTE"
+        },
+        {
+          "name": "globalQps",
+          "type": "int",
+          "env": "TELEMETRY_GLOBAL_QPS"
+        },
+        {
+          "name": "aggregateAudience",
+          "type": "string",
+          "env": "TELEMETRY_AGGREGATE_AUDIENCE"
+        },
+        {
+          "name": "aggregateIssuer",
+          "type": "string",
+          "env": "TELEMETRY_AGGREGATE_ISSUER"
+        },
+        {
+          "name": "aggregateCallers",
+          "type": "string",
+          "env": "TELEMETRY_AGGREGATE_CALLERS"
+        }
+      ]
+    }
+  ]
+}

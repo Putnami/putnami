@@ -1,0 +1,219 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-workspace-probe.json",
+  "title": "Putnami Workspace Probe Result",
+  "description": "Workspace probe protocol v1. A provider (extension) answers core's ProbeRequest with this result: what it knows about each candidate project directory, addressed by repo-relative path. Core alone assigns canonical paths and IDs; providers contribute source identity, derived dependency paths, publish/runs-with metadata, requested extension references, watched files, and opaque provider-owned metadata.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "extension"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Probe protocol version. A mismatch is rejected, never guessed at."
+    },
+    "extension": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Name of the answering extension. Keys the provider-owned metadata bucket in the merged view."
+    },
+    "projects": {
+      "type": "array",
+      "description": "Per-directory findings, joined across providers by path.",
+      "items": { "$ref": "#/definitions/probeProject" }
+    },
+    "watchedFiles": {
+      "type": "array",
+      "description": "Repo-relative files whose content changes this provider's answer independently of any single project (a workspace lockfile, a root toolchain config).",
+      "items": { "$ref": "#/definitions/relativePath" }
+    },
+    "diagnostics": {
+      "type": "array",
+      "description": "Provider-side findings. Advisory prose: deliberately excluded from the probe digest so a reworded warning cannot cold a cache key.",
+      "items": { "$ref": "#/definitions/diagnostic" }
+    }
+  },
+  "definitions": {
+    "dependencySource": {
+      "type": "string",
+      "enum": ["declared", "go-module", "package-json", "contract"],
+      "description": "Where one dependency edge came from: a declaration, a go.mod require or replace, a package.json dependency on a workspace package, or a generated client's committed contract."
+    },
+    "providerDependencySource": {
+      "type": "string",
+      "enum": ["declared", "go-module", "package-json"],
+      "description": "The subset of dependencySource a provider may claim. The contract source is core's own derivation and belongs to no provider's answer."
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\]",
+      "description": "Repo-relative, slash-separated path inside the workspace. The pattern only rejects the two shapes a plain regex can catch (a leading separator, a backslash-rooted path); the full rule — no absolute paths, no backslashes anywhere, no escape above the root — is enforced by the Go validator. Absolute paths, backslashes, and paths escaping the root are rejected: they would make a digest depend on where the repository is checked out or on the host OS."
+    },
+    "probeRequest": {
+      "type": "object",
+      "description": "Core's question to one provider.",
+      "additionalProperties": false,
+      "required": ["version", "extension"],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "const": 1,
+          "description": "Probe protocol version."
+        },
+        "extension": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Target extension name, echoed back in the result so a misrouted response is detectable."
+        },
+        "reason": {
+          "type": "string",
+          "enum": ["load", "refresh", "plan"],
+          "description": "Why core is probing. Advisory and never digested. 'plan' marks a --plan/--dry-run probe whose result must not be persisted."
+        },
+        "paths": {
+          "type": "array",
+          "description": "Repo-relative candidate project directories core already knows about. A provider may report a subset; it may not invent a project outside this set.",
+          "items": { "$ref": "#/definitions/relativePath" }
+        },
+        "files": {
+          "type": "array",
+          "description": "Repo-relative files core has already observed. Hints only: a provider that ignores them must still produce the same result.",
+          "items": { "$ref": "#/definitions/relativePath" }
+        },
+        "dependencySources": {
+          "type": "boolean",
+          "description": "Ask the provider to attribute every edge it reports (probeProject.dependencySources). Core sets it only for a provider whose manifest declares the capability; a provider strips the attribution from any answer to a request that did not ask, so a strict core that predates the member never receives it."
+        }
+      }
+    },
+    "probeProject": {
+      "type": "object",
+      "description": "What one provider knows about one project directory. The project root is NOT assumed to be the provider's own unit root: sourceFile may sit arbitrarily deep below path, and dependencies are project paths rather than module identifiers.",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "allOf": [{ "$ref": "#/definitions/relativePath" }],
+          "description": "Repo-relative project directory; the join key across providers. '.' is the canonical spelling of the workspace root."
+        },
+        "sourceName": {
+          "type": "string",
+          "description": "Identity the provider's own manifest declares (go.mod module, package.json name, pyproject name). Outranks a scope namePattern, never an explicit putnami.json name."
+        },
+        "sourceFile": {
+          "allOf": [{ "$ref": "#/definitions/relativePath" }],
+          "description": "Repo-relative file sourceName was read from. May be nested below path."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version the provider's manifest declares."
+        },
+        "type": {
+          "type": "string",
+          "description": "Provider's project classification (\"library\", \"application\")."
+        },
+        "tags": {
+          "type": "array",
+          "description": "Provider-derived tags.",
+          "items": { "type": "string" }
+        },
+        "dependencies": {
+          "type": "array",
+          "description": "Repo-relative PATHS of workspace projects this project depends on. Providers resolve their own module graph to paths; core resolves paths to projects.",
+          "items": { "$ref": "#/definitions/relativePath" }
+        },
+        "dependencySources": {
+          "type": "object",
+          "description": "Manifest family each reported dependency edge was derived from, keyed by the same repo-relative path. A dependency absent from this map is declared: the provider read it from a declaration rather than from an import. It never changes which edges are reported.",
+          "additionalProperties": { "$ref": "#/definitions/providerDependencySource" }
+        },
+        "publish": {
+          "type": "array",
+          "description": "Publish channels the provider derives.",
+          "items": { "type": "string" }
+        },
+        "runsWith": {
+          "type": "array",
+          "description": "Serve-mode service dependencies the provider derives.",
+          "items": { "type": "string" }
+        },
+        "extensions": {
+          "type": "array",
+          "description": "Extension references the project requests.",
+          "items": { "type": "string" }
+        },
+        "watchedFiles": {
+          "type": "array",
+          "description": "Repo-relative files whose content changes this project's probe answer or invalidates its work. Workspace-root entries also map otherwise-unowned root changes back to this project.",
+          "items": { "$ref": "#/definitions/relativePath" }
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Provider-owned opaque data. Core never interprets it; it is carried under project.metadata[<extension>] and hashed canonically."
+        }
+      }
+    },
+    "mergedProject": {
+      "type": "object",
+      "description": "Core's merged view of one project directory after folding every provider's answer and the explicitly authored putnami.json.",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": { "allOf": [{ "$ref": "#/definitions/relativePath" }] },
+        "sourceName": { "type": "string" },
+        "sourceFile": { "allOf": [{ "$ref": "#/definitions/relativePath" }] },
+        "version": { "type": "string" },
+        "type": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "dependencies": { "type": "array", "items": { "$ref": "#/definitions/relativePath" } },
+        "dependencySources": {
+          "type": "object",
+          "description": "Union of the providers' edge provenance, keyed by the same repo-relative paths dependencies carries. An edge only the authored putnami.json declares is absent from it.",
+          "additionalProperties": { "$ref": "#/definitions/dependencySource" }
+        },
+        "publish": { "type": "array", "items": { "type": "string" } },
+        "runsWith": { "type": "array", "items": { "type": "string" } },
+        "extensions": { "type": "array", "items": { "type": "string" } },
+        "watchedFiles": { "type": "array", "items": { "$ref": "#/definitions/relativePath" } },
+        "metadata": {
+          "type": "object",
+          "description": "Provider-owned metadata bucketed by extension name, so two providers can never collide.",
+          "additionalProperties": { "type": "object" }
+        }
+      }
+    },
+    "probeFailure": {
+      "type": "object",
+      "description": "Typed, causal probe failure. Graph-dependent commands fail with this attached; recovery commands stay available.",
+      "additionalProperties": false,
+      "required": ["kind", "message"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["provider-unavailable", "transport", "timeout", "invalid-result", "merge-conflict", "visibility-violation", "declared-edge"],
+          "description": "Machine-readable cause."
+        },
+        "extension": { "type": "string", "description": "Provider that failed, when known." },
+        "message": { "type": "string", "description": "Human-readable cause." },
+        "diagnostics": {
+          "type": "array",
+          "description": "Underlying validation findings, when the failure came from rejecting a payload.",
+          "items": { "$ref": "#/definitions/diagnostic" }
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "description": "Shared structured diagnostic (protocols/diagnostic).",
+      "additionalProperties": false,
+      "required": ["severity", "code", "message"],
+      "properties": {
+        "severity": { "type": "string", "enum": ["error", "warning", "info"] },
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "field": { "type": "string" }
+      }
+    }
+  }
+}

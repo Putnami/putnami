@@ -1,0 +1,77 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/migration-cli",
+      "type": "feature",
+      "name": "Go migration CLI",
+      "outcome": "Operators run migration apply, rollback, status, inspect, and drift verification against the service's real application graph without starting runtime listeners",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "cancellation-cleanup",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "operational-error-closes-prepared-container",
+              "prepare-failure-closes-eager-container-resource",
+              "signal-cancels-in-flight-registry-work"
+            ]
+          }
+        },
+        {
+          "id": "command-contract",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "clean-verify-exits-0",
+              "down-forwards-explicit-target",
+              "down-rejects-bare-target-without-to",
+              "drift-exits-3",
+              "operational-failure-exits-2",
+              "read-commands-reject-extra-arguments",
+              "up-forwards-explicit-target",
+              "up-rejects-bare-target-without-to",
+              "user-error-exits-1"
+            ]
+          }
+        },
+        {
+          "id": "machine-output",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "default-output-is-table",
+              "empty-result-is-an-empty-json-array",
+              "inspect-emits-valid-json",
+              "records-completed-before-an-error-are-emitted",
+              "status-emits-json-array",
+              "status-emits-jsonl"
+            ]
+          }
+        },
+        {
+          "id": "prepare-only",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "prepare-collects-the-migration-registry",
+              "prepare-starts-no-plugin-and-runs-no-invoker"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

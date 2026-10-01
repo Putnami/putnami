@@ -1,0 +1,8 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-storage.json",
+  "protocolVersion": 1,
+  "resources": [
+    { "name": "uploads", "access": "readwrite", "scope": "runtime", "signedUrls": true, "retention": "30d" },
+    { "name": "public-assets", "access": "read", "scope": "workspace", "public": true }
+  ]
+}

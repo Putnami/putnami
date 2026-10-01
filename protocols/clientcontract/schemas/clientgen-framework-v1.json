@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/clientgen-framework-v1.json",
+  "title": "Putnami generated-client framework transport inventory v1",
+  "description": "The older workspace-root layout: one file whose entries each name their project. clientgen reads none of its entries and lists the project file each one moves to; each project commits a clientgen-framework-v2 document instead.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "transports"],
+  "properties": {
+    "protocolVersion": {
+      "const": 1
+    },
+    "transports": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transport"
+      }
+    }
+  },
+  "$defs": {
+    "workspacePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:\\.|(?!/|.*(?:^|/)\\.\\.(?:/|$)|.*\\\\).+)$"
+    },
+    "callsite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "transport", "symbol", "fingerprint"],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/workspacePath"
+        },
+        "transport": {
+          "enum": ["connect", "http", "putnami-client", "sse", "websocket"]
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "runtime", "status", "adapter", "callsites", "owner", "tests", "reason"],
+      "properties": {
+        "project": {
+          "$ref": "#/$defs/workspacePath"
+        },
+        "runtime": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "status": {
+          "enum": ["framework-runtime", "pending-provider-contract", "transport-primitive"]
+        },
+        "adapter": {
+          "$ref": "#/$defs/workspacePath"
+        },
+        "callsites": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/callsite"
+          }
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tests": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/workspacePath"
+          }
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "pendingWork": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "framework-runtime" } }, "required": ["status"] },
+          "then": {
+            "properties": { "runtime": { "enum": ["@putnami/client", "go.putnami.dev/client"] } },
+            "not": { "anyOf": [{ "required": ["operations"] }, { "required": ["pendingWork"] }] }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "transport-primitive" } }, "required": ["status"] },
+          "then": { "not": { "anyOf": [{ "required": ["operations"] }, { "required": ["pendingWork"] }] } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "pending-provider-contract" } }, "required": ["status"] },
+          "then": { "required": ["operations", "pendingWork"] }
+        }
+      ]
+    }
+  }
+}

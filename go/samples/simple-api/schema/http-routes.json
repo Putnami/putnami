@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/greetings",
+      "methods": [
+        "GET",
+        "HEAD",
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/greetings/{id}",
+      "methods": [
+        "DELETE",
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    }
+  ],
+  "digest": "sha256:def173ba066baaef200f9221739932722da11c1bf0fb6fe9f60c329ac75f033f"
+}

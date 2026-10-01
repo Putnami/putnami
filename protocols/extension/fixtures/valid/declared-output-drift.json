@@ -1,0 +1,66 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/declared-output-drift",
+  "version": "1.0.0",
+  "cliContract": 4,
+  "commands": {
+    "build": {
+      "description": "Generate the committed contract and the configured client",
+      "run": [
+        { "id": "generate", "task": "build-generate" },
+        { "id": "clients", "task": "build-clients", "dependsOn": ["generate"] }
+      ]
+    }
+  },
+  "tasks": {
+    "build-generate": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["generate"],
+      "cwd": "{projectRoot}",
+      "reads": ["sources"],
+      "writes": ["gen"],
+      "cache": { "enabled": true, "deterministic": true },
+      "declares": {
+        "outputs": {
+          "gen": {
+            "kind": "directory",
+            "path": ".gen",
+            "description": "Build-time generation; not committed, so no drift policy."
+          },
+          "schema": {
+            "kind": "file",
+            "path": "schema/openapi.json",
+            "drift": "warn",
+            "description": "The committed contract sidecar: a difference is reported, the task keeps its status."
+          }
+        }
+      }
+    },
+    "build-clients": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["clients"],
+      "cwd": "{projectRoot}",
+      "reads": ["sources"],
+      "writes": ["clients"],
+      "cache": { "enabled": true, "deterministic": true },
+      "outputs": {
+        "clientOutput": {
+          "description": "Project-relative directory of the generated client, chosen by the project's configuration."
+        }
+      },
+      "declares": {
+        "outputs": {
+          "client": {
+            "kind": "directory",
+            "pathFrom": "clientOutput",
+            "optionalEmpty": true,
+            "drift": "fail",
+            "description": "The committed generated client: stale bytes fail the task, and the worktree holds the regenerated ones to commit."
+          }
+        }
+      }
+    }
+  }
+}

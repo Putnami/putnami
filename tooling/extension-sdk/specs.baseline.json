@@ -1,0 +1,25 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "tooling/extension-authoring#agent-content-packaging",
+    "tooling/extension-authoring#agent-content-staging",
+    "tooling/extension-authoring#architecture-authored-in-code",
+    "tooling/extension-authoring#builder-does-not-alias",
+    "tooling/extension-authoring#cache-eviction-policy",
+    "tooling/extension-authoring#checkout-independent-generation-paths",
+    "tooling/extension-authoring#credential-confinement",
+    "tooling/extension-authoring#ecosystem-profiles",
+    "tooling/extension-authoring#event-stream-conformance",
+    "tooling/extension-authoring#host-identity-scrub",
+    "tooling/extension-authoring#infra-aggregation-neutrality",
+    "tooling/extension-authoring#local-image-publication-boundary",
+    "tooling/extension-authoring#log-forwarding-fidelity",
+    "tooling/extension-authoring#manifest-validated-at-build-time",
+    "tooling/extension-authoring#oci-publish-by-digest",
+    "tooling/extension-authoring#release-plan-compatibility",
+    "tooling/extension-authoring#shared-package-metadata-writer",
+    "tooling/extension-authoring#subprocess-control",
+    "tooling/extension-authoring#test-environment-policy"
+  ]
+}

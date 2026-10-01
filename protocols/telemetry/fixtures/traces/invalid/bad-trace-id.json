@@ -1,0 +1,19 @@
+{
+  "resourceSpans": [
+    {
+      "resource": { "attributes": [] },
+      "scopeSpans": [
+        {
+          "scope": { "name": "putnami" },
+          "spans": [
+            {
+              "traceId": "abc123",
+              "spanId": "0000000000000001",
+              "name": "process"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

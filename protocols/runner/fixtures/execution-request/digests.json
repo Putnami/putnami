@@ -1,0 +1,11 @@
+{
+  "bound-inputs.json": "sha256:6d23bd163b7470be800c9738f40f367c4507ae2d477d48e089e0db4a4e064a67",
+  "impacted-fallback.json": "sha256:81d1b2a60b3c9f97db2b975501fa769fdada52539317676fd649606420ae273f",
+  "impacted-task-scoped.json": "sha256:8669e01e3f85580db2663d2d4de1a30000b4580040f243b6c6a3a50c130eebb5",
+  "impacted.json": "sha256:6db802dc4594883da964bbc1c3b3c348bf954fbe26d28b8628a82c1b5b10984c",
+  "projects.json": "sha256:8b512b30fcb4f45a02a8c48441b974aeb4bf020a909d40b43dc11b2d8d40f318",
+  "providers-install.json": "sha256:ac15fb249b367bd25b5261215b70e9927d5dab076dabb75bef3a860996fb2c7a",
+  "providers-publication.json": "sha256:53ba788080b84a98de2a0e54ad49cb0edd035ac6a9a2f686ba4a6196e0f23eae",
+  "publication-under-another-command.json": "sha256:635436cea9ce75a454d126e8a2276fbe7ebcafb75000bb56cc8aef55c6ab435e",
+  "resources.json": "sha256:8b512b30fcb4f45a02a8c48441b974aeb4bf020a909d40b43dc11b2d8d40f318"
+}

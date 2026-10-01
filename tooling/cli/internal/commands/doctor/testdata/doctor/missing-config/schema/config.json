@@ -1,0 +1,16 @@
+{
+  "appName": "go.putnami.dev/example/missing",
+  "version": "0.1.0",
+  "configs": [
+    {
+      "path": "server",
+      "fields": [{ "name": "port", "type": "int", "required": true }]
+    },
+    {
+      "path": "database",
+      "fields": [
+        { "name": "password", "type": "string", "required": true, "sensitive": true }
+      ]
+    }
+  ]
+}

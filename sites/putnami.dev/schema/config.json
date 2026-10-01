@@ -1,0 +1,135 @@
+{
+  "appName": "putnami.dev",
+  "version": "0.84.1",
+  "schemaHash": "sha256:523146083e8aa685",
+  "configs": [
+    {
+      "path": "app",
+      "fields": []
+    },
+    {
+      "path": "analytics",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "default": "true"
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "default": "cookieless",
+          "constraints": ["oneOf"]
+        },
+        {
+          "name": "datasource",
+          "type": "string",
+          "default": "analytics"
+        },
+        {
+          "name": "secret",
+          "type": "string",
+          "sensitive": true
+        },
+        {
+          "name": "serverPageViews",
+          "type": "bool",
+          "default": "true"
+        },
+        {
+          "name": "respectGpc",
+          "type": "bool",
+          "default": "true"
+        },
+        {
+          "name": "respectDnt",
+          "type": "bool",
+          "default": "true"
+        },
+        {
+          "name": "countryHeader",
+          "type": "string"
+        },
+        {
+          "name": "trustedProxies",
+          "type": "array",
+          "items": {
+            "name": "",
+            "type": "string"
+          }
+        },
+        {
+          "name": "retentionRawDays",
+          "type": "int",
+          "default": "90",
+          "constraints": ["integer"]
+        },
+        {
+          "name": "retentionAggregateDays",
+          "type": "int",
+          "default": "760",
+          "constraints": ["integer"]
+        },
+        {
+          "name": "retentionMode",
+          "type": "string",
+          "default": "sweep",
+          "constraints": ["oneOf"]
+        },
+        {
+          "name": "maxPathKeysPerDay",
+          "type": "int",
+          "default": "2000",
+          "constraints": ["integer"]
+        },
+        {
+          "name": "rateLimitPerMinute",
+          "type": "int",
+          "default": "120",
+          "constraints": ["integer"]
+        },
+        {
+          "name": "flushIntervalMs",
+          "type": "int",
+          "default": "5000",
+          "constraints": ["integer"]
+        },
+        {
+          "name": "flushWaitMs",
+          "type": "int",
+          "default": "1000",
+          "constraints": ["integer"]
+        },
+        {
+          "name": "queueCapacity",
+          "type": "int",
+          "default": "5000",
+          "constraints": ["integer"]
+        },
+        {
+          "name": "flushBatch",
+          "type": "int",
+          "default": "200",
+          "constraints": ["integer"]
+        },
+        {
+          "name": "flushDeadlineMs",
+          "type": "int",
+          "default": "5000",
+          "constraints": ["integer"]
+        },
+        {
+          "name": "cookieName",
+          "type": "string",
+          "default": "_pa"
+        },
+        {
+          "name": "cookieMaxAgeDays",
+          "type": "int",
+          "default": "390",
+          "constraints": ["integer"]
+        }
+      ]
+    }
+  ]
+}

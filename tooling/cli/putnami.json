@@ -1,0 +1,75 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/cli",
+  "tags": [
+    "go"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "publish": [
+    "archives"
+  ],
+  "options": {
+    "lint": {
+      "fix": false
+    },
+    "test": {
+      "coverage-threshold": 80,
+      "filePatterns": [
+        "doc/**",
+        "internal/cli/testdata/**",
+        "internal/commands/testdata/**",
+        "internal/mcp/testdata/**",
+        "testdata/recorded/**",
+        "internal/lockfile/testdata/prior-releases/**",
+        "scripts/**",
+        "../../**/putnami.json",
+        "../*/putnami.json",
+        "../../decisions.json",
+        "../../**/decisions.json",
+        "../../typescript/samples/recipes.json",
+        "../../go/samples/recipes.json",
+        "../../python/samples/recipes.json",
+        "../../.agents/constraints.md",
+        "../../putnami.support.json",
+        "../../putnami.workspace.json",
+        "../../putnami.ci.json",
+        "../../protocols/ci/fixtures/change-plan/**",
+        "../../go/framework/config/*.go",
+        "../../**/putnami.extension.json",
+        "../local-collaboration/**",
+        "../../.agents/skills/**",
+        "../../.claude/skills/**",
+        "../../.claude/agents/**",
+        "../../.codex/agents/**",
+        "../contributor/putnami.json",
+        "../contributor/putnami.extension.json",
+        "../contributor/src/**",
+        "git:../../**/client.putnami.json",
+        "git:../../**/schema/openapi.json"
+      ]
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true,
+      "binary-name": "putnami"
+    },
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami",
+      "install": ".putnami/bin/putnami-go-dev",
+      "version-var": "go.putnami.dev/tooling/cli/internal/cli.Version"
+    },
+    "@putnami/go:test": {
+      "race": true
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

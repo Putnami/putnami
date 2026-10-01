@@ -1,0 +1,74 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/workspace-discovery-selection",
+  "outcomes": [
+    "A user can identify the active workspace and inspect every project without reading private state",
+    "A user can select projects by canonical id, name, path, alias, group, tag, current directory, or explicit list",
+    "An impacted selection includes direct owners and their transitive dependents against an explicit or safely resolved baseline"
+  ],
+  "nonGoals": [
+    "Adding project or impacted filters to feature and specification commands",
+    "Letting language manifests replace Putnami workspace membership",
+    "Treating generated workspace projections as authored identity",
+    "Owning the target-expression grammar, filter composition, dependency-graph closure, and change-to-owner mapping, which cli/workspace-model specifies and /tooling/cli-model proves"
+  ],
+  "requirements": [
+    {
+      "id": "workspace-root",
+      "text": "Workspace discovery walks upward to a supported workspace marker, canonicalizes the result, and gives commands that require a workspace an actionable initialization error when none exists."
+    },
+    {
+      "id": "project-inventory",
+      "text": "Project listing and description expose canonical identities, physical paths, tags, dependencies, dependents, extensions, and metadata from the same loaded workspace graph."
+    },
+    {
+      "id": "target-selection",
+      "text": "Target expressions and selection flags resolve through the workspace model's shared grammar: one resolver serves the wire and the flags, the reported selection scope matches what was asked, and an ordinary selection that matches nothing is a usage error rather than an empty run."
+    },
+    {
+      "id": "impacted-closure",
+      "text": "Impacted selection maps changed files to their direct owners and includes the full transitive dependent closure, reaching an in-workspace extension's consumers for that extension's tasks only, so a plan keeps a task-scoped project's jobs of those extensions and their predecessors. A run that executes the selection records its complete trace, the diff base and the uncommitted changed files as a session event."
+    },
+    {
+      "id": "safe-baseline",
+      "text": "An implicit impacted baseline resolves from reviewed workspace and trunk candidates and never compares a branch with its own published counterpart."
+    },
+    {
+      "id": "version-lines-are-scopes",
+      "text": "A scope that declares a line block versions and tags its projects together under the line's tag pattern; a project's line is its nearest ancestor line, exactly one; a workspace without a line block is one line."
+    },
+    {
+      "id": "registries-keyed-by-ecosystem",
+      "text": "The workspace declares one registries entry per ecosystem, overridable per project, and every registry endpoint an extension needs comes from that entry."
+    },
+    {
+      "id": "registry-pin-wins",
+      "text": "A workspace extensions key equal to a project manifest's name, and that is not that project's path, pins the published build: it wins over the project manifest for every project. A path the workspace lists keeps the project manifest, and the project manifest loads when the pinned build does not."
+    },
+    {
+      "id": "starters-declare-their-registries",
+      "text": "putnami init declares, in the new workspace's registries, the entry its starter's framework dependencies install from: the TypeScript starter maps the @putnami npm scope to https://npm.putnami.dev, and the workspace install writes the .npmrc scope line from it. putnami init --force keeps every entry the workspace config at that path already declares, whole."
+    },
+    {
+      "id": "import-visibility-check",
+      "text": "Every workspace synchronization holds the resolved graph to the import boundaries its projects declare, on the edges providers attributed to a real import and never on declared dependencies alone. One workspace switch sets the severity, options.workspace.visibility: enforce — the default — refuses the graph while the repair commands stay reachable, report publishes warnings and changes no exit code, and off skips the check."
+    },
+    {
+      "id": "declared-edge-check",
+      "text": "Every workspace synchronization reports each declared dependency edge no import, contract or declared file input backs: a putnami.json entry, a language manifest entry no source imports, an orphan client.putnami.json. A project whose providers report no provenance is skipped with a notice. options.workspace.declaredEdges sets the severity. putnami deps prune removes what it can edit and names the hand edit for the rest, and the advice promises no more."
+    },
+    {
+      "id": "change-shape-report",
+      "text": "An impacted run reports its change's size split into authored code, tests, docs and generated files, and warns when the authored code spans projects no dependency relates, unless the branch is on a configured epic branch. Both are recorded as a session event and never change the exit code; no line-count threshold exists."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md",
+    "tooling/cli/doc/adr/0006-cli-model-and-command-verticals.md",
+    "tooling/cli/doc/adr/0042-impacted-plans-from-the-commit-and-records-why.md",
+    "tooling/cli/doc/adr/0045-a-project-declares-who-may-import-it.md",
+    "tooling/cli/doc/adr/0046-a-declared-edge-no-import-backs-is-a-finding.md",
+    "tooling/cli/doc/adr/0053-a-registry-pin-wins-over-a-same-name-project-manifest.md"
+  ]
+}

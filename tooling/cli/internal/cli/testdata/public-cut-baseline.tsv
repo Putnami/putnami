@@ -1,0 +1,5 @@
+# category<TAB>path<TAB>rule<TAB>exact evidence<TAB>count<TAB>review reason
+#
+# This is reviewed debt in the tracked tree, not an exception list. The gate
+# fails when an entry grows and also when it becomes stale, so this file can
+# only move toward empty. High-confidence secrets are never eligible.

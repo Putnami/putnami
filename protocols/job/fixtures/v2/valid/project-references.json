@@ -1,0 +1,122 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/apps/console/build",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {
+    "name": "putnami"
+  },
+  "project": {
+    "name": "surfaces/apps/console",
+    "path": "apps/console",
+    "fullPath": "/ws/apps/console",
+    "type": "application",
+    "dependencyClosure": [
+      {
+        "id": "/apps/console",
+        "name": "surfaces/apps/console",
+        "sourceName": "surfaces/apps/console",
+        "version": "1.4.0",
+        "path": "apps/console",
+        "fullPath": "/ws/apps/console",
+        "dependencies": [
+          "/libs/widget"
+        ]
+      },
+      {
+        "id": "/libs/widget",
+        "name": "@acme/widget",
+        "sourceName": "widget",
+        "version": "0.9.2",
+        "path": "libs/widget",
+        "fullPath": "/ws/libs/widget"
+      }
+    ]
+  },
+  "selectedProjects": [
+    {
+      "id": "/apps/console",
+      "name": "surfaces/apps/console",
+      "sourceName": "surfaces/apps/console",
+      "version": "1.4.0",
+      "path": "apps/console",
+      "fullPath": "/ws/apps/console",
+      "outputPath": "/ws/.putnami/out/apps/console/build",
+      "dependencies": [
+        "/libs/widget"
+      ]
+    },
+    {
+      "id": "/libs/widget",
+      "name": "@acme/widget",
+      "sourceName": "widget",
+      "version": "0.9.2",
+      "path": "libs/widget",
+      "fullPath": "/ws/libs/widget",
+      "outputPath": "/ws/.putnami/out/libs/widget/build",
+      "dependencies": []
+    },
+    {
+      "id": "/libs/legacy",
+      "name": "legacy",
+      "path": "libs/legacy",
+      "fullPath": "/ws/libs/legacy",
+      "outputPath": "/ws/.putnami/out/libs/legacy/build"
+    }
+  ],
+  "extension": {
+    "name": "@putnami/typescript",
+    "root": "/ws/typescript/extension"
+  },
+  "job": {
+    "name": "workspace-sync"
+  },
+  "identity": {
+    "key": "/apps/console:workspace-sync",
+    "scope": "workspace",
+    "project": {
+      "id": "/apps/console",
+      "name": "surfaces/apps/console"
+    },
+    "task": {
+      "name": "workspace-sync",
+      "command": "projects",
+      "kind": "sync"
+    },
+    "provider": {
+      "extension": "@putnami/typescript"
+    }
+  },
+  "params": {},
+  "workspaceProjects": [
+    {
+      "id": "/apps/console",
+      "name": "surfaces/apps/console",
+      "sourceName": "surfaces/apps/console",
+      "version": "1.4.0",
+      "path": "apps/console",
+      "fullPath": "/ws/apps/console",
+      "dependencies": [
+        "/libs/widget"
+      ],
+      "extensions": [
+        "/typescript/extension"
+      ]
+    },
+    {
+      "id": "/libs/legacy",
+      "name": "legacy",
+      "path": "libs/legacy",
+      "fullPath": "/ws/libs/legacy"
+    },
+    {
+      "id": "/libs/widget",
+      "name": "@acme/widget",
+      "sourceName": "widget",
+      "version": "0.9.2",
+      "path": "libs/widget",
+      "fullPath": "/ws/libs/widget",
+      "dependencies": []
+    }
+  ]
+}

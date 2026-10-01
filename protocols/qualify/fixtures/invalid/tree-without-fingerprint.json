@@ -1,0 +1,71 @@
+{
+  "protocolVersion": 1,
+  "project": "/go/samples/service-to-service",
+  "target": {
+    "kind": "local",
+    "compositionId": "0f1e2d3c4b5a6978"
+  },
+  "binding": {
+    "kind": "tree",
+    "headSHA": "3cc91b658a1e0f7d2c4b9e8f6a5d3c2b1a0f9e8d"
+  },
+  "contract": {
+    "digest": "sha256:3cc976e6d69f069aaf9a6afc5bc7564cffe1f31e7f889f3dc0719684bbbca1c9",
+    "requests": 1,
+    "derivedFrom": [
+      {
+        "kind": "http-routes",
+        "path": "go/samples/service-to-service/schema/http-routes.json",
+        "digest": "sha256:b71b8bcddd7e3f336d3abc1cf4cff56ed3a89536c44de8da65fccb01469681be"
+      }
+    ]
+  },
+  "phases": [
+    {
+      "name": "resolve-target",
+      "state": "composition_failed",
+      "durationMs": 12,
+      "diagnostics": [
+        {
+          "severity": "error",
+          "code": "qualify.composition_failed",
+          "message": "member /go/samples/service-to-service did not report ready within 60s (phase readiness)"
+        }
+      ]
+    },
+    {
+      "name": "readiness",
+      "state": "not_run",
+      "durationMs": 0
+    },
+    {
+      "name": "version-binding",
+      "state": "not_run",
+      "durationMs": 0
+    },
+    {
+      "name": "smoke",
+      "state": "not_run",
+      "durationMs": 0
+    },
+    {
+      "name": "teardown",
+      "state": "passed",
+      "durationMs": 12
+    }
+  ],
+  "requests": [
+    {
+      "id": "GET /items",
+      "durationMs": 0,
+      "state": "not_run"
+    }
+  ],
+  "state": "composition_failed",
+  "startedAt": "2026-09-17T10:00:00Z",
+  "finishedAt": "2026-09-17T10:01:02Z",
+  "cleanup": {
+    "state": "clean",
+    "leftovers": []
+  }
+}

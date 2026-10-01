@@ -1,0 +1,12 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities.json",
+  "protocolVersion": 1,
+  "project": "go.putnami.dev/example/iam",
+  "schemas": [
+    {
+      "name": "listUsers",
+      "kind": "grpc",
+      "provenance": { "project": "go.putnami.dev/example/iam", "sourceKind": "framework" }
+    }
+  ]
+}

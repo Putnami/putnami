@@ -1,0 +1,12 @@
+{
+  "$defs": {
+    "Currency": {
+      "enum": [
+        "usd"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "go.putnami.dev/acme/billing contracts"
+}

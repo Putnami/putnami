@@ -1,0 +1,12 @@
+{
+  "bundles": [
+    {
+      "name": "platform",
+      "package": "cloud/doc-contents-platform",
+      "channelHint": "canary",
+      "version": "0.0.0-20260929051531-8339b50e2",
+      "digest": "37d3e84a5d52ba8ff7b2c51fb2c0274bca5334b556dc6fb52d8ffbfff00e2ad2",
+      "registry": "https://put.putnami.dev"
+    }
+  ]
+}

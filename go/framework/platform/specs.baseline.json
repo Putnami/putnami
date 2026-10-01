@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/platform-endpoints#bounded-probes",
+    "go/platform-endpoints#deferred-discovery",
+    "go/platform-endpoints#endpoint-set",
+    "go/platform-endpoints#error-redaction",
+    "go/platform-endpoints#lifecycle-state",
+    "go/platform-endpoints#liveness-is-trivial",
+    "go/platform-endpoints#probe-names",
+    "go/platform-endpoints#required-probes",
+    "go/platform-endpoints#version-fallback"
+  ]
+}

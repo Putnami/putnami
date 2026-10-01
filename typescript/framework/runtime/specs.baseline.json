@@ -1,0 +1,21 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/dependency-injection#disposal-order",
+    "typescript/dependency-injection#graph-validation",
+    "typescript/dependency-injection#one-shot-lifecycle",
+    "typescript/dependency-injection#private-visibility",
+    "typescript/dependency-injection#root-surface",
+    "typescript/dependency-injection#scope-isolation",
+    "typescript/dependency-injection#singleton-identity",
+    "typescript/typed-configuration#browser-surface",
+    "typescript/typed-configuration#contributed-paths",
+    "typescript/typed-configuration#env-fills-gaps",
+    "typescript/typed-configuration#fail-loud",
+    "typescript/typed-configuration#secret-names-only",
+    "typescript/typed-configuration#secret-redaction",
+    "typescript/typed-configuration#source-precedence",
+    "typescript/typed-configuration#untrusted-input"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/events/managed-publish-frame-v1.json",
+  "title": "Putnami Events Managed Publish Frame v1",
+  "description": "The managed-workload profile of putnami.events.v1 EventServerFrame. Managed admission stamps channel and reserved routing/identity attributes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "type", "id", "dedupeKey", "topic", "topicVersion", "payload"],
+  "properties": {
+    "protocol": { "const": "putnami.events.v1" },
+    "type": { "const": "publish" },
+    "id": { "type": "string", "pattern": "\\S" },
+    "dedupeKey": { "type": "string", "pattern": "\\S" },
+    "topic": {
+      "type": "string",
+      "pattern": "\\S",
+      "not": { "pattern": "^projects/[^/]+/topics/" }
+    },
+    "topicVersion": { "type": "string", "pattern": "\\S" },
+    "payload": true,
+    "key": { "type": "string" },
+    "attributes": {
+      "type": "object",
+      "propertyNames": {
+        "not": {
+          "anyOf": [
+            {
+              "enum": [
+                "workspace_id",
+                "environment",
+                "workload",
+                "service",
+                "channel",
+                "topology_generation_id",
+                "traceparent",
+                "tracestate"
+              ]
+            },
+            { "pattern": "^auth\\." },
+            { "pattern": "^putnami\\." }
+          ]
+        }
+      },
+      "additionalProperties": { "type": "string" }
+    },
+    "traceId": { "type": "string" }
+  }
+}

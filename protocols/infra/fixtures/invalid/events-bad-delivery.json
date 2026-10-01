@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "events": {
+    "subscribes": [
+      { "topic": "order.created", "delivery": "webhook" }
+    ]
+  }
+}

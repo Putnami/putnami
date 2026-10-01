@@ -1,0 +1,16 @@
+{
+  "name": "@example/12-caching",
+  "version": "0.0.0",
+  "description": "Framework cache with TTL and pattern-based eviction",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/go-templates-proof",
+  "tags": ["go"],
+  "extensions": ["/go/extension"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0,
+      "filePatterns": [
+        "../*/putnami.template.json",
+        "../go-library/**",
+        "../go-server/**",
+        "../../extension/config/.golangci.yml",
+        "../../extension/tools/versions.json",
+        "../../framework/app/**",
+        "../../framework/config/**",
+        "../../framework/errors/**",
+        "../../framework/http/**",
+        "../../framework/inject/**",
+        "../../framework/logger/**",
+        "../../framework/migration/**",
+        "../../../protocols/capabilities/**",
+        "../../../protocols/config/**",
+        "../../../protocols/database/**",
+        "../../../protocols/diagnostic/**",
+        "../../../protocols/events/**",
+        "../../../protocols/features/**",
+        "../../../protocols/http-routes/**",
+        "../../../protocols/identity/**",
+        "../../../protocols/infra/**",
+        "../../../protocols/migration/**",
+        "../../../protocols/runtime/**",
+        "../../../protocols/storage/**"
+      ]
+    }
+  }
+}

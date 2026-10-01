@@ -1,0 +1,16 @@
+isError true
+--- block 0 ---
+{
+  "revision": {
+    "kind": ""
+  },
+  "compatibility": "",
+  "id": "",
+  "name": "",
+  "outcome": "",
+  "owner": "",
+  "declarations": null,
+  "implementations": null
+}
+--- block 1 ---
+no authored manifest or native design declaration matches feature "billing/nope"

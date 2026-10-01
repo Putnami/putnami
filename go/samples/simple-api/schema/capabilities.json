@@ -1,0 +1,123 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities-v2.json",
+  "protocolVersion": 2,
+  "project": "go.putnami.dev/examples/simple-api",
+  "lifecycleHooks": [
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/simple-api",
+        "kind": "lifecycle",
+        "subkind": "starter",
+        "key": "health"
+      },
+      "name": "health",
+      "phase": "starter",
+      "provenance": {
+        "project": "go.putnami.dev/examples/simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "health.go",
+          "symbol": "go.putnami.dev/http.(*HealthPlugin).Start"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/simple-api",
+        "kind": "lifecycle",
+        "subkind": "starter",
+        "key": "http"
+      },
+      "name": "http",
+      "phase": "starter",
+      "provenance": {
+        "project": "go.putnami.dev/examples/simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "server.go",
+          "symbol": "go.putnami.dev/http.(*ServerPlugin).Start"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/simple-api",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "health"
+      },
+      "name": "health",
+      "phase": "stopper",
+      "provenance": {
+        "project": "go.putnami.dev/examples/simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "health.go",
+          "symbol": "go.putnami.dev/http.(*HealthPlugin).Stop"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/simple-api",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "http"
+      },
+      "name": "http",
+      "phase": "stopper",
+      "provenance": {
+        "project": "go.putnami.dev/examples/simple-api",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "server.go",
+          "symbol": "go.putnami.dev/http.(*ServerPlugin).Stop"
+        }
+      }
+    }
+  ],
+  "packages": [
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/simple-api",
+        "kind": "package",
+        "key": "go.putnami.dev/examples/simple-api"
+      },
+      "package": "go.putnami.dev/examples/simple-api",
+      "provenance": {
+        "project": "go.putnami.dev/examples/simple-api",
+        "package": "go.putnami.dev/examples/simple-api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/http",
+        "kind": "package",
+        "key": "go.putnami.dev/http"
+      },
+      "package": "go.putnami.dev/http",
+      "provenance": {
+        "project": "go.putnami.dev/http",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ]
+}

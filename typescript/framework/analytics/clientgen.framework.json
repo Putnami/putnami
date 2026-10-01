@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "@putnami/analytics",
+      "status": "transport-primitive",
+      "adapter": "typescript/framework/analytics/src/client/transport.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/analytics/src/client/transport.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "95e7a194d8b56e7990d2326c80da069d0d2a2f7607380582b08f19c1b2a09921"
+        }
+      ],
+      "owner": "@putnami/analytics",
+      "tests": ["typescript/framework/analytics/test/transport.runtime.test.ts"],
+      "reason": "The browser beacon that posts to the ingest route the consuming application declares. The endpoint is the application\u2019s own path, supplied at runtime."
+    }
+  ]
+}

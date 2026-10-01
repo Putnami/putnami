@@ -1,0 +1,5 @@
+{"v":1,"type":"meta","time":"2026-06-10T07:00:00.000Z","level":"info","message":"Starting test","data":{"extension":"@putnami/go","job":"test"}}
+{"v":1,"type":"metric","time":"2026-06-10T07:00:01.000Z","name":"tests-total","value":42,"unit":"count"}
+{"v":1,"type":"diagnostic","time":"2026-06-10T07:00:01.100Z","severity":"error","message":"assertion failed","code":"TEST_FAILED","location":{"file":"app_test.go","line":42}}
+{"v":1,"type":"artifact","time":"2026-06-10T07:00:01.200Z","id":"coverage","name":"Coverage Report","kind":"coverage","path":"out/coverage.html"}
+{"v":1,"type":"result","time":"2026-06-10T07:00:01.300Z","level":"info","message":"Job FAILED","data":{"status":"FAILED","data":{"testSummary":{"total":42,"passed":40,"failed":1,"skipped":1},"coverageSummary":{"percentage":81.5,"granularity":"statements","covered":163,"total":200,"threshold":70}}}}

@@ -1,0 +1,673 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/x-putnami-client-v1.json",
+  "title": "Putnami first-party generated client metadata v1",
+  "oneOf": [
+    { "$ref": "#/$defs/document" },
+    { "$ref": "#/$defs/operation" }
+  ],
+  "$defs": {
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "service", "credentials"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "service": { "$ref": "#/$defs/service" },
+        "credentials": {
+          "type": "object",
+          "propertyNames": { "type": "string", "minLength": 1 },
+          "additionalProperties": { "$ref": "#/$defs/credentialProfile" }
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resilience": { "$ref": "#/$defs/resilience" }
+          }
+        },
+        "protobuf": { "$ref": "#/$defs/protobufDescriptor" }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "audience"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "audience": { "type": "string", "minLength": 1 }
+      }
+    },
+    "credentialProfile": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "const": "service-token" },
+            "audience": { "type": "string", "minLength": 1 },
+            "scopes": { "$ref": "#/$defs/stringSet" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "const": "forwarded-user-token" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "header"],
+          "properties": {
+            "kind": { "const": "api-key" },
+            "header": { "$ref": "#/$defs/headerName" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "header"],
+          "properties": {
+            "kind": { "const": "named-header" },
+            "header": { "$ref": "#/$defs/headerName" }
+          }
+        }
+      ]
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stream", "transports", "security", "errors", "idempotency"],
+      "properties": {
+        "stream": { "enum": ["unary", "server", "client", "bidirectional"] },
+        "messages": { "$ref": "#/$defs/messageShapes" },
+        "transports": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/transport" }
+        },
+        "security": { "$ref": "#/$defs/security" },
+        "errors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/declaredError" }
+        },
+        "idempotency": { "$ref": "#/$defs/idempotency" },
+        "resilience": { "$ref": "#/$defs/resilience" }
+      }
+    },
+    "messageShapes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "input": { "$ref": "#/$defs/schema" },
+        "output": { "$ref": "#/$defs/schema" }
+      }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "path", "encoding"],
+      "properties": {
+        "protocol": { "enum": ["rest-json", "connect", "sse", "websocket"] },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^/[^?#\\\\\\r\\n]*$"
+        },
+        "encoding": { "enum": ["json", "proto", "binary"] },
+        "protobufMethod": {
+          "type": "string",
+          "pattern": "^/[A-Za-z_][A-Za-z0-9_.]*\\/[A-Za-z_][A-Za-z0-9_]*$"
+        },
+        "websocket": { "$ref": "#/$defs/websocketTransport" },
+        "sse": { "$ref": "#/$defs/sseTransport" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "protocol": { "const": "sse" } },
+            "required": ["protocol"]
+          },
+          "else": { "not": { "required": ["sse"] } }
+        },
+        {
+          "if": {
+            "properties": { "protocol": { "enum": ["rest-json", "sse"] } },
+            "required": ["protocol"]
+          },
+          "then": {
+            "properties": { "encoding": { "const": "json" } }
+          }
+        },
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": { "protocol": { "const": "connect" } },
+                "required": ["protocol"]
+              },
+              {
+                "properties": { "encoding": { "const": "proto" } },
+                "required": ["encoding"]
+              }
+            ]
+          },
+          "then": { "required": ["protobufMethod"] },
+          "else": { "not": { "required": ["protobufMethod"] } }
+        },
+        {
+          "if": {
+            "properties": { "protocol": { "const": "websocket" } },
+            "required": ["protocol"]
+          },
+          "then": { "required": ["websocket"] },
+          "else": { "not": { "required": ["websocket"] } }
+        },
+        {
+          "if": {
+            "properties": { "encoding": { "const": "binary" } },
+            "required": ["encoding"]
+          },
+          "then": {
+            "properties": {
+              "protocol": { "const": "websocket" },
+              "websocket": { "required": ["wire"] }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "encoding": { "const": "json" },
+              "websocket": { "required": ["wire"] }
+            },
+            "required": ["encoding", "websocket"]
+          },
+          "then": {
+            "properties": { "websocket": { "required": ["subprotocol"] } }
+          }
+        }
+      ]
+    },
+    "websocketTransport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resume"],
+      "properties": {
+        "subprotocol": {
+          "type": "string",
+          "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+        },
+        "resume": { "type": "boolean" },
+        "wire": { "enum": ["provider"] }
+      },
+      "if": { "required": ["wire"] },
+      "then": {
+        "properties": {
+          "subprotocol": { "not": { "pattern": "^putnami\\.service\\." } },
+          "resume": { "const": false }
+        }
+      },
+      "else": {
+        "required": ["subprotocol"],
+        "properties": { "subprotocol": { "const": "putnami.service.v1" } }
+      }
+    },
+    "sseTransport": {
+      "description": "Continuation metadata of an SSE transport (ADR 0013). Present only when the provider declares a continuation; valid only on a safe server stream. The consumer half is the effective resilience.stream.reconnect.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["continuation"],
+      "properties": {
+        "continuation": { "$ref": "#/$defs/sseContinuation" }
+      }
+    },
+    "sseContinuation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["cursor", "best-effort"],
+          "description": "cursor reopens after the position of the last delivered message, which the provider continues exclusively after on any instance. best-effort reopens the original selector with no position: messages may be missing or repeated."
+        },
+        "cursor": { "$ref": "#/$defs/sseCursor" }
+      },
+      "if": {
+        "properties": { "mode": { "const": "cursor" } },
+        "required": ["mode"]
+      },
+      "then": { "required": ["cursor"] },
+      "else": { "not": { "required": ["cursor"] } }
+    },
+    "sseCursor": {
+      "description": "Where a cursor-mode position travels. The runtime copies it verbatim from the output field to the query parameter and never parses, orders or synthesizes it. Both must be plain strings the operation declares; the output field must be required.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outputField", "queryParameter"],
+      "properties": {
+        "outputField": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "queryParameter": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alternatives"],
+      "properties": {
+        "alternatives": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["allOf"],
+            "properties": {
+              "allOf": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["profile"],
+                  "properties": {
+                    "profile": { "type": "string", "minLength": 1 },
+                    "scopes": { "$ref": "#/$defs/stringSet" },
+                    "roles": { "$ref": "#/$defs/stringSet" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "authorization": { "$ref": "#/$defs/authorization" }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "issuers": { "$ref": "#/$defs/stringSet" },
+        "audiences": { "$ref": "#/$defs/stringSet" },
+        "principalKinds": { "$ref": "#/$defs/stringSet" },
+        "clients": { "$ref": "#/$defs/stringSet" },
+        "scopesAll": { "$ref": "#/$defs/stringSet" },
+        "scopesAny": { "$ref": "#/$defs/stringSet" },
+        "rolesAll": { "$ref": "#/$defs/stringSet" },
+        "rolesAny": { "$ref": "#/$defs/stringSet" },
+        "scopeClaims": { "$ref": "#/$defs/stringSet" },
+        "roleClaims": { "$ref": "#/$defs/stringSet" }
+      }
+    },
+    "declaredError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "code"],
+      "properties": {
+        "status": { "type": "integer", "minimum": 400, "maximum": 599 },
+        "code": { "type": "string", "minLength": 1 },
+        "grpcCode": { "type": "integer", "minimum": 1, "maximum": 16 },
+        "schema": { "$ref": "#/$defs/schema" },
+        "retryable": { "type": "boolean" }
+      }
+    },
+    "idempotency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["safe", "idempotent", "non-idempotent"] },
+        "keyHeader": { "$ref": "#/$defs/headerName" }
+      },
+      "if": {
+        "not": {
+          "properties": { "kind": { "const": "idempotent" } },
+          "required": ["kind"]
+        }
+      },
+      "then": { "not": { "required": ["keyHeader"] } }
+    },
+    "resilience": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeoutMs": { "$ref": "#/$defs/positiveInteger" },
+        "attemptTimeoutMs": { "$ref": "#/$defs/positiveInteger" },
+        "maxResponseBytes": { "$ref": "#/$defs/positiveInteger" },
+        "retry": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxAttempts": { "$ref": "#/$defs/positiveInteger" },
+            "statuses": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "integer", "minimum": 400, "maximum": 599 }
+            },
+            "codes": { "$ref": "#/$defs/stringSet" }
+          }
+        },
+        "circuit": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "failureThreshold": { "$ref": "#/$defs/positiveInteger" },
+            "resetTimeoutMs": { "$ref": "#/$defs/positiveInteger" }
+          }
+        },
+        "stream": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "handshakeTimeoutMs": {
+              "$ref": "#/$defs/positiveInteger",
+              "description": "Bounds the connect-to-admission phase on its own budget, separately from the declared operation duration. Absent, it defaults to attemptTimeoutMs."
+            },
+            "idleTimeoutMs": {
+              "$ref": "#/$defs/positiveInteger",
+              "description": "Bounds the interval between two provider frames after admission."
+            },
+            "heartbeatMs": {
+              "$ref": "#/$defs/positiveInteger",
+              "description": "Declares the heartbeat cadence the provider maintains on an idle stream."
+            },
+            "reconnect": {
+              "type": "boolean",
+              "description": "Permits automatic reconnection, and only where a transport declares how it continues: a first-party websocket transport with resume, or an sse transport with a continuation. A best-effort sse continuation is the one declared continuation that is not lossless."
+            },
+            "maxBufferedMessages": {
+              "$ref": "#/$defs/positiveInteger",
+              "description": "Bounds the queue of unconsumed messages. Exceeding it is a terminal backpressure error, never a silent drop."
+            },
+            "maxFrameBytes": {
+              "$ref": "#/$defs/positiveInteger",
+              "description": "Bounds one encoded stream frame or event."
+            }
+          }
+        },
+        "cache": {
+          "$ref": "#/$defs/cachePolicy",
+          "description": "Per-operation response cache. Valid only on a unary operation whose idempotency is safe or idempotent, and never in document defaults."
+        }
+      }
+    },
+    "cachePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["freshMs"],
+      "properties": {
+        "freshMs": {
+          "$ref": "#/$defs/positiveInteger",
+          "description": "Age in milliseconds below which a stored answer is returned without calling the provider."
+        },
+        "staleMs": {
+          "$ref": "#/$defs/positiveInteger",
+          "description": "Age in milliseconds below which a stored answer is returned when the provider call fails with a transport error, retry exhaustion or an open circuit. Must exceed freshMs. Absent, a failure is never masked."
+        },
+        "maxEntries": {
+          "$ref": "#/$defs/positiveInteger",
+          "description": "Least-recently-used entry bound per service binding. Absent, the runtime default of 1000 applies."
+        },
+        "keyFields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Request fields that form the key, in key order. Absent, the key is every path, query and header parameter plus the whole canonical body. The forwarded user identity is always part of the key.",
+          "items": {
+            "type": "string",
+            "pattern": "^(body|(path|query|body)\\.[^\\u0000-\\u001F\\u007F]+|header\\.[!#$%&'*+.^_`|~0-9A-Za-z-]+)$"
+          }
+        },
+        "invalidationFields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Top-level properties of the JSON success body that tag a stored answer, so a consumer can drop every answer carrying one value across the service's operations. Each names a string, integer or boolean property the success body declares; a string declared format byte or binary is octets and is refused, because a TypeScript runtime decodes it to a byte array no value can equal. Absent, answers are dropped by key prefix only.",
+          "items": {
+            "type": "string",
+            "pattern": "^[^\\u0000-\\u0020\\u007F]([^\\u0000-\\u001F\\u007F]*[^\\u0000-\\u0020\\u007F])?$"
+          }
+        }
+      }
+    },
+    "protobufDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["syntax", "package", "services", "messages", "enums"],
+      "properties": {
+        "syntax": { "const": "proto3" },
+        "package": { "type": "string", "minLength": 1 },
+        "services": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protobufService" }
+        },
+        "messages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protobufMessage" }
+        },
+        "enums": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protobufEnum" }
+        }
+      }
+    },
+    "protobufService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "methods"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "methods": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protobufMethod" }
+        }
+      }
+    },
+    "protobufMethod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "input", "output", "clientStreaming", "serverStreaming"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "input": { "type": "string", "minLength": 1 },
+        "output": { "type": "string", "minLength": 1 },
+        "clientStreaming": { "type": "boolean" },
+        "serverStreaming": { "type": "boolean" }
+      }
+    },
+    "protobufMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "fields"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protobufField" }
+        },
+        "oneofs": { "$ref": "#/$defs/stringSet" }
+      }
+    },
+    "protobufField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "jsonName", "number", "typeKind", "type"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "jsonName": { "type": "string", "minLength": 1 },
+        "number": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 536870911,
+          "not": { "minimum": 19000, "maximum": 19999 }
+        },
+        "typeKind": { "enum": ["scalar", "message", "enum", "map"] },
+        "type": { "type": "string", "minLength": 1 },
+        "repeated": { "type": "boolean" },
+        "optional": { "type": "boolean" },
+        "oneof": { "type": "string", "minLength": 1 },
+        "map": { "$ref": "#/$defs/protobufMap" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "typeKind": { "const": "map" } },
+            "required": ["typeKind"]
+          },
+          "then": {
+            "required": ["map"],
+            "properties": {
+              "type": { "const": "map" },
+              "repeated": { "const": false },
+              "optional": { "const": false }
+            },
+            "not": { "required": ["oneof"] }
+          },
+          "else": { "not": { "required": ["map"] } }
+        }
+      ]
+    },
+    "protobufMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyType", "valueKind", "valueType"],
+      "properties": {
+        "keyType": { "type": "string", "minLength": 1 },
+        "valueKind": { "enum": ["scalar", "message", "enum"] },
+        "valueType": { "type": "string", "minLength": 1 }
+      }
+    },
+    "protobufEnum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "values"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "type": "object",
+              "properties": { "number": { "const": 0 } },
+              "required": ["number"]
+            }
+          ],
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "number"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "number": { "type": "integer", "minimum": -2147483648, "maximum": 2147483647 }
+            }
+          }
+        }
+      }
+    },
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["string", "number", "integer", "boolean", "object", "array"] },
+        "format": {
+          "enum": [
+            "int32", "int64", "uint32", "uint64", "float", "double",
+            "byte", "binary", "date", "date-time", "uuid", "email", "uri"
+          ]
+        },
+        "nullable": { "type": "boolean" },
+        "$ref": {
+          "type": "string",
+          "pattern": "^#/components/schemas/[A-Za-z_][A-Za-z0-9_.-]*$"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/schema" }
+        },
+        "required": { "$ref": "#/$defs/stringSet" },
+        "items": { "$ref": "#/$defs/schema" },
+        "additionalProperties": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "$ref": "#/$defs/schema" }
+          ]
+        },
+        "enum": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": ["string", "number", "boolean", "null"] }
+        },
+        "oneOf": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/schema" }
+        },
+        "discriminator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["propertyName"],
+          "properties": {
+            "propertyName": { "type": "string", "minLength": 1 },
+            "mapping": {
+              "type": "object",
+              "propertyNames": { "type": "string", "minLength": 1 },
+              "additionalProperties": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "default": true,
+        "minimum": { "type": "number" },
+        "maximum": { "type": "number" },
+        "exclusiveMinimum": { "type": "boolean" },
+        "exclusiveMaximum": { "type": "boolean" },
+        "minLength": { "type": "integer", "minimum": 0 },
+        "maxLength": { "type": "integer", "minimum": 0 },
+        "pattern": { "type": "string" },
+        "minItems": { "type": "integer", "minimum": 0 },
+        "maxItems": { "type": "integer", "minimum": 0 },
+        "uniqueItems": { "type": "boolean" },
+        "readOnly": { "type": "boolean" },
+        "writeOnly": { "type": "boolean" },
+        "x-putnami-json": { "enum": ["any"] }
+      },
+      "anyOf": [
+        { "required": ["type"] },
+        { "required": ["$ref"] },
+        { "required": ["oneOf"] },
+        { "required": ["x-putnami-json"] }
+      ],
+      "dependentSchemas": {
+        "x-putnami-json": {
+          "propertyNames": { "enum": ["x-putnami-json", "title", "description"] }
+        }
+      }
+    },
+    "headerName": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "stringSet": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "externalContract": {
+      "description": "Value of the operation-scope OpenAPI extension x-putnami-external-contract. It names the external authority that owns the operation's wire contract, for example \"OCI Distribution Specification v1.1\". A marked operation of a first-party document carries no x-putnami-client, and every first-party reader skips it: it contributes no contract operation, no protobuf method and no generated client method. An operation that carries both extensions is refused.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    }
+  }
+}

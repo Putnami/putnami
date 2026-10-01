@@ -1,0 +1,40 @@
+exit 2
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "features diff",
+  "status": "failure",
+  "exitCode": 2,
+  "data": {
+    "compatibility": "provisional",
+    "base": {
+      "kind": ""
+    },
+    "head": {
+      "kind": "git",
+      "commit": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08"
+    },
+    "added": [],
+    "removed": [],
+    "promoted": [],
+    "regressed": [],
+    "stale": [],
+    "contradicted": [],
+    "newlyUnclassified": [],
+    "baseDiagnostics": [
+      {
+        "severity": "error",
+        "code": "features.invalid_subject",
+        "message": "revision must identify one resolvable, unambiguous Git commit",
+        "field": "baseRevision"
+      }
+    ],
+    "headDiagnostics": []
+  },
+  "error": {
+    "code": "usage",
+    "message": "features diff requires two resolvable, unambiguous repository revisions"
+  }
+}
+--- stderr ---
+putnami: features diff requires two resolvable, unambiguous repository revisions

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/openapi",
+  "visibility": "public",
+  "tags": [
+    "go"
+  ],
+  "extensions": [
+    "/go/extension"
+  ],
+  "dependencies": [
+    "/go/framework/app",
+    "/go/framework/http"
+  ],
+  "publish": [
+    "go"
+  ],
+  "disable": {
+    "jobs": [
+      "serve"
+    ]
+  },
+  "options": {
+    "publish": {
+      "archives": false
+    },
+    "test": {
+      "filePatterns": [
+        "../../../typescript/framework/*/src/**",
+        "../../../typescript/framework/*/package.json",
+        "../../../tsconfig.base.json",
+        "../../../package.json",
+        "../../../bun.lock"
+      ]
+    }
+  },
+  "featureAuthority": {
+    "owner": "go/api-contracts"
+  }
+}

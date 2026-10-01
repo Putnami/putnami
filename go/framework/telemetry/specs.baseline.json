@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/service-telemetry#bounded-shutdown",
+    "go/service-telemetry#duration-precision",
+    "go/service-telemetry#endpoint-required",
+    "go/service-telemetry#explicit-sampling",
+    "go/service-telemetry#final-flush",
+    "go/service-telemetry#lifecycle-purity",
+    "go/service-telemetry#never-fails-the-workload",
+    "go/service-telemetry#push-transport",
+    "go/service-telemetry#service-identity",
+    "go/service-telemetry#span-always-ends",
+    "go/service-telemetry#trace-propagation"
+  ]
+}

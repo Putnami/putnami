@@ -1,0 +1,65 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature-verification.json",
+  "protocolVersion": 1,
+  "observations": [
+    {
+      "feature": "logging/flush-performance",
+      "requirement": "flush-latency",
+      "check": "flush-benchmark",
+      "measurement": {
+        "name": "logger.flush.duration",
+        "aggregation": "p95",
+        "value": 18.5,
+        "unit": "ms"
+      },
+      "window": {
+        "start": "2026-08-18T09:59:00Z",
+        "end": "2026-08-18T10:00:00Z"
+      },
+      "provenance": {
+        "path": "flush_benchmark_test.go",
+        "symbol": "BenchmarkLoggerFlush"
+      }
+    },
+    {
+      "feature": "logging/structured-logging",
+      "requirement": "delivery-slo",
+      "check": "production-delivery-slo",
+      "measurement": {
+        "name": "logging.delivery.success",
+        "aggregation": "ratio",
+        "value": 0.9994,
+        "unit": "ratio"
+      },
+      "window": {
+        "start": "2026-07-19T10:00:00Z",
+        "end": "2026-08-18T10:00:00Z"
+      },
+      "environment": "production",
+      "provenance": {
+        "path": "internal/slo/delivery.go",
+        "symbol": "ObserveDeliverySLO"
+      }
+    },
+    {
+      "feature": "logging/structured-logging",
+      "requirement": "lifecycle",
+      "check": "close-visits-every-sink",
+      "status": "passed",
+      "provenance": {
+        "path": "logger_test.go",
+        "symbol": "TestLoggerCloseVisitsEverySinkAndReturnsFirstError"
+      }
+    },
+    {
+      "feature": "logging/structured-logging",
+      "requirement": "lifecycle",
+      "check": "flush-visits-every-sink",
+      "status": "passed",
+      "provenance": {
+        "path": "logger_test.go",
+        "symbol": "TestLoggerFlushVisitsEverySinkAndReturnsFirstError"
+      }
+    }
+  ]
+}

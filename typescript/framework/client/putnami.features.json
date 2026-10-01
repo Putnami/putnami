@@ -1,0 +1,566 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/service-clients",
+      "type": "feature",
+      "name": "TypeScript service clients",
+      "outcome": "A TypeScript workload calls another service through a client generated from that service's contract, with one latency budget that retries cannot exceed, cancellation that actually stops the call, and a circuit that stops feeding a service that is already failing",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "success-body",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-success-body-is-delivered-byte-for-byte-after-the-calls-own-checks",
+              "a-cached-answer-delivers-the-bytes-the-provider-sent",
+              "a-refused-or-failed-call-delivers-no-bytes",
+              "a-transport-that-rewrites-the-body-is-refused-before-dispatch",
+              "a-sink-belongs-to-one-call-at-a-time"
+            ]
+          }
+        },
+        {
+          "id": "per-call-endpoint",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "concurrent-targets-isolate-credentials-circuits-and-cached-responses",
+              "an-invalid-override-fails-before-credentials-or-network",
+              "an-override-preserves-explicit-audiences-and-declared-schemas"
+            ]
+          }
+        },
+        {
+          "id": "bounded-latency",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-backoff-sleep-overshooting-the-deadline-surfaces-retry-exhausted",
+              "a-deadline-ending-a-network-error-sequence-surfaces-retry-exhausted",
+              "a-declared-non-retryable-status-outranks-the-generic-retryable-set",
+              "a-provider-retry-after-budget-replaces-the-computed-backoff",
+              "a-retry-after-budget-larger-than-the-remaining-deadline-ends-the-sequence",
+              "a-separate-max-elapsed-caps-total-time-across-attempts",
+              "backoff-is-capped-at-the-maximum-delay",
+              "each-attempt-gets-its-own-fresh-timeout-budget",
+              "no-deadline-applies-when-no-timeout-is-configured",
+              "the-deadline-check-and-the-retry-sleep-use-the-same-jittered-delay",
+              "total-elapsed-time-is-bounded-by-the-timeout"
+            ]
+          }
+        },
+        {
+          "id": "cancellation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-manual-abort-cancels-an-in-flight-request",
+              "a-pre-aborted-signal-rejects-at-the-transport",
+              "an-abort-during-the-first-attempt-stops-immediately",
+              "an-abort-during-the-retry-delay-ends-the-sequence",
+              "an-aborted-attempt-is-not-retried",
+              "an-already-aborted-signal-rejects-before-a-retry-delay",
+              "no-per-attempt-signal-is-injected-without-a-timeout",
+              "the-caller-signal-is-combined-with-the-per-attempt-timeout"
+            ]
+          }
+        },
+        {
+          "id": "canonical-generated-manifest",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "manifest-hashes-the-canonical-biome-output",
+              "the-provider-local-biome-package-wins-over-the-client-fallback"
+            ]
+          }
+        },
+        {
+          "id": "circuit-isolation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-4xx-does-not-count-as-a-breaker-failure",
+              "a-concurrent-trial-request-is-rejected-while-half-open",
+              "a-custom-half-open-concurrency-is-honoured",
+              "a-success-resets-the-failure-count",
+              "half-open-admits-another-trial-once-the-in-flight-one-completes",
+              "half-open-admits-one-trial-by-default-and-rejects-the-rest",
+              "the-breaker-closes-from-half-open-after-the-success-threshold",
+              "the-breaker-goes-half-open-after-the-timeout",
+              "the-breaker-opens-after-the-configured-consecutive-failures",
+              "the-breaker-reopens-from-half-open-on-a-failure"
+            ]
+          }
+        },
+        {
+          "id": "connect-transport",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-connect-only-contract-emits-a-client-carrying-the-provider-descriptor",
+              "a-connect-operation-with-several-declared-successes-is-refused",
+              "a-generated-client-reaches-a-real-provider-over-connect-in-three-shapes",
+              "a-nullable-field-is-refused-because-protobuf-cannot-represent-null",
+              "a-property-name-that-protobuf-json-name-would-rename-is-refused",
+              "every-connect-stream-scene-from-the-specification-reaches-its-declared-outcome"
+            ]
+          }
+        },
+        {
+          "id": "credential-registry",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-401-does-not-replay-a-non-idempotent-operation",
+              "a-chosen-alternative-that-fails-is-not-downgraded",
+              "a-credential-source-failure-is-never-cached",
+              "a-forwarded-user-identity-is-never-cached",
+              "a-malformed-or-expired-token-response-is-a-safe-typed-failure",
+              "a-partially-bound-alternative-is-refused-before-dispatch",
+              "a-retained-client-cannot-call-after-the-application-stopped",
+              "an-acquisition-after-closure-names-the-closure",
+              "an-acquisition-that-completes-during-dispose-is-not-cached",
+              "concurrent-refreshes-collapse-onto-one-acquisition",
+              "disposing-the-registry-releases-in-flight-waiters-with-a-distinct-error",
+              "disposing-the-registry-twice-is-silent",
+              "expiry-renews-once-inside-the-leeway-and-never-before",
+              "modules-of-one-application-share-one-credential-registry",
+              "rejecting-a-stale-credential-does-not-evict-the-fresh-one",
+              "stopping-the-application-cancels-the-streams-it-still-holds",
+              "the-acquisition-budget-bounds-a-source-that-never-answers",
+              "two-applications-do-not-share-a-credential-registry"
+            ]
+          }
+        },
+        {
+          "id": "credential-audience",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-binding-audience-wins-over-the-profile-and-contract-audience",
+              "a-gcp-id-token-is-requested-for-the-binding-url-whatever-the-contract-says"
+            ]
+          }
+        },
+        {
+          "id": "declared-error-safety",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-malformed-declared-payload-is-a-safe-local-response-error",
+              "redaction-that-breaks-the-declared-schema-omits-details",
+              "generated-guards-bind-the-complete-operation-error-identity",
+              "a-provider-declared-details-body-arrives-typed-at-the-generated-client"
+            ]
+          }
+        },
+        {
+          "id": "generated-parity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "canonicalizes-project-generation-with-effective-biome-config",
+              "the-committed-typescript-client-is-in-sync-with-the-provider-spec"
+            ]
+          }
+        },
+        {
+          "id": "resilience-telemetry",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-open-transition-sets-the-state-gauge",
+              "circuit-metrics-fall-back-to-an-unnamed-prefix",
+              "each-circuit-transition-emits-a-counter-and-a-state-gauge",
+              "network-error-attempts-are-counted",
+              "no-retry-counter-is-emitted-when-the-first-attempt-succeeds",
+              "one-attempt-counter-per-retried-attempt",
+              "retry-exhaustion-is-counted",
+              "retry-metrics-fall-back-to-an-unnamed-prefix"
+            ]
+          }
+        },
+        {
+          "id": "resource-release",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "disposing-the-breaker-stops-its-health-probe",
+              "disposing-the-client-stops-a-wired-circuit-health-probe",
+              "disposing-the-client-tears-down-disposable-interceptors",
+              "disposing-with-no-disposable-interceptor-is-a-no-op",
+              "the-using-statement-delegates-to-dispose"
+            ]
+          }
+        },
+        {
+          "id": "retry-cap",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-negative-retry-count-means-no-retries",
+              "a-non-finite-retry-count-means-no-retries",
+              "a-zero-retry-count-means-no-retries",
+              "an-absurd-retry-count-is-clamped-to-the-cap"
+            ]
+          }
+        },
+        {
+          "id": "retry-scope",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-caller-cancellation-during-an-attempt-is-not-retried",
+              "a-custom-retryable-status-list-overrides-the-defaults",
+              "a-network-error-is-retried",
+              "a-non-error-throwable-is-not-retried",
+              "a-non-retryable-status-is-not-retried",
+              "a-per-attempt-timeout-is-treated-as-transient-and-retried",
+              "a-retryable-status-is-retried",
+              "client-error-and-500-statuses-are-not-retried",
+              "the-four-default-retryable-statuses-are-retried"
+            ]
+          }
+        },
+        {
+          "id": "stream-session-lifecycle",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-caller-cancel-before-admission-writes-nothing-to-the-breaker",
+              "a-mid-stream-break-writes-nothing-to-the-breaker",
+              "a-refused-handshake-opens-the-circuit",
+              "a-session-reaches-closed-on-every-exit-path",
+              "the-call-measurement-is-emitted-exactly-once",
+              "the-handshake-budget-is-released-at-admission",
+              "the-queue-bound-ends-the-stream-instead-of-dropping"
+            ]
+          }
+        },
+        {
+          "id": "strict-generation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-connect-only-or-websocket-only-contract-emits-no-partial-output",
+              "a-get-or-head-request-body-is-refused-instead-of-dropped",
+              "a-websocket-proto-encoding-is-refused-at-generation-not-at-runtime",
+              "an-integer-without-a-declared-width-is-refused",
+              "multiple-success-variants-are-emitted-as-a-status-discriminated-result",
+              "the-emitted-sources-typecheck-against-the-real-client-surface"
+            ]
+          }
+        },
+        {
+          "id": "transport-safety",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-body-at-the-cap-is-read-in-full",
+              "a-body-exactly-at-the-cap-is-accepted",
+              "a-body-one-byte-over-the-cap-fails-with-a-typed-size-error",
+              "a-file-scheme-base-url-is-rejected",
+              "a-malformed-base-url-is-rejected",
+              "an-ftp-scheme-base-url-is-rejected",
+              "an-oversized-non-json-body-is-not-speculatively-parsed",
+              "only-http-and-https-base-urls-are-accepted",
+              "the-cap-bounds-the-bytes-read-not-only-the-verdict",
+              "the-connect-transport-caps-its-response-body-too",
+              "the-connect-transport-rejects-a-file-scheme-base-url",
+              "the-http-transport-rejects-a-file-scheme-base-url",
+              "the-websocket-transport-rejects-a-file-scheme-base-url"
+            ]
+          }
+        },
+        {
+          "id": "websocket-streams",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-401-admission-refusal-invalidates-the-credential-once",
+              "a-bidirectional-stream-reaches-a-real-provider",
+              "a-client-stream-reaches-a-real-provider",
+              "a-resumed-ready-is-accepted-only-when-the-init-requested-it",
+              "a-server-stream-reaches-a-real-provider-over-websocket",
+              "an-init-that-cannot-be-composed-is-a-typed-terminal",
+              "the-corpus-invalid-scenes-are-refused-with-the-declared-code",
+              "the-socket-is-opened-with-the-subprotocol-and-no-header"
+            ]
+          }
+        },
+        {
+          "id": "websocket-stream-emission",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-server-stream-follows-the-declared-transport-order",
+              "a-duplex-stream-is-emitted-as-a-typed-duplex-handle",
+              "a-duplex-stream-without-both-message-schemas-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "declared-transport-preference",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-break-after-admission-never-opens-another-declared-transport",
+              "a-declaration-with-no-carriable-transport-is-refused-before-any-socket",
+              "a-provider-that-does-not-negotiate-the-first-party-wire-falls-back",
+              "a-repeated-fallback-does-not-open-the-circuit-for-the-operation",
+              "a-transport-the-provider-does-not-serve-falls-back-to-the-next-declared-one",
+              "an-answer-about-the-call-is-surfaced-instead-of-trying-another-wire",
+              "an-exhausted-fallback-surfaces-the-answer-of-the-last-declared-transport",
+              "an-operation-that-is-not-declared-replayable-is-never-opened-twice",
+              "the-declared-order-is-the-dispatch-order"
+            ]
+          }
+        },
+        {
+          "id": "declared-stream-resume",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-continuation-carries-a-credential-renewed-at-the-instant-it-dials",
+              "a-continuation-that-cannot-renew-its-credential-ends-before-admission",
+              "a-declared-server-stream-continues-after-the-last-sequence-the-caller-received",
+              "a-provider-that-answers-a-continuation-with-a-fresh-stream-is-refused",
+              "a-stream-that-keeps-breaking-stops-at-the-framework-resume-bound",
+              "a-stream-that-was-not-declared-resumable-ends-at-the-break",
+              "a-token-the-provider-no-longer-honors-ends-the-stream-with-a-typed-terminal",
+              "each-continuation-presents-the-token-the-previous-connection-issued"
+            ]
+          }
+        },
+        {
+          "id": "declared-sse-continuation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-shared-sse-scenes-replay-against-the-real-runtime",
+              "values-queued-but-not-received-never-advance-the-position-nor-arrive-twice",
+              "a-cursor-stream-continues-on-another-instance-after-the-last-position-the-caller-received",
+              "a-best-effort-stream-reopens-the-original-query-and-keeps-its-queue",
+              "a-typed-refusal-of-a-position-ends-the-session-without-another-reopening",
+              "a-negotiated-stream-that-keeps-breaking-stops-at-the-framework-bound",
+              "every-reopening-resolves-credentials-and-a-refused-one-re-mints-a-forwarded-user-credential-once",
+              "a-provider-that-does-not-acknowledge-the-wire-is-refused-without-fallback",
+              "closing-a-reopening-stream-releases-its-connection-and-emits-one-measurement",
+              "a-reopening-never-resets-the-idle-budget",
+              "a-reopening-has-its-own-bounded-handshake-and-its-failure-ends-the-session",
+              "the-emitted-ts-client-continues-a-declared-cursor-stream-through-the-real-runtime",
+              "the-emitted-ts-client-reopens-a-declared-best-effort-stream-through-the-real-runtime"
+            ]
+          }
+        },
+        {
+          "id": "response-cache",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-upstream-call-per-key-and-identity-per-fresh-window-under-concurrent-load",
+              "a-provider-failure-inside-the-stale-window-returns-the-stored-answer-and-is-counted",
+              "a-failure-after-the-stale-window-or-outside-the-provider-failure-classes-reaches-the-caller",
+              "a-caller-deadline-that-passes-while-the-provider-hangs-returns-the-stored-answer",
+              "an-invalidation-sends-the-next-call-upstream",
+              "entries-never-cross-a-forwarded-identity-or-outlive-the-registry",
+              "the-cache-key-matches-the-shared-vectors",
+              "the-runtime-implements-exactly-the-published-capabilities",
+              "the-emitted-ts-client-pins-the-response-cache-capability-and-its-manifest-declares-the-policy"
+            ]
+          }
+        },
+        {
+          "id": "response-cache-bypass-and-field-invalidation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bypassed-call-neither-reads-nor-stores-nor-joins-a-call-in-flight",
+              "an-invalidation-by-a-response-field-drops-every-answer-carrying-the-value",
+              "the-response-field-tags-match-the-shared-vectors"
+            ]
+          }
+        },
+        {
+          "id": "streamed-binary-payloads",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "raw-http-streams-generate-explicit-content-types-and-readers",
+              "raw-http-streams-return-before-eof-and-do-not-buffer",
+              "raw-http-stream-uploads-are-never-replayed",
+              "a-generated-bound-client-streams-through-a-real-provider"
+            ]
+          }
+        },
+        {
+          "id": "binary-payloads",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-reader-preserves-the-declared-octet-media-type-and-bound",
+              "raw-octets-are-refused-inside-a-json-document",
+              "the-emitted-client-carries-octets-without-json-or-base64",
+              "raw-octets-are-refused-on-a-transport-that-cannot-carry-them",
+              "an-oversized-raw-octet-request-is-refused-before-the-source-is-drained"
+            ]
+          }
+        },
+        {
+          "id": "stream-call-telemetry",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stream-call-span-is-the-parent-the-provider-receives",
+              "a-stream-is-measured-under-the-transport-that-carried-it"
+            ]
+          }
+        },
+        {
+          "id": "additive-responses",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-response-property-the-client-does-not-declare-is-dropped",
+              "a-declared-response-property-is-still-validated",
+              "a-request-property-the-contract-does-not-declare-is-still-refused"
+            ]
+          }
+        },
+        {
+          "id": "opaque-json",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-emitted-types-carry-opaque-json-as-unknown",
+              "an-opaque-value-is-refused-as-a-parameter-and-on-a-connect-dispatch",
+              "the-codec-carries-opaque-json-without-rounding-an-integer"
+            ]
+          }
+        },
+        {
+          "id": "provider-owned-websocket-wires",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-emitted-typescript-client-returns-a-byte-stream-or-a-frame-stream",
+              "the-emitted-typescript-client-carries-both-provider-owned-wires-through-the-real-runtime",
+              "a-provider-owned-wire-this-runtime-cannot-carry-is-refused-before-dialing",
+              "a-provider-owned-wire-ends-on-its-close-code-and-its-budgets"
+            ]
+          }
+        },
+        {
+          "id": "external-contract-operations",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-typescript-reader-skips-an-external-operation-whole",
+              "the-emitted-typescript-client-exposes-only-the-first-party-routes-through-a-real-provider"
+            ]
+          }
+        },
+        {
+          "id": "caller-resolved-bindings",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "shared-page-schemas-match-the-go-corpus",
+              "caller-paths-match-the-shared-refusal-corpus",
+              "caller-bindings-snapshot-paths-isolate-caches-and-dispose"
+            ]
+          }
+        },
+        {
+          "id": "binding-headers",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "static-headers-accompany-each-calls-credentials",
+              "invalid-or-reserved-headers-fail-before-dispatch",
+              "binding-headers-are-an-immutable-snapshot",
+              "operation-headers-win-and-cache-keys-see-the-sent-value",
+              "stream-headers-use-each-transports-declared-carrier",
+              "binding-headers-match-the-shared-corpus",
+              "the-emitted-typescript-client-carries-binding-headers-beside-forwarded-users"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "build": {
+      "run": [
+        { "id": "a", "task": "build-exec", "dependsOn": ["b"] },
+        { "id": "b", "task": "build-exec", "dependsOn": ["a"] }
+      ]
+    }
+  },
+  "tasks": {
+    "build-exec": {
+      "kind": "command",
+      "command": "echo"
+    }
+  }
+}

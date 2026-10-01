@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-keyring-digest.json",
+  "title": "Putnami PHC Credential Digest",
+  "description": "A PHC-style versioned credential digest string. Two algorithms: '$pbkdf2-sha256$v=1$i=<iterations>$<b64-salt>$<b64-hash>' and '$hmac-sha256$v=1$<b64-salt>$<b64-hash>'. Salt and hash use RFC 4648 §4 standard base64 WITHOUT padding (alphabet A-Za-z0-9+/). The version segment pins 'v=1' (DigestVersion).",
+  "type": "string",
+  "pattern": "^(\\$pbkdf2-sha256\\$v=1\\$i=[0-9]+\\$[A-Za-z0-9+/]+\\$[A-Za-z0-9+/]+|\\$hmac-sha256\\$v=1\\$[A-Za-z0-9+/]+\\$[A-Za-z0-9+/]+)$",
+  "$defs": {
+    "algorithm": {
+      "type": "string",
+      "enum": ["pbkdf2-sha256", "hmac-sha256"],
+      "description": "Recognized digest algorithms. Closed enum."
+    }
+  }
+}

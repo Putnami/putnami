@@ -1,0 +1,10 @@
+{
+  "message": {
+    "data": "eyJwcm90b2NvbCI6InB1dG5hbWkuZXZlbnRzLnYxIiwiaWQiOiJldnQtMSIsInRvcGljIjoib3JkZXJzLmNyZWF0ZWQiLCJwYXlsb2FkIjp7Im9yZGVySWQiOiJvLTEifSwidGltZXN0YW1wIjoiMjAyNi0wNS0wMVQxMjowMDowMFoiLCJhdHRlbXB0IjoxfQ==",
+    "attributes": { "topic": "orders.created", "auth.sub": "user-1" },
+    "messageId": "1405",
+    "publishTime": "2026-05-01T12:00:00.123456789Z",
+    "orderingKey": "o-1"
+  },
+  "subscription": "projects/demo/subscriptions/orders-created-push"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "invalid-timeout-zero",
+  "tasks": {
+    "lint": { "timeoutMs": 0 }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "valid": [
+    "composition-failed.json",
+    "contract-empty.json",
+    "contract-service-to-service.json",
+    "digest-mismatch.json",
+    "passed-local.json",
+    "passed-url.json",
+    "unsupported.json"
+  ],
+  "invalid": {
+    "artifact-without-expected-sha.json": [
+      "qualify.invalid_binding"
+    ],
+    "case-alias-member.json": [
+      "qualify.unknown_field"
+    ],
+    "contract-digest-mismatch.json": [
+      "qualify.invalid_digest"
+    ],
+    "contract-mutating-method.json": [
+      "qualify.invalid_request"
+    ],
+    "passed-with-failed-request.json": [
+      "qualify.unproven_pass"
+    ],
+    "passed-with-mismatched-sha.json": [
+      "qualify.unproven_pass"
+    ],
+    "passed-without-requests.json": [
+      "qualify.unproven_pass"
+    ],
+    "passed-without-teardown-phase.json": [
+      "qualify.unproven_pass"
+    ],
+    "state-ok.json": [
+      "qualify.invalid_state"
+    ],
+    "tree-without-fingerprint.json": [
+      "qualify.invalid_binding"
+    ],
+    "unknown-field.json": [
+      "qualify.unknown_field"
+    ],
+    "unsupported-protocol-version.json": [
+      "qualify.unsupported_protocol_version"
+    ]
+  }
+}

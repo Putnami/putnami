@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "@putnami/ui",
+      "status": "transport-primitive",
+      "adapter": "typescript/framework/ui/src/components/markdown-renderer.tsx",
+      "callsites": [
+        {
+          "path": "typescript/framework/ui/src/components/markdown-renderer.tsx",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "a4a13962066e2997b41a283a44bc8e5783bb8b529d548db8344e6f865b8da230"
+        }
+      ],
+      "owner": "@putnami/ui",
+      "tests": ["typescript/framework/ui/test/components/markdown-renderer.test.tsx"],
+      "reason": "Loads the markdown document named by the component\u2019s own src property. The caller owns the URL and there is no API contract behind it."
+    }
+  ]
+}

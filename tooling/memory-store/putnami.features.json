@@ -1,0 +1,159 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "tooling",
+  "features": [
+    {
+      "id": "tooling/memory-store",
+      "type": "feature",
+      "name": "File and Git memory provider",
+      "outcome": "A workspace keeps its agents' memory in a directory or on a Git branch it owns, and every agent reads context and saves checkpoints through the memory contract without knowing which, never overwriting another agent's checkpoint and never writing one twice",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "explicit-backend",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-binding-without-a-backend-is-invalid",
+              "a-remote-carrying-credentials-is-refused",
+              "a-remote-url-with-a-query-or-fragment-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "one-contract-every-backend",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "read-checkpoint-resume",
+              "pages-keep-one-order"
+            ]
+          }
+        },
+        {
+          "id": "compare-and-set-checkpoints",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stale-revision-is-a-conflict",
+              "concurrent-checkpoints-at-one-revision-land-once",
+              "concurrent-creations-land-once",
+              "concurrent-processes-land-once"
+            ]
+          }
+        },
+        {
+          "id": "readable-records",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-maximal-checkpoint-is-read-back",
+              "a-record-above-the-bound-is-refused-before-writing"
+            ]
+          }
+        },
+        {
+          "id": "retries-never-duplicate",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-landed-write-whose-sync-failed-is-unresolved",
+              "a-repeated-key-replays-the-write",
+              "a-write-answers-before-the-tool-timeout",
+              "an-uncertain-push-is-reconciled",
+              "an-unreconcilable-push-is-unresolved"
+            ]
+          }
+        },
+        {
+          "id": "layout-independent-context",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "context-selects-by-identity-and-scope"
+            ]
+          }
+        },
+        {
+          "id": "explicit-outage",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unreachable-store-is-unavailable-and-writes-nothing",
+              "records-without-an-identity-are-never-given-a-new-one"
+            ]
+          }
+        },
+        {
+          "id": "contextual-memory",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "evidence-stays-a-reference"
+            ]
+          }
+        },
+        {
+          "id": "truthful-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-passes-both-gates"
+            ]
+          }
+        },
+        {
+          "id": "portable-git-writes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "hooks-checkouts-and-working-trees-are-never-touched"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

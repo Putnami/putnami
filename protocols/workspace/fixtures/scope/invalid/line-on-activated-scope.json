@@ -1,0 +1,6 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "activate": true,
+  "includes": ["infra"],
+  "line": { "tag": "infra/v{version}" }
+}

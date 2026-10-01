@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 1,
+  "project": "/go/samples/service-to-service",
+  "derivedFrom": [
+    {
+      "kind": "http-routes",
+      "path": "go/samples/service-to-service/schema/http-routes.json",
+      "digest": "sha256:b71b8bcddd7e3f336d3abc1cf4cff56ed3a89536c44de8da65fccb01469681be"
+    }
+  ],
+  "requests": [
+    {
+      "id": "POST /items",
+      "method": "POST",
+      "path": "/items",
+      "maxStatus": 499,
+      "provenance": "typed-api"
+    }
+  ],
+  "digest": "sha256:f67dbb4a4bde1e9b509bb8e3107047b4b8c0102a60420cd9e835a851e6e38226"
+}

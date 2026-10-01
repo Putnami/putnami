@@ -1,0 +1,13 @@
+{
+  "protocolVersion": 1,
+  "observations": [
+    {
+      "feature": "billing/invoice-export",
+      "requirement": "export-format",
+      "check": "export-states-content-type",
+      "status": "passed",
+      "issuer": { "kind": "test", "id": "billing" },
+      "provenance": { "path": "export_test.go" }
+    }
+  ]
+}

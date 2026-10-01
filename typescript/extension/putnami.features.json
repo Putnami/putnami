@@ -1,0 +1,446 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/typescript-project-toolchain",
+      "type": "feature",
+      "name": "TypeScript project toolchain",
+      "outcome": "A TypeScript project builds, tests, lints, serves, runs and packages on Bun and Biome through independently cached phases, installs its workspace dependencies from one shared version catalog, and ships an npm or Docker artifact that loads exactly as it did in the workspace",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "phase-isolation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-project-writes-only-into-its-own-output-directory",
+              "incremental-build-info-state-is-per-project",
+              "the-types-phase-emits-per-project-declarations",
+              "the-generate-phase-emits-per-project-data"
+            ]
+          }
+        },
+        {
+          "id": "batch-equals-solo",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-batched-phase-matches-the-solo-artifacts"
+            ]
+          }
+        },
+        {
+          "id": "batch-failure-isolation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-project-failing-still-produces-sibling-outputs",
+              "a-solo-generate-failure-emits-a-diagnostic",
+              "a-batched-generate-failure-emits-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "deterministic-content-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "identical-inputs-yield-an-identical-hash",
+              "changed-content-changes-the-hash",
+              "file-discovery-order-does-not-affect-the-hash",
+              "non-source-files-do-not-affect-the-hash"
+            ]
+          }
+        },
+        {
+          "id": "catalog-seeding",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-catalog-entry-is-seeded",
+              "a-requested-named-catalog-is-selected",
+              "an-existing-entry-is-left-alone",
+              "the-root-manifest-top-level-key-order-is-preserved",
+              "no-catalog-references-seeds-nothing"
+            ]
+          }
+        },
+        {
+          "id": "serve-entrypoint",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-explicit-entrypoint-is-used-as-given",
+              "the-entrypoint-resolves-from-the-serve-export",
+              "a-missing-package-manifest-is-a-user-facing-error",
+              "a-missing-serve-export-is-a-user-facing-error"
+            ]
+          }
+        },
+        {
+          "id": "serve-supervision",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-child-exit-code-is-forwarded",
+              "an-interrupt-terminates-the-group-and-reports-130",
+              "a-group-that-outlives-the-grace-period-is-sigkilled",
+              "the-whole-child-process-group-is-terminated"
+            ]
+          }
+        },
+        {
+          "id": "environment-independent-library-output",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-tsx-library-built-under-a-development-environment-imports-the-production-jsx-runtime",
+              "the-transpile-step-never-inlines-the-builder-environment"
+            ]
+          }
+        },
+        {
+          "id": "packaged-loadability",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-staged-package-loads-under-the-claimed-contract",
+              "a-contract-claim-newer-than-the-packager-is-rejected",
+              "a-stale-lower-claim-is-ratcheted-to-the-earned-one",
+              "an-unloadable-hook-only-manifest-fails-packaging"
+            ]
+          }
+        },
+        {
+          "id": "npm-agent-content",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-npm-package-carries-its-bound-agent-content",
+              "a-files-allowlist-must-carry-the-content",
+              "content-the-package-cannot-bind-fails-packaging"
+            ]
+          }
+        },
+        {
+          "id": "package-channel-index",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-channel-is-recorded-inside-the-directory-its-packager-owns",
+              "sibling-packagers-record-independently-and-the-index-reports-both",
+              "a-channel-is-never-recorded-twice",
+              "no-package-task-claims-a-path-outside-the-directory-it-owns"
+            ]
+          }
+        },
+        {
+          "id": "declared-assets-must-exist",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "declared-but-absent-public-assets-fail-packaging",
+              "a-project-declaring-public-assets-is-recognized"
+            ]
+          }
+        },
+        {
+          "id": "lint-covers-the-project",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "lint-covers-every-biome-writable-project-file",
+              "a-nested-project-is-never-linted-by-its-parent",
+              "the-workspace-configuration-resolves-from-the-config-root",
+              "an-external-configuration-stays-anchored-at-the-project-root",
+              "the-scheduler-cpu-budget-is-bound-to-the-linter",
+              "an-explicit-thread-setting-is-never-overridden"
+            ]
+          }
+        },
+        {
+          "id": "workspace-biome-default",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-workspace-biome-config-materializes-extension-rules-as-a-root-config",
+              "an-existing-workspace-biome-config-is-preserved",
+              "a-missing-extension-biome-default-fails-install",
+              "a-fresh-workspace-install-is-idempotent-and-lint-uses-the-root-config"
+            ]
+          }
+        },
+        {
+          "id": "workspace-bun-pin",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-fresh-workspace-declares-the-bun-it-installs-with",
+              "an-existing-package-manager-is-kept",
+              "a-bun-that-is-not-a-release-is-not-declared"
+            ]
+          }
+        },
+        {
+          "id": "workspace-install-lists-the-members",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-members-are-listed-before-bun-install",
+              "the-list-is-the-one-projects-sync-writes",
+              "a-context-without-the-membership-changes-nothing",
+              "an-unreadable-workspaces-member-fails-the-install"
+            ]
+          }
+        },
+        {
+          "id": "hosted-install-fetches-first",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-credential-is-read-before-any-process-and-its-files-are-removed",
+              "a-workspace-without-a-committed-lock-fails",
+              "workspace-fetch-runs-no-bun-from-the-workspace",
+              "a-fetch-never-rewrites-the-committed-lock",
+              "the-hosted-install-is-frozen-and-materializes-no-credential",
+              "fetch-and-install-shape-the-same-manifests",
+              "a-hosted-run-installs-from-the-fetched-cache-and-no-process-reads-the-bearer"
+            ]
+          }
+        },
+        {
+          "id": "hook-order-determinism",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "ranked-manifests-are-discovered-first",
+              "unranked-manifests-keep-a-stable-order",
+              "invocation-follows-discovery-order"
+            ]
+          }
+        },
+        {
+          "id": "structured-reports",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "test-results-parse-into-a-structured-report",
+              "coverage-parses-into-a-per-file-report",
+              "coverage-parses-into-a-per-project-report",
+              "uncovered-project-sources-are-counted",
+              "external-dependencies-are-excluded",
+              "a-missing-coverage-file-yields-an-empty-result",
+              "a-missing-test-report-yields-an-empty-result"
+            ]
+          }
+        },
+        {
+          "id": "bounded-test-output",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-deterministic-structured-outcome-summary-by-default",
+              "the-complete-transcript-is-retained-as-session-detail",
+              "failure-diagnostics-are-bounded-with-omission-accounting",
+              "a-bounded-failure-message-keeps-the-test-name-and-tail",
+              "test-verbose-changes-visibility-only",
+              "test-verbose-never-changes-the-bun-invocation-or-verdicts"
+            ]
+          }
+        },
+        {
+          "id": "runtime-manifest-parity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-local-and-packaged-runtime-manifests-describe-the-same-runtime"
+            ]
+          }
+        },
+        {
+          "id": "npm-ecosystem-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "probe-declares-npm-and-oci-members"
+            ]
+          }
+        },
+        {
+          "id": "registries-drive-npmrc",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "npmrc-lines-come-from-registries"
+            ]
+          }
+        },
+        {
+          "id": "member-event-per-publication",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "reuse-reports-the-existing-digest",
+              "no-dist-tag-is-written",
+              "private-loopback-broker-carries-the-publication"
+            ]
+          }
+        },
+        {
+          "id": "upgrade-table-shows-source-revision",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "revision-column-follows-the-version-suffix"
+            ]
+          }
+        },
+        {
+          "id": "resolved-dependency-documentation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-nearest-project-package-supplies-exact-documentation",
+              "workspace-package-links-retain-their-source-identity",
+              "missing-dependencies-and-documentation-are-explicit",
+              "unsafe-documentation-paths-are-unavailable"
+            ]
+          }
+        },
+        {
+          "id": "committed-client-drift",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-generate-client-output-declares-fail-on-drift"
+            ]
+          }
+        },
+        {
+          "id": "committed-openapi-drift",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-generate-openapi-output-declares-fail-on-drift"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

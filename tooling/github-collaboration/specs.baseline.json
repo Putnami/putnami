@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "tooling/github-collaboration#configurable-state-mapping",
+    "tooling/github-collaboration#contract-scenarios",
+    "tooling/github-collaboration#credential-safety",
+    "tooling/github-collaboration#exact-proposal-identity",
+    "tooling/github-collaboration#honest-failures",
+    "tooling/github-collaboration#reconciled-writes",
+    "tooling/github-collaboration#reported-publication",
+    "tooling/github-collaboration#truthful-manifest"
+  ]
+}

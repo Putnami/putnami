@@ -1,0 +1,8 @@
+{
+  "ref": {
+    "source": "github:acme/app",
+    "id": "42"
+  },
+  "state": "done",
+  "reason": "merged"
+}

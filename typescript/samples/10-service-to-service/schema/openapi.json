@@ -1,0 +1,4148 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Items Service",
+    "version": "1.0.0",
+    "description": "Typed clients, interceptors, and service communication"
+  },
+  "paths": {
+    "/blobs/echo": {
+      "post": {
+        "operationId": "postBlobsEcho",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                },
+                "x-putnami-max-bytes": 4096
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported Media Type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              },
+              "x-putnami-max-bytes": 4096
+            }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [
+            {
+              "protocol": "rest-json",
+              "path": "/blobs/echo",
+              "encoding": "json"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": []
+              }
+            ]
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 413,
+              "code": "http.payload_too_large",
+              "retryable": false
+            },
+            {
+              "status": 415,
+              "code": "http.unsupported_media_type",
+              "retryable": false
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          }
+        }
+      }
+    },
+    "/blobs/{id}": {
+      "get": {
+        "operationId": "getBlobs_id",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                },
+                "x-putnami-max-bytes": 4096
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required scopes: catalog.watch",
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [
+            {
+              "protocol": "rest-json",
+              "path": "/blobs/{id}",
+              "encoding": "json"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "catalog-key",
+                    "scopes": [
+                      "catalog.watch"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "authorization": {
+              "scopesAll": [
+                "catalog.watch"
+              ]
+            }
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 404,
+              "code": "not_found"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          }
+        }
+      }
+    },
+    "/items": {
+      "get": {
+        "operationId": "getItems",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tenant": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Model1"
+                      }
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "tenant",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "x-catalog-tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [
+            {
+              "protocol": "rest-json",
+              "path": "/items",
+              "encoding": "json"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": []
+              }
+            ]
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postItems",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Model4"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number"
+                  },
+                  "stock": {
+                    "type": "number"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "price",
+                  "stock"
+                ]
+              }
+            }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [
+            {
+              "protocol": "rest-json",
+              "path": "/items",
+              "encoding": "json"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": []
+              }
+            ]
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent",
+            "keyHeader": "X-Idempotency-Key"
+          },
+          "resilience": {
+            "timeoutMs": 2000,
+            "attemptTimeoutMs": 250,
+            "retry": {
+              "maxAttempts": 3,
+              "statuses": [
+                503
+              ]
+            },
+            "circuit": {
+              "failureThreshold": 2,
+              "resetTimeoutMs": 60000
+            }
+          }
+        }
+      }
+    },
+    "/items/changes": {
+      "get": {
+        "operationId": "getItemsChanges",
+        "responses": {
+          "200": {
+            "description": "Server-Sent Events stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cursor": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "number"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "cursor",
+                    "revision",
+                    "id",
+                    "name"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "description": "Stream endpoint (WebSocket, SSE). Connect via WebSocket upgrade or Accept: text/event-stream.\n\nRequired scopes: catalog.watch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "stream": "server",
+          "messages": {
+            "output": {
+              "type": "object",
+              "properties": {
+                "cursor": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "number"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "cursor",
+                "revision",
+                "id",
+                "name"
+              ]
+            }
+          },
+          "transports": [
+            {
+              "protocol": "sse",
+              "path": "/items/changes",
+              "encoding": "json",
+              "sse": {
+                "continuation": {
+                  "mode": "cursor",
+                  "cursor": {
+                    "outputField": "cursor",
+                    "queryParameter": "cursor"
+                  }
+                }
+              }
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "catalog-key",
+                    "scopes": [
+                      "catalog.watch"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "authorization": {
+              "scopesAll": [
+                "catalog.watch"
+              ]
+            }
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 404,
+              "code": "not_found"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "resilience": {
+            "stream": {
+              "reconnect": true,
+              "maxFrameBytes": 16384,
+              "maxBufferedMessages": 4
+            }
+          }
+        }
+      }
+    },
+    "/items/{id}": {
+      "get": {
+        "operationId": "getItems_id",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Model4"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [
+            {
+              "protocol": "rest-json",
+              "path": "/items/{id}",
+              "encoding": "json"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": []
+              }
+            ]
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 404,
+              "code": "not_found"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          }
+        }
+      }
+    },
+    "/items/{id}/adjust": {
+      "get": {
+        "operationId": "getItems_idAdjust",
+        "responses": {
+          "101": {
+            "description": "WebSocket upgrade"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Stream endpoint (WebSocket). Connect via WebSocket upgrade. Client sends messages, server returns a final response.\n\nRequired scopes: catalog.watch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "stream": "client",
+          "messages": {
+            "input": {
+              "type": "object",
+              "properties": {
+                "delta": {
+                  "type": "number"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "delta"
+              ]
+            },
+            "output": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "applied": {
+                  "type": "number"
+                },
+                "total": {
+                  "type": "number"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "applied",
+                "total"
+              ]
+            }
+          },
+          "transports": [
+            {
+              "protocol": "websocket",
+              "path": "/items/{id}/adjust",
+              "encoding": "json",
+              "websocket": {
+                "subprotocol": "putnami.service.v1",
+                "resume": false
+              }
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "catalog-key",
+                    "scopes": [
+                      "catalog.watch"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "authorization": {
+              "scopesAll": [
+                "catalog.watch"
+              ]
+            }
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 404,
+              "code": "not_found"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "resilience": {
+            "stream": {
+              "handshakeTimeoutMs": 2000,
+              "idleTimeoutMs": 5000,
+              "heartbeatMs": 250,
+              "maxFrameBytes": 16384,
+              "maxBufferedMessages": 4
+            }
+          }
+        }
+      }
+    },
+    "/items/{id}/history": {
+      "get": {
+        "operationId": "getItems_idHistory",
+        "responses": {
+          "200": {
+            "description": "Server-Sent Events stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "revision"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Stream endpoint (WebSocket, SSE). Connect via WebSocket upgrade or Accept: text/event-stream.\n\nRequired scopes: catalog.watch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "stream": "server",
+          "messages": {
+            "output": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "revision"
+              ]
+            }
+          },
+          "transports": [
+            {
+              "protocol": "websocket",
+              "path": "/items/{id}/history",
+              "encoding": "json",
+              "websocket": {
+                "subprotocol": "putnami.service.v1",
+                "resume": true
+              }
+            },
+            {
+              "protocol": "sse",
+              "path": "/items/{id}/history",
+              "encoding": "json"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "catalog-key",
+                    "scopes": [
+                      "catalog.watch"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "authorization": {
+              "scopesAll": [
+                "catalog.watch"
+              ]
+            }
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 404,
+              "code": "not_found"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "resilience": {
+            "stream": {
+              "handshakeTimeoutMs": 2000,
+              "idleTimeoutMs": 5000,
+              "heartbeatMs": 250,
+              "maxFrameBytes": 16384,
+              "maxBufferedMessages": 4,
+              "reconnect": true
+            }
+          }
+        }
+      }
+    },
+    "/items/{id}/negotiate": {
+      "get": {
+        "operationId": "getItems_idNegotiate",
+        "responses": {
+          "101": {
+            "description": "WebSocket upgrade"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Stream endpoint (WebSocket). Connect via WebSocket upgrade. Bidirectional message exchange.\n\nRequired scopes: catalog.watch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "stream": "bidirectional",
+          "messages": {
+            "input": {
+              "type": "object",
+              "properties": {
+                "delta": {
+                  "type": "number"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "delta"
+              ]
+            },
+            "output": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "applied": {
+                  "type": "number"
+                },
+                "total": {
+                  "type": "number"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "applied",
+                "total"
+              ]
+            }
+          },
+          "transports": [
+            {
+              "protocol": "websocket",
+              "path": "/items/{id}/negotiate",
+              "encoding": "json",
+              "websocket": {
+                "subprotocol": "putnami.service.v1",
+                "resume": false
+              }
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "catalog-key",
+                    "scopes": [
+                      "catalog.watch"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "authorization": {
+              "scopesAll": [
+                "catalog.watch"
+              ]
+            }
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 404,
+              "code": "not_found"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "resilience": {
+            "stream": {
+              "handshakeTimeoutMs": 2000,
+              "idleTimeoutMs": 5000,
+              "heartbeatMs": 250,
+              "maxFrameBytes": 16384,
+              "maxBufferedMessages": 4
+            }
+          }
+        }
+      }
+    },
+    "/items/{id}/watch": {
+      "get": {
+        "operationId": "getItems_idWatch",
+        "responses": {
+          "200": {
+            "description": "Server-Sent Events stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/Model1"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "follow",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "description": "Stream endpoint (WebSocket, SSE). Connect via WebSocket upgrade or Accept: text/event-stream.\n\nRequired scopes: catalog.watch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "stream": "server",
+          "messages": {
+            "output": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "price": {
+                  "type": "number"
+                },
+                "stock": {
+                  "type": "number"
+                },
+                "discontinuedAt": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "price",
+                "stock"
+              ]
+            }
+          },
+          "transports": [
+            {
+              "protocol": "sse",
+              "path": "/items/{id}/watch",
+              "encoding": "json"
+            },
+            {
+              "protocol": "websocket",
+              "path": "/items/{id}/watch",
+              "encoding": "json",
+              "websocket": {
+                "subprotocol": "putnami.service.v1",
+                "resume": false
+              }
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "catalog-key",
+                    "scopes": [
+                      "catalog.watch"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "authorization": {
+              "scopesAll": [
+                "catalog.watch"
+              ]
+            }
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 404,
+              "code": "not_found"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          }
+        }
+      }
+    },
+    "/proxy": {
+      "get": {
+        "operationId": "getProxy",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "tenant": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Model1"
+                      }
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "message",
+                    "tenant",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [
+            {
+              "protocol": "rest-json",
+              "path": "/proxy",
+              "encoding": "json"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": []
+              }
+            ]
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          }
+        }
+      }
+    },
+    "/quotes/{id}": {
+      "get": {
+        "operationId": "getQuotes_id",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Model2"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing quote",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Model3"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required scopes: catalog.watch",
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [
+            {
+              "protocol": "connect",
+              "path": "/catalog.items.v1.QuotesService/GetQuotesById",
+              "encoding": "proto",
+              "protobufMethod": "/catalog.items.v1.QuotesService/GetQuotesById"
+            },
+            {
+              "protocol": "connect",
+              "path": "/catalog.items.v1.QuotesService/GetQuotesById",
+              "encoding": "json",
+              "protobufMethod": "/catalog.items.v1.QuotesService/GetQuotesById"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "catalog-key",
+                    "scopes": [
+                      "catalog.watch"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "authorization": {
+              "scopesAll": [
+                "catalog.watch"
+              ]
+            }
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 404,
+              "code": "not_found",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resource": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "resource",
+                  "id"
+                ]
+              }
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          }
+        }
+      }
+    },
+    "/quotes/{id}/snapshot": {
+      "get": {
+        "operationId": "getQuotes_idSnapshot",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Model2"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing quote",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Model3"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required scopes: catalog.watch",
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [
+            {
+              "protocol": "connect",
+              "path": "/catalog.items.v1.QuotesService/ListQuotesByIdSnapshot",
+              "encoding": "json",
+              "protobufMethod": "/catalog.items.v1.QuotesService/ListQuotesByIdSnapshot"
+            },
+            {
+              "protocol": "connect",
+              "path": "/catalog.items.v1.QuotesService/ListQuotesByIdSnapshot",
+              "encoding": "proto",
+              "protobufMethod": "/catalog.items.v1.QuotesService/ListQuotesByIdSnapshot"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "catalog-key",
+                    "scopes": [
+                      "catalog.watch"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "authorization": {
+              "scopesAll": [
+                "catalog.watch"
+              ]
+            }
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 404,
+              "code": "not_found",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resource": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "resource",
+                  "id"
+                ]
+              }
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          }
+        }
+      }
+    },
+    "/quotes/{id}/ticks": {
+      "get": {
+        "operationId": "getQuotes_idTicks",
+        "responses": {
+          "200": {
+            "description": "Server-Sent Events stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "sequence": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "sequence"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Stream endpoint (WebSocket, SSE). Connect via WebSocket upgrade or Accept: text/event-stream.\n\nRequired scopes: catalog.watch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "stream": "server",
+          "messages": {
+            "output": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "sequence": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "sequence"
+              ]
+            }
+          },
+          "transports": [
+            {
+              "protocol": "connect",
+              "path": "/catalog.items.v1.QuotesService/ListQuotesByIdTicks",
+              "encoding": "proto",
+              "protobufMethod": "/catalog.items.v1.QuotesService/ListQuotesByIdTicks"
+            },
+            {
+              "protocol": "connect",
+              "path": "/catalog.items.v1.QuotesService/ListQuotesByIdTicks",
+              "encoding": "json",
+              "protobufMethod": "/catalog.items.v1.QuotesService/ListQuotesByIdTicks"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "catalog-key",
+                    "scopes": [
+                      "catalog.watch"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "authorization": {
+              "scopesAll": [
+                "catalog.watch"
+              ]
+            }
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 404,
+              "code": "not_found"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          }
+        }
+      }
+    },
+    "/tenant-check": {
+      "get": {
+        "operationId": "getTenant-check",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "boolean"
+                    },
+                    "tenant": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "key",
+                    "tenant"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required scopes: catalog.tenant",
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [
+            {
+              "protocol": "rest-json",
+              "path": "/tenant-check",
+              "encoding": "json"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "catalog-key",
+                    "scopes": [
+                      "catalog.tenant"
+                    ]
+                  },
+                  {
+                    "profile": "tenant"
+                  }
+                ]
+              }
+            ],
+            "authorization": {
+              "scopesAll": [
+                "catalog.tenant"
+              ]
+            }
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 401,
+              "code": "unauthorized"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          }
+        }
+      }
+    },
+    "/whoami": {
+      "get": {
+        "operationId": "getWhoami",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subject": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "subject"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required scopes: catalog.caller",
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [
+            {
+              "protocol": "rest-json",
+              "path": "/whoami",
+              "encoding": "json"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "catalog.caller"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "authorization": {
+              "scopesAll": [
+                "catalog.caller"
+              ]
+            }
+          },
+          "errors": [
+            {
+              "status": 400,
+              "code": "http.bad_request"
+            },
+            {
+              "status": 401,
+              "code": "unauthorized"
+            },
+            {
+              "status": 500,
+              "code": "http.internal_server"
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          }
+        }
+      }
+    }
+  },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": {
+      "id": "catalog.items",
+      "audience": "api://catalog.items"
+    },
+    "credentials": {
+      "catalog-key": {
+        "kind": "api-key",
+        "header": "X-Catalog-Key"
+      },
+      "tenant": {
+        "kind": "named-header",
+        "header": "X-Tenant-Id"
+      },
+      "user": {
+        "kind": "forwarded-user-token"
+      }
+    },
+    "protobuf": {
+      "syntax": "proto3",
+      "package": "catalog.items.v1",
+      "services": [
+        {
+          "name": "BlobsService",
+          "methods": [
+            {
+              "name": "GetBlobsById",
+              "input": "GetBlobsByIdRequest",
+              "output": "GetBlobsByIdResponse",
+              "clientStreaming": false,
+              "serverStreaming": false
+            },
+            {
+              "name": "CreateBlobsEcho",
+              "input": "CreateBlobsEchoRequest",
+              "output": "CreateBlobsEchoResponse",
+              "clientStreaming": false,
+              "serverStreaming": false
+            }
+          ]
+        },
+        {
+          "name": "ItemsService",
+          "methods": [
+            {
+              "name": "ListItems",
+              "input": "ListItemsRequest",
+              "output": "ListItemsResponse",
+              "clientStreaming": false,
+              "serverStreaming": false
+            },
+            {
+              "name": "CreateItems",
+              "input": "CreateItemsRequest",
+              "output": "CreateItemsResponse",
+              "clientStreaming": false,
+              "serverStreaming": false
+            },
+            {
+              "name": "GetItemsById",
+              "input": "GetItemsByIdRequest",
+              "output": "GetItemsByIdResponse",
+              "clientStreaming": false,
+              "serverStreaming": false
+            },
+            {
+              "name": "ListItemsByIdAdjust",
+              "input": "ListItemsByIdAdjustRequest",
+              "output": "ListItemsByIdAdjustResponse",
+              "clientStreaming": true,
+              "serverStreaming": false
+            },
+            {
+              "name": "ListItemsByIdHistory",
+              "input": "ListItemsByIdHistoryRequest",
+              "output": "ListItemsByIdHistoryResponse",
+              "clientStreaming": false,
+              "serverStreaming": true
+            },
+            {
+              "name": "ListItemsByIdNegotiate",
+              "input": "ListItemsByIdNegotiateRequest",
+              "output": "ListItemsByIdNegotiateResponse",
+              "clientStreaming": true,
+              "serverStreaming": true
+            },
+            {
+              "name": "ListItemsByIdWatch",
+              "input": "ListItemsByIdWatchRequest",
+              "output": "ListItemsByIdWatchResponse",
+              "clientStreaming": false,
+              "serverStreaming": true
+            },
+            {
+              "name": "ListItemsChanges",
+              "input": "ListItemsChangesRequest",
+              "output": "ListItemsChangesResponse",
+              "clientStreaming": false,
+              "serverStreaming": true
+            }
+          ]
+        },
+        {
+          "name": "ProxyService",
+          "methods": [
+            {
+              "name": "ListProxy",
+              "input": "ListProxyRequest",
+              "output": "ListProxyResponse",
+              "clientStreaming": false,
+              "serverStreaming": false
+            }
+          ]
+        },
+        {
+          "name": "QuotesService",
+          "methods": [
+            {
+              "name": "GetQuotesById",
+              "input": "GetQuotesByIdRequest",
+              "output": "GetQuotesByIdResponse",
+              "clientStreaming": false,
+              "serverStreaming": false
+            },
+            {
+              "name": "ListQuotesByIdSnapshot",
+              "input": "ListQuotesByIdSnapshotRequest",
+              "output": "ListQuotesByIdSnapshotResponse",
+              "clientStreaming": false,
+              "serverStreaming": false
+            },
+            {
+              "name": "ListQuotesByIdTicks",
+              "input": "ListQuotesByIdTicksRequest",
+              "output": "ListQuotesByIdTicksResponse",
+              "clientStreaming": false,
+              "serverStreaming": true
+            }
+          ]
+        },
+        {
+          "name": "TenantCheckService",
+          "methods": [
+            {
+              "name": "ListTenantCheck",
+              "input": "ListTenantCheckRequest",
+              "output": "ListTenantCheckResponse",
+              "clientStreaming": false,
+              "serverStreaming": false
+            }
+          ]
+        },
+        {
+          "name": "WhoamiService",
+          "methods": [
+            {
+              "name": "ListWhoami",
+              "input": "ListWhoamiRequest",
+              "output": "ListWhoamiResponse",
+              "clientStreaming": false,
+              "serverStreaming": false
+            }
+          ]
+        }
+      ],
+      "messages": [
+        {
+          "name": "GetBlobsByIdRequestParams",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "GetBlobsByIdRequest",
+          "fields": [
+            {
+              "name": "params",
+              "jsonName": "params",
+              "number": 1,
+              "typeKind": "message",
+              "type": "GetBlobsByIdRequestParams"
+            }
+          ]
+        },
+        {
+          "name": "GetBlobsByIdResponse",
+          "fields": []
+        },
+        {
+          "name": "CreateBlobsEchoRequest",
+          "fields": []
+        },
+        {
+          "name": "CreateBlobsEchoResponse",
+          "fields": []
+        },
+        {
+          "name": "ListItemsRequestQuery",
+          "fields": [
+            {
+              "name": "search",
+              "jsonName": "search",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "limit",
+              "jsonName": "limit",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "double"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsRequest",
+          "fields": [
+            {
+              "name": "query",
+              "jsonName": "query",
+              "number": 1,
+              "typeKind": "message",
+              "type": "ListItemsRequestQuery"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsResponse",
+          "fields": [
+            {
+              "name": "tenant",
+              "jsonName": "tenant",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "items",
+              "jsonName": "items",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "string",
+              "repeated": true
+            }
+          ]
+        },
+        {
+          "name": "CreateItemsRequestBody",
+          "fields": [
+            {
+              "name": "name",
+              "jsonName": "name",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "price",
+              "jsonName": "price",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "stock",
+              "jsonName": "stock",
+              "number": 3,
+              "typeKind": "scalar",
+              "type": "double"
+            }
+          ]
+        },
+        {
+          "name": "CreateItemsRequest",
+          "fields": [
+            {
+              "name": "body",
+              "jsonName": "body",
+              "number": 1,
+              "typeKind": "message",
+              "type": "CreateItemsRequestBody"
+            }
+          ]
+        },
+        {
+          "name": "CreateItemsResponseItem",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "name",
+              "jsonName": "name",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "price",
+              "jsonName": "price",
+              "number": 3,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "stock",
+              "jsonName": "stock",
+              "number": 4,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "discontinued_at",
+              "jsonName": "discontinuedAt",
+              "number": 5,
+              "typeKind": "scalar",
+              "type": "string",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "name": "CreateItemsResponse",
+          "fields": [
+            {
+              "name": "item",
+              "jsonName": "item",
+              "number": 1,
+              "typeKind": "message",
+              "type": "CreateItemsResponseItem"
+            }
+          ]
+        },
+        {
+          "name": "GetItemsByIdRequestParams",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "GetItemsByIdRequest",
+          "fields": [
+            {
+              "name": "params",
+              "jsonName": "params",
+              "number": 1,
+              "typeKind": "message",
+              "type": "GetItemsByIdRequestParams"
+            }
+          ]
+        },
+        {
+          "name": "GetItemsByIdResponseItem",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "name",
+              "jsonName": "name",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "price",
+              "jsonName": "price",
+              "number": 3,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "stock",
+              "jsonName": "stock",
+              "number": 4,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "discontinued_at",
+              "jsonName": "discontinuedAt",
+              "number": 5,
+              "typeKind": "scalar",
+              "type": "string",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "name": "GetItemsByIdResponse",
+          "fields": [
+            {
+              "name": "item",
+              "jsonName": "item",
+              "number": 1,
+              "typeKind": "message",
+              "type": "GetItemsByIdResponseItem"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdAdjustRequestParams",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdAdjustRequestBody",
+          "fields": [
+            {
+              "name": "delta",
+              "jsonName": "delta",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "double"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdAdjustRequest",
+          "fields": [
+            {
+              "name": "params",
+              "jsonName": "params",
+              "number": 1,
+              "typeKind": "message",
+              "type": "ListItemsByIdAdjustRequestParams"
+            },
+            {
+              "name": "body",
+              "jsonName": "body",
+              "number": 2,
+              "typeKind": "message",
+              "type": "ListItemsByIdAdjustRequestBody"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdAdjustResponse",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "applied",
+              "jsonName": "applied",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "total",
+              "jsonName": "total",
+              "number": 3,
+              "typeKind": "scalar",
+              "type": "double"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdHistoryRequestParams",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdHistoryRequest",
+          "fields": [
+            {
+              "name": "params",
+              "jsonName": "params",
+              "number": 1,
+              "typeKind": "message",
+              "type": "ListItemsByIdHistoryRequestParams"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdHistoryResponse",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "revision",
+              "jsonName": "revision",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdNegotiateRequestParams",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdNegotiateRequestBody",
+          "fields": [
+            {
+              "name": "delta",
+              "jsonName": "delta",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "double"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdNegotiateRequest",
+          "fields": [
+            {
+              "name": "params",
+              "jsonName": "params",
+              "number": 1,
+              "typeKind": "message",
+              "type": "ListItemsByIdNegotiateRequestParams"
+            },
+            {
+              "name": "body",
+              "jsonName": "body",
+              "number": 2,
+              "typeKind": "message",
+              "type": "ListItemsByIdNegotiateRequestBody"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdNegotiateResponse",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "applied",
+              "jsonName": "applied",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "total",
+              "jsonName": "total",
+              "number": 3,
+              "typeKind": "scalar",
+              "type": "double"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdWatchRequestParams",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdWatchRequestQuery",
+          "fields": [
+            {
+              "name": "follow",
+              "jsonName": "follow",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdWatchRequest",
+          "fields": [
+            {
+              "name": "params",
+              "jsonName": "params",
+              "number": 1,
+              "typeKind": "message",
+              "type": "ListItemsByIdWatchRequestParams"
+            },
+            {
+              "name": "query",
+              "jsonName": "query",
+              "number": 2,
+              "typeKind": "message",
+              "type": "ListItemsByIdWatchRequestQuery"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsByIdWatchResponse",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "name",
+              "jsonName": "name",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "price",
+              "jsonName": "price",
+              "number": 3,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "stock",
+              "jsonName": "stock",
+              "number": 4,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "discontinued_at",
+              "jsonName": "discontinuedAt",
+              "number": 5,
+              "typeKind": "scalar",
+              "type": "string",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "name": "ListItemsChangesRequestQuery",
+          "fields": [
+            {
+              "name": "cursor",
+              "jsonName": "cursor",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string",
+              "optional": true
+            },
+            {
+              "name": "until",
+              "jsonName": "until",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "double"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsChangesRequest",
+          "fields": [
+            {
+              "name": "query",
+              "jsonName": "query",
+              "number": 1,
+              "typeKind": "message",
+              "type": "ListItemsChangesRequestQuery"
+            }
+          ]
+        },
+        {
+          "name": "ListItemsChangesResponse",
+          "fields": [
+            {
+              "name": "cursor",
+              "jsonName": "cursor",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "revision",
+              "jsonName": "revision",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 3,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "name",
+              "jsonName": "name",
+              "number": 4,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "ListProxyRequest",
+          "fields": []
+        },
+        {
+          "name": "ListProxyResponse",
+          "fields": [
+            {
+              "name": "message",
+              "jsonName": "message",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "tenant",
+              "jsonName": "tenant",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "items",
+              "jsonName": "items",
+              "number": 3,
+              "typeKind": "scalar",
+              "type": "string",
+              "repeated": true
+            }
+          ]
+        },
+        {
+          "name": "GetQuotesByIdRequestParams",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "GetQuotesByIdRequest",
+          "fields": [
+            {
+              "name": "params",
+              "jsonName": "params",
+              "number": 1,
+              "typeKind": "message",
+              "type": "GetQuotesByIdRequestParams"
+            }
+          ]
+        },
+        {
+          "name": "GetQuotesByIdResponse",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "units",
+              "jsonName": "units",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "int64"
+            },
+            {
+              "name": "offset",
+              "jsonName": "offset",
+              "number": 3,
+              "typeKind": "scalar",
+              "type": "int32"
+            },
+            {
+              "name": "tags",
+              "jsonName": "tags",
+              "number": 4,
+              "typeKind": "scalar",
+              "type": "string",
+              "repeated": true
+            }
+          ]
+        },
+        {
+          "name": "ListQuotesByIdSnapshotRequestParams",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "ListQuotesByIdSnapshotRequest",
+          "fields": [
+            {
+              "name": "params",
+              "jsonName": "params",
+              "number": 1,
+              "typeKind": "message",
+              "type": "ListQuotesByIdSnapshotRequestParams"
+            }
+          ]
+        },
+        {
+          "name": "ListQuotesByIdSnapshotResponse",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "units",
+              "jsonName": "units",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "int64"
+            },
+            {
+              "name": "offset",
+              "jsonName": "offset",
+              "number": 3,
+              "typeKind": "scalar",
+              "type": "int32"
+            },
+            {
+              "name": "tags",
+              "jsonName": "tags",
+              "number": 4,
+              "typeKind": "scalar",
+              "type": "string",
+              "repeated": true
+            }
+          ]
+        },
+        {
+          "name": "ListQuotesByIdTicksRequestParams",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "ListQuotesByIdTicksRequest",
+          "fields": [
+            {
+              "name": "params",
+              "jsonName": "params",
+              "number": 1,
+              "typeKind": "message",
+              "type": "ListQuotesByIdTicksRequestParams"
+            }
+          ]
+        },
+        {
+          "name": "ListQuotesByIdTicksResponse",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "sequence",
+              "jsonName": "sequence",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "int64"
+            }
+          ]
+        },
+        {
+          "name": "ListTenantCheckRequest",
+          "fields": []
+        },
+        {
+          "name": "ListTenantCheckResponse",
+          "fields": [
+            {
+              "name": "key",
+              "jsonName": "key",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "bool"
+            },
+            {
+              "name": "tenant",
+              "jsonName": "tenant",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "ListWhoamiRequest",
+          "fields": []
+        },
+        {
+          "name": "ListWhoamiResponse",
+          "fields": [
+            {
+              "name": "subject",
+              "jsonName": "subject",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        }
+      ],
+      "enums": []
+    }
+  },
+  "components": {
+    "schemas": {
+      "Model1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "stock": {
+            "type": "number"
+          },
+          "discontinuedAt": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "price",
+          "stock"
+        ]
+      },
+      "Model4": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/Model1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "item"
+        ]
+      },
+      "Model2": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "units": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "units",
+          "offset",
+          "tags"
+        ]
+      },
+      "Model3": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resource",
+          "id"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

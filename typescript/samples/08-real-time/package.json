@@ -1,0 +1,16 @@
+{
+  "name": "@example/08-real-time",
+  "version": "0.0.0",
+  "description": "WebSocket and SSE streaming with broadcasting and presence",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

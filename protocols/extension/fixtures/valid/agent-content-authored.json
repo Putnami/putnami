@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/review",
+  "cliContract": 5,
+  "agentContent": {
+    "path": "agent-content",
+    "source": "agent-src",
+    "supersedes": ["@acme/review-workflows", "maintainer-workflows"]
+  }
+}

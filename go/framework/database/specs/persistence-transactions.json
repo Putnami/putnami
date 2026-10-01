@@ -1,0 +1,41 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/persistence-transactions",
+  "outcomes": [
+    "A service persists and queries typed records through a pool-bound repository",
+    "Related writes on one datasource commit together or roll back together",
+    "A request-scoped unit of work transparently shares one transaction per participating datasource",
+    "Transaction telemetry explains the boundary without disclosing query parameters, row data, or panic values"
+  ],
+  "nonGoals": [
+    "Providing distributed atomic commit across multiple datasources",
+    "Hiding PostgreSQL behavior behind a database-independent ORM",
+    "Defining migration command behavior owned by go.putnami.dev/migration and go.putnami.dev/migratecli"
+  ],
+  "requirements": [
+    {
+      "id": "pool-scoped-transaction",
+      "text": "A transaction is keyed by the pool that began it; nested work on the same pool reuses it and a different pool never receives that transaction."
+    },
+    {
+      "id": "transaction-finalization",
+      "text": "When WithTx owns a transaction, it commits after a nil callback result, rolls back after an error or panic, releases the connection after failed commit, and never double-finalizes the transaction."
+    },
+    {
+      "id": "unit-of-work",
+      "text": "A request unit of work begins at most one transaction per enrolled pool and finalizes every owned transaction once at the request boundary, including after cancellation and rollback-only outcomes; WithTx inside that request joins the enrolled transaction without taking finalization ownership."
+    },
+    {
+      "id": "multi-datasource-boundary",
+      "text": "Multi-datasource commit is deterministic best-effort rather than two-phase commit; a failure reports the committed prefix and rolls back every uncommitted remainder."
+    },
+    {
+      "id": "secret-safe-telemetry",
+      "text": "Rollback telemetry uses only fixed outcome classifications and never emits raw error text, bound parameters, row data, or panic values."
+    }
+  ],
+  "decisions": [
+    "go/framework/database/doc/adr/0001-pool-scoped-transaction-boundaries.md"
+  ]
+}

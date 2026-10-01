@@ -1,0 +1,72 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/structured-logging",
+      "type": "feature",
+      "name": "Go structured logging",
+      "outcome": "Go workloads emit structured, context-aware records through pluggable sinks without logging failures crashing application work",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "failure-isolation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "sink-write-panic-isolated"
+            ]
+          }
+        },
+        {
+          "id": "field-precedence",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "field-precedence-order"
+            ]
+          }
+        },
+        {
+          "id": "lifecycle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "flush-visits-every-sink",
+              "close-visits-every-sink"
+            ]
+          }
+        },
+        {
+          "id": "record",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "record-core-fields",
+              "record-structured-error",
+              "record-trace-identity"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

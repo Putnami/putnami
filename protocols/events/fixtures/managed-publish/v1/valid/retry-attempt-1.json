@@ -1,0 +1,11 @@
+{
+  "protocol": "putnami.events.v1",
+  "type": "publish",
+  "id": "evt-01JAZ6Y5K1W8FQ2CP3R4T5V6X9",
+  "dedupeKey": "membership-changed:user-123:7",
+  "topic": "identity.membership.changed",
+  "topicVersion": "1",
+  "payload": { "userId": "user-123", "revision": 7 },
+  "key": "user-123",
+  "attributes": { "operation": "role-added" }
+}

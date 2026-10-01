@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/runtime-prepare-workspace-dependent",
+  "runtime": {
+    "executable": "bin/sample",
+    "prepare": {
+      "command": "{workspaceRoot}/bin/prepare",
+      "inputs": ["cmd/**"]
+    }
+  },
+  "commands": {
+    "build": { "run": [{ "id": "build", "task": "build-exec" }] }
+  },
+  "tasks": {
+    "build-exec": { "kind": "command", "command": "echo" }
+  }
+}

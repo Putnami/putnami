@@ -1,0 +1,213 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-workspace.json",
+  "disable": {
+    "tags": [
+      "e2e"
+    ]
+  },
+  "epicBranches": [
+    "epic/*"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/typescript/extension",
+    "/python/extension",
+    "/tooling/scaffold",
+    "/tooling/sdd-extension",
+    "/tooling/contributor",
+    "/tooling/github-collaboration",
+    "@putnami/cloud"
+  ],
+  "agentArtifacts": [
+    "extension:@putnami/contributor"
+  ],
+  "includes": [
+    "go",
+    "protocols",
+    "python",
+    "sites",
+    "tooling",
+    "typescript"
+  ],
+  "groups": {},
+  "name": "putnami",
+  "options": {
+    "sdd": {
+      "owners": [
+        "@fdumay"
+      ],
+      "verification": {
+        "architecture": "enforce"
+      }
+    },
+    "test": {
+      "coverage-threshold": 70
+    },
+    "collaboration": {
+      "tasks": {
+        "provider": "@putnami/github-collaboration",
+        "version": 1,
+        "require": [
+          "assign"
+        ],
+        "settings": {
+          "repository": "Putnami/putnami",
+          "states": {
+            "open": [
+              "status/confirmed",
+              "status/audit-finding"
+            ],
+            "in_progress": [
+              "status/in-progress"
+            ],
+            "blocked": [
+              "status/needs-review",
+              "status/needs-design"
+            ]
+          },
+          "stateLabelPrefix": "status/"
+        }
+      },
+      "proposals": {
+        "provider": "@putnami/github-collaboration",
+        "version": 1,
+        "settings": {
+          "repository": "Putnami/putnami",
+          "assignAuthor": true,
+          "inheritLabelPrefixes": [
+            "group/",
+            "scope/",
+            "area/",
+            "severity/",
+            "priority/"
+          ]
+        }
+      }
+    },
+    "@putnami/contributor": {
+      "version": 1,
+      "tasks": {
+        "source": "github:putnami/putnami",
+        "backlog": {
+          "states": [
+            "open"
+          ]
+        },
+        "filters": {
+          "group": "group/{value}",
+          "scope": "scope/{value}"
+        },
+        "rank": [
+          "severity/critical",
+          "severity/high",
+          "severity/medium",
+          "severity/low",
+          "priority/p0",
+          "priority/p1",
+          "priority/p2",
+          "priority/p3"
+        ],
+        "tiers": {
+          "light": "tier/light",
+          "standard": "tier/standard",
+          "heavy": "tier/heavy"
+        },
+        "planLabels": [
+          "enhancement",
+          "source/plan"
+        ],
+        "claimAssignees": [
+          "@me"
+        ]
+      },
+      "proposals": {
+        "source": "github:putnami/putnami"
+      },
+      "states": {
+        "claimed": "in_progress",
+        "delivered": "blocked"
+      },
+      "workers": {
+        "light": "fix-light",
+        "standard": "fix-standard",
+        "heavy": "fix-heavy",
+        "analyst": "epic-analyst"
+      },
+      "verification": {
+        "language": "en",
+        "documentation": [
+          "sites/putnami.dev/doc/"
+        ],
+        "ciGate": {
+          "checks": [
+            "Putnami CI"
+          ],
+          "load": 0.7
+        }
+      },
+      "publication": {
+        "draft": false,
+        "taskReference": "Closes #{id}",
+        "bodyMaxBytes": 1500
+      },
+      "integrations": {
+        "contentBump": {
+          "lock": "sites/putnami.dev/content.lock.json",
+          "command": [
+            "bun",
+            "run",
+            "sites/putnami.dev/scripts/content-bump.ts"
+          ],
+          "projects": [
+            "putnami.dev"
+          ]
+        }
+      }
+    },
+    "@putnami/typescript": {
+      "fix": true
+    },
+    "@putnami/cloud": {
+      "workspace": {
+        "workspace_id": "a3839d53-5b31-48d4-8924-fb29df25c743"
+      },
+      "intelligence": {
+        "audit": {
+          "enabled": false
+        },
+        "enabled": true,
+        "workspace": "dev"
+      },
+      "deploy": {
+        "enabled": false
+      }
+    }
+  },
+  "output": "text",
+  "registries": {
+    "npm": {
+      "publish": "https://npm.putnami.dev",
+      "scopes": {
+        "@putnami": "https://npm.putnami.dev"
+      }
+    },
+    "go": {
+      "origin": "https://go.putnami.dev",
+      "proxy": [
+        "https://proxy.golang.org",
+        "direct"
+      ]
+    },
+    "oci": {
+      "publish": "oci.putnami.dev/putnami"
+    },
+    "put": {
+      "registry": "https://put.putnami.dev"
+    }
+  },
+  "projectAliases": {
+    "cli": "/tooling/cli",
+    "site": "/sites/putnami.dev"
+  },
+  "quiet": false
+}

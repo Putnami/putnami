@@ -1,0 +1,4 @@
+interface:
+  display_name: "Execute"
+  short_description: "Implement, review and verify an authorized change"
+  default_prompt: "Use $execute to deliver this change through independent review, corrections and current verification evidence."

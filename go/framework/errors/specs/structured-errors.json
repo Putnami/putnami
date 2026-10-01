@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/structured-errors",
+  "outcomes": [
+    "Framework packages attach stable codes, attributes, categories, retryability, and source information to errors",
+    "Callers inspect semantic error information across wrapped and aggregated error trees",
+    "Client serialization exposes user and security messages while hiding internal details",
+    "Observability integrations receive structured creation events without creating package cycles"
+  ],
+  "nonGoals": [
+    "Defining every domain-specific error code in the core package",
+    "Automatically retrying operations marked retryable",
+    "Using the JSON representation as a cross-service wire protocol"
+  ],
+  "requirements": [
+    {
+      "id": "creation",
+      "text": "New and Bug capture a stack at the origin, while Wrap adds boundary meaning without capturing another stack and returns nil for a nil cause."
+    },
+    {
+      "id": "disclosure",
+      "text": "JSON and HTTP serialization expose messages and attributes only for user or security categories, omit stack and cause data, and substitute a generic internal message otherwise."
+    },
+    {
+      "id": "inspection",
+      "text": "Code, attributes, category, and retryability remain discoverable through single-cause and multi-cause error trees."
+    },
+    {
+      "id": "observation",
+      "text": "Creation hooks are removable, panic-isolated, reentrancy-safe, and fire only when a new origin error or bug error is created."
+    }
+  ],
+  "decisions": [
+    "go/framework/errors/doc/adr/0001-client-safe-error-disclosure.md"
+  ]
+}

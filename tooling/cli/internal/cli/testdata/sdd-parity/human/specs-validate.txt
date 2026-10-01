@@ -1,0 +1,17 @@
+exit 0
+--- stdout ---
+
+  Spec validation passed
+  Scope: the whole workspace
+  Revision: worktree @ git:7c5122267ea7854954d543e1eda0a15c7cc56b08
+  1 spec(s) · 2 authored feature(s) · 0 publishable project(s)
+  Completeness: 1 feature(s) without a spec · 0 project(s) without a support entry · 0 project(s) without a feature link
+  Support completeness was not assessed (no readable support catalog)
+  Diagnostics: 0 error(s) · 2 warning(s) · 0 info
+  Diagnostics (2):
+    [warning] specs.missing_spec · feature
+      authored feature "shipping/labels" has no durable spec
+    [warning] specs.missing_support_catalog · putnami.support.json
+      no support catalog was found, so project support completeness was not assessed
+
+--- stderr ---

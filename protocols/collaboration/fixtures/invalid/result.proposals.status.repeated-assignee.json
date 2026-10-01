@@ -1,0 +1,21 @@
+{
+  "proposal": {
+    "ref": {
+      "source": "github:acme/app",
+      "id": "7"
+    },
+    "revision": "r1",
+    "change": {
+      "repository": "acme/app",
+      "base": "main",
+      "head": "fix-issue-42"
+    },
+    "title": "feat(cli): route collaboration contracts",
+    "state": "open",
+    "labels": [" group/tooling"],
+    "assignees": ["putnami-bot", "putnami-bot"]
+  },
+  "checks": {
+    "state": "none"
+  }
+}

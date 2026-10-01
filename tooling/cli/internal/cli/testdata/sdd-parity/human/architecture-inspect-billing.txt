@@ -1,0 +1,11 @@
+exit 0
+--- stdout ---
+
+  Architecture domain billing
+  Owner: billing-team · source: billing/putnami.architecture.json
+  1 project(s) · 0 owned concept(s) · 0 export(s) · 1 import(s)
+  Relationships: 1 inbound · 0 outbound · 1 observed
+  Coverage: projects=enforced-for-mapped-projects · database=not-detected · http=not-detected · events=not-detected
+  Baseline: git:7c5122267ea7854954d543e1eda0a15c7cc56b08 (main; prior file loaded)
+
+--- stderr ---

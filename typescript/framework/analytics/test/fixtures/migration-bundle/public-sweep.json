@@ -1,0 +1,49 @@
+{
+  "appName": "site",
+  "operations": [
+    {
+      "kind": "sql",
+      "target": "analytics",
+      "schema": "public",
+      "namespace": "putnami-analytics",
+      "name": "putnami-analytics/001_create_analytics_event",
+      "orderKey": "putnami-analytics/001_create_analytics_event",
+      "up": {
+        "path": "payload/sql/analytics/putnami-analytics/001_create_analytics_event.up.sql",
+        "hash": "cdb07ff3ba99286c27c98c36f046dd1dc9c0b66ba8afbe06373478c14d008093"
+      },
+      "safety": "safe-online",
+      "capabilities": {
+        "transactional": true,
+        "reversible": true
+      },
+      "down": {
+        "path": "payload/sql/analytics/putnami-analytics/001_create_analytics_event.down.sql",
+        "hash": "5945966d3d868613b8f60ba1c01d43d198f3f1c87989072b86f50fa6dfaa759c"
+      }
+    },
+    {
+      "kind": "sql",
+      "target": "analytics",
+      "schema": "public",
+      "namespace": "putnami-analytics",
+      "name": "putnami-analytics/002_create_analytics_daily",
+      "orderKey": "putnami-analytics/002_create_analytics_daily",
+      "up": {
+        "path": "payload/sql/analytics/putnami-analytics/002_create_analytics_daily.up.sql",
+        "hash": "88c346665bf57798714d4e1ebd8990820657c5e3951db846c8e112f69f5f3a62"
+      },
+      "safety": "safe-online",
+      "capabilities": {
+        "transactional": true,
+        "reversible": true
+      },
+      "down": {
+        "path": "payload/sql/analytics/putnami-analytics/002_create_analytics_daily.down.sql",
+        "hash": "3b0511d3c291371ab28937d46631a88007409a3e939fd83fc632f14861478fb1"
+      }
+    }
+  ],
+  "protocol": "migration-bundle.v1",
+  "digest": "a64559381c48a11bf2d34b556e5cad08c24e07b3e995eb2c5f034cc903738af7"
+}

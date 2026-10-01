@@ -1,0 +1,6 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-template.json",
+  "name": "typescript-web",
+  "description": "React web application with SSR",
+  "extension": "@putnami/typescript"
+}

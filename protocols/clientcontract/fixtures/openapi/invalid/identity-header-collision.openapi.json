@@ -1,0 +1,12 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "invalid", "version": "1" },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": { "id": "invalid", "audience": "urn:invalid" },
+    "credentials": {
+      "api": { "kind": "api-key", "header": "X-Client-Id" }
+    }
+  },
+  "paths": {}
+}

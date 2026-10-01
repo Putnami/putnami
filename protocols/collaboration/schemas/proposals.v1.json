@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/putnami-collaboration-proposals.v1.json",
+  "title": "Putnami change proposals contract, version 1",
+  "description": "Request (<operation>Input) and result (<operation>Result) documents of every proposals v1 operation. Required: find, upsert, status, review. Optional: merge.",
+  "$defs": {
+    "proposalState": {
+      "type": "string",
+      "enum": ["closed", "draft", "merged", "open"]
+    },
+    "change": {
+      "type": "object",
+      "description": "The exact identity a proposal is associated with. A request may omit repository, and the provider then applies its configured repository; every proposal a provider returns names all three members.",
+      "additionalProperties": false,
+      "required": ["base", "head"],
+      "properties": {
+        "repository": { "$ref": "collaboration.json#/$defs/token" },
+        "base": { "$ref": "collaboration.json#/$defs/token" },
+        "head": { "$ref": "collaboration.json#/$defs/token" },
+        "headCommit": { "$ref": "collaboration.json#/$defs/commit" }
+      }
+    },
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "revision", "change", "title", "state"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "revision": { "$ref": "collaboration.json#/$defs/token" },
+        "url": { "$ref": "collaboration.json#/$defs/url" },
+        "change": { "$ref": "#/$defs/change" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "body": { "type": "string" },
+        "state": { "$ref": "#/$defs/proposalState" },
+        "providerState": { "type": "string", "maxLength": 64 },
+        "labels": {
+          "$ref": "collaboration.json#/$defs/labels",
+          "description": "The proposal's labels, including those the provider applies from its settings. Absent: the provider does not report labels. Empty: the proposal carries none."
+        },
+        "assignees": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 100,
+          "items": { "$ref": "collaboration.json#/$defs/token" },
+          "description": "The accounts assigned to the proposal, including one the provider assigns from its settings. Absent: the provider does not report assignees. Empty: nobody is assigned. Informational, never an exclusive lease."
+        },
+        "updatedAt": { "$ref": "collaboration.json#/$defs/timestamp" }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["failing", "none", "passing", "pending", "unsupported"],
+          "description": "none: checks are supported and none are reported. unsupported: the provider has no hosted checks, and detail says so."
+        },
+        "commit": { "$ref": "collaboration.json#/$defs/commit" },
+        "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/check" } },
+        "detail": { "type": "string" }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "state"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "state": { "type": "string", "enum": ["failing", "passing", "pending", "skipped"] },
+        "url": { "$ref": "collaboration.json#/$defs/url" }
+      }
+    },
+    "reviewVerdict": {
+      "type": "string",
+      "enum": ["approve", "comment", "request_changes"]
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "verdict"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "url": { "$ref": "collaboration.json#/$defs/url" },
+        "verdict": { "$ref": "#/$defs/reviewVerdict" },
+        "commit": { "$ref": "collaboration.json#/$defs/commit" },
+        "author": { "$ref": "collaboration.json#/$defs/token" },
+        "submittedAt": { "$ref": "collaboration.json#/$defs/timestamp" }
+      }
+    },
+    "findInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["change"],
+      "properties": {
+        "change": { "$ref": "#/$defs/change" },
+        "states": { "type": "array", "items": { "$ref": "#/$defs/proposalState" } },
+        "page": { "$ref": "collaboration.json#/$defs/pageRequest" }
+      }
+    },
+    "findResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items", "page"],
+      "properties": {
+        "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/proposal" } },
+        "page": { "$ref": "collaboration.json#/$defs/page" }
+      }
+    },
+    "upsertInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["change", "title"],
+      "properties": {
+        "change": { "$ref": "#/$defs/change" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "body": { "type": "string" },
+        "draft": { "type": "boolean" },
+        "expectedRevision": { "$ref": "collaboration.json#/$defs/token" }
+      }
+    },
+    "upsertResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal", "created"],
+      "properties": {
+        "proposal": { "$ref": "#/$defs/proposal" },
+        "created": { "type": "boolean" }
+      }
+    },
+    "statusInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" }
+      }
+    },
+    "statusResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal", "checks"],
+      "properties": {
+        "proposal": { "$ref": "#/$defs/proposal" },
+        "checks": { "$ref": "#/$defs/checks" },
+        "reviews": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/review" } }
+      }
+    },
+    "reviewInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "verdict", "body", "idempotencyKey"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "verdict": { "$ref": "#/$defs/reviewVerdict" },
+        "body": { "type": "string" },
+        "commit": { "$ref": "collaboration.json#/$defs/commit" },
+        "idempotencyKey": { "$ref": "collaboration.json#/$defs/idempotencyKey" }
+      }
+    },
+    "reviewResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["review", "created"],
+      "properties": {
+        "review": { "$ref": "#/$defs/review" },
+        "created": { "type": "boolean" }
+      }
+    },
+    "mergeInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "expectedHeadCommit"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "expectedHeadCommit": { "$ref": "collaboration.json#/$defs/commit" },
+        "method": { "type": "string", "enum": ["merge", "rebase", "squash"] }
+      }
+    },
+    "mergeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal"],
+      "properties": {
+        "proposal": { "$ref": "#/$defs/proposal" }
+      }
+    }
+  }
+}

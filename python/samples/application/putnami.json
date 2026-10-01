@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "py_example_application",
+  "tags": ["sample", "python", "e2e"],
+  "extensions": ["/python/extension"],
+  "dependencies": ["/python/samples/library"],
+  "options": {
+    "publish": {
+      "archives": false,
+      "docker": true
+    }
+  }
+}

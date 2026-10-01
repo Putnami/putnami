@@ -1,0 +1,8 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "workload": "go.putnami.dev/example/api",
+  "runtime": {
+    "billing": "instance-based"
+  }
+}

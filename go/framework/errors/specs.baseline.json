@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/structured-errors#creation",
+    "go/structured-errors#disclosure",
+    "go/structured-errors#inspection",
+    "go/structured-errors#observation"
+  ]
+}

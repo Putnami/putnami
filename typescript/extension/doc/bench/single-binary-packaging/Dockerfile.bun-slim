@@ -1,0 +1,20 @@
+# Baseline: the deployment shape TypeScript servers ship on today —
+# oven/bun:1.4-slim running the bundled entrypoint with `bun run --smol`
+# (`--smol` is what `putnami serve` adds when NODE_ENV=production).
+#
+# Build context: $BENCH_WORK/ctx (see bench.sh prepare_ctx).
+ARG BUN_IMAGE=oven/bun:1.4-slim
+FROM ${BUN_IMAGE}
+
+WORKDIR /app
+COPY server.js /app/server.js
+COPY public /app/.gen/public
+
+# PWD is what getProjectRoot() reads when PUTNAMI_PROJECT_ROOT is unset, and it
+# is what makes /app/.gen/public the static root.
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV PWD=/app
+
+EXPOSE 3000
+CMD ["bun", "run", "--smol", "/app/server.js"]

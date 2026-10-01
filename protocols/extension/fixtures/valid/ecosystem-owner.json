@@ -1,0 +1,34 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/ecosystem-owner",
+  "ecosystems": [
+    {
+      "id": "npm",
+      "coordinate": { "pattern": "^(@[a-z0-9-]+/)?[a-z0-9-]+$" },
+      "version": { "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$", "ordering": "semver" },
+      "channel": "native",
+      "channelEncoding": "^[a-z][a-z0-9.-]{0,31}$",
+      "registries": {
+        "type": "object",
+        "properties": {
+          "publish": { "type": "string" },
+          "scopes": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "publish": "publish-npm"
+    }
+  ],
+  "commands": {
+    "publish-npm": {
+      "description": "Publish this project to npm",
+      "run": [{ "id": "publish", "task": "publish-npm-exec" }]
+    }
+  },
+  "tasks": {
+    "publish-npm-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["published"]
+    }
+  }
+}

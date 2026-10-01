@@ -1,0 +1,77 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/signing-key-rotation",
+      "type": "feature",
+      "name": "Go signing key rotation",
+      "outcome": "Go services persist and rotate signing keys without half-rotations or disclosure of private key material",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "durable-owner-document",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-row-mapping-round-trips-the-full-jwk",
+              "the-owner-document-round-trips-and-excludes-revoked-keys",
+              "the-state-column-is-authoritative-over-the-material",
+              "the-retirement-instant-survives-a-restart"
+            ]
+          }
+        },
+        {
+          "id": "atomic-rotation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "rotation-commits-in-one-transaction",
+              "a-successor-conflict-rolls-back-all-writes",
+              "a-non-applied-outcome-rolls-back-all-writes"
+            ]
+          }
+        },
+        {
+          "id": "scheduled-policy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-a-caller-supplied-policy-is-ever-invoked",
+              "policy-invocations-never-overlap",
+              "a-policy-error-never-stops-future-ticks",
+              "nothing-fires-after-the-idempotent-stop-returns"
+            ]
+          }
+        },
+        {
+          "id": "non-disclosure",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-store-error-reports-key-identity-never-private-material"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

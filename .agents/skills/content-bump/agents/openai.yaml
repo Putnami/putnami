@@ -1,0 +1,6 @@
+interface:
+  display_name: "Content Bump"
+  short_description: "Refresh a pinned-content lock and publish a proposal"
+  default_prompt: "Use $content-bump to refresh the requested pinned content bundle."
+policy:
+  allow_implicit_invocation: false

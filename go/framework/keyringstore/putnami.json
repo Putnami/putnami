@@ -1,0 +1,34 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/keyringstore",
+  "description": "Database-backed security.KeyringStore: persists a signing keyring's owner document (private JWK material) in Postgres and performs atomic key rotation on the unit-of-work primitives. DB integration tests are gated behind DATABASE_TEST_BINDINGS; the serialization and scheduler tests run without a database.",
+  "tags": [
+    "go"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "dependencies": [
+    "/go/framework/database",
+    "/go/framework/security",
+    "/protocols/keyring",
+    "/protocols/transaction"
+  ],
+  "publish": [
+    "go"
+  ],
+  "disable": {
+    "jobs": [
+      "serve"
+    ]
+  },
+  "options": {
+    "test": {
+      "coverage-threshold": 0
+    },
+    "publish": {
+      "archives": false
+    }
+  }
+}

@@ -1,0 +1,47 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "specs list",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "counts": {
+      "authoredFeatures": 2,
+      "featuresWithoutSpec": 1,
+      "specs": 1
+    },
+    "diagnostics": [],
+    "revision": {
+      "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08",
+      "kind": "worktree"
+    },
+    "selection": {
+      "externalRecords": [],
+      "features": 2,
+      "mode": "all",
+      "projects": [
+        "/billing",
+        "/shipping"
+      ],
+      "scoped": false,
+      "specs": 1
+    },
+    "specs": [
+      {
+        "decisions": 0,
+        "feature": "billing/invoice",
+        "nonGoals": 0,
+        "outcomeCount": 1,
+        "outcomes": [
+          "Customers export issued invoices"
+        ],
+        "path": "billing/specs/billing.invoice.json",
+        "project": "@acme/billing",
+        "requirements": 0,
+        "valid": true
+      }
+    ]
+  }
+}
+--- stderr ---

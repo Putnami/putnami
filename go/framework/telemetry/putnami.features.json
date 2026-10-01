@@ -1,0 +1,188 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/service-telemetry",
+      "type": "feature",
+      "name": "Go service telemetry",
+      "outcome": "A Go service pushes traces, metrics, and logs to an OTLP collector and keeps serving traffic unchanged when that collector is unavailable",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "bounded-shutdown",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "shutdown-bounds-the-flush-by-the-configured-shutdown-timeout",
+              "a-tracer-shutdown-failure-is-reported",
+              "a-meter-shutdown-failure-is-reported-rather-than-lost-behind-the-tracers"
+            ]
+          }
+        },
+        {
+          "id": "duration-precision",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-sub-millisecond-duration-keeps-its-real-value",
+              "the-middleware-records-a-sub-millisecond-request-duration"
+            ]
+          }
+        },
+        {
+          "id": "endpoint-required",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-otlp-configuration-with-an-empty-endpoint-fails-at-configure"
+            ]
+          }
+        },
+        {
+          "id": "explicit-sampling",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unset-sample-rate-samples-every-trace",
+              "an-explicit-rate-of-zero-samples-none"
+            ]
+          }
+        },
+        {
+          "id": "final-flush",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-metric-reader-flushes-once-more-during-provider-shutdown"
+            ]
+          }
+        },
+        {
+          "id": "lifecycle-purity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "reading-the-provider-registrations-has-no-side-effect",
+              "configure-installs-the-global-providers-exactly-once-per-lifetime",
+              "the-plugin-rebuilds-cleanly-after-an-application-stop",
+              "the-error-count-bridge-hook-is-removed-on-stop"
+            ]
+          }
+        },
+        {
+          "id": "never-fails-the-workload",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-collector-error-is-dropped-rather-than-propagated",
+              "the-log-sink-batches-records-onto-a-background-flush"
+            ]
+          }
+        },
+        {
+          "id": "push-transport",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-otlp-configuration-wires-the-metric-reader-and-the-span-exporter",
+              "an-explicitly-supplied-reader-or-exporter-is-not-replaced-by-auto-wiring",
+              "the-metric-exporter-posts-otlp-json-to-the-collectors-metrics-path",
+              "the-span-exporter-posts-otlp-json-to-the-collectors-traces-path"
+            ]
+          }
+        },
+        {
+          "id": "service-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-configured-service-name-and-version-merge-onto-the-sdk-default-resource",
+              "leaving-name-and-version-unset-leaves-the-default-resource-untouched"
+            ]
+          }
+        },
+        {
+          "id": "span-always-ends",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-span-ends-on-a-normal-response",
+              "the-span-ends-marked-errored-on-a-server-error-response",
+              "the-span-ends-on-a-nil-response",
+              "a-downstream-panic-is-recorded-on-the-span-and-re-raised"
+            ]
+          }
+        },
+        {
+          "id": "trace-propagation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-inbound-w3c-traceparent-continues-the-callers-trace"
+            ]
+          }
+        },
+        {
+          "id": "generated-client-telemetry",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stale-cached-answer-is-counted-on-the-call-identity"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

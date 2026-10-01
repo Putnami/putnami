@@ -1,0 +1,11 @@
+package <%= projectModule %>
+
+import "testing"
+
+func TestHello(t *testing.T) {
+	result := Hello("World")
+	expected := "Hello, World!"
+	if result != expected {
+		t.Errorf("Hello(\"World\") = %q, want %q", result, expected)
+	}
+}

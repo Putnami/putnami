@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# scaffold-run — Thin wrapper that compiles (with caching) and runs the
+# putnami-scaffold Go binary.
+#
+# Usage (from putnami.extension.json):
+#   "command": "{extensionRoot}/bin/scaffold-run",
+#   "args": ["package-template", "--putnamiContext", "..."]
+#
+# The first positional argument is the subcommand.
+# All remaining arguments are passed through to the Go binary.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+EXTENSION_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Binary output location (cached in workspace .putnami/bin/).
+# Parse --putnamiContext to find the workspace root for the cache location.
+_NEXT_IS_CTX="false"
+_WS_ROOT=""
+for arg in "$@"; do
+  if [ "$_NEXT_IS_CTX" = "true" ]; then
+    if [ -f "$arg" ]; then
+      _WS_ROOT=$(grep -o '"workspaceRoot":"[^"]*"' "$arg" 2>/dev/null | head -1 | sed 's/"workspaceRoot":"//;s/"$//')
+    fi
+    break
+  fi
+  if [ "$arg" = "--putnamiContext" ]; then
+    _NEXT_IS_CTX="true"
+  fi
+done
+
+# Fall back to the extension root's parent workspace.
+if [ -z "$_WS_ROOT" ]; then
+  _WS_ROOT="$(cd "$EXTENSION_ROOT/../.." && pwd)"
+fi
+
+# Go consults PWD while resolving go.work. If the caller entered the workspace
+# through a symlink, normalize the shell's logical PWD before building.
+_PHYSICAL_PWD="$(pwd -P)"
+cd "$_PHYSICAL_PWD"
+
+BINARY_DIR="$_WS_ROOT/.putnami/bin"
+BINARY="$BINARY_DIR/putnami-scaffold"
+SOURCE_DIR="$EXTENSION_ROOT/cmd"
+
+# Check if Go is available.
+if ! command -v go &>/dev/null; then
+  for candidate in /usr/local/go/bin/go "$HOME/go/bin/go" "$HOME/.go/bin/go"; do
+    if [ -x "$candidate" ]; then
+      GO_BINARY="$candidate"
+      break
+    fi
+  done
+  if [ -z "${GO_BINARY:-}" ]; then
+    # STREAM VERSION: `"v":2` — since CLI contract 3 the CLI accepts exactly the
+    # runtime-event version it advertises, so a v1 line is DROPPED by the
+    # parser. Dropping these two would turn this SKIP into a synthesized
+    # success, and a cacheable task with an optionalEmpty output would then
+    # persist an empty-success cache entry.
+    echo '{"v":2,"type":"diagnostic","severity":"info","message":"Go toolchain is not available. Skipping."}' >&1
+    echo '{"v":2,"type":"result","data":{"status":"SKIP"}}' >&1
+    exit 0
+  fi
+else
+  GO_BINARY="go"
+fi
+
+# The compiled binary at $BINARY is shared by every scaffold-run invocation in the
+# workspace. To make a rebuild concurrency-safe we (1) serialize it with a
+# portable mkdir-based lock so exactly one process compiles while the rest wait
+# and reuse the result, and (2) build to a private temp file and atomically rename
+# it into place so a concurrent exec never observes a half-written binary.
+
+LOCK_DIR="$BINARY_DIR/.putnami-scaffold.build.lock"
+
+# needs_build: true (0) when the cached binary is missing or any Go source under
+# the extension is newer than it.
+needs_build() {
+  [ -x "$BINARY" ] || return 0
+  if find "$EXTENSION_ROOT" -name '*.go' -newer "$BINARY" 2>/dev/null | grep -q .; then
+    return 0
+  fi
+  return 1
+}
+
+# build_binary: compile to a unique temp file, then atomically move it into place.
+build_binary() {
+  local tmp
+  tmp="$(mktemp "$BINARY_DIR/.putnami-scaffold.XXXXXX")" || return 1
+  if "$GO_BINARY" build -o "$tmp" "$SOURCE_DIR" >&2 && mv -f "$tmp" "$BINARY"; then
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+# lock_holder_alive: true while the PID recorded in the lock is still running.
+lock_holder_alive() {
+  local pid
+  pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+  [ -z "$pid" ] && return 0
+  kill -0 "$pid" 2>/dev/null
+}
+
+if needs_build; then
+  mkdir -p "$BINARY_DIR"
+  waited=0
+  while needs_build; do
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+      echo "$$" >"$LOCK_DIR/pid" 2>/dev/null || true
+      if needs_build && ! build_binary; then
+        rm -rf "$LOCK_DIR" 2>/dev/null || true
+        echo "Failed to compile putnami-scaffold" >&2
+        exit 1
+      fi
+      rm -rf "$LOCK_DIR" 2>/dev/null || true
+      break
+    fi
+    if ! lock_holder_alive; then
+      rm -rf "$LOCK_DIR" 2>/dev/null || true
+      continue
+    fi
+    waited=$((waited + 1))
+    if [ "$waited" -gt 1200 ]; then # ~120s cap, then force takeover
+      rm -rf "$LOCK_DIR" 2>/dev/null || true
+      continue
+    fi
+    sleep 0.1 2>/dev/null || sleep 1
+  done
+fi
+
+# Safety net: never exec a missing binary.
+if [ ! -x "$BINARY" ]; then
+  echo "Failed to compile putnami-scaffold" >&2
+  exit 1
+fi
+
+exec "$BINARY" "$@"

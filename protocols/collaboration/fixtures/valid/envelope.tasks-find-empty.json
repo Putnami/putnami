@@ -1,0 +1,13 @@
+{
+  "contract": "tasks",
+  "version": 1,
+  "operation": "find",
+  "provider": {
+    "name": "@putnami/local-collaboration"
+  },
+  "outcome": "ok",
+  "result": {
+    "items": [],
+    "page": {}
+  }
+}

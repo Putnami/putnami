@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "databases": [
+    { "name": "primary", "engine": "postgres", "schemas": ["iam", "configs"] },
+    { "name": "cache",   "engine": "sqlite" }
+  ],
+  "events": {
+    "publishes":  ["workspace.deploy.completed", "workspace.deploy.failed"],
+    "subscribes": ["billing.invoice.issued"]
+  },
+  "storage": [
+    { "name": "audit-logs", "access": "write", "retention": "90d" },
+    { "name": "uploads", "access": "readwrite", "public": true }
+  ],
+  "secrets": ["jwks_signing_key", "stripe_webhook_secret"],
+  "scheduledJobs": [
+    { "name": "nightly-rollup", "schedule": "0 2 * * *", "entrypoint": "jobs.NightlyRollup" }
+  ]
+}

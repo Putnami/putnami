@@ -1,0 +1,96 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/application-lifecycle",
+      "type": "feature",
+      "name": "Go application lifecycle",
+      "outcome": "Go services compose modules, plugins, and dependencies into a bounded startup and shutdown lifecycle",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "describe",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "describe-configures-before-describers",
+              "describe-defers-eager-providers",
+              "describe-migration-project-identity",
+              "describe-requires-output-dir",
+              "describe-skips-runtime-start"
+            ]
+          }
+        },
+        {
+          "id": "phase-order",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "migrations-apply-during-start",
+              "pre-configure-runs-before-di-build",
+              "startup-phase-order"
+            ]
+          }
+        },
+        {
+          "id": "shutdown",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "container-detached-after-cleanup",
+              "plugins-stop-in-reverse-registration-order",
+              "shutdown-phase-order",
+              "stop-hook-error-surfaces",
+              "stop-plugin-error-surfaces"
+            ]
+          }
+        },
+        {
+          "id": "startup-failure",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "start-errors-aggregated",
+              "start-timeout-cancels-and-joins"
+            ]
+          }
+        },
+        {
+          "id": "darc-runtime-evidence",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-reference-refuses-a-fact-its-import-does-not-name",
+              "an-evidence-row-carries-the-declared-contract-verbatim",
+              "a-registered-component-contributes-exactly-one-row",
+              "the-emitted-evidence-rows-are-deterministic-bytes"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

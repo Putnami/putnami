@@ -1,0 +1,3 @@
+{
+  "extends": "<%= workspaceRelativePath %>/tsconfig.json"
+}

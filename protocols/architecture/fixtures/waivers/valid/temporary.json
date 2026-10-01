@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture-waivers.json",
+  "protocolVersion": 1,
+  "waivers": [
+    {
+      "finding": "architecture.undeclared_project_dependency:project-dependency:observability:runtime:%2Fobservability%2Fapi:%2Fruntime%2Flib",
+      "owner": "observability",
+      "reason": "The public Runtime contract has not reached the Cloud repository yet.",
+      "scope": "/observability/api -> /runtime/lib only",
+      "removeWhen": "The Observability projection consumes the published Runtime export."
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "workload": "go.putnami.dev/example/static-site",
+  "runtime": {
+    "ingress": { "domain": "static.example.com", "domains": ["static.example.com", "www.example.com"], "public": true },
+    "scaling": { "max": 4 },
+    "resources": { "cpu": "1000m", "memory": "1Gi" },
+    "security": { "platformAuth": "disabled", "signBlob": true, "eventsGateway": true },
+    "protocols": { "http2": false }
+  }
+}

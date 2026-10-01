@@ -1,0 +1,178 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/web-analytics-collection",
+      "type": "feature",
+      "name": "Cookieless web analytics collection",
+      "outcome": "A Putnami web application records page views, declared actions, sessions, and daily aggregates in its own database without cookies, consent banners, or third-party egress, and a retried event is stored exactly once",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "a-pre-rendered-page-reports-from-the-browser",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-pre-rendered-page-is-served-with-the-tracker-tag",
+              "a-rendered-page-is-not-injected-twice",
+              "the-injected-tag-carries-the-recorded-page-view-id",
+              "the-tracker-boots-from-the-injected-tag"
+            ]
+          }
+        },
+        {
+          "id": "a-retried-event-is-stored-once",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "counters-fold-only-inserted-rows",
+              "sessions-prefold-duplicate-ids-before-upsert",
+              "the-raw-upsert-only-enriches-on-conflict"
+            ]
+          }
+        },
+        {
+          "id": "a-slow-database-never-delays-a-response",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-full-queue-drops-the-oldest-and-counts-it",
+              "stop-drains-within-its-deadline",
+              "the-ingest-route-answers-before-the-sink-settles",
+              "the-page-view-middleware-returns-before-the-sink-settles"
+            ]
+          }
+        },
+        {
+          "id": "acceptance-is-not-an-oracle",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-semantically-invalid-batch-still-answers-202",
+              "an-oversized-body-answers-413",
+              "malformed-json-answers-400"
+            ]
+          }
+        },
+        {
+          "id": "bots-leave-no-trace",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-bot-user-agent-gets-no-bootstrap-and-no-row", "every-bot-fixture-is-detected"]
+          }
+        },
+        {
+          "id": "identified-mode-needs-consent",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-forged-cookie-signature-is-ignored",
+              "a-signed-cookie-is-minted-after-consent",
+              "no-cookie-before-consent"
+            ]
+          }
+        },
+        {
+          "id": "no-network-address-or-raw-user-agent-is-persisted",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-persisted-column-is-in-the-protocol-vocabulary",
+              "the-hash-rotates-at-utc-midnight",
+              "the-visitor-hash-consumes-the-ip-and-emits-22-chars"
+            ]
+          }
+        },
+        {
+          "id": "opt-out-signals-force-cookieless",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["dnt-forces-cookieless-when-respected", "sec-gpc-forces-cookieless"]
+          }
+        },
+        {
+          "id": "page-views-are-collected-without-cookies",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-html-get-records-a-server-page-view-with-a-daily-visitor-id",
+              "cookieless-mode-never-sets-a-cookie",
+              "the-bootstrap-carries-the-server-event-id-and-route"
+            ]
+          }
+        },
+        {
+          "id": "raw-events-expire",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "pg-cron-mode-contributes-the-scheduling-migration",
+              "sweep-runs-at-most-every-ten-minutes-and-is-bounded"
+            ]
+          }
+        },
+        {
+          "id": "the-browser-bundle-stays-inside-the-boundary",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "no-server-only-runtime-import-reaches-the-browser-graph",
+              "the-tracker-bundle-is-under-4-kib-gzipped"
+            ]
+          }
+        },
+        {
+          "id": "the-tables-follow-the-datasource-schema",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-contradicting-schema-fails-the-build",
+              "a-workload-without-a-schema-keeps-its-bundle",
+              "the-tables-follow-the-schema-the-datasource-declares"
+            ]
+          }
+        },
+        {
+          "id": "undeclared-actions-are-dropped",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-undeclared-action-is-dropped-and-counted",
+              "props-outside-bounds-reject-the-event",
+              "server-track-throws-on-an-undeclared-name"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "irVersion": 1,
+  "transport": "http",
+  "services": [
+    {
+      "name": "UsersService",
+      "className": "UsersClient",
+      "methods": [
+        {
+          "name": "getUser",
+          "operationId": "getUser",
+          "httpMethod": "GET",
+          "path": "/users/{id}",
+          "params": [{ "name": "id", "tsType": "string", "optional": false, "array": false }],
+          "responseType": "Model1"
+        },
+        {
+          "name": "createUser",
+          "operationId": "createUser",
+          "httpMethod": "POST",
+          "path": "/users",
+          "bodyType": "Model1",
+          "responseType": "Model1"
+        }
+      ]
+    }
+  ],
+  "namedTypes": {
+    "Model1": [
+      { "name": "id", "tsType": "string", "optional": false, "array": false },
+      { "name": "name", "tsType": "string", "optional": false, "array": false },
+      { "name": "address", "tsType": "Model2", "optional": true, "array": false },
+      { "name": "tags", "tsType": "Model2", "optional": true, "array": true }
+    ],
+    "Model2": [{ "name": "city", "tsType": "string", "optional": false, "array": false }]
+  }
+}

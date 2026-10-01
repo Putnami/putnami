@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "shell": "make test",
+  "commands": [
+    "test"
+  ]
+}

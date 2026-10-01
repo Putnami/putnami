@@ -1,0 +1,33 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/typescript-templates-proof",
+  "tags": ["ts"],
+  "extensions": ["/typescript/extension"],
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0,
+      "filePatterns": [
+        "../*/putnami.template.json",
+        "../typescript-library/**",
+        "../typescript-server/**",
+        "../typescript-web/**",
+        "../../extension/config/biome.json",
+        "../../extension/config/tsconfig.json",
+        "../../framework/application/bin/**",
+        "../../framework/application/package.json",
+        "../../framework/application/putnami.extension.json",
+        "../../framework/application/src/**",
+        "../../framework/runtime/package.json",
+        "../../framework/runtime/src/**",
+        "../../framework/ui/package.json",
+        "../../framework/ui/src/**",
+        "../../framework/web/bin/**",
+        "../../framework/web/package.json",
+        "../../framework/web/putnami.extension.json",
+        "../../framework/web/src/**",
+        "../../../tooling/cli/internal/commands/lifecycle/workspace_init.go"
+      ]
+    }
+  }
+}

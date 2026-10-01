@@ -1,0 +1,16 @@
+{
+  "name": "@example/04-configuration",
+  "version": "0.0.0",
+  "description": "Type-safe configuration with environments and multi-datasource",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

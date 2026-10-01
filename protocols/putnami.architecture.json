@@ -1,0 +1,76 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "protocols",
+  "owner": "protocols",
+  "projects": [
+    "/protocols/agentcontext",
+    "/protocols/analytics",
+    "/protocols/architecture",
+    "/protocols/cache",
+    "/protocols/capabilities",
+    "/protocols/ci",
+    "/protocols/cli",
+    "/protocols/clientcontract",
+    "/protocols/collaboration",
+    "/protocols/config",
+    "/protocols/contracts",
+    "/protocols/database",
+    "/protocols/diagnostic",
+    "/protocols/distribution",
+    "/protocols/doccov",
+    "/protocols/doctor",
+    "/protocols/events",
+    "/protocols/extension",
+    "/protocols/features",
+    "/protocols/gomod",
+    "/protocols/http-routes",
+    "/protocols/identity",
+    "/protocols/infra",
+    "/protocols/job",
+    "/protocols/keyring",
+    "/protocols/migration",
+    "/protocols/oci",
+    "/protocols/platform",
+    "/protocols/qualify",
+    "/protocols/registry",
+    "/protocols/runner",
+    "/protocols/runtime",
+    "/protocols/sitecontent",
+    "/protocols/storage",
+    "/protocols/support",
+    "/protocols/telemetry",
+    "/protocols/template",
+    "/protocols/transaction",
+    "/protocols/workspace"
+  ],
+  "owns": [
+    {
+      "id": "protocols.wire-contracts",
+      "kind": "schema",
+      "description": "The strict wire formats, parsers, and validators every Putnami surface shares: one interpretation per document, reused by the CLI, extensions, and agents."
+    }
+  ],
+  "exports": [
+    {
+      "id": "protocols.wire-contracts.v1",
+      "version": 1,
+      "status": "active",
+      "description": "Strict contract types and validators for Putnami wire documents. Consumers hold a stable reference to the published contract packages; the protocols domain retains sole authority over document meaning.",
+      "facts": [
+        {
+          "name": "wire_contract_definitions",
+          "authority": "protocols"
+        }
+      ],
+      "modes": [
+        "reference"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    }
+  ],
+  "imports": []
+}

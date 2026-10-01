@@ -1,0 +1,19 @@
+{
+  "version": 3,
+  "commands": [
+    "test"
+  ],
+  "envs": {
+    "prod": {
+      "channel": "canary",
+      "rollout": {
+        "strategy": "progressive",
+        "steps": [
+          50,
+          10,
+          100
+        ]
+      }
+    }
+  }
+}

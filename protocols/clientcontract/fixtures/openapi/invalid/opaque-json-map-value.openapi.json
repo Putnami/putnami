@@ -1,0 +1,36 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "invalid", "version": "1" },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": { "id": "invalid", "audience": "urn:invalid" },
+    "credentials": {}
+  },
+  "paths": {
+    "/audit": {
+      "get": {
+        "operationId": "getAudit",
+        "responses": {
+          "200": {
+            "description": "a free-form object is additionalProperties: true",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": { "x-putnami-json": "any" }
+                }
+              }
+            }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [{ "protocol": "rest-json", "path": "/audit", "encoding": "json" }],
+          "security": { "alternatives": [{ "allOf": [] }] },
+          "errors": [],
+          "idempotency": { "kind": "safe" }
+        }
+      }
+    }
+  }
+}

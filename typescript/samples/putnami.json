@@ -1,0 +1,8 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "tags": ["e2e", "ts"],
+  "extensions": ["/typescript/extension"],
+  "publishConfig": {
+    "npm": { "namePattern": "@example/{name}" }
+  }
+}

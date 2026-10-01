@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/ecosystem-publish-missing",
+  "ecosystems": [
+    {
+      "id": "npm",
+      "coordinate": { "pattern": "^[a-z0-9-]+$" },
+      "version": { "pattern": "^v?\\d+$", "ordering": "semver" },
+      "channel": "native",
+      "registries": { "type": "object" },
+      "publish": "publish-npm"
+    }
+  ],
+  "commands": {
+    "build": { "run": [{ "id": "build", "task": "build-exec" }] }
+  },
+  "tasks": {
+    "build-exec": { "kind": "command", "command": "echo", "args": ["built"] }
+  }
+}

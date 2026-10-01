@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-agent-artifact.json",
+  "protocolVersion": 1,
+  "name": "@putnami/agent-workflows",
+  "version": "1.0.0",
+  "files": [
+    {
+      "path": ".agents/skills/fix/SKILL.md",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "path": ".claude/skills/fix/SKILL.md",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "path": ".codex/agents/fix-heavy.toml",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ]
+}

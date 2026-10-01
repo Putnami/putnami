@@ -1,0 +1,34 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-database-test-binding.json",
+  "protocolVersion": 1,
+  "mode": "require",
+  "isolation": "database",
+  "reuse": "bundle-template",
+  "applyMigrations": true,
+  "databases": {
+    "auth": {
+      "engine": "postgres",
+      "schema": "iam",
+      "connection": {
+        "host": "localhost",
+        "port": 5432,
+        "database": "auth_test",
+        "user": "postgres",
+        "password": "postgres",
+        "ssl": false
+      }
+    },
+    "billing": {
+      "engine": "postgres",
+      "schema": "billing",
+      "connection": {
+        "host": "localhost",
+        "port": 5432,
+        "database": "billing_test",
+        "user": "postgres",
+        "password": "postgres",
+        "ssl": false
+      }
+    }
+  }
+}

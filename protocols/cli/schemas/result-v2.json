@@ -1,0 +1,1493 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-cli-result-v2.json",
+  "title": "Putnami CLI machine result contract, version 2",
+  "description": "The versioned machine-readable documents every Putnami CLI surface emits: the --output=json envelope, the --output=jsonl run stream or terminal plan record, the recorded session event log, the MCP run_jobs/plan_jobs results, and the session files. Every document carries protocolVersion 2; a document without the field is version 1. Cross-field rules JSON Schema cannot express (unified success, abort precedence, exit-code agreement, count arithmetic, derived identity key) are stated in the per-property descriptions, specified in doc/02-result-v2.md, and machine-checked by ValidateDocument plus the conformance/manifest.json corpus in both Go and TypeScript.",
+  "oneOf": [
+    { "$ref": "#/$defs/resultEnvelope" },
+    { "$ref": "#/$defs/sessionStreamRecord" },
+    { "$ref": "#/$defs/mcpResult" },
+    { "$ref": "#/$defs/sessionFile" },
+    { "$ref": "#/$defs/sessionPlanFile" },
+    { "$ref": "#/$defs/reportFile" }
+  ],
+  "$defs": {
+    "protocolVersion": {
+      "const": 2,
+      "description": "The machine-contract version. Absent means version 1."
+    },
+    "runOutcome": {
+      "type": "string",
+      "enum": ["success", "failure", "aborted"],
+      "description": "The run verdict. Precedence is aborted > failure > success: an aborted run reports \"aborted\" even when tasks also failed, so the verdict agrees with the 130 the process itself returns, and the failures stay visible in counts.failed and failures[]."
+    },
+    "resultStatus": {
+      "type": "string",
+      "enum": ["success", "failure", "aborted"],
+      "description": "The envelope verdict. Version 1 had two values; version 2 reports an abort distinctly from a failure instead of folding it into \"failure\"."
+    },
+    "abortedBy": {
+      "type": "string",
+      "enum": ["user", "signal"],
+      "description": "The abort source: \"user\" for an interactive Ctrl-C, \"signal\" for a supervisor's SIGTERM. Present exactly when the outcome is \"aborted\"."
+    },
+    "taskStatus": {
+      "type": "string",
+      "enum": ["success", "failed", "canceled", "skipped"],
+      "description": "One task's execution verdict. A task whose result was reused still carries the verdict that was reused, so a reused failure is a failure."
+    },
+    "taskReuse": {
+      "type": "string",
+      "enum": ["none", "local-cache", "remote-cache", "coalesced"],
+      "description": "How the task's result was obtained without executing it. \"none\" means the task ran in this session. Orthogonal to taskStatus: reuse is provenance, not a verdict."
+    },
+    "exitCode": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "A process exit code from the taxonomy in doc/01-contract.md. Every surface reports the code the process itself returns."
+    },
+    "durationMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "projectIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "description": "The owning project, identified structurally rather than by a display name.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Workspace project id (\"/tooling/cli\"). Workspace-scoped tasks carry the workspace's own id."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Declared project name (\"@putnami/cli\")."
+        }
+      }
+    },
+    "taskRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "command", "kind"],
+      "description": "The task within its project, identified structurally.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Canonical plan name, the scheduler/DAG name (\"build~compile\"). Not a display name."
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Root command the task belongs to (\"build\")."
+        },
+        "step": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Pipeline step id when the task is an expanded step. Absent for a plain task."
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Task kind: the step's declared task when there is one, otherwise the task name. Groups same-shaped work across projects."
+        }
+      }
+    },
+    "providerIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["extension"],
+      "description": "The extension that provides the task.",
+      "properties": {
+        "extension": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Extension name (\"@putnami/go\")."
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Resolved extension version, when the surface knows it."
+        }
+      }
+    },
+    "taskIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "scope", "project", "task", "provider"],
+      "description": "The immutable typed identity of one planned task. It is the identity diagnostics, events, session records and cache keys all join on.",
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Derived view of the identity, exactly project.id + \":\" + task.name. It is a projection, never an independent value: a key that disagrees with the structured fields is a contract violation."
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["project", "workspace"],
+          "description": "\"project\" for a task that runs once per project, \"workspace\" for a task that runs once for the whole workspace."
+        },
+        "project": { "$ref": "#/$defs/projectIdentity" },
+        "task": { "$ref": "#/$defs/taskRef" },
+        "provider": { "$ref": "#/$defs/providerIdentity" }
+      }
+    },
+    "resultError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "description": "The error member of a failed or aborted document. Identical to the version 1 shape.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": ["usage", "auth", "api", "signal", "failure"],
+          "description": "Stable error class matching the exit-code taxonomy."
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable failure message."
+        },
+        "next": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Suggested next command or documentation link."
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "message"],
+      "description": "One diagnostic attributed to a task.",
+      "properties": {
+        "severity": { "type": "string", "enum": ["error", "warning", "info"] },
+        "message": { "type": "string", "minLength": 1 },
+        "code": { "type": "string", "minLength": 1 },
+        "file": { "type": "string", "minLength": 1 },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "executionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "wallMs", "userCpuMs", "systemCpuMs", "tasks"],
+      "description": "One PHYSICAL execution — one subprocess the CLI spawned — and the resources that process tree consumed. The task list is LOGICAL and fans out (a batched dispatch runs n projects in one subprocess), so summing task records double-counts cost; these records are each listed once, so a physical roll-up sums them instead. The list is the run's complete spawn ledger, so it also carries executions no task record references — a superseded retry attempt, whose cost the machine still paid. Reuse contributes no execution at all. Every member is measured, never derived: a counter the platform does not expose is omitted rather than reported as zero.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The execution's handle within this document; task records reference it. Unique among this document's executions and not meaningful outside it."
+        },
+        "wallMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "Measured wall time of the subprocess, from immediately before fork/exec until wait returned."
+        },
+        "userCpuMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "User-mode CPU time of the process tree, waited children included."
+        },
+        "systemCpuMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "Kernel-mode CPU time of the same tree."
+        },
+        "maxRssBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Peak resident set size in BYTES, normalized by the producer because the underlying rusage member's unit is platform-dependent (bytes on darwin, kilobytes on linux). Absent where the platform reports no peak."
+        },
+        "ioInBlocks": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "rusage block-input operation count. Absent where the platform does not account it."
+        },
+        "ioOutBlocks": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "rusage block-output operation count, with the same platform caveat as ioInBlocks."
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Tool-native parallelism this execution was granted — the CPU budget the CLI exported to the subprocess. Absent when the scheduler granted none."
+        },
+        "tasks": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many logical task records in this document reference this execution: 1 for an ordinary spawn, n for a batch, and 0 for an execution every record superseded — a retried attempt, or a batch leader whose members all re-executed solo. A 0 is real work nothing points at, not an empty record."
+        }
+      }
+    },
+    "taskRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "status", "reuse", "exitCode", "durationMs"],
+      "description": "One task's terminal result.",
+      "properties": {
+        "identity": { "$ref": "#/$defs/taskIdentity" },
+        "executionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The physical execution that produced this record; every logical record of a batch carries the SAME id, and it must name an execution the same session file declares. Absent for a task that spawned nothing in this run (a cache hit, a coalesced result, a skipped task)."
+        },
+        "inputDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The cache key the scheduler computed for this task. It is the same value the cache is addressed by, so it moves exactly when the key does: two records with one digest were keyed on the same inputs, and reuse says what the run did with that. Absent on a skipped record, which never looked its key up (a skipped record carrying one is invalid), and on a task with no cache identity."
+        },
+        "status": { "$ref": "#/$defs/taskStatus" },
+        "reuse": { "$ref": "#/$defs/taskReuse" },
+        "exitCode": { "$ref": "#/$defs/exitCode" },
+        "durationMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "Wall time of the final execution attempt, or the reused result's recorded duration."
+        },
+        "taskWallMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "Scheduler-level wall around the whole task: lookup, reuse, hooks, every retry attempt, and result publication."
+        },
+        "spawnToFirstEventMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "Latency from spawn to the first runtime event. Absent when no subprocess event was observed."
+        },
+        "error": {
+          "$ref": "#/$defs/resultError",
+          "description": "Present only when the task did not succeed."
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diagnostic" }
+        },
+        "testCasesDropped": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many test cases this task ran that have no test:case record: cases the producer or the CLI left out to stay within testCaseMaxPerTask or the byte budgets, plus cases a producer could not describe. Absent when every reported case has its record, and when the task reported no cases. It rides on every task record: task:end and the session file's tasks."
+        }
+      }
+    },
+    "testCaseMaxPerTask": {
+      "const": 1000,
+      "description": "The most test:case records one task carries in a session stream. A producer past it keeps failed cases first, then skipped, then passed, each in runner order, and counts the rest in taskRecord.testCasesDropped. The bound spans records, so no per-record schema can check it; the drift tests pin it to the Go and TypeScript constants."
+    },
+    "testCaseMaxBytesPerTask": {
+      "const": 1048576,
+      "description": "The most bytes of test cases one task carries: the sum of the compact JSON encoding of each kept testCase payload. A producer keeps cases in the testCaseMaxPerTask priority order while they fit and counts the rest in taskRecord.testCasesDropped. The bound spans records, so no per-record schema can check it; the drift tests pin it to the Go and TypeScript constants."
+    },
+    "testCaseMaxBytesPerBatch": {
+      "const": 8388608,
+      "description": "The most bytes of test cases all the members of one batched run carry together, since a batch hands them to the CLI in one result line. Each member gets an equal share, never more than testCaseMaxBytesPerTask. The drift tests pin it to the Go and TypeScript constants."
+    },
+    "testCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "suite", "status", "durationMs"],
+      "description": "One test case a test task ran: the payload of a test:case record. The name, suite and file bounds are normatively 1024 UTF-8 BYTES and the output bound 4096 UTF-8 BYTES; maxLength counts code points and is therefore the weaker check, so a document the validators accept always satisfies it.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "description": "The full test name as the runner reports it: \"TestParse/empty\" for Go, \"parser > rejects empty input\" for TypeScript, \"TestParser::test_empty\" for Python."
+        },
+        "suite": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "description": "What groups the case: the Go package import path, or the workspace-relative test file for TypeScript and Python."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "skipped"],
+          "description": "The case's verdict, in the words of the runtime testSummary counters."
+        },
+        "durationMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "The case's wall time as the runner measured it."
+        },
+        "output": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "What a failed or skipped case printed, or the runner's failure or skip message. Forbidden on a passed case. A producer past the bound keeps the start and the end around a marker line and sets outputTruncated."
+        },
+        "outputTruncated": {
+          "type": "boolean",
+          "description": "The output lost its middle to the bound. Forbidden without output."
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "description": "The workspace-relative file the runner ties to the case, when it reports one: the declaration site for TypeScript and Python, the first test-file location of the case's output for Go."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The 1-based line in file, when the runner reports it. Forbidden without file."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "passed" } }, "required": ["status"] },
+          "then": { "not": { "required": ["output"] } }
+        },
+        {
+          "if": { "required": ["outputTruncated"] },
+          "then": { "required": ["output"] }
+        },
+        {
+          "if": { "required": ["line"] },
+          "then": { "required": ["file"] }
+        }
+      ]
+    },
+    "taskFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "error"],
+      "description": "One failed task in a run summary. Identity is the full typed identity, not the plan key repeated into two display fields as version 1's JSONL summary did.",
+      "properties": {
+        "identity": { "$ref": "#/$defs/taskIdentity" },
+        "error": { "$ref": "#/$defs/resultError" },
+        "diagnostics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diagnostic" }
+        }
+      }
+    },
+    "runCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "succeeded", "failed", "canceled", "skipped"],
+      "description": "The verdict histogram over EVERY selected task, reuse included. total equals the sum of the four buckets. There is no \"cached\" bucket here: reuse is counted separately in runReuse, which is what removes version 1's strict/lenient fork.",
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "succeeded": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "canceled": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "runReuse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["localCache", "remoteCache", "coalesced"],
+      "description": "The provenance histogram over the same task set as runCounts. Its sum is the number of tasks that did not execute and never exceeds runCounts.total.",
+      "properties": {
+        "localCache": { "type": "integer", "minimum": 0 },
+        "remoteCache": { "type": "integer", "minimum": 0 },
+        "coalesced": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "dockerPublishTimings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["buildMs", "cacheLookupMs", "cacheTransferMs", "registryPushMs", "referencePublishMs", "digestResolveMs"],
+      "description": "Measured per-workload Docker publication timings. buildMs comes from the package task; the remaining fields are registry-facing publisher phases.",
+      "properties": {
+        "buildMs": { "$ref": "#/$defs/durationMs" },
+        "cacheLookupMs": { "$ref": "#/$defs/durationMs" },
+        "cacheTransferMs": { "$ref": "#/$defs/durationMs" },
+        "registryPushMs": { "$ref": "#/$defs/durationMs" },
+        "referencePublishMs": { "$ref": "#/$defs/durationMs" },
+        "digestResolveMs": { "$ref": "#/$defs/durationMs" }
+      }
+    },
+    "dockerPublishConcurrency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configuredCap", "effective"],
+      "description": "The configured scheduler cap and the maximum Docker registry-publication concurrency actually observed for this run.",
+      "properties": {
+        "configuredCap": { "type": "integer", "minimum": 1 },
+        "effective": { "type": "integer", "minimum": 0, "description": "The observed maximum; zero when no registry-facing publish phase ran. Never exceeds configuredCap." }
+      }
+    },
+    "dockerPublication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "session", "registry", "image", "immutableRef", "imageDigest", "contentStatus", "cacheOutcome", "digestReused", "timings", "concurrency"],
+      "description": "One verified Docker publication. imageDigest is immutable content-addressed provenance and never a mutable image tag.",
+      "properties": {
+        "identity": { "$ref": "#/$defs/taskIdentity" },
+        "session": { "type": "string", "minLength": 1, "description": "The resolved release identity of the publish session." },
+        "registry": { "type": "string", "minLength": 1 },
+        "image": { "type": "string", "minLength": 1 },
+        "immutableRef": { "type": "string", "minLength": 1 },
+        "tags": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "imageDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "contentStatus": { "type": "string", "enum": ["pushed", "retagged", "reused"] },
+        "cacheOutcome": { "type": "string", "enum": ["hit", "miss"] },
+        "digestReused": { "type": "boolean" },
+        "timings": { "$ref": "#/$defs/dockerPublishTimings" },
+        "concurrency": { "$ref": "#/$defs/dockerPublishConcurrency" }
+      }
+    },
+    "runCpu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allocatedMillicores", "allocatedSource", "allocatedMs", "actualMs", "executions"],
+      "description": "The run's CPU balance sheet: what the runner was entitled to over this run's wall against what the run actually burned. actualMs is summed from the PHYSICAL execution ledger, so each subprocess counts exactly once however many logical task records it produced — summing tasks[].durationMs instead multiplies a batch's cost by its fan-out. Absent when the run spawned nothing, and absent when no runner environment was captured: allocation cannot be stated without knowing what the machine granted.",
+      "properties": {
+        "allocatedMillicores": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The CPU the runner may use, in thousandths of a core: a cgroup quota of 800000us per 100000us period is 8000."
+        },
+        "allocatedSource": {
+          "type": "string",
+          "enum": ["cgroup-quota", "logical-cpus"],
+          "description": "Where allocatedMillicores came from. \"cgroup-quota\" means a cgroup v1 or v2 bandwidth limit is in force and THROTTLES an over-running task; \"logical-cpus\" means nothing bounded the run below the visible CPU count. The two are different physics, not two spellings."
+        },
+        "allocatedMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "allocatedMillicores applied over the SAME durationMs this summary reports: durationMs * allocatedMillicores / 1000, truncating."
+        },
+        "actualMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "CPU time the run's subprocesses consumed, user plus system, summed over the physical ledger with each execution counted once. It excludes the CLI's own process, which environment.cgroupCpu.usageUs does include. It may exceed allocatedMs: a cgroup quota is enforced per period, not per run."
+        },
+        "executions": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many physical executions actualMs was summed from."
+        }
+      }
+    },
+    "runLocalCache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hits", "misses", "servedMs", "keysMs", "bindingsMs", "restoreVerifyMs", "spawnedProcesses"],
+      "description": "Measured work performed by the CLI's local cache leg outside task execution spans. servedMs is the union of all local cache intervals. Each union segment is attributed once with stable priority bindings, then keys, then restoreVerify, so phase totals are additive and do not multiply nested or parallel work. Their integer-millisecond sum equals servedMs or trails it by at most 2 ms due to independent truncation.",
+      "properties": {
+        "hits": { "type": "integer", "minimum": 0, "description": "Tasks served directly from an entry already in the local store. Equals run.reuse.localCache." },
+        "misses": { "type": "integer", "minimum": 0, "description": "Cacheable task lookups not satisfied by an existing local entry." },
+        "servedMs": { "$ref": "#/$defs/durationMs", "description": "Union wall time spent computing local keys and bindings and verifying/restoring local entries." },
+        "keysMs": { "$ref": "#/$defs/durationMs", "description": "Additive share of servedMs attributed to cache-key and input-digest computation after higher-priority binding overlap is removed." },
+        "bindingsMs": { "$ref": "#/$defs/durationMs", "description": "Additive share of servedMs attributed to version/capability stamping and source bindings; this phase has first priority for overlapping segments." },
+        "restoreVerifyMs": { "$ref": "#/$defs/durationMs", "description": "Additive residual share of servedMs attributed to local lookup, validation, replay, and materialization after binding and key overlap is removed." },
+        "spawnedProcesses": { "type": "integer", "minimum": 0, "description": "Git subprocesses spawned while computing source bindings." }
+      }
+    },
+    "runCache": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Typed cache attribution carried by every run surface.",
+      "properties": {
+        "local": { "$ref": "#/$defs/runLocalCache" }
+      }
+    },
+    "runSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "exitCode", "counts", "reuse", "durationMs"],
+      "description": "The canonical verdict of one run, identical on all four surfaces. UNIFIED SUCCESS (strict): outcome is \"success\" only when the run was not aborted and counts.failed is 0, where counts spans every selected task including reused ones — a reused failure fails the run, and a reused success counts as a success. Version 1's lenient accounting (SuccessIgnoringReuse, which skipped reused tasks before reaching the failure branch) does not exist in version 2.",
+      "properties": {
+        "outcome": { "$ref": "#/$defs/runOutcome" },
+        "abortedBy": { "$ref": "#/$defs/abortedBy" },
+        "exitCode": {
+          "$ref": "#/$defs/exitCode",
+          "description": "The process exit code this run produces: 0 when the outcome is \"success\", 130 when it is \"aborted\", and any other non-zero code when it is \"failure\" (commands that forward a workload's own code report it here)."
+        },
+        "counts": { "$ref": "#/$defs/runCounts" },
+        "reuse": { "$ref": "#/$defs/runReuse" },
+        "durationMs": { "$ref": "#/$defs/durationMs" },
+        "failures": {
+          "type": "array",
+          "description": "Every failed task. When present the array length equals counts.failed, so a reused failure cannot be counted and then omitted.",
+          "items": { "$ref": "#/$defs/taskFailure" }
+        },
+        "publications": {
+          "type": "array",
+          "description": "Additive per-workload Docker publication facts for automation. Omitted when no Docker publication could verify an immutable digest.",
+          "items": { "$ref": "#/$defs/dockerPublication" }
+        },
+        "cpu": { "$ref": "#/$defs/runCpu" },
+        "cache": { "$ref": "#/$defs/runCache" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "outcome": { "const": "aborted" } }, "required": ["outcome"] },
+          "then": { "required": ["abortedBy"], "properties": { "exitCode": { "const": 130 } } },
+          "else": { "not": { "required": ["abortedBy"] } }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "success" } }, "required": ["outcome"] },
+          "then": { "properties": { "exitCode": { "const": 0 } } }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "failure" } }, "required": ["outcome"] },
+          "then": { "properties": { "exitCode": { "not": { "enum": [0, 130] } } } }
+        }
+      ]
+    },
+    "streamRunSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "exitCode", "counts", "reuse", "durationMs"],
+      "description": "The bounded terminal verdict carried by session:end. The unbounded runSummary failures and publications members are not members of this type: counts.failed remains exact, live failure evidence has a dedicated reserve, and complete sanitized detail remains in the named session artifact.",
+      "properties": {
+        "outcome": { "$ref": "#/$defs/runOutcome" },
+        "abortedBy": { "$ref": "#/$defs/abortedBy" },
+        "exitCode": { "$ref": "#/$defs/exitCode" },
+        "counts": { "$ref": "#/$defs/runCounts" },
+        "reuse": { "$ref": "#/$defs/runReuse" },
+        "durationMs": { "$ref": "#/$defs/durationMs" },
+        "cpu": { "$ref": "#/$defs/runCpu" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "outcome": { "const": "aborted" } }, "required": ["outcome"] },
+          "then": { "required": ["abortedBy"], "properties": { "exitCode": { "const": 130 } } },
+          "else": { "not": { "required": ["abortedBy"] } }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "success" } }, "required": ["outcome"] },
+          "then": { "properties": { "exitCode": { "const": 0 } } }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "failure" } }, "required": ["outcome"] },
+          "then": { "properties": { "exitCode": { "not": { "enum": [0, 130] } } } }
+        }
+      ]
+    },
+    "planMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tasks", "edges", "projects"],
+      "properties": {
+        "tasks": { "type": "integer", "minimum": 0 },
+        "edges": { "type": "integer", "minimum": 0 },
+        "projects": { "type": "integer", "minimum": 0 },
+        "byCommand": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "plannedTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "cache"],
+      "description": "One task in a plan. Dependency edges reference other tasks by their derived identity key.",
+      "properties": {
+        "identity": { "$ref": "#/$defs/taskIdentity" },
+        "dependsOn": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "after": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "cache": { "type": "boolean" }
+      }
+    },
+    "planSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dryRun", "metrics", "tasks"],
+      "properties": {
+        "dryRun": { "type": "boolean" },
+        "metrics": { "$ref": "#/$defs/planMetrics" },
+        "tasks": { "type": "array", "items": { "$ref": "#/$defs/plannedTask" } }
+      }
+    },
+    "resultEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "command", "status", "exitCode"],
+      "description": "The --output=json document: exactly one object per invocation. status and exitCode are the document's verdict and always agree with each other and with the process exit code; when run is present its outcome and exitCode must equal them.",
+      "properties": {
+        "protocolVersion": { "$ref": "#/$defs/protocolVersion" },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full command path, e.g. \"build\" or \"cloud status\"."
+        },
+        "status": { "$ref": "#/$defs/resultStatus" },
+        "exitCode": { "$ref": "#/$defs/exitCode" },
+        "data": {
+          "description": "Command-specific payload for commands that are not job runs (a list, a config dump, ...). Job runs report the typed run member instead of stuffing a summary in here."
+        },
+        "run": {
+          "$ref": "#/$defs/runSummary",
+          "description": "The typed run summary for job-running commands."
+        },
+        "plan": {
+          "$ref": "#/$defs/planSummary",
+          "description": "The typed plan for a successful plan-only preview. It is mutually exclusive with run and data because no session executed."
+        },
+        "error": {
+          "$ref": "#/$defs/resultError",
+          "description": "Present exactly when status is not \"success\". An aborted run carries code \"signal\"."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "success" } }, "required": ["status"] },
+          "then": {
+            "not": { "required": ["error"] },
+            "properties": { "exitCode": { "const": 0 } }
+          },
+          "else": { "required": ["error"] }
+        },
+        {
+          "if": { "properties": { "status": { "const": "aborted" } }, "required": ["status"] },
+          "then": {
+            "properties": {
+              "exitCode": { "const": 130 },
+              "error": { "properties": { "code": { "const": "signal" } } }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "failure" } }, "required": ["status"] },
+          "then": {
+            "properties": {
+              "exitCode": { "not": { "enum": [0, 130] } },
+              "error": { "properties": { "code": { "not": { "const": "signal" } } } }
+            }
+          }
+        },
+        {
+          "if": { "required": ["plan"] },
+          "then": {
+            "properties": { "status": { "const": "success" }, "exitCode": { "const": 0 } },
+            "not": { "anyOf": [{ "required": ["run"] }, { "required": ["data"] }, { "required": ["error"] }] }
+          }
+        }
+      ]
+    },
+    "machineOutputBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxBytes", "maxRecords", "failureReserveBytes", "failureReserveRecords", "finalReserveBytes", "finalReserveRecords"],
+      "description": "The selected live-stream budget. Every value is fixed by mode; no producer may choose a wider or narrower budget.",
+      "properties": {
+        "maxBytes": { "type": "integer", "minimum": 1 },
+        "maxRecords": { "type": "integer", "minimum": 1 },
+        "failureReserveBytes": { "type": "integer", "minimum": 1 },
+        "failureReserveRecords": { "type": "integer", "minimum": 1 },
+        "finalReserveBytes": { "type": "integer", "minimum": 1 },
+        "finalReserveRecords": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "machineOutputElision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["records", "bytes"],
+      "description": "Whole sanitized records omitted live and their compact UTF-8 JSON plus LF bytes. records and bytes are either both zero or both positive.",
+      "properties": {
+        "records": { "type": "integer", "minimum": 0 },
+        "bytes": { "type": "integer", "minimum": 0 }
+      },
+      "oneOf": [
+        { "properties": { "records": { "const": 0 }, "bytes": { "const": 0 } } },
+        { "properties": { "records": { "minimum": 1 }, "bytes": { "minimum": 1 } } }
+      ]
+    },
+    "machineOutputElisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinary", "failure"],
+      "description": "Elision accounting split so failure-priority evidence can never disappear inside an aggregate ordinary-detail count.",
+      "properties": {
+        "ordinary": { "$ref": "#/$defs/machineOutputElision" },
+        "failure": { "$ref": "#/$defs/machineOutputElision" }
+      }
+    },
+    "machineOutputArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sessionId", "path", "retention"],
+      "description": "The complete sanitized stream retained with its session and never filtered by the live cap.",
+      "properties": {
+        "sessionId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "path": { "const": "events.jsonl" },
+        "retention": { "const": "session" }
+      }
+    },
+    "machineOutputSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "sanitization", "budget", "elided", "artifact"],
+      "description": "Required on the final session:end record only by the opt-in bounded machine-output profile: selected fixed budget, split exact elision accounting, sanitizer version and the retained full-detail artifact.",
+      "properties": {
+        "mode": { "type": "string", "enum": ["normal", "verbose"] },
+        "sanitization": { "const": "terminal-safe-redacted-v1" },
+        "budget": { "$ref": "#/$defs/machineOutputBudget" },
+        "elided": { "$ref": "#/$defs/machineOutputElisions" },
+        "artifact": { "$ref": "#/$defs/machineOutputArtifact" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "normal" } }, "required": ["mode"] },
+          "then": {
+            "properties": {
+              "budget": {
+                "properties": {
+                  "maxBytes": { "const": 1048576 },
+                  "maxRecords": { "const": 1024 },
+                  "failureReserveBytes": { "const": 262144 },
+                  "failureReserveRecords": { "const": 256 },
+                  "finalReserveBytes": { "const": 16384 },
+                  "finalReserveRecords": { "const": 1 }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "verbose" } }, "required": ["mode"] },
+          "then": {
+            "properties": {
+              "budget": {
+                "properties": {
+                  "maxBytes": { "const": 8388608 },
+                  "maxRecords": { "const": 8192 },
+                  "failureReserveBytes": { "const": 2097152 },
+                  "failureReserveRecords": { "const": 2048 },
+                  "finalReserveBytes": { "const": 16384 },
+                  "finalReserveRecords": { "const": 1 }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "boundedSessionEndRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "record", "time", "run", "machineOutput"],
+      "description": "The opt-in bounded terminal wire type. It is distinct from the legacy SessionStreamRecord producer shape so the contract can land before producer adoption without falsely claiming an unbounded stream conforms.",
+      "properties": {
+        "protocolVersion": { "$ref": "#/$defs/protocolVersion" },
+        "record": { "const": "session:end" },
+        "time": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "run": { "$ref": "#/$defs/streamRunSummary" },
+        "machineOutput": { "$ref": "#/$defs/machineOutputSummary" }
+      }
+    },
+    "sessionStreamRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "record", "time"],
+      "description": "One line of --output=jsonl: a run/session event, or the single terminal plan:end record of a plan-only preview. Recorded session event logs contain only task:*, test:case and session:end because plan:end does not claim a session.",
+      "properties": {
+        "protocolVersion": { "$ref": "#/$defs/protocolVersion" },
+        "record": {
+          "type": "string",
+          "enum": ["task:start", "task:event", "task:end", "test:case", "plan:end", "session:end"],
+          "description": "Record discriminator. Version 1 spelled these job:start / job:event / job:end / session:end. test:case is additive: a reader that does not know a record value skips the line."
+        },
+        "time": { "type": "string", "minLength": 1, "description": "RFC 3339 timestamp. The legacy per-line contract remains additive; the bounded profile applies a 64-byte ceiling." },
+        "identity": {
+          "$ref": "#/$defs/taskIdentity",
+          "description": "Required on every task:* and test:case record, forbidden on plan:end and session:end."
+        },
+        "event": {
+          "type": "object",
+          "description": "The subprocess runtime event, versioned by protocols/runtime. Required on task:event, forbidden otherwise."
+        },
+        "task": {
+          "$ref": "#/$defs/taskRecord",
+          "description": "Required on task:end, forbidden otherwise."
+        },
+        "testCase": {
+          "$ref": "#/$defs/testCase",
+          "description": "Required on test:case, forbidden otherwise. The task's test:case records precede its task:end."
+        },
+        "run": {
+          "$ref": "#/$defs/runSummary",
+          "description": "Required on session:end and forbidden otherwise. A legacy record carries runSummary; when machineOutput is present the conditional bounded profile narrows this to streamRunSummary, which forbids failures and publications."
+        },
+        "plan": {
+          "$ref": "#/$defs/planSummary",
+          "description": "Required on plan:end and forbidden otherwise. Its presence proves planning completed, not that a session executed."
+        },
+        "machineOutput": {
+          "$ref": "#/$defs/machineOutputSummary",
+          "description": "The fixed budget, exact elision counts and retained full-detail artifact. Optional for a legacy session:end record, required only by the opt-in bounded stream profile, and forbidden otherwise."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "record": { "const": "session:end" } }, "required": ["record"] },
+          "then": { "required": ["run"], "not": { "anyOf": [{ "required": ["identity"] }, { "required": ["task"] }, { "required": ["event"] }, { "required": ["testCase"] }, { "required": ["plan"] }] } },
+          "else": {
+            "if": { "properties": { "record": { "const": "plan:end" } }, "required": ["record"] },
+            "then": {
+              "required": ["plan"],
+              "not": { "anyOf": [{ "required": ["identity"] }, { "required": ["task"] }, { "required": ["event"] }, { "required": ["testCase"] }, { "required": ["run"] }, { "required": ["machineOutput"] }] }
+            },
+            "else": { "required": ["identity"], "not": { "anyOf": [{ "required": ["run"] }, { "required": ["plan"] }, { "required": ["machineOutput"] }] } }
+          }
+        },
+        {
+          "if": { "properties": { "record": { "const": "task:event" } }, "required": ["record"] },
+          "then": { "required": ["event"] },
+          "else": { "not": { "required": ["event"] } }
+        },
+        {
+          "if": { "properties": { "record": { "const": "task:end" } }, "required": ["record"] },
+          "then": { "required": ["task"] },
+          "else": { "not": { "required": ["task"] } }
+        },
+        {
+          "if": { "properties": { "record": { "const": "test:case" } }, "required": ["record"] },
+          "then": { "required": ["testCase"] },
+          "else": { "not": { "required": ["testCase"] } }
+        },
+        {
+          "if": { "required": ["machineOutput"] },
+          "then": {
+            "properties": {
+              "time": { "type": "string", "minLength": 1, "maxLength": 64 },
+              "run": { "$ref": "#/$defs/streamRunSummary" }
+            }
+          }
+        }
+      ]
+    },
+    "mcpResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "tool", "commands"],
+      "description": "The result an MCP tool call returns. run_jobs reports the canonical run summary; plan_jobs reports the plan.",
+      "properties": {
+        "protocolVersion": { "$ref": "#/$defs/protocolVersion" },
+        "tool": { "type": "string", "enum": ["run_jobs", "plan_jobs"] },
+        "commands": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "run": { "$ref": "#/$defs/runSummary" },
+        "plan": { "$ref": "#/$defs/planSummary" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "tool": { "const": "run_jobs" } }, "required": ["tool"] },
+          "then": { "required": ["run"], "not": { "required": ["plan"] } },
+          "else": { "required": ["plan"], "not": { "required": ["run"] } }
+        }
+      ]
+    },
+    "sessionFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "sessionId", "startTime", "commands", "run"],
+      "description": "The recorded session metadata document (session.json).",
+      "properties": {
+        "protocolVersion": { "$ref": "#/$defs/protocolVersion" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "parentSessionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The session of the run that spawned this one. Absent for a top-level run."
+        },
+        "startTime": { "type": "string", "minLength": 1 },
+        "endTime": { "type": "string", "minLength": 1 },
+        "commands": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "scoped"],
+          "description": "How the run chose the projects it planned over. Absent when the producer recorded none.",
+          "properties": {
+            "mode": { "type": "string", "enum": ["all", "impacted", "projects"] },
+            "scoped": { "type": "boolean" },
+            "projects": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "releaseSetProjects": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "The canonical ids, sorted, of the projects whose publish and package steps this session's release-set plan owned. A subset of projects, which stays the union the run planned and executed. Absent when the session coordinated no release set, and when its plan selected no member."
+            }
+          }
+        },
+        "git": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "branch": { "type": "string", "minLength": 1 },
+            "baseline": { "type": "string", "minLength": 1 }
+          }
+        },
+        "tree": { "$ref": "#/$defs/sessionTree" },
+        "placement": { "$ref": "#/$defs/sessionPlacement" },
+        "run": { "$ref": "#/$defs/runSummary" },
+        "tasks": { "type": "array", "items": { "$ref": "#/$defs/taskRecord" } },
+        "executions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/executionRecord" },
+          "description": "The physical executions this session spawned, each listed once however many task records it produced. Absent when nothing executed."
+        },
+        "environment": { "$ref": "#/$defs/sessionEnvironment" },
+        "preparation": { "$ref": "#/$defs/sessionPreparation" },
+        "scheduler": { "description": "Scheduler tuning report; shape owned by the scheduler." },
+        "cache": { "description": "Detailed local/remote end-of-run cache snapshot. Its shape is producer-owned; portable attribution is in run.cache." }
+      }
+    },
+    "cgroupThrottle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["periods", "throttledPeriods", "throttledUs"],
+      "description": "cgroup v2 CPU bandwidth accounting, WINDOWED to the session: each member is the delta between the sample taken at session start and the one taken at session end. It is a nested object rather than three optional members because a ZERO here is a measurement, and the important one — \"the quota never throttled us\" is what separates contention from quota starvation, and an omitted-when-zero member could not say it. The object is present exactly when cpu.stat exposed these counters.",
+      "properties": {
+        "periods": { "type": "integer", "minimum": 0, "description": "Bandwidth periods elapsed during the session." },
+        "throttledPeriods": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many of those periods ended with the cgroup suspended for exhausting its quota."
+        },
+        "throttledUs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total microseconds the cgroup spent suspended during the session."
+        }
+      }
+    },
+    "cgroupCpu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["periodUs"],
+      "description": "The cgroup v1 or v2 CPU controller as the session saw it. Absent entirely when neither v2 cpu.max nor v1 cpu.cfs_quota_us and cpu.cfs_period_us are readable.",
+      "properties": {
+        "periodUs": { "type": "integer", "minimum": 1, "description": "The bandwidth period from v2 cpu.max or v1 cpu.cfs_period_us, in microseconds." },
+        "quotaUs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "CPU time the cgroup may consume per period. ABSENT when v2 cpu.max says \"max\" or v1 cpu.cfs_quota_us says -1: there is no quota, and reporting one would invent a ceiling. A quota is always positive, so the absence is unambiguous."
+        },
+        "usageUs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "CPU time the WHOLE cgroup burned during the session, from v2 cpu.stat's cumulative usage_usec or v1 cpuacct.usage converted from nanoseconds, delta'd over the window. Wider than run.cpu.actualMs because it includes the CLI itself and anything else in the cgroup. Absent when neither controller exposed usage."
+        },
+        "throttle": { "$ref": "#/$defs/cgroupThrottle" }
+      }
+    },
+    "cpuPressure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["someStalledUs"],
+      "description": "Linux PSI for CPU (/proc/pressure/cpu), windowed to the session. It answers the shared-host half of the question: a runner whose own quota is never exceeded can still be slow because the HOST is oversubscribed. Only the \"some\" line's cumulative total is reported, delta'd over the session — the avg10/avg60/avg300 columns are decaying averages over windows that are not this session's, so nothing in this document could reconcile them.",
+      "properties": {
+        "someStalledUs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Microseconds at least one task spent stalled on CPU during environment.windowMs."
+        }
+      }
+    },
+    "hostCpuTime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stealTicks", "ioWaitTicks", "totalTicks"],
+      "description": "The /proc/stat aggregate, windowed to the session — the hypervisor's view: steal is time the host gave to somebody else while this vCPU was runnable, iowait is time it had nothing to run because a device had not answered. Counters are in USER_HZ TICKS exactly as the kernel states them, because converting to milliseconds needs a USER_HZ this process cannot read; totalTicks is every column summed over the same window, so the ratios — the only reading this block is for — are unit-free. Neither column may exceed totalTicks.",
+      "properties": {
+        "stealTicks": { "type": "integer", "minimum": 0, "description": "Involuntary wait imposed by the hypervisor." },
+        "ioWaitTicks": { "type": "integer", "minimum": 0, "description": "Idle time attributed to outstanding IO." },
+        "totalTicks": { "type": "integer", "minimum": 0, "description": "Every CPU-state column summed: the denominator for the two above." }
+      }
+    },
+    "cgroupMemoryLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bytes", "source"],
+      "description": "A finite memory-controller limit and the cgroup layout that supplied it. An unlimited controller is represented by an absent object, never by zero.",
+      "properties": {
+        "bytes": { "type": "integer", "minimum": 1 },
+        "source": { "type": "string", "enum": ["cgroup-v1", "cgroup-v2"] }
+      }
+    },
+    "memoryCapacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effectiveBytes", "effectiveSource"],
+      "description": "Stable memory capacity and provenance. physicalBytes and cgroupLimit are independent measurements; effectiveBytes is the smaller available bound and effectiveSource identifies the input that supplied it. This observe-only fact describes the scheduler's existing capacity input and does not change admission.",
+      "properties": {
+        "physicalBytes": { "type": "integer", "minimum": 1, "description": "Host physical RAM, absent when it could not be measured." },
+        "cgroupLimit": { "$ref": "#/$defs/cgroupMemoryLimit" },
+        "effectiveBytes": { "type": "integer", "minimum": 1, "description": "The smaller available stable bound." },
+        "effectiveSource": { "type": "string", "enum": ["physical", "cgroup-limit"] }
+      },
+      "anyOf": [{ "required": ["physicalBytes"] }, { "required": ["cgroupLimit"] }],
+      "allOf": [
+        {
+          "if": { "properties": { "effectiveSource": { "const": "physical" } }, "required": ["effectiveSource"] },
+          "then": { "required": ["physicalBytes"] }
+        },
+        {
+          "if": { "properties": { "effectiveSource": { "const": "cgroup-limit" } }, "required": ["effectiveSource"] },
+          "then": { "required": ["cgroupLimit"] }
+        }
+      ]
+    },
+    "cgroupMemoryComposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["anonBytes", "fileBytes", "shmemBytes"],
+      "description": "Closing cgroup v2 memory.stat composition. fileBytes INCLUDES shmemBytes under the kernel contract; they MUST NOT be summed. This block is absent on cgroup v1, whose similarly named counters do not have these exact semantics.",
+      "properties": {
+        "anonBytes": { "type": "integer", "minimum": 0 },
+        "fileBytes": { "type": "integer", "minimum": 0 },
+        "shmemBytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "cgroupMemoryLifetimePeak": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bytes"],
+      "description": "memory.peak (v2) or memory.max_usage_in_bytes (v1), sampled at session close. This is a peak over the CGROUP LIFETIME, never over environment.windowMs. Object presence preserves a measured zero.",
+      "properties": {
+        "bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "cgroupMemoryClosing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currentBytes"],
+      "description": "The memory controller's closing sample. Gauges are not session deltas. A present block preserves a measured zero; unsupported optional gauges are absent as nested objects.",
+      "properties": {
+        "currentBytes": { "type": "integer", "minimum": 0 },
+        "composition": { "$ref": "#/$defs/cgroupMemoryComposition" },
+        "lifetimePeak": { "$ref": "#/$defs/cgroupMemoryLifetimePeak" }
+      }
+    },
+    "cgroupMemoryEvents": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["low", "high", "max", "oom", "oomKill"],
+      "description": "The standard cgroup v2 memory.events counters, WINDOWED to the session by subtracting the opening sample from the closing sample. Cgroup v1 failcnt has different semantics and is never relabelled as one of these. Object presence preserves a completely measured zero delta.",
+      "properties": {
+        "low": { "type": "integer", "minimum": 0 },
+        "high": { "type": "integer", "minimum": 0 },
+        "max": { "type": "integer", "minimum": 0 },
+        "oom": { "type": "integer", "minimum": 0 },
+        "oomKill": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "cgroupMemory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "closing"],
+      "description": "The memory controller the session was a member of. closing contains closing-sample gauges; events contains session-window deltas and is cgroup-v2-only.",
+      "properties": {
+        "source": { "type": "string", "enum": ["cgroup-v1", "cgroup-v2"] },
+        "closing": { "$ref": "#/$defs/cgroupMemoryClosing" },
+        "events": { "$ref": "#/$defs/cgroupMemoryEvents" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "source": { "const": "cgroup-v1" } }, "required": ["source"] },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["events"] },
+                { "properties": { "closing": { "required": ["composition"] } }, "required": ["closing"] }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "memoryPressure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "someStalledUs", "fullStalledUs"],
+      "description": "Linux memory PSI, WINDOWED to the session. scope is explicit because /proc/pressure/memory describes the host while a cgroup v2 memory.pressure file describes only that cgroup; consumers must not treat those populations as interchangeable.",
+      "properties": {
+        "scope": { "type": "string", "enum": ["host", "cgroup"] },
+        "someStalledUs": { "type": "integer", "minimum": 0 },
+        "fullStalledUs": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "sessionTree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fingerprint", "dirty", "headSHA"],
+      "description": "The worktree a session ran against, identified by CONTENT: HEAD, the bytes at every tracked path that differs from it (recursing through submodules), and the bytes of every untracked non-ignored file. It exists because \"the same files are dirty\" is not \"the same bytes are on disk\", so a branch and a commit cannot say which tree a recorded run measured. Absent when the producer could not compute it.",
+      "properties": {
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Lowercase hex sha256 of the canonical tree byte stream defined in doc/02-result-v2.md (Gated tree fingerprint) and computed by `putnami tree fingerprint`. Always sha256, whatever hash the repository uses for its own objects."
+        },
+        "dirty": {
+          "type": "boolean",
+          "description": "Whether the worktree differed from headSHA. Always known when this object is present: computing the fingerprint IS the measurement that decides it, which is why absence of the whole object — not of this member — carries \"unknown\"."
+        },
+        "headSHA": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
+          "description": "The FULL object id of the commit the worktree sat on — 40 hex for a sha1 repository, 64 for a sha256 one. It is folded into fingerprint as well, so a moved HEAD reads as a different tree instead of canceling out against a coincidentally identical diff."
+        }
+      }
+    },
+    "sessionPlacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requested", "actual"],
+      "description": "Requested and actual execution locations. A remote request may execute locally when no execution provider is available. Observational metadata only: it does not alter task identity, cache keys or the gated tree fingerprint. Absent when placement is unknown.",
+      "properties": {
+        "requested": { "type": "string", "enum": ["local", "remote"] },
+        "actual": { "type": "string", "enum": ["local", "remote"] },
+        "provenance": { "$ref": "#/$defs/sessionProvenance" }
+      }
+    },
+    "sessionProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceDigest", "inputDigest", "submission"],
+      "description": "The identity of the bound execution request whose execution this session records, stated by the EXECUTING engine from the request it was handed. Present exactly when a bound request executed; absent for a local run, a local fallback and every older producer, so absence is the only unknown. It names no provider, attempt or machine: those are transport observations and live beside the session. Observational metadata only: never a task cache input.",
+      "properties": {
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The canonical source-manifest digest of the snapshot the session executed, in the runner contract's spelling."
+        },
+        "inputDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The execution-input digest of the bound request: source, invocation, frozen selection and pinned environment. Applicability identity, never a task cache key."
+        },
+        "submission": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "description": "The request's idempotency key: the one submission this session answers, however many times the submitting side had to resolve it."
+        }
+      }
+    },
+    "sessionEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "arch", "logicalCpus", "windowMs"],
+      "description": "The RUNNER the session executed on, and how much of it the session got. A per-task duration is uninterpretable alone: CI runners are CPU-quota-limited and share a host, so a task that took twice as long may have hit its cgroup quota, been starved by a neighbor, or simply had more work — three problems with three fixes, indistinguishable from timings. EVERY MEMBER IS MEASURED: a file the platform does not have yields an ABSENT member, never a zero (macOS has no cgroups and no PSI, and a zero there would claim \"measured no throttling\" for a machine that cannot throttle). Blocks whose zeros ARE meaningful are nested objects, so the object's presence says \"this was read\". Cumulative counters are reported as SESSION DELTAS between opening and closing samples; closing memory gauges are named separately and are not delta'd. windowMs is the wall every delta is read against.",
+      "properties": {
+        "os": { "type": "string", "minLength": 1, "description": "GOOS of the recording CLI (\"linux\", \"darwin\")." },
+        "arch": {
+          "type": "string",
+          "minLength": 1,
+          "description": "GOARCH (\"amd64\", \"arm64\"). Cross-architecture comparison of task durations is meaningless without it."
+        },
+        "logicalCpus": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "CPU count visible to the process — what the scheduler sized its worker pool from, and NOT the quota: a container pinned to 2 cores still sees the host's 64."
+        },
+        "cpuModel": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Processor brand string, absent where the platform publishes none."
+        },
+        "windowMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "Wall time between the opening and closing samples — the window every delta below covers."
+        },
+        "cgroupCpu": { "$ref": "#/$defs/cgroupCpu" },
+        "cpuPressure": { "$ref": "#/$defs/cpuPressure" },
+        "hostCpu": { "$ref": "#/$defs/hostCpuTime" },
+        "memoryCapacity": { "$ref": "#/$defs/memoryCapacity" },
+        "cgroupMemory": { "$ref": "#/$defs/cgroupMemory" },
+        "memoryPressure": { "$ref": "#/$defs/memoryPressure" }
+      }
+    },
+    "preparationPhaseRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "wallMs", "steps"],
+      "description": "One OWNERSHIP CLASS's contribution to the dependency-preparation stage. wallMs is a SUM OF SPANS, not an interval: when preparation.parallelism is above 1 the spans overlapped, so the phases can add up to more than preparation.wallMs — deliberately, because the phase total is the WORK the class represents and the gap is what the parallelism bought. Only at parallelism 1 do the phases partition the stage, and only there does the validator enforce the sum.",
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": ["network", "resolution", "verification", "generation", "mutation"],
+          "description": "The ownership class. The set is CLOSED: network (talking to a remote), resolution (deciding what is needed and under which content identity), verification (proving what is on disk is what was promised), generation (running a declared prepare/build command), mutation (staging, ownership-lock wait, publish, reclaim). A step fitting none of these is a step whose cost nobody can act on, so it is classified rather than given a sixth bucket."
+        },
+        "wallMs": { "$ref": "#/$defs/durationMs", "description": "Summed wall of this phase's spans." },
+        "steps": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many spans were summed, so a mean is derivable without publishing one. A phase with no span is absent from the list rather than present with 0."
+        },
+        "cpuMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "MEASURED child CPU (user+system) for the spans of this phase that spawned a subprocess. Absent for a phase that ran entirely in the CLI process — an in-process phase reports no child CPU rather than a fabricated one."
+        }
+      }
+    },
+    "sessionPreparation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wallMs", "parallelism", "phases"],
+      "description": "The dependency-preparation stage — resolving, fetching, building and publishing the artifacts a run needs BEFORE it can plan anything — decomposed into ownership phases. Its separation from executions[] is a correctness property rather than a layout choice: an executionRecord is one SUBPROCESS, joined to by taskRecord.executionId and summed into run.cpu.actualMs, while most of preparation is in-process work no subprocess performed and no task record could reference. Nothing here is in executions[], and nothing in executions[] is here.",
+      "properties": {
+        "wallMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "The stage's own wall — the sum of its top-level invocations, which run sequentially within a session. It is what the critical path actually paid, and the denominator every phase is read against."
+        },
+        "parallelism": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The widest independent-step fan-out the stage was permitted. 1 means the phase walls partition wallMs; above 1 they may overlap and must not be added up as elapsed time."
+        },
+        "phases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/preparationPhaseRecord" },
+          "description": "The classes the stage ENTERED, in the canonical order network, resolution, verification, generation, mutation. A class the stage never entered is absent, not zero, and each class appears at most once."
+        }
+      }
+    },
+    "sessionPlanFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "sessionId", "commands", "tasks"],
+      "description": "The recorded plan snapshot document (plan.json).",
+      "properties": {
+        "protocolVersion": { "$ref": "#/$defs/protocolVersion" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "commands": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "tasks": { "type": "array", "items": { "$ref": "#/$defs/plannedTask" } }
+      }
+    },
+    "reportGit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha"],
+      "description": "The repository state a report was produced against. Report-owned rather than a reuse of sessionFile.git: the session records what SELECTION was computed from, while a report is a durable fact a consumer files against a commit, so sha is required here and the session's optional branch/baseline pair stays as it is on disk in every recorded session.",
+      "properties": {
+        "branch": { "type": "string", "minLength": 1, "description": "The checked-out branch, absent on a detached HEAD." },
+        "sha": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
+          "description": "The FULL object id of the commit the run was produced at — 40 hex for a sha1 repository, 64 for a sha256 one. It is the join key a longitudinal consumer files the report under, so an abbreviation or a symbolic name (\"HEAD\", a branch) is a violation rather than a shorthand."
+        },
+        "dirty": {
+          "type": "boolean",
+          "description": "Uncommitted changes in the worktree. ABSENT when the producer did not determine it — a report that cannot say whether the tree matched sha says nothing rather than claiming a clean tree."
+        },
+        "baseline": { "type": "string", "minLength": 1, "description": "The ref selection was computed against, absent when the run did not select by impact." }
+      }
+    },
+    "reportRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "exitCode", "counts", "reuse", "durationMs"],
+      "description": "The run's verdict as the report states it. Deliberately NOT runSummary: that shape carries failures[], whose length equals counts.failed and whose members each embed a full typed identity, an error and that task's diagnostics — an UNBOUNDED member, and the report's premise is that its worst case is stated up front. The failed tasks are not lost: they sort first into jobs[] by the selection priority, so a report elides successes before failures. The histogram arithmetic and the exit-code agreement are the same rules runSummary carries.",
+      "properties": {
+        "outcome": { "$ref": "#/$defs/runOutcome" },
+        "exitCode": { "$ref": "#/$defs/exitCode" },
+        "counts": { "$ref": "#/$defs/runCounts" },
+        "reuse": { "$ref": "#/$defs/runReuse" },
+        "durationMs": { "$ref": "#/$defs/durationMs" },
+        "cpu": {
+          "$ref": "#/$defs/runCpu",
+          "description": "The run's actual-versus-allocated CPU balance, in the same shape the session file reports so the two are comparable without conversion. Absent when the run spawned nothing or captured no runner environment."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "outcome": { "const": "success" } }, "required": ["outcome"] },
+          "then": { "properties": { "exitCode": { "const": 0 } } }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "aborted" } }, "required": ["outcome"] },
+          "then": { "properties": { "exitCode": { "const": 130 } } }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "failure" } }, "required": ["outcome"] },
+          "then": { "properties": { "exitCode": { "not": { "enum": [0, 130] } } } }
+        }
+      ]
+    },
+    "reportTests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "passed", "failed", "skipped"],
+      "description": "One command's test outcome, mirroring protocols/runtime's TestSummary so a report member and the event payload it was aggregated from carry the same counters and omission accounting. total equals passed + failed + skipped.",
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "failureDetailsTruncated": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Causal failure diagnostics the command's producers omitted before report reduction. Optional and absent when zero for backward compatibility."
+        }
+      }
+    },
+    "reportCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["percentage", "granularity", "enforced"],
+      "description": "A coverage measurement, mirroring protocols/runtime's CoverageSummary. Present only where coverage was actually COLLECTED: the report displays what the run measured and never forces instrumentation, so an uninstrumented command omits the block rather than reporting 0%.",
+      "properties": {
+        "percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "The covered share at the declared granularity. It is the contract's only non-integer member: a coverage share is a measurement, not a count, and rounding it would erase the difference between 89.4% and 89.6% against a 90% threshold."
+        },
+        "granularity": {
+          "type": "string",
+          "enum": ["statements", "lines", "functions", "branches"],
+          "description": "What the percentage counts. It travels WITH the number because languages measure differently (Go counts statements, TypeScript lines), so averaging across granularities is the reader's decision to make knowingly rather than one this contract hides."
+        },
+        "covered": { "type": "integer", "minimum": 0, "description": "Covered units at that granularity, when the producer reported a count. Never exceeds total." },
+        "total": { "type": "integer", "minimum": 0, "description": "Measured units at that granularity, when the producer reported a count." },
+        "enforced": {
+          "type": "boolean",
+          "description": "Whether a threshold was in force for this measurement — the difference between \"coverage was observed\" and \"coverage could have failed the run\". A run without --enforce-coverage still measures."
+        }
+      }
+    },
+    "reportCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "counts", "reuse", "freshWallMs", "errors", "warnings"],
+      "description": "One root command's synthesis. The vocabulary is COMMANDS, not phases: a task names the root command it belongs to (taskRef.command), so this aggregation is a projection of facts the run already carries, and \"phase\" is taken in this contract by sessionPreparation's ownership classes, which decompose something else entirely. Each command appears at most once, and the per-command totals sum to run.counts.total because every selected task belongs to exactly one root command.",
+      "properties": {
+        "command": { "type": "string", "minLength": 1, "description": "The root command (\"build\", \"test\", \"lint\")." },
+        "counts": { "$ref": "#/$defs/runCounts" },
+        "reuse": { "$ref": "#/$defs/runReuse" },
+        "freshWallMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "Summed wall of this command's tasks that actually EXECUTED. Reused tasks contribute nothing: a cache hit spends no wall, and counting the duration it replayed would make a fully cached command look as expensive as the run that populated the cache."
+        },
+        "cpuMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "Summed CPU of this command's fresh tasks — each execution's measured CPU divided among the task records that reference it, so a batched dispatch is not multiplied by its fan-out. Summed over commands it never exceeds run.cpu.actualMs: superseded attempts belong to the run's ledger and to no command. Absent when no execution of this command was measured."
+        },
+        "tests": { "$ref": "#/$defs/reportTests" },
+        "coverage": { "$ref": "#/$defs/reportCoverage" },
+        "errors": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many real error-severity diagnostics this command's tasks reported plus producer-omitted causal failure details, including diagnostics the bounded job lists dropped. The synthetic accounting marker is informational and is not another error. This is what keeps truncation from losing the totals."
+        },
+        "warnings": { "type": "integer", "minimum": 0, "description": "The same count for warning severity." }
+      }
+    },
+    "reportJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "project", "task", "command", "outcome", "reuse", "durationMs"],
+      "description": "One selected task's line in the report. Identity is FLATTENED to the three strings a consumer joins on plus the root command that ties the job to its reportCommand entry; the full taskIdentity (display name, provider, kind, step) stays in the session, because repeating it 64 times would spend the report's whole budget on identity a reader can look up.",
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The identity key every other v2 surface joins on, exactly project + \":\" + task. A key that disagrees with the two is a violation, not an alternative spelling — the same rule taskIdentity carries."
+        },
+        "project": { "type": "string", "minLength": 1, "description": "Workspace project id (\"/tooling/cli\")." },
+        "task": { "type": "string", "minLength": 1, "description": "Canonical plan name (\"build~compile\")." },
+        "command": { "type": "string", "minLength": 1, "description": "The root command the task belongs to, so a job joins to its command's synthesis without re-deriving it from the task name." },
+        "outcome": { "$ref": "#/$defs/taskStatus" },
+        "reuse": { "$ref": "#/$defs/taskReuse" },
+        "durationMs": { "$ref": "#/$defs/durationMs" },
+        "cpuMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "This task's share of its execution's measured CPU. Absent for a task that spawned nothing, and absent where the platform measured nothing — never a zero, which would read as \"ran and cost nothing\"."
+        },
+        "coverage": { "$ref": "#/$defs/reportCoverage" },
+        "diagnostics": {
+          "type": "array",
+          "maxItems": 16,
+          "description": "The task's diagnostics, bounded. Orthogonal to outcome: a succeeding task may still report warnings. The message bound is normatively 1024 UTF-8 BYTES, which is what a size budget is spent in; maxLength counts code points and is therefore the weaker check, so a document the validators accept always satisfies it.",
+          "items": {
+            "allOf": [{ "$ref": "#/$defs/diagnostic" }],
+            "properties": { "message": { "maxLength": 1024 } }
+          }
+        },
+        "failureDetailsTruncated": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The producer-side portion of truncatedCount. It identifies causal failure details omitted before report reduction, so validators can distinguish legitimate early omission from a reducer that dropped diagnostics while it still had room."
+        },
+        "truncatedCount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many diagnostics were omitted before or during report reduction: failureDetailsTruncated plus diagnostics the report bound dropped. A short diagnostics list may carry only producer omissions; report-side drops require a full list. Absence means the displayed diagnostics are complete."
+        }
+      }
+    },
+    "reportCache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hits", "misses", "restored", "uploads", "timeSavedMs", "bytesFetched", "bytesUploaded"],
+      "description": "The run's remote-cache economics: a TYPED subset of the scheduler's own cache snapshot, chosen so the report answers \"did the cache pay off\" without inheriting an open shape. The session file's free-form cache member is exactly what a contracted document must not repeat — a consumer binding to it binds to whatever the scheduler happened to serialize that release. ABSENT when no remote cache participated: an all-zero block would claim \"the cache was asked and answered nothing\", which is a different fact from \"there was no cache\".",
+      "properties": {
+        "hits": { "type": "integer", "minimum": 0, "description": "Negotiated keys the remote cache held." },
+        "misses": { "type": "integer", "minimum": 0, "description": "Negotiated keys it did not." },
+        "restored": { "type": "integer", "minimum": 0, "description": "Hits actually materialized into the local store. Never exceeds hits: a key that was not held cannot have been restored." },
+        "uploads": { "type": "integer", "minimum": 0, "description": "Freshly built results stored remotely." },
+        "timeSavedMs": { "$ref": "#/$defs/durationMs", "description": "Build time the restored results avoided — the recorded duration of work that did not have to run again." },
+        "bytesFetched": { "type": "integer", "minimum": 0, "description": "Bytes downloaded from the cache." },
+        "bytesUploaded": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Bytes pushed back. Byte traffic is stated ONCE, at run level: a per-command split would have to attribute shared blobs, and any split of a deduplicated transfer is a fiction."
+        }
+      }
+    },
+    "reportScheduler": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parallelism", "criticalPathMs"],
+      "description": "The two scheduler facts a budget consumer reads out of the session's free-form scheduler report. Absent when the run recorded no scheduler report.",
+      "properties": {
+        "parallelism": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The worker count the scheduler chose for this run. Without it a wall time cannot be read against the work it covered."
+        },
+        "criticalPathMs": {
+          "$ref": "#/$defs/durationMs",
+          "description": "The longest dependency chain by cumulative task duration — the makespan floor no worker count can beat. A fully cached plan has no positive-duration chain, and 0 there is a real measurement."
+        }
+      }
+    },
+    "reportFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "sessionId", "startTime", "endTime", "origin", "enforceCoverage", "run", "commands", "jobs", "elidedJobs"],
+      "description": "The recorded synthesis document (report.json) — the run's contracted bilan. It exists because a consumer that wants \"what did this run cost, what failed, what did it cover\" had to scrape the raw session. Three rules govern its content: ABSENT IS NOT ZERO (a fact the run could not measure is omitted; a zero means measured-zero); it is a PROJECTION, never an input (derived after the run settled — nothing in it influences pass/fail and nothing in it enters a cache key); and it is BOUNDED BY CONTRACT (jobs, per-job diagnostics and message length have stated ceilings, and what they drop is COUNTED rather than silently lost). Specified in doc/03-report.md.",
+      "properties": {
+        "protocolVersion": { "$ref": "#/$defs/protocolVersion" },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The session this report synthesizes, so a consumer that wants the full detail knows exactly which session directory to open."
+        },
+        "startTime": { "type": "string", "minLength": 1, "description": "RFC 3339 timestamp of the run's start." },
+        "endTime": {
+          "type": "string",
+          "minLength": 1,
+          "description": "RFC 3339 timestamp of the run's end. Required: a report is written from a SETTLED run, so an unfinished one has no report rather than a report missing its end."
+        },
+        "origin": {
+          "type": "string",
+          "enum": ["cli", "mcp"],
+          "description": "Which surface drove the run. Not cosmetic: an MCP run is an agent's, and a consumer aggregating build economics over time has to keep agent traffic apart from a human's or CI's rather than average them together."
+        },
+        "enforceCoverage": {
+          "type": "boolean",
+          "description": "Whether a configured coverage-threshold could fail this run. Defaults to true; a run that passed --no-enforce-coverage still measures and still reports percentages, so this marks whether a green verdict actually means the thresholds held."
+        },
+        "git": { "$ref": "#/$defs/reportGit" },
+        "run": { "$ref": "#/$defs/reportRun" },
+        "commands": { "type": "array", "items": { "$ref": "#/$defs/reportCommand" } },
+        "jobs": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/reportJob" },
+          "description": "The per-job synthesis, bounded. Selection priority when the run has more tasks than the bound allows: failed first, then diagnostic-bearing, then coverage-bearing, then the longest wall."
+        },
+        "elidedJobs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many selected tasks the bound left out, so len(jobs) + elidedJobs equals run.counts.total and a reader can always tell a small run from a truncated one. It is positive only when jobs is FULL: otherwise a producer could ship one job, call the rest elided, and carry none of the information the bound was sized to allow."
+        },
+        "cache": { "$ref": "#/$defs/reportCache" },
+        "scheduler": { "$ref": "#/$defs/reportScheduler" }
+      }
+    }
+  }
+}

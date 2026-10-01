@@ -1,0 +1,283 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "tooling",
+  "features": [
+    {
+      "id": "tooling/project-scaffolding",
+      "type": "feature",
+      "name": "Project scaffolding",
+      "outcome": "A new project starts from a distributable template archive rather than a copied directory, and an extension that ships only agent content arrives the same way: both are packaged, versioned and published like any other artifact by one content packager, and `putnami projects create` or `putnami install` materializes them",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "manifest-selects-the-template",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-with-a-template-manifest-is-packaged",
+              "a-missing-manifest-fails-the-job-with-a-diagnostic",
+              "an-unparseable-manifest-fails-the-job-with-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "resolved-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-invocations-resolved-version-wins",
+              "the-workspace-version-is-used-when-there-is-no-resolved-one",
+              "stable-strips-the-pre-release-suffix",
+              "pre-release-stripping-is-exact",
+              "stable-strips-the-pre-release-suffix-for-a-content-only-extension"
+            ]
+          }
+        },
+        {
+          "id": "stamped-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-packaged-manifest-carries-the-archives-version",
+              "an-unwritable-stamp-fails-the-job",
+              "an-unparseable-manifest-is-never-stamped"
+            ]
+          }
+        },
+        {
+          "id": "archive-contents",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-side-declarations-are-excluded-from-the-archive",
+              "the-archive-carries-the-manifest-and-every-template-file"
+            ]
+          }
+        },
+        {
+          "id": "dry-run-produces-nothing",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dry-run-creates-no-archive-and-no-metadata"
+            ]
+          }
+        },
+        {
+          "id": "source-selects-the-content-form",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-project-selects-its-packager-and-declaring-both-fails"
+            ]
+          }
+        },
+        {
+          "id": "content-only-extension-packaging",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-content-only-extension-is-written-once-per-platform-key-with-identical-bytes",
+              "an-extension-that-runs-something-is-left-to-its-language-extension",
+              "the-contributor-extension-packages-through-the-package-job",
+              "the-archive-keys-are-the-sdk-distribution-matrix",
+              "a-declared-policy-violation-fails-the-job",
+              "the-file-key-encodes-the-extension-name-the-registry-uses"
+            ]
+          }
+        },
+        {
+          "id": "shared-metadata-index",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-sibling-packagers-record-in-its-own-directory-survives",
+              "the-packager-owns-the-archive-publication-manifest"
+            ]
+          }
+        },
+        {
+          "id": "declared-output-ownership",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-task-is-the-sole-owner-of-the-archives-directory",
+              "the-manifest-passes-the-protocol-validation-the-cli-applies",
+              "every-task-carries-a-v3-declaration"
+            ]
+          }
+        },
+        {
+          "id": "no-source-mutation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "no-task-declares-or-performs-a-source-mutation",
+              "the-staging-directory-is-removed-before-the-task-returns"
+            ]
+          }
+        },
+        {
+          "id": "committed-template-validity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-committed-template-manifest-parses-and-validates",
+              "each-sibling-putnami-json-declares-the-template-contract"
+            ]
+          }
+        },
+        {
+          "id": "placeholders-are-substituted",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-placeholder-appears-only-in-a-file-the-engine-substitutes-into"
+            ]
+          }
+        },
+        {
+          "id": "rendered-manifests-parse",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-json-template-renders-to-valid-json"
+            ]
+          }
+        },
+        {
+          "id": "declared-extension-activates",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-rendered-putnami-json-declares-the-manifests-extension"
+            ]
+          }
+        },
+        {
+          "id": "servable-applications",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-application-template-declares-and-ships-its-serve-export"
+            ]
+          }
+        },
+        {
+          "id": "generated-imports-are-declared",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-application-template-declares-the-bundled-serve-imports"
+            ]
+          }
+        },
+        {
+          "id": "go-imports-are-required",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-go-template-requires-every-putnami-module-it-imports"
+            ]
+          }
+        },
+        {
+          "id": "go-mod-survives-tidy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-go-template-writes-no-toolchain-line-tidy-drops"
+            ]
+          }
+        },
+        {
+          "id": "templates-ship-a-readme",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-template-renders-a-readme-whose-links-resolve"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

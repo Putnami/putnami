@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "lint": {
+      "run": [{ "id": "fix", "task": "lint-fix" }]
+    }
+  },
+  "tasks": {
+    "lint-fix": {
+      "kind": "command",
+      "command": "echo",
+      "reads": ["sources"],
+      "cache": { "enabled": true, "noOutput": true },
+      "declares": {
+        "mutatesSources": true
+      }
+    }
+  }
+}

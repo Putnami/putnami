@@ -1,0 +1,625 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities-v2.json",
+  "protocolVersion": 2,
+  "project": "putnami.dev",
+  "configDefinitions": [
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "config",
+        "key": "analytics"
+      },
+      "path": "analytics",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "name": "mode",
+          "type": "string"
+        },
+        {
+          "name": "datasource",
+          "type": "string"
+        },
+        {
+          "name": "schema",
+          "type": "string"
+        },
+        {
+          "name": "secret",
+          "type": "string",
+          "sensitive": true
+        },
+        {
+          "name": "serverPageViews",
+          "type": "bool"
+        },
+        {
+          "name": "respectGpc",
+          "type": "bool"
+        },
+        {
+          "name": "respectDnt",
+          "type": "bool"
+        },
+        {
+          "name": "countryHeader",
+          "type": "string"
+        },
+        {
+          "name": "trustedProxies",
+          "type": "array"
+        },
+        {
+          "name": "retentionRawDays",
+          "type": "int"
+        },
+        {
+          "name": "retentionAggregateDays",
+          "type": "int"
+        },
+        {
+          "name": "retentionMode",
+          "type": "string"
+        },
+        {
+          "name": "maxPathKeysPerDay",
+          "type": "int"
+        },
+        {
+          "name": "rateLimitPerMinute",
+          "type": "int"
+        },
+        {
+          "name": "flushIntervalMs",
+          "type": "int"
+        },
+        {
+          "name": "flushWaitMs",
+          "type": "int"
+        },
+        {
+          "name": "queueCapacity",
+          "type": "int"
+        },
+        {
+          "name": "flushBatch",
+          "type": "int"
+        },
+        {
+          "name": "flushDeadlineMs",
+          "type": "int"
+        },
+        {
+          "name": "cookieName",
+          "type": "string"
+        },
+        {
+          "name": "cookieMaxAgeDays",
+          "type": "int"
+        }
+      ],
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "config",
+        "key": "app"
+      },
+      "path": "app",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "schemas": [
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "schema",
+        "subkind": "openapi",
+        "key": "openapi"
+      },
+      "name": "openapi",
+      "kind": "openapi",
+      "path": "schema/openapi.json",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": "schema/openapi.json"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "api-loader"
+      },
+      "name": "api-loader",
+      "kind": "route",
+      "path": ".gen/src/api/.api-application.gen.ts",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/src/api/.api-application.gen.ts"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "react-loader"
+      },
+      "name": "react-loader",
+      "kind": "route",
+      "path": ".gen/src/app/.react-application.gen.tsx",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/src/app/.react-application.gen.tsx"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "static-loader"
+      },
+      "name": "static-loader",
+      "kind": "route",
+      "path": ".gen/src/static/.static.gen.ts",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/src/static/.static.gen.ts"
+          }
+        ]
+      }
+    }
+  ],
+  "discoverers": [
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "discoverer",
+        "subkind": "config",
+        "key": "analytics"
+      },
+      "name": "analytics",
+      "kind": "config",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "discoverer",
+        "subkind": "config",
+        "key": "app"
+      },
+      "name": "app",
+      "kind": "config",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "discoverer",
+        "subkind": "source",
+        "key": "sql-loader"
+      },
+      "name": "sql-loader",
+      "kind": "source",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/src/.sql.gen.ts"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "discoverer",
+        "subkind": "source",
+        "key": "sql:putnami-analytics"
+      },
+      "name": "sql:putnami-analytics",
+      "kind": "source",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "migrations": [
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "migration",
+        "subkind": "sql",
+        "key": "putnami-analytics"
+      },
+      "name": "putnami-analytics",
+      "kind": "sql",
+      "datasource": "analytics",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "infraRequirements": [
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "infra",
+        "subkind": "database",
+        "key": "analytics"
+      },
+      "name": "analytics",
+      "kind": "database",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/migration",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "package",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/infra/migration.json"
+          }
+        ]
+      }
+    }
+  ],
+  "healthContributors": [
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "health",
+        "subkind": "health",
+        "key": "database"
+      },
+      "name": "database",
+      "probe": "health",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "packages": [
+    {
+      "identity": {
+        "ownerProject": "@putnami/migration",
+        "kind": "package",
+        "key": "@putnami/migration"
+      },
+      "package": "@putnami/migration",
+      "provenance": {
+        "project": "@putnami/migration",
+        "package": "@putnami/migration",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "package",
+        "key": "putnami.dev"
+      },
+      "package": "putnami.dev",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "domainAccess": [
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "domainAccess",
+        "subkind": "reference",
+        "key": "public-docs.application-runtime.v1"
+      },
+      "import": "public-docs.application-runtime.v1",
+      "mode": "reference",
+      "status": "active",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "domainAccess",
+        "subkind": "snapshot",
+        "key": "public-docs.go-framework-documentation.v1"
+      },
+      "import": "public-docs.go-framework-documentation.v1",
+      "mode": "snapshot",
+      "status": "active",
+      "transports": [
+        {
+          "role": "transport",
+          "kind": "file",
+          "contract": "putnami.documentation-tree.v1",
+          "availability": "active"
+        }
+      ],
+      "enforced": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "lateEvents": "ignore-older"
+      },
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "domainAccess",
+        "subkind": "snapshot",
+        "key": "public-docs.method-documentation.v1"
+      },
+      "import": "public-docs.method-documentation.v1",
+      "mode": "snapshot",
+      "status": "active",
+      "transports": [
+        {
+          "role": "transport",
+          "kind": "file",
+          "contract": "putnami.documentation-tree.v1",
+          "availability": "active"
+        }
+      ],
+      "enforced": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "lateEvents": "ignore-older"
+      },
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "domainAccess",
+        "subkind": "snapshot",
+        "key": "public-docs.python-surface-documentation.v1"
+      },
+      "import": "public-docs.python-surface-documentation.v1",
+      "mode": "snapshot",
+      "status": "active",
+      "transports": [
+        {
+          "role": "transport",
+          "kind": "file",
+          "contract": "putnami.documentation-tree.v1",
+          "availability": "active"
+        }
+      ],
+      "enforced": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "lateEvents": "ignore-older"
+      },
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "domainAccess",
+        "subkind": "snapshot",
+        "key": "public-docs.typescript-framework-documentation.v1"
+      },
+      "import": "public-docs.typescript-framework-documentation.v1",
+      "mode": "snapshot",
+      "status": "active",
+      "transports": [
+        {
+          "role": "transport",
+          "kind": "file",
+          "contract": "putnami.documentation-tree.v1",
+          "availability": "active"
+        }
+      ],
+      "enforced": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "lateEvents": "ignore-older"
+      },
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "domainAccess",
+        "subkind": "snapshot",
+        "key": "public-docs.workspace-documentation.v1"
+      },
+      "import": "public-docs.workspace-documentation.v1",
+      "mode": "snapshot",
+      "status": "active",
+      "transports": [
+        {
+          "role": "transport",
+          "kind": "file",
+          "contract": "putnami.documentation-tree.v1",
+          "availability": "active"
+        }
+      ],
+      "enforced": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "lateEvents": "ignore-older"
+      },
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ]
+}

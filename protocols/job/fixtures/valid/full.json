@@ -1,0 +1,35 @@
+{
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/typescript/framework/utils/build",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {"name": "putnami", "rootPath": "/ws", "version": "1.2.0"},
+  "project": {
+    "name": "@putnami/utils",
+    "path": "typescript/framework/utils",
+    "fullPath": "/ws/typescript/framework/utils",
+    "main": "src/index.ts",
+    "bin": "dist/cli.js",
+    "exports": {".": "./dist/index.js"},
+    "publish": ["npm"],
+    "options": {"build": {"minify": true}}
+  },
+  "selectedProjects": [
+    {
+      "id": "/typescript/framework/utils",
+      "name": "@putnami/utils",
+      "path": "typescript/framework/utils",
+      "fullPath": "/ws/typescript/framework/utils"
+    },
+    {
+      "id": "/typescript/framework/web",
+      "name": "@putnami/web",
+      "path": "typescript/framework/web",
+      "fullPath": "/ws/typescript/framework/web"
+    }
+  ],
+  "extension": {"name": "@putnami/typescript", "root": "/ws/typescript/extension"},
+  "job": {"name": "build"},
+  "params": {"minify": true, "coverage-threshold": "80", "coverageThreshold": "80"},
+  "filePatterns": ["src/**/*.ts"],
+  "version": {"base": "1.2.0", "full": "1.2.0-abc1234", "sha": "abc1234", "branch": "main", "isDirty": false, "tag": "", "suffix": "abc1234"}
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "tooling/specification-driven-development#architecture-adoption-policy",
+    "tooling/specification-driven-development#architecture-agent-context",
+    "tooling/specification-driven-development#authoring-never-grants-a-permission",
+    "tooling/specification-driven-development#codeowners-follow-declared-owners",
+    "tooling/specification-driven-development#declared-inputs-cover-the-read-set",
+    "tooling/specification-driven-development#every-document-has-working-links",
+    "tooling/specification-driven-development#one-engine-two-surfaces",
+    "tooling/specification-driven-development#opt-in-activation",
+    "tooling/specification-driven-development#predictable-spec-scaffolding",
+    "tooling/specification-driven-development#refuse-rather-than-widen",
+    "tooling/specification-driven-development#settled-decisions-are-enforced"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "accepted-200",
+  "request": { "id": "evt-outcome-1", "topic": "orders.created" },
+  "input": {
+    "http": {
+      "status": 200,
+      "headers": { "Content-Type": "application/json" },
+      "body": {
+        "protocol": "putnami.events.v1",
+        "id": "evt-outcome-1",
+        "topic": "orders.created",
+        "timestamp": "2026-07-22T08:00:00Z"
+      }
+    }
+  },
+  "expected": { "class": "accepted", "action": "complete" }
+}

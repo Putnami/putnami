@@ -1,0 +1,42 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/shared-datasource-pooling",
+  "outcomes": [
+    "A workload that owns several schemas of one physical database holds one connection pool for that database, so its idle backends and connection ceiling scale with databases, not with datasources",
+    "Every unqualified query a datasource issues resolves in that datasource's schema, whichever datasource last used the pooled connection",
+    "Advanced pgx access and the migration runner's database/sql handle stay bound to their datasource, so existing callers keep compiling and keep their search_path",
+    "Closing one datasource never interrupts another datasource of the same database"
+  ],
+  "nonGoals": [
+    "Sharing a pool across different connection identities (different host, database, user, or password)",
+    "Reconciling different pool tunings declared for one database by taking the largest",
+    "Guarding user code that issues a session-level SET search_path, RESET, or DISCARD ALL on a framework connection",
+    "Changing how transactions are keyed: WithTx and UnitOfWork stay keyed by the logical pool"
+  ],
+  "requirements": [
+    {
+      "id": "acquire-time-search-path",
+      "text": "The physical pool carries no search_path startup parameter; before a connection is handed out, the hook compares the acquiring datasource's request with the connection's marker, issues nothing when equal, one session-level set_config when it differs, RESET for an empty request over a set marker, destroys the connection when the set fails, and fails an acquire that carries no request."
+    },
+    {
+      "id": "datasource-bound-acquire",
+      "text": "Every acquire through a logical pool, its PGXPool view, Pool.Acquire, and the database/sql connector marks the context with that datasource's search_path; the raw shared pgxpool is never handed to callers."
+    },
+    {
+      "id": "one-pool-per-physical-database",
+      "text": "Physical pools are keyed by the rendered DSN of each datasource's effective configuration, never by datasource name: byte-identical identities share one physical pool, distinct identities open distinct pools, and concurrent first opens of one identity connect once."
+    },
+    {
+      "id": "shared-pool-lifetime",
+      "text": "Logical pools hold references on their physical pool: closing one datasource leaves the shared pool open for the others, closing the last handle closes it, and the registry's Close is idempotent with a later For re-opening."
+    },
+    {
+      "id": "tuning-agreement",
+      "text": "Datasources that resolve to one physical pool must declare the same MaxConns, MinConns, MaxConnLifetime, MaxConnIdleTime, HealthCheckPeriod, StatementTimeout, IdentityResolver, and TokenFetcher; a difference is a db.datasource declaration error naming both datasources and each differing field, never a larger ceiling or a second pool."
+    }
+  ],
+  "decisions": [
+    "go/framework/database/doc/adr/0003-shared-physical-pool-per-database.md"
+  ]
+}

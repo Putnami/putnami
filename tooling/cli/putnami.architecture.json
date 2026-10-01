@@ -1,0 +1,609 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "cli",
+  "owner": "cli",
+  "projects": [
+    "/tooling/cli",
+    "/tooling/cli-documents",
+    "/tooling/cli-model"
+  ],
+  "owns": [
+    {
+      "id": "cli.workspace-documentation",
+      "kind": "fact",
+      "description": "The authored workspace, CLI, jobs, extensions, and templates documentation tree under /tooling/doc. This domain decides what that reference says; a site that publishes it copies the tree and never edits it."
+    },
+    {
+      "id": "cli.workspace-engine",
+      "kind": "model",
+      "description": "Workspace resolution, the job planner and scheduler, caching, and the command dispatcher. Internal packages are not a consumable surface; other domains integrate through wire contracts only."
+    }
+  ],
+  "exports": [
+    {
+      "id": "cli.workspace-documentation.v1",
+      "version": 1,
+      "status": "active",
+      "description": "The authored workspace and CLI documentation tree (/tooling/doc): the markdown a publisher copies verbatim, addressed by a deterministic digest over its sorted (relative path, content digest) pairs. The carrier contract is putnami.documentation-tree.v1.",
+      "facts": [
+        {
+          "name": "workspace_documentation",
+          "authority": "cli",
+          "classification": "public",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "snapshot"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    }
+  ],
+  "imports": [
+    {
+      "id": "cli.extension-runtime.v1",
+      "version": 1,
+      "from": {
+        "domain": "extension-sdk",
+        "export": "extension-sdk.extension-runtime.v1"
+      },
+      "as": "cli.extension-runtime",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "extension_runtime_api"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/tooling/extension-sdk"
+        }
+      ],
+      "justification": "The CLI and the extensions share one implementation of every contract both sides read or write, so the orchestrator and the extension that produced a document never disagree on it: release sets and package metadata (releaseset, pkgmeta), channel credentials (registrycred, privatebroker), recorded results, agent artifacts, context, profiles, architecture declarations, JSONL events, OCI and Docker publication, the compose test database (dbtestenv), and the source-v1 record of one worktree path (sourcebinding). A few packages are shared platform primitives instead: filelock, the one cross-process lock every Putnami process takes on the same files; scratch, the reclaimable scratch directory both sides create; proctree, which starts and stops a process tree the same way on every OS; dirlink, the directory link (a symbolic link on Unix, a junction on Windows); treearchive, which stages a tree and packs it into a reproducible .tar.gz without starting a process; envkeys, the environment-name rule (case-insensitive on Windows); and ownerperm, which restricts a private file to its owner (an access list on Windows). None of them carries an extension's behavior."
+    },
+    {
+      "id": "cli.protocol-contracts.v1",
+      "version": 1,
+      "from": {
+        "domain": "protocols",
+        "export": "protocols.wire-contracts.v1"
+      },
+      "as": "cli.protocol-contracts",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "wire_contract_definitions"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/agentcontext"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/cache"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/ci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/clientcontract"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/collaboration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/config"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/contracts"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/doctor"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/http-routes"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/platform"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/qualify"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/runner"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/support"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/telemetry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/template"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/agentcontext"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/cache"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/ci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/config"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/contracts"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/doctor"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/clientcontract"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/collaboration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/http-routes"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/platform"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/qualify"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/runner"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/support"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/telemetry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/template"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/agentcontext"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/cache"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/ci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/config"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/contracts"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/doctor"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/support"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/telemetry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/template"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-model",
+          "producerProject": "/protocols/workspace"
+        }
+      ],
+      "justification": "The CLI reads and writes every Putnami wire document through the shared strict contract packages instead of a private parse, so one interpretation serves the CLI, extensions, and agents."
+    },
+    {
+      "id": "cli.usage-telemetry.v1",
+      "version": 1,
+      "from": {
+        "domain": "observability",
+        "export": "observability.usage-ingest.v1"
+      },
+      "as": "cli.usage-telemetry",
+      "mode": "command",
+      "status": "active",
+      "facts": [
+        "usage_ingest"
+      ],
+      "transport": {
+        "kind": "event",
+        "contract": "putnami.cli-usage.otlp-logs.v1",
+        "availability": "active"
+      },
+      "justification": "After the one-time notice, the CLI fire-and-forgets anonymous usage records to the observability ingest; the device id is anonymous and rotates monthly, no command arguments are sent, and a refused or unreachable ingest never fails a run."
+    },
+    {
+      "id": "cli.verification-observations.v1",
+      "version": 1,
+      "from": {
+        "domain": "extension-providers",
+        "export": "extension-providers.verification-observations.v1"
+      },
+      "as": "cli.spec-gate-observations",
+      "mode": "snapshot",
+      "status": "active",
+      "facts": [
+        "feature_verification_observations"
+      ],
+      "transport": {
+        "kind": "file",
+        "contract": "putnami.feature-verification.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "1h",
+        "onMissing": "fail-closed",
+        "onStale": "fail-closed",
+        "ordering": "none",
+        "sourceVersion": "session_id",
+        "idempotencyKey": "task_key",
+        "lateEvents": "reject"
+      },
+      "justification": "The executable-spec gate joins the criteria projection with the observation artifacts the language test jobs emitted in the SAME session, and — only for a group that join left unresolved — with the report a dependency's own test cache entry holds at the key the current inputs derive, read in place and never materialized. An observation whose provenance is not contained in the declaring project is dropped, restored or not. A requirement whose checks a consulted source did not report is sanctioned; one for which no source existed in this run's scope at all is reported unobserved and warned. Neither path ever infers support."
+    },
+    {
+      "id": "cli.workspace-probe-view.v1",
+      "version": 1,
+      "from": {
+        "domain": "extension-providers",
+        "export": "extension-providers.probe-answers.v1"
+      },
+      "as": "cli.workspace-index",
+      "mode": "projection",
+      "status": "active",
+      "facts": [
+        "dependency_edges",
+        "project_identity"
+      ],
+      "bootstrap": {
+        "kind": "in-process",
+        "contract": "putnami.workspace-probe.v1",
+        "availability": "active"
+      },
+      "updates": {
+        "kind": "in-process",
+        "contract": "putnami.workspace-probe.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "24h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "sourceVersion": "probe_digest",
+        "idempotencyKey": "identity_digest",
+        "lateEvents": "ignore-older"
+      },
+      "deletion": {
+        "strategy": "not-applicable"
+      },
+      "localModel": {
+        "name": "cli.workspace-index",
+        "kind": "projection",
+        "sourceIdentity": "project_identity",
+        "projectedFields": [
+          "dependency_edges",
+          "project_identity"
+        ],
+        "provenanceField": "probe_digest",
+        "observedAtField": "observed_at",
+        "freshnessField": "freshness_state",
+        "writer": "cli.workspace-loader",
+        "rebuildable": true,
+        "rebuild": "bootstrap"
+      },
+      "justification": "The recorded workspace index (.putnami/workspace-index.json) lets read-only commands and MCP tools answer without paying a probe. It carries the declared provenance, observation time and freshness fields, and the graph surfaces act on them: an absent copy fails closed with the command that rebuilds it, and a copy past the freshness bound is answered from and marked stale."
+    }
+  ]
+}

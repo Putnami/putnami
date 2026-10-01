@@ -1,0 +1,17 @@
+{
+  "name": "ambiguous-unstructured-502",
+  "request": { "id": "evt-outcome-1", "topic": "orders.created" },
+  "input": {
+    "http": {
+      "status": 502,
+      "headers": { "Content-Type": "text/plain" },
+      "body": "Bad Gateway"
+    }
+  },
+  "expected": {
+    "class": "ambiguous",
+    "action": "retry",
+    "sameRoute": true,
+    "sameRequestBytes": true
+  }
+}

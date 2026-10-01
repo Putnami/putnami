@@ -1,0 +1,28 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/service-clients#binary-payloads",
+    "typescript/service-clients#bounded-latency",
+    "typescript/service-clients#cancellation",
+    "typescript/service-clients#canonical-generated-manifest",
+    "typescript/service-clients#circuit-isolation",
+    "typescript/service-clients#connect-transport",
+    "typescript/service-clients#credential-audience",
+    "typescript/service-clients#credential-registry",
+    "typescript/service-clients#declared-error-safety",
+    "typescript/service-clients#declared-stream-resume",
+    "typescript/service-clients#declared-transport-preference",
+    "typescript/service-clients#generated-parity",
+    "typescript/service-clients#resilience-telemetry",
+    "typescript/service-clients#resource-release",
+    "typescript/service-clients#retry-cap",
+    "typescript/service-clients#retry-scope",
+    "typescript/service-clients#stream-call-telemetry",
+    "typescript/service-clients#stream-session-lifecycle",
+    "typescript/service-clients#strict-generation",
+    "typescript/service-clients#transport-safety",
+    "typescript/service-clients#websocket-stream-emission",
+    "typescript/service-clients#websocket-streams"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "client-contract/first-party-generated-clients#generated-inventory",
+    "client-contract/first-party-generated-clients#strict-provider-authority",
+    "client-contract/first-party-generated-clients#websocket-state-machine"
+  ]
+}

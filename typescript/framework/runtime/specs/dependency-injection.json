@@ -1,0 +1,47 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/dependency-injection",
+  "outcomes": [
+    "A workload declares its services once and resolves them from one container tree that spans the application and its modules",
+    "A broken dependency graph fails while the application is being composed, not on the first request that needs it",
+    "Request-scoped state is isolated per scope while shared state stays shared",
+    "Shutdown disposes every constructed instance after the consumers that depend on it"
+  ],
+  "nonGoals": [
+    "Deriving providers from decorators, reflection metadata, or type inference",
+    "Hot-swapping a provider in a started container outside the explicit fork and refresh surfaces",
+    "Promising that a pre-1.0 minor release keeps the previous injection contract"
+  ],
+  "requirements": [
+    {
+      "id": "graph-validation",
+      "text": "Starting a container context validates the whole registered graph first: an unresolvable dependency, a dependency cycle, or an unmet module requirement fails before any instance is constructed."
+    },
+    {
+      "id": "singleton-identity",
+      "text": "A singleton provider is constructed at most once per container, including when several asynchronous resolutions of the same token overlap."
+    },
+    {
+      "id": "scope-isolation",
+      "text": "A scoped provider is constructed once per scope, is the same instance for every resolution inside that scope, and is never shared with another scope, including concurrent ones."
+    },
+    {
+      "id": "private-visibility",
+      "text": "A provider registered as private resolves only inside the container that declared it and is not reachable from a parent or sibling container."
+    },
+    {
+      "id": "disposal-order",
+      "text": "Closing a context runs onClose hooks in reverse construction order, and resolving a token after close fails instead of returning a disposed instance."
+    },
+    {
+      "id": "one-shot-lifecycle",
+      "text": "A context starts once and closes once: starting twice, closing before start, and resolving before start each raise a named error."
+    },
+    {
+      "id": "root-surface",
+      "text": "The package root exports only the stable injection surface; test doubles are reachable from the testing subpath and container escape hatches from the inject subpath."
+    }
+  ],
+  "decisions": ["typescript/framework/runtime/doc/adr/0001-lifetimes-and-visibility-are-composition-time-decisions.md"]
+}

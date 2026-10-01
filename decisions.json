@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decisions.json",
+  "protocolVersion": 1,
+  "decisions": [
+    {
+      "id": "D-001",
+      "statement": "serverless workloads scale to zero when idle",
+      "settled": "2026-09-03",
+      "settledBy": "fdumay",
+      "adr": "protocols/infra/doc/adr/0003-deployers-own-runtime-cost-policy.md",
+      "check": {
+        "kind": "json-value",
+        "files": [
+          "**/infra/requirements.json"
+        ],
+        "pointer": "/scaling/minInstances",
+        "rule": "equals",
+        "value": 0,
+        "whenMissing": "satisfied"
+      }
+    },
+    {
+      "id": "D-002",
+      "statement": "every pull request names what it deletes",
+      "settled": "2026-09-03",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-003",
+      "statement": "every GitHub artifact, code comment and document is written in English",
+      "settled": "2026-09-11",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    }
+  ]
+}

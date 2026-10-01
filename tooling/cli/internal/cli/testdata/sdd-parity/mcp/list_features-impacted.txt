@@ -1,0 +1,23 @@
+isError false
+--- block 0 ---
+{
+  "compatibility": "provisional",
+  "revision": {
+    "kind": "worktree",
+    "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08"
+  },
+  "selection": {
+    "mode": "impacted",
+    "scoped": true,
+    "baseline": "main",
+    "baselineSource": "local-trunk",
+    "projects": [],
+    "emptyImpact": true,
+    "features": 0,
+    "specs": 0,
+    "externalRecords": []
+  },
+  "graphs": 0,
+  "manifests": 0,
+  "features": []
+}

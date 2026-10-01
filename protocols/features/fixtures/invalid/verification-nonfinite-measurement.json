@@ -1,0 +1,13 @@
+{
+  "protocolVersion": 1,
+  "observations": [
+    {
+      "feature": "billing/invoice-export",
+      "requirement": "export-latency",
+      "check": "export-benchmark",
+      "measurement": { "name": "export.duration", "aggregation": "p95", "value": 1e400, "unit": "ms" },
+      "window": { "start": "2026-08-18T09:59:00Z", "end": "2026-08-18T10:00:00Z" },
+      "provenance": { "path": "export_test.go" }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "protocol": "putnami.events.v1",
+  "suite": "putnami.events.conformance.v1",
+  "target": {
+    "discoveryPath": "/.well-known/putnami/events",
+    "grpcService": "putnami.events.v1.EventServer"
+  },
+  "cases": [
+    {
+      "id": "case.bad-transport",
+      "level": "required",
+      "transport": "carrier-pigeon",
+      "steps": ["deliver by bird"],
+      "expect": ["never arrives"]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "waivers": [
+    {
+      "finding": "architecture.undeclared_project_dependency:project-dependency:observability:runtime:%2Fobservability%2Fapi:%2Fruntime%2Flib",
+      "owner": "observability"
+    }
+  ]
+}

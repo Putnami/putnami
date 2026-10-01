@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "serve": {
+      "run": [{ "id": "serve", "task": "serve-app" }]
+    }
+  },
+  "tasks": {
+    "serve-app": {
+      "kind": "command",
+      "command": "echo",
+      "declares": {
+        "effects": ["process"]
+      }
+    }
+  }
+}

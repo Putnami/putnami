@@ -1,0 +1,4 @@
+{
+  "tasks": {"provider": "@putnami/local-collaboration", "version": 1},
+  "tasks": {"provider": "@acme/github", "version": 1}
+}

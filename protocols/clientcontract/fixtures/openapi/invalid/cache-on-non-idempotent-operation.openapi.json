@@ -1,0 +1,25 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "invalid", "version": "1" },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": { "id": "invalid", "audience": "urn:invalid" },
+    "credentials": {}
+  },
+  "paths": {
+    "/orders": {
+      "post": {
+        "operationId": "createOrder",
+        "responses": { "204": { "description": "empty" } },
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [{ "protocol": "rest-json", "path": "/orders", "encoding": "json" }],
+          "security": { "alternatives": [{ "allOf": [] }] },
+          "errors": [],
+          "idempotency": { "kind": "non-idempotent" },
+          "resilience": { "cache": { "freshMs": 5000 } }
+        }
+      }
+    }
+  }
+}

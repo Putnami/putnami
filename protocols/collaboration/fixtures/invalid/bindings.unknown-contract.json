@@ -1,0 +1,6 @@
+{
+  "issues": {
+    "provider": "@acme/github",
+    "version": 1
+  }
+}

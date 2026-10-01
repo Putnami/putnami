@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/distribution-release-set-publish-outcome-v2.json",
+  "title": "Putnami Distribution Release Set Publish Outcome v2",
+  "description": "The sole successful publish payload carried under data.releaseSet by the runtime result event: the immutable set the publication stored, and the head of every channel it advanced.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocolVersion",
+    "namespace",
+    "ref",
+    "channels"
+  ],
+  "properties": {
+    "protocolVersion": {
+      "type": "integer",
+      "const": 2
+    },
+    "namespace": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "ref": {
+      "$ref": "#/$defs/ref"
+    },
+    "channels": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 16,
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/channelHead"
+      }
+    }
+  },
+  "$defs": {
+    "ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "digest"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^rs_[0-9a-f]{64}$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "channelHead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "generation"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The monotone counter of accepted moves on this channel."
+        }
+      }
+    }
+  }
+}

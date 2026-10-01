@@ -1,0 +1,25 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "databases": [
+    {
+      "name": "analytics",
+      "engine": "postgres",
+      "schemas": [
+        "events",
+        "reporting"
+      ]
+    },
+    {
+      "name": "cache",
+      "engine": "postgres"
+    },
+    {
+      "name": "primary",
+      "engine": "postgres",
+      "schemas": [
+        "iam"
+      ]
+    }
+  ]
+}

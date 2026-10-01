@@ -1,0 +1,51 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/contributor-workflows",
+  "outcomes": [
+    "A workspace installs one contributor offering and receives every contributor workflow, worker profile and helper at the version of that one extension",
+    "Contributor workflows reach tasks, proposals and memory through the providers the workspace binds, so a backend changes without a skill edit",
+    "A repository states its labels, states, worker profiles, language rule and publication defaults once, in its own configuration",
+    "Existing entry points keep working through named, deprecated aliases until their announced removal"
+  ],
+  "nonGoals": [
+    "Choosing a tasks, proposals or memory provider for the workspace, or falling back to another one",
+    "Authorizing publication, merge or deployment: the mandate and the repository's controls still decide",
+    "Changing host permissions, credentials or model access, which stay with the workspace and the host",
+    "Moving the audit workflow and its workers, which stay hand-authored until their owner ships them as a contribution",
+    "Migrating other workspaces' separate agentArtifacts declarations and pins"
+  ],
+  "requirements": [
+    {
+      "id": "one-contributor-extension",
+      "text": "One content-only extension, @putnami/contributor, ships the plan, execute, fix, epic, check, code-review, fix-loop and content-bump workflows, the four worker profiles, their references and helpers, rendered for Claude Code and Codex from one source. A workspace opts in with the agentArtifacts entry extension:@putnami/contributor; this repository declares nothing else, so its committed host trees are exactly what that extension builds."
+    },
+    {
+      "id": "explicit-only-invocation",
+      "text": "epic, fix-loop and content-bump never run on implicit selection: each declares it on both hosts, disable-model-invocation on Claude Code and allow_implicit_invocation false on Codex. Every other entry point stays implicitly available."
+    },
+    {
+      "id": "entry-point-aliases",
+      "text": "putnami-plan, putnami-change, putnami-check and putnami-review remain as deprecated aliases of plan, execute, check and code-review. Each names its canonical skill, keeps the local-only restriction of the entry point it replaces, and shares its canonical skill's invocation policy until the documented migration window ends."
+    },
+    {
+      "id": "provider-neutral-content",
+      "text": "No shipped file invokes a backend client, names a tracker label, a hosted repository address, a private memory identity or storage layout, or this repository's identity. Skills reach tasks, proposals and memory through putnami tasks, proposals or memory operations, or the matching MCP tools."
+    },
+    {
+      "id": "provider-neutral-publication",
+      "text": "The finalizer commits and pushes with Git, publishes with proposals upsert for the exact base and head, reads the proposal back with proposals status, which must carry every assignee and label the upsert answered with, and moves a named task with tasks transition. An unresolved write stops it without a retry and names the reconciling read; an unbound contract or an unknown task stops it before any write. The language rule reads open tasks through tasks find."
+    },
+    {
+      "id": "repository-policy",
+      "text": "Conventions live in options[\"@putnami/contributor\"] of putnami.workspace.json: backlog states, filters and ranking labels, claimed and delivered task states, worker profiles per tier, the language rule, publication defaults and optional integrations. Instructions name worker profiles, never models; the shipped profiles' host metadata carries the reference model mapping."
+    },
+    {
+      "id": "squash-ready-publication",
+      "text": "A proposal opens as a draft when work starts, carries no gate, and keeps one empty checkpoint the squash drops. Its title and body are the squash commit: the finalizer refuses a heading, a body over publication.bodyMaxBytes, and any title, body or commit that names an agent, and posts the verification record as a comment. On a machine loaded above verification.ciGate.load, the named hosted checks gate the change; a failing check returns the proposal to draft."
+    }
+  ],
+  "decisions": [
+    "tooling/contributor/doc/adr/0001-one-contributor-extension.md"
+  ]
+}

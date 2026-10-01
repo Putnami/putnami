@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/structured-logging",
+  "outcomes": [
+    "Application code emits one structured record to one or more interchangeable sinks",
+    "Request and event boundaries accumulate context fields without sharing mutable logger state",
+    "Trace and structured-error metadata remain machine-readable in JSON output",
+    "A panicking logged value cannot unwind the application call that attempted to log it"
+  ],
+  "nonGoals": [
+    "Shipping, retaining, or querying logs in a remote service",
+    "Guaranteeing that arbitrary caller-owned objects are safe to marshal",
+    "Promising cross-runtime parity beyond the cases covered by the logging conformance corpus"
+  ],
+  "requirements": [
+    {
+      "id": "failure-isolation",
+      "text": "Each sink write is panic-isolated so marshaling or formatting a hostile value cannot crash the logging caller."
+    },
+    {
+      "id": "field-precedence",
+      "text": "Context-aware records apply field precedence in the order logger context, request FieldBag, call-site attributes, then framework-reserved fields."
+    },
+    {
+      "id": "lifecycle",
+      "text": "Logger Flush and Close invoke every configured sink and return the first sink error they observe."
+    },
+    {
+      "id": "record",
+      "text": "Every emitted record carries level, message, timestamp, logger name, attributes, optional context, optional trace identity, and optional structured error information."
+    }
+  ],
+  "decisions": [
+    "go/framework/logger/doc/adr/0001-record-precedence-and-failure-isolation.md"
+  ]
+}

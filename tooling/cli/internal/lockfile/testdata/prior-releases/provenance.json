@@ -1,0 +1,60 @@
+{
+  "$comment": "Immutable prior-release lock artifacts. See README.md. Every field is checked by TestPriorReleaseFixturesAreImmutable; digests are SHA-256 of the file bytes.",
+  "fixtures": [
+    {
+      "file": "lock-v1-b64aa6880.json",
+      "formatVersion": 1,
+      "sourceCommit": "b64aa68809156e165320cabd7b962dd212d27ed2",
+      "sourcePath": "putnami.lock.json",
+      "committed": "2026-06-12",
+      "sha256": "367416e25ddcd8a10fffe0d271953a6b8908388bfabadd7365863485cf4608ab",
+      "why": "The oldest recoverable v1 shape: one extension pinned by a SINGLE scalar `integrity`, before per-platform `integrities` existed. It is the only fixture that proves the migration keeps a scalar-only entry's sole verification datum instead of dropping it with the legacy field."
+    },
+    {
+      "file": "lock-v1-f11103e15.json",
+      "formatVersion": 1,
+      "sourceCommit": "f11103e158359f5b7b35c4eb5864579e55714658",
+      "sourcePath": "putnami.lock.json",
+      "committed": "2026-06-18",
+      "sha256": "24b3c0069edbb88dbbfa2dc578823f9ec476f3fb726b96c3c9a0174e22950141",
+      "why": "The v1 shape at the release that introduced the CLI pin (LockFile.CLI). The extension entry carries BOTH the legacy scalar `integrity` and a one-platform `integrities` map, which is the pair the v2 canonical projection must resolve: map wins, scalar is dropped."
+    },
+    {
+      "file": "lock-v2-9155be22d.json",
+      "formatVersion": 2,
+      "sourceCommit": "9155be22dbfa4ae0aaecabe1265ebf707109732d",
+      "sourcePath": "putnami.lock.json",
+      "committed": "2026-07-29",
+      "sha256": "0d88ca8dfaca7ee42c3d238c2088ba908ed60b42efc75cbb7bb67fa04d54fbae",
+      "why": "The first lock this repository ever committed at v2 — the require-v3 cutover that made v2 the read floor. Its extension entry records NO taskContract, which is the state `putnami migrate vnext` reports as drift rather than guessing at."
+    },
+    {
+      "file": "lock-v2-7f9f08e25.json",
+      "formatVersion": 2,
+      "sourceCommit": "7f9f08e251dc9a128cf20ae5197c4733df8cec45",
+      "sourcePath": "putnami.lock.json",
+      "committed": "2026-07-30",
+      "sha256": "2c5fcfba9d2ac109c44adbb76be2a8022c9ab5b43fff879ece93a0ada0af0b18",
+      "why": "A fully populated v2: `taskContract: 3` recorded plus two real per-platform archive digests. It is the fixture that proves a v2→v4 migration carries every platform's digest, not just the one the migrating machine runs."
+    },
+    {
+      "file": "lock-v3-fb2f6edfb.json",
+      "formatVersion": 3,
+      "sourceCommit": "fb2f6edfb2f02b66fb6c5b239043635275bcf4ec",
+      "sourcePath": "putnami.lock.json",
+      "committed": "2026-08-01",
+      "sha256": "da4cf2295b198867c886bcfc6a33eb552085618231c6da13d96dbbeda205cd5e",
+      "why": "The first v3 lock: it adds the `toolchains` dimension with six per-platform Go release digests. Six digests in one entry is what makes a lossy migration visible — a projection that rebuilt the map from the running platform would drop five of them."
+    }
+  ],
+  "gaps": [
+    {
+      "shape": "lock format v4",
+      "reason": "v4 shipped in a later release but this workspace's committed lock is still v3, so no v4 artifact exists to recover. v4 is covered as the OUTPUT of MigrateLockFileToCurrent, which is the only way a v4 lock is produced from an older one."
+    },
+    {
+      "shape": "a lock carrying a `cli` pin",
+      "reason": "No lock committed to this repository has ever pinned the CLI (`putnami pin` writes one, but this workspace builds the CLI from source). The per-platform `cli.integrities` preservation is therefore proven against the in-package `v1Golden`, which is labelled synthetic where it is used."
+    }
+  ]
+}

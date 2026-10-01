@@ -1,0 +1,5 @@
+name: fix-light
+description: Implementation worker for the /fix skill, light tier — mechanical fixes fully prescribed in the task (docs, config values, renames, test-only, log wording). Use only when the /fix skill delegates a task; not for general delegation.
+tools: Bash, Read, Grep, Glob, Edit, Write, TodoWrite, ToolSearch, mcp__putnami__putnami_search, mcp__putnami__putnami_symbol, mcp__putnami__putnami_context, mcp__putnami__list_projects, mcp__putnami__describe_project, mcp__putnami__find_owner
+model: sonnet
+effort: medium

@@ -1,0 +1,6 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-storage-binding.json",
+  "protocolVersion": 1,
+  "name": "uploads",
+  "backend": "gcs"
+}

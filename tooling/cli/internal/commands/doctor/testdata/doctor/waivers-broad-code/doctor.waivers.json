@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "waivers": [
+    {
+      "code": "doctor.missing_required_config",
+      "project": "/app",
+      "owner": "platform-team",
+      "reason": "field-less waiver deliberately accepts every missing-config finding in this project",
+      "expires": "2099-01-01"
+    }
+  ]
+}

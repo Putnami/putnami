@@ -1,0 +1,19 @@
+{
+  "resourceLogs": [
+    {
+      "resource": { "attributes": [] },
+      "scopeLogs": [
+        {
+          "scope": { "name": "putnami" },
+          "logRecords": [
+            {
+              "timeUnixNano": "1700000000000000000",
+              "severityNumber": 9,
+              "body": { "stringValue": "x", "intValue": "1" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

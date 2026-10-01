@@ -1,0 +1,139 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "Google Cloud Storage JSON and XML APIs (cloud.google.com/storage/docs/apis)",
+      "adapter": "go/framework/storage/gcs.go",
+      "callsites": [
+        {
+          "path": "go/framework/storage/gcs.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "1bfe64c9ed1cb7a8061d6045583eefeab3cb6b3a3882a268525d3d84ee0968bc"
+        },
+        {
+          "path": "go/framework/storage/gcs.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "27a844106b4355df52bd7ccfcf1bac6a112220c95634b3f39d6f6bfd31d448e6"
+        },
+        {
+          "path": "go/framework/storage/gcs.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "6c88270c8b5853e71dc1f142ecdd84bac187498a0adec2852f8e762377264621"
+        },
+        {
+          "path": "go/framework/storage/gcs.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "c38294783f5dd640d8847ca595b290b444430ddf958e55ad559bd4f6b5b7e9e0"
+        },
+        {
+          "path": "go/framework/storage/gcs.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "c397f4f770794384960134443cd374a32b766696d531b2cf0599e8a8ed068b84"
+        },
+        {
+          "path": "go/framework/storage/gcs.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "e8212ee36a2a0b02607f0a68c07715f79fb98501046fb03f97609e45e289043a"
+        }
+      ],
+      "owner": "go.putnami.dev/storage",
+      "tests": [
+        "go/framework/storage/gcs_test.go"
+      ],
+      "reason": "Object put, get, head, list, copy and delete against the Google Cloud Storage API."
+    },
+    {
+      "authority": "Google OAuth 2.0 service-account flow and GCE metadata server (developers.google.com/identity/protocols/oauth2/service-account)",
+      "adapter": "go/framework/storage/gcs_auth.go",
+      "callsites": [
+        {
+          "path": "go/framework/storage/gcs_auth.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "a9fec02c04dc0954efcdb1b273b380417eb4634eeb1ce05b0e9e1890d45be284"
+        },
+        {
+          "path": "go/framework/storage/gcs_auth.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "ccc41d7d839e82e1e7b9e485a45abeb9f18d9d3036a11fc6bce4ffa36e094801"
+        }
+      ],
+      "owner": "go.putnami.dev/storage",
+      "tests": [
+        "go/framework/storage/gcs_auth_test.go"
+      ],
+      "reason": "Mints the access token the Google Cloud Storage adapter presents, from a service-account key or the metadata server."
+    },
+    {
+      "authority": "Google IAM Credentials API v1 signBlob (cloud.google.com/iam/docs/reference/credentials/rest)",
+      "adapter": "go/framework/storage/gcs_sign.go",
+      "callsites": [
+        {
+          "path": "go/framework/storage/gcs_sign.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "260a9cd1ddba1c335a878128c47fd87a3d9e9a828fbe6c95ef5cb4530b04923f"
+        },
+        {
+          "path": "go/framework/storage/gcs_sign.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "c91820f3bd209a610b91a575459d760ce1e5b2e629a08598e6eae227d3588e1f"
+        }
+      ],
+      "owner": "go.putnami.dev/storage",
+      "tests": [
+        "go/framework/storage/gcs_test.go"
+      ],
+      "reason": "Signs V4 signed URLs through the IAM Credentials API when no private key is available locally."
+    },
+    {
+      "authority": "Amazon S3 REST API with SigV4 (docs.aws.amazon.com/AmazonS3/latest/API)",
+      "adapter": "go/framework/storage/s3.go",
+      "callsites": [
+        {
+          "path": "go/framework/storage/s3.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "192206eb9bbe8fa2f01155f49753b130fbf86e51ac9477058dbfd451f348d665"
+        },
+        {
+          "path": "go/framework/storage/s3.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "6c88270c8b5853e71dc1f142ecdd84bac187498a0adec2852f8e762377264621"
+        },
+        {
+          "path": "go/framework/storage/s3.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "77b25287e06033a1aa0bddbb7b7858ca978355f8b4a70b683c41f828429cab16"
+        },
+        {
+          "path": "go/framework/storage/s3.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "c2562d4b04f8ebdaadc360f078e4dbdf8a90f00b4ebc513f16d3abce3312f523"
+        },
+        {
+          "path": "go/framework/storage/s3.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "fab06450379b3dd55d56294b08c646c6229a01c09535b75cbac3048f3ae8749b"
+        }
+      ],
+      "owner": "go.putnami.dev/storage",
+      "tests": [
+        "go/framework/storage/s3_test.go"
+      ],
+      "reason": "Object put, get, head, list, copy and delete against an S3 or S3-compatible endpoint."
+    }
+  ]
+}

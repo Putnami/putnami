@@ -1,0 +1,698 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/go-project-toolchain",
+      "type": "feature",
+      "name": "Go project toolchain",
+      "outcome": "A Go project builds, tests, lints, serves, runs and packages through one managed toolchain that discovers Go projects itself, keeps the workspace module graph resolvable, and publishes the contracts the project's own code declares",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "archive-matrix-honesty",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-archive-missing-a-declared-executable-is-refused",
+              "an-archive-stages-exactly-the-declared-platform-matrix",
+              "an-archive-whose-prepared-runtime-is-missing-is-refused",
+              "each-declared-executable-ships-beside-the-runtime",
+              "each-declared-platform-carries-its-own-runtime",
+              "the-release-target-set-defaults-to-the-archive-matrix"
+            ]
+          }
+        },
+        {
+          "id": "archive-agent-content",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "content-the-archive-cannot-bind-fails-packaging",
+              "every-platform-archive-carries-the-same-bound-content",
+              "only-a-manifest-with-agent-content-is-stamped-the-additive-contract"
+            ]
+          }
+        },
+        {
+          "id": "bounded-test-output",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-default-outcome-summary-is-deterministic",
+              "the-complete-transcript-is-retained-as-session-detail",
+              "failure-diagnostics-are-bounded-with-explicit-omission-accounting",
+              "bounding-keeps-the-selected-early-failure-block",
+              "test-verbose-changes-visibility-without-changing-result-data",
+              "a-large-successful-transcript-line-survives-the-split"
+            ]
+          }
+        },
+        {
+          "id": "declared-compile-matrix",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-ordinary-build-compiles-for-the-host-only",
+              "ordinary-build-never-schedules-the-cross-compile-task",
+              "a-declared-platform-matrix-opts-into-cross-compilation",
+              "a-requested-target-partitions-the-output-tree",
+              "the-package-channel-being-produced-scopes-the-targets",
+              "a-declared-matrix-never-widens-beyond-what-was-declared",
+              "a-malformed-platform-request-is-an-error",
+              "an-undecodable-platforms-parameter-is-an-error"
+            ]
+          }
+        },
+        {
+          "id": "explicit-entrypoint",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-root-main-package-is-selected-automatically",
+              "a-single-cmd-subdirectory-is-selected-automatically",
+              "a-configured-entrypoint-overrides-the-automatic-choice",
+              "an-ambiguous-cmd-layout-is-an-error-rather-than-a-guess",
+              "an-unreadable-configuration-falls-back-to-the-documented-default",
+              "an-absent-configuration-falls-back-to-the-documented-default",
+              "describe-uses-its-own-explicit-entrypoint-option",
+              "describe-falls-back-to-the-build-entrypoint",
+              "describe-rejects-an-ambiguous-cmd-layout"
+            ]
+          }
+        },
+        {
+          "id": "generation-opt-out",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-that-opts-out-still-gets-the-build-only-gen-copy",
+              "opting-out-suppresses-the-committed-copy",
+              "opting-out-without-a-describe-phase-is-refused",
+              "collect-skips-the-commit-for-an-opted-out-project"
+            ]
+          }
+        },
+        {
+          "id": "generation-path-safety",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-generator-writing-outside-the-project-root-is-rejected"
+            ]
+          }
+        },
+        {
+          "id": "go-ecosystem-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "probe-declares-go-and-oci-members",
+              "probe-declares-image-member-without-go-module"
+            ]
+          }
+        },
+        {
+          "id": "lint-batch-equivalence",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "batched-staticcheck-diagnostics-match-a-solo-run",
+              "a-batched-golangci-run-splits-by-config-and-attributes-each-finding",
+              "a-batched-staticcheck-run-groups-one-go-work-root-and-attributes-each-finding",
+              "a-finding-is-charged-to-the-longest-matching-project-root",
+              "projects-from-distinct-go-work-roots-are-never-grouped-together",
+              "an-unattributable-batch-failure-fails-closed"
+            ]
+          }
+        },
+        {
+          "id": "managed-toolchain",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-requirement-comes-from-go-work-before-the-project-go-mod",
+              "an-absent-go-work-requirement-falls-back-to-the-project-go-mod",
+              "a-child-go-invocation-runs-against-the-managed-toolchain",
+              "a-child-go-invocation-runs-against-the-managed-caches",
+              "explicit-credential-and-proxy-settings-are-preserved",
+              "the-proxy-chain-never-leads-with-the-module-origin",
+              "an-inherited-origin-leading-proxy-chain-is-repaired",
+              "caller-supplied-proxy-routing-is-left-intact"
+            ]
+          }
+        },
+        {
+          "id": "member-event-per-publication",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "conflict-with-equal-digest-is-a-reuse",
+              "private-loopback-broker-carries-the-publication"
+            ]
+          }
+        },
+        {
+          "id": "merged-config-survives-a-cache-hit",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dependency-config-change-is-a-cache-key-input-of-config-merge",
+              "both-config-merge-tasks-declare-the-merged-file-inside-the-ceded-gen-conf",
+              "build-generate-cedes-gen-conf-to-the-config-merge-tasks",
+              "config-merge-reports-its-merged-file-project-relative-on-success",
+              "config-merge-reports-no-merged-file-on-skip"
+            ]
+          }
+        },
+        {
+          "id": "modfile-restoration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "mutated-mod-file-content-is-restored",
+              "a-go-sum-the-run-created-is-deleted",
+              "a-go-mod-the-run-created-is-deleted",
+              "a-file-the-run-removed-is-recreated",
+              "an-untouched-tree-is-left-alone",
+              "an-empty-file-is-distinguished-from-an-absent-one"
+            ]
+          }
+        },
+        {
+          "id": "tidy-drift-visibility",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-test-only-workspace-import-is-reported",
+              "an-external-requirement-is-not-reported",
+              "an-unchanged-go-mod-is-silent",
+              "a-test-only-workspace-require-is-a-release-set-dependency"
+            ]
+          }
+        },
+        {
+          "id": "offline-tidy-is-a-cacheable-no-op",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "disabled-module-downloads-run-no-tidy-command",
+              "a-tidy-that-ran-and-failed-stays-a-skip",
+              "goproxy-is-a-declared-cache-key-input",
+              "only-a-proxy-list-leading-with-off-disables-downloads",
+              "an-inherited-off-survives-environment-resolution"
+            ]
+          }
+        },
+        {
+          "id": "image-input-producers",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["image-packaging-requires-build-producers-without-go-compilation"]
+          }
+        },
+        {
+          "id": "package-channel-index",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-dispatched-channel-is-recorded-inside-the-output-that-produced-it",
+              "the-declared-publish-channels-are-the-fallback-selection",
+              "packaging-writes-only-inside-the-outputs-its-tasks-declare"
+            ]
+          }
+        },
+        {
+          "id": "per-module-channel-resolution",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "modules-pin-independently"
+            ]
+          }
+        },
+        {
+          "id": "channel-query-credentials",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-channel-behind-basic-auth-resolves-with-a-netrc-entry",
+              "an-anonymous-refusal-names-the-missing-credential"
+            ]
+          }
+        },
+        {
+          "id": "pinned-lint-tools",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-pins-file-is-the-declared-source-of-tool-versions",
+              "a-stale-path-binary-is-replaced-by-the-managed-pin",
+              "the-resolver-reports-the-pinned-version-it-resolved"
+            ]
+          }
+        },
+        {
+          "id": "probe-graph-fidelity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-is-identified-by-its-module-path",
+              "dependency-edges-are-repo-relative-paths-from-require-and-replace",
+              "repository-edges-are-backed-by-the-module-graph",
+              "a-directory-without-the-marker-is-not-a-project",
+              "a-manifest-with-no-module-warns-and-is-skipped",
+              "a-project-is-classified-by-its-main-package",
+              "a-main-the-build-never-links-does-not-classify-the-project"
+            ]
+          }
+        },
+        {
+          "id": "probe-purity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-answer-is-identical-across-repeated-runs-and-request-orderings",
+              "the-answer-is-identical-whatever-reason-it-was-asked-for",
+              "the-answer-does-not-depend-on-the-probing-host",
+              "classification-is-deterministic",
+              "duplicate-module-paths-resolve-deterministically"
+            ]
+          }
+        },
+        {
+          "id": "registries-drive-go-origin",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "origin-comes-from-registries"
+            ]
+          }
+        },
+        {
+          "id": "relocatable-generation-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-serialized-manifest-path-is-checkout-relocatable",
+              "a-merged-manifest-exports-a-relative-path",
+              "a-legacy-absolute-path-is-relativized"
+            ]
+          }
+        },
+        {
+          "id": "replace-closure",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "sync-appends-the-missing-transitive-workspace-replaces",
+              "a-second-run-changes-nothing",
+              "an-unterminated-require-block-stays-idempotent-too",
+              "a-dry-run-writes-nothing",
+              "an-existing-unrelated-replace-is-preserved",
+              "a-block-form-replace-already-satisfies-the-closure",
+              "a-run-with-no-resolved-project-selection-fails-closed",
+              "the-committed-repository-closure-is-complete"
+            ]
+          }
+        },
+        {
+          "id": "repository-reads-are-declared-inputs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-go-mod-the-repository-tests-read-is-a-declared-test-input",
+              "every-first-party-manifest-and-content-source-the-tests-read-is-a-declared-test-input"
+            ]
+          }
+        },
+        {
+          "id": "shared-build-cache",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-helper-backs-the-go-build-cache-only-for-a-provider-backed-run",
+              "a-cold-machine-is-served-by-the-provider-and-keeps-what-it-received",
+              "served-bytes-are-verified-against-the-output-id-they-were-announced-under",
+              "the-run-trust-policy-decides-which-channels-a-lookup-accepts",
+              "a-provider-failure-degrades-to-the-local-cache-for-the-rest-of-the-process",
+              "the-remote-build-cache-option-never-enters-a-task-cache-key"
+            ]
+          }
+        },
+        {
+          "id": "single-schema-committer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "generate-defers-the-committed-sidecar-when-describe-will-run",
+              "a-late-generate-cannot-clobber-the-describe-merge",
+              "an-unknown-schema-producer-overwriting-a-committed-file-is-an-error",
+              "only-changed-files-are-committed",
+              "an-unchanged-untouched-file-is-left-alone",
+              "publishing-an-unmerged-canonical-provider-document-preserves-its-hash"
+            ]
+          }
+        },
+        {
+          "id": "test-batch-size",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-test-batch-policy-reads-its-cap-from-the-batch-max-projects-option",
+              "an-unset-batch-max-projects-leaves-go-test-batches-unbounded",
+              "the-batch-max-projects-option-never-enters-a-task-cache-key"
+            ]
+          }
+        },
+        {
+          "id": "test-failure-attribution",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-batched-failure-is-charged-to-the-project-that-produced-it",
+              "an-unattributable-batch-failure-is-reported-once-for-every-member",
+              "each-coverage-verdict-is-charged-to-its-own-project",
+              "a-failure-with-no-parseable-per-test-output-is-still-a-failure",
+              "a-single-project-batch-failure-that-cannot-be-attributed-is-still-reported",
+              "a-package-level-failure-is-diagnosed"
+            ]
+          }
+        },
+        {
+          "id": "project-scoped-coverage",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-scoped-profile-is-identical-alone-and-in-a-batch",
+              "a-project-scoped-members-arguments-do-not-depend-on-its-batch-mates",
+              "the-default-batch-scope-keeps-the-union-invocation-and-its-split",
+              "the-coverage-scope-keys-the-test-task",
+              "an-unknown-coverage-scope-fails-closed"
+            ]
+          }
+        },
+        {
+          "id": "module-bounded-coverage",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-nested-module-stays-out-of-the-solo-profile",
+              "a-nested-module-stays-out-of-a-one-member-batch",
+              "a-nested-module-stays-out-of-a-union-batch",
+              "a-nested-module-stays-out-of-a-project-scoped-batch",
+              "a-nested-module-keeps-its-own-measurement"
+            ]
+          }
+        },
+        {
+          "id": "test-host-identity-scrub",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-host-platform-identity-is-scrubbed-from-the-test-subprocess",
+              "every-other-inherited-variable-is-preserved",
+              "the-scrub-is-a-noop-when-there-is-no-platform-identity"
+            ]
+          }
+        },
+        {
+          "id": "resolved-dependency-documentation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "exact-selected-module-documentation-is-returned",
+              "documentation-resolution-is-offline-and-read-only",
+              "extension-carried-documentation-is-never-mislabeled",
+              "unsafe-documentation-paths-are-unavailable"
+            ]
+          }
+        },
+        {
+          "id": "reproducible-archives",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "independent-staging-produces-identical-archive-bytes"
+            ]
+          }
+        },
+        {
+          "id": "contract-canonicalization-preserves-declared-order",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-provider-declared-value-survives-canonicalization",
+              "a-putnami-extension-payload-survives-canonicalization",
+              "declared-server-and-alternative-order-survives-a-merge",
+              "a-canonical-contract-is-stable-under-a-second-pass",
+              "a-route-a-first-party-provider-removed-does-not-survive-publication"
+            ]
+          }
+        },
+        {
+          "id": "committed-client-drift",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-describe-client-output-declares-fail-on-drift"
+            ]
+          }
+        },
+        {
+          "id": "locked-go-is-exact",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-go-on-path-that-is-not-the-pin-is-passed-over"
+            ]
+          }
+        },
+        {
+          "id": "install-without-go",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-install-skips-go-when-nothing-declares-it"
+            ]
+          }
+        },
+        {
+          "id": "included-members-join-go-work",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "included-go-members-are-added-to-go-work",
+              "included-members-create-no-go-work"
+            ]
+          }
+        },
+        {
+          "id": "included-members-are-go-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "included-standalone-members-are-warmed",
+              "included-standalone-members-are-upgraded",
+              "a-legacy-projects-member-wins-over-the-membership"
+            ]
+          }
+        },
+        {
+          "id": "hosted-run-dependencies",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-fetch-reads-the-credential-descriptor",
+              "workspace-fetch-fails-closed-on-an-unreadable-credential",
+              "workspace-fetch-gives-the-credential-only-to-the-downloads",
+              "workspace-fetch-runs-no-program-from-the-workspace",
+              "deps-upgrade-refuses-offline-dependencies",
+              "workspace-fetch-removes-the-credential-on-failure",
+              "a-signal-still-removes-the-fetch-credential",
+              "the-fetch-netrc-names-each-host-as-go-matches-it",
+              "without-the-offline-signal-go-commands-are-unchanged",
+              "offline-go-commands-forbid-every-module-download",
+              "offline-goflags-keep-an-explicit-mod",
+              "offline-policy-runs-workspace-go-commands",
+              "offline-policy-closes-the-direct-origin-route",
+              "offline-workspace-install-downloads-nothing",
+              "a-hosted-run-keeps-go-work-as-committed",
+              "an-offline-job-refreshes-no-credential",
+              "the-offline-signal-runs-no-tidy-command",
+              "build-tidy-keys-on-the-offline-signal"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

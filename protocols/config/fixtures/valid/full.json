@@ -1,0 +1,31 @@
+{
+  "appName": "task-api",
+  "version": "2.1.0",
+  "schemaHash": "sha256:1234567890abcdef",
+  "configs": [
+    {
+      "path": "server",
+      "fields": [
+        { "name": "host", "type": "string", "default": "0.0.0.0" },
+        { "name": "port", "type": "int", "default": "3000", "env": "PORT", "required": true },
+        { "name": "tls", "type": "bool" }
+      ]
+    },
+    {
+      "path": "database",
+      "fields": [
+        { "name": "url", "type": "string", "env": "DATABASE_URL", "required": true, "sensitive": true },
+        { "name": "pool", "type": "int", "default": "10" },
+        { "name": "timeout", "type": "duration", "default": "5s" },
+        { "name": "options", "type": "object" }
+      ]
+    },
+    {
+      "path": "logging",
+      "fields": [
+        { "name": "level", "type": "string", "default": "info", "constraints": ["oneof=debug|info|warn|error"] },
+        { "name": "json", "type": "bool", "default": "false" }
+      ]
+    }
+  ]
+}

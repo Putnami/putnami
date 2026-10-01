@@ -1,0 +1,251 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-transaction-conformance.json",
+  "protocol": "putnami.transaction.v1",
+  "suite": "putnami.transaction.conformance.v1",
+  "protocolVersion": 1,
+  "cases": [
+    {
+      "id": "concurrent.consume.one-credential",
+      "level": "required",
+      "summary": "Two concurrent consumers of one credential: exactly one applied, the other already-consumed-conflict.",
+      "setup": {
+        "tables": [
+          {
+            "name": "credentials",
+            "columns": [
+              { "name": "id", "type": "text", "primaryKey": true },
+              { "name": "consumed", "type": "boolean", "notNull": true, "default": "false" }
+            ],
+            "seed": [{ "id": "cred-1", "consumed": false }]
+          }
+        ]
+      },
+      "operations": [
+        {
+          "id": "consume-a",
+          "table": "credentials",
+          "primitive": "consume-once",
+          "args": { "keyColumn": "id", "key": "cred-1", "claimGuard": "consumed = false", "set": "consumed = true" }
+        },
+        {
+          "id": "consume-b",
+          "table": "credentials",
+          "primitive": "consume-once",
+          "args": { "keyColumn": "id", "key": "cred-1", "claimGuard": "consumed = false", "set": "consumed = true" }
+        }
+      ],
+      "concurrency": [
+        {
+          "id": "consumers",
+          "operations": ["consume-a", "consume-b"],
+          "expect": { "applied": 1, "already-consumed-conflict": 1 }
+        }
+      ],
+      "asserts": [{ "table": "credentials", "where": "id = 'cred-1' AND consumed = true", "count": 1 }]
+    },
+    {
+      "id": "sequential.consume.device-code",
+      "level": "required",
+      "summary": "Device code issues its token only once: first consume applies, a second conflicts, an unknown code is not-found.",
+      "setup": {
+        "tables": [
+          {
+            "name": "device_codes",
+            "columns": [
+              { "name": "code", "type": "text", "primaryKey": true },
+              { "name": "consumed", "type": "boolean", "notNull": true, "default": "false" }
+            ],
+            "seed": [{ "code": "dev-1", "consumed": false }]
+          }
+        ]
+      },
+      "operations": [
+        {
+          "id": "first-claim",
+          "table": "device_codes",
+          "primitive": "consume-once",
+          "args": { "keyColumn": "code", "key": "dev-1", "claimGuard": "consumed = false", "set": "consumed = true" },
+          "expect": "applied"
+        },
+        {
+          "id": "second-claim",
+          "table": "device_codes",
+          "primitive": "consume-once",
+          "args": { "keyColumn": "code", "key": "dev-1", "claimGuard": "consumed = false", "set": "consumed = true" },
+          "expect": "already-consumed-conflict"
+        },
+        {
+          "id": "unknown-claim",
+          "table": "device_codes",
+          "primitive": "consume-once",
+          "args": { "keyColumn": "code", "key": "missing", "claimGuard": "consumed = false", "set": "consumed = true" },
+          "expect": "not-found"
+        }
+      ]
+    },
+    {
+      "id": "concurrent.rotate.refresh-once",
+      "level": "required",
+      "summary": "Refresh rotation revokes the predecessor and installs a successor atomically inside a transaction; two concurrent rotations produce exactly one applied and one conflict, and exactly one successor exists.",
+      "setup": {
+        "tables": [
+          {
+            "name": "refresh_tokens",
+            "columns": [
+              { "name": "id", "type": "text", "primaryKey": true },
+              { "name": "state", "type": "text", "notNull": true }
+            ],
+            "seed": [{ "id": "rt-old", "state": "active" }]
+          }
+        ]
+      },
+      "operations": [
+        {
+          "id": "rotate-a",
+          "table": "refresh_tokens",
+          "primitive": "rotate",
+          "boundary": "transaction",
+          "args": {
+            "keyColumn": "id",
+            "predecessorKey": "rt-old",
+            "stateColumn": "state",
+            "expected": "active",
+            "revoked": "revoked",
+            "successorColumns": ["id", "state"],
+            "successorValues": ["rt-a", "active"]
+          }
+        },
+        {
+          "id": "rotate-b",
+          "table": "refresh_tokens",
+          "primitive": "rotate",
+          "boundary": "transaction",
+          "args": {
+            "keyColumn": "id",
+            "predecessorKey": "rt-old",
+            "stateColumn": "state",
+            "expected": "active",
+            "revoked": "revoked",
+            "successorColumns": ["id", "state"],
+            "successorValues": ["rt-b", "active"]
+          }
+        }
+      ],
+      "concurrency": [
+        {
+          "id": "rotators",
+          "operations": ["rotate-a", "rotate-b"],
+          "expect": { "applied": 1, "already-consumed-conflict": 1 }
+        }
+      ],
+      "asserts": [
+        { "table": "refresh_tokens", "where": "id = 'rt-a' OR id = 'rt-b'", "count": 1 },
+        { "table": "refresh_tokens", "where": "id = 'rt-old' AND state = 'revoked'", "count": 1 }
+      ]
+    },
+    {
+      "id": "atomic.rotate.all-or-nothing",
+      "level": "required",
+      "summary": "A two-write unit whose second write fails rolls back the first: rotate revokes the predecessor then hits a unique violation inserting the successor, so inside a transaction the revoke is rolled back and no transient revoked state is observable.",
+      "setup": {
+        "tables": [
+          {
+            "name": "api_keys",
+            "columns": [
+              { "name": "id", "type": "text", "primaryKey": true },
+              { "name": "state", "type": "text", "notNull": true }
+            ],
+            "seed": [
+              { "id": "key-1", "state": "active" },
+              { "id": "key-2", "state": "active" }
+            ]
+          }
+        ]
+      },
+      "operations": [
+        {
+          "id": "rotate-into-collision",
+          "table": "api_keys",
+          "primitive": "rotate",
+          "boundary": "transaction",
+          "args": {
+            "keyColumn": "id",
+            "predecessorKey": "key-1",
+            "stateColumn": "state",
+            "expected": "active",
+            "revoked": "revoked",
+            "successorColumns": ["id", "state"],
+            "successorValues": ["key-2", "active"]
+          },
+          "expect": "already-consumed-conflict"
+        }
+      ],
+      "asserts": [
+        { "table": "api_keys", "where": "id = 'key-1' AND state = 'active'", "count": 1 },
+        { "table": "api_keys", "where": "state = 'revoked'", "count": 0 }
+      ]
+    },
+    {
+      "id": "nested.uow.join-outer-rollback",
+      "level": "required",
+      "summary": "Nested unit of work has join-outer semantics (no savepoints): an inner transaction on the same pool joins the outer, so when the outer rolls back the inner's applied write is undone with it.",
+      "setup": {
+        "tables": [
+          {
+            "name": "nested_sessions",
+            "columns": [
+              { "name": "id", "type": "text", "primaryKey": true },
+              { "name": "revoked", "type": "boolean", "notNull": true, "default": "false" }
+            ],
+            "seed": [{ "id": "ns-1", "revoked": false }]
+          }
+        ]
+      },
+      "operations": [
+        {
+          "id": "inner-consume-outer-rollback",
+          "table": "nested_sessions",
+          "primitive": "consume-once",
+          "boundary": "nested-transaction",
+          "fault": "callback-error",
+          "args": { "keyColumn": "id", "key": "ns-1", "claimGuard": "revoked = false", "set": "revoked = true" },
+          "expect": "applied"
+        }
+      ],
+      "asserts": [{ "table": "nested_sessions", "where": "id = 'ns-1' AND revoked = false", "count": 1 }]
+    },
+    {
+      "id": "boundary.rollback-releases-connection",
+      "level": "required",
+      "summary": "An abnormal exit (callback error) inside a transaction rolls the unit back and releases the connection; repeated failures leave the row unchanged and a follow-up query still succeeds (no leaked connection).",
+      "setup": {
+        "tables": [
+          {
+            "name": "ledger",
+            "columns": [
+              { "name": "id", "type": "text", "primaryKey": true },
+              { "name": "applied", "type": "boolean", "notNull": true, "default": "false" }
+            ],
+            "seed": [{ "id": "l-1", "applied": false }]
+          }
+        ]
+      },
+      "operations": [
+        {
+          "id": "consume-then-fail",
+          "table": "ledger",
+          "primitive": "consume-once",
+          "boundary": "transaction",
+          "fault": "callback-error",
+          "repeat": 5,
+          "args": { "keyColumn": "id", "key": "l-1", "claimGuard": "applied = false", "set": "applied = true" },
+          "expect": "applied"
+        }
+      ],
+      "asserts": [
+        { "table": "ledger", "where": "id = 'l-1' AND applied = false", "count": 1 },
+        { "table": "ledger", "where": "id = 'l-1'", "count": 1 }
+      ]
+    }
+  ]
+}

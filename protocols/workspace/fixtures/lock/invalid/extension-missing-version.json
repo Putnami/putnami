@@ -1,0 +1,9 @@
+{
+  "version": 3,
+  "extensions": {
+    "@putnami/go": {
+      "integrity": "sha256:cccc"
+    }
+  },
+  "templates": {}
+}

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+output=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --output)
+      [ "$#" -ge 2 ] || { printf '%s\n' "prepare: --output requires a value" >&2; exit 2; }
+      output="$2"
+      shift 2
+      ;;
+    *)
+      printf 'prepare: unknown argument %s\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+[ -n "$output" ] || { printf '%s\n' "prepare: --output is required" >&2; exit 2; }
+go_binary=""
+if [ -n "${GOROOT:-}" ] && [ -x "$GOROOT/bin/go" ]; then
+  go_binary="$GOROOT/bin/go"
+elif command -v go >/dev/null 2>&1; then
+  go_binary="$(command -v go)"
+else
+  printf '%s\n' 'prepare: Go compiler not found' >&2
+  exit 1
+fi
+mkdir -p "$output/compiled"
+runtime_tmp="$output/compiled/putnami-clientgen.tmp.$$"
+go_generator_tmp="$output/compiled/putnami-client-generate-go.tmp.$$"
+trap 'rm -f "$runtime_tmp" "$go_generator_tmp"' EXIT INT TERM
+(
+  export GOENV=off
+  export GOFLAGS="-mod=mod -buildvcs=false -trimpath"
+  export GO111MODULE=on
+  export GOWORK=off
+  export GOTOOLCHAIN=local
+  export CGO_ENABLED=0
+  unset GOOS GOARCH GO386 GOAMD64 GOARM GOARM64 GOMIPS GOMIPS64 GOPPC64 GORISCV64 GOWASM
+  unset GOEXPERIMENT GOFIPS140 GODEBUG GO_EXTLINK_ENABLED GO_LDSO
+  "$go_binary" build -o "$runtime_tmp" ./cmd/putnami-clientgen
+  "$go_binary" build -o "$go_generator_tmp" go.putnami.dev/api/cmd/clientgen
+)
+chmod +x "$runtime_tmp" "$go_generator_tmp"
+mv "$runtime_tmp" "$output/compiled/putnami-clientgen"
+mv "$go_generator_tmp" "$output/compiled/putnami-client-generate-go"
+trap - EXIT INT TERM

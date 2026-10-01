@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Sample extension: test job.
+#
+# Invoked by Putnami as:
+#   bin/test --putnamiContext <file> --output jsonl [--verbose] [--filter <name>]
+
+set -euo pipefail
+
+# Load JSONL helpers.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/putnami-jsonl.sh"
+
+# --- Parse arguments ---
+CONTEXT_FILE=""
+OUTPUT_MODE="jsonl"
+VERBOSE="false"
+FILTER=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --putnamiContext) CONTEXT_FILE="$2"; shift 2 ;;
+    --output)        OUTPUT_MODE="$2"; shift 2 ;;
+    --verbose|-v)    VERBOSE="true"; shift ;;
+    --no-verbose)    VERBOSE="false"; shift ;;
+    --filter)        FILTER="$2"; shift 2 ;;
+    --help|-h)
+      echo "Usage: test --putnamiContext <file> [--verbose] [--filter <name>]" >&2
+      exit 0
+      ;;
+    *)               shift ;;
+  esac
+done
+
+if [ -z "$CONTEXT_FILE" ]; then
+  echo "Error: --putnamiContext is required" >&2
+  exit 2
+fi
+
+# --- Read context ---
+parse_context "$CONTEXT_FILE"
+
+if [ -z "$PUTNAMI_CTX_PROJECT_NAME" ]; then
+  emit_log "warn" "Test requires a project context"
+  emit_result "SKIP"
+  exit 0
+fi
+
+# --- Start ---
+emit_meta "$PUTNAMI_CTX_EXTENSION_NAME" "$PUTNAMI_CTX_JOB_NAME"
+
+emit_phase_start "test"
+emit_log "info" "Testing $PUTNAMI_CTX_PROJECT_NAME..."
+
+# Build make test arguments.
+MAKE_ARGS="test"
+if [ "$VERBOSE" = "true" ]; then
+  MAKE_ARGS="$MAKE_ARGS VERBOSE=1"
+fi
+if [ -n "$FILTER" ]; then
+  MAKE_ARGS="$MAKE_ARGS FILTER=$FILTER"
+fi
+
+emit_progress 0 1 "Running tests..."
+
+if make -C "$PUTNAMI_CTX_PROJECT_PATH" $MAKE_ARGS 2>/dev/stderr; then
+  emit_progress 1 1 "Tests passed"
+  emit_phase_end "test" "success"
+  emit_result "OK"
+  exit 0
+else
+  emit_phase_end "test" "failed"
+  emit_diagnostic "error" "Tests failed in $PUTNAMI_CTX_PROJECT_NAME"
+  emit_result "FAILED" "{\"error\":\"make test failed\"}"
+  exit 1
+fi

@@ -1,0 +1,74 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "OAuth 2.0 (RFC 6749), Token Introspection (RFC 7662) and OpenID Connect Discovery 1.0",
+      "adapter": "typescript/framework/application/src/oauth/oauth.service.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/application/src/oauth/oauth.service.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "0889c028afc5608e4479fa6c7a96407966c385da9e28dd2f82f4fe267fc88593"
+        },
+        {
+          "path": "typescript/framework/application/src/oauth/oauth.service.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "0b1e966bc6b0b633cb6429e8ffbfb1c037f7b90e6ac1b163774756c8a42197a9"
+        },
+        {
+          "path": "typescript/framework/application/src/oauth/oauth.service.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "58b1b8b4ff8844376543c99daac0b189b20c30d3508663bd72a77fa75c4bb56b"
+        },
+        {
+          "path": "typescript/framework/application/src/oauth/oauth.service.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "b9b7a00fb2f0f9895c8400e76141f1ee2ef06bce3cfd0cc1be32efae1cbc265c"
+        }
+      ],
+      "owner": "@putnami/application",
+      "tests": ["typescript/framework/application/test/oauth/oauth-service.test.ts"],
+      "reason": "Runs the authorization-code, token, userinfo and discovery exchanges against the configured identity provider."
+    },
+    {
+      "authority": "OAuth 2.0 Token Introspection, RFC 7662",
+      "adapter": "typescript/framework/application/src/security/strategies/introspection.strategy.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/application/src/security/strategies/introspection.strategy.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "c484eb75d4fcb3b85fc7232163c44e858d7684407b337d897f4fcb5b7771febd"
+        },
+        {
+          "path": "typescript/framework/application/src/security/strategies/introspection.strategy.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "ccd09c97376b64794af9d8492d2a1cd1cfae5c119be002e65db18f7aee6650da"
+        }
+      ],
+      "owner": "@putnami/application",
+      "tests": ["typescript/framework/application/test/security/strategies/introspection.strategy.test.ts"],
+      "reason": "Posts an opaque bearer token to the identity provider\u2019s introspection endpoint."
+    },
+    {
+      "authority": "OpenTelemetry OTLP/HTTP v1 (opentelemetry.io/docs/specs/otlp), mirrored by protocols/telemetry",
+      "adapter": "typescript/framework/application/src/telemetry/telemetry.sender.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/application/src/telemetry/telemetry.sender.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "fa68a925294ef76c9eec2b845fbec7cb0f5c8e4123a96e6f7c8f38a5d5a276ed"
+        }
+      ],
+      "owner": "@putnami/application",
+      "tests": ["typescript/framework/application/test/telemetry/telemetry-sender.test.ts"],
+      "reason": "Exports application spans, metrics and logs over OTLP/HTTP to the configured collector."
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "name": "putnami.dev",
+  "version": "0.0.0",
+  "description": "Putnami website serving install script and documentation",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/analytics": "workspace:*",
+    "@putnami/application": "workspace:*",
+    "@putnami/cloud": "0.0.0-20260929210146-c834161ac",
+    "@putnami/database": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/ui": "workspace:*",
+    "@putnami/utils": "workspace:*",
+    "@putnami/web": "workspace:*",
+    "marked": "^15.0.7",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@putnami/spectest": "workspace:*",
+    "@types/react": "^19.2.3",
+    "@types/react-dom": "^19.2.3",
+    "shiki": "^3.21.0"
+  },
+  "scripts": {
+    "build:search": "bun run scripts/build-search-index.ts",
+    "content:bump": "bun run scripts/content-bump.ts"
+  },
+  "exports": {
+    ".": {
+      "default": "src/main.ts"
+    },
+    "./api-loader": {
+      "default": ".gen/src/app/.api-application.gen.ts"
+    },
+    "./static-loader": {
+      "default": ".gen/src/static/.static.gen.ts"
+    },
+    "./serve": {
+      "default": ".gen/src/serve.ts"
+    }
+  }
+}

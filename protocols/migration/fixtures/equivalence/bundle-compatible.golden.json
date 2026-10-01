@@ -1,0 +1,67 @@
+{
+  "protocol": "migration-bundle.v1",
+  "appName": "wealth",
+  "source": "go/samples/wealth",
+  "version": "2.2.0",
+  "git": {
+    "revision": "4d7e0bc",
+    "branch": "main"
+  },
+  "imageDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "digest": "2884a81ce4de0e7e28f776b46c370c3ec1c7bbd1cb1bf2c8149ce61e2c23a2bc",
+  "generatedAt": "2026-09-04T12:00:00Z",
+  "operations": [
+    {
+      "kind": "sql",
+      "target": "analytics",
+      "schema": "events",
+      "namespace": "events",
+      "name": "events/0002_add_nullable_column",
+      "up": {
+        "path": "payload/sql/analytics/events/0002_add_nullable_column.up.sql",
+        "hash": "5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      "safety": "safe-online",
+      "capabilities": {
+        "transactional": true,
+        "compatible": true
+      }
+    },
+    {
+      "kind": "sql",
+      "target": "default",
+      "namespace": "iam",
+      "name": "iam/0002_add_users_locale",
+      "up": {
+        "path": "payload/sql/default/iam/0002_add_users_locale.up.sql",
+        "hash": "6666666666666666666666666666666666666666666666666666666666666666"
+      },
+      "down": {
+        "path": "payload/sql/default/iam/0002_add_users_locale.down.sql",
+        "hash": "7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "safety": "safe-online",
+      "capabilities": {
+        "transactional": true,
+        "reversible": true,
+        "compatible": true
+      }
+    },
+    {
+      "kind": "sql",
+      "target": "default",
+      "namespace": "billing",
+      "name": "billing/0003_backfill_invoices",
+      "up": {
+        "path": "payload/sql/default/billing/0003_backfill_invoices.up.sql",
+        "hash": "8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "safety": "long-running",
+      "capabilities": {
+        "async": true,
+        "resumable": true,
+        "compatible": true
+      }
+    }
+  ]
+}

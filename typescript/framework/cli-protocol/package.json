@@ -1,0 +1,31 @@
+{
+  "name": "@putnami/cli-protocol",
+  "version": "0.0.0",
+  "description": "TypeScript binding of the Putnami CLI result-envelope contract (go.putnami.dev/protocol/cli)",
+  "keywords": [
+    "cli",
+    "protocol",
+    "contract",
+    "typescript"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/cli-protocol"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    }
+  },
+  "private": false,
+  "devDependencies": {
+    "@putnami/spectest": "workspace:*"
+  }
+}

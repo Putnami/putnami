@@ -1,0 +1,17 @@
+{
+  "appName": "task-api",
+  "version": "1.0.0",
+  "schemaHash": "sha256:0123456789abcdef",
+  "configs": [
+    {
+      "path": "server",
+      "fields": [
+        {
+          "name": "host",
+          "type": "string",
+          "items": { "name": "", "type": "string" }
+        }
+      ]
+    }
+  ]
+}

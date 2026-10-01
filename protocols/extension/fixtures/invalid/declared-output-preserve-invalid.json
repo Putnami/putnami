@@ -1,0 +1,30 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "build": {
+      "run": [{ "id": "generate", "task": "build-generate" }]
+    }
+  },
+  "tasks": {
+    "build-generate": {
+      "kind": "command",
+      "command": "echo",
+      "declares": {
+        "outputs": {
+          "file": {
+            "kind": "file",
+            "path": "dist/app.js",
+            "preserves": ["putnami.json"],
+            "description": "A file has no subpath to preserve."
+          },
+          "dir": {
+            "kind": "directory",
+            "path": "clients/go",
+            "preserves": ["../putnami.json", "go.sum", "./go.sum"],
+            "description": "An entry must stay inside the output, and one path is preserved once."
+          }
+        }
+      }
+    }
+  }
+}

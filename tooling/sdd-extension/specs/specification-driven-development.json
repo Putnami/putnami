@@ -1,0 +1,79 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/specification-driven-development",
+  "outcomes": [
+    "A workspace that never declares this extension carries no SDD surface at all: no commands, no MCP tools, no jobs, and no cost",
+    "A workspace that does declare it gets features, specs and architecture checked by the same planner, cache and exit-code contract as build, test and lint, with no planner special case",
+    "A workspace can adopt automatic architecture validation in report mode before making coherent findings admission-blocking, while every run states the effective mode and provenance",
+    "A terminal and an agent asking the same question get the same answer, because both call one engine builder rather than two renderings of two evaluations",
+    "An agent can inspect one exact architecture domain, its complete declared contracts and every touching declared or observed edge without granting Git or baseline access to the tool"
+  ],
+  "nonGoals": [
+    "Owning what a feature, a spec or an architecture declaration MEANS \u2014 that stays in protocols/features and protocols/architecture, and this extension adds no second opinion about any of it",
+    "Knowing anything about the workspace that the job context or the tool request did not carry: no directory scan, no putnami subprocess, no copied loader",
+    "Authoring durable prose on a human's behalf; specs init writes a skeleton that restates only the declaration and never invents a requirement or a decision",
+    "Making contracts generate or contracts check part of the validation jobs while check owns a distinct exit-2 drift verdict and generate writes into the source tree",
+    "Owning the extraction-parity recording and the wire-only boundary claim, which cli/sdd-extraction owns \u2014 the parity harness and the boundary observer live in tooling/cli",
+    "Turning an observed dependency into a permission: architecture sync proposes a binding only for a relation a human already declared, never writes an import, and leaves an undeclared edge as a failing architecture finding",
+    "Changing explicit interactive architecture validate, snapshot or inspect commands when automatic DAG evaluation is off",
+    "Resolving Git history or an adoption baseline for agent architecture context"
+  ],
+  "requirements": [
+    {
+      "id": "opt-in-activation",
+      "text": "A project is validated only when the command's activationFiles match its tree AND the project names this extension in its own extensions array; because the second condition fails silently, this repository asserts that every project authoring a feature manifest or a spec declares it."
+    },
+    {
+      "id": "declared-inputs-cover-the-read-set",
+      "text": "A validation task declares cache inputs only when those inputs cover everything the task reads: specs-validate carries a workspace-wide identity port beside its two project ports, architecture-validate reads no git history in the cached path, and features-validate and decisions-validate are uncached because no file-pattern key can express the evidence source bindings, or the per-repository globs, their verdicts depend on."
+    },
+    {
+      "id": "architecture-adoption-policy",
+      "text": "Automatic architecture evaluation resolves only workspace options.sdd.verification.architecture. Enforce lets coherent findings block; report preserves the typed report and warns without blocking; off skips evaluation. Mode, provenance, and evaluation state are always reported. Policy and structural errors fail closed. The workspace file keys the cache; interactive architecture commands are unchanged."
+    },
+    {
+      "id": "one-engine-two-surfaces",
+      "text": "Each vertical stops at a Build<Something>Result builder that returns a report and never writes to stdout; the interactive subcommands and the sdd.* MCP tools are two renderings of that one value, so they cannot answer differently."
+    },
+    {
+      "id": "architecture-agent-context",
+      "text": "sdd.architecture_context requires an exact domain and resolved workspace selection. It reuses the worktree-only ARC/DARC evaluator and returns the complete domain declaration, touching declared and observed edges, relevant findings, coverage, and diagnostics. Argument or selection failures carry no report; structural failures and unknown domains carry the evaluated typed report beside the error. The tool is read-only, resolves no Git history, and leaves interactive baseline-aware commands unchanged."
+    },
+    {
+      "id": "refuse-rather-than-widen",
+      "text": "A handler given no resolved selection refuses the call instead of defaulting to the whole workspace, and a workspace-scoped evaluation given only a subset of the membership fails closed rather than reporting that subset as the whole."
+    },
+    {
+      "id": "predictable-spec-scaffolding",
+      "text": "specs init derives specs/<leaf>.json from the final segment of the complete feature ID while preserving that complete identity in the document and report. Dry-run and create use the same canonical bytes and path; creation remains contained and exclusive, never renames an existing spec, and refuses an occupied leaf instead of overwriting it or inventing another filename."
+    },
+    {
+      "id": "settled-decisions-are-enforced",
+      "text": "validate-workspace proves the root and every project decisions.json against the worktree: a json-value check judges the files its globs name inside its registry's directory, a violation fails naming the decision's id, statement, settled date and registry, ids are unique across registries, a reviewOnly decision reaches the agent context and never fails, an absent registry is adoption, and an unusable one fails closed."
+    },
+    {
+      "id": "recipe-indexes-are-checked",
+      "text": "validate-workspace reads every committed <lang>/samples/recipes.json: a recipe whose sample is not a directory in the worktree fails naming the sample, two recipes for one intention fail, a malformed index fails closed, and an absent index is adoption."
+    },
+    {
+      "id": "codeowners-follow-declared-owners",
+      "text": "validate-workspace writes .github/CODEOWNERS from options.sdd.owners: putnami.workspace.json gives the catch-all rule, a scope or project putnami.json gives its directory a rule placed after the rules above it, and the spec-governance files stay with the workspace owners. An unchanged file is not rewritten, an invalid declaration or one without a catch-all fails without writing, and a workspace that declares no owners is left alone."
+    },
+    {
+      "id": "every-document-has-working-links",
+      "text": "validate-workspace checks every relative link and anchor in every README.md file and doc/ tree of the workspace, whatever the selection, with the rule each language extension's lint-docs task applies. A missing file, a path whose case differs on disk, an anchor no heading of the target defines, or a path that leaves the workspace fails naming the file, line and link. A project whose lint options set docs-links false is skipped. Links with a scheme and absolute paths are not checked."
+    },
+    {
+      "id": "authoring-never-grants-a-permission",
+      "text": "The two architecture authoring subcommands write only the mechanical half of a declaration: architecture init scaffolds a domain carrying the id, owner and projects the caller stated and refuses a domain another manifest already declares, and architecture sync removes a project entry the workspace no longer contains and a binding the graph no longer observes while refusing to grant an edge no declared import covers; the reconciliation is whole-workspace, so it rejects project selection."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0013-sdd-as-a-standalone-extension.md",
+    "tooling/cli/doc/adr/0007-read-mostly-spec-surface.md",
+    "tooling/cli/doc/adr/0008-executable-architecture-command-boundary.md",
+    "tooling/cli/doc/adr/0015-specs-ratchet-keeps-its-own-discovery.md",
+    "tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md"
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/cli-machine-output",
+      "type": "feature",
+      "name": "TypeScript CLI machine-output binding",
+      "outcome": "A TypeScript program reads Putnami CLI machine output through typed, validated documents instead of guessing at JSON shapes",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "execution-placement",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["placement-is-optional-and-preserves-fallback"]
+          }
+        },
+        {
+          "id": "qualify-verdict-wire",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": { "kind": "acceptance", "checks": ["shared-qualify-corpus-and-digest"] }
+        },
+        {
+          "id": "session-reporter-wire",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": { "kind": "acceptance", "checks": ["shared-reporter-corpus-and-identity"] }
+        },
+        {
+          "id": "version-token",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["version-2-token-matches-the-schema-const", "the-version-1-envelope-stays-exported"]
+          }
+        },
+        {
+          "id": "shared-corpus",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["every-fixture-produces-its-pinned-violations", "the-corpus-covers-every-kind-and-code"]
+          }
+        },
+        {
+          "id": "schema-pinned-members",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["every-document-member-set-is-pinned", "every-schema-def-has-a-pinned-member-list"]
+          }
+        },
+        {
+          "id": "schema-pinned-bounds",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "report-bounds-come-from-the-schema",
+              "machine-output-budgets-come-from-the-schema",
+              "test-case-bounds-come-from-the-schema"
+            ]
+          }
+        },
+        {
+          "id": "bounded-stream-policy",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-stream-mode-policy-is-enforced",
+              "the-two-mode-budgets-are-fixed",
+              "failure-priority-is-classified"
+            ]
+          }
+        },
+        {
+          "id": "deterministic-violations",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "violations-sort-by-path-then-code",
+              "paths-compare-by-code-unit",
+              "array-indices-order-numerically"
+            ]
+          }
+        },
+        {
+          "id": "strict-verdict",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-strict-verdict-gates-run-success", "an-aborted-run-keeps-failures-visible"]
+          }
+        },
+        {
+          "id": "sanitization",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["controls-strip-and-member-names-remain", "every-credential-family-is-redacted"]
+          }
+        }
+      ]
+    }
+  ]
+}

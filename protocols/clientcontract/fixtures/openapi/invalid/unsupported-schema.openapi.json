@@ -1,0 +1,37 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "invalid", "version": "1" },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": { "id": "invalid", "audience": "urn:invalid" },
+    "credentials": {}
+  },
+  "paths": {
+    "/lossy": {
+      "get": {
+        "operationId": "lossy",
+        "responses": {
+          "200": {
+            "description": "lossy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "type": "object", "properties": { "id": { "type": "string" } } }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [{ "protocol": "rest-json", "path": "/lossy", "encoding": "json" }],
+          "security": { "alternatives": [{ "allOf": [] }] },
+          "errors": [],
+          "idempotency": { "kind": "safe" }
+        }
+      }
+    }
+  }
+}

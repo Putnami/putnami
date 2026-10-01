@@ -1,0 +1,238 @@
+# bash completion for putnami
+# Install: putnami completion bash > /etc/bash_completion.d/putnami
+#      or: putnami completion bash >> ~/.bashrc
+
+_putnami_subcommands_for() {
+    case "$1" in
+        'cache') printf '%s\n' 'clean gc verify' ;;
+        'channel') printf '%s\n' 'set status' ;;
+        'ci') printf '%s\n' 'explain fmt init validate' ;;
+        'completion') printf '%s\n' 'bash fish zsh' ;;
+        'config') printf '%s\n' 'set show' ;;
+        'context') printf '%s\n' 'generate map' ;;
+        'deps') printf '%s\n' 'add install remove' ;;
+        'dev') printf '%s\n' 'extension template' ;;
+        'extensions') printf '%s\n' 'install list remove update' ;;
+        'infra') printf '%s\n' 'plan' ;;
+        'mcp') printf '%s\n' 'install' ;;
+        'migrate') printf '%s\n' 'agent-content vnext' ;;
+        'projects') printf '%s\n' 'create describe list sync tag' ;;
+        'scopes') printf '%s\n' 'list' ;;
+        'sessions') printf '%s\n' 'export inspect list replay summary' ;;
+        'telemetry') printf '%s\n' 'off on show status' ;;
+        'templates') printf '%s\n' 'install list remove update' ;;
+        'tree') printf '%s\n' 'fingerprint verify' ;;
+        'version') printf '%s\n' 'get list tag use' ;;
+        'workspace') printf '%s\n' 'describe init' ;;
+    esac
+}
+
+_putnami_path_known() {
+    case "$1" in
+        'cache') return 0 ;;
+        'cache clean') return 0 ;;
+        'cache gc') return 0 ;;
+        'cache verify') return 0 ;;
+        'change-plan') return 0 ;;
+        'channel') return 0 ;;
+        'channel set') return 0 ;;
+        'channel status') return 0 ;;
+        'ci') return 0 ;;
+        'ci explain') return 0 ;;
+        'ci fmt') return 0 ;;
+        'ci init') return 0 ;;
+        'ci validate') return 0 ;;
+        'completion') return 0 ;;
+        'completion bash') return 0 ;;
+        'completion fish') return 0 ;;
+        'completion zsh') return 0 ;;
+        'compose') return 0 ;;
+        'config') return 0 ;;
+        'config set') return 0 ;;
+        'config show') return 0 ;;
+        'context') return 0 ;;
+        'context generate') return 0 ;;
+        'context map') return 0 ;;
+        'deps') return 0 ;;
+        'deps add') return 0 ;;
+        'deps install') return 0 ;;
+        'deps remove') return 0 ;;
+        'dev') return 0 ;;
+        'dev extension') return 0 ;;
+        'dev template') return 0 ;;
+        'doctor') return 0 ;;
+        'extensions') return 0 ;;
+        'extensions install') return 0 ;;
+        'extensions list') return 0 ;;
+        'extensions remove') return 0 ;;
+        'extensions update') return 0 ;;
+        'help') return 0 ;;
+        'infra') return 0 ;;
+        'infra plan') return 0 ;;
+        'init') return 0 ;;
+        'install') return 0 ;;
+        'mcp') return 0 ;;
+        'mcp install') return 0 ;;
+        'migrate') return 0 ;;
+        'migrate agent-content') return 0 ;;
+        'migrate vnext') return 0 ;;
+        'pin') return 0 ;;
+        'projects') return 0 ;;
+        'projects create') return 0 ;;
+        'projects describe') return 0 ;;
+        'projects list') return 0 ;;
+        'projects sync') return 0 ;;
+        'projects tag') return 0 ;;
+        'qualify') return 0 ;;
+        'report') return 0 ;;
+        'scopes') return 0 ;;
+        'scopes list') return 0 ;;
+        'sessions') return 0 ;;
+        'sessions export') return 0 ;;
+        'sessions inspect') return 0 ;;
+        'sessions list') return 0 ;;
+        'sessions replay') return 0 ;;
+        'sessions summary') return 0 ;;
+        'telemetry') return 0 ;;
+        'telemetry off') return 0 ;;
+        'telemetry on') return 0 ;;
+        'telemetry show') return 0 ;;
+        'telemetry status') return 0 ;;
+        'templates') return 0 ;;
+        'templates install') return 0 ;;
+        'templates list') return 0 ;;
+        'templates remove') return 0 ;;
+        'templates update') return 0 ;;
+        'tree') return 0 ;;
+        'tree fingerprint') return 0 ;;
+        'tree verify') return 0 ;;
+        'upgrade') return 0 ;;
+        'version') return 0 ;;
+        'version get') return 0 ;;
+        'version list') return 0 ;;
+        'version tag') return 0 ;;
+        'version use') return 0 ;;
+        'workspace') return 0 ;;
+        'workspace describe') return 0 ;;
+        'workspace init') return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+_putnami_flags_for() {
+    case "$1" in
+        'change-plan') printf '%s\n' '--base --head' ;;
+        'channel set') printf '%s\n' '--expected --from' ;;
+        'channel status') printf '%s\n' '--wait' ;;
+        'ci explain') printf '%s\n' '--branch --event --pr --tag' ;;
+        'ci fmt') printf '%s\n' '--check' ;;
+        'ci init') printf '%s\n' '--force' ;;
+        'compose') printf '%s\n' '--no-watch --port --ready-timeout' ;;
+        'context generate') printf '%s\n' '--force' ;;
+        'context map') printf '%s\n' '--print' ;;
+        'dev template') printf '%s\n' '--keep --skip-build --stable --version' ;;
+        'doctor') printf '%s\n' '--profile --project' ;;
+        'extensions install') printf '%s\n' '--dest --latest --platform --user' ;;
+        'extensions list') printf '%s\n' '--user' ;;
+        'extensions remove') printf '%s\n' '--user' ;;
+        'help') printf '%s\n' '--man --markdown' ;;
+        'init') printf '%s\n' '--extension --force --project --project-path --workspace' ;;
+        'install') printf '%s\n' '--latest' ;;
+        'migrate agent-content') printf '%s\n' '--apply --check --rollback' ;;
+        'migrate vnext') printf '%s\n' '--apply --check' ;;
+        'pin') printf '%s\n' '--remove' ;;
+        'projects create') printf '%s\n' '--force --path --template' ;;
+        'projects sync') printf '%s\n' '--prune --skip-install' ;;
+        'projects tag') printf '%s\n' '--remove --set' ;;
+        'qualify') printf '%s\n' '--expect-sha --platform-prefix --print-contract --ready-timeout --request-timeout --target' ;;
+        'report') printf '%s\n' '--session' ;;
+        'sessions export') printf '%s\n' '--since' ;;
+        'sessions inspect') printf '%s\n' '--run' ;;
+        'sessions list') printf '%s\n' '--revision' ;;
+        'sessions replay') printf '%s\n' '--session' ;;
+        'sessions summary') printf '%s\n' '--by-digest --command --since' ;;
+        'templates install') printf '%s\n' '--latest' ;;
+        'tree verify') printf '%s\n' '--base --gate --record --ref --report --snapshot' ;;
+        'upgrade') printf '%s\n' '--channel --cli --deps --dry-run --extensions --from-source --global --namespace --release --version' ;;
+        'version get') printf '%s\n' '--scope' ;;
+        'version list') printf '%s\n' '--global' ;;
+        'version tag') printf '%s\n' '--dry-run --push --scope --yes' ;;
+        'version use') printf '%s\n' '--global' ;;
+        'workspace init') printf '%s\n' '--extension --force --project --project-path --workspace' ;;
+    esac
+}
+
+_putnami_completions() {
+    local cur prev words cword
+    _init_completion || return
+
+    local commands="D P b build cache change-plan channel ci completion compose config context d deploy deps dev doctor extensions f format generate help infra init install l lint mcp migrate p package pin projects publish qualify report run s scopes serve sessions t telemetry templates test tree upgrade version workspace"
+    local structured="cache change-plan channel ci completion compose config context deps dev doctor extensions help infra init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade version workspace"
+    local global_flags="--verbose --debug --watch --plan --help --all --impacted --projects --tag --exclude-tag --exclude --baseline --impacted-strict --where --providers --credential-fd --no-cache --no-cache-projects --cache-trust --continue-on-error --max-parallel --resource --cpu-policy --retry --retry-failed --profile --dry-run --output --json --quiet --color --no-color --trace-profile --version"
+    local projects=""
+    local project_ids=""
+    local project_basenames=""
+    local project_aliases=""
+    # Every form ResolveTarget accepts for a positional/--projects target.
+    local project_targets="${project_ids} ${projects} ${project_basenames} ${project_aliases}"
+
+    # First argument: command name
+    if [[ ${cword} -eq 1 ]]; then
+        COMPREPLY=( $(compgen -W "${commands}" -- "${cur}") )
+        return
+    fi
+
+    local cmd="${words[1]}"
+
+    local path="${cmd}"
+    local i=2
+    while [[ ${i} -lt ${cword} ]]; do
+        local word="${words[${i}]}"
+        if [[ "${word}" == -* ]]; then
+            break
+        fi
+        local candidate="${path} ${word}"
+        if _putnami_path_known "${candidate}"; then
+            path="${candidate}"
+            ((i++))
+        else
+            break
+        fi
+    done
+
+    local nested_subcommands="$(_putnami_subcommands_for "${path}")"
+    if [[ -n "${nested_subcommands}" && "${cur}" != -* && ${i} -eq ${cword} ]]; then
+        COMPREPLY=( $(compgen -W "${nested_subcommands}" -- "${cur}") )
+        return
+    fi
+
+    # Flags and project names
+    local structured_values=""
+    case "${path} ${prev}" in
+        'workspace init --extension')
+            structured_values='go py ts'
+            ;;
+    esac
+
+    if [[ -n "${structured_values}" ]]; then
+        COMPREPLY=( $(compgen -W "${structured_values}" -- "${cur}") )
+    elif [[ "${cur}" == -* ]]; then
+        local structured_flags="$(_putnami_flags_for "${path}")"
+        COMPREPLY=( $(compgen -W "${structured_flags} ${global_flags}" -- "${cur}") )
+    elif [[ "${prev}" == "--projects" ]]; then
+        COMPREPLY=( $(compgen -W "${project_targets}" -- "${cur}") )
+    elif [[ "${prev}" == "--exclude" ]]; then
+        # --exclude matches project names.
+        COMPREPLY=( $(compgen -W "${projects}" -- "${cur}") )
+    elif [[ "${prev}" == "--output" ]]; then
+        COMPREPLY=( $(compgen -W "text json jsonl cloud-logging" -- "${cur}") )
+    elif [[ "${prev}" == "--tag" || "${prev}" == "--exclude-tag" ]]; then
+        # Tags are dynamic — no static completion
+        :
+    else
+        # Positional project target: IDs, names, basenames, and aliases
+        COMPREPLY=( $(compgen -W "${project_targets} ${global_flags}" -- "${cur}") )
+    fi
+}
+
+complete -F _putnami_completions putnami

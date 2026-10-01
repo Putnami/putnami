@@ -1,0 +1,25 @@
+[project]
+name = "py_example_library"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "Example Python library with string and math utilities"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# Registered so a bare `pytest` run (without the Putnami adapter's injected
+# plugin) does not warn about the executable-spec binding marker.
+markers = [
+    "putnami_proves(feature, requirement, check): bind this test to a declared executable-spec check",
+    "putnami_observes(feature, requirement, check): bind this test to a declared executable-spec threshold check",
+]

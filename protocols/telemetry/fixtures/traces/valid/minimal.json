@@ -1,0 +1,25 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "worker" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "putnami" },
+          "spans": [
+            {
+              "traceId": "00000000000000000000000000000001",
+              "spanId": "0000000000000001",
+              "name": "process",
+              "startTimeUnixNano": "1700000000000000000",
+              "endTimeUnixNano": "1700000000001000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

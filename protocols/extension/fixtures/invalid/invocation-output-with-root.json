@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/invocation-output-with-root",
+  "commands": {
+    "test": { "run": [{ "id": "setup", "task": "test-setup" }] }
+  },
+  "tasks": {
+    "test-setup": {
+      "kind": "command",
+      "command": "echo",
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "lease": { "kind": "file", "scope": "invocation", "root": "project", "path": "database/lease.json" }
+        }
+      }
+    }
+  }
+}

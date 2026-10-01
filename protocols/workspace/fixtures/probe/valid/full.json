@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "projects": [
+    {
+      "path": "go/framework/http",
+      "sourceName": "go.putnami.dev/http",
+      "sourceFile": "go/framework/http/go.mod",
+      "version": "0.1.0",
+      "type": "library",
+      "tags": ["go"],
+      "dependencies": ["go/framework/app", "protocols/http-routes"],
+      "dependencySources": { "go/framework/app": "go-module", "protocols/http-routes": "go-module" },
+      "publish": ["go"],
+      "runsWith": [],
+      "extensions": ["/go/extension"],
+      "watchedFiles": ["go/framework/http/go.mod", "go/framework/http/go.sum", "go.work", "go.work.sum"],
+      "metadata": {
+        "moduleRoot": "go/framework/http",
+        "toolchain": "1.25.7"
+      }
+    },
+    {
+      "path": "typescript/samples/10-service-to-service/clients/go",
+      "sourceName": "go.putnami.dev/examples/generated-client",
+      "sourceFile": "typescript/samples/10-service-to-service/clients/go/go.mod",
+      "metadata": { "generated": true }
+    }
+  ],
+  "watchedFiles": ["go.work", "go.work.sum"],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "missing-go-sum",
+      "message": "go.sum is absent; module graph may be incomplete",
+      "field": "go/framework/http"
+    }
+  ]
+}

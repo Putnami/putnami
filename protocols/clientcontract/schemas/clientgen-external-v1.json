@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/clientgen-external-v1.json",
+  "title": "Putnami external client contract inventory v1",
+  "description": "The older workspace-root layout: one file whose entries each name their project. clientgen reads none of its entries and lists the project file each one moves to; each project commits a clientgen-external-v2 document instead.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "contracts"],
+  "properties": {
+    "protocolVersion": {
+      "const": 1
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/contract"
+      }
+    }
+  },
+  "$defs": {
+    "workspacePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:\\.|(?!/|.*(?:^|/)\\.\\.(?:/|$)|.*\\\\).+)$"
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "authority", "adapter", "callsites", "owner", "tests", "reason"],
+      "properties": {
+        "project": {
+          "$ref": "#/$defs/workspacePath",
+          "description": "Canonical path of the indexed Putnami project that consumes the unmarked contract."
+        },
+        "authority": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable upstream authority for the third-party contract."
+        },
+        "adapter": {
+          "$ref": "#/$defs/workspacePath",
+          "description": "Workspace source file that adapts the external contract to the consumer."
+        },
+        "callsites": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/callsite"
+          },
+          "description": "Sorted concrete transport expressions owned by this adapter authority."
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Team or person responsible for the adapter."
+        },
+        "tests": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/workspacePath"
+          },
+          "description": "Sorted workspace paths to executable adapter contract tests."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why the upstream contract cannot use the first-party provider path."
+        }
+      }
+    },
+    "callsite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "transport", "symbol", "fingerprint"],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/workspacePath"
+        },
+        "transport": {
+          "enum": ["connect", "http", "putnami-client", "sse", "websocket"]
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

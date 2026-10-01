@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Putnami Real-Time</title>
+		<style>
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+		body {
+			font-family: system-ui, sans-serif;
+			max-width: 800px;
+			margin: 0 auto;
+			padding: 2rem;
+		}
+		h1 {
+			margin-bottom: 1rem;
+		}
+		input,
+		button {
+			padding: 0.5rem;
+			font-size: 1rem;
+		}
+		.tabs {
+			display: flex;
+			gap: 0.5rem;
+			margin-bottom: 1rem;
+		}
+		.tabs button {
+			padding: 0.5rem 1rem;
+			border: 1px solid #ccc;
+			background: #f9f9f9;
+			cursor: pointer;
+			border-radius: 4px;
+		}
+		.tabs button.active {
+			background: #333;
+			color: white;
+		}
+		.panel {
+			display: none;
+		}
+		.panel.active {
+			display: block;
+		}
+		#messages,
+		#notifications {
+			border: 1px solid #eee;
+			padding: 1rem;
+			height: 300px;
+			overflow-y: auto;
+			margin-bottom: 1rem;
+			background: #fafafa;
+		}
+		.msg {
+			padding: 0.25rem 0;
+			border-bottom: 1px solid #f0f0f0;
+		}
+		.msg .user {
+			font-weight: bold;
+		}
+		.msg .system {
+			color: #888;
+			font-style: italic;
+		}
+		#chatForm {
+			display: flex;
+			gap: 0.5rem;
+		}
+		#chatForm input {
+			flex: 1;
+		}
+		#users {
+			margin-bottom: 1rem;
+			color: #666;
+		}
+		</style>
+	</head>
+	<body>
+		<h1>Real-Time Demo</h1>
+		<div class="tabs">
+			<button type="button" class="active" data-tab="chat">WebSocket Chat</button>
+			<button type="button" data-tab="sse">SSE Notifications</button>
+		</div>
+
+		<div id="chatPanel" class="panel active">
+			<div id="joinSection">
+				<input id="username" placeholder="Your name">
+				<button type="button" id="joinBtn">Join</button>
+			</div>
+			<div id="users"></div>
+			<div id="messages"></div>
+			<form id="chatForm" style="display:none">
+				<input id="chatInput" placeholder="Type a message...">
+				<button type="submit">Send</button>
+			</form>
+		</div>
+
+		<div id="ssePanel" class="panel">
+			<button type="button" id="sseConnectBtn">Connect to SSE</button>
+			<button type="button" id="sseDisconnectBtn">Disconnect</button>
+			<div id="notifications"></div>
+		</div>
+
+		<script>
+		let ws;
+		let sse;
+
+		function showTab(tab) {
+			for (const b of document.querySelectorAll('.tabs button')) {
+				b.classList.remove('active');
+			}
+			for (const p of document.querySelectorAll('.panel')) {
+				p.classList.remove('active');
+			}
+			if (tab === 'chat') {
+				document.querySelector('.tabs button:first-child').classList.add('active');
+				document.getElementById('chatPanel').classList.add('active');
+			} else {
+				document.querySelector('.tabs button:last-child').classList.add('active');
+				document.getElementById('ssePanel').classList.add('active');
+			}
+		}
+
+		function joinChat() {
+			const name = document.getElementById('username').value.trim();
+			if (!name) return;
+			ws = new WebSocket(`ws://${location.host}/chat`);
+			ws.onopen = () => {
+				ws.send(JSON.stringify({ type: 'join', username: name }));
+				document.getElementById('joinSection').style.display = 'none';
+				document.getElementById('chatForm').style.display = 'flex';
+			};
+			ws.onmessage = (e) => {
+				const data = JSON.parse(e.data);
+				const div = document.getElementById('messages');
+				if (data.type === 'message') {
+					div.innerHTML += `<div class="msg"><span class="user">${data.username}:</span> ${data.text}</div>`;
+				} else if (data.type === 'join') {
+					div.innerHTML += `<div class="msg"><span class="system">${data.username} joined</span></div>`;
+				} else if (data.type === 'leave') {
+					div.innerHTML += `<div class="msg"><span class="system">${data.username} left</span></div>`;
+				} else if (data.type === 'users') {
+					document.getElementById('users').textContent = `Online: ${data.users.join(', ')}`;
+				}
+				div.scrollTop = div.scrollHeight;
+			};
+		}
+
+		function sendMessage(e) {
+			e.preventDefault();
+			const input = document.getElementById('chatInput');
+			if (input.value.trim() && ws) {
+				ws.send(JSON.stringify({ type: 'message', text: input.value }));
+				input.value = '';
+			}
+		}
+
+		function connectSSE() {
+			sse = new EventSource('/notifications');
+			const div = document.getElementById('notifications');
+			sse.onmessage = (e) => {
+				const data = JSON.parse(e.data);
+				div.innerHTML += `<div class="msg">${data.message} (${new Date(data.timestamp).toLocaleTimeString()})</div>`;
+				div.scrollTop = div.scrollHeight;
+			};
+		}
+
+		function disconnectSSE() {
+			if (sse) {
+				sse.close();
+				sse = null;
+			}
+			document.getElementById('notifications').innerHTML +=
+				'<div class="msg"><span class="system">Disconnected</span></div>';
+		}
+
+		for (const btn of document.querySelectorAll('[data-tab]')) {
+			btn.addEventListener('click', () => showTab(btn.dataset.tab));
+		}
+		document.getElementById('joinBtn').addEventListener('click', joinChat);
+		document.getElementById('chatForm').addEventListener('submit', sendMessage);
+		document.getElementById('sseConnectBtn').addEventListener('click', connectSSE);
+		document.getElementById('sseDisconnectBtn').addEventListener('click', disconnectSSE);
+		</script>
+	</body>
+</html>

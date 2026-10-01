@@ -1,0 +1,27 @@
+{
+  "name": "@example/13-fullstack-app",
+  "version": "0.0.0",
+  "description": "Complete production app — React SSR, REST API, PostgreSQL, events",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/analytics": "workspace:*",
+    "@putnami/application": "workspace:*",
+    "@putnami/database": "workspace:*",
+    "@putnami/events": "workspace:*",
+    "@putnami/migration": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/web": "workspace:*",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.3",
+    "@types/react-dom": "^19.2.3"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

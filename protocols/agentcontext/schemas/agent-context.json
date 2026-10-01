@@ -1,0 +1,229 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-agent-context.json",
+  "title": "Putnami Agent Context Document or Overrides File",
+  "description": "The two agent-context wire shapes: the per-project Document that aggregates a project's orientation facts by reference, and the author-owned OverridesFile that narrows deterministic selection. A document is exactly one of the two.",
+  "oneOf": [
+    { "$ref": "#/$defs/document" },
+    { "$ref": "#/$defs/overridesFile" }
+  ],
+  "$defs": {
+    "rootKind": {
+      "type": "string",
+      "enum": ["applicationMain", "describeEntrypoint"],
+      "description": "The kind of a composition root. Closed enum; adding a kind requires a protocol version bump."
+    },
+    "sourceReason": {
+      "type": "string",
+      "enum": ["capability-evidence", "main", "override"],
+      "description": "Why a representative source range was selected. Closed enum; adding a reason requires a protocol version bump."
+    },
+    "docRelationship": {
+      "type": "string",
+      "enum": ["checked", "unchecked"],
+      "description": "Whether a doc-to-code relationship was verified. Closed enum; adding a status requires a protocol version bump."
+    },
+    "testPolicy": {
+      "type": "string",
+      "enum": ["auto", "require", "skip"],
+      "description": "How the test tooling behaves; mirrors database TestMode. Closed enum; adding a value requires a protocol version bump."
+    },
+    "absenceReason": {
+      "type": "string",
+      "enum": ["not-collected", "no-packs", "unsupported-project-type"],
+      "description": "Machine-readable reason a tests section carries no packs. Closed enum; adding a reason requires a protocol version bump."
+    },
+    "tokenMethod": {
+      "type": "string",
+      "enum": ["bytes/4"],
+      "description": "How a token estimate was computed. Closed enum; adding a method requires a protocol version bump."
+    },
+    "aggregationMethod": {
+      "type": "string",
+      "enum": ["by-reference"],
+      "description": "How the document aggregates project facts. Closed enum; adding a method requires a protocol version bump."
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Content address in sha256:<64 lowercase hex> form."
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A non-empty workspace-relative POSIX path (no leading '/' and no '..' segment)."
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "path"],
+      "description": "Project identity and dependency graph — workspace-owned facts only.",
+      "properties": {
+        "id": { "type": "string", "description": "Workspace project id." },
+        "name": { "type": "string", "description": "Project package/module name." },
+        "path": { "$ref": "#/$defs/relativePath", "description": "Workspace-relative project directory." },
+        "type": { "type": "string", "description": "Workspace project type when set." },
+        "tags": { "type": "array", "items": { "type": "string" }, "description": "Project workspace tags." },
+        "languages": { "type": "array", "items": { "type": "string" }, "description": "Languages the project is written in." },
+        "dependencies": { "type": "array", "items": { "type": "string" }, "description": "Ids of projects this project depends on." },
+        "dependents": { "type": "array", "items": { "type": "string" }, "description": "Ids of projects that depend on this project." }
+      }
+    },
+    "compositionRoot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path"],
+      "description": "One entrypoint into the project's wiring — kind, path, provenance only.",
+      "properties": {
+        "kind": { "$ref": "#/$defs/rootKind" },
+        "path": { "$ref": "#/$defs/relativePath" },
+        "provenance": { "type": "string", "description": "Short tag naming how the root was identified." },
+        "sensitive": { "type": "boolean", "description": "Marks a root pointing at caller-flagged sensitive material." }
+      }
+    },
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "description": "A reference to a committed artifact by path + digest; never embedded content.",
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "digest": { "$ref": "#/$defs/digest" },
+        "kind": { "type": "string", "description": "Optional within-section disambiguator (e.g. an infra 'secret' kind)." },
+        "sensitive": { "type": "boolean", "description": "Marks a reference to caller-flagged sensitive material." }
+      }
+    },
+    "tokenEstimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["estimated", "method"],
+      "description": "Token-budget estimate for a referenced range, with the method that produced it.",
+      "properties": {
+        "estimated": { "type": "integer", "minimum": 0, "description": "Estimated token count for the range." },
+        "method": { "$ref": "#/$defs/tokenMethod" }
+      }
+    },
+    "sourceRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "startLine", "endLine", "why", "tokens"],
+      "description": "A representative slice of a source file by path + line range — never content.",
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "startLine": { "type": "integer", "minimum": 1, "description": "1-based first line (inclusive)." },
+        "endLine": { "type": "integer", "minimum": 1, "description": "1-based last line (inclusive); >= startLine." },
+        "why": { "$ref": "#/$defs/sourceReason" },
+        "tokens": { "$ref": "#/$defs/tokenEstimate" },
+        "sensitive": { "type": "boolean", "description": "Marks a range in caller-flagged sensitive material." }
+      }
+    },
+    "docRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "relationship"],
+      "description": "An adjacent documentation reference with a checked/unchecked relationship status.",
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "relationship": { "$ref": "#/$defs/docRelationship" },
+        "sensitive": { "type": "boolean", "description": "Marks a doc in caller-flagged sensitive material." }
+      }
+    },
+    "packRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "description": "A conformance-pack reference mirroring conformance/pack.json (id, capabilityKinds, languages).",
+      "properties": {
+        "id": { "type": "string", "description": "Stable conformance-pack identifier." },
+        "capabilityKinds": { "type": "array", "items": { "type": "string" }, "description": "Capability kinds the pack certifies." },
+        "languages": { "type": "array", "items": { "type": "string" }, "description": "Language adapters that ship a runner." }
+      }
+    },
+    "testsSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy"],
+      "description": "The optional tests section: packs + policy + fixture digests, or an absence reason.",
+      "properties": {
+        "policy": { "$ref": "#/$defs/testPolicy" },
+        "packs": { "type": "array", "items": { "$ref": "#/$defs/packRef" }, "description": "Referenced conformance packs." },
+        "fixtureDigests": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" }, "description": "Test-fixture artifacts by path + digest." },
+        "absenceReason": { "$ref": "#/$defs/absenceReason", "description": "Why packs is empty; required when packs is empty, forbidden otherwise." }
+      }
+    },
+    "operationalSurface": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Refs-only hints about a project's runtime surface.",
+      "properties": {
+        "platformEndpoints": { "type": "boolean", "description": "Whether the project exposes the platform operational endpoints." }
+      }
+    },
+    "configSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Config schema reference and operational surface hints — references only.",
+      "properties": {
+        "schemaRef": { "$ref": "#/$defs/artifactRef", "description": "Committed config schema by path + digest." },
+        "operational": { "$ref": "#/$defs/operationalSurface" }
+      }
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "description": "The tool that produced the document.",
+      "properties": {
+        "name": { "type": "string", "description": "Generator identity." },
+        "version": { "type": "string", "description": "Generator version." }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspaceRevision", "generator", "aggregationMethod"],
+      "description": "Freshness and origin: workspace revision, generator, aggregation method.",
+      "properties": {
+        "workspaceRevision": { "type": "string", "description": "Workspace revision the document was computed at." },
+        "generator": { "$ref": "#/$defs/generator" },
+        "aggregationMethod": { "$ref": "#/$defs/aggregationMethod" }
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "identity", "provenance"],
+      "description": "The per-project agent-context artifact emitted to <project>/.gen/agent-context.json.",
+      "properties": {
+        "$schema": { "type": "string", "description": "JSON Schema reference." },
+        "protocolVersion": { "type": "integer", "const": 1, "description": "Current agent-context protocol version." },
+        "identity": { "$ref": "#/$defs/identity" },
+        "compositionRoots": { "type": "array", "items": { "$ref": "#/$defs/compositionRoot" }, "description": "The project's entrypoints." },
+        "capabilities": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" }, "description": "Capability manifest references." },
+        "contracts": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" }, "description": "Contract artifact references." },
+        "infra": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" }, "description": "Infra requirement references." },
+        "migrations": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" }, "description": "Migration bundle references." },
+        "representativeSources": { "type": "array", "items": { "$ref": "#/$defs/sourceRange" }, "description": "Selected source ranges, never content." },
+        "tests": { "$ref": "#/$defs/testsSection" },
+        "docs": { "type": "array", "items": { "$ref": "#/$defs/docRef" }, "description": "Adjacent documentation references." },
+        "config": { "$ref": "#/$defs/configSection" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "overridesFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion"],
+      "description": "The author-owned schema/agent-context.overrides.json that narrows deterministic selection.",
+      "properties": {
+        "$schema": { "type": "string", "description": "JSON Schema reference." },
+        "protocolVersion": { "type": "integer", "const": 1, "description": "Current agent-context protocol version." },
+        "addSources": { "type": "array", "items": { "$ref": "#/$defs/sourceRange" }, "description": "Representative-source ranges to add." },
+        "removeSources": { "type": "array", "items": { "$ref": "#/$defs/relativePath" }, "description": "Source paths to drop from the selection." },
+        "addDocs": { "type": "array", "items": { "$ref": "#/$defs/docRef" }, "description": "Documentation references to add." },
+        "removeDocs": { "type": "array", "items": { "$ref": "#/$defs/relativePath" }, "description": "Doc paths to drop." },
+        "sensitive": { "type": "array", "items": { "$ref": "#/$defs/relativePath" }, "description": "Paths to force-flag as sensitive." }
+      }
+    }
+  }
+}

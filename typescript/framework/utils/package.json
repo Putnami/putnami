@@ -1,0 +1,34 @@
+{
+  "name": "@putnami/utils",
+  "version": "0.0.0",
+  "description": "Shared utility functions for object manipulation, type checking, URL handling, and common helpers",
+  "keywords": [
+    "utilities",
+    "helpers",
+    "typescript"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/utils"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "browser": "./src/index.browser.ts",
+      "default": "./src/index.ts"
+    },
+    "./hooks": {
+      "default": "./src/server/hooks.ts"
+    }
+  },
+  "private": false,
+  "devDependencies": {
+    "@putnami/spectest": "workspace:*"
+  }
+}

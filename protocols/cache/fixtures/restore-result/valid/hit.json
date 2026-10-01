@@ -1,0 +1,1 @@
+{ "status": "hit", "result": { "status": "success", "durationMs": 1200 }, "manifest": { "files": [ { "path": "dist/a.js", "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "mode": 420, "size": 12 } ] } }

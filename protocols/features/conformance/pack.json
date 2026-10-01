@@ -1,0 +1,6 @@
+{
+  "id": "putnami.features.protocol-v1",
+  "corpus": "vectors.json",
+  "capabilityKinds": [],
+  "languages": ["go"]
+}

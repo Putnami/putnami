@@ -1,0 +1,57 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "npm registry API (github.com/npm/registry/blob/master/docs/REGISTRY-API.md)",
+      "adapter": "typescript/extension/cmd/putnami-ts/deps_upgrade.go",
+      "callsites": [
+        {
+          "path": "typescript/extension/cmd/putnami-ts/deps_upgrade.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "5e7839aff490c16ff8d8bd0a6040cf3b379052979c6bae7fe36686d4e3e8bded"
+        },
+        {
+          "path": "typescript/extension/cmd/putnami-ts/deps_upgrade.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "cf1022f32f0fd3f3303c975c0bfde8991d1f620c3c1de761dcc29af4ebf97040"
+        }
+      ],
+      "owner": "@putnami/typescript",
+      "tests": [
+        "typescript/extension/cmd/putnami-ts/deps_upgrade_test.go"
+      ],
+      "reason": "Reads package metadata to resolve the version an upgrade pins."
+    },
+    {
+      "authority": "npm registry API (github.com/npm/registry/blob/master/docs/REGISTRY-API.md)",
+      "adapter": "typescript/extension/cmd/putnami-ts/publish.go",
+      "callsites": [
+        {
+          "path": "typescript/extension/cmd/putnami-ts/publish.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "afc43fc8c958252028a3bdaec97b497a46c9c82ffa469bdca3c32d5675dfc400"
+        },
+        {
+          "path": "typescript/extension/cmd/putnami-ts/publish.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "0d3a08ffb0dfc742bcc7f28328ffb9d6e0544fe7b054baf0bfbd237a16ba113d"
+        },
+        {
+          "path": "typescript/extension/cmd/putnami-ts/publish.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "f7953373f3a529e96655647c28529b58fe771d972645031704a731fc88637e6f"
+        }
+      ],
+      "owner": "@putnami/typescript",
+      "tests": [
+        "typescript/extension/cmd/putnami-ts/publish_test.go"
+      ],
+      "reason": "Publishes a package tarball and reads back its published metadata."
+    }
+  ]
+}

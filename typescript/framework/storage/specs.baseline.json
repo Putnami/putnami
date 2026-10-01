@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/object-storage#backend-lifecycle",
+    "typescript/object-storage#bounded-expiry",
+    "typescript/object-storage#declared-infrastructure",
+    "typescript/object-storage#error-body-not-serialized",
+    "typescript/object-storage#key-safety",
+    "typescript/object-storage#one-contract",
+    "typescript/object-storage#public-bucket-warning",
+    "typescript/object-storage#signed-url-binding",
+    "typescript/object-storage#typed-shapes",
+    "typescript/object-storage#upload-constraints"
+  ]
+}

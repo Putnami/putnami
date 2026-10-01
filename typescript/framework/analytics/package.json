@@ -1,0 +1,46 @@
+{
+  "name": "@putnami/analytics",
+  "version": "0.0.0",
+  "description": "Cookieless web analytics collection for Putnami web applications: page views, declared actions, sessions, daily aggregates in the app's own Postgres",
+  "bin": {
+    "putnami-analytics-generate": "./bin/generate.ts"
+  },
+  "keywords": [
+    "analytics",
+    "web",
+    "privacy",
+    "cookieless",
+    "putnami"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/analytics"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "browser": "./src/index.browser.ts",
+      "default": "./src/index.ts"
+    },
+    "./tracker": {
+      "browser": "./src/client/entry.ts"
+    }
+  },
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/database": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/utils": "workspace:*",
+    "@putnami/web": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.3"
+  },
+  "private": false
+}

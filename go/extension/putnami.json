@@ -1,0 +1,43 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/go",
+  "tags": [
+    "go",
+    "extension"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "options": {
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-go",
+      "version-var": "main.runtimeVersion"
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    },
+    "test": {
+      "filePatterns": [
+        "../../go.work",
+        "git:**/go.mod",
+        "git:**/putnami.extension.json",
+        "../../tooling/contributor/putnami.json",
+        "../../tooling/contributor/src/**",
+        "../../typescript/extension/internal/pkg/manifest_contract.go",
+        "git:../../typescript/extension/bin/**",
+        "git:../../python/extension/bin/**",
+        "git:../../protocols/transaction/**",
+        "../../protocols/infra/fixtures/equivalence/secrets.golden.json"
+      ]
+    }
+  }
+}

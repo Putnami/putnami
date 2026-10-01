@@ -1,0 +1,20 @@
+{
+  "$comment": "Immutable prior-release machine-result artifacts, recovered with `git show <sourceCommit>:<sourcePath>`. Checked by TestPriorReleaseResultArtifactsAreImmutable. The compatibility budget these prove is tooling/cli/doc/21-compatibility-and-migration.md.",
+  "fixtures": [
+    {
+      "file": "result-v1-schema-f70fd2d44.json",
+      "protocolVersion": 1,
+      "sourceCommit": "f70fd2d4474a7016063c72cf45433a22f39ae74d",
+      "sourcePath": "protocols/cli/schemas/result.json",
+      "committed": "2026-07-26",
+      "sha256": "2b73b7ed1ae76de8f7c9617fcee936c6be5bcccf5331548601b99f45a98a8a45",
+      "why": "The published version-1 result schema in its LAST released state, recovered from the final commit that changed it — before a later change deleted the v1 emitters and another deleted the constructor and writer. Documents recorded by those builds are still on disk, so the retained read shape must still describe them: this fixture is what proves the in-tree schema has not drifted since the last build that could emit against it."
+    }
+  ],
+  "gaps": [
+    {
+      "shape": "a machine-emitted version-1 result document",
+      "reason": "No `--output=json` document was ever committed to this repository — the v1 emitters were exercised by in-memory tests, not by goldens. The v1 read path is therefore driven by the literal documents in result_test.go, whose shape is pinned against this recovered schema."
+    }
+  ]
+}

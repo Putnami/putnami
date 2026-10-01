@@ -1,0 +1,26 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": [
+    "A customer exports an issued invoice without leaving the billing workspace",
+    "An exported invoice stays readable after the issuing revision is superseded"
+  ],
+  "nonGoals": [
+    "Exporting a draft invoice",
+    "Exporting invoices owned by another tenant"
+  ],
+  "requirements": [
+    {
+      "id": "export-format",
+      "text": "An export states its format in the response content type and never guesses it from the file name."
+    },
+    {
+      "id": "retention",
+      "text": "An exported invoice stays retrievable for the full invoice retention period."
+    }
+  ],
+  "decisions": [
+    "protocols/features/doc/adr/0001-minimal-spec-contract.md"
+  ]
+}

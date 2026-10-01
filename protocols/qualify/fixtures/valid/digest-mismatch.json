@@ -1,0 +1,83 @@
+{
+  "protocolVersion": 1,
+  "project": "/go/samples/service-to-service",
+  "target": {
+    "kind": "url",
+    "url": "http://127.0.0.1:3910"
+  },
+  "binding": {
+    "kind": "artifact",
+    "expectedSHA": "deadbeef0",
+    "observedSHA": "3cc91b658a1e0f7d2c4b9e8f6a5d3c2b1a0f9e8d"
+  },
+  "contract": {
+    "digest": "sha256:19782e4140d2d58581b8821654e85ea9c96deaf1b2683dd55d2912856c4d8adc",
+    "requests": 4,
+    "derivedFrom": [
+      {
+        "kind": "http-routes",
+        "path": "go/samples/service-to-service/schema/http-routes.json",
+        "digest": "sha256:b71b8bcddd7e3f336d3abc1cf4cff56ed3a89536c44de8da65fccb01469681be"
+      }
+    ]
+  },
+  "phases": [
+    {
+      "name": "resolve-target",
+      "state": "passed",
+      "durationMs": 12
+    },
+    {
+      "name": "readiness",
+      "state": "passed",
+      "durationMs": 12
+    },
+    {
+      "name": "version-binding",
+      "state": "digest_mismatch",
+      "durationMs": 12,
+      "diagnostics": [
+        {
+          "severity": "error",
+          "code": "qualify.version_mismatch",
+          "message": "/version reports sha 3cc91b658a1e0f7d2c4b9e8f6a5d3c2b1a0f9e8d, which does not start with the expected deadbeef0"
+        }
+      ]
+    },
+    {
+      "name": "smoke",
+      "state": "not_run",
+      "durationMs": 0
+    },
+    {
+      "name": "teardown",
+      "state": "passed",
+      "durationMs": 12
+    }
+  ],
+  "requests": [
+    {
+      "id": "GET /credential-check",
+      "durationMs": 0,
+      "state": "not_run"
+    },
+    {
+      "id": "GET /items",
+      "durationMs": 0,
+      "state": "not_run"
+    },
+    {
+      "id": "GET /tenant-check",
+      "durationMs": 0,
+      "state": "not_run"
+    },
+    {
+      "id": "GET /whoami",
+      "durationMs": 0,
+      "state": "not_run"
+    }
+  ],
+  "state": "digest_mismatch",
+  "startedAt": "2026-09-17T10:00:00Z",
+  "finishedAt": "2026-09-17T10:00:00Z"
+}

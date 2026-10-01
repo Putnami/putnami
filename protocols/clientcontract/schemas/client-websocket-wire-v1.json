@@ -1,0 +1,409 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/client-websocket-wire-v1.json",
+  "title": "Putnami first-party WebSocket wire protocol v1",
+  "description": "The closed frame vocabulary of a first-party WebSocket transport. Admission happens in band, in the first client frame, on a socket opened with the putnami.service.v1 subprotocol and no handshake header; the conversation then follows the published state machine await-init, await-ready, open, half-closed, terminal.",
+  "oneOf": [
+    { "$ref": "#/$defs/init" },
+    { "$ref": "#/$defs/ready" },
+    { "$ref": "#/$defs/message" },
+    { "$ref": "#/$defs/halfClose" },
+    { "$ref": "#/$defs/result" },
+    { "$ref": "#/$defs/error" },
+    { "$ref": "#/$defs/cancel" },
+    { "$ref": "#/$defs/ping" },
+    { "$ref": "#/$defs/pong" }
+  ],
+  "$defs": {
+    "version": {
+      "const": 1,
+      "description": "The wire protocol version. Only version 1 exists; a peer refuses any other value instead of guessing a dialect."
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._~-]+$",
+      "description": "A bounded opaque identifier: URL-safe characters only, so it can never smuggle a control character into a log line or a close reason."
+    },
+    "uint64": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+      "description": "Canonical decimal uint64; readers additionally reject values above 18446744073709551615. Sequences and deadlines travel as text so a JavaScript reader never loses the low bits of a value past 2^53."
+    },
+    "positiveUint64": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,19}$",
+      "description": "Canonical positive decimal uint64; readers additionally enforce the uint64 maximum. Message sequences start at 1."
+    },
+    "credential": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "value"],
+      "description": "One resolved credential, selected by a declared profile. Credential values are first-frame material: they never appear in a URL, a subprotocol list, a diagnostic, a telemetry attribute, a close reason, or generated source.",
+      "properties": {
+        "profile": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The name of a credential profile declared in the provider's x-putnami-client document."
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536,
+          "description": "The resolved credential value for that profile, bounded so a socket cannot be used to push an unbounded secret."
+        }
+      }
+    },
+    "header": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "values"],
+      "description": "One ordinary request header carried in band. Authentication, client identity, tracing, hop-by-hop and WebSocket negotiation headers have dedicated fields and cannot be overridden here.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$",
+          "description": "The header field name, restricted to RFC 9110 token characters and refused when it collides with a reserved or credential-carrying name."
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "description": "The header's ordered values; between 1 and 32, each free of CR, LF and NUL so no value can split a frame or a log record.",
+          "items": { "type": "string", "maxLength": 8192, "pattern": "^[^\\r\\n\\u0000]*$" }
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Bounded propagation carried in the protected init frame rather than in the URL or the subprotocol list, which a browser exposes and a proxy logs.",
+      "properties": {
+        "traceparent": {
+          "type": "string",
+          "maxLength": 4096,
+          "pattern": "^[^\\r\\n\\u0000]*$",
+          "description": "The W3C traceparent of the calling span, so the stream joins the caller's trace."
+        },
+        "tracestate": {
+          "type": "string",
+          "maxLength": 4096,
+          "pattern": "^[^\\r\\n\\u0000]*$",
+          "description": "The W3C tracestate accompanying traceparent, forwarded opaquely."
+        },
+        "baggage": {
+          "type": "string",
+          "maxLength": 4096,
+          "pattern": "^[^\\r\\n\\u0000]*$",
+          "description": "W3C baggage forwarded opaquely; it is bounded and never interpreted by the transport."
+        },
+        "requestId": {
+          "type": "string",
+          "maxLength": 4096,
+          "pattern": "^[^\\r\\n\\u0000]*$",
+          "description": "The caller's request identity, so provider logs correlate with the caller's without a header the browser cannot set."
+        }
+      }
+    },
+    "resume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token", "afterSequence"],
+      "description": "A request to resume a previously admitted server stream. It is legal only when the selected transport declares websocket.resume.",
+      "properties": {
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "The resume token the provider issued on a previous ready frame. It is sensitive first-frame material."
+        },
+        "afterSequence": {
+          "$ref": "#/$defs/uint64",
+          "description": "The last sequence the caller received completely. The provider resumes strictly after it, so no delivered value repeats and none is skipped."
+        }
+      }
+    },
+    "jsonPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["encoding", "value"],
+      "description": "A JSON-encoded application payload. The authored JSON value is preserved exactly, including numeric literals a float would round.",
+      "properties": {
+        "encoding": {
+          "const": "json",
+          "description": "Marks the payload as JSON, matching the selected transport's declared encoding."
+        },
+        "value": true
+      }
+    },
+    "protoPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["encoding", "base64"],
+      "description": "A protobuf-encoded application payload. The contract accepts it in v1 even where a runtime cannot yet decode it: an undeliverable transport is a strict generation error, never a runtime refusal.",
+      "properties": {
+        "encoding": {
+          "const": "proto",
+          "description": "Marks the payload as protobuf, matching the selected transport's declared encoding."
+        },
+        "base64": {
+          "type": "string",
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+          "description": "The protobuf bytes as canonical RFC 4648 base64; readers additionally re-encode and compare, so a non-canonical spelling is refused."
+        }
+      }
+    },
+    "payload": {
+      "description": "One application payload in exactly one of the two declared encodings.",
+      "oneOf": [
+        { "$ref": "#/$defs/jsonPayload" },
+        { "$ref": "#/$defs/protoPayload" }
+      ]
+    },
+    "init": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "operationId", "clientId", "deadlineUnixMs", "budgetMs", "credentials", "headers"],
+      "description": "The mandatory first client frame and the only admission channel. It carries the identity, credentials, budgets and propagation a browser cannot put in a handshake header.",
+      "properties": {
+        "v": {
+          "$ref": "#/$defs/version",
+          "description": "The wire protocol version this frame is encoded in."
+        },
+        "type": { "const": "init", "description": "Identifies the frame as the admission request." },
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The generated operation being opened. The provider refuses an init that does not name the operation the upgraded route belongs to."
+        },
+        "clientId": {
+          "$ref": "#/$defs/token",
+          "description": "The calling client's declared identity, checked against the operation's authorized clients."
+        },
+        "deadlineUnixMs": {
+          "$ref": "#/$defs/uint64",
+          "description": "Absolute Unix epoch milliseconds, or 0 when no total deadline applies; idle and handshake bounds still apply."
+        },
+        "budgetMs": {
+          "$ref": "#/$defs/uint64",
+          "description": "Remaining total budget in milliseconds, or 0 when no total deadline applies; idle and handshake bounds still apply."
+        },
+        "credentials": {
+          "type": "array",
+          "maxItems": 32,
+          "description": "The resolved credentials, which must satisfy exactly one declared security alternative. The array is present even when empty.",
+          "items": { "$ref": "#/$defs/credential" }
+        },
+        "headers": {
+          "type": "array",
+          "maxItems": 64,
+          "description": "The declared ordinary headers for this call. The array is present even when empty.",
+          "items": { "$ref": "#/$defs/header" }
+        },
+        "context": {
+          "$ref": "#/$defs/context",
+          "description": "Bounded trace and request propagation for this call."
+        },
+        "resume": {
+          "$ref": "#/$defs/resume",
+          "description": "Present only when the caller resumes a previously admitted server stream."
+        },
+        "request": {
+          "$ref": "#/$defs/payload",
+          "description": "The single request message of a server-streaming operation, which has no client message direction."
+        }
+      }
+    },
+    "ready": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "resumed"],
+      "description": "Admission: the provider proves authentication and authorization completed before its handler sees any application message. It is sent exactly once.",
+      "properties": {
+        "v": {
+          "$ref": "#/$defs/version",
+          "description": "The wire protocol version this frame is encoded in."
+        },
+        "type": { "const": "ready", "description": "Identifies the frame as admission." },
+        "resumed": {
+          "type": "boolean",
+          "description": "True when the provider honoured the init frame's resume request. It is always present, so a reader never infers resumption from an absent field."
+        },
+        "resumeToken": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "The token a later call passes back in init.resume. It is required when resumed is true and may also be issued on a fresh stream."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "resumed": { "const": true } }, "required": ["resumed"] },
+          "then": { "required": ["resumeToken"] }
+        }
+      ]
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "sequence", "payload"],
+      "description": "One ordered application message. Sequences are per-direction and gap-free, so a reader detects a lost or reordered message instead of absorbing it.",
+      "properties": {
+        "v": {
+          "$ref": "#/$defs/version",
+          "description": "The wire protocol version this frame is encoded in."
+        },
+        "type": { "const": "message", "description": "Identifies the frame as an application message." },
+        "sequence": {
+          "$ref": "#/$defs/positiveUint64",
+          "description": "The message's position in its own direction, starting at 1 or continuing after a resumed afterSequence."
+        },
+        "payload": {
+          "$ref": "#/$defs/payload",
+          "description": "The application value, in the transport's declared encoding."
+        }
+      }
+    },
+    "halfClose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type"],
+      "description": "Ends the client message direction while leaving the provider direction live. It is client-only: the provider terminates with result or error.",
+      "properties": {
+        "v": {
+          "$ref": "#/$defs/version",
+          "description": "The wire protocol version this frame is encoded in."
+        },
+        "type": { "const": "half-close", "description": "Identifies the frame as the end of the client message direction." }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type"],
+      "description": "The single successful terminal provider frame. On a server stream it carries no payload: values are delivered as message frames, and a payload here would be a second, undeclared delivery channel.",
+      "properties": {
+        "v": {
+          "$ref": "#/$defs/version",
+          "description": "The wire protocol version this frame is encoded in."
+        },
+        "type": { "const": "result", "description": "Identifies the frame as successful termination." },
+        "payload": {
+          "$ref": "#/$defs/payload",
+          "description": "The final response of a client-streaming or bidirectional operation."
+        }
+      }
+    },
+    "remoteError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "code"],
+      "description": "A typed framework error. It carries framework fields only: never a raw response, headers, credential values, or an arbitrary server cause.",
+      "properties": {
+        "status": {
+          "type": "integer",
+          "minimum": 400,
+          "maximum": 599,
+          "description": "The HTTP status the same failure would carry over REST, so one declared error maps across transports."
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The stable framework error code, in the dotted snake_case vocabulary of go/framework/errors. It is what selects the declared error a generated client raises."
+        },
+        "grpcCode": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "The equivalent gRPC status code, present when the operation also declares a Connect transport."
+        },
+        "retryable": {
+          "type": "boolean",
+          "description": "Whether the provider states this failure may be retried, so the caller does not infer retryability from the status alone."
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4096,
+          "description": "A bounded human-readable message. It is diagnostic text, never a machine contract."
+        },
+        "details": {
+          "description": "The declared error's structured payload, matching the schema the operation declares for this code."
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "error"],
+      "description": "The single failed terminal provider frame. It is also how a refused admission is reported, so a rejection stays a decodable typed error instead of an opaque close code.",
+      "properties": {
+        "v": {
+          "$ref": "#/$defs/version",
+          "description": "The wire protocol version this frame is encoded in."
+        },
+        "type": { "const": "error", "description": "Identifies the frame as failed termination." },
+        "error": {
+          "$ref": "#/$defs/remoteError",
+          "description": "The typed framework error that terminates the conversation."
+        }
+      }
+    },
+    "cancel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "code"],
+      "description": "Caller-initiated termination, without an arbitrary reason string. It is client-only and legal from init onwards: before init no operation identity exists to cancel.",
+      "properties": {
+        "v": {
+          "$ref": "#/$defs/version",
+          "description": "The wire protocol version this frame is encoded in."
+        },
+        "type": { "const": "cancel", "description": "Identifies the frame as caller-initiated termination." },
+        "code": {
+          "enum": ["canceled", "deadline_exceeded"],
+          "description": "Why the caller stopped: an explicit cancellation or an elapsed deadline. The spelling is the framework's own, canceled."
+        }
+      }
+    },
+    "heartbeat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "nonce"],
+      "description": "Liveness in either direction. It is legal from await-ready onwards, so a slow admission — an asynchronous credential check — does not trip the idle budget before ready.",
+      "properties": {
+        "v": {
+          "$ref": "#/$defs/version",
+          "description": "The wire protocol version this frame is encoded in."
+        },
+        "type": {
+          "enum": ["ping", "pong"],
+          "description": "Whether the frame solicits liveness or answers it."
+        },
+        "nonce": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9._~-]+$",
+          "description": "The bounded token a pong echoes back, so a peer matches an answer to its own ping."
+        }
+      }
+    },
+    "ping": {
+      "description": "A liveness solicitation.",
+      "allOf": [
+        { "$ref": "#/$defs/heartbeat" },
+        { "properties": { "type": { "const": "ping" } } }
+      ]
+    },
+    "pong": {
+      "description": "The answer to a ping, echoing its nonce.",
+      "allOf": [
+        { "$ref": "#/$defs/heartbeat" },
+        { "properties": { "type": { "const": "pong" } } }
+      ]
+    }
+  }
+}

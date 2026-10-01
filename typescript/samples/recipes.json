@@ -1,0 +1,99 @@
+{
+  "protocolVersion": 1,
+  "recipes": [
+    {
+      "intention": "Call a service that requires a credential and scopes (authorization client)",
+      "sample": "typescript/samples/10-service-to-service",
+      "primitives": [
+        "@putnami/application: api({ client: { service, credentials } })",
+        "@putnami/application: endpoint().secure({ scopes })",
+        "@putnami/application: authenticate({ anyOf })",
+        "generated client: registerItemsClient(app), resolved with endpoint().inject()"
+      ],
+      "antiPatterns": [
+        "A hand-written client class that sets the Authorization header itself",
+        "A custom middleware that parses credentials instead of authenticate()",
+        "Credential header names repeated in consumer code instead of the provider's credential profiles"
+      ],
+      "since": "0.0.0-20260917065345-3cc91b658"
+    },
+    {
+      "intention": "Generate a typed HTTP client for a provider service",
+      "sample": "typescript/samples/10-service-to-service",
+      "primitives": [
+        "@putnami/application: openapi()",
+        "@putnami/client/generator: clientGenerator({ packageName, targets })",
+        "putnami clientgen",
+        "@putnami/client: BaseClient (the generated classes extend it)"
+      ],
+      "antiPatterns": [
+        "A fetch wrapper with request and response types copied by hand",
+        "An edit inside a generated clients/ tree instead of a regeneration",
+        "A base URL, header or retry interceptor written in the consumer"
+      ],
+      "since": "0.0.0-20260917065345-3cc91b658"
+    },
+    {
+      "intention": "Run tests against a real database",
+      "sample": "typescript/samples/06-database",
+      "primitives": [
+        "infra/requirements.json databases entry (putnami test provisions the binding)",
+        "@putnami/database: database('default')",
+        "@putnami/application/testing: createTestApp({ plugins: [sql()] })",
+        "@putnami/database: closeAllDatabases()",
+        "@putnami/database/conformance: registerConformanceTests()"
+      ],
+      "antiPatterns": [
+        "A per-project database test helper that hardcodes a connection string or starts its own container",
+        "A test that opens a raw driver connection instead of the default datasource"
+      ],
+      "since": "0.0.0-20260917065345-3cc91b658"
+    },
+    {
+      "intention": "Serve a server-rendered route with an interactive island",
+      "sample": "typescript/samples/03-web",
+      "primitives": [
+        "@putnami/web: react()",
+        "@putnami/web: page files under src/app/ with loader() and useLoaderData()",
+        "@putnami/web: action(), Form and CsrfInput",
+        "@putnami/web: island().load('visible').render()"
+      ],
+      "antiPatterns": [
+        "Client-side fetching in a page for data a loader can provide",
+        "A whole page hydrated to make one widget interactive",
+        "A hand-written form handler without a CSRF input"
+      ],
+      "since": "0.0.0-20260917065345-3cc91b658"
+    },
+    {
+      "intention": "Add a database migration",
+      "sample": "typescript/samples/06-database",
+      "primitives": [
+        "@putnami/migration: MigrationContributor.migrationSources()",
+        "@putnami/database: sqlSourceInline({ namespace, datasource, definitions })",
+        "@putnami/database: sql({ autoApply: true })",
+        "@putnami/database: Table, Column, Key"
+      ],
+      "antiPatterns": [
+        "Schema DDL run from application startup code",
+        "A hand-rolled migrations table or runner"
+      ],
+      "since": "0.0.0-20260917065345-3cc91b658"
+    },
+    {
+      "intention": "Subscribe to an event topic",
+      "sample": "typescript/samples/09-events",
+      "primitives": [
+        "@putnami/events: topic(name, schema)",
+        "@putnami/events: handler(topic).handle() in src/events/*.on.ts",
+        "@putnami/events: getPublisher(topic)",
+        "@putnami/events: events()"
+      ],
+      "antiPatterns": [
+        "A polling loop or an in-process emitter between features",
+        "An untyped payload parsed by hand in the subscriber"
+      ],
+      "since": "0.0.0-20260917065345-3cc91b658"
+    }
+  ]
+}

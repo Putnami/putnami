@@ -1,0 +1,25 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/server-streams",
+  "outcomes": [
+    "A consumer learns that a stream was refused from the HTTP status, before it has parsed a single event",
+    "A provider cannot outrun a slow consumer or write a frame the consumer contract requires it to reject",
+    "A stream that produces nothing for a while stays distinguishable from a dead one"
+  ],
+  "nonGoals": ["Serving the WebSocket transport of the same endpoint", "Resuming a stream the consumer lost"],
+  "decisions": [
+    "typescript/framework/application/doc/adr/0002-server-stream-admission-is-the-response-head.md",
+    "protocols/clientcontract/doc/adr/0013-an-sse-stream-declares-how-it-continues-and-a-negotiated-stream-ends-explicitly.md"
+  ],
+  "requirements": [
+    {
+      "id": "sse-admission-and-bounds",
+      "text": "A server-stream endpoint decides admission before the first body byte: a request that carries a body and a request whose params or query do not validate are refused with a non-2xx status, never with a 200 followed by a terminal event. Past admission the provider bounds what it writes — queue depth and frame size are declared, and exceeding either fails the stream with the typed terminal event — and it writes liveness comments that carry no data so a quiet stream is not read as a dead one."
+    },
+    {
+      "id": "negotiated-sse-wire",
+      "text": "A first-party server stream that declares a continuation acknowledges a request that asks for putnami.sse.v1 on the admitted response head and ends it with the exact complete frame once the handler returns, every message was written and the consumer stayed. A failure ends it with the typed error, a cancellation or a draining provider with nothing, and a request that does not negotiate, or a route without a continuation, keeps the legacy framing byte for byte."
+    }
+  ]
+}

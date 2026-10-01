@@ -1,0 +1,12 @@
+{
+  "version": 3,
+  "toolchains": {
+    "deno": {
+      "version": "2.4.0",
+      "integrities": { "linux/amd64": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+      "source": "https://example.invalid/deno/"
+    }
+  },
+  "extensions": {},
+  "templates": {}
+}

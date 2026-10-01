@@ -1,0 +1,59 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/windows-consumers",
+  "outcomes": [
+    "A user on Windows 10 version 1803 or later or Windows 11, on amd64, installs the CLI with irm https://putnami.dev/install.ps1 | iex, without administrator rights, and the next terminal runs putnami",
+    "putnami init --project webapp --extension ts then putnami serve webapp give the same result on Windows as on macOS and Linux",
+    "A missing Windows prerequisite is named where it is missing, with the way to fix it, instead of surfacing later as an unrelated failure",
+    "Upgrading or switching the CLI on Windows replaces a running putnami.exe without Developer Mode"
+  ],
+  "nonGoals": [
+    "Running putnamiw, the contributor gate or an extension's bin/prepare on Windows: contributors stay on macOS and Linux",
+    "windows/arm64, which is built only once a host can prove it",
+    "Zip archives, or a store layout shortened for 260-character paths",
+    "Proving that the bytes come from Putnami: verification proves the bytes the registry advertised, and artifacts are not signed"
+  ],
+  "requirements": [
+    {
+      "id": "powershell-installer-trust",
+      "text": "install.ps1, served at https://putnami.dev/install.ps1, hashes the download and compares it with the digest the registry advertised or --sha256 states before it extracts, runs or installs it. A mismatch stops the install; a missing digest stops it unless PUTNAMI_UNSAFE_INSTALL=1 is set. The script runs no elevation command, the only registry value it sets is the user's Path in HKCU\\Environment, and it opens the machine Path read-only."
+    },
+    {
+      "id": "windows-shells-get-the-powershell-installer",
+      "text": "install.sh run from Git Bash, MSYS2 or Cygwin installs nothing: it prints the install.ps1 one-liner to type in a PowerShell window, and for cmd.exe or the current shell a download of install.ps1 run with powershell -File, never the one-liner passed to powershell -c, which Microsoft Defender blocks. It exits non-zero."
+    },
+    {
+      "id": "one-binary-switch-on-windows",
+      "text": "On Windows, install.ps1, putnami upgrade and putnami version use make putnami.exe a copy of the versioned binary, under an exclusive lock on .putnami-switch.lock in the same directory. A running putnami.exe is renamed aside to a .old- name that starts with a dot, and a later switch deletes it once it no longer runs. When the new binary cannot move in, the old one moves back; when that fails too, the old one stays aside and the error names its path."
+    },
+    {
+      "id": "windows-executables-by-name",
+      "text": "A windows/amd64 archive carries its executable at compiled/<name>.exe. putnami pin records windows/amd64 from any host and reads compiled/putnami.exe. On Windows the CLI runs an installed extension's declared runtime under its .exe name, never the unsuffixed file, and a missing runtime error names the .exe the extension must ship."
+    },
+    {
+      "id": "lf-checkout-policy",
+      "text": "putnami init writes a .gitattributes containing * text=auto eol=lf when the workspace has none, and never rewrites an existing one, even with --force. putnami doctor reports tracked text files checked out with CRLF, naming the first ones, and gives that rule as the fix. The content hasher does not normalize line endings."
+    },
+    {
+      "id": "windows-release-smoke",
+      "text": "scripts/smoke-check-release.ps1 runs the windows/amd64 release smoke with the inputs, leg names and neutral environment of smoke-check-release.sh. It names Bun, Git for Windows, LongPathsEnabled and tar.exe before any request, installs with the install.ps1 one-liner run as script text with -File, never passed on a command line, runs putnami init --project webapp --extension ts and putnami serve webapp, requires a 2xx response, and stops the server with CTRL_BREAK_EVENT, failing when it must kill it."
+    },
+    {
+      "id": "windows-prerequisites-are-named",
+      "text": "On Windows, putnami doctor reports LongPathsEnabled, Git core.longpaths and the Visual C++ runtime that Biome needs separately when one is off, missing or cannot be read, each with the command that enables or installs it. A workspace hook that finds no sh on PATH fails before it spawns anything, with an error that names Git for Windows as the provider of sh; on other platforms the error is unchanged."
+    },
+    {
+      "id": "providers-run-the-prepared-runtime",
+      "text": "A remote build-cache provider and a runner provider whose command is {extensionRuntime} start the runtime the CLI prepared and verified with the runtime-info handshake, as a task does: compiled/<name>, and compiled/<name>.exe on Windows, with no POSIX launcher. When that runtime cannot be prepared, a build uses only the local cache and prints one notice naming the failure, and a remote run stops with that error before it submits anything."
+    },
+    {
+      "id": "powershell-installer-run-form",
+      "text": "install.ps1 takes the run form of install.sh: ?run=<command>, which the site bakes into its one $RunCommandDefault line, --run, PUTNAMI_RUN and PUTNAMI_COMMAND_MAP_URL. Before it installs anything, it refuses a command that does not match ^[a-z][a-z0-9-]{0,63}$ or that a valid command map does not list. It pins the extension with extensions install --user --latest, runs putnami <command> in the caller's directory without writing there, and ends with its status: exit from a file, $LASTEXITCODE from text."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0012-install-trust-and-release-smoke.md",
+    "tooling/cli/doc/adr/0052-windows-consumers-junctions-job-objects-lf-and-long-paths.md"
+  ]
+}

@@ -1,0 +1,14 @@
+exit 2
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "features inspect",
+  "status": "failure",
+  "exitCode": 2,
+  "error": {
+    "code": "usage",
+    "message": "features inspect requires exactly one \u003cfeature-id\u003e"
+  }
+}
+--- stderr ---
+putnami: features inspect requires exactly one <feature-id>

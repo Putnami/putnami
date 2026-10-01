@@ -1,0 +1,29 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/examples/migrations-feature",
+  "description": "Go example: per-feature migration ownership end-to-end (plugin + server + migrate CLI)",
+  "tags": ["go", "e2e"],
+  "extensions": ["/go/extension"],
+  "featureAuthority": {"owner": "go/migration-execution"},
+  "dependencies": [
+    "/go/framework/app",
+    "/go/framework/database",
+    "/go/framework/http",
+    "/go/framework/logger",
+    "/go/framework/migration",
+    "/go/framework/migration/migratecli",
+    "/go/framework/platform"
+  ],
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    },
+    "serve": {
+      "port": 3803
+    },
+    "@putnami/go": {
+      "describe-entrypoint": "./cmd/server"
+    }
+  }
+}

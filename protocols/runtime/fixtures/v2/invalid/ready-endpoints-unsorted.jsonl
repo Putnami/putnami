@@ -1,0 +1,2 @@
+{"v":2,"type":"ready","data":{"target":"server","endpoints":[{"scheme":"https","host":"localhost","port":8443},{"scheme":"http","host":"localhost","port":3000}]}}
+{"v":2,"type":"result","data":{"status":"OK"}}

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/workspace-model",
+  "outcomes": [
+    "Every consumer of the CLI's workspace model — the orchestrator, extensions, and tools — sees one deterministic answer for what a target expression selects, what depends on what, and what a change reaches",
+    "The model stays a pure library: it can be read, tested and depended on without pulling in the engine that drives it"
+  ],
+  "nonGoals": [
+    "Workspace discovery from the filesystem, baseline resolution, and command-line flag handling, which tooling/cli owns",
+    "Scheduling and executing the jobs planned over the selected projects, which tooling/cli owns"
+  ],
+  "requirements": [
+    {
+      "id": "target-expression-grammar",
+      "text": "A target expression resolves deterministically across exact ids, relative paths, recursive and wildcard paths, aliases, groups, unions, and subtractions: input order is preserved, a union is deduplicated, and an unknown target is an error rather than an empty selection."
+    },
+    {
+      "id": "selection-filters",
+      "text": "Selection filters compose over the resolved targets: name and tag filters and explicit exclusions always apply, while a default-excluded tag is overridden by naming the project directly or including its tag — never the other way around."
+    },
+    {
+      "id": "dependency-graph",
+      "text": "The dependency graph answers transitive dependents, transitive dependencies, and a topological order deterministically, reports a declared cycle instead of looping, and keeps external path dependencies out of the ordering."
+    },
+    {
+      "id": "change-impact",
+      "text": "A changed file claims its nearest directory owner (symlinks, grouped paths canonicalized), asset, declared-input and scope-config readers, then the tasks of each that read it; a file no task reads claims nothing. Dependency edges, and contract edges whose committed contract changed, carry the tasks whose `^` reference names a source task; ordering-only edges carry none. A rebuilt extension reaches consumers for its own tasks; an unattributable claim or workspace-wide input keeps a project whole."
+    },
+    {
+      "id": "canonical-identity",
+      "text": "A project's canonical id derives from its workspace-relative path, grouped folders stay transparent so a grouped physical path resolves to the logical id, and a legacy name still resolves as a fallback."
+    },
+    {
+      "id": "model-purity",
+      "text": "The model module requires only protocol modules and never imports the CLI that drives it, so the boundary is enforced by the build rather than by convention."
+    },
+    {
+      "id": "import-visibility",
+      "text": "Every dependency edge carries the manifest family it came from — a declaration, a go.mod require or replace, a package.json dependency, or a generated client's contract — without changing which edges the graph carries. A project is importable within its own scope, the nearest ancestor directory whose putnami.json contributes scope configuration; an import that leaves it is reported unless the imported project is public or a generated client, and a contract edge is always allowed."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0038-nearest-ownership-and-ordering-only-scope-edges.md",
+    "tooling/cli/doc/adr/0042-impacted-plans-from-the-commit-and-records-why.md",
+    "tooling/cli/doc/adr/0044-selection-is-task-level.md",
+    "tooling/cli/doc/adr/0054-the-contract-edge-fires-on-the-committed-contract.md"
+  ]
+}

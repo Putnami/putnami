@@ -1,0 +1,19 @@
+{
+  "appName": "svc",
+  "version": "1.0.0",
+  "schemaHash": "sha256:d93c54ab2d46bb24",
+  "configs": [
+    {
+      "path": "database",
+      "fields": [
+        { "name": "driver", "type": "string", "default": "memory", "productionUnsafeDefault": true }
+      ]
+    },
+    {
+      "path": "session",
+      "fields": [
+        { "name": "signingKey", "type": "string", "sensitive": true, "productionUnsafeDefault": true }
+      ]
+    }
+  ]
+}

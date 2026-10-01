@@ -1,0 +1,123 @@
+{
+  "$defs": {
+    "AccessToken": {
+      "additionalProperties": false,
+      "properties": {
+        "expiresIn": {
+          "type": "integer"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "expiresIn",
+        "value"
+      ],
+      "type": "object"
+    },
+    "Credential": {
+      "description": "One presented credential.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "expiresIn": {
+              "type": "integer"
+            },
+            "type": {
+              "const": "access"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "expiresIn",
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "refresh"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "type": "string"
+            },
+            "type": {
+              "const": "anonymous"
+            }
+          },
+          "required": [
+            "reason",
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RefreshToken": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "type": "object"
+    },
+    "TokenBundle": {
+      "additionalProperties": false,
+      "description": "A tokenType plus its credential and scopes.",
+      "properties": {
+        "credential": {
+          "$ref": "#/$defs/Credential"
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tokenType": {
+          "$ref": "#/$defs/TokenType"
+        }
+      },
+      "required": [
+        "credential",
+        "scopes",
+        "tokenType"
+      ],
+      "type": "object"
+    },
+    "TokenType": {
+      "description": "The kind of bearer credential.",
+      "enum": [
+        "bearer",
+        "api_key"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "go.putnami.dev/example/identity contracts"
+}

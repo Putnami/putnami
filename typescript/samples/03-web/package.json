@@ -1,0 +1,24 @@
+{
+  "name": "@example/03-web",
+  "version": "0.0.0",
+  "description": "React SSR with pages, layouts, loaders, actions, and forms",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/analytics": "workspace:*",
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/web": "workspace:*",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.3",
+    "@types/react-dom": "^19.2.3"
+  },
+  "exports": {
+    "./serve": {
+      "default": "./src/serve.ts"
+    }
+  }
+}

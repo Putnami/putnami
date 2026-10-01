@@ -1,0 +1,57 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "features list",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "compatibility": "provisional",
+    "features": [
+      {
+        "declarations": [
+          {
+            "kind": "manifest",
+            "name": "Invoice export",
+            "outcome": "Customers export issued invoices",
+            "owner": "billing",
+            "project": "@acme/billing",
+            "provenance": {
+              "path": "billing/putnami.features.json",
+              "symbol": "features[0]"
+            },
+            "source": "billing/putnami.features.json",
+            "target": "modeled",
+            "type": "feature"
+          }
+        ],
+        "id": "billing/invoice",
+        "name": "Invoice export",
+        "outcome": "Customers export issued invoices",
+        "owner": "billing",
+        "projects": [
+          "@acme/billing"
+        ]
+      }
+    ],
+    "graphs": 0,
+    "manifests": 2,
+    "query": "invoice",
+    "revision": {
+      "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08",
+      "kind": "worktree"
+    },
+    "selection": {
+      "externalRecords": [],
+      "features": 2,
+      "mode": "all",
+      "projects": [
+        "/billing",
+        "/shipping"
+      ],
+      "scoped": false,
+      "specs": 0
+    }
+  }
+}
+--- stderr ---

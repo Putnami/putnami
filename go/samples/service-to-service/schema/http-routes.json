@@ -1,0 +1,572 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/audit",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/blobs/echo",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/blobs/{id}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/body-counter",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/body-fidelity",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/body-nullable",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/body-values",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/credential-check",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/healthz",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items",
+      "methods": [
+        "GET",
+        "HEAD",
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/CreateBlobsEcho",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/CreateBodyCounter",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/CreateBodyFidelity",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/CreateBodyNullable",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/CreateBodyValues",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/CreateItems",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/GetBlobs",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/GetItems",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/GetItemsHistory",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/GetItemsWatch",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/GetQuotes",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/GetQuotesSnapshot",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/GetQuotesTicks",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/ListCredentialCheck",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/ListItems",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/ListItemsChanges",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/ListTenantCheck",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items.v1.ApiService/ListWhoami",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items/changes",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/items/{id}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/items/{id}/adjust",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/items/{id}/history",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/items/{id}/negotiate",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/items/{id}/watch",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/livez",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/quotes/{id}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/quotes/{id}/snapshot",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/quotes/{id}/ticks",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/readyz",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/tenant-check",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/version",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/whoami",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "typed-api"
+      }
+    }
+  ],
+  "digest": "sha256:8a6696167e448853e3fa204a1a201b8e932d2a245c01f95f6afac44c33c8b258"
+}

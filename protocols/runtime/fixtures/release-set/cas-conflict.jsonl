@@ -1,0 +1,2 @@
+{"v":1,"type":"diagnostic","severity":"error","code":"distribution.cas_conflict","message":"release-set channel CAS conflict; current head was preserved"}
+{"v":1,"type":"result","data":{"status":"FAILED","error":{"message":"release-set channel CAS conflict; current head was preserved","code":"distribution.cas_conflict"}}}

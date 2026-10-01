@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/dependency-injection",
+  "outcomes": [
+    "Applications register dependencies by Go type or explicit token",
+    "The container rejects missing dependencies, cycles, duplicate providers, and invalid lifetime edges",
+    "Singleton and scoped resources are created once per owning lifetime and cleaned up deterministically",
+    "Concurrent first resolution returns one shared singleton without deadlock"
+  ],
+  "nonGoals": [
+    "Generating dependency wiring source code",
+    "Providing a process-global mutable service locator",
+    "Choosing the request or job boundaries that create and finalize scopes"
+  ],
+  "requirements": [
+    {
+      "id": "cleanup",
+      "text": "Container close runs child cleanup before parent cleanup and runs close hooks in reverse registration order only for instances that were built."
+    },
+    {
+      "id": "lifetimes",
+      "text": "Singleton instances live in the provider-owning container, scoped instances live in the requesting child scope, and root resolution of a scoped provider fails."
+    },
+    {
+      "id": "resolution",
+      "text": "Constructor-based and token-based registrations share the same validation, cycle detection, visibility, tagging, and concurrency-safe resolution rules."
+    },
+    {
+      "id": "startup",
+      "text": "ContainerContext.Start validates the graph and eagerly resolves non-lazy singletons; a failure cleans up constructed singletons and returns the context to idle for a retry."
+    }
+  ],
+  "decisions": [
+    "go/framework/inject/doc/adr/0001-lifetimes-own-construction-and-cleanup.md"
+  ]
+}

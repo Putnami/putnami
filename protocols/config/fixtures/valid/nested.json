@@ -1,0 +1,38 @@
+{
+  "appName": "task-api",
+  "version": "3.0.0",
+  "schemaHash": "sha256:0123456789abcdef",
+  "configs": [
+    {
+      "path": "server",
+      "fields": [
+        {
+          "name": "tls",
+          "type": "object",
+          "fields": [
+            { "name": "certFile", "type": "string", "required": true },
+            { "name": "keyFile", "type": "string", "required": true, "sensitive": true }
+          ]
+        },
+        {
+          "name": "listeners",
+          "type": "array",
+          "items": {
+            "name": "",
+            "type": "object",
+            "fields": [
+              { "name": "host", "type": "string" },
+              { "name": "port", "type": "int" }
+            ]
+          }
+        },
+        {
+          "name": "labels",
+          "type": "map",
+          "keys": "string",
+          "values": { "name": "", "type": "string" }
+        }
+      ]
+    }
+  ]
+}

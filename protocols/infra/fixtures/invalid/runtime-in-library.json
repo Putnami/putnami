@@ -1,0 +1,7 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "runtime": {
+    "ingress": { "domain": "leaked.example.com" }
+  }
+}

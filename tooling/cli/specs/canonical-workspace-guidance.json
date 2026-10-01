@@ -1,0 +1,45 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/canonical-workspace-guidance",
+  "outcomes": [
+    "A new contributor can move from workspace discovery to an exact validation command and then to focused diagnostics using only public guidance",
+    "Generated assistant guidance and public CLI documentation describe the same commands, selection rules, MCP routing, support promise, and failure workflow",
+    "Repository contributors use the workspace wrapper for build, test, lint, dependency, and generation workflows"
+  ],
+  "nonGoals": [
+    "Publishing the internal cli-model module or adding it to the public support catalog",
+    "Claiming Python is default, production-ready, or at parity with Go and TypeScript",
+    "Announcing a release, changing the current license, or promising pre-1.0 minor compatibility"
+  ],
+  "requirements": [
+    {
+      "id": "generated-help",
+      "text": "Top-level, command, Markdown, man-page, completion, and structured help are derived from the command catalog and cover every public command."
+    },
+    {
+      "id": "onboarding-path",
+      "text": "Public guidance presents workspace and project discovery, feature and specification discovery, project selection, plan preview, the validation gate, and diagnostic recall as one usable path."
+    },
+    {
+      "id": "generated-agent-guidance",
+      "text": "Generated context routes structural discovery to live lock-resolved MCP instructions and resources, names the CLI gate for verification, and states the bounded local fallback when MCP data is unavailable or stale."
+    },
+    {
+      "id": "support-maturity-separation",
+      "text": "Documentation identifies the CLI package as stable under the pre-1.0 migration policy while keeping feature maturity dependent on generated evidence."
+    },
+    {
+      "id": "internal-model-boundary",
+      "text": "Documentation identifies cli-model as an unpublished internal companion that depends only on protocol modules and is tested through the workspace wrapper."
+    },
+    {
+      "id": "experimental-python",
+      "text": "Canonical guidance describes Python as experimental, explicit opt-in, non-default, and without Go or TypeScript parity."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md",
+    "tooling/cli/doc/adr/0006-cli-model-and-command-verticals.md"
+  ]
+}

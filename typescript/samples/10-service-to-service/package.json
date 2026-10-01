@@ -1,0 +1,17 @@
+{
+  "name": "@example/10-service-to-service",
+  "version": "0.0.0",
+  "description": "Typed clients, interceptors, and service communication",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/client": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

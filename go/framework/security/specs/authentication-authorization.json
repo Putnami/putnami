@@ -1,0 +1,50 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/authentication-authorization",
+  "outcomes": [
+    "A service accepts an identity only after validating the configured credential contract",
+    "A route distinguishes missing authentication from insufficient authorization",
+    "Operators can audit allow and deny decisions without storing bearer tokens or private signing material",
+    "Signing-key rotation preserves verification during overlap and fails closed after revocation"
+  ],
+  "nonGoals": [
+    "Choosing an identity provider, tenant role model, or route policy for an application",
+    "Granting access merely because another middleware pre-populated a user when the security plugin is unconfigured",
+    "Persisting signing keys inside the security module"
+  ],
+  "requirements": [
+    {
+      "id": "authorization-decision",
+      "text": "Missing identity returns 401 unless the rule declares Optional, an authenticated identity that fails any required role, scope, client, or guard decision returns 403, and only an explicit excluded path bypasses the rule."
+    },
+    {
+      "id": "credential-validation",
+      "text": "JWT and JWKS identities require valid signatures and configured expiry, issuer, and audience policy; opaque-token introspection is bounded and inactive, failed, or mismatched results do not produce an identity."
+    },
+    {
+      "id": "fail-closed-configuration",
+      "text": "The security plugin denies every non-excluded request when it has no identity resolver unless AllowUnauthenticated is explicitly enabled."
+    },
+    {
+      "id": "optional-authentication",
+      "text": "A rule declares Optional to serve a request that presents no credential: no resolved identity and an absent or empty Authorization header. An authenticated caller is authorized exactly as by a required rule, a request whose non-empty Authorization header resolved no identity returns 401, and a rule that does not declare Optional requires authentication. The rule reports the choice through phttp.SecurityOptionalAuthentication, the only claim that lets a first-party contract offer an anonymous alternative."
+    },
+    {
+      "id": "jwks-overlap-and-revocation",
+      "text": "The public JWKS includes the active key and a retiring key that is still inside its overlap window, and excludes a key once its window has elapsed or it has been revoked."
+    },
+    {
+      "id": "password-secret-policy",
+      "text": "Versioned secret hashes distinguish matching and incorrect secrets, malformed or disabled legacy formats fail closed, and rehash policy is explicit."
+    },
+    {
+      "id": "secret-non-disclosure",
+      "text": "Introspection caches store only hashed credential keys, signing evidence and metrics expose only public identifiers and counters, and public JWKS and string forms never contain private JWK parameters."
+    }
+  ],
+  "decisions": [
+    "go/framework/security/doc/adr/0001-fail-closed-authorization-decisions.md",
+    "go/framework/security/doc/adr/0002-an-optional-rule-serves-a-caller-that-presents-no-credential.md"
+  ]
+}

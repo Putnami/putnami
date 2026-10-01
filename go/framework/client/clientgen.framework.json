@@ -1,0 +1,141 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "go.putnami.dev/client",
+      "status": "framework-runtime",
+      "adapter": "go/framework/client/connect_call.go",
+      "callsites": [
+        {
+          "path": "go/framework/client/connect_call.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "b5fec2b6816cbacf99e89caadac122c1c1504b31d9d43c69c797ae71819cdacf"
+        }
+      ],
+      "owner": "go.putnami.dev/client",
+      "tests": ["go/framework/client/connect_dispatch_test.go"],
+      "reason": "The unary Connect request a generated binding dispatches to."
+    },
+    {
+      "runtime": "go.putnami.dev/client",
+      "status": "framework-runtime",
+      "adapter": "go/framework/client/connect_stream.go",
+      "callsites": [
+        {
+          "path": "go/framework/client/connect_stream.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "8d083df8eb1044a5eec139809113c51aa4389758cbc8a9352deaa06d3eb295a9"
+        }
+      ],
+      "owner": "go.putnami.dev/client",
+      "tests": ["go/framework/client/connect_dispatch_test.go"],
+      "reason": "The Connect server-stream request a generated binding dispatches to."
+    },
+    {
+      "runtime": "go.putnami.dev/client",
+      "status": "framework-runtime",
+      "adapter": "go/framework/client/connect_transport.go",
+      "callsites": [
+        {
+          "path": "go/framework/client/connect_transport.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "b5b92b867510d86ea0ad727abeff14095fd2d4b3586d051f4dc2084c5901c218"
+        },
+        {
+          "path": "go/framework/client/connect_transport.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "3acb13d51bd704d373d8e9c2b8adb8dcf1c73cbc0f78252d87e03cd89b051226"
+        }
+      ],
+      "owner": "go.putnami.dev/client",
+      "tests": ["go/framework/client/connect_transport_test.go"],
+      "reason": "The Connect transport a generated binding dispatches to. Replacing it with a generated client would make the binding call itself."
+    },
+    {
+      "runtime": "go.putnami.dev/client",
+      "status": "framework-runtime",
+      "adapter": "go/framework/client/credential.go",
+      "callsites": [
+        {
+          "path": "go/framework/client/credential.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "2f3cdeb8d105e331510d32d74a23847999fcd32d39b7fde39f5cbc4ff2d35a98"
+        },
+        {
+          "path": "go/framework/client/credential.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "3689a773b3ade69daeb743f687cf1af51b2842dcd37e87725e8dceda0eff6428"
+        },
+        {
+          "path": "go/framework/client/credential.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "b2823514a9615b0ee3840c06e0e94a12280d8d74b90a767fb8dafbb8dae7cf07"
+        }
+      ],
+      "owner": "go.putnami.dev/client",
+      "tests": ["go/framework/client/credential_test.go"],
+      "reason": "Service-token acquisition and refresh for every generated binding. The token endpoint is the identity provider named by the binding, not a Putnami operation."
+    },
+    {
+      "runtime": "go.putnami.dev/client",
+      "status": "framework-runtime",
+      "adapter": "go/framework/client/http_transport.go",
+      "callsites": [
+        {
+          "path": "go/framework/client/http_transport.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "b5b92b867510d86ea0ad727abeff14095fd2d4b3586d051f4dc2084c5901c218"
+        },
+        {
+          "path": "go/framework/client/http_transport.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "56a610ae1b20ad0d53aa0de974d39c60a00ed82a9f4b2e5f10d02cdde8e11f4d"
+        }
+      ],
+      "owner": "go.putnami.dev/client",
+      "tests": ["go/framework/client/binary_stream_test.go", "go/framework/client/http_transport_test.go"],
+      "reason": "The unary REST transport a generated binding dispatches to, including declared unframed octet streams."
+    },
+    {
+      "runtime": "go.putnami.dev/client",
+      "status": "framework-runtime",
+      "adapter": "go/framework/client/server_stream.go",
+      "callsites": [
+        {
+          "path": "go/framework/client/server_stream.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "fba24051ac361b07d1deff21aadf33259f859ba7a6db4919946047b98f98c870"
+        }
+      ],
+      "owner": "go.putnami.dev/client",
+      "tests": ["go/framework/client/server_stream_test.go"],
+      "reason": "The SSE server-stream transport a generated binding dispatches to."
+    },
+    {
+      "runtime": "go.putnami.dev/client",
+      "status": "framework-runtime",
+      "adapter": "go/framework/client/ws_dial.go",
+      "callsites": [
+        {
+          "path": "go/framework/client/ws_dial.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "05fcc13588d516fd3c7cd270eed1047d0448f4e06f4907a0b797a356e46712de"
+        }
+      ],
+      "owner": "go.putnami.dev/client",
+      "tests": ["go/framework/client/ws_dial_test.go"],
+      "reason": "The RFC 6455 upgrade request the WebSocket transport of a generated binding issues."
+    }
+  ]
+}

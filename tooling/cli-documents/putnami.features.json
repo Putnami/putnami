@@ -1,0 +1,187 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "features": [
+    {
+      "id": "cli/release-rehearsal",
+      "type": "feature",
+      "name": "Release rehearsal",
+      "outcome": "A release approver can run one repeatable, read-only rehearsal over the current tree and read an explicit GO or NO-GO verdict, with every blocked evidence item naming its missing input and owner",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "read-only-rehearsal",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-rehearsal-performs-no-destructive-operation"
+            ]
+          }
+        },
+        {
+          "id": "ten-evidence-items",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-required-evidence-item-is-reported"
+            ]
+          }
+        },
+        {
+          "id": "no-vacuous-check",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-vacuous-or-undeclared-check-proves-nothing"
+            ]
+          }
+        },
+        {
+          "id": "recorded-verdict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-verdict-is-deterministic-for-a-tree",
+              "go-only-when-every-check-passes"
+            ]
+          }
+        },
+        {
+          "id": "named-blockers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "blockers-are-named-sorted-and-bounded"
+            ]
+          }
+        },
+        {
+          "id": "reused-scrub",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-scrub-result-comes-from-the-public-cut-scanner"
+            ]
+          }
+        },
+        {
+          "id": "publish-order-coverage",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-artifact-channel-pair-is-claimed-exactly-once"
+            ]
+          }
+        },
+        {
+          "id": "rollback-completeness",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-step-names-a-rollback-and-reversal"
+            ]
+          }
+        },
+        {
+          "id": "stable-recorded-fields",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-recorded-block-is-stable-and-unbreakable"
+            ]
+          }
+        },
+        {
+          "id": "declarative-plan",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-plan-is-declarative-reviewed-data"
+            ]
+          }
+        },
+        {
+          "id": "keyed-verdict-inputs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "verdict-inputs-are-declared-cache-key-inputs"
+            ]
+          }
+        },
+        {
+          "id": "provenance-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-trust-contract-is-pinned"
+            ]
+          }
+        },
+        {
+          "id": "canonical-migration-evidence",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "migration-evidence-is-canonical-and-immutable"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "protocol": "putnami.events.v1",
+  "type": "subscribe",
+  "topic": "user.updated",
+  "channel": "realtime",
+  "from": "latest"
+}

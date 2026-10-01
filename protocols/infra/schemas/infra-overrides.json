@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-infra-overrides.json",
+  "title": "Putnami Infrastructure Overrides (workload)",
+  "description": "Workload-only overrides applied to the aggregated manifest after merge. Lives at <workload>/infra/overrides.json. Supports suppression (ignore) only — dropping requirements a library or framework generator declared that the workload does not want.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "ignore": {
+      "$ref": "#/$defs/ignoreRules"
+    }
+  },
+  "$defs": {
+    "resourceName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_./-]{0,63}$",
+      "description": "Canonical resource identifier: lowercase letters, digits, '-', '_', '.', '/'; 1–64 chars."
+    },
+    "engine": {
+      "type": "string",
+      "enum": ["postgres", "mysql", "sqlite", "firestore"],
+      "description": "Database engine. Closed enum; adding an engine requires a protocol version bump."
+    },
+    "ignoreRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Requirements to drop from the aggregated manifest, matched by merge identity: databases by (name, engine), everything else by name.",
+      "properties": {
+        "databases": {
+          "type": "array",
+          "description": "Databases to drop, identified by name and engine.",
+          "items": { "$ref": "#/$defs/databaseRef" }
+        },
+        "events": { "$ref": "#/$defs/eventsRef" },
+        "storage": {
+          "type": "array",
+          "description": "Storage bucket names to drop.",
+          "items": { "$ref": "#/$defs/resourceName" }
+        },
+        "secrets": {
+          "type": "array",
+          "description": "Secret names to drop.",
+          "items": { "$ref": "#/$defs/resourceName" }
+        },
+        "scheduledJobs": {
+          "type": "array",
+          "description": "Scheduled job names to drop.",
+          "items": { "$ref": "#/$defs/resourceName" }
+        }
+      }
+    },
+    "databaseRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "engine"],
+      "properties": {
+        "name": { "$ref": "#/$defs/resourceName" },
+        "engine": { "$ref": "#/$defs/engine" }
+      }
+    },
+    "eventsRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Event topics to drop from the aggregated events block.",
+      "properties": {
+        "publishes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/resourceName" }
+        },
+        "subscribes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/resourceName" }
+        }
+      }
+    }
+  }
+}

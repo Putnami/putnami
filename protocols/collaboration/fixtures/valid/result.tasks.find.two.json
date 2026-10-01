@@ -1,0 +1,35 @@
+{
+  "items": [
+    {
+      "ref": {
+        "source": "local:3f9a0c1d",
+        "id": "T-1"
+      },
+      "revision": "r2",
+      "title": "Add provider contracts",
+      "body": "Define tasks, proposals and memory.",
+      "state": "in_progress",
+      "providerState": "doing",
+      "labels": [
+        "area/protocols",
+        "size/large"
+      ],
+      "assignees": [
+        "agent-1"
+      ],
+      "updatedAt": "2026-09-24T08:00:00Z"
+    },
+    {
+      "ref": {
+        "source": "github:acme/app",
+        "id": "42"
+      },
+      "revision": "etag-42",
+      "url": "https://github.com/acme/app/issues/42",
+      "title": "Fix the login redirect",
+      "state": "open",
+      "updatedAt": "2026-09-23T10:00:00+02:00"
+    }
+  ],
+  "page": {}
+}

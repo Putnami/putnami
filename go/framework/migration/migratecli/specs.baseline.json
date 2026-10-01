@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/migration-cli#cancellation-cleanup",
+    "go/migration-cli#command-contract",
+    "go/migration-cli#machine-output",
+    "go/migration-cli#prepare-only"
+  ]
+}

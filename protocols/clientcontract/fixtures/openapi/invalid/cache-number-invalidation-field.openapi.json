@@ -1,0 +1,89 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "invalid",
+    "version": "1"
+  },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": {
+      "id": "invalid",
+      "audience": "urn:invalid"
+    },
+    "credentials": {}
+  },
+  "paths": {
+    "/access/{subject}": {
+      "get": {
+        "operationId": "effectiveAccess",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "an invalidation field names a number, which keeps no lexeme in a TypeScript runtime",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "principalId": {
+                      "type": "string"
+                    },
+                    "score": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "principalId",
+                    "score"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [
+            {
+              "protocol": "rest-json",
+              "path": "/access/{subject}",
+              "encoding": "json"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": []
+              }
+            ]
+          },
+          "errors": [],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "resilience": {
+            "cache": {
+              "freshMs": 5000,
+              "keyFields": [
+                "path.subject"
+              ],
+              "invalidationFields": [
+                "score"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

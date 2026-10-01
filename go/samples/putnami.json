@@ -1,0 +1,8 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "tags": ["sample", "e2e"],
+  "extensions": ["/go/extension"],
+  "publishConfig": {
+    "go": { "namePattern": "go.putnami.dev/examples/{name}" }
+  }
+}

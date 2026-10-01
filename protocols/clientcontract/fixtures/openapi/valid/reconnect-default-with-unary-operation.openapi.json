@@ -1,0 +1,69 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Reconnect default fixture", "version": "1.0.0" },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": { "id": "fixtures.clock", "audience": "urn:putnami:fixtures:clock" },
+    "credentials": {},
+    "defaults": {
+      "resilience": { "stream": { "reconnect": true } }
+    }
+  },
+  "paths": {
+    "/clock": {
+      "get": {
+        "operationId": "readClock",
+        "responses": {
+          "200": {
+            "description": "Current time",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Tick" } } }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [{ "protocol": "rest-json", "path": "/clock", "encoding": "json" }],
+          "security": { "alternatives": [{ "allOf": [] }] },
+          "errors": [],
+          "idempotency": { "kind": "safe" }
+        }
+      }
+    },
+    "/clock/ticks": {
+      "get": {
+        "operationId": "watchClock",
+        "responses": {
+          "200": {
+            "description": "Tick stream",
+            "content": { "text/event-stream": { "schema": { "$ref": "#/components/schemas/Tick" } } }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "server",
+          "messages": { "output": { "$ref": "#/components/schemas/Tick" } },
+          "transports": [
+            { "protocol": "sse", "path": "/clock/ticks", "encoding": "json" },
+            {
+              "protocol": "websocket",
+              "path": "/clock/ticks",
+              "encoding": "json",
+              "websocket": { "subprotocol": "putnami.service.v1", "resume": true }
+            }
+          ],
+          "security": { "alternatives": [{ "allOf": [] }] },
+          "errors": [],
+          "idempotency": { "kind": "safe" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Tick": {
+        "type": "object",
+        "properties": { "at": { "type": "string" } },
+        "required": ["at"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

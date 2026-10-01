@@ -1,0 +1,13 @@
+{
+  "name": "@example/items-client",
+  "version": "0.0.0",
+  "description": "Generated API client for @example/items-client",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@putnami/client": "workspace:*"
+  },
+  "private": false
+}

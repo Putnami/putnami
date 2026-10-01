@@ -1,0 +1,85 @@
+{
+  "description": "The negotiated SSE wire of protocol v1 (ADR 0013). header and token negotiate it; completeFrame is the exact successful terminal; negotiation pins how both sides read the header's field lines; provider pins what a provider writes for each request. A reader's outcomes are in scenes.json.",
+  "header": "X-Putnami-Stream-Wire",
+  "token": "putnami.sse.v1",
+  "contentType": "text/event-stream",
+  "completeFrame": "event: complete\ndata: {}\n\n",
+  "heartbeatFrame": ": heartbeat\n\n",
+  "negotiation": [
+    { "lines": ["putnami.sse.v1"], "negotiates": true },
+    { "lines": [" putnami.sse.v1\t"], "negotiates": true },
+    { "lines": [], "negotiates": false },
+    { "lines": [""], "negotiates": false },
+    { "lines": ["putnami.sse.v2"], "negotiates": false },
+    { "lines": ["Putnami.SSE.v1"], "negotiates": false },
+    { "lines": ["putnami.sse.v1, putnami.sse.v2"], "negotiates": false },
+    { "lines": ["putnami.sse.v1", "putnami.sse.v1"], "negotiates": false },
+    { "lines": ["putnami.service.v1"], "negotiates": false }
+  ],
+  "provider": [
+    {
+      "name": "a negotiated stream whose handler returns ends with the complete frame",
+      "routeDeclaresContinuation": true,
+      "request": ["putnami.sse.v1"],
+      "admission": "admitted",
+      "handler": "returns",
+      "expect": { "acknowledges": true, "terminal": "complete" }
+    },
+    {
+      "name": "a negotiated stream whose handler fails ends with the typed error frame",
+      "routeDeclaresContinuation": true,
+      "request": ["putnami.sse.v1"],
+      "admission": "admitted",
+      "handler": "fails",
+      "expect": { "acknowledges": true, "terminal": "error" }
+    },
+    {
+      "name": "a negotiated stream the consumer cancels writes no terminal",
+      "routeDeclaresContinuation": true,
+      "request": ["putnami.sse.v1"],
+      "admission": "admitted",
+      "handler": "canceled",
+      "expect": { "acknowledges": true, "terminal": "none" }
+    },
+    {
+      "name": "an old client keeps the legacy framing: no acknowledgment and no complete frame",
+      "routeDeclaresContinuation": true,
+      "request": [],
+      "admission": "admitted",
+      "handler": "returns",
+      "expect": { "acknowledges": false, "terminal": "none" }
+    },
+    {
+      "name": "an old client still receives the typed error frame",
+      "routeDeclaresContinuation": true,
+      "request": [],
+      "admission": "admitted",
+      "handler": "fails",
+      "expect": { "acknowledges": false, "terminal": "error" }
+    },
+    {
+      "name": "a wire version the provider does not speak keeps the legacy framing",
+      "routeDeclaresContinuation": true,
+      "request": ["putnami.sse.v2"],
+      "admission": "admitted",
+      "handler": "returns",
+      "expect": { "acknowledges": false, "terminal": "none" }
+    },
+    {
+      "name": "a route that declares no continuation never negotiates",
+      "routeDeclaresContinuation": false,
+      "request": ["putnami.sse.v1"],
+      "admission": "admitted",
+      "handler": "returns",
+      "expect": { "acknowledges": false, "terminal": "none" }
+    },
+    {
+      "name": "a refused admission is an HTTP status with no acknowledgment",
+      "routeDeclaresContinuation": true,
+      "request": ["putnami.sse.v1"],
+      "admission": "refused",
+      "handler": "never-runs",
+      "expect": { "acknowledges": false, "terminal": "none" }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "message": {
+    "data": "%%%not-base64%%%"
+  },
+  "subscription": "projects/demo/subscriptions/orders-created-push"
+}

@@ -1,0 +1,216 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "public-docs",
+  "owner": "public-docs",
+  "projects": [
+    "/sites/putnami.dev"
+  ],
+  "owns": [
+    {
+      "id": "public-docs.published-documentation-site",
+      "kind": "model",
+      "description": "putnami.dev's published information architecture: which documentation trees appear on the site, at which section, in what order, and under which navigation. This domain owns placement, navigation, and the site's own authored pages; it never owns the content of a tree another domain authored."
+    }
+  ],
+  "exports": [],
+  "imports": [
+    {
+      "id": "public-docs.application-runtime.v1",
+      "version": 1,
+      "from": {
+        "domain": "typescript-framework",
+        "export": "typescript-framework.application-runtime.v1"
+      },
+      "as": "public-docs.application-runtime",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "typescript_application_runtime_api"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/putnami.dev",
+          "producerProject": "/typescript/framework/analytics"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/putnami.dev",
+          "producerProject": "/typescript/framework/application"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/putnami.dev",
+          "producerProject": "/typescript/framework/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/putnami.dev",
+          "producerProject": "/typescript/framework/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/putnami.dev",
+          "producerProject": "/typescript/framework/ui"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/putnami.dev",
+          "producerProject": "/typescript/framework/utils"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/putnami.dev",
+          "producerProject": "/typescript/framework/web"
+        }
+      ],
+      "justification": "putnami.dev is an ordinary Putnami TypeScript application: it boots on the application container, renders its pages through the web runtime, draws them with the shared UI components, and measures its own audience with the analytics plugin into a database it owns. The site consumes the public framework API the same way a tenant application does, and reaches into no framework internal."
+    },
+    {
+      "id": "public-docs.go-framework-documentation.v1",
+      "version": 1,
+      "from": {
+        "domain": "go-framework",
+        "export": "go-framework.api-documentation.v1"
+      },
+      "as": "public-docs.go-framework-documentation",
+      "mode": "snapshot",
+      "status": "active",
+      "facts": [
+        "go_framework_documentation"
+      ],
+      "transport": {
+        "kind": "file",
+        "contract": "putnami.documentation-tree.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "sourceVersion": "tree_digest",
+        "idempotencyKey": "tree_digest",
+        "lateEvents": "ignore-older"
+      },
+      "justification": "The site publishes the Go framework reference at public/docs/09-frameworks/02-go by copying the /go/doc/framework tree verbatim at build time. The go-framework domain decides what that reference says; the site decides only where it appears and in what order. A missing tree fails the build rather than publishing a gap, and a tree older than the freshness bound is still published because stale documentation beats no documentation."
+    },
+    {
+      "id": "public-docs.method-documentation.v1",
+      "version": 1,
+      "from": {
+        "domain": "sdd",
+        "export": "sdd.method-documentation.v1"
+      },
+      "as": "public-docs.method-documentation",
+      "mode": "snapshot",
+      "status": "active",
+      "facts": [
+        "spec_driven_development_documentation"
+      ],
+      "transport": {
+        "kind": "file",
+        "contract": "putnami.documentation-tree.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "sourceVersion": "tree_digest",
+        "idempotencyKey": "tree_digest",
+        "lateEvents": "ignore-older"
+      },
+      "justification": "The site publishes the spec-driven development method at public/docs/07-spec-driven-development by copying the /tooling/sdd-extension/doc tree verbatim at build time. The sdd domain owns the method's wording; the site owns only its placement in the published information architecture."
+    },
+    {
+      "id": "public-docs.python-surface-documentation.v1",
+      "version": 1,
+      "from": {
+        "domain": "extension-providers",
+        "export": "extension-providers.python-surface-documentation.v1"
+      },
+      "as": "public-docs.python-surface-documentation",
+      "mode": "snapshot",
+      "status": "active",
+      "facts": [
+        "python_surface_documentation"
+      ],
+      "transport": {
+        "kind": "file",
+        "contract": "putnami.documentation-tree.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "sourceVersion": "tree_digest",
+        "idempotencyKey": "tree_digest",
+        "lateEvents": "ignore-older"
+      },
+      "justification": "The site publishes the Python surface reference at public/docs/09-frameworks/03-python by copying the /python/doc/framework tree verbatim at build time. The Python surface is the extension and its templates only, and the extension-providers domain decides what that reference claims; the site never promotes it to framework parity by where it places it."
+    },
+    {
+      "id": "public-docs.typescript-framework-documentation.v1",
+      "version": 1,
+      "from": {
+        "domain": "typescript-framework",
+        "export": "typescript-framework.api-documentation.v1"
+      },
+      "as": "public-docs.typescript-framework-documentation",
+      "mode": "snapshot",
+      "status": "active",
+      "facts": [
+        "typescript_framework_documentation"
+      ],
+      "transport": {
+        "kind": "file",
+        "contract": "putnami.documentation-tree.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "sourceVersion": "tree_digest",
+        "idempotencyKey": "tree_digest",
+        "lateEvents": "ignore-older"
+      },
+      "justification": "The site publishes the TypeScript framework reference at public/docs/09-frameworks/01-typescript by copying the /typescript/doc/framework tree verbatim at build time. The typescript-framework domain decides what that reference says; the site decides only where it appears. This is a separate contract from the site's runtime dependency on the same domain: one is a copied document, the other is a linked API."
+    },
+    {
+      "id": "public-docs.workspace-documentation.v1",
+      "version": 1,
+      "from": {
+        "domain": "cli",
+        "export": "cli.workspace-documentation.v1"
+      },
+      "as": "public-docs.workspace-documentation",
+      "mode": "snapshot",
+      "status": "active",
+      "facts": [
+        "workspace_documentation"
+      ],
+      "transport": {
+        "kind": "file",
+        "contract": "putnami.documentation-tree.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "sourceVersion": "tree_digest",
+        "idempotencyKey": "tree_digest",
+        "lateEvents": "ignore-older"
+      },
+      "justification": "The site publishes the workspace and CLI reference at public/docs/08-tooling-&-workspace by copying the /tooling/doc tree verbatim at build time. The cli domain decides what that reference says; the site owns only its section number and its position in the navigation."
+    }
+  ]
+}

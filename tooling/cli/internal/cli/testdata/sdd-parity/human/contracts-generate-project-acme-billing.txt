@@ -1,0 +1,10 @@
+exit 0
+--- stdout ---
+
+  Generated 4 contract artifact(s) for go.putnami.dev/acme/billing:
+    schema/contracts.json
+    schema/contracts.gen.go
+    schema/contracts.schema.json
+    schema/contracts.md
+
+--- stderr ---

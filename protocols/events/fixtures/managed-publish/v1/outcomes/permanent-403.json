@@ -1,0 +1,16 @@
+{
+  "name": "permanent-403",
+  "request": { "id": "evt-outcome-1", "topic": "orders.created" },
+  "input": {
+    "http": {
+      "status": 403,
+      "body": {
+        "protocol": "putnami.events.v1",
+        "code": "forbidden",
+        "message": "Managed publish is not authorized.",
+        "retryable": false
+      }
+    }
+  },
+  "expected": { "class": "permanent", "action": "fail" }
+}

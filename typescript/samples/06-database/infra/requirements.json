@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "databases": [
+    {
+      "name": "default",
+      "engine": "postgres",
+      "schemas": ["public"]
+    }
+  ]
+}

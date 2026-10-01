@@ -1,0 +1,202 @@
+[
+  {
+    "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "browser": "chrome",
+    "browserMajor": 126,
+    "os": "windows",
+    "deviceType": "desktop",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "browser": "chrome",
+    "browserMajor": 125,
+    "os": "macos",
+    "deviceType": "desktop",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.71 Mobile Safari/537.36",
+    "browser": "chrome",
+    "browserMajor": 126,
+    "os": "android",
+    "deviceType": "mobile",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    "browser": "safari",
+    "browserMajor": 17,
+    "os": "macos",
+    "deviceType": "desktop",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    "browser": "safari",
+    "browserMajor": 17,
+    "os": "ios",
+    "deviceType": "mobile",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    "browser": "safari",
+    "browserMajor": 17,
+    "os": "ios",
+    "deviceType": "tablet",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0",
+    "browser": "firefox",
+    "browserMajor": 127,
+    "os": "windows",
+    "deviceType": "desktop",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (X11; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0",
+    "browser": "firefox",
+    "browserMajor": 126,
+    "os": "linux",
+    "deviceType": "desktop",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (Android 14; Mobile; rv:127.0) Gecko/127.0 Firefox/127.0",
+    "browser": "firefox",
+    "browserMajor": 127,
+    "os": "android",
+    "deviceType": "mobile",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.2592.68",
+    "browser": "edge",
+    "browserMajor": 126,
+    "os": "windows",
+    "deviceType": "desktop",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 OPR/111.0.0.0",
+    "browser": "opera",
+    "browserMajor": 111,
+    "os": "windows",
+    "deviceType": "desktop",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0.0.0 Mobile Safari/537.36",
+    "browser": "samsung",
+    "browserMajor": 25,
+    "os": "android",
+    "deviceType": "mobile",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "browser": "chrome",
+    "browserMajor": 126,
+    "os": "chromeos",
+    "deviceType": "desktop",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (Linux; Android 13; SM-X710) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.71 Safari/537.36",
+    "browser": "chrome",
+    "browserMajor": 126,
+    "os": "android",
+    "deviceType": "tablet",
+    "bot": false
+  },
+  {
+    "ua": "Mozilla/5.0 (Unknown; Experimental) SomeEngine/1.0",
+    "browser": "other",
+    "browserMajor": null,
+    "os": "other",
+    "deviceType": "other",
+    "bot": false
+  },
+  {
+    "ua": "",
+    "browser": "other",
+    "browserMajor": null,
+    "os": "other",
+    "deviceType": "other",
+    "bot": true
+  },
+  {
+    "ua": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+    "browser": "other",
+    "browserMajor": null,
+    "os": "other",
+    "deviceType": "other",
+    "bot": true
+  },
+  {
+    "ua": "curl/8.6.0",
+    "browser": "other",
+    "browserMajor": null,
+    "os": "other",
+    "deviceType": "other",
+    "bot": true
+  },
+  {
+    "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/126.0.6478.61 Safari/537.36",
+    "browser": "chrome",
+    "browserMajor": 126,
+    "os": "linux",
+    "deviceType": "desktop",
+    "bot": true
+  },
+  {
+    "ua": "python-requests/2.32.3",
+    "browser": "other",
+    "browserMajor": null,
+    "os": "other",
+    "deviceType": "other",
+    "bot": true
+  },
+  {
+    "ua": "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+    "browser": "other",
+    "browserMajor": null,
+    "os": "other",
+    "deviceType": "other",
+    "bot": true
+  },
+  {
+    "ua": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+    "browser": "other",
+    "browserMajor": null,
+    "os": "other",
+    "deviceType": "other",
+    "bot": true
+  },
+  {
+    "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Chrome-Lighthouse",
+    "browser": "chrome",
+    "browserMajor": 126,
+    "os": "linux",
+    "deviceType": "desktop",
+    "bot": true
+  },
+  {
+    "ua": "Mozilla/5.0+(compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)",
+    "browser": "other",
+    "browserMajor": null,
+    "os": "other",
+    "deviceType": "other",
+    "bot": true
+  },
+  {
+    "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/125.0.0.0 Safari/537.36 Playwright/1.44",
+    "browser": "chrome",
+    "browserMajor": 125,
+    "os": "linux",
+    "deviceType": "desktop",
+    "bot": true
+  }
+]

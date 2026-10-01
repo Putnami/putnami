@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-template.json",
+  "name": "go-library",
+  "description": "Go module with exports",
+  "extension": "@putnami/go",
+  "workspaceDevDependencies": {
+    "go.putnami.dev/go/extension": "latest"
+  }
+}

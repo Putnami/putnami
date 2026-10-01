@@ -1,0 +1,107 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities-v2.json",
+  "protocolVersion": 2,
+  "project": "go.putnami.dev/examples/unit-of-work-proof",
+  "infraRequirements": [
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/unit-of-work-proof",
+        "kind": "infra",
+        "subkind": "database",
+        "key": "default"
+      },
+      "name": "default",
+      "kind": "database",
+      "provenance": {
+        "project": "go.putnami.dev/examples/unit-of-work-proof",
+        "package": "go.putnami.dev/database",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "infra.go",
+          "symbol": "go.putnami.dev/database.(*Plugin).Describe"
+        }
+      }
+    }
+  ],
+  "healthContributors": [
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/unit-of-work-proof",
+        "kind": "health",
+        "subkind": "health",
+        "key": "database"
+      },
+      "name": "database",
+      "probe": "health",
+      "provenance": {
+        "project": "go.putnami.dev/examples/unit-of-work-proof",
+        "package": "go.putnami.dev/database",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/database.(*Plugin).CheckHealth"
+        }
+      }
+    }
+  ],
+  "lifecycleHooks": [
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/unit-of-work-proof",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "database"
+      },
+      "name": "database",
+      "phase": "stopper",
+      "provenance": {
+        "project": "go.putnami.dev/examples/unit-of-work-proof",
+        "package": "go.putnami.dev/database",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/database.(*Plugin).Stop"
+        }
+      }
+    }
+  ],
+  "packages": [
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/database",
+        "kind": "package",
+        "key": "go.putnami.dev/database"
+      },
+      "package": "go.putnami.dev/database",
+      "provenance": {
+        "project": "go.putnami.dev/database",
+        "package": "go.putnami.dev/database",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/unit-of-work-proof",
+        "kind": "package",
+        "key": "go.putnami.dev/examples/unit-of-work-proof"
+      },
+      "package": "go.putnami.dev/examples/unit-of-work-proof",
+      "provenance": {
+        "project": "go.putnami.dev/examples/unit-of-work-proof",
+        "package": "go.putnami.dev/examples/unit-of-work-proof",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ]
+}

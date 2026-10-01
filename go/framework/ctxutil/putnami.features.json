@@ -1,0 +1,44 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/bounded-request-contexts",
+      "type": "feature",
+      "name": "Bounded Go request contexts",
+      "outcome": "Go framework operations apply one consistent deadline rule to bounded request work, including work detached from caller cancellation",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "detached-context",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["detached-context-is-rebounded"]
+          }
+        },
+        {
+          "id": "non-positive-timeout",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["non-positive-timeout-passes-the-context-through"]
+          }
+        },
+        {
+          "id": "positive-timeout",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["positive-timeout-derives-a-deadline-and-preserves-values"]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/p/build",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {"name": "putnami"},
+  "project": {"name": "p", "path": "p", "fullPath": "/ws/p"},
+  "selectedProjects": [
+    {"name": "a", "path": "a", "fullPath": "/ws/a", "outputPath": "/ws/.putnami/out/a/build"},
+    {"name": "b", "path": "libs/b", "fullPath": "/ws/libs/b", "outputPath": "/ws/.putnami/out/libs/b/build"}
+  ],
+  "extension": {"name": "@putnami/go", "root": "/ws/go/extension"},
+  "job": {"name": "build"},
+  "params": {}
+}

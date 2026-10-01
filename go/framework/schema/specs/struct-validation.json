@@ -1,0 +1,63 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/struct-validation",
+  "outcomes": [
+    "Constraints live on the struct that receives the input, so the same rules apply wherever that struct is populated",
+    "A caller can hand the validated data straight on, because only values that passed are in it",
+    "A mistake in a constraint declaration is reported as a mistake rather than silently disabling the check",
+    "A partial update validates only the fields it actually supplies",
+    "A typed JSON boundary preserves wire presence, nullability, exact numbers, nested constraints, and defaults while validating the decoded value"
+  ],
+  "nonGoals": [
+    "Choosing a JSON decoder: ValidateDecoded receives both a value the caller already decoded and its original JSON bytes",
+    "Changing the historical Validate map API's required-and-non-zero semantics",
+    "Producing localized or user-facing error text",
+    "Promising strict compatibility between every pre-1.0 minor release"
+  ],
+  "requirements": [
+    {
+      "id": "declaration-faults",
+      "text": "An unknown constraint name or an uncompilable pattern is reported as a schema-definition error attributed to its field, independently of whether a value was supplied, so a typo in `required` cannot silently disable the check."
+    },
+    {
+      "id": "absent-fields",
+      "text": "A field that is absent or nil is skipped after the required check, so a partial update validates only the fields it supplies, and a default tag supplies the value for an absent field before the required check runs."
+    },
+    {
+      "id": "validated-data-only",
+      "text": "The result's data map contains only fields that passed every constraint, so a value that failed validation cannot reach a caller that reads the data map without re-checking the error list."
+    },
+    {
+      "id": "decoded-json-fidelity",
+      "text": "ValidateDecoded uses encoding/json-compatible field selection and the original JSON bytes to distinguish absent, null, and present zero values, validates nested structs, slice items, and map values recursively with exact numeric bounds, writes valid optional defaults into the decoded value, and rejects invalid defaults without exposing their authored values."
+    },
+    {
+      "id": "length-in-runes",
+      "text": "Minimum and maximum length constraints count runes rather than bytes, so a multi-byte string is measured the way its author counts it."
+    },
+    {
+      "id": "url-scheme-allowlist",
+      "text": "The url constraint accepts only http and https, rejecting javascript, data, file, and every other scheme, so a validated URL is safe to place in a redirect or a link."
+    },
+    {
+      "id": "opt-in-coercion",
+      "text": "Type coercion is opt-in; without it a value keeps the type the caller supplied, so a transport that already decodes types is not second-guessed."
+    },
+    {
+      "id": "error-labels",
+      "text": "An optional label prefixes every reported field name, so errors from path parameters, query parameters, and the body stay distinguishable when one response reports several boundaries."
+    },
+    {
+      "id": "no-panic-on-bad-type",
+      "text": "Validating a non-struct type returns a structured schema error instead of panicking, and pointer-to-struct types validate identically to the struct itself."
+    },
+    {
+      "id": "custom-constraints",
+      "text": "A workload can register a constraint by name, replacing a built-in of the same name, and the registered function is what subsequent validation dispatches to."
+    }
+  ],
+  "decisions": [
+    "go/framework/schema/doc/adr/0001-declaration-faults-are-not-validation-results.md"
+  ]
+}

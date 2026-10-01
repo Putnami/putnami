@@ -1,0 +1,36 @@
+{
+  "name": "@putnami/document",
+  "version": "0.0.0",
+  "description": "Portable NoSQL document storage with pluggable adapters, typed collections, transactions, and cursor-based pagination",
+  "keywords": [
+    "document",
+    "nosql",
+    "firestore",
+    "repository"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/document"
+  },
+  "main": "src/index.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/utils": "workspace:*"
+  },
+  "peerDependencies": {
+    "@google-cloud/firestore": "^7.11.0"
+  },
+  "peerDependenciesMeta": {
+    "@google-cloud/firestore": {
+      "optional": true
+    }
+  },
+  "private": false
+}

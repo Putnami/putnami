@@ -1,0 +1,6 @@
+{
+  "id": "putnami.transaction.conformance",
+  "corpus": "manifest.json",
+  "capabilityKinds": ["datasource"],
+  "languages": ["go", "typescript"]
+}

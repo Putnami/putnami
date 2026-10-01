@@ -1,0 +1,41 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/event-delivery",
+  "outcomes": [
+    "A service publishes and handles typed envelopes across memory, local, provider, or managed transports",
+    "A handler can choose competing or broadcast delivery and bound its concurrency and queue",
+    "Transient failures retry with stable message identity while permanent or exhausted failures have an explicit terminal outcome",
+    "Operators can distinguish handled, retried, dead-lettered, and dropped messages"
+  ],
+  "nonGoals": [
+    "Guaranteeing exactly-once delivery or globally ordered topics",
+    "Treating a dedupe key as framework-managed deduplication state",
+    "Falling back or dual-publishing after an ambiguous managed publish outcome"
+  ],
+  "requirements": [
+    {
+      "id": "delivery-semantics",
+      "text": "Competing handlers select one matching consumer while broadcast handlers select every matching consumer; retries and provider redelivery mean handlers must tolerate duplicates."
+    },
+    {
+      "id": "retry-boundary",
+      "text": "A handler invocation is deadline-bound, retries use bounded exponential backoff with stable event identity, and a retry for one Redis consumer group is not amplified into another group."
+    },
+    {
+      "id": "terminal-outcome",
+      "text": "After retry exhaustion a message is reported dead-lettered only after a DLQ subscriber accepts it; otherwise it is reported dropped, never both."
+    },
+    {
+      "id": "shutdown",
+      "text": "Broker shutdown rejects new publishes, cancels pending retry timers, drains counted in-flight deliveries up to the configured deadline, and never invokes a retry after Stop returns."
+    },
+    {
+      "id": "ingress-authority",
+      "text": "Provider ingress strips caller-supplied auth attributes and push delivery authenticates and allowlists the pusher before invoking a handler."
+    }
+  ],
+  "decisions": [
+    "go/framework/events/doc/adr/0001-at-least-once-retry-and-terminal-outcomes.md"
+  ]
+}

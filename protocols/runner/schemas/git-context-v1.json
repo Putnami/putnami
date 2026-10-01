@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/runner-git-context-v1.json",
+  "title": "Runner source version-stamp context",
+  "description": "Separate from SourceManifest and its content identity. Does not authorize repository access. Exact branch syntax and strict JSON rules are defined by the runner contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["head", "branch", "dirty"],
+  "properties": {
+    "head": { "type": "string", "pattern": "^(?:|[0-9a-f]{40}|[0-9a-f]{64})$" },
+    "branch": { "type": "string", "maxLength": 1024 },
+    "dirty": { "type": "boolean" }
+  }
+}

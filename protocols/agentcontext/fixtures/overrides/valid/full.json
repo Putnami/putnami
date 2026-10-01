@@ -1,0 +1,31 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-agent-context.json",
+  "protocolVersion": 1,
+  "addSources": [
+    {
+      "path": "go/samples/task-api/handlers.go",
+      "startLine": 5,
+      "endLine": 30,
+      "why": "override",
+      "tokens": {
+        "estimated": 180,
+        "method": "bytes/4"
+      }
+    }
+  ],
+  "removeSources": [
+    "go/samples/task-api/tasks.go"
+  ],
+  "addDocs": [
+    {
+      "path": "docs/task-api-internals.md",
+      "relationship": "checked"
+    }
+  ],
+  "removeDocs": [
+    "docs/task-api.md"
+  ],
+  "sensitive": [
+    "go/samples/task-api/secrets.env"
+  ]
+}

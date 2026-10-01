@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/typescript",
+  "tags": [
+    "go",
+    "extension"
+  ],
+  "extensions": [
+    "@putnami/go",
+    "/tooling/sdd-extension"
+  ],
+  "dependencies": [
+    "/protocols/http-routes"
+  ],
+  "options": {
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-ts",
+      "version-var": "main.runtimeVersion"
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "protocolVersion": 2,
+  "namespace": "putnami",
+  "members": [
+    {
+      "ecosystem": "npm",
+      "coordinate": "@putnami/core",
+      "version": "0.3.0-8d5edb751",
+      "artifactDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dependencies": [],
+      "sourceRevision": "8d5edb7513d93b9165ba2a7cb48466d022fc3f63",
+      "selectionFingerprint": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "sourceTree": "c0ffee5f1e2d3c4b5a69788796a5b4c3d2e1f0a9"
+    },
+    {
+      "ecosystem": "npm",
+      "coordinate": "@putnami/web",
+      "version": "0.3.0-1f2e3d4c5",
+      "artifactDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "dependencies": [],
+      "sourceRevision": "1f2e3d4c5b6a79880706f5e4d3c2b1a098f7e6d5",
+      "selectionFingerprint": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ]
+}

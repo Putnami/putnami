@@ -1,0 +1,276 @@
+# Contributor CI — the credential-free gate.
+#
+# This does NOT replace `putnami ci`, the authoritative gate Putnami Cloud's
+# native runner executes. It runs beside it and proves the one thing that gate
+# cannot: the repository lints, tests, builds and validates for somebody who
+# has no Putnami account. The task list is the one CONTRIBUTING.md documents
+# and the one the native runner's fixed gate runs, so this gate covers the same
+# project and workspace validation surface without credentials.
+# `putnami ci` runs on credentialed runners with a warm machine-global
+# store and a reachable private cache, so "it passes there" says nothing about a
+# fresh clone on a stranger's machine.
+#
+# Everything below is anonymous. The job reads no secret and reaches only public
+# endpoints: go.dev for the Go toolchain, putnami.dev for the CLI's extensions,
+# the public npm registry for TypeScript dependencies, and npm.putnami.dev for
+# the @putnami/cloud version that sites/putnami.dev pins, which it serves
+# without an account.
+name: Contributor CI
+
+# A draft pull request runs nothing: every proposal opens as a draft when work
+# starts, and its checkpoints need no gate. Marking it ready runs the job.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Which projects to gate
+        type: choice
+        default: impacted
+        options:
+          - impacted
+          - all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contributor-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: lint,test,build,validate without credentials
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    # A wide change fans out across the whole workspace (a CLI edit reaches ~79
+    # projects), so this is a ceiling that fails loudly, not an expected
+    # duration. `putnami ci` remains the gate that has to cover everything.
+    timeout-minutes: 60
+
+    services:
+      # This is the one piece of infrastructure the job provides, and the reason
+      # its first incarnation flaked.
+      #
+      # `@putnami/database` plans no `test~test-env` task, so the CLI's test-infra
+      # planner never provisions it a database. Its suite falls back to the fixed
+      # port-6432 datasources in
+      # typescript/framework/database/conf/.env.test.yaml, and
+      # typescript/framework/database/test/utils/postgres-helper.ts starts its own
+      # `postgres:17-alpine` container when nothing answers there. On a cold
+      # GitHub runner that `docker run` has to pull the image first, which takes
+      # longer than the helper's readiness budget; the suite then fails, and the
+      # next attempt collides with the half-started container it already named.
+      #
+      # A service container removes the race instead of widening the timeout:
+      # GitHub starts Postgres and waits for the health check below to pass
+      # BEFORE the first step runs, so the helper's liveness probe succeeds on
+      # its first try and it never shells out to Docker at all. The image is a
+      # public one and the credentials are the fixture's own, so the job still
+      # reads no secret.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          # Host 6432 is what conf/.env.test.yaml names. Docker publishes it on
+          # IPv4 only, which is why every datasource in that file has to say
+          # 127.0.0.1 rather than localhost: on this runner localhost resolves to
+          # ::1 first, and a connection there is refused even though Postgres is
+          # up.
+          - 6432:5432
+        options: >-
+          --health-cmd "pg_isready --username test --dbname test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # A contributor holds none of these. Emptying them makes that a property
+      # of the job instead of an accident of the runner: a self-hosted runner
+      # that exports them, or a step someone adds later, cannot quietly
+      # re-credential this gate and hide a break in the neutral path.
+      #
+      # Empty means "unconfigured", which is exactly a contributor's state. The
+      # hostile variant — pointing both endpoints at a server that refuses and
+      # counts every request — belongs in
+      # tooling/cli/internal/cli/neutral_contributor_ci_test.go, where a test
+      # server can exist.
+      PUTNAMI_CLOUD_TOKEN: ''
+      PUTNAMI_CACHE_URL: ''
+      PUTNAMI_CACHE_TOKEN: ''
+      PUTNAMI_TOKEN: ''
+      CONFIG_SERVER_URL: ''
+      CONFIG_SERVER_TOKEN: ''
+      # CI=true already disables CLI telemetry. Saying so explicitly keeps the
+      # claim above true if that default ever changes.
+      DO_NOT_TRACK: '1'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # `--impacted` diffs against the merge base with the target branch, so
+          # the gate needs that branch's history. At the default fetch-depth 1
+          # the baseline is unresolvable, and an unresolvable baseline does not
+          # select nothing — it selects EVERY project. `--impacted-strict` below
+          # turns that into a failure, but only full history makes the intended
+          # selection possible in the first place.
+          fetch-depth: 0
+
+      # Keep every wrapper invocation on the exact workspace Go version. The
+      # first putnamiw call can provision its own managed toolchain, but later
+      # fast-path calls reuse the CLI binary and inherit PATH from the runner.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache: false
+
+      # The CLI resolves bun and uv from PATH; it does not install them. Keep
+      # this pin equal to package.json#packageManager (the workspace-declared
+      # Bun baseline recorded in putnami.lock.json).
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - uses: astral-sh/setup-uv@v6
+
+      # ~/.putnami/tools/go is the machine tool home, which holds
+      # golangci-lint and staticcheck: `putnami install` writes them there, and
+      # without this they rebuild from source on every run. They are safe to
+      # restore from a partial key: the extension re-checks each binary against
+      # go/extension/tools/versions.json and the current Go toolchain, and
+      # reinstalls whatever does not match.
+      #
+      # Deliberately absent: ~/.putnami/store, the local task-result cache. It is
+      # the one that would make a repeat run fast, and also the one that grows
+      # without bound and carries the workspace's cache-key correctness on its
+      # back. Leaving it out means every run recomputes from source — which is
+      # what a first-time contributor gets anyway.
+      #
+      # The save is a separate step that runs when the gate fails. The combined
+      # actions/cache saves only after a green job, so while the gate was red
+      # no run ever stored these directories and every run compiled the race
+      # build of every Go package from nothing.
+      - name: Restore toolchain and dependency caches
+        id: dependency-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.putnami/cache/go
+            ~/.putnami/toolchains
+            ~/.putnami/artifacts
+            ~/.bun/install/cache
+            ~/.putnami/tools/go
+          key: putnami-${{ runner.os }}-${{ hashFiles('putnami.lock.json', 'go.work.sum', 'bun.lock', 'go/extension/tools/versions.json') }}
+          restore-keys: |
+            putnami-${{ runner.os }}-
+
+      - name: Resolve the gate scope
+        env:
+          SCOPE: ${{ inputs.scope || 'impacted' }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ "$SCOPE" = all ]; then
+            args='--all'
+          elif [ -n "$BASE_REF" ]; then
+            # Name the target branch rather than letting the CLI resolve a
+            # trunk: a PR onto a release or epic branch would otherwise be
+            # measured against main and gate the wrong change set.
+            args="--impacted --impacted-strict --baseline origin/$BASE_REF"
+          else
+            args='--impacted --impacted-strict'
+          fi
+          echo "GATE_ARGS=$args" >> "$GITHUB_ENV"
+
+      # `./putnamiw` builds the CLI from this workspace's source. This repository
+      # develops that CLI, so `--download` would gate the change under a
+      # different binary than the one under review.
+      - name: Install the workspace
+        run: ./putnamiw install
+
+      # `putnami install` runs the cloud extension's setup, which writes
+      # .putnami/cache.json pointing at cache.putnami.cloud. It builds that from
+      # the committed workspace link in putnami.workspace.json, so it needs no
+      # credential to WRITE the file — and there is none here to use it.
+      #
+      # Left alone the gate still passes, degrading to local-only, but every job
+      # prints `cache-provider: ... resolve cache token: exit status 3`. A
+      # contributor reads that wall as a broken setup instead of as the intended
+      # neutral one. `enabled: false` is the documented off switch;
+      # PUTNAMI_CACHE_URL='' above is not one, because the env overlay only
+      # applies a NON-empty value.
+      - name: Turn the remote cache off
+        run: |
+          echo '{"enabled": false}' > .putnami/cache.json
+
+      # A green gate that selected zero projects is green over nothing. Publish
+      # what was selected so a reviewer reads the scope, not just the checkmark.
+      - name: Report what the gate covers
+        run: |
+          set -euo pipefail
+          # Into RUNNER_TEMP, not the workspace: a stray untracked file at the
+          # repository root is an input to the very selection being reported.
+          ./putnamiw lint,test,build,validate $GATE_ARGS --enforce-coverage --plan | tee "$RUNNER_TEMP/plan.txt"
+          {
+            echo '### Credential-free gate'
+            echo
+            echo '```'
+            tail -n 3 "$RUNNER_TEMP/plan.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Record the tree the gate starts from, so the check after it blames the
+      # gate only for what the gate wrote, not for what install wrote. The tree
+      # hash covers the content of every tracked and untracked non-ignored
+      # file. It is built in a scratch index, so the real index is untouched.
+      - name: Record the tree before the gate
+        run: |
+          set -euo pipefail
+          export GIT_INDEX_FILE="$RUNNER_TEMP/tree-before.index"
+          git read-tree HEAD
+          git add -A
+          git write-tree > "$RUNNER_TEMP/tree-before.txt"
+
+      # $GATE_ARGS is deliberately unquoted — it carries several words. `set -u`
+      # is what keeps that safe: an unset GATE_ARGS aborts here instead of
+      # quietly falling through to the CLI's own default project selection,
+      # which would gate a different set than the one just reported above.
+      - name: Run the gate
+        run: |
+          set -euo pipefail
+          ./putnamiw lint,test,build,validate $GATE_ARGS --enforce-coverage
+
+      # A gate that changed or created a file ran over bytes nobody committed:
+      # a generated file (CODEOWNERS, an OpenAPI document, go.sum) is behind its
+      # declarations. Fail and show the change, so the fix is to run the gate
+      # locally and commit what it wrote.
+      - name: Fail when the gate changed the tree
+        run: |
+          set -euo pipefail
+          export GIT_INDEX_FILE="$RUNNER_TEMP/tree-after.index"
+          git read-tree HEAD
+          git add -A
+          before=$(cat "$RUNNER_TEMP/tree-before.txt")
+          after=$(git write-tree)
+          if [ "$before" != "$after" ]; then
+            echo "::error::the gate changed the tree; run it locally and commit the result"
+            git diff --stat "$before" "$after"
+            git diff "$before" "$after"
+            exit 1
+          fi
+
+      # Store the caches the restore step above names, also after a red gate.
+      # An exact hit is already stored under this key, so it is not saved again.
+      - name: Save toolchain and dependency caches
+        if: always() && steps.dependency-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.putnami/cache/go
+            ~/.putnami/toolchains
+            ~/.putnami/artifacts
+            ~/.bun/install/cache
+            ~/.putnami/tools/go
+          key: ${{ steps.dependency-cache.outputs.cache-primary-key }}

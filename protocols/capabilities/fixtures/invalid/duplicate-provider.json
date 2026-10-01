@@ -1,0 +1,25 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities.json",
+  "protocolVersion": 1,
+  "project": "example/duplicate-provider",
+  "healthContributors": [
+    {
+      "name": "primary",
+      "probe": "readiness",
+      "provenance": {
+        "project": "example/duplicate-provider",
+        "package": "example/first",
+        "sourceKind": "framework"
+      }
+    },
+    {
+      "name": "primary",
+      "probe": "readiness",
+      "provenance": {
+        "project": "example/duplicate-provider",
+        "package": "example/second",
+        "sourceKind": "framework"
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "events": {
+    "publishes": ["task.created"],
+    "subscribes": ["task.completed", "task.created"]
+  }
+}

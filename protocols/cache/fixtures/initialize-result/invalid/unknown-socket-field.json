@@ -1,0 +1,1 @@
+{ "protocolVersion": 1, "providerVersion": "1.0.0", "capabilities": ["object-cache"], "objectCacheSocket": "/tmp/exchange/objects.sock", "ready": true, "socketMode": 384 }

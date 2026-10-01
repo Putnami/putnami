@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/contributor",
+  "version": "1.2.0",
+  "cliContract": 5,
+  "agentContent": {
+    "path": "agent-content",
+    "manifestSha256": "3f6c9a1d2b7e4f8a0c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3"
+  }
+}

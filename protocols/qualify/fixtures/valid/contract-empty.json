@@ -1,0 +1,13 @@
+{
+  "protocolVersion": 1,
+  "project": "/go/samples/migrations-feature",
+  "derivedFrom": [
+    {
+      "kind": "http-routes",
+      "path": "go/samples/migrations-feature/schema/http-routes.json",
+      "digest": "sha256:fd4d81a72818dde428f4413b2bd84c3ae4cf53e296ce9187cc3d1156b965a03a"
+    }
+  ],
+  "requests": [],
+  "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+}

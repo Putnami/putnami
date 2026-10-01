@@ -1,0 +1,6 @@
+{
+  "appName": "go.putnami.dev/example/invalid",
+  "version": "0.1.0",
+  "configs": [],
+  "unexpectedField": true
+}

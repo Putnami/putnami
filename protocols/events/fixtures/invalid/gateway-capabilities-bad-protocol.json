@@ -1,0 +1,13 @@
+{
+  "protocol": "putnami.events.v2",
+  "transports": ["sse"],
+  "features": {
+    "replay": false,
+    "publish": false,
+    "ack": false,
+    "payload": ["json"]
+  },
+  "endpoints": {
+    "sse": { "method": "GET", "path": "/events/stream" }
+  }
+}

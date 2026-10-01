@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/event-delivery#delivery-semantics",
+    "go/event-delivery#ingress-authority",
+    "go/event-delivery#retry-boundary",
+    "go/event-delivery#shutdown",
+    "go/event-delivery#terminal-outcome"
+  ]
+}

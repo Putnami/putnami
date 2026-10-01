@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/overlap",
+  "cliContract": 5,
+  "agentContent": {
+    "path": "content",
+    "source": "content/src"
+  }
+}

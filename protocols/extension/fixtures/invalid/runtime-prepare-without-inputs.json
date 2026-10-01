@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/runtime-prepare-without-inputs",
+  "runtime": {
+    "executable": "bin/sample",
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare"
+    }
+  },
+  "commands": {
+    "build": { "run": [{ "id": "build", "task": "build-exec" }] }
+  },
+  "tasks": {
+    "build-exec": { "kind": "command", "command": "echo" }
+  }
+}

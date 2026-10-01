@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "protocol": {
+    "version": 1,
+    "capabilities": [
+      "execution-request-v1",
+      "session-bundle-v1"
+    ]
+  },
+  "source": {
+    "digest": "sha256:05b3abf2579a5eb66403cd78be557fd860633a1fe2103c7642030defe32c657f",
+    "indexDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "git": {
+      "head": "",
+      "branch": "main",
+      "dirty": false
+    },
+    "versions": [
+      {
+        "line": "",
+        "base": "0.3.0",
+        "full": "0.3.0-20260916000000-aaaaaaa-d1d1d1d",
+        "sha": "aaaaaaa",
+        "branch": "feature/portable",
+        "suffix": "20260916000000-aaaaaaa-d1d1d1d",
+        "tag": "",
+        "tagged": false,
+        "dirty": true
+      }
+    ],
+    "bound": [
+      "app/conf/secret-link",
+      "app/conf/local.txt"
+    ]
+  },
+  "invocation": {
+    "commands": [
+      "build"
+    ],
+    "params": {},
+    "flags": {
+      "noCache": false,
+      "noCacheExplicit": false,
+      "retryFailed": false,
+      "continueOnError": false,
+      "impactedStrict": false,
+      "verbose": false,
+      "debug": false,
+      "quiet": false,
+      "retry": 0,
+      "maxParallel": 0,
+      "maxParallelMode": "",
+      "cpuBudgetPolicy": "",
+      "cacheTrust": "",
+      "output": "",
+      "profile": "",
+      "resourceBudgets": {}
+    },
+    "cwd": "app"
+  },
+  "selection": {
+    "requestedMode": "projects",
+    "mode": "projects",
+    "scoped": true,
+    "projects": [
+      "/app"
+    ],
+    "baseline": "",
+    "baselineSource": "",
+    "changedPaths": [],
+    "diagnostics": [],
+    "noCacheProjects": []
+  },
+  "plan": {
+    "tasks": [
+      {
+        "identity": {
+          "key": "/app:build",
+          "scope": "project",
+          "project": {
+            "id": "/app",
+            "name": "app"
+          },
+          "task": {
+            "name": "build",
+            "command": "build",
+            "kind": "build"
+          },
+          "provider": {
+            "extension": "@fixture/gate",
+            "version": "1.0.0"
+          }
+        },
+        "dependsOn": [],
+        "serializeAfter": [],
+        "contractDigest": "",
+        "deadlineMs": 1,
+        "cacheable": false,
+        "resources": {
+          "heavy": false,
+          "cpuWeight": 1,
+          "reads": [],
+          "writes": []
+        }
+      }
+    ]
+  },
+  "environment": {
+    "cli": {
+      "source": "published",
+      "version": "0.3.0"
+    },
+    "extensions": [],
+    "toolchains": [],
+    "platform": {
+      "os": "darwin",
+      "arch": "arm64"
+    }
+  },
+  "control": {
+    "caller": "cli",
+    "idempotencyKey": "ffffffffffffffffffffffffffffffff",
+    "deadline": "2026-09-16T12:00:00Z"
+  }
+}

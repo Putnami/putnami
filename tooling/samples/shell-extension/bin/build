@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Sample extension: build job.
+#
+# This script demonstrates a Putnami extension job
+# implemented as a shell script. It uses the putnami-jsonl.sh helper
+# library for JSONL event emission.
+#
+# Invoked by Putnami as:
+#   bin/build --putnamiContext <file> --output jsonl [--target release] [--clean]
+
+set -euo pipefail
+
+# Load JSONL helpers.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/putnami-jsonl.sh"
+
+# --- Parse arguments ---
+CONTEXT_FILE=""
+OUTPUT_MODE="jsonl"
+TARGET="release"
+CLEAN="false"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --putnamiContext) CONTEXT_FILE="$2"; shift 2 ;;
+    --output)        OUTPUT_MODE="$2"; shift 2 ;;
+    --target)        TARGET="$2"; shift 2 ;;
+    --clean)         CLEAN="true"; shift ;;
+    --no-clean)      CLEAN="false"; shift ;;
+    --help|-h)
+      echo "Usage: build --putnamiContext <file> [--target debug|release] [--clean]" >&2
+      exit 0
+      ;;
+    *)               shift ;;
+  esac
+done
+
+if [ -z "$CONTEXT_FILE" ]; then
+  echo "Error: --putnamiContext is required" >&2
+  exit 2
+fi
+
+# --- Read context ---
+parse_context "$CONTEXT_FILE"
+
+if [ -z "$PUTNAMI_CTX_PROJECT_NAME" ]; then
+  emit_log "warn" "Build requires a project context"
+  emit_result "SKIP"
+  exit 0
+fi
+
+# --- Start ---
+emit_meta "$PUTNAMI_CTX_EXTENSION_NAME" "$PUTNAMI_CTX_JOB_NAME"
+
+emit_phase_start "build"
+
+if [ "$CLEAN" = "true" ]; then
+  emit_log "info" "Cleaning build artifacts..."
+  make -C "$PUTNAMI_CTX_PROJECT_PATH" clean 2>/dev/null || true
+fi
+
+emit_log "info" "Building $PUTNAMI_CTX_PROJECT_NAME (target=$TARGET)..."
+emit_progress 0 2 "Compiling..."
+
+START_TIME=$(date +%s%N 2>/dev/null || date +%s)
+
+if make -C "$PUTNAMI_CTX_PROJECT_PATH" "$TARGET" 2>/dev/stderr; then
+  emit_progress 1 2 "Copying artifacts..."
+  # The task contract declares <command-output>/build as this task's only
+  # output, so artifacts go into that subdirectory and nowhere else: a step owns
+  # named paths under the shared command output directory, never the directory
+  # itself.
+  mkdir -p "$PUTNAMI_CTX_OUTPUT_PATH/build"
+  cp -r "$PUTNAMI_CTX_PROJECT_PATH/build/"* "$PUTNAMI_CTX_OUTPUT_PATH/build/" 2>/dev/null || true
+
+  END_TIME=$(date +%s%N 2>/dev/null || date +%s)
+  DURATION_MS=$(( (END_TIME - START_TIME) / 1000000 )) 2>/dev/null || DURATION_MS=0
+  emit_metric "build-time" "$DURATION_MS" "ms"
+
+  emit_progress 2 2 "Done"
+  emit_phase_end "build" "success"
+  emit_result "OK" "{\"target\":\"$TARGET\"}"
+  exit 0
+else
+  emit_phase_end "build" "failed"
+  emit_result "FAILED" "{\"error\":\"make failed\"}"
+  exit 1
+fi

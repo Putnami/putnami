@@ -1,0 +1,203 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "tooling",
+  "features": [
+    {
+      "id": "tooling/specification-driven-development",
+      "type": "feature",
+      "name": "Specification-driven development",
+      "outcome": "A workspace that opts in can author features, specs and architecture contracts, have them checked as ordinary DAG jobs in the same gate as build and test, and read them from a terminal or an agent through one shared engine \u2014 while a workspace that does not opt in carries none of it",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "opt-in-activation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "validation-commands-carry-the-settled-activations",
+              "every-authoring-project-declares-the-extension"
+            ]
+          }
+        },
+        {
+          "id": "declared-inputs-cover-the-read-set",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cache-policy-matches-the-declared-read-set",
+              "worktree-validation-reads-no-git-history"
+            ]
+          }
+        },
+        {
+          "id": "architecture-adoption-policy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "automatic-architecture-policy-controls-admission",
+              "report-never-hides-structural-errors",
+              "off-skips-automatic-architecture-evaluation",
+              "architecture-policy-is-part-of-cache-key"
+            ]
+          }
+        },
+        {
+          "id": "one-engine-two-surfaces",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-rendered-payload-is-the-builder-result",
+              "features-list-renders-both-surfaces-from-one-value",
+              "spec-commands-render-both-surfaces-from-one-value"
+            ]
+          }
+        },
+        {
+          "id": "architecture-agent-context",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "architecture-context-returns-the-complete-domain",
+              "architecture-context-reads-worktree-only",
+              "architecture-context-fails-closed",
+              "architecture-context-is-read-only-and-workspace-scoped"
+            ]
+          }
+        },
+        {
+          "id": "refuse-rather-than-widen",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unresolved-interactive-selection-is-refused",
+              "an-unresolved-tool-call-is-refused",
+              "a-selection-only-view-fails-closed-for-workspace-evaluation"
+            ]
+          }
+        },
+        {
+          "id": "predictable-spec-scaffolding",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-uses-the-feature-leaf-with-dry-run-parity",
+              "init-refuses-a-leaf-collision-without-overwriting"
+            ]
+          }
+        },
+        {
+          "id": "settled-decisions-are-enforced",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-registry-judges-only-its-directory",
+              "a-violated-decision-fails-naming-it",
+              "an-absent-registry-is-adoption",
+              "an-unusable-registry-fails-closed"
+            ]
+          }
+        },
+        {
+          "id": "recipe-indexes-are-checked",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dangling-sample-fails-naming-it",
+              "a-duplicate-intention-fails",
+              "an-absent-index-is-adoption"
+            ]
+          }
+        },
+        {
+          "id": "codeowners-follow-declared-owners",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-file-follows-the-declarations",
+              "a-single-maintainer-gets-one-rule",
+              "an-unchanged-file-is-not-rewritten",
+              "a-declaration-without-a-catch-all-fails",
+              "an-invalid-owner-fails-without-writing",
+              "no-declaration-is-adoption"
+            ]
+          }
+        },
+        {
+          "id": "every-document-has-working-links",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-broken-link-fails-naming-it",
+              "working-links-pass",
+              "a-link-into-another-project-is-checked",
+              "a-project-opt-out-is-honored"
+            ]
+          }
+        },
+        {
+          "id": "authoring-never-grants-a-permission",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-scaffolds-only-what-was-stated",
+              "init-refuses-an-already-declared-domain",
+              "sync-removes-a-stale-project-and-a-stale-binding",
+              "sync-refuses-to-grant-an-undeclared-relation",
+              "sync-rejects-project-selection"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

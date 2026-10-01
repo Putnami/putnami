@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "cli": {
+    "version": "1.2.3",
+    "protocolVersion": 2
+  },
+  "extensions": {},
+  "templates": {}
+}

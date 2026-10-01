@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "telemetry-putnami-dev/cli-usage-receiver#acceptance-is-not-an-oracle",
+    "telemetry-putnami-dev/cli-usage-receiver#aggregate-read-fails-closed",
+    "telemetry-putnami-dev/cli-usage-receiver#caller-address-is-not-retained",
+    "telemetry-putnami-dev/cli-usage-receiver#declared-surface-is-complete",
+    "telemetry-putnami-dev/cli-usage-receiver#exhausted-dimension-is-reported-unavailable",
+    "telemetry-putnami-dev/cli-usage-receiver#expiry-runs-without-the-service",
+    "telemetry-putnami-dev/cli-usage-receiver#fields-are-allowlisted",
+    "telemetry-putnami-dev/cli-usage-receiver#ingest-is-anonymous",
+    "telemetry-putnami-dev/cli-usage-receiver#small-groups-are-withheld",
+    "telemetry-putnami-dev/cli-usage-receiver#undeclared-requests-are-rejected"
+  ]
+}

@@ -1,0 +1,1 @@
+{"$schema":"https://putnami.dev/schemas/putnami-http-routes-v1.json","protocol":"putnami.http-routes.v1","routes":[{"match":"exact","path":"/health","methods":["GET","GET"],"publicEdge":true,"provenance":{"project":"example/app","sourceKind":"manual"}}],"digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000"}

@@ -1,0 +1,4 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "invalid/missing-commands"
+}

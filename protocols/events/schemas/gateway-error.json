@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/events/gateway-error.json",
+  "title": "Putnami Events Event Server Error",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "code", "message"],
+  "properties": {
+    "protocol": { "const": "putnami.events.v1" },
+    "code": {
+      "enum": [
+        "unauthorized",
+        "forbidden",
+        "protocol_mismatch",
+        "invalid_frame",
+        "invalid_envelope",
+        "invalid_topic",
+        "invalid_cursor",
+        "unsupported_feature",
+        "payload_too_large",
+        "rate_limited",
+        "upstream_unavailable",
+        "internal"
+      ]
+    },
+    "message": { "type": "string", "minLength": 1 },
+    "retryable": { "type": "boolean" },
+    "details": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

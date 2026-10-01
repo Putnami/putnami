@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "databases": [
+    {
+      "name": "default",
+      "engine": "postgres",
+      "schemas": ["public"]
+    }
+  ],
+  "events": {
+    "subscribes": ["project.created", "task.status.changed"]
+  },
+  "secrets": ["analytics.secret"]
+}

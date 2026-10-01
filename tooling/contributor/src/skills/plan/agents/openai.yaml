@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plan"
+  short_description: "Explore a change and produce an implementation plan"
+  default_prompt: "Use $plan to explore this change and produce a structured local plan."

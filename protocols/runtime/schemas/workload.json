@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/protocol/runtime/workload.json",
+  "title": "Putnami Workload Types",
+  "description": "Defines the workload classifications for Putnami projects. A workload type describes the runtime behavior and lifecycle expectations of a project.",
+  "type": "object",
+  "properties": {
+    "type": {
+      "$ref": "#/$defs/WorkloadType"
+    }
+  },
+  "$defs": {
+    "WorkloadType": {
+      "type": "string",
+      "enum": ["service", "worker", "job", "command"],
+      "description": "The runtime workload classification.",
+      "x-descriptions": {
+        "service": "Long-running process that serves requests (HTTP, gRPC, WebSocket). Lifecycle: start → ready → serve → stop. Supports health checks, graceful shutdown, and readiness probes.",
+        "worker": "Long-running background processor that consumes work from a source (queue, stream, file system). Lifecycle: start → process → stop. Runs indefinitely until signaled to stop.",
+        "job": "One-shot batch execution that runs to completion. Lifecycle: start → execute → complete. Used for migrations, data imports, builds, and scheduled tasks.",
+        "command": "Interactive CLI one-shot that executes and exits. Lifecycle: execute → exit. Used for code generators, formatters, and developer tools."
+      }
+    },
+    "WorkloadDescriptor": {
+      "type": "object",
+      "description": "Full workload descriptor declaring type and runtime properties.",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/WorkloadType"
+        },
+        "healthCheck": {
+          "$ref": "#/$defs/HealthCheck"
+        },
+        "gracefulShutdown": {
+          "$ref": "#/$defs/GracefulShutdown"
+        },
+        "runsWith": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Service dependencies that must be running alongside this workload (e.g., database, cache)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "HealthCheck": {
+      "type": "object",
+      "description": "Health check configuration for service and worker workloads.",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "HTTP path for health check endpoint (services only)."
+        },
+        "intervalMs": {
+          "type": "integer",
+          "minimum": 100,
+          "description": "Interval between health checks in milliseconds."
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 100,
+          "description": "Timeout for a single health check in milliseconds."
+        }
+      },
+      "additionalProperties": false
+    },
+    "GracefulShutdown": {
+      "type": "object",
+      "description": "Graceful shutdown configuration for long-running workloads.",
+      "properties": {
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 30000,
+          "description": "Maximum time to wait for graceful shutdown in milliseconds."
+        },
+        "signal": {
+          "type": "string",
+          "enum": ["SIGTERM", "SIGINT"],
+          "default": "SIGTERM",
+          "description": "Signal to send for graceful shutdown."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

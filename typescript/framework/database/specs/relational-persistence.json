@@ -1,0 +1,53 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/relational-persistence",
+  "outcomes": [
+    "A request that writes several rows commits them together or not at all, without the handler naming a transaction",
+    "A read-only request pays nothing for transactional mode: no reserved connection, no BEGIN",
+    "A cancelled request stops its database work rather than finishing it on a connection nobody is waiting for",
+    "A wedged handler cannot pin a pooled connection for ever",
+    "An operator can tell why a transaction rolled back without any log line carrying an error message, a bound parameter, or row data"
+  ],
+  "nonGoals": [
+    "Two-phase commit or any cross-datasource atomicity guarantee",
+    "Deriving the schema from the database: the table declarations in code are the source of truth",
+    "Hiding SQL — the query builder narrows what is easy to express, it does not replace the driver",
+    "Promising that a pre-1.0 minor release keeps the previous persistence contract"
+  ],
+  "requirements": [
+    {
+      "id": "lazy-transaction",
+      "text": "Entering transactional mode reserves no connection and issues no BEGIN. A connection is reserved and BEGIN is issued on the first write to a datasource, once per datasource, and concurrent writers await the same opening rather than opening twice."
+    },
+    {
+      "id": "single-committer",
+      "text": "The request-scoped unit of work finalizes at most once: a second commit or rollback is a no-op, a nested `runInTransaction` joins the outer unit instead of committing it, and finalizing after the ambient state was already resolved is a no-op rather than an error."
+    },
+    {
+      "id": "partial-commit-is-an-error",
+      "text": "A unit spanning several datasources is best-effort, never two-phase: every reserved connection is released, and any COMMIT failure is surfaced as an error — as an AggregateError when more than one datasource failed — so a partial commit is never reported as success."
+    },
+    {
+      "id": "timeout-rollback",
+      "text": "A transaction that exceeds its timeout is rolled back exactly once. A commit racing that timeout awaits the in-flight rollback and then fails, instead of committing connections the timeout already released."
+    },
+    {
+      "id": "cancellation",
+      "text": "A query started after the request signal aborted raises `QueryAbortError`, and a query already in flight is cancelled at the PostgreSQL protocol level rather than left running."
+    },
+    {
+      "id": "secret-free-telemetry",
+      "text": "The transaction boundary record and the `sql.tx.rollback.<cause>` counter carry a classified cause code only. No error message, bound parameter value, or row datum is read or emitted, and a rollback record never carries an error object."
+    },
+    {
+      "id": "cross-language-conformance",
+      "text": "The transaction and concurrency behaviour is asserted against the shared cross-language corpus, so the TypeScript and Go adapters cannot drift on outcomes, causes, or metric names."
+    },
+    {
+      "id": "declared-infrastructure",
+      "text": "A project that declares tables emits the database and schemas it needs into its own infra requirements sidecar, including tables that live only in a dependency package, so deployment requirements are derived from code rather than restated by hand."
+    }
+  ],
+  "decisions": ["typescript/framework/database/doc/adr/0001-the-request-is-the-transaction-boundary.md"]
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/protocol/identity",
+  "visibility": "public",
+  "tags": ["go", "protocol"],
+  "extensions": ["/go/extension"],
+  "publish": ["go"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "test": {
+      "coverage": false
+    },
+    "publish": {
+      "archives": false
+    }
+  },
+  "featureAuthority": {
+    "none": "A consumer-side vocabulary compiled from one manifest; the outcomes belong to the surfaces that consume it."
+  }
+}

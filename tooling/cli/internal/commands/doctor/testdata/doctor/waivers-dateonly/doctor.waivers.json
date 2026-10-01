@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "waivers": [
+    {
+      "code": "doctor.missing_required_config",
+      "owner": "platform-team",
+      "reason": "date-only expiry boundary fixture; workspace-wide scope",
+      "expires": "2027-06-15"
+    }
+  ]
+}

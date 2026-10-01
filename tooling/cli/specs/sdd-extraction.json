@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/sdd-extraction",
+  "outcomes": [
+    "The extracted SDD surfaces answer byte-for-byte what the built-in CLI implementation answered before it was deleted",
+    "The extension binary knows the workspace only through the wire, so the CLI can evolve internals without breaking it"
+  ],
+  "nonGoals": [
+    "Specifying the SDD engine's own verdicts, which tooling/sdd-extension owns"
+  ],
+  "requirements": [
+    {
+      "id": "recorded-parity-with-the-replaced-surface",
+      "text": "Every subcommand and tool is pinned byte-for-byte against answers recorded from the CLI implementation it replaced, captured before that implementation was deleted; the recording has no update flag, because the only code that could rewrite it is the code under test."
+    },
+    {
+      "id": "wire-only-workspace-knowledge",
+      "text": "The extension binary does not import the CLI's internal packages, does not replace into tooling/cli, and does not exec putnami at run time; a workspace fact it needs and the wire does not carry is closed as an additive member of protocols/job or protocols/extension, never re-derived here."
+    }
+  ]
+}

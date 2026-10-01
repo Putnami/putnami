@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "clients": {
+      "additionalProperties": false,
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "x-env": "PUTNAMI_CLIENT_ID"
+        },
+        "services": {
+          "additionalProperties": {
+            "additionalProperties": false,
+            "properties": {
+              "allowInsecure": {
+                "type": "boolean"
+              },
+              "carryRemoteMessage": {
+                "type": "boolean"
+              },
+              "clientId": {
+                "type": "string"
+              },
+              "credentials": {
+                "additionalProperties": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "allowInsecure": {
+                      "type": "boolean"
+                    },
+                    "assertion": {
+                      "type": "string",
+                      "x-sensitive": true
+                    },
+                    "assertionAudience": {
+                      "type": "string"
+                    },
+                    "assertionSource": {
+                      "type": "string"
+                    },
+                    "audience": {
+                      "type": "string"
+                    },
+                    "clientId": {
+                      "type": "string"
+                    },
+                    "clientSecret": {
+                      "type": "string",
+                      "x-sensitive": true
+                    },
+                    "grantType": {
+                      "type": "string"
+                    },
+                    "metadataUrl": {
+                      "type": "string"
+                    },
+                    "parameters": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "type": "object",
+                      "x-sensitive": true
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "tokenRequestFormat": {
+                      "type": "string"
+                    },
+                    "tokenUrl": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string",
+                      "x-sensitive": true
+                    }
+                  },
+                  "type": "object"
+                },
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "headers": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "clients"
+  ],
+  "title": "go.putnami.dev/client config",
+  "type": "object"
+}

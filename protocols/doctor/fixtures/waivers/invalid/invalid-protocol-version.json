@@ -1,0 +1,5 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-doctor.json",
+  "protocolVersion": 99,
+  "waivers": []
+}

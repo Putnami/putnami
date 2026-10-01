@@ -1,0 +1,65 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "@putnami/events",
+      "status": "pending-provider-contract",
+      "adapter": "typescript/framework/events/src/client/event-client.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/events/src/client/event-client.ts",
+          "transport": "websocket",
+          "symbol": "globalThis.WebSocket",
+          "fingerprint": "a54eeeef646d66ca8826a954e31cf5829cf36849fa04285decf04e4490c05fad"
+        }
+      ],
+      "owner": "@putnami/events",
+      "tests": ["typescript/framework/events/test/client/event-client.test.ts"],
+      "reason": "Binds the global WebSocket used to subscribe to the Putnami Event Server. Both emitters now carry a provider-owned putnami.events.v1 wire as a typed frame stream; the event server has not published that wire in its contract yet.",
+      "operations": ["eventserver.subscribe"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    },
+    {
+      "runtime": "@putnami/events",
+      "status": "pending-provider-contract",
+      "adapter": "typescript/framework/events/src/server/local-server.transport.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/events/src/server/local-server.transport.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "30a14140dbcc6cae985cd0eba6f236743b258d7dcbf818ceccbbf222eafe9ca5"
+        },
+        {
+          "path": "typescript/framework/events/src/server/local-server.transport.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "38397a67bd5d3dfcfee0f82d3d5a28ec46ff531b248a3d87ad33f96c85ed50f3"
+        }
+      ],
+      "owner": "@putnami/events",
+      "tests": ["typescript/framework/events/test/server/local-server.transport.test.ts"],
+      "reason": "Publishes, pulls and acknowledges against the local event server. Same first-party service, same missing provider declaration.",
+      "operations": ["eventserver.ack", "eventserver.publish", "eventserver.pull"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    },
+    {
+      "runtime": "@putnami/events",
+      "status": "pending-provider-contract",
+      "adapter": "typescript/framework/events/src/transport/event-server.transport.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/events/src/transport/event-server.transport.ts",
+          "transport": "http",
+          "symbol": "globalThis.fetch",
+          "fingerprint": "75796a44c0c898e5f0ad7aca8a944e53ce041a55e7610ddba28bb6923065fc81"
+        }
+      ],
+      "owner": "@putnami/events",
+      "tests": ["typescript/framework/events/test/transport/event-server.transport.test.ts"],
+      "reason": "Binds the global fetch used to publish to the Putnami Event Server. First-party service, provider declaration still owned by Putnami Cloud.",
+      "operations": ["eventserver.publish"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    }
+  ]
+}

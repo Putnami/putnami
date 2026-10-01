@@ -1,0 +1,8 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-transaction.json",
+  "protocolVersion": 1,
+  "name": "read-ledger",
+  "propagation": "nested",
+  "isolation": "repeatable-read",
+  "readOnly": true
+}

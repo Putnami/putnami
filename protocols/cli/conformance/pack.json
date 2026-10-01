@@ -1,0 +1,6 @@
+{
+  "id": "putnami.cli.result.conformance",
+  "corpus": "manifest.json",
+  "capabilityKinds": [],
+  "languages": ["go", "typescript"]
+}

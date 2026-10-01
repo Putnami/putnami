@@ -1,0 +1,15 @@
+{
+  "operationId": "widgets.watch",
+  "stream": "server",
+  "encoding": "json",
+  "idempotency": "safe",
+  "resume": false,
+  "maxFrameBytes": 4096,
+  "maxBufferedMessages": 8,
+  "steps": [
+    {
+      "direction": "server-to-client",
+      "frame": { "v": 1, "type": "message", "sequence": "1", "payload": { "encoding": "json", "value": {} } }
+    }
+  ]
+}

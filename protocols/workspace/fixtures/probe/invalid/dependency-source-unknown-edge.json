@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "projects": [
+    {
+      "path": "go/framework/http",
+      "dependencies": ["go/framework/app"],
+      "dependencySources": { "protocols/http-routes": "go-module" }
+    }
+  ]
+}

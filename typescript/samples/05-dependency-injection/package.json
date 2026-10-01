@@ -1,0 +1,16 @@
+{
+  "name": "@example/05-dependency-injection",
+  "version": "0.0.0",
+  "description": "DI container with singleton and request-scoped services",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

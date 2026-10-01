@@ -1,0 +1,23 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/client",
+  "visibility": "public",
+  "tags": ["ts"],
+  "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
+  "options": {
+    "test": {
+      "filePatterns": ["../../../protocols/clientcontract/fixtures/**"]
+    },
+    "package": {
+      "npm": true
+    },
+    "publish": {
+      "npm": true
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

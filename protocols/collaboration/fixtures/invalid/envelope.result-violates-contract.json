@@ -1,0 +1,30 @@
+{
+  "contract": "tasks",
+  "version": 1,
+  "operation": "find",
+  "outcome": "ok",
+  "result": {
+    "items": [
+      {
+        "ref": {
+          "source": "local:3f9a0c1d",
+          "id": "T-1"
+        },
+        "revision": "r2",
+        "title": "Add provider contracts",
+        "body": "Define tasks, proposals and memory.",
+        "state": "doing",
+        "providerState": "doing",
+        "labels": [
+          "area/protocols",
+          "size/large"
+        ],
+        "assignees": [
+          "agent-1"
+        ],
+        "updatedAt": "2026-09-24T08:00:00Z"
+      }
+    ],
+    "page": {}
+  }
+}

@@ -1,0 +1,56 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "features snapshot",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "compatibility": "provisional",
+    "diagnostics": [],
+    "features": [
+      {
+        "current": "modeled",
+        "id": "billing/invoice",
+        "name": "Invoice export",
+        "outcome": "Customers export issued invoices",
+        "owner": "billing",
+        "relations": [],
+        "requirements": [],
+        "source": "billing/putnami.features.json",
+        "target": "modeled",
+        "type": "feature"
+      },
+      {
+        "current": "modeled",
+        "id": "shipping/labels",
+        "name": "Shipping labels",
+        "outcome": "Operators print shipping labels",
+        "owner": "shipping",
+        "relations": [],
+        "requirements": [],
+        "source": "shipping/putnami.features.json",
+        "target": "modeled",
+        "type": "feature"
+      }
+    ],
+    "revision": {
+      "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08",
+      "kind": "worktree"
+    },
+    "selection": {
+      "externalRecords": [],
+      "features": 2,
+      "mode": "all",
+      "projects": [
+        "/billing",
+        "/shipping"
+      ],
+      "scoped": false,
+      "specs": 0
+    },
+    "sourceBindings": [],
+    "unclassified": []
+  }
+}
+--- stderr ---

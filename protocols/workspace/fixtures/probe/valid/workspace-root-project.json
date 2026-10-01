@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "extension": "@putnami/scaffold",
+  "projects": [
+    { "path": ".", "sourceName": "putnami", "type": "application" }
+  ]
+}

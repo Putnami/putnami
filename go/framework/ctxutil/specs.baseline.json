@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/bounded-request-contexts#detached-context",
+    "go/bounded-request-contexts#non-positive-timeout",
+    "go/bounded-request-contexts#positive-timeout"
+  ]
+}

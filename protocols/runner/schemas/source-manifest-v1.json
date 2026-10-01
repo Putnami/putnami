@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/runner-source-manifest-v1.json",
+  "title": "Runner source manifest version 1",
+  "description": "Content-only manifest. Implementations must also enforce the semantic path, ordering, alias, symlink-resolution, UTF-8 byte, aggregate-size and JSON ambiguity constraints documented in protocols/runner/README.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "entries"],
+  "properties": {
+    "version": { "const": 1 },
+    "entries": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "kind", "digest", "size", "mode"],
+            "properties": {
+              "path": { "$ref": "#/definitions/path" },
+              "kind": { "const": "file" },
+              "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+              "size": { "type": "integer", "minimum": 0, "maximum": 1073741824 },
+              "mode": { "enum": ["0644", "0755"] },
+              "bound": { "$ref": "#/definitions/bound" }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "kind", "target"],
+            "properties": {
+              "path": { "$ref": "#/definitions/path" },
+              "kind": { "const": "symlink" },
+              "target": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024,
+                "pattern": "^[^/\\\\:*?\"<>|\\u0000-\\u001f\\u007f][^\\\\:*?\"<>|\\u0000-\\u001f\\u007f]*$",
+                "description": "Exact relative target; dot and parent components retain their symlink-resolution meaning. Must resolve inside the workspace without a cycle."
+              },
+              "bound": { "$ref": "#/definitions/bound" }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "bound": {
+      "const": true,
+      "description": "Present only as true: the path is ignored by Git in the source worktree and was captured because a planned task declares it as an input. Part of the canonical bytes, so binding a path changes the source digest; an explicit false is rejected as non-canonical."
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)[^\\\\:*?\"<>|\\u0000-\\u001f\\u007f]+$",
+      "description": "Canonical slash-separated relative path, at most 1024 UTF-8 bytes, 64 components and 255 bytes per component; no Git metadata, reserved portable names, trailing dot/space or Unicode control/replacement characters."
+    }
+  }
+}

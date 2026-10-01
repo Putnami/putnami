@@ -1,0 +1,33 @@
+{
+  "protocolVersion": 2,
+  "namespace": "billing",
+  "features": [
+    {
+      "id": "billing/invoice-export",
+      "type": "feature",
+      "name": "Invoice export",
+      "outcome": "Customers can export issued invoices",
+      "owner": "billing",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "export-slo",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "threshold",
+            "checks": ["production-export-slo"],
+            "metric": "export.delivery.success",
+            "aggregation": "ratio",
+            "operator": "gte",
+            "target": 0.999,
+            "unit": "ratio",
+            "window": { "kind": "rolling", "seconds": 2592000 },
+            "environment": "production",
+            "maxAgeSeconds": 3600
+          }
+        }
+      ]
+    }
+  ]
+}

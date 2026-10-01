@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "line": {},
+  "includes": [
+    "extension",
+    "samples/application",
+    "samples/library",
+    "templates/python-library",
+    "templates/python-server"
+  ]
+}

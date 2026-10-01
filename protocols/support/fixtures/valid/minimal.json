@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-support.json",
+  "protocolVersion": 1,
+  "entries": [
+    {
+      "id": "@putnami/python",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    }
+  ]
+}

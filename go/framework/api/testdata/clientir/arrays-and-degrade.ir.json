@@ -1,0 +1,44 @@
+{
+  "irVersion": 1,
+  "transport": "http",
+  "services": [
+    {
+      "name": "ItemsService",
+      "className": "ItemsClient",
+      "methods": [
+        {
+          "name": "listItems",
+          "operationId": "listItems",
+          "httpMethod": "GET",
+          "path": "/items",
+          "response": [
+            {
+              "name": "counts",
+              "goType": "int64",
+              "optional": true,
+              "array": true
+            },
+            {
+              "name": "meta",
+              "goType": "map[string]any",
+              "optional": true,
+              "array": false
+            },
+            {
+              "name": "rows",
+              "goType": "map[string]any",
+              "optional": true,
+              "array": true
+            },
+            {
+              "name": "tags",
+              "goType": "string",
+              "optional": false,
+              "array": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

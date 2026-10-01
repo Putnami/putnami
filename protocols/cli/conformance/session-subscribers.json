@@ -1,0 +1,758 @@
+[
+  {
+    "name": "delivered",
+    "valid": true,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "partial-mid-record",
+    "valid": true,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "partial",
+          "acknowledged": {
+            "offset": 700,
+            "records": 2
+          },
+          "lost": 2
+        }
+      ]
+    }
+  },
+  {
+    "name": "partial-every-byte-without-final",
+    "valid": true,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "partial",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "lost",
+    "valid": true,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "lost",
+          "acknowledged": {
+            "offset": 0,
+            "records": 0
+          },
+          "lost": 4
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty-stream-delivered",
+    "valid": true,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 0,
+        "records": 0
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 0,
+            "records": 0
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "sorted-subscribers",
+    "valid": true,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "ledger",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        },
+        {
+          "name": "session-reporter",
+          "evidence": "partial",
+          "acknowledged": {
+            "offset": 10,
+            "records": 0
+          },
+          "lost": 4
+        }
+      ]
+    }
+  },
+  {
+    "name": "version-2",
+    "valid": false,
+    "document": {
+      "protocolVersion": 2,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "newline-session",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123\n",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-member",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ],
+      "extra": true
+    }
+  },
+  {
+    "name": "unknown-subscriber-member",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0,
+          "note": "x"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing-stream",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing-acknowledged-records",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "null-lost",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-evidence",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "dropped",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "delivered-short-of-stream",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 700,
+            "records": 2
+          },
+          "lost": 2
+        }
+      ]
+    }
+  },
+  {
+    "name": "lost-with-acknowledged-bytes",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "lost",
+          "acknowledged": {
+            "offset": 10,
+            "records": 0
+          },
+          "lost": 4
+        }
+      ]
+    }
+  },
+  {
+    "name": "partial-without-bytes",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "partial",
+          "acknowledged": {
+            "offset": 0,
+            "records": 0
+          },
+          "lost": 4
+        }
+      ]
+    }
+  },
+  {
+    "name": "lost-count-mismatch",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "partial",
+          "acknowledged": {
+            "offset": 700,
+            "records": 2
+          },
+          "lost": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "acknowledged-beyond-stream",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "partial",
+          "acknowledged": {
+            "offset": 1300,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "records-exceed-offset",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 3,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "lost",
+          "acknowledged": {
+            "offset": 0,
+            "records": 0
+          },
+          "lost": 4
+        }
+      ]
+    }
+  },
+  {
+    "name": "unsorted-subscribers",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        },
+        {
+          "name": "ledger",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate-subscribers",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        },
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "no-subscribers",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": []
+    }
+  },
+  {
+    "name": "uppercase-name",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "Reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative-offset",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": -1,
+        "records": 0
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "fractional-offset",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 1200.5,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "unsafe-integer-offset",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260917-120000-abc123",
+      "stream": {
+        "offset": 9007199254740992,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "partial",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "array-document",
+    "valid": false,
+    "document": [
+      {
+        "protocolVersion": 1,
+        "sessionId": "20260917-120000-abc123",
+        "stream": {
+          "offset": 1200,
+          "records": 4
+        },
+        "subscribers": [
+          {
+            "name": "session-reporter",
+            "evidence": "delivered",
+            "acknowledged": {
+              "offset": 1200,
+              "records": 4
+            },
+            "lost": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "session-and-log-reporters",
+    "valid": true,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260927-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "log-reporter",
+          "evidence": "partial",
+          "acknowledged": {
+            "offset": 700,
+            "records": 2
+          },
+          "lost": 2
+        },
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "session-and-log-reporters-log-lost",
+    "valid": true,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260927-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "log-reporter",
+          "evidence": "lost",
+          "acknowledged": {
+            "offset": 0,
+            "records": 0
+          },
+          "lost": 4
+        },
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "session-and-log-reporters-unsorted",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "sessionId": "20260927-120000-abc123",
+      "stream": {
+        "offset": 1200,
+        "records": 4
+      },
+      "subscribers": [
+        {
+          "name": "session-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        },
+        {
+          "name": "log-reporter",
+          "evidence": "delivered",
+          "acknowledged": {
+            "offset": 1200,
+            "records": 4
+          },
+          "lost": 0
+        }
+      ]
+    }
+  }
+]

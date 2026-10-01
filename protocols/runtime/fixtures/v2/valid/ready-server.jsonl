@@ -1,0 +1,4 @@
+{"v":2,"type":"meta","data":{"extension":"@putnami/typescript","job":"serve"}}
+{"v":2,"type":"log","level":"info","message":"starting server"}
+{"v":2,"type":"ready","time":"2026-07-28T09:00:01.000Z","data":{"target":"server","name":"api","endpoints":[{"scheme":"http","host":"localhost","port":3000}],"durationMs":420}}
+{"v":2,"type":"result","data":{"status":"OK"}}

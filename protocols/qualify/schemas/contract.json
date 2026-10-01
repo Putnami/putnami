@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-qualify-contract.json",
+  "title": "Putnami Workload Smoke Contract",
+  "description": "The smoke contract the CLI derives from a workload's route inventory. It is data, never authored: every request names the route fact it came from, and the digest identifies the exact request list.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "project", "derivedFrom", "requests", "digest"],
+  "properties": {
+    "protocolVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Document version. A reader refuses any other value."
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical ID of the workload the contract belongs to."
+    },
+    "derivedFrom": {
+      "type": "array",
+      "description": "Documents the requests were derived from.",
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "requests": {
+      "type": "array",
+      "description": "Smoke requests in execution order. An empty list means nothing could be derived, which a verdict reports as unsupported.",
+      "items": { "$ref": "#/$defs/request" }
+    },
+    "digest": {
+      "$ref": "#/$defs/digest",
+      "description": "sha256: plus the hex SHA-256 of the canonical JSON of requests: members sorted by name, no insignificant whitespace, no HTML escaping."
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "A sha256 content digest."
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "digest"],
+      "description": "One document a contract was derived from.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["http-routes"],
+          "description": "Source document kind. Version 1 derives from the putnami.http-routes.v1 inventory only."
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Workspace-relative, slash-separated path of the document read."
+        },
+        "digest": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Digest the source document declares for itself."
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "method", "path", "maxStatus", "provenance"],
+      "description": "One read-only smoke request.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "\"<method> <path>\", unique within the contract."
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "HEAD"],
+          "description": "HTTP method. Version 1 derives read-only methods only."
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "Route path, relative to the target base URL."
+        },
+        "maxStatus": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599,
+          "description": "Highest response status the request accepts; 499 for a derived request."
+        },
+        "provenance": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source kind of the route fact the request was derived from, for example typed-api."
+        }
+      }
+    }
+  }
+}

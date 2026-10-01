@@ -1,0 +1,183 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/event-messaging",
+      "type": "feature",
+      "name": "TypeScript event messaging",
+      "outcome": "A TypeScript workload publishes and handles typed events with at-least-once delivery whose retries are bounded, whose dead letters are kept rather than logged away, and whose every lost message leaves exactly one record",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "at-least-once",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-message-is-neither-lost-nor-duplicated-under-concurrent-publish",
+              "an-opted-in-broker-redelivers-a-handled-message",
+              "duplicate-simulation-is-off-unless-opted-into"
+            ]
+          }
+        },
+        {
+          "id": "bounded-concurrency",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-handler-admits-at-most-its-configured-concurrency",
+              "an-overflow-under-drop-policy-drops-instead-of-throwing",
+              "competing-consumers-share-the-load-under-parallel-publish"
+            ]
+          }
+        },
+        {
+          "id": "bounded-retry",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-delivery-is-retried-with-backoff",
+              "a-manual-handler-that-never-acks-is-retried",
+              "a-scheduled-backoff-retry-really-fires",
+              "the-handler-sees-the-attempt-number"
+            ]
+          }
+        },
+        {
+          "id": "browser-surface",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-browser-entry-exposes-only-topic-client-and-protocol",
+              "the-browser-entry-is-the-react-native-entry-too"
+            ]
+          }
+        },
+        {
+          "id": "cross-language-records",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-delivery-emits-the-corpus-terminal-record",
+              "a-handled-delivery-emits-the-corpus-terminal-record",
+              "an-exhausted-delivery-emits-the-corpus-retry-and-dead-letter-records",
+              "the-producer-output-matches-the-shared-golden-fixture"
+            ]
+          }
+        },
+        {
+          "id": "dead-letter-or-drop",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-message-with-no-subscriber-is-dropped",
+              "an-exhausted-delivery-reaches-the-dlq-topic-with-failure-metadata"
+            ]
+          }
+        },
+        {
+          "id": "graceful-drain",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failing-in-flight-handler-does-not-hold-up-the-drain",
+              "a-pending-retry-is-cancelled-by-stop-and-never-redelivered",
+              "a-retry-scheduled-before-stop-is-not-delivered-afterwards",
+              "a-stopped-broker-refuses-new-publishes",
+              "queued-deliveries-drain-before-stop-resolves",
+              "the-drain-is-bounded-by-the-drain-timeout"
+            ]
+          }
+        },
+        {
+          "id": "isolated-invocation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-handler-runs-inside-its-own-event-context",
+              "a-scope-close-failure-after-success-leaks-no-rejection",
+              "a-timeout-abort-signal-is-visible-to-the-handler",
+              "the-handler-sees-its-own-injection-scope",
+              "the-scope-is-closed-after-a-failed-delivery"
+            ]
+          }
+        },
+        {
+          "id": "no-silent-loss",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-repeated-scope-failure-with-no-dlq-subscriber-is-captured",
+              "an-exhausted-delivery-with-no-dlq-subscriber-is-captured"
+            ]
+          }
+        },
+        {
+          "id": "one-record-per-message",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-completed-delivery-emits-one-completion-entry",
+              "a-dead-letter-nobody-subscribes-to-is-recorded-as-a-drop",
+              "a-drop-record-carries-the-true-final-attempt",
+              "a-failed-delivery-emits-one-failure-entry",
+              "a-queue-full-drop-records-the-limit-and-no-handler-error",
+              "one-dead-letter-record-is-emitted-once-the-dlq-accepts-it"
+            ]
+          }
+        },
+        {
+          "id": "payload-validation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-schema-invalid-payload-never-reaches-the-handler",
+              "a-schema-invalid-payload-takes-the-ordinary-failure-path-to-the-dlq",
+              "a-valid-payload-reaches-the-handler"
+            ]
+          }
+        },
+        {
+          "id": "residual-failures-are-routed",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dlq-enqueue-failure-does-not-crash-the-worker",
+              "a-failing-dlq-handler-is-still-invoked-and-contained",
+              "a-refused-retry-re-enqueue-is-routed-to-the-dlq",
+              "a-routing-failure-is-logged-as-its-own-record",
+              "a-scope-creation-failure-is-routed-not-left-as-a-rejection",
+              "a-scope-creation-failure-reaches-the-failure-router-with-its-record"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

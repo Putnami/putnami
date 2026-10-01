@@ -1,0 +1,79 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/web-analytics-collection",
+  "outcomes": [
+    "An application composes one plugin and starts collecting page views and declared actions into its own Postgres",
+    "A visitor cannot be linked across UTC days without a consent-gated identifier, and no network address or raw user agent is ever stored",
+    "A page view or action that is retried by the browser, or re-sent with engagement, changes no aggregate",
+    "A sender learns nothing from the ingest answer, and a bot leaves no trace",
+    "A slow or unreachable database costs bounded memory and lost events, never a slow page"
+  ],
+  "nonGoals": [
+    "Visualisation, dashboards, or any read API (Putnami Cloud, later)",
+    "Cross-site tracking, fingerprinting beyond the daily hash, or any third-party egress",
+    "A Go runtime — there is no Go web layer; only the wire contract is shared",
+    "Web vitals, scroll depth, click autocapture (v2)",
+    "Governing consent UI — the application owns the banner and passes a consent callback"
+  ],
+  "requirements": [
+    {
+      "id": "a-pre-rendered-page-reports-from-the-browser",
+      "text": "A page served from build output carries the tracker and this request's page-view id, injected into the response the handler produced, so a fully pre-rendered site collects sessions, engagement, and declared actions without double-counting the view the server already recorded; a page the React renderer produced is left untouched."
+    },
+    {
+      "id": "a-retried-event-is-stored-once",
+      "text": "An event replayed by the browser, or re-sent to carry engagement, enriches the row it already wrote and leaves every counter, daily unique, and session aggregate unchanged."
+    },
+    {
+      "id": "a-slow-database-never-delays-a-response",
+      "text": "No response path waits for the analytics sink: a page, a beacon, and a server-side track() return while the write is still pending, rows are held in a bounded queue that drops the oldest and counts them when it is full, and stop() drains what is left inside its deadline even when the database never answers."
+    },
+    {
+      "id": "acceptance-is-not-an-oracle",
+      "text": "An accepted ingest answers 202 whether every event was stored or every event was dropped, so the only statuses a sender can distinguish are transport faults: 400 for a body that is not JSON and 413 for a body over the size ceiling."
+    },
+    {
+      "id": "bots-leave-no-trace",
+      "text": "A request whose user agent matches the closed bot list receives no tracker bootstrap, mints no cookie, and writes no row."
+    },
+    {
+      "id": "identified-mode-needs-consent",
+      "text": "A persistent visitor cookie exists only after the application's consent callback returned true, is signed server-side, and a cookie whose signature does not verify is treated as no cookie at all."
+    },
+    {
+      "id": "no-network-address-or-raw-user-agent-is-persisted",
+      "text": "A client address and a raw user agent are consumed only to derive a daily-rotating hash and a coarse device family, and every column written to the database is a name the shared protocol vocabulary declares."
+    },
+    {
+      "id": "opt-out-signals-force-cookieless",
+      "text": "A request carrying Sec-GPC: 1, or DNT: 1 when the application respects it, is collected in cookieless mode however the plugin is configured."
+    },
+    {
+      "id": "page-views-are-collected-without-cookies",
+      "text": "An HTML page response records a server page view identified by a daily-rotating hash, sets no cookie, and hands the browser only the event id and route it needs to complete that view."
+    },
+    {
+      "id": "raw-events-expire",
+      "text": "Raw events are deleted past their retention window by a bounded sweep that runs at most every ten minutes, and the scheduled mode contributes the database job that keeps expiry running when the application is idle."
+    },
+    {
+      "id": "the-browser-bundle-stays-inside-the-boundary",
+      "text": "The published browser graph reaches no server-only runtime import and no server implementation symbol, and the tracker it ships stays under 4 KiB gzipped."
+    },
+    {
+      "id": "the-tables-follow-the-datasource-schema",
+      "text": "The four tables live in the schema their datasource already has: analytics.schema when set, otherwise the schema another SQL migration source or sql() declares for that datasource, otherwise public. A workload that declares no schema keeps its migration bundle byte for byte, and a schema that contradicts the datasource's fails the build instead of the migration."
+    },
+    {
+      "id": "undeclared-actions-are-dropped",
+      "text": "An action name the application did not declare, or a property outside the declared bounds, never reaches the database: the wire event is dropped and counted, and a server-side call raises."
+    }
+  ],
+  "decisions": [
+    "typescript/framework/analytics/doc/adr/0001-cookieless-by-default.md",
+    "typescript/framework/analytics/doc/adr/0002-app-owned-sink-and-daily-fold.md",
+    "typescript/framework/analytics/doc/adr/0003-shared-protocol-typescript-only-runtime.md",
+    "typescript/framework/analytics/doc/adr/0004-writes-are-asynchronous-and-lossy.md"
+  ]
+}

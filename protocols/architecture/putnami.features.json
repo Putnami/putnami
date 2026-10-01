@@ -1,0 +1,171 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "architecture",
+  "features": [
+    {
+      "id": "architecture/executable-contracts",
+      "type": "feature",
+      "name": "Executable architecture contracts",
+      "outcome": "A workspace can declare domain authority and access contracts once, then receive deterministic local validation, drift detection, debt ratcheting and inspection without a Cloud dependency",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "single-interpretation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-protocol-owns-strict-parsing",
+              "strict-parsing-rejects-duplicate-fields-at-any-depth",
+              "the-protocol-owns-semantic-validation",
+              "canonicalization-makes-the-snapshot-order-independent",
+              "canonical-writing-round-trips-through-the-strict-reader",
+              "finding-ids-and-vocabularies-are-closed-and-stable",
+              "contract-id-validators-share-one-wire-bound",
+              "the-published-schemas-are-strict",
+              "the-schema-guard-rejects-an-open-definition"
+            ]
+          }
+        },
+        {
+          "id": "distributed-authority",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-domain-owns-its-identity-and-its-half-of-a-contract",
+              "two-domains-cannot-author-incompatible-halves",
+              "binding-direction-and-uniqueness-are-checked-at-the-source",
+              "the-generated-graph-is-a-projection-of-the-authored-manifests",
+              "an-invalid-authored-manifest-is-rejected-at-its-source",
+              "reference-only-code-facts-may-omit-data-metadata"
+            ]
+          }
+        },
+        {
+          "id": "planned-is-not-observed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-planned-target-cannot-carry-a-current-project-binding",
+              "a-declared-transport-creates-no-observed-evidence"
+            ]
+          }
+        },
+        {
+          "id": "exact-drift",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-observed-edge-needs-an-exact-consumer-to-producer-declaration"
+            ]
+          }
+        },
+        {
+          "id": "ratchet",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-new-violation-fails-while-baselined-debt-stays-a-warning",
+              "a-stale-baseline-entry-and-any-growth-fail",
+              "an-expired-or-stale-waiver-fails",
+              "an-expiring-waiver-fails-closed-without-an-evaluation-date",
+              "debt-cannot-be-both-baselined-and-waived",
+              "waiver-documents-parse-under-the-same-strict-rules"
+            ]
+          }
+        },
+        {
+          "id": "coverage",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "database-http-and-event-observation-report-as-not-detected",
+              "the-snapshot-reports-project-dependency-enforcement-for-mapped-projects"
+            ]
+          }
+        },
+        {
+          "id": "framework-evidence",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-implementation-nobody-declared-is-a-finding",
+              "a-declaration-is-only-expected-to-be-implemented-inside-an-adopting-domain",
+              "evidence-coverage-reports-the-framework-tier-and-never-more"
+            ]
+          }
+        },
+        {
+          "id": "contained-read-only-tooling",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-tools-declare-and-honor-read-only",
+              "discovery-finds-only-exact-contained-authority-files",
+              "the-prior-baseline-loads-from-immutable-git-objects",
+              "worktree-validation-reads-no-git-history"
+            ]
+          }
+        },
+        {
+          "id": "runtime-enforcement",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-component-refuses-a-contract-the-gate-would-reject",
+              "a-declared-rebuild-strategy-needs-its-source-at-construction",
+              "an-absent-fact-takes-the-declared-missing-behavior",
+              "a-copy-past-the-declared-bound-is-stamped-or-refused",
+              "updates-are-ordered-deduplicated-and-late-handled-as-declared",
+              "the-local-model-names-one-writer-and-a-second-is-refused",
+              "rebuild-replaces-and-replay-resumes-from-the-newest-version",
+              "deletion-follows-the-declared-strategy",
+              "a-snapshot-version-is-immutable-and-addressable",
+              "a-snapshot-latest-read-takes-the-declared-consistency",
+              "a-command-refuses-a-contract-that-is-not-live",
+              "an-acknowledged-send-surfaces-the-carrier-verdict",
+              "a-fire-and-forget-send-never-fails-the-caller"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

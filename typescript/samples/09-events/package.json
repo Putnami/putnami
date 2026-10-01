@@ -1,0 +1,17 @@
+{
+  "name": "@example/09-events",
+  "version": "0.0.0",
+  "description": "Event-driven pub/sub with typed topics and handlers",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/events": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Check"
+  short_description: "Run the Putnami gate and applicable local proof"
+  default_prompt: "Use $check to validate impacted projects and applicable runtime behavior."

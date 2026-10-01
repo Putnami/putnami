@@ -1,0 +1,98 @@
+[
+  {
+    "referrer": "",
+    "origin": "https://app.example.com",
+    "expected": {
+      "referrer": "",
+      "referrerType": "direct"
+    }
+  },
+  {
+    "referrer": "https://app.example.com/pricing",
+    "origin": "https://app.example.com",
+    "expected": {
+      "referrer": "https://app.example.com/pricing",
+      "referrerType": "internal"
+    }
+  },
+  {
+    "referrer": "/dashboard",
+    "origin": "https://app.example.com",
+    "expected": {
+      "referrer": "/dashboard",
+      "referrerType": "internal"
+    }
+  },
+  {
+    "referrer": "https://www.google.com/search?q=putnami",
+    "origin": "https://app.example.com",
+    "expected": {
+      "referrer": "https://www.google.com/search",
+      "referrerType": "search"
+    }
+  },
+  {
+    "referrer": "https://www.bing.com/search?q=putnami+framework",
+    "origin": "https://app.example.com",
+    "expected": {
+      "referrer": "https://www.bing.com/search",
+      "referrerType": "search"
+    }
+  },
+  {
+    "referrer": "https://duckduckgo.com/?q=putnami",
+    "origin": "https://app.example.com",
+    "expected": {
+      "referrer": "https://duckduckgo.com/",
+      "referrerType": "search"
+    }
+  },
+  {
+    "referrer": "https://www.facebook.com/putnami/posts/123",
+    "origin": "https://app.example.com",
+    "expected": {
+      "referrer": "https://www.facebook.com/putnami/posts/123",
+      "referrerType": "social"
+    }
+  },
+  {
+    "referrer": "https://t.co/aBcDeFgH",
+    "origin": "https://app.example.com",
+    "expected": {
+      "referrer": "https://t.co/aBcDeFgH",
+      "referrerType": "social"
+    }
+  },
+  {
+    "referrer": "https://www.linkedin.com/feed/update/12345/",
+    "origin": "https://app.example.com",
+    "expected": {
+      "referrer": "https://www.linkedin.com/feed/update/12345/",
+      "referrerType": "social"
+    }
+  },
+  {
+    "referrer": "https://news.ycombinator.com/item?id=42000000",
+    "origin": "https://app.example.com",
+    "expected": {
+      "referrer": "https://news.ycombinator.com/item",
+      "referrerType": "other"
+    }
+  },
+  {
+    "referrer": "http://www.legacy.example.net/index.html?ref=1#top",
+    "origin": "https://app.example.com",
+    "expected": {
+      "referrer": "http://www.legacy.example.net/index.html",
+      "referrerType": "other"
+    }
+  },
+  {
+    "referrer": "https://long.example.com/blog/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "origin": "https://app.example.com",
+    "expected": {
+      "referrer": "https://long.example.com/blog/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "referrerType": "other"
+    }
+  }
+]

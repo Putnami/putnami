@@ -1,0 +1,49 @@
+{
+  "compatibility": "provisional",
+  "project": "samples/tasks",
+  "nodes": [
+    {
+      "id": "api.operation:POST:/api/tasks",
+      "kind": "api.operation",
+      "name": "POST /api/tasks",
+      "properties": {
+        "method": "POST",
+        "operationId": "createTask",
+        "path": "/api/tasks"
+      }
+    },
+    {
+      "id": "feature:tasks/manage",
+      "kind": "feature",
+      "name": "Task management",
+      "properties": {
+        "outcome": "Users can create, list, update and complete tasks",
+        "owner": "samples"
+      },
+      "provenance": {
+        "path": "src/tasks/tasks.module.ts",
+        "line": 4,
+        "symbol": "tasks"
+      }
+    },
+    {
+      "id": "module:tasks",
+      "kind": "module",
+      "name": "tasks"
+    }
+  ],
+  "edges": [
+    {
+      "from": "feature:tasks/manage",
+      "to": "module:tasks",
+      "kind": "implementedBy",
+      "authority": "exact"
+    },
+    {
+      "from": "module:tasks",
+      "to": "api.operation:POST:/api/tasks",
+      "kind": "exposes",
+      "authority": "exact"
+    }
+  ]
+}

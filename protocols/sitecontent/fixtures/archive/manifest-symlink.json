@@ -1,0 +1,8 @@
+{
+  "omitManifest": true,
+  "entries": [
+    { "type": "symlink", "path": "bundle.json", "linkname": "../outside.json" },
+    { "type": "file", "path": "docs/cloud/index.html", "data": "hello cloud\n" }
+  ],
+  "wantCodes": ["sitecontent.parse_error"]
+}

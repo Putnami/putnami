@@ -1,0 +1,13 @@
+{
+  "appName": "hash-app",
+  "version": "1.0.0",
+  "schemaHash": "fnv:abcdef0123456789",
+  "configs": [
+    {
+      "path": "server",
+      "fields": [
+        { "name": "port", "type": "int" }
+      ]
+    }
+  ]
+}

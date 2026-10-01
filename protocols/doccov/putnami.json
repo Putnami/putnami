@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/protocol/doccov",
+  "tags": ["go", "protocol"],
+  "extensions": ["/go/extension"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0,
+      "filePatterns": [
+        "../*/go.mod",
+        "../*/*.go",
+        "../*/schemas/*.json",
+        "../*/schema/*.go",
+        "../*/schema/*.json"
+      ]
+    }
+  }
+}

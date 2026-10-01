@@ -1,0 +1,195 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-contracts.json",
+  "protocolVersion": 1,
+  "name": "go.putnami.dev/example/identity",
+  "enums": [
+    {
+      "name": "TokenType",
+      "description": "The kind of bearer credential.",
+      "values": [
+        {
+          "name": "Bearer",
+          "value": "bearer",
+          "description": "An OAuth bearer token."
+        },
+        {
+          "name": "ApiKey",
+          "value": "api_key"
+        }
+      ]
+    }
+  ],
+  "unions": [
+    {
+      "name": "Credential",
+      "description": "One presented credential.",
+      "discriminator": "type",
+      "variants": [
+        {
+          "tag": "access",
+          "struct": "AccessToken"
+        },
+        {
+          "tag": "refresh",
+          "struct": "RefreshToken"
+        },
+        {
+          "tag": "anonymous",
+          "fields": [
+            {
+              "name": "reason",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "structs": [
+    {
+      "name": "AccessToken",
+      "fields": [
+        {
+          "name": "value",
+          "type": "string"
+        },
+        {
+          "name": "expiresIn",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "RefreshToken",
+      "fields": [
+        {
+          "name": "value",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "TokenBundle",
+      "description": "A tokenType plus its credential and scopes.",
+      "fields": [
+        {
+          "name": "tokenType",
+          "type": "TokenType"
+        },
+        {
+          "name": "credential",
+          "type": "Credential"
+        },
+        {
+          "name": "scopes",
+          "type": "string",
+          "repeated": true
+        }
+      ]
+    }
+  ],
+  "configFields": [
+    {
+      "name": "issuer",
+      "type": "string",
+      "description": "Token issuer URL.",
+      "required": true,
+      "default": "https://issuer.example.com"
+    },
+    {
+      "name": "ttlSeconds",
+      "type": "int",
+      "default": 3600
+    },
+    {
+      "name": "rotateKeys",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "clientSecret",
+      "type": "string",
+      "sensitive": true
+    }
+  ],
+  "scopes": [
+    {
+      "name": "openid",
+      "description": "OpenID Connect sign-in."
+    },
+    {
+      "name": "profile"
+    },
+    {
+      "name": "email"
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "authenticate",
+      "description": "Establish a session.",
+      "scopes": [
+        "openid"
+      ]
+    },
+    {
+      "name": "readProfile",
+      "scopes": [
+        "profile",
+        "email"
+      ]
+    }
+  ],
+  "grants": [
+    {
+      "name": "loginGrant",
+      "capability": "authenticate"
+    },
+    {
+      "name": "profileGrant",
+      "capability": "readProfile"
+    }
+  ],
+  "claims": [
+    {
+      "name": "sub",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "iss",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "exp",
+      "type": "int",
+      "required": true
+    },
+    {
+      "name": "email",
+      "type": "string"
+    }
+  ],
+  "principalKinds": [
+    {
+      "name": "user"
+    },
+    {
+      "name": "service"
+    },
+    {
+      "name": "apiClient"
+    }
+  ],
+  "discovery": {
+    "title": "Identity Contract",
+    "summary": "The identity and authorization vocabulary for the example workload.",
+    "version": "2.1.0",
+    "tags": [
+      "auth",
+      "identity",
+      "security"
+    ]
+  }
+}

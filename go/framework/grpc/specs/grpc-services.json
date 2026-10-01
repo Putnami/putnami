@@ -1,0 +1,56 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/grpc-services",
+  "outcomes": [
+    "A gRPC server starts and drains with the rest of the application rather than on its own schedule",
+    "A server that configures nothing is still bounded in connection lifetime, keepalive tolerance, and concurrent streams",
+    "A web or mobile caller reaches the same operations over Connect that an internal caller reaches over gRPC",
+    "Wiring a gateway incompletely is reported at startup instead of surfacing as production 404s",
+    "A first-party Connect caller reaches a declared operation with the same values a REST caller reaches it with, over JSON or protobuf"
+  ],
+  "nonGoals": [
+    "Generating Connect or gRPC stubs, which remain the job of protoc and buf against the published .proto document",
+    "Carrying client or bidirectional streams over the api bridge, because Connect carries at most one request message per call",
+    "Terminating TLS or mutual TLS, which belongs to the deployment's ingress",
+    "Promising strict compatibility between every pre-1.0 minor release"
+  ],
+  "requirements": [
+    {
+      "id": "secure-defaults",
+      "text": "Connection-lifetime, keepalive, and concurrent-stream limits are applied before any caller-supplied server option, so an unconfigured server is bounded by conservative defaults while an explicit option still wins."
+    },
+    {
+      "id": "bounded-drain",
+      "text": "Stop runs a graceful drain under a deadline that defaults when unset, and force-closes the server when the deadline elapses so a long-lived stream cannot hang shutdown; stopping a server that never started is a no-op."
+    },
+    {
+      "id": "reflection-opt-in",
+      "text": "Server reflection is disabled unless the workload enables it explicitly, so a deployment does not publish its service catalogue by default."
+    },
+    {
+      "id": "interceptor-chain",
+      "text": "Unary and stream interceptors run in registration order; the recovery interceptor converts a handler panic into an internal error without leaking the panic value; the dependency-injection interceptor creates one scope per RPC and passes the call through unchanged when no container is available."
+    },
+    {
+      "id": "gateway-mounting",
+      "text": "Connect handlers become reachable only when the gateway is registered on the HTTP server; a gateway that holds handlers but was never registered warns at start rather than serving nothing silently."
+    },
+    {
+      "id": "api-bridge",
+      "text": "Every bound api endpoint is exposed at a Connect-style RPC URL taken from the published protobuf descriptor when one exists, so the mounted URL and the descriptor's method identity cannot diverge; the bridge refuses to start when they do. Document-only endpoints are skipped, and the JSON envelope keeps path parameters, query parameters, and body in separate sections so identically named fields cannot collide. A mounted bridge publishes the payload encodings it actually serves."
+    },
+    {
+      "id": "connect-protocol",
+      "text": "The bridge serves Connect protocol version 1 for a provider that publishes a protobuf descriptor: JSON and protobuf unary bodies, the caller's Connect-Timeout-Ms, gzip bounded in the decompressed direction, the Connect error document carrying the gRPC code beside the stable first-party code in google.rpc.ErrorInfo, and a declared server stream as 5-byte-prefixed envelopes ended by exactly one EndStreamResponse. A codec it does not serve is refused, never guessed at."
+    },
+    {
+      "id": "bridge-validation",
+      "text": "A bridged call re-enters the endpoint's own validation pipeline, so it accepts and rejects exactly what the equivalent REST call would, and a numeric path parameter keeps its original decimal text rather than passing through float64."
+    }
+  ],
+  "decisions": [
+    "go/framework/grpc/doc/adr/0001-bridge-reenters-the-endpoint-pipeline.md",
+    "go/framework/grpc/doc/adr/0002-bounded-by-default-mounted-explicitly.md"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "<%= projectName %>",
+  "type": "application",
+  "main": "src/<%= projectModule %>/__init__.py",
+  "extensions": [
+    "@putnami/python"
+  ],
+  "options": {
+    "@putnami/python:run": {
+      "entrypoint": "src/<%= projectModule %>/__init__.py"
+    },
+    "@putnami/python:serve": {
+      "entrypoint": "src/<%= projectModule %>/__init__.py"
+    }
+  }
+}

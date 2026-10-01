@@ -1,0 +1,65 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "registry", "version": "1" },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": { "id": "registry", "audience": "urn:putnami:registry" },
+    "credentials": {
+      "user": { "kind": "forwarded-user-token" }
+    }
+  },
+  "paths": {
+    "/v2/_putnami/capabilities": {
+      "get": {
+        "operationId": "getV2PutnamiCapabilities",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Capabilities" } }
+            }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [{ "protocol": "rest-json", "path": "/v2/_putnami/capabilities", "encoding": "json" }],
+          "security": { "alternatives": [{ "allOf": [{ "profile": "user" }] }] },
+          "errors": [],
+          "idempotency": { "kind": "safe" }
+        }
+      }
+    },
+    "/v2/{name}/manifests/{reference}": {
+      "get": {
+        "operationId": "getV2_Name_Manifests_Reference",
+        "description": "An OCI Distribution Specification leg: the standard owns its wire format, so its own schemas are not held to the first-party subset.",
+        "parameters": [
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "reference", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The manifest, in the media type the specification negotiates",
+            "content": {
+              "application/vnd.oci.image.manifest.v1+json": { "schema": {} }
+            }
+          }
+        },
+        "x-putnami-external-contract": "OCI Distribution Specification v1.1"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Capabilities": {
+        "type": "object",
+        "properties": {
+          "copy": { "type": "boolean" },
+          "revert": { "type": "boolean" }
+        },
+        "required": ["copy", "revert"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

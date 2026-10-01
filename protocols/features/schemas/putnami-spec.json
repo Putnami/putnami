@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-spec.json",
+  "title": "Putnami durable specification v1",
+  "$comment": "A spec details exactly one already-authored feature. It never mints a feature, a maturity stage, an evidence record, or a design-graph node, and it never restates derived facts such as owners, source bindings, routes, schemas, or migrations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "feature", "outcomes", "requirements"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "protocolVersion": {
+      "$comment": "Readers require the exact JSON integer token 1; 1.0 and 1e0 are invalid.",
+      "type": "integer",
+      "const": 1
+    },
+    "feature": { "$ref": "#/$defs/featureID" },
+    "outcomes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/statement" } },
+    "nonGoals": { "type": "array", "items": { "$ref": "#/$defs/statement" } },
+    "requirements": { "type": "array", "items": { "$ref": "#/$defs/requirement" } },
+    "decisions": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/decisionLink" } }
+  },
+  "$defs": {
+    "featureID": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)+$"
+    },
+    "segmentID": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "statement": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "decisionLink": {
+      "$comment": "A workspace-relative link to a record written under the existing project-local doc/adr/*.md convention. There is no second decision wire protocol.",
+      "type": "string",
+      "maxLength": 512,
+      "pattern": "^(?:[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?/)*doc/adr/[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?\\.md$"
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/segmentID" },
+        "text": { "$ref": "#/$defs/statement" }
+      }
+    }
+  }
+}

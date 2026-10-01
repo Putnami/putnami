@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/generated-client-manifest-v1.json",
+  "title": "Putnami generated first-party client manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocolVersion",
+    "generatedBy",
+    "language",
+    "service",
+    "binding",
+    "contractSha256",
+    "operations",
+    "files"
+  ],
+  "properties": {
+    "protocolVersion": { "const": 1 },
+    "generatedBy": { "const": "@putnami/clientgen" },
+    "language": { "enum": ["go", "ts"] },
+    "service": { "$ref": "x-putnami-client-v1.json#/$defs/service" },
+    "binding": { "$ref": "#/$defs/binding" },
+    "contractSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "operations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/operation" }
+    },
+    "omittedOperations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Contract operations the target's configuration leaves out (a Go target's go.omitOperations), in ascending operationId order. operations and omittedOperations together account for every contract operation, and no operationId is in both. Absent when the target generates every operation.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "runtimeCapabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Client runtime capabilities the generated target cannot run without, in ascending order. Derived from the operations: response-cache when any operation declares a cache policy, sse-continuation when any SSE transport declares a continuation.",
+      "items": { "enum": ["response-cache", "sse-continuation"] }
+    },
+    "files": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/file" }
+    }
+  },
+  "$defs": {
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["importPath", "clients"],
+      "properties": {
+        "importPath": { "type": "string", "minLength": 1 },
+        "clients": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/bindingClient" }
+        }
+      }
+    },
+    "bindingClient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service", "clientSymbol", "bindingSymbol"],
+      "properties": {
+        "service": { "type": "string", "minLength": 1 },
+        "clientSymbol": { "type": "string", "minLength": 1 },
+        "bindingSymbol": { "type": "string", "minLength": 1 }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "service", "methodSymbol", "stream", "transports"],
+      "properties": {
+        "operationId": { "type": "string", "minLength": 1 },
+        "service": { "type": "string", "minLength": 1 },
+        "methodSymbol": { "type": "string", "minLength": 1 },
+        "stream": { "enum": ["unary", "server", "client", "bidirectional"] },
+        "transports": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "x-putnami-client-v1.json#/$defs/transport" }
+        },
+        "cache": { "$ref": "x-putnami-client-v1.json#/$defs/cachePolicy" }
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!client\\.putnami\\.json$)(?!.*[:\\u0000-\\u001F\\u007F])[^\\\\]+$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

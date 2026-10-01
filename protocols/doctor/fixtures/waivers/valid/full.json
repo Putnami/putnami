@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-doctor.json",
+  "protocolVersion": 1,
+  "waivers": [
+    {
+      "code": "doctor.volatile_persistence",
+      "project": "go.putnami.dev/example/iam",
+      "owner": "platform-team",
+      "reason": "staging bake still uses the in-memory store; tracked in PUT-1234",
+      "expires": "2027-06-30"
+    },
+    {
+      "code": "doctor.local_rate_limit",
+      "owner": "gateway-team",
+      "reason": "single-replica preview deploy; distributed limiter lands in PUT-1300",
+      "expires": "2027-12-31"
+    }
+  ]
+}

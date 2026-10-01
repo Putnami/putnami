@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@example/06-database",
+  "tags": ["e2e", "ts"],
+  "extensions": ["/typescript/extension"],
+  "featureAuthority": { "owner": "typescript/relational-persistence" },
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    },
+    "serve": {
+      "port": 3906
+    }
+  }
+}

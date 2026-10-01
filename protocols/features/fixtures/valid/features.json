@@ -1,0 +1,30 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 1,
+  "namespace": "billing",
+  "features": [
+    {
+      "id": "billing/invoicing",
+      "type": "feature",
+      "name": "Invoicing",
+      "outcome": "Customers can issue invoices",
+      "owner": "billing",
+      "target": "modeled"
+    },
+    {
+      "id": "billing/invoice-export",
+      "type": "feature",
+      "name": "Invoice export",
+      "outcome": "Customers can export issued invoices",
+      "owner": "billing",
+      "target": "coded",
+      "relations": [
+        { "kind": "dependsOn", "target": "billing/invoicing" }
+      ],
+      "requirements": [
+        { "id": "integration-test", "stage": "wired", "evidenceKinds": ["artifact"] },
+        { "id": "implementation", "stage": "coded", "evidenceKinds": ["capability"] }
+      ]
+    }
+  ]
+}

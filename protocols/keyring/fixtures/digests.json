@@ -1,0 +1,106 @@
+{
+  "description": "Cross-language corpus for the PHC-style credential-digest grammar. Every 'valid' entry must strict-parse clean and round-trip (parse then re-encode yields the same string). Every 'invalid' entry must be rejected; 'reason' explains WHY and 'expectCode' pins the diagnostic code the strict parser must emit. Salt/hash use RFC 4648 §4 standard base64 WITHOUT padding (note the '+' and '/' characters in the valid vectors — a base64url parser would mis-decode them).",
+  "valid": [
+    {
+      "id": "pbkdf2-sha256-100k",
+      "digest": "$pbkdf2-sha256$v=1$i=100000$MDEyMzQ1Njc4OWFiY2RlZg$CQEF03iMraucElCfobodRqkaFY16F3mxFDIvP9WoJcs",
+      "algorithm": "pbkdf2-sha256",
+      "version": 1,
+      "iterations": 100000
+    },
+    {
+      "id": "pbkdf2-sha256-250k-plus-char",
+      "digest": "$pbkdf2-sha256$v=1$i=250000$c2FsdHlzYWx0eXNhbHQwMA$WLdJu6tmRcfOdDkk05+kPfz75ryVW75qVCUSBca38es",
+      "algorithm": "pbkdf2-sha256",
+      "version": 1,
+      "iterations": 250000
+    },
+    {
+      "id": "hmac-sha256-basic-slash-char",
+      "digest": "$hmac-sha256$v=1$MDEyMzQ1Njc4OWFiY2RlZg$nA6xcr//o7YeWaQAtYH6Gt0KzvxAyR28IaJvtYFuj6g",
+      "algorithm": "hmac-sha256",
+      "version": 1,
+      "iterations": 0
+    }
+  ],
+  "invalid": [
+    {
+      "id": "empty-string",
+      "digest": "",
+      "reason": "empty string is not a digest",
+      "expectCode": "keyring.digest_structure"
+    },
+    {
+      "id": "no-leading-dollar",
+      "digest": "pbkdf2-sha256$v=1$i=100000$MDEyMzQ1Njc4OWFiY2RlZg$CQEF03iMraucElCfobodRqkaFY16F3mxFDIvP9WoJcs",
+      "reason": "digest must begin with '$'",
+      "expectCode": "keyring.digest_structure"
+    },
+    {
+      "id": "unknown-algorithm",
+      "digest": "$scrypt$v=1$i=100000$MDEyMzQ1Njc4OWFiY2RlZg$CQEF03iMraucElCfobodRqkaFY16F3mxFDIvP9WoJcs",
+      "reason": "scrypt is not a recognized digest algorithm",
+      "expectCode": "keyring.digest_algorithm"
+    },
+    {
+      "id": "unsupported-version",
+      "digest": "$pbkdf2-sha256$v=2$i=100000$MDEyMzQ1Njc4OWFiY2RlZg$CQEF03iMraucElCfobodRqkaFY16F3mxFDIvP9WoJcs",
+      "reason": "digest version 2 is not supported (want 1)",
+      "expectCode": "keyring.digest_version"
+    },
+    {
+      "id": "malformed-version-segment",
+      "digest": "$pbkdf2-sha256$x=1$i=100000$MDEyMzQ1Njc4OWFiY2RlZg$CQEF03iMraucElCfobodRqkaFY16F3mxFDIvP9WoJcs",
+      "reason": "version segment must be 'v=<int>', got 'x=1'",
+      "expectCode": "keyring.digest_params"
+    },
+    {
+      "id": "iterations-zero",
+      "digest": "$pbkdf2-sha256$v=1$i=0$MDEyMzQ1Njc4OWFiY2RlZg$CQEF03iMraucElCfobodRqkaFY16F3mxFDIvP9WoJcs",
+      "reason": "iterations 0 is below MinIterations (1)",
+      "expectCode": "keyring.digest_params"
+    },
+    {
+      "id": "iterations-too-high",
+      "digest": "$pbkdf2-sha256$v=1$i=20000000$MDEyMzQ1Njc4OWFiY2RlZg$CQEF03iMraucElCfobodRqkaFY16F3mxFDIvP9WoJcs",
+      "reason": "iterations 20000000 exceeds MaxIterations (10000000)",
+      "expectCode": "keyring.digest_params"
+    },
+    {
+      "id": "iterations-not-integer",
+      "digest": "$pbkdf2-sha256$v=1$i=abc$MDEyMzQ1Njc4OWFiY2RlZg$CQEF03iMraucElCfobodRqkaFY16F3mxFDIvP9WoJcs",
+      "reason": "iterations 'abc' is not an integer",
+      "expectCode": "keyring.digest_params"
+    },
+    {
+      "id": "iterations-signed",
+      "digest": "$pbkdf2-sha256$v=1$i=+100000$MDEyMzQ1Njc4OWFiY2RlZg$CQEF03iMraucElCfobodRqkaFY16F3mxFDIvP9WoJcs",
+      "reason": "iterations must be a canonical unsigned decimal; a leading '+' is rejected",
+      "expectCode": "keyring.digest_params"
+    },
+    {
+      "id": "pbkdf2-missing-iterations-segment",
+      "digest": "$pbkdf2-sha256$v=1$MDEyMzQ1Njc4OWFiY2RlZg$CQEF03iMraucElCfobodRqkaFY16F3mxFDIvP9WoJcs",
+      "reason": "pbkdf2-sha256 requires the i=<n> segment (too few segments)",
+      "expectCode": "keyring.digest_structure"
+    },
+    {
+      "id": "hmac-with-extra-iterations-segment",
+      "digest": "$hmac-sha256$v=1$i=100000$MDEyMzQ1Njc4OWFiY2RlZg$CQEF03iMraucElCfobodRqkaFY16F3mxFDIvP9WoJcs",
+      "reason": "hmac-sha256 carries no work factor; the extra i= segment makes it too long",
+      "expectCode": "keyring.digest_structure"
+    },
+    {
+      "id": "salt-uses-base64url-alphabet",
+      "digest": "$pbkdf2-sha256$v=1$i=100000$abc-_def$CQEF03iMraucElCfobodRqkaFY16F3mxFDIvP9WoJcs",
+      "reason": "salt uses base64url chars '-' and '_' which are not valid in standard base64",
+      "expectCode": "keyring.digest_encoding"
+    },
+    {
+      "id": "hash-empty",
+      "digest": "$pbkdf2-sha256$v=1$i=100000$MDEyMzQ1Njc4OWFiY2RlZg$",
+      "reason": "hash segment is empty",
+      "expectCode": "keyring.digest_params"
+    }
+  ]
+}

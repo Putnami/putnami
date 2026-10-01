@@ -1,0 +1,53 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "go.putnami.dev/events",
+      "status": "pending-provider-contract",
+      "adapter": "go/framework/events/eventserver_transport.go",
+      "callsites": [
+        {
+          "path": "go/framework/events/eventserver_transport.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "467b483f0323661fdb841df6a38176240f396cac0d0e40a298f6381ff546bd20"
+        },
+        {
+          "path": "go/framework/events/eventserver_transport.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "47a1efef6acb93b451daa43fb549f39938f56e4e3a6aab8c20f467c93d5af8c3"
+        }
+      ],
+      "owner": "go.putnami.dev/events",
+      "tests": ["go/framework/events/eventserver_transport_test.go"],
+      "reason": "Publishes to the Putnami Event Server. The service is first-party but its provider-side client declaration lives in Putnami Cloud, so no generated binding exists to migrate to yet.",
+      "operations": ["eventserver.publish"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    },
+    {
+      "runtime": "go.putnami.dev/events",
+      "status": "pending-provider-contract",
+      "adapter": "go/framework/events/local_server.go",
+      "callsites": [
+        {
+          "path": "go/framework/events/local_server.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "7b47035205dc6ce332e33fa69afbe69aff87dfa211217b97f6e96f81bc34bd1f"
+        },
+        {
+          "path": "go/framework/events/local_server.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "ab19e0f86f19647359e6d4d787d3026adba9d598817fab703d14602a09da5f8c"
+        }
+      ],
+      "owner": "go.putnami.dev/events",
+      "tests": ["go/framework/events/eventserver_transport_test.go"],
+      "reason": "Publishes, pulls and acknowledges against the local event server. Same first-party service, same missing provider declaration.",
+      "operations": ["eventserver.ack", "eventserver.publish", "eventserver.pull"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    }
+  ]
+}

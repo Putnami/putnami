@@ -1,0 +1,27 @@
+{
+  "manifest": {
+    "formatVersion": "1.0",
+    "name": "cloud-docs",
+    "mounts": [
+      { "urlPrefix": "/docs/cloud" }
+    ],
+    "source": {
+      "repo": "acme-platform",
+      "commit": "abc123"
+    },
+    "files": [
+      {
+        "path": "docs/cloud/index.html",
+        "digest": "1a31f208b4e0b7759528b7af8580d7beb300ba849259987113d8b8d7718ff4a5"
+      }
+    ]
+  },
+  "entries": [
+    {
+      "type": "symlink",
+      "path": "docs/cloud/index.html",
+      "linkname": "../../secret.html"
+    }
+  ],
+  "wantCodes": ["sitecontent.invalid_symlink", "sitecontent.missing_file"]
+}

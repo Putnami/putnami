@@ -1,0 +1,132 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-doctor.json",
+  "title": "Putnami Doctor Report or Waiver File",
+  "description": "The two doctor wire shapes: a Report of production-readiness findings evaluated under a profile, and the committed doctor.waivers.json WaiverFile of accepted findings. A document is exactly one of the two.",
+  "oneOf": [
+    { "$ref": "#/$defs/report" },
+    { "$ref": "#/$defs/waiverFile" }
+  ],
+  "$defs": {
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warning", "high", "critical"],
+      "description": "How urgent a finding is. Closed enum; adding a value requires a protocol version bump."
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["dev", "test", "production"],
+      "description": "A deployment profile. Closed enum; adding a value requires a protocol version bump."
+    },
+    "checkCode": {
+      "type": "string",
+      "enum": [
+        "doctor.incomplete_capability",
+        "doctor.missing_required_config",
+        "doctor.volatile_persistence",
+        "doctor.ephemeral_signing_key",
+        "doctor.insecure_transport",
+        "doctor.local_rate_limit",
+        "doctor.invalid_generated_schema",
+        "doctor.config_shadowing",
+        "doctor.waiver_expired",
+        "doctor.waiver_unknown_code",
+        "doctor.committed_manifest_stability",
+        "doctor.undeclared_schema_commit",
+        "doctor.crlf_checkout",
+        "doctor.long_paths_disabled",
+        "doctor.git_long_paths_disabled",
+        "doctor.vc_runtime_missing",
+        "doctor.missing_readme"
+      ],
+      "description": "One class of doctor finding. The taxonomy is frozen: renaming, repurposing, or removing a code requires a protocol version bump; adding one is additive and does not, since documents written against an earlier vocabulary stay valid."
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where to look for a finding: a path and/or a field name only. Deliberately has no slot for a resolved value.",
+      "properties": {
+        "path":  { "type": "string", "description": "Workspace-relative path to the file that produced the finding." },
+        "field": { "type": "string", "description": "Configuration path or field name; a name, never a resolved value." }
+      }
+    },
+    "waiverProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "reason", "expires"],
+      "description": "Records that a finding was suppressed by a matching committed waiver.",
+      "properties": {
+        "owner":   { "type": "string" },
+        "reason":  { "type": "string" },
+        "expires": { "type": "string", "description": "RFC 3339 date the waiver lapses. Opaque data; never evaluated by the protocol package." }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "profile", "project", "message", "remediation"],
+      "properties": {
+        "code":        { "$ref": "#/$defs/checkCode" },
+        "severity":    { "$ref": "#/$defs/severity" },
+        "profile":     { "$ref": "#/$defs/profile" },
+        "project":     { "type": "string" },
+        "message":     { "type": "string" },
+        "evidence":    { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+        "remediation": { "type": "string" },
+        "waivedBy":    { "$ref": "#/$defs/waiverProvenance" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["findings", "info", "warning", "high", "critical", "waived"],
+      "description": "Finding tallies; the per-severity counts sum to findings and waived counts findings with waivedBy provenance.",
+      "properties": {
+        "findings": { "type": "integer", "minimum": 0 },
+        "info":     { "type": "integer", "minimum": 0 },
+        "warning":  { "type": "integer", "minimum": 0 },
+        "high":     { "type": "integer", "minimum": 0 },
+        "critical": { "type": "integer", "minimum": 0 },
+        "waived":   { "type": "integer", "minimum": 0 }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "profile", "summary"],
+      "description": "The result of one `putnami doctor` evaluation for a single profile.",
+      "properties": {
+        "$schema":         { "type": "string" },
+        "protocolVersion": { "type": "integer", "const": 1, "description": "Current doctor wire-contract protocol version." },
+        "profile":         { "$ref": "#/$defs/profile" },
+        "findings":        { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+        "summary":         { "$ref": "#/$defs/summary" }
+      }
+    },
+    "waiver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "owner", "reason", "expires"],
+      "description": "One accepted finding. Matches by code and, when project is set, by project; an empty project applies workspace-wide. When field is set, the waiver narrows to the single finding whose evidence field matches, instead of every finding of its code.",
+      "properties": {
+        "code":    { "$ref": "#/$defs/checkCode" },
+        "project": { "type": "string" },
+        "field":   { "type": "string", "description": "Optional config path or field name; narrows the waiver to the single matching finding. A name, never a resolved value." },
+        "owner":   { "type": "string" },
+        "reason":  { "type": "string" },
+        "expires": { "type": "string", "description": "RFC 3339 date the waiver lapses. Opaque data; never evaluated by the protocol package." }
+      }
+    },
+    "waiverFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion"],
+      "description": "The committed workspace-root doctor.waivers.json.",
+      "properties": {
+        "$schema":         { "type": "string" },
+        "protocolVersion": { "type": "integer", "const": 1, "description": "Current doctor wire-contract protocol version." },
+        "waivers":         { "type": "array", "items": { "$ref": "#/$defs/waiver" } }
+      }
+    }
+  }
+}

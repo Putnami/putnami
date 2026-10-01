@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/protocol/qualify",
+  "visibility": "public",
+  "tags": ["go", "protocol"],
+  "extensions": ["/go/extension"],
+  "publish": ["go"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "test": {
+      "filePatterns": ["fixtures/**", "schemas/**"]
+    },
+    "publish": {
+      "archives": false
+    }
+  },
+  "featureAuthority": {
+    "owner": "cli/workload-qualification"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "OpenTelemetry OTLP/HTTP v1 (opentelemetry.io/docs/specs/otlp), mirrored by protocols/telemetry",
+      "adapter": "sites/telemetry.putnami.dev/emitter.go",
+      "callsites": [
+        {
+          "path": "sites/telemetry.putnami.dev/emitter.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "ddabbfa4b61583515aaa1b7207c7e244a2ba4cc4613105d73f4a4daa26eb8e2b"
+        },
+        {
+          "path": "sites/telemetry.putnami.dev/emitter.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "c78819296e3aea6cd680c254da5aa340e5c4707bd9ac8e7acf520fd97e48e225"
+        }
+      ],
+      "owner": "telemetry.putnami.dev",
+      "tests": [
+        "sites/telemetry.putnami.dev/emitter_test.go"
+      ],
+      "reason": "Forwards received batches upstream over OTLP/HTTP to the configured collector."
+    }
+  ]
+}

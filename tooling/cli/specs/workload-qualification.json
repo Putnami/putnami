@@ -1,0 +1,66 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/workload-qualification",
+  "outcomes": [
+    "A user or agent serves a workload together with the workloads it runs with in one command, and every one of them is reachable at a URL that stays the same across restarts",
+    "A workload that declares a database gets its own, migrated by the workload at boot, without anyone starting a server or copying a connection string",
+    "A composition that died without tearing itself down leaves nothing behind once the next one starts",
+    "A change's execution proof is one command whose smoke is derived from the workload's own route inventory, never improvised",
+    "A deployed environment is qualified only when it reports the build the caller expects",
+    "Anything short of a proven pass reads as a failure to every caller, human or automated"
+  ],
+  "nonGoals": [
+    "Inferring what a workload runs with from its dependency graph",
+    "Deploying, scaling or supervising workloads beyond one developer machine",
+    "Running migrations on behalf of a workload",
+    "Printing or recording the injected configuration",
+    "Requesting mutating routes, which needs a safety annotation the route inventory does not carry",
+    "Recording the verdict in session.json or adding a member to the result envelope"
+  ],
+  "requirements": [
+    {
+      "id": "runs-with-closure-served-behind-stable-proxies",
+      "text": "compose serves the transitive runsWith closure of one project in topological order, each member behind a 127.0.0.1 proxy whose URL is known before any process starts and answers 503 until the member announces a port. A dependant receives each provider's proxy URL under its client-contract service id and its project name. A library, image, disabled, unknown or cyclic member is refused before anything starts."
+    },
+    {
+      "id": "ephemeral-databases-per-composition",
+      "text": "Each datasource a member declares in infra/requirements.json is bound through the database config section. On a provider that isolates, it gets a database named compose_<id>_<slug>_<datasource>, recorded in the lease before it is created and dropped when the composition stops; on a provided server members share its database and the composition reports isolation none."
+    },
+    {
+      "id": "typed-readiness-bounds-every-member",
+      "text": "A member is ready when its serve step emits a typed v2 ready event, whose first endpoint port the proxy forwards to; a member starts only once the one before it is ready. A member that exits first, or stays silent past --ready-timeout, fails the composition with a code naming the member and the phase, and everything already started is torn down."
+    },
+    {
+      "id": "ungraceful-death-is-reaped-by-the-next-invocation",
+      "text": "A composition keeps a lease under .putnami/compose/<id> with its pid, member process groups, database names, provisioner digest and proxy ports. The next composition reaps every lease whose lock is free and whose pid is dead: SIGTERM, then SIGKILL after two seconds, drops the databases, removes the lease, and reports each reap."
+    },
+    {
+      "id": "injected-configuration-never-reaches-output",
+      "text": "Service URLs and database bindings reach a member only through CONFIG_DATA on its serve step, never through a file in the project tree or a cache key. Output, errors and the lease carry section and datasource names, never the document, a connection string or a password. A member whose environment already carries CONFIG_DATA is refused."
+    },
+    {
+      "id": "smoke-is-derived-from-the-route-inventory",
+      "text": "The contract is read from schema/http-routes.json, then .gen/schema/http-routes.json, with the strict inventory parser. Only exact, publicEdge GET or HEAD routes are requested, one per path with GET preferred, sorted by path and capped at 25; platform paths, bare or under the platform prefix, and paths under /debug/pprof or /_putnami never are. Without --platform-prefix, the prefix is where the inventory declares GET readyz and version. Requests carry provenance; the contract carries a digest."
+    },
+    {
+      "id": "no-derivable-request-is-unsupported-not-success",
+      "text": "A workload with no route inventory, or with no request safe to derive, yields a verdict of unsupported that opens no target, never passed. A missing inventory names `putnami build --projects <id>` as the remedy. --print-contract still prints the empty contract and exits 0."
+    },
+    {
+      "id": "remote-verdict-binds-to-the-deployed-sha",
+      "text": "A URL target requires --expect-sha, a lowercase hexadecimal sha of at least 7 characters; without it the command exits 2. The verdict passes only when /version reports a sha starting with the expected one; a different or absent sha is digest_mismatch and no smoke request is sent. A target with credentials, a query or a fragment is refused."
+    },
+    {
+      "id": "local-verdict-binds-to-the-exact-worktree",
+      "text": "--target local composes the workload with the workloads it runs with, production-mode without watch, and binds the verdict to the worktree fingerprint read before anything is prepared. Version-binding passes only when the worktree still has that fingerprint once every member is ready; otherwise digest_mismatch and no request is sent. --expect-sha with local exits 2. A composition failure is composition_failed naming the member and phase; teardown always runs and cleanup.state is recorded."
+    },
+    {
+      "id": "every-non-pass-state-exits-non-zero",
+      "text": "Exit 0 follows passed alone. Every other verdict state exits 1 and still delivers the verdict: human output prints it, and --output=json carries it as the failure envelope's data. A request answering 500 or above fails the smoke without stopping the other requests."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0039-derived-smoke-contracts-and-fail-closed-verdicts.md"
+  ]
+}

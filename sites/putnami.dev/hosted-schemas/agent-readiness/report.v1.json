@@ -1,0 +1,563 @@
+{
+  "$defs": {
+    "Claim": {
+      "additionalProperties": false,
+      "properties": {
+        "claimedAt": {
+          "description": "When the first signed-in visitor claimed the report; null while unclaimed.",
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "enum": [
+            "unclaimed",
+            "claimed"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "type": "object"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "properties": {
+        "area": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/FindingEvidence"
+          },
+          "type": "array"
+        },
+        "fix": {
+          "maxLength": 600,
+          "minLength": 1,
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "impact": {
+          "maxLength": 600,
+          "minLength": 1,
+          "type": "string"
+        },
+        "markerId": {
+          "maxLength": 64,
+          "pattern": "^(understand|bound|verify|recover)\\.[a-z0-9-]+$",
+          "type": "string"
+        },
+        "step": {
+          "enum": [
+            "understand",
+            "bound",
+            "verify",
+            "recover"
+          ],
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        "unlockShare": {
+          "format": "double",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "area",
+        "evidence",
+        "fix",
+        "id",
+        "impact",
+        "markerId",
+        "step",
+        "title",
+        "unlockShare"
+      ],
+      "type": "object"
+    },
+    "FindingEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "maxLength": 300,
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "observed",
+            "inferred"
+          ],
+          "type": "string"
+        },
+        "rule": {
+          "maxLength": 120,
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 400,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "text"
+      ],
+      "type": "object"
+    },
+    "Goal": {
+      "additionalProperties": false,
+      "properties": {
+        "agents": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "allow": {
+          "enum": [
+            "none",
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "type": "string"
+        },
+        "want": {
+          "enum": [
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "agents",
+        "allow",
+        "want"
+      ],
+      "type": "object"
+    },
+    "InstructionFile": {
+      "additionalProperties": false,
+      "properties": {
+        "ageDays": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bytes": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^/\\\\~\\s][^\\\\]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ageDays",
+        "bytes",
+        "path"
+      ],
+      "type": "object"
+    },
+    "Inventory": {
+      "additionalProperties": false,
+      "properties": {
+        "activeContributors90d": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "agentTools": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "ciProviders": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "commits90d": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "commitsTotal": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "containers": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "databases": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "files": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "frameworks": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "iac": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "instructionFiles": {
+          "items": {
+            "$ref": "#/$defs/InstructionFile"
+          },
+          "type": "array"
+        },
+        "languages": {
+          "items": {
+            "$ref": "#/$defs/LanguageShare"
+          },
+          "type": "array"
+        },
+        "lines": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "monorepoTools": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "packageManagers": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "repoAgeDays": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "testFrameworks": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "activeContributors90d",
+        "agentTools",
+        "ciProviders",
+        "commits90d",
+        "commitsTotal",
+        "containers",
+        "databases",
+        "files",
+        "frameworks",
+        "iac",
+        "instructionFiles",
+        "languages",
+        "lines",
+        "monorepoTools",
+        "packageManagers",
+        "repoAgeDays",
+        "testFrameworks"
+      ],
+      "type": "object"
+    },
+    "LanguageShare": {
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lines": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "files",
+        "lines",
+        "name"
+      ],
+      "type": "object"
+    },
+    "Report": {
+      "additionalProperties": false,
+      "properties": {
+        "areas": {
+          "items": {
+            "$ref": "#/$defs/ReportArea"
+          },
+          "type": "array"
+        },
+        "claim": {
+          "$ref": "#/$defs/Claim"
+        },
+        "collectedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "findings": {
+          "description": "At most three findings, one per area, from areas with at least 5% of the change, ranked by share of change times the gap to the goal.",
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "type": "array"
+        },
+        "goal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Goal",
+              "description": "The three goal answers; null until the signed-in owner answers them."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "headCommit": {
+          "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
+          "type": "string"
+        },
+        "inventory": {
+          "$ref": "#/$defs/Inventory"
+        },
+        "level": {
+          "enum": [
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "type": "string"
+        },
+        "methodVersion": {
+          "pattern": "^[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "shareBlocked": {
+          "format": "double",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "steps": {
+          "$ref": "#/$defs/StepLevels"
+        },
+        "token": {
+          "maxLength": 32,
+          "minLength": 6,
+          "pattern": "^[a-z0-9]+$",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "areas",
+        "claim",
+        "collectedAt",
+        "createdAt",
+        "findings",
+        "headCommit",
+        "inventory",
+        "level",
+        "methodVersion",
+        "shareBlocked",
+        "steps",
+        "token",
+        "url"
+      ],
+      "type": "object"
+    },
+    "ReportArea": {
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "maxLength": 64,
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "shareOfChange": {
+          "format": "double",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "shareOfCode": {
+          "format": "double",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "steps": {
+          "$ref": "#/$defs/StepLevels"
+        }
+      },
+      "required": [
+        "level",
+        "name",
+        "path",
+        "shareOfChange",
+        "shareOfCode",
+        "steps"
+      ],
+      "type": "object"
+    },
+    "StepLevels": {
+      "additionalProperties": false,
+      "properties": {
+        "bound": {
+          "enum": [
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "type": "string"
+        },
+        "recover": {
+          "enum": [
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "type": "string"
+        },
+        "understand": {
+          "enum": [
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "type": "string"
+        },
+        "verify": {
+          "enum": [
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "bound",
+        "recover",
+        "understand",
+        "verify"
+      ],
+      "type": "object"
+    },
+    "Tool": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://putnami.dev/schemas/agent-readiness/report.v1.json",
+  "$ref": "#/$defs/Report",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Putnami agent-readiness report v1"
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-contracts.json",
+  "protocolVersion": 1,
+  "name": "go.putnami.dev/example/payments",
+  "unions": [
+    {
+      "name": "PaymentMethod",
+      "discriminator": "kind",
+      "variants": [
+        { "tag": "card", "struct": "CardPayment" }
+      ]
+    }
+  ]
+}

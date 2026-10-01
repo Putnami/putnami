@@ -1,0 +1,23 @@
+{
+  "description": "Cross-language corpus for the key-state machine. 'states' is the closed enum in canonical order; 'terminal' lists the states that permit no further transition. Each 'transitions' case asserts whether Transition(from, to) is legal ('legal': true) or must be rejected ('legal': false). A transition must change state, so a same-state edge is illegal, and unknown states are illegal.",
+  "states": ["active", "retiring", "revoked", "expired"],
+  "terminal": ["revoked"],
+  "transitions": [
+    { "id": "active-to-retiring", "from": "active", "to": "retiring", "legal": true, "reason": "begin rollover: stop signing, keep verifying" },
+    { "id": "active-to-expired", "from": "active", "to": "expired", "legal": true, "reason": "validity window elapsed without rotation" },
+    { "id": "active-to-revoked", "from": "active", "to": "revoked", "legal": true, "reason": "emergency revocation of a compromised active key" },
+    { "id": "retiring-to-expired", "from": "retiring", "to": "expired", "legal": true, "reason": "rollover grace window elapsed" },
+    { "id": "retiring-to-revoked", "from": "retiring", "to": "revoked", "legal": true, "reason": "compromise discovered during retirement" },
+    { "id": "expired-to-revoked", "from": "expired", "to": "revoked", "legal": true, "reason": "retroactive compromise disclosure of an expired key" },
+    { "id": "revoked-to-active", "from": "revoked", "to": "active", "legal": false, "reason": "revoked is terminal: a key is never un-revoked" },
+    { "id": "revoked-to-expired", "from": "revoked", "to": "expired", "legal": false, "reason": "revoked is terminal" },
+    { "id": "revoked-to-retiring", "from": "revoked", "to": "retiring", "legal": false, "reason": "revoked is terminal" },
+    { "id": "retiring-to-active", "from": "retiring", "to": "active", "legal": false, "reason": "no going back: a retiring key never resumes signing" },
+    { "id": "expired-to-active", "from": "expired", "to": "active", "legal": false, "reason": "cannot un-expire a key" },
+    { "id": "expired-to-retiring", "from": "expired", "to": "retiring", "legal": false, "reason": "cannot un-expire a key" },
+    { "id": "active-self", "from": "active", "to": "active", "legal": false, "reason": "a transition must change state" },
+    { "id": "revoked-self", "from": "revoked", "to": "revoked", "legal": false, "reason": "a transition must change state" },
+    { "id": "unknown-from", "from": "pending", "to": "active", "legal": false, "reason": "'pending' is not a recognized key state" },
+    { "id": "unknown-to", "from": "active", "to": "suspended", "legal": false, "reason": "'suspended' is not a recognized key state" }
+  ]
+}

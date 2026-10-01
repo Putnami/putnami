@@ -1,0 +1,52 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/scaffold",
+  "tags": [
+    "go",
+    "extension"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "dependencies": [
+    "/go/templates/go-library",
+    "/go/templates/go-server",
+    "/python/templates/python-library",
+    "/python/templates/python-server",
+    "/typescript/templates/typescript-library",
+    "/typescript/templates/typescript-server",
+    "/typescript/templates/typescript-web"
+  ],
+  "options": {
+    "@putnami/go": {
+      "entrypoint": "./cmd"
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    },
+    "test": {
+      "filePatterns": [
+        "putnami.extension.json",
+        "../contributor/putnami.json",
+        "../contributor/putnami.extension.json",
+        "../contributor/src/**",
+        "../../go/templates/go-library/**",
+        "../../go/templates/go-server/**",
+        "../../python/templates/python-library/**",
+        "../../python/templates/python-server/**",
+        "../../typescript/templates/typescript-library/**",
+        "../../typescript/templates/typescript-server/**",
+        "../../typescript/templates/typescript-web/**"
+      ]
+    }
+  }
+}

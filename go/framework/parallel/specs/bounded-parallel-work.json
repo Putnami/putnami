@@ -1,0 +1,42 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/bounded-parallel-work",
+  "outcomes": [
+    "Callers choose a positive concurrency cap or an explicitly unbounded non-positive limit",
+    "Successful map results retain input order regardless of completion order",
+    "The first worker failure cancels siblings, stops bounded dispatch when cancellation is observed, and skips unbounded user work when cancellation is visible before invocation",
+    "A worker panic is returned as structured error data instead of terminating the process"
+  ],
+  "nonGoals": [
+    "Returning partial results after any worker fails",
+    "Retrying failed items",
+    "Guaranteeing worker start order or scheduling fairness",
+    "Forcibly terminating a worker that ignores context cancellation"
+  ],
+  "requirements": [
+    {
+      "id": "concurrency",
+      "text": "A positive limit bounds in-flight workers, while a non-positive limit permits one goroutine per item."
+    },
+    {
+      "id": "dispatch-throughput-budget",
+      "text": "Bounded dispatch stays within its throughput budget: mapping a trivial worker over a large batch sustains at least 50 000 items per second. The budget is an order-of-magnitude tripwire with roughly thirty times headroom over the measured rate, not a service objective \u2014 it catches a structural regression in the dispatch path, never runner noise."
+    },
+    {
+      "id": "failure",
+      "text": "The first worker error wins atomically, cancels the shared child context, and suppresses partial results. With a positive limit, the dispatcher stops launching workers when cancellation is observed; with a non-positive limit, an already-created goroutine skips the user function when cancellation is visible before invocation."
+    },
+    {
+      "id": "ordering",
+      "text": "MapBounded stores each successful result at its input index and returns the complete ordered slice only when every worker succeeds."
+    },
+    {
+      "id": "panic",
+      "text": "A recovered worker panic returns PanicError with the recovered value and worker stack and participates in normal first-error cancellation."
+    }
+  ],
+  "decisions": [
+    "go/framework/parallel/doc/adr/0001-ordered-all-or-nothing-fanout.md"
+  ]
+}

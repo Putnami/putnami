@@ -1,0 +1,16 @@
+{
+  "name": "@example/01-hello-world",
+  "version": "0.0.0",
+  "description": "Minimal Putnami server — one route, health check",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

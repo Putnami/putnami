@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/spec-test-binding#honest-verdict",
+    "typescript/spec-test-binding#inert-without-the-adapter",
+    "typescript/spec-test-binding#verdict-or-measurement"
+  ]
+}

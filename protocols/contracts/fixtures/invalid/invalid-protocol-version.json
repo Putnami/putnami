@@ -1,0 +1,5 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-contracts.json",
+  "protocolVersion": 99,
+  "name": "go.putnami.dev/example/payments"
+}

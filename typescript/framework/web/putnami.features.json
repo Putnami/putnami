@@ -1,0 +1,261 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/web-application-delivery",
+      "type": "feature",
+      "name": "TypeScript web application delivery",
+      "outcome": "TypeScript applications deliver file-routed React pages through explicit SSR or static rendering, bounded hydration, server-owned data mutations, and fail-closed request security",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "browser-security-hint",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-guard-gated-requirement-is-indeterminate-and-denied-on-the-client",
+              "the-client-evaluates-authentication-role-and-scope-facts",
+              "the-serialized-context-is-what-react-consumers-read"
+            ]
+          }
+        },
+        {
+          "id": "cache-isolation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-loader-cache-key-serializes-its-params-in-a-stable-order",
+              "a-loader-is-not-cached-without-a-ttl",
+              "a-redirect-is-never-cached",
+              "a-successful-action-evicts-both-static-and-computed-keys",
+              "the-default-page-cache-key-includes-a-user-fingerprint",
+              "the-default-page-cache-key-includes-the-query-string",
+              "the-user-fingerprint-is-stable-for-equivalent-claims"
+            ]
+          }
+        },
+        {
+          "id": "csrf-and-csp",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-form-carries-the-csrf-token-as-a-hidden-input",
+              "a-head-injected-script-carries-the-per-request-nonce",
+              "a-per-request-nonce-is-generated-per-call",
+              "an-empty-nonce-emits-no-nonce-directive",
+              "the-csrf-cookie-token-is-read-by-the-client",
+              "the-default-policy-is-applied-when-no-options-are-given",
+              "the-nonce-reaches-the-script-src-directive"
+            ]
+          }
+        },
+        {
+          "id": "document-isolation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-request-without-a-context-gets-a-fresh-request-local-meta",
+              "a-script-is-de-duplicated-by-src",
+              "an-inline-script-is-de-duplicated-by-type",
+              "browser-tags-are-de-duplicated-and-title-and-lang-updated",
+              "interleaved-requests-never-share-their-meta",
+              "ssr-meta-resolves-from-the-per-request-context"
+            ]
+          }
+        },
+        {
+          "id": "entrypoint-boundary",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "no-ssr-implementation-reaches-the-published-browser-graph",
+              "the-browser-entry-re-exports-the-client-modules",
+              "the-documented-error-boundary-hooks-build-under-both-export-conditions",
+              "the-package-entry-re-exports-the-ssr-modules",
+              "the-server-only-document-helper-stays-out-of-the-browser-bundle"
+            ]
+          }
+        },
+        {
+          "id": "explicit-render-mode",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bare-revalidate-number-selects-isr",
+              "a-dynamic-path-cannot-escape-the-static-output-root",
+              "a-non-positive-revalidate-stays-ssg",
+              "a-route-reaching-only-singletons-is-proven-static",
+              "a-scoped-provider-reachable-from-a-static-route-is-a-violation",
+              "a-static-loader-reading-request-data-raises-a-violation",
+              "a-static-render-that-reads-request-data-raises-a-violation",
+              "an-opaque-factory-dependency-falls-back-to-hybrid",
+              "page-static-defaults-to-ssg"
+            ]
+          }
+        },
+        {
+          "id": "static-build-version",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-isr-build-output-serves-the-running-version",
+              "an-ssg-page-serves-the-running-version",
+              "prerender-records-the-version-a-page-shows"
+            ]
+          }
+        },
+        {
+          "id": "hydration-containment",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-lazy-chunk-preserves-the-server-html",
+              "a-healthy-client-render-is-left-untouched",
+              "a-missing-root-element-falls-back-to-anonymous-security",
+              "a-non-numeric-injected-timeout-is-ignored",
+              "a-script-break-out-in-serialized-state-is-escaped",
+              "a-silently-blanked-outlet-is-restored-and-reported",
+              "an-uncaught-hydration-error-restores-the-server-html",
+              "lazy-routes-hydrate-with-the-serialized-security-context",
+              "the-serialized-fetch-timeout-is-read-from-the-injected-global",
+              "the-unicode-line-separators-are-escaped"
+            ]
+          }
+        },
+        {
+          "id": "island-hydration",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-hydrate-mode-page-renders-the-component-inline",
+              "a-static-page-emits-a-hydration-marker-instead-of-a-full-bundle",
+              "a-static-route-renders-a-zero-javascript-document",
+              "an-island-declares-a-media-strategy",
+              "an-island-declares-its-load-strategy",
+              "island-props-escape-script-breaking-sequences",
+              "island-props-round-trip-through-the-boundary"
+            ]
+          }
+        },
+        {
+          "id": "generation-configuration",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "flat-package-react-config-remains-compatible",
+              "misplaced-project-react-config-fails-before-generation",
+              "nested-project-react-config-takes-precedence"
+            ]
+          }
+        },
+        {
+          "id": "render-manifest",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-absolute-cap-is-reported-in-preference-to-a-regression",
+              "the-budget-gate-rejects-a-route-at-or-above-the-absolute-cap",
+              "the-budget-gate-rejects-growth-beyond-the-tolerance",
+              "the-manifest-carries-the-di-proof-for-static-routes-only",
+              "the-manifest-is-sorted-and-carries-per-route-client-javascript-bytes",
+              "the-manifest-serializes-deterministically-with-a-trailing-newline"
+            ]
+          }
+        },
+        {
+          "id": "route-graph",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bracketed-dynamic-segment-becomes-a-router-param",
+              "a-loader-endpoint-is-registered-when-declared",
+              "a-nested-layout-produces-nested-nodes",
+              "a-nested-page-id-is-derived-deterministically",
+              "a-page-registers-under-its-route-id",
+              "a-route-group-is-filtered-out-of-the-path",
+              "a-scan-root-prefix-is-inferred-and-normalized",
+              "an-action-endpoint-is-registered-when-declared",
+              "an-index-page-is-placed-at-its-parent",
+              "several-dynamic-segments-are-mapped-together",
+              "the-default-scan-path-applies-when-none-is-configured"
+            ]
+          }
+        },
+        {
+          "id": "security-propagation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-stack-composes-in-order",
+              "a-loader-is-wrapped-by-its-declared-security-middleware",
+              "a-route-outside-the-declaring-subtree-is-unwrapped",
+              "an-action-is-wrapped-by-its-declared-security-middleware",
+              "layout-and-page-middleware-merge-in-order"
+            ]
+          }
+        },
+        {
+          "id": "server-data-boundary",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-loader-resolves-its-dependencies-from-the-request-scope",
+              "a-loader-validates-and-coerces-its-declared-input",
+              "a-loader-without-schemas-is-not-wrapped",
+              "an-action-resolves-its-dependencies-from-the-request-scope",
+              "an-action-validates-and-coerces-its-declared-input",
+              "an-action-without-schemas-is-not-wrapped"
+            ]
+          }
+        },
+        {
+          "id": "ssr-response",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-handler-result-is-serialized-to-json-or-204",
+              "a-lazy-head-contribution-reaches-the-rendered-head",
+              "a-middleware-stack-runs-in-order-and-can-short-circuit",
+              "a-plain-object-result-is-serialized-to-json",
+              "an-http-exception-becomes-a-json-response-and-an-unknown-error-rethrows",
+              "an-http-response-passes-through-unchanged"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

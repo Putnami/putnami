@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/signing-key-rotation",
+  "outcomes": [
+    "A service loads its signing keyring after restart instead of silently minting a new key",
+    "A rotation installs one active successor while preserving the retiring predecessor during the overlap window",
+    "A failed or conflicting rotation leaves the durable keyring unchanged",
+    "Private signing material stays confined to the owner document and storage boundary"
+  ],
+  "nonGoals": [
+    "Choosing an organization's key age or rotation schedule",
+    "Providing database-column encryption or a key management service",
+    "Publishing revoked or expired keys in a verifier JWKS"
+  ],
+  "requirements": [
+    {
+      "id": "durable-owner-document",
+      "text": "The database store persists the private keyring owner document, loads only active and retiring keys, and treats lifecycle and retirement columns as authoritative across restarts."
+    },
+    {
+      "id": "atomic-rotation",
+      "text": "Retiring the active predecessor, inserting the active successor, and stamping retirement time commit in one transaction; every non-applied outcome rolls back all writes."
+    },
+    {
+      "id": "scheduled-policy",
+      "text": "The scheduler invokes only a caller-supplied policy, never overlaps invocations, reports policy errors without stopping future ticks, and cannot fire after its idempotent stop returns."
+    },
+    {
+      "id": "non-disclosure",
+      "text": "The store's own errors and logs never contain private key material: a failure that has a key in hand reports the key's identity (kid), never its private parameters. The public JWKS projection and signing evidence are owned by go/authentication-authorization's secret-non-disclosure."
+    }
+  ],
+  "decisions": [
+    "go/framework/keyringstore/doc/adr/0001-atomic-overlap-key-rotation.md"
+  ]
+}

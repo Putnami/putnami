@@ -1,0 +1,177 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "python",
+  "features": [
+    {
+      "id": "python/experimental-workspace-integration",
+      "type": "feature",
+      "name": "Experimental Python workspace integration",
+      "outcome": "Experimenters can explicitly opt Python projects into Putnami workspace jobs backed by uv, Ruff, and pytest",
+      "owner": "python",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "explicit-opt-in",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-extension-manifest-passes-the-protocol-validation-the-cli-applies"
+            ]
+          }
+        },
+        {
+          "id": "workspace-scope",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "cached-python-tasks-are-keyed-on-the-uv-workspace-files",
+              "a-workspace-with-no-python-members-reports-skipped",
+              "a-missing-workspace-config-is-reported-not-invented"
+            ]
+          }
+        },
+        {
+          "id": "native-tools",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "lint-delegates-to-ruff-scoped-to-the-project-root",
+              "test-delegates-to-pytest",
+              "the-application-entrypoint-result-is-exposed-through-the-job",
+              "pytest-results-are-parsed-into-a-structured-report",
+              "ruff-findings-are-parsed-into-a-structured-report",
+              "serve-and-run-declare-the-process-effect-they-have"
+            ]
+          }
+        },
+        {
+          "id": "experimental-boundary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "upgrade-messaging-never-implies-a-supported-framework-release-set",
+              "the-experimental-surface-contract-inputs-are-cache-keyed"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "python/experimental-server-template",
+      "type": "feature",
+      "name": "Experimental Python server template",
+      "outcome": "Experimenters can explicitly scaffold a minimal FastAPI service configured for the Python extension",
+      "owner": "python",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "explicit-template",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-server-template-is-named-and-declares-the-python-extension"
+            ]
+          }
+        },
+        {
+          "id": "minimal-server-shape",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-server-template-ships-fastapi-uvicorn-and-a-root-response-test",
+              "the-server-template-configures-run-and-serve-entrypoints"
+            ]
+          }
+        },
+        {
+          "id": "experimental-disclosure",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-server-catalog-record-and-readme-disclose-the-experimental-boundary"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "python/experimental-library-template",
+      "type": "feature",
+      "name": "Experimental Python library template",
+      "outcome": "Experimenters can explicitly scaffold an importable Python package configured for the Python extension",
+      "owner": "python",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "explicit-template",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-library-template-is-named-and-declares-the-python-extension"
+            ]
+          }
+        },
+        {
+          "id": "minimal-library-shape",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-library-template-ships-setuptools-metadata-and-a-greeting-test",
+              "the-library-template-is-a-src-layout-package"
+            ]
+          }
+        },
+        {
+          "id": "experimental-disclosure",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-library-catalog-record-and-readme-disclose-the-experimental-boundary"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

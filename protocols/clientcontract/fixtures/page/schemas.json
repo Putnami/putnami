@@ -1,0 +1,49 @@
+{
+  "query": {
+    "type": "object",
+    "properties": {
+      "relation": {
+        "type": "string"
+      },
+      "afterKey": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "integer",
+        "format": "int32",
+        "minimum": 1
+      }
+    },
+    "required": [
+      "relation"
+    ]
+  },
+  "envelope": {
+    "type": "object",
+    "properties": {
+      "watermark": {
+        "type": "integer",
+        "format": "int64",
+        "minimum": 0
+      },
+      "ownerConfirmedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "relation": {
+        "type": "string"
+      },
+      "rows": {
+        "x-putnami-json": "any"
+      },
+      "nextKey": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "watermark",
+      "relation",
+      "rows"
+    ]
+  }
+}

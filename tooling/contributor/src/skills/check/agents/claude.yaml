@@ -1,0 +1,4 @@
+name: check
+description: Run the Putnami gate, applicable local execution proof, the documentation audit and the repository language rule for a change
+allowed-tools: Bash, Read, Grep, Glob, Task, TodoWrite
+argument-hint: [<project-path-or-name> | --all] [--skip-docs]

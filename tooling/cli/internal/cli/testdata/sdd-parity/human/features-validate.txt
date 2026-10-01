@@ -1,0 +1,11 @@
+exit 0
+--- stdout ---
+
+  Feature validation passed
+  Scope: the whole workspace
+  Revision: worktree @ git:7c5122267ea7854954d543e1eda0a15c7cc56b08
+  2 feature(s) · 0 incomplete · 0 requirement(s) · 0 evidence record(s) · 0 unclassified contribution(s)
+  Requirement states: 0 verified · 0 missing · 0 stale · 0 contradicted
+  Diagnostics: 0 error(s) · 0 warning(s) · 0 info
+
+--- stderr ---

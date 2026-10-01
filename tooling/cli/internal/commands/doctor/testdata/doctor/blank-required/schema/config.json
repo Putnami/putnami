@@ -1,0 +1,24 @@
+{
+  "appName": "go.putnami.dev/example/blank",
+  "version": "0.1.0",
+  "configs": [
+    {
+      "path": "server",
+      "fields": [
+        { "name": "port", "type": "int", "required": true },
+        { "name": "host", "type": "string", "required": true }
+      ]
+    },
+    {
+      "path": "database",
+      "fields": [
+        {
+          "name": "primary",
+          "type": "object",
+          "required": true,
+          "fields": [{ "name": "url", "type": "string", "required": true }]
+        }
+      ]
+    }
+  ]
+}

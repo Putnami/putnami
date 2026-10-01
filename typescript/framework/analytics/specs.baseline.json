@@ -1,0 +1,18 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/web-analytics-collection#a-pre-rendered-page-reports-from-the-browser",
+    "typescript/web-analytics-collection#a-retried-event-is-stored-once",
+    "typescript/web-analytics-collection#a-slow-database-never-delays-a-response",
+    "typescript/web-analytics-collection#acceptance-is-not-an-oracle",
+    "typescript/web-analytics-collection#bots-leave-no-trace",
+    "typescript/web-analytics-collection#identified-mode-needs-consent",
+    "typescript/web-analytics-collection#no-network-address-or-raw-user-agent-is-persisted",
+    "typescript/web-analytics-collection#opt-out-signals-force-cookieless",
+    "typescript/web-analytics-collection#page-views-are-collected-without-cookies",
+    "typescript/web-analytics-collection#raw-events-expire",
+    "typescript/web-analytics-collection#the-browser-bundle-stays-inside-the-boundary",
+    "typescript/web-analytics-collection#undeclared-actions-are-dropped"
+  ]
+}

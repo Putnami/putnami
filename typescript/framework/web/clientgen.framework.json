@@ -1,0 +1,53 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "@putnami/web",
+      "status": "transport-primitive",
+      "adapter": "typescript/framework/web/src/client/form/action.handler.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/web/src/client/form/action.handler.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "79c622bf465329cef3ecc2096ecc79a8911365aa01432263844fbe8735e0a3cd"
+        }
+      ],
+      "owner": "@putnami/web",
+      "tests": ["typescript/framework/web/test/client/form-handlers.test.ts"],
+      "reason": "Submits a browser form back to the route that rendered it. The URL comes from the submitted form element, so no service contract crosses this callsite."
+    },
+    {
+      "runtime": "@putnami/web",
+      "status": "transport-primitive",
+      "adapter": "typescript/framework/web/src/client/form/loader.handler.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/web/src/client/form/loader.handler.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "81c2fa1e840f0bc589edf81977ef91e6b12af33e586438cd6881b228c9859b71"
+        }
+      ],
+      "owner": "@putnami/web",
+      "tests": ["typescript/framework/web/test/ssr/loader.test.ts"],
+      "reason": "Re-runs a page loader over the same origin. The URL is the route the router already resolved, not a declared operation."
+    },
+    {
+      "runtime": "@putnami/web",
+      "status": "transport-primitive",
+      "adapter": "typescript/framework/web/src/client/hooks/use-fetch.hook.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/web/src/client/hooks/use-fetch.hook.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "914d7aa8cdc9bc74a4cc664fcb54c36c1e009fd38ea7ed7bba0b4d0712d27bf6"
+        }
+      ],
+      "owner": "@putnami/web",
+      "tests": ["typescript/framework/web/test/hooks/hooks.test.ts"],
+      "reason": "A React hook that fetches the arbitrary path its caller passes. The application, not the framework, owns whatever contract sits behind it."
+    }
+  ]
+}

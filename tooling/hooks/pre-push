@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Optional pre-push hook: run the validation-cadence test gate before pushing.
+#
+# This runs `./putnamiw test --enforce-coverage --impacted`, which instruments
+# coverage and enforces each impacted project's `coverage-threshold` gate (honoring
+# `coverage: false` opt-outs) — the same gate CI and `/check` use. Both are now the
+# default, so the flag is redundant; it stays explicit so the hook behaves the same
+# on an older pinned CLI. It exits non-zero (aborting the push) when the gate fails.
+#
+# OPT-IN: this hook is NOT active by default. Enable it explicitly with:
+#
+#     git config core.hooksPath tooling/hooks
+#
+# Nothing installs or activates it for you; anyone who does not opt in is
+# unaffected.
+
+set -e
+
+# Resolve the repository root so the hook works regardless of the invoking cwd.
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+exec ./putnamiw test --enforce-coverage --impacted

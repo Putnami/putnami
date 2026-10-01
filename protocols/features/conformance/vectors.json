@@ -1,0 +1,53 @@
+{
+  "protocolVersion": 1,
+  "vectors": [
+    {
+      "id": "go-typescript-feature-intent",
+      "kind": "feature-intent",
+      "canonical": "../fixtures/equivalence/go-typescript-features.golden.json",
+      "authors": ["go", "typescript"]
+    },
+    {
+      "id": "go-typescript-feature-evidence",
+      "kind": "feature-evidence",
+      "canonical": "../fixtures/equivalence/go-typescript-evidence.golden.json",
+      "authors": ["go", "typescript"]
+    },
+    {
+      "id": "go-typescript-generated-feature-evidence",
+      "kind": "feature-evidence",
+      "canonical": "../fixtures/equivalence/generated-evidence.golden.json",
+      "authors": ["go", "typescript"]
+    },
+    {
+      "id": "python-authored-feature-evidence",
+      "kind": "feature-evidence",
+      "canonical": "../fixtures/equivalence/python-authored-evidence.golden.json",
+      "authors": ["python"]
+    },
+    {
+      "id": "go-typescript-native-design",
+      "kind": "design-graph",
+      "canonical": "../fixtures/equivalence/go-typescript-design.golden.json",
+      "authors": ["go", "typescript"]
+    },
+    {
+      "id": "human-authored-spec",
+      "kind": "spec",
+      "canonical": "../fixtures/equivalence/human-authored-spec.golden.json",
+      "authors": ["human"]
+    },
+    {
+      "id": "human-authored-feature-intent-v2",
+      "kind": "feature-intent",
+      "canonical": "../fixtures/equivalence/human-authored-features-v2.golden.json",
+      "authors": ["human"]
+    },
+    {
+      "id": "go-typescript-feature-verification",
+      "kind": "verification-report",
+      "canonical": "../fixtures/equivalence/go-typescript-verification.golden.json",
+      "authors": ["go", "typescript"]
+    }
+  ]
+}

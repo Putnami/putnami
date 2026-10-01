@@ -1,0 +1,20 @@
+{
+  "protocol": "putnami.transaction.v1",
+  "suite": "putnami.transaction.conformance.v1",
+  "protocolVersion": 1,
+  "cases": [
+    {
+      "id": "orphan.operation",
+      "level": "required",
+      "setup": { "tables": [{ "name": "t", "columns": [{ "name": "id", "type": "text", "primaryKey": true }] }] },
+      "operations": [
+        {
+          "id": "op",
+          "table": "t",
+          "primitive": "consume-once",
+          "args": { "keyColumn": "id", "key": "x", "claimGuard": "id = 'x'", "set": "id = 'x'" }
+        }
+      ]
+    }
+  ]
+}

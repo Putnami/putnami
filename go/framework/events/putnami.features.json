@@ -1,0 +1,93 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/event-delivery",
+      "type": "feature",
+      "name": "Go event delivery",
+      "outcome": "Go services exchange typed events with explicit distribution, retry, duplicate, dead-letter, and shutdown behavior",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "delivery-semantics",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "attribute-filter-selects-matching-consumers",
+              "broadcast-delivery-selects-every-consumer",
+              "competing-delivery-selects-one-consumer",
+              "push-broadcast-delivery-fans-out",
+              "push-competing-delivery-round-robins"
+            ]
+          }
+        },
+        {
+          "id": "ingress-authority",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "empty-allowlist-rejects-every-pusher",
+              "google-pubsub-ingress-strips-auth-attributes",
+              "push-allows-an-allowlisted-pusher",
+              "push-ingress-strips-auth-attributes",
+              "push-rejects-a-non-allowlisted-pusher",
+              "push-rejects-a-missing-token"
+            ]
+          }
+        },
+        {
+          "id": "retry-boundary",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "handler-invocation-is-deadline-bound",
+              "handler-retries-on-failure",
+              "redis-retry-stays-in-its-consumer-group",
+              "retry-backoff-honors-the-configured-base",
+              "retry-backoff-stays-within-bounds",
+              "retry-preserves-stable-event-identity"
+            ]
+          }
+        },
+        {
+          "id": "shutdown",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "drain-honors-the-configured-deadline",
+              "stop-cancels-pending-retries",
+              "stop-during-publish-is-race-free",
+              "stop-rejects-new-publishes"
+            ]
+          }
+        },
+        {
+          "id": "terminal-outcome",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "dead-letter-reported-only-when-a-subscriber-accepts",
+              "exhausted-retries-without-a-dlq-report-drop",
+              "partial-dead-letter-acceptance-reports-dead-letter-only",
+              "refused-dead-letter-enqueue-reports-drop-only",
+              "unsubscribed-dlq-drops-the-message"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

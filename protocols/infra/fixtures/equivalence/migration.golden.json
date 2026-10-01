@@ -1,0 +1,21 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-infra.json",
+  "protocolVersion": 2,
+  "databases": [
+    {
+      "name": "primary",
+      "engine": "postgres",
+      "schemas": [
+        "audit",
+        "iam"
+      ]
+    },
+    {
+      "name": "wealth",
+      "engine": "postgres",
+      "schemas": [
+        "ledger"
+      ]
+    }
+  ]
+}

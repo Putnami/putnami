@@ -1,0 +1,7 @@
+{
+  "omitManifest": true,
+  "entries": [
+    { "type": "file", "path": "docs/cloud/index.html", "data": "hello cloud\n" }
+  ],
+  "wantCodes": ["sitecontent.parse_error"]
+}

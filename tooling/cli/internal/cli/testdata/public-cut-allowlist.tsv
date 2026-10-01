@@ -1,0 +1,12 @@
+# category<TAB>path<TAB>rule<TAB>exact evidence<TAB>count<TAB>review reason
+#
+# Add only an exact, reviewed false positive: no wildcard or directory prefix
+# is accepted. Synthetic secret examples are allowed only in exact test/fixture
+# files and are keyed by a non-reversible digest. An unused or widened entry
+# fails the gate and must be removed or narrowed.
+forbidden-cut-file	.npmrc	credential-bearing-filename	.npmrc	1	Root npm configuration selects the public Putnami package registry and contains no credential.
+high-confidence-secret	go/framework/storage/gcs_auth_test.go	private-key-block	sha256:3021d90eb9437b2d	1	Synthetic malformed PEM header used to prove invalid service-account keys fail closed.
+high-confidence-secret	go/framework/storage/s3_sign_test.go	aws-access-key-id	sha256:1a5d44a2dca19669	2	AWS documentation example identifier paired only with an explicitly invalid example secret in a signing test.
+high-confidence-secret	tooling/cli/internal/jobs/invocation_test.go	private-key-block	sha256:3021d90eb9437b2d	1	Synthetic private-key-shaped scratch artifact used to prove invocation secret scrubbing.
+orphaned-history	.github/PULL_REQUEST_TEMPLATE.md	bare-tracker-reference	#123	1	Placeholder in the pull request template that shows contributors how to link an issue.
+orphaned-history	.github/PULL_REQUEST_TEMPLATE.md	bare-tracker-reference	#456	1	Placeholder in the pull request template that shows contributors how to link an issue.

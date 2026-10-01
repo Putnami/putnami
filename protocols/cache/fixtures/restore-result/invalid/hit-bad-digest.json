@@ -1,0 +1,1 @@
+{ "status": "hit", "result": { "status": "success" }, "manifest": { "files": [ { "path": "a", "digest": "bad", "mode": 420 } ] } }

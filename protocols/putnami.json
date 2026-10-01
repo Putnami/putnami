@@ -1,0 +1,50 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "includes": [
+    "agentcontext",
+    "analytics",
+    "architecture",
+    "cache",
+    "capabilities",
+    "ci",
+    "cli",
+    "clientcontract",
+    "collaboration",
+    "config",
+    "contracts",
+    "database",
+    "diagnostic",
+    "distribution",
+    "doccov",
+    "doctor",
+    "events",
+    "extension",
+    "features",
+    "gomod",
+    "http-routes",
+    "identity",
+    "infra",
+    "job",
+    "keyring",
+    "migration",
+    "oci",
+    "platform",
+    "qualify",
+    "registry",
+    "runner",
+    "runtime",
+    "sitecontent",
+    "storage",
+    "support",
+    "telemetry",
+    "template",
+    "transaction",
+    "workspace"
+  ],
+  "line": {},
+  "publishConfig": {
+    "go": {
+      "namePattern": "go.putnami.dev/protocol/{name}"
+    }
+  }
+}

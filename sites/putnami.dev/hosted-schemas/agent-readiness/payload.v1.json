@@ -1,0 +1,441 @@
+{
+  "$defs": {
+    "AgentProbe": {
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Area": {
+      "additionalProperties": false,
+      "properties": {
+        "authors90d": {
+          "description": "First 16 hex digits of SHA-256(salt + \":\" + lowercase author email), one per distinct author; the salt is random per run and never sent.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "commits90d": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "files": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "language": {
+          "maxLength": 64,
+          "type": "string"
+        },
+        "lines": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "path": {
+          "description": "Repository-relative, slash-separated path; \".\" for the root.",
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^(\\.|[^/\\\\~\\s][^\\\\]*)$",
+          "type": "string"
+        },
+        "role": {
+          "description": "code, tests (a test tree) or docs (a documentation site). Declared by method 0.2; absent reads as code.",
+          "enum": [
+            "code",
+            "tests",
+            "docs"
+          ],
+          "type": "string"
+        },
+        "shareOfChange": {
+          "format": "double",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "source": {
+          "enum": [
+            "manifest",
+            "inferred"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "authors90d",
+        "commits90d",
+        "files",
+        "lines",
+        "name",
+        "path",
+        "shareOfChange",
+        "source"
+      ],
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "maxLength": 300,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "type": "string"
+        },
+        "sample": {
+          "description": "Up to five repository-relative locations, each a path with an optional :line. Never file contents.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "command",
+        "sample"
+      ],
+      "type": "object"
+    },
+    "InstructionFile": {
+      "additionalProperties": false,
+      "properties": {
+        "ageDays": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bytes": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^/\\\\~\\s][^\\\\]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ageDays",
+        "bytes",
+        "path"
+      ],
+      "type": "object"
+    },
+    "Inventory": {
+      "additionalProperties": false,
+      "properties": {
+        "activeContributors90d": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "agentTools": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "ciProviders": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "commits90d": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "commitsTotal": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "containers": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "databases": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "files": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "frameworks": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "iac": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "instructionFiles": {
+          "items": {
+            "$ref": "#/$defs/InstructionFile"
+          },
+          "type": "array"
+        },
+        "languages": {
+          "items": {
+            "$ref": "#/$defs/LanguageShare"
+          },
+          "type": "array"
+        },
+        "lines": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "monorepoTools": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "packageManagers": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        },
+        "repoAgeDays": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "testFrameworks": {
+          "items": {
+            "$ref": "#/$defs/Tool"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "activeContributors90d",
+        "agentTools",
+        "ciProviders",
+        "commits90d",
+        "commitsTotal",
+        "containers",
+        "databases",
+        "files",
+        "frameworks",
+        "iac",
+        "instructionFiles",
+        "languages",
+        "lines",
+        "monorepoTools",
+        "packageManagers",
+        "repoAgeDays",
+        "testFrameworks"
+      ],
+      "type": "object"
+    },
+    "LanguageShare": {
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lines": {
+          "format": "int64",
+          "maximum": 9223372036854776000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "files",
+        "lines",
+        "name"
+      ],
+      "type": "object"
+    },
+    "Marker": {
+      "additionalProperties": false,
+      "properties": {
+        "area": {
+          "description": "Area name; empty for a repository-wide marker.",
+          "maxLength": 128,
+          "type": "string"
+        },
+        "enforcedDays": {
+          "description": "Days the enforcing CI check has existed, for a marker whose value measures something else. Declared by method 0.2 for bound.cross-area-changes.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "evidence": {
+          "$ref": "#/$defs/Evidence"
+        },
+        "id": {
+          "description": "Marker id defined on the method page.",
+          "maxLength": 64,
+          "pattern": "^(understand|bound|verify|recover)\\.[a-z0-9-]+$",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "absent",
+            "exists",
+            "enforced"
+          ],
+          "type": "string"
+        },
+        "value": {
+          "description": "The marker's 90-day measurement in the unit the method page declares; null when not measured.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "evidence",
+        "id",
+        "state"
+      ],
+      "type": "object"
+    },
+    "Payload": {
+      "additionalProperties": false,
+      "properties": {
+        "agentProbe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentProbe",
+              "description": "Reserved for the opt-in agent probe. Always null in methods 0.1 and 0.2."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "areas": {
+          "items": {
+            "$ref": "#/$defs/Area"
+          },
+          "type": "array"
+        },
+        "inventory": {
+          "$ref": "#/$defs/Inventory"
+        },
+        "markers": {
+          "items": {
+            "$ref": "#/$defs/Marker"
+          },
+          "type": "array"
+        },
+        "meta": {
+          "$ref": "#/$defs/PayloadMeta"
+        }
+      },
+      "required": [
+        "areas",
+        "inventory",
+        "markers",
+        "meta"
+      ],
+      "type": "object"
+    },
+    "PayloadMeta": {
+      "additionalProperties": false,
+      "properties": {
+        "collectedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "collectorVersion": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "headCommit": {
+          "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
+          "type": "string"
+        },
+        "methodVersion": {
+          "pattern": "^[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "repoFingerprint": {
+          "description": "Lowercase hex SHA-256 of the lexically smallest root commit id.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "collectedAt",
+        "collectorVersion",
+        "headCommit",
+        "methodVersion",
+        "repoFingerprint"
+      ],
+      "type": "object"
+    },
+    "Tool": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://putnami.dev/schemas/agent-readiness/payload.v1.json",
+  "$ref": "#/$defs/Payload",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Putnami agent-readiness payload v1"
+}

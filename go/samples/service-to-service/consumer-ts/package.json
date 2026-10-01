@@ -1,0 +1,18 @@
+{
+  "name": "@example/go-items-consumer",
+  "version": "0.0.0",
+  "description": "TypeScript consumer of the Go service-to-service sample",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@example/go-items-client": "workspace:*",
+    "@putnami/application": "workspace:*",
+    "@putnami/client": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

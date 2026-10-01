@@ -1,0 +1,125 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/lifecycle-v3",
+  "version": "1.0.0",
+  "cliContract": 2,
+  "runtime": {
+    "executable": "bin/putnami-sample",
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": ["--output", "{runtimeOutput}"],
+      "inputs": ["bin/**", "cmd/**", "go.mod", "go.sum", "internal/**"]
+    }
+  },
+  "workspace": {
+    "markers": ["package.json"],
+    "inputs": ["bun.lock", "package.json", "tsconfig*.json"],
+    "excludes": ["dist", "node_modules"],
+    "syncTask": "workspace-sync"
+  },
+  "commands": {
+    "test": {
+      "description": "Run tests against a throwaway database",
+      "run": [
+        { "id": "setup", "task": "test-database-setup" },
+        { "id": "run", "task": "test-run", "dependsOn": ["setup"] },
+        {
+          "id": "teardown",
+          "task": "test-database-teardown",
+          "runOn": "finally",
+          "finalizes": {
+            "producer": "setup",
+            "consumers": ["run"]
+          }
+        }
+      ]
+    },
+    "projects": {
+      "description": "Synchronize native workspace manifests",
+      "run": [{ "id": "sync", "task": "workspace-sync" }]
+    }
+  },
+  "tasks": {
+    "test-database-setup": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "database",
+        "up",
+        "--dsn-file",
+        "{invocationArtifactRoot}/database/dsn.env",
+        "--lease-file",
+        "{invocationArtifactRoot}/database/lease.json"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "dsn": {
+            "kind": "runtime-file",
+            "scope": "invocation",
+            "sensitive": true,
+            "path": "database/dsn.env",
+            "description": "Connection string for the throwaway database; dies with the invocation."
+          },
+          "lease": {
+            "kind": "file",
+            "scope": "invocation",
+            "path": "database/lease.json",
+            "description": "Non-secret invocation lease a later run reaps the container by."
+          }
+        },
+        "effects": ["process"]
+      }
+    },
+    "test-run": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--dsn-file",
+        "{invocationArtifactRoot}/database/dsn.env"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": { "enabled": true },
+      "declares": {
+        "outputs": {
+          "coverage": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "lcov.info",
+            "optionalEmpty": true
+          }
+        },
+        "effects": ["toolchain-cache"]
+      }
+    },
+    "test-database-teardown": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "database",
+        "down",
+        "--lease-file",
+        "{invocationArtifactRoot}/database/lease.json"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "declares": {
+        "effects": ["process"]
+      }
+    },
+    "workspace-sync": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["workspace", "sync"],
+      "cwd": "{workspaceRoot}",
+      "writes": ["sources"],
+      "cache": false,
+      "declares": {
+        "mutatesSources": true,
+        "effects": ["workspace-files"]
+      }
+    }
+  }
+}

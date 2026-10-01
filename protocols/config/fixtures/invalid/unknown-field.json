@@ -1,0 +1,14 @@
+{
+  "appName": "my-app",
+  "version": "1.0.0",
+  "schemaHash": "sha256:abcdef0123456789",
+  "unknownField": true,
+  "configs": [
+    {
+      "path": "server",
+      "fields": [
+        { "name": "port", "type": "int" }
+      ]
+    }
+  ]
+}

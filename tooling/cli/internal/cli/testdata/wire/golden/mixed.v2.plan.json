@@ -1,0 +1,179 @@
+{
+  "protocolVersion": 2,
+  "sessionId": "20260101-000000-a1b2c3",
+  "commands": [
+    "build",
+    "test",
+    "lint"
+  ],
+  "tasks": [
+    {
+      "identity": {
+        "key": "/services/api:build",
+        "scope": "project",
+        "project": {
+          "id": "/services/api",
+          "name": "@acme/api"
+        },
+        "task": {
+          "name": "build",
+          "command": "build",
+          "kind": "build"
+        },
+        "provider": {
+          "extension": "go"
+        }
+      },
+      "cache": true
+    },
+    {
+      "identity": {
+        "key": "/services/api:test",
+        "scope": "project",
+        "project": {
+          "id": "/services/api",
+          "name": "@acme/api"
+        },
+        "task": {
+          "name": "test",
+          "command": "test",
+          "kind": "test"
+        },
+        "provider": {
+          "extension": "go"
+        }
+      },
+      "dependsOn": [
+        "/services/api:build"
+      ],
+      "cache": true
+    },
+    {
+      "identity": {
+        "key": "/apps/web:build",
+        "scope": "project",
+        "project": {
+          "id": "/apps/web",
+          "name": "@acme/web"
+        },
+        "task": {
+          "name": "build",
+          "command": "build",
+          "kind": "build"
+        },
+        "provider": {
+          "extension": "typescript"
+        }
+      },
+      "cache": true
+    },
+    {
+      "identity": {
+        "key": "/apps/web:test",
+        "scope": "project",
+        "project": {
+          "id": "/apps/web",
+          "name": "@acme/web"
+        },
+        "task": {
+          "name": "test",
+          "command": "test",
+          "kind": "test"
+        },
+        "provider": {
+          "extension": "typescript"
+        }
+      },
+      "dependsOn": [
+        "/apps/web:build"
+      ],
+      "cache": true
+    },
+    {
+      "identity": {
+        "key": "/apps/web:lint",
+        "scope": "project",
+        "project": {
+          "id": "/apps/web",
+          "name": "@acme/web"
+        },
+        "task": {
+          "name": "lint",
+          "command": "lint",
+          "kind": "lint"
+        },
+        "provider": {
+          "extension": "typescript"
+        }
+      },
+      "cache": true
+    },
+    {
+      "identity": {
+        "key": "/tools/lint:build",
+        "scope": "project",
+        "project": {
+          "id": "/tools/lint",
+          "name": "@acme/tools"
+        },
+        "task": {
+          "name": "build",
+          "command": "build",
+          "kind": "build"
+        },
+        "provider": {
+          "extension": "go"
+        }
+      },
+      "after": [
+        "/services/api:build"
+      ],
+      "cache": true
+    },
+    {
+      "identity": {
+        "key": "/tools/lint:test",
+        "scope": "project",
+        "project": {
+          "id": "/tools/lint",
+          "name": "@acme/tools"
+        },
+        "task": {
+          "name": "test",
+          "command": "test",
+          "kind": "test"
+        },
+        "provider": {
+          "extension": "go"
+        }
+      },
+      "dependsOn": [
+        "/tools/lint:build",
+        "/services/api:test"
+      ],
+      "cache": true
+    },
+    {
+      "identity": {
+        "key": "/tools/lint:deploy",
+        "scope": "project",
+        "project": {
+          "id": "/tools/lint",
+          "name": "@acme/tools"
+        },
+        "task": {
+          "name": "deploy",
+          "command": "deploy",
+          "kind": "deploy"
+        },
+        "provider": {
+          "extension": "go"
+        }
+      },
+      "dependsOn": [
+        "/tools/lint:build"
+      ],
+      "cache": false
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/shared-datasource-pooling",
+  "outcomes": [
+    "A workload that owns several schemas of one physical database holds one connection pool for that database, so its idle backends and connection ceiling scale with databases, not with datasources",
+    "Every unqualified query a datasource issues resolves in that datasource's schema, whichever datasource last used the pooled connection",
+    "Reserved connections and driver transactions stay bound to their datasource, so the transaction machinery and the migrator keep their search_path on the shared pool",
+    "Closing one datasource never interrupts another datasource of the same database"
+  ],
+  "nonGoals": [
+    "Sharing a pool across different connection identities (different host, database, user, or password source)",
+    "Reconciling different pool tunings declared for one database by taking the largest",
+    "Skipping the per-operation set when the connection already carries the value: postgres.js exposes no acquire hook and no connection identity, so there is no marker to compare against",
+    "Guarding user code that issues a session-level SET search_path, RESET, or DISCARD ALL on a framework connection",
+    "Changing how transactions are keyed: useTxConnection and UnitOfWork stay keyed by datasource"
+  ],
+  "requirements": [
+    {
+      "id": "acquire-time-search-path",
+      "text": "The physical pool carries no search_path startup parameter; every operation of a datasource-bound client reserves a connection, pipelines SELECT set_config('search_path', $1, false) with the datasource's search_path \u2014 or RESET search_path for a datasource on the server default \u2014 before its own statement on that same connection, releases the connection, and rejects with the set's error when the set failed, so a result is never returned under an unverified search_path."
+    },
+    {
+      "id": "datasource-bound-acquire",
+      "text": "database(name) returns a datasource-bound client, never the shared driver pool: tagged-template queries, unsafe, file and notify set the path per operation; reserve() and begin() set it on the pinned connection they hand out; cancel and query modes reach the inner driver query; identifier and row builders forward to the physical pool untouched."
+    },
+    {
+      "id": "one-pool-per-physical-database",
+      "text": "Physical pools are keyed by the effective connection identity of each datasource \u2014 host, port, database, resolved username, password source, ssl and the remaining startup parameters \u2014 never by datasource name: byte-identical identities share one physical pool, distinct identities open distinct pools, and concurrent first opens of one identity connect once."
+    },
+    {
+      "id": "shared-pool-lifetime",
+      "text": "Datasource-bound clients hold references on their physical pool: closing one datasource leaves the shared pool open for the others, closing the last handle ends it, a closed client rejects its operations with an error, closeAllDatabases ends every pool, and a later database(name) re-opens."
+    },
+    {
+      "id": "tuning-agreement",
+      "text": "Datasources that resolve to one physical pool must declare the same poolSize, connectTimeout, idleTimeout, maxLifetime, statementTimeoutMs, idleInTransactionTimeoutMs and debug; a difference rejects database(name) with an error naming both datasources and each differing field, never a larger ceiling or a second pool."
+    }
+  ],
+  "decisions": ["typescript/framework/database/doc/adr/0003-shared-physical-pool-per-database.md"]
+}

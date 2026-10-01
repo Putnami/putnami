@@ -1,0 +1,12 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities.json",
+  "protocolVersion": 1,
+  "project": "go.putnami.dev/example/iam",
+  "infraRequirements": [
+    {
+      "name": "primary",
+      "kind": "database",
+      "provenance": { "project": "go.putnami.dev/example/iam", "sourceKind": "robot" }
+    }
+  ]
+}

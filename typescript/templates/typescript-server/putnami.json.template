@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "<%= projectName %>",
+  "type": "application",
+  "main": "src/main.ts",
+  "extensions": ["@putnami/typescript"],
+  "exports": {
+    "./serve": "./src/serve.ts"
+  }
+}

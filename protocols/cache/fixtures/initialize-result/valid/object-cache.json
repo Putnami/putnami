@@ -1,0 +1,1 @@
+{ "protocolVersion": 2, "providerName": "@acme/cache", "providerVersion": "1.2.3", "capabilities": ["object-cache"], "objectCacheSocket": "/tmp/exchange/objects.sock", "ready": true }

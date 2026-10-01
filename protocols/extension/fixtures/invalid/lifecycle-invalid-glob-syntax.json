@@ -1,0 +1,23 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/lifecycle-invalid-glob-syntax",
+  "runtime": {
+    "executable": "bin/sample",
+    "prepare": {
+      "command": "make",
+      "inputs": ["cmd/[abc"]
+    }
+  },
+  "workspace": {
+    "markers": ["project.[json"],
+    "inputs": ["project.[json"]
+  },
+  "commands": {
+    "build": {
+      "run": [{ "id": "build", "task": "build" }]
+    }
+  },
+  "tasks": {
+    "build": { "kind": "command", "command": "echo" }
+  }
+}

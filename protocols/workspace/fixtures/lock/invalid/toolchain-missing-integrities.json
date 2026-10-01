@@ -1,0 +1,11 @@
+{
+  "version": 3,
+  "toolchains": {
+    "node": {
+      "version": "20.19.4",
+      "source": "https://nodejs.org/dist/v20.19.4/"
+    }
+  },
+  "extensions": {},
+  "templates": {}
+}

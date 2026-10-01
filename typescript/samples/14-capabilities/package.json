@@ -1,0 +1,17 @@
+{
+  "name": "@example/14-capabilities",
+  "version": "0.0.0",
+  "description": "Capability manifest emission at generate time (Go parity)",
+  "private": true,
+  "main": "src/main.ts",
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/migration": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "exports": {
+    "./serve": {
+      "default": "src/serve.ts"
+    }
+  }
+}

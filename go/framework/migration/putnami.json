@@ -1,0 +1,36 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/migration",
+  "visibility": "public",
+  "tags": [
+    "go"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "dependencies": [
+    "/go/framework/errors",
+    "/go/framework/logger",
+    "/protocols/infra",
+    "/protocols/migration"
+  ],
+  "publish": [
+    "go"
+  ],
+  "disable": {
+    "jobs": [
+      "serve"
+    ]
+  },
+  "options": {
+    "publish": {
+      "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

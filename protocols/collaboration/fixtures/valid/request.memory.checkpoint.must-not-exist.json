@@ -1,0 +1,11 @@
+{
+  "mission": "3868",
+  "identity": {
+    "scope": "/tooling"
+  },
+  "precondition": {
+    "mustNotExist": true
+  },
+  "idempotencyKey": "3868:checkpoint:1",
+  "content": "Mission opened."
+}

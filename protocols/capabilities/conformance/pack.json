@@ -1,0 +1,17 @@
+{
+  "id": "putnami.capabilities.manifest-determinism",
+  "capabilityKinds": [
+    "config",
+    "schema",
+    "discoverer",
+    "migration",
+    "datasource",
+    "infra",
+    "health",
+    "liveness",
+    "readiness",
+    "lifecycle",
+    "package"
+  ],
+  "languages": ["go"]
+}

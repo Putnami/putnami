@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/events/push-delivery.json",
+  "title": "Putnami Events Push Delivery Receiver Contract",
+  "description": "Provider push wrapper POSTed to a subscriber-hosted receiver endpoint (the conventional route is POST /_putnami/events/:subscription). The receiver authenticates the request out-of-band via an OIDC bearer token (audience-pinned, minted as the events-server service account) verified against the provider JWKS with an issuer + audience + service-account-email allowlist, fail-closed — never via a field in this body. An HTTP 2xx acknowledges delivery; 4xx dead-letters the message; any other status is retried by the provider. Push delivery is at-least-once, so receivers must be idempotent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["message", "subscription"],
+  "properties": {
+    "message": { "$ref": "#/$defs/pushMessage" },
+    "subscription": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "pushMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data"],
+      "properties": {
+        "data": {
+          "type": "string",
+          "minLength": 1,
+          "contentEncoding": "base64",
+          "contentMediaType": "application/json",
+          "description": "Base64-encoded canonical Envelope JSON (schemas/envelope.json)."
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "messageId": { "type": "string" },
+        "publishTime": { "type": "string", "format": "date-time" },
+        "orderingKey": { "type": "string" }
+      }
+    },
+    "ackOutcome": {
+      "description": "Receiver HTTP status to delivery outcome mapping: 2xx=ack, 4xx=dlq, otherwise=retry.",
+      "enum": ["ack", "dlq", "retry"]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/application-lifecycle#darc-runtime-evidence",
+    "go/application-lifecycle#describe",
+    "go/application-lifecycle#phase-order",
+    "go/application-lifecycle#shutdown",
+    "go/application-lifecycle#startup-failure"
+  ]
+}

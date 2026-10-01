@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "includes": ["cache", "config", "events"],
+  "tags": ["protocol"],
+  "extensions": ["/go/extension"],
+  "distribution": { "visibility": "public" },
+  "projectAliases": {
+    "cfg": "/protocols/config"
+  }
+}

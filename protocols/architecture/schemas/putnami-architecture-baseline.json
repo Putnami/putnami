@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-architecture-baseline.json",
+  "title": "Putnami architecture debt baseline v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "findings"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "protocolVersion": { "const": 1 },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/debtRecord" } }
+  },
+  "$defs": {
+    "debtRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finding", "owner", "reason", "scope"],
+      "anyOf": [{ "required": ["removeWhen"] }, { "required": ["expires"] }],
+      "properties": {
+        "finding": { "type": "string", "pattern": "^architecture\\.[^\\s]+$" },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "tracking": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "removeWhen": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "expires": { "type": "string", "format": "date" }
+      }
+    }
+  }
+}

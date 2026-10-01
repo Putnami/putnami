@@ -1,0 +1,218 @@
+{
+  "version": 1,
+  "protocol": {
+    "version": 1,
+    "capabilities": [
+      "execution-request-v1",
+      "session-bundle-v1"
+    ]
+  },
+  "source": {
+    "digest": "sha256:05b3abf2579a5eb66403cd78be557fd860633a1fe2103c7642030defe32c657f",
+    "indexDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "git": {
+      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "branch": "feature/portable",
+      "dirty": true
+    },
+    "tree": {
+      "fingerprint": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "dirty": true,
+      "headSHA": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "versions": [
+      {
+        "line": "",
+        "base": "0.3.0",
+        "full": "0.3.0-20260916000000-aaaaaaa-d1d1d1d",
+        "sha": "aaaaaaa",
+        "branch": "feature/portable",
+        "suffix": "20260916000000-aaaaaaa-d1d1d1d",
+        "tag": "",
+        "tagged": false,
+        "dirty": true
+      }
+    ]
+  },
+  "invocation": {
+    "commands": [
+      "lint",
+      "test",
+      "build"
+    ],
+    "params": {
+      "coverage": {
+        "type": "string",
+        "value": "true"
+      },
+      "fix": {
+        "type": "bool",
+        "value": false
+      },
+      "only": {
+        "type": "strings",
+        "value": [
+          "a",
+          "b"
+        ]
+      },
+      "ratio": {
+        "type": "float",
+        "value": 0.5
+      },
+      "retries": {
+        "type": "int",
+        "value": 3
+      },
+      "map": {
+        "type": "object",
+        "value": {}
+      }
+    },
+    "flags": {
+      "noCache": true,
+      "noCacheExplicit": true,
+      "retryFailed": false,
+      "continueOnError": true,
+      "impactedStrict": false,
+      "verbose": false,
+      "debug": false,
+      "quiet": false,
+      "retry": 1,
+      "maxParallel": 0,
+      "maxParallelMode": "auto",
+      "cpuBudgetPolicy": "",
+      "cacheTrust": "ci",
+      "output": "json",
+      "profile": "dev",
+      "resourceBudgets": {
+        "db": 2
+      }
+    },
+    "cwd": "."
+  },
+  "selection": {
+    "requestedMode": "impacted",
+    "mode": "impacted",
+    "scoped": true,
+    "projects": [
+      "/app",
+      "/lib"
+    ],
+    "baseline": "dddddddddddddddddddddddddddddddddddddddd",
+    "baselineSource": "merge-base",
+    "changedPaths": [
+      "app/main.go",
+      "lib/lib.go"
+    ],
+    "diagnostics": [
+      "baseline: merge-base with main"
+    ],
+    "noCacheProjects": [
+      "/app"
+    ]
+  },
+  "plan": {
+    "tasks": [
+      {
+        "identity": {
+          "key": "/app:build",
+          "scope": "project",
+          "project": {
+            "id": "/app",
+            "name": "app"
+          },
+          "task": {
+            "name": "build",
+            "command": "build",
+            "kind": "build"
+          },
+          "provider": {
+            "extension": "@fixture/gate",
+            "version": "1.0.0"
+          }
+        },
+        "dependsOn": [
+          "/lib:build"
+        ],
+        "serializeAfter": [],
+        "contractDigest": "tc1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "deadlineMs": 300000,
+        "cacheable": true,
+        "resources": {
+          "heavy": false,
+          "cpuWeight": 1,
+          "reads": [],
+          "writes": [
+            {
+              "id": "db",
+              "scope": "workspace"
+            }
+          ]
+        }
+      },
+      {
+        "identity": {
+          "key": "/lib:build",
+          "scope": "project",
+          "project": {
+            "id": "/lib",
+            "name": "lib"
+          },
+          "task": {
+            "name": "build",
+            "command": "build",
+            "kind": "build"
+          },
+          "provider": {
+            "extension": "@fixture/gate",
+            "version": "1.0.0"
+          }
+        },
+        "dependsOn": [],
+        "serializeAfter": [],
+        "contractDigest": "tc1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "deadlineMs": 300000,
+        "cacheable": true,
+        "resources": {
+          "heavy": true,
+          "cpuWeight": 2,
+          "reads": [
+            {
+              "id": "db",
+              "scope": "workspace"
+            }
+          ],
+          "writes": []
+        }
+      }
+    ]
+  },
+  "environment": {
+    "cli": {
+      "source": "workspace",
+      "version": ""
+    },
+    "extensions": [
+      {
+        "name": "@fixture/gate",
+        "version": "1.0.0"
+      }
+    ],
+    "toolchains": [
+      {
+        "name": "go",
+        "version": "1.26.1"
+      }
+    ],
+    "platform": {
+      "os": "linux",
+      "arch": "arm64"
+    }
+  },
+  "control": {
+    "caller": "cli",
+    "idempotencyKey": "ffffffffffffffffffffffffffffffff",
+    "deadline": "2026-09-16T12:00:00Z"
+  }
+}

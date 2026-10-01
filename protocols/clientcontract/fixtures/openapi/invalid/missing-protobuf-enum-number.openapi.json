@@ -1,0 +1,17 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "invalid", "version": "1" },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": { "id": "invalid", "audience": "urn:invalid" },
+    "credentials": {},
+    "protobuf": {
+      "syntax": "proto3",
+      "package": "invalid.v1",
+      "services": [],
+      "messages": [],
+      "enums": [{ "name": "State", "values": [{ "name": "STATE_UNSPECIFIED" }] }]
+    }
+  },
+  "paths": {}
+}

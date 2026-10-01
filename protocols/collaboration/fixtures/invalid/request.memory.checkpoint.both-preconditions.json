@@ -1,0 +1,9 @@
+{
+  "mission": "42",
+  "precondition": {
+    "expectedRevision": "r1",
+    "mustNotExist": true
+  },
+  "idempotencyKey": "k1",
+  "content": "x"
+}

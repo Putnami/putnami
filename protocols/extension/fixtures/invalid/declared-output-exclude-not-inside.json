@@ -1,0 +1,24 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "build": {
+      "run": [{ "id": "generate", "task": "build-generate" }]
+    }
+  },
+  "tasks": {
+    "build-generate": {
+      "kind": "command",
+      "command": "echo",
+      "declares": {
+        "outputs": {
+          "gen": {
+            "kind": "directory",
+            "path": ".gen",
+            "excludes": [".gen", "dist/other"],
+            "description": "A carve-out that cedes the output itself declares nothing, and one outside the output cedes a region the task never owned."
+          }
+        }
+      }
+    }
+  }
+}

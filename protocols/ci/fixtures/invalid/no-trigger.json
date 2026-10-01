@@ -1,0 +1,13 @@
+{
+  "version": 3,
+  "commands": [
+    "test"
+  ],
+  "rules": [
+    {
+      "publish": [
+        "canary"
+      ]
+    }
+  ]
+}

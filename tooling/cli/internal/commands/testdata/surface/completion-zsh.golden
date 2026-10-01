@@ -1,0 +1,661 @@
+#compdef putnami
+# zsh completion for putnami
+#
+# Install:
+#   oh-my-zsh:  putnami completion zsh > ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/completions/_putnami
+#   manual:     putnami completion zsh > ~/.zfunc/_putnami
+#               echo 'fpath=(~/.zfunc $fpath)' >> ~/.zshrc
+#
+# Then restart your shell: exec zsh
+
+_putnami_subcommands_for() {
+    reply=()
+    case "$1" in
+        'cache')
+            reply=(
+                'clean'
+                'gc'
+                'verify'
+            )
+            ;;
+        'channel')
+            reply=(
+                'set'
+                'status'
+            )
+            ;;
+        'ci')
+            reply=(
+                'explain'
+                'fmt'
+                'init'
+                'validate'
+            )
+            ;;
+        'completion')
+            reply=(
+                'bash'
+                'fish'
+                'zsh'
+            )
+            ;;
+        'config')
+            reply=(
+                'set'
+                'show'
+            )
+            ;;
+        'context')
+            reply=(
+                'generate'
+                'map'
+            )
+            ;;
+        'deps')
+            reply=(
+                'add'
+                'install'
+                'remove'
+            )
+            ;;
+        'dev')
+            reply=(
+                'extension'
+                'template'
+            )
+            ;;
+        'extensions')
+            reply=(
+                'install'
+                'list'
+                'remove'
+                'update'
+            )
+            ;;
+        'infra')
+            reply=(
+                'plan'
+            )
+            ;;
+        'mcp')
+            reply=(
+                'install'
+            )
+            ;;
+        'migrate')
+            reply=(
+                'agent-content'
+                'vnext'
+            )
+            ;;
+        'projects')
+            reply=(
+                'create'
+                'describe'
+                'list'
+                'sync'
+                'tag'
+            )
+            ;;
+        'scopes')
+            reply=(
+                'list'
+            )
+            ;;
+        'sessions')
+            reply=(
+                'export'
+                'inspect'
+                'list'
+                'replay'
+                'summary'
+            )
+            ;;
+        'telemetry')
+            reply=(
+                'off'
+                'on'
+                'show'
+                'status'
+            )
+            ;;
+        'templates')
+            reply=(
+                'install'
+                'list'
+                'remove'
+                'update'
+            )
+            ;;
+        'tree')
+            reply=(
+                'fingerprint'
+                'verify'
+            )
+            ;;
+        'version')
+            reply=(
+                'get'
+                'list'
+                'tag'
+                'use'
+            )
+            ;;
+        'workspace')
+            reply=(
+                'describe'
+                'init'
+            )
+            ;;
+    esac
+}
+
+_putnami_path_known() {
+    case "$1" in
+        'cache') return 0 ;;
+        'cache clean') return 0 ;;
+        'cache gc') return 0 ;;
+        'cache verify') return 0 ;;
+        'change-plan') return 0 ;;
+        'channel') return 0 ;;
+        'channel set') return 0 ;;
+        'channel status') return 0 ;;
+        'ci') return 0 ;;
+        'ci explain') return 0 ;;
+        'ci fmt') return 0 ;;
+        'ci init') return 0 ;;
+        'ci validate') return 0 ;;
+        'completion') return 0 ;;
+        'completion bash') return 0 ;;
+        'completion fish') return 0 ;;
+        'completion zsh') return 0 ;;
+        'compose') return 0 ;;
+        'config') return 0 ;;
+        'config set') return 0 ;;
+        'config show') return 0 ;;
+        'context') return 0 ;;
+        'context generate') return 0 ;;
+        'context map') return 0 ;;
+        'deps') return 0 ;;
+        'deps add') return 0 ;;
+        'deps install') return 0 ;;
+        'deps remove') return 0 ;;
+        'dev') return 0 ;;
+        'dev extension') return 0 ;;
+        'dev template') return 0 ;;
+        'doctor') return 0 ;;
+        'extensions') return 0 ;;
+        'extensions install') return 0 ;;
+        'extensions list') return 0 ;;
+        'extensions remove') return 0 ;;
+        'extensions update') return 0 ;;
+        'help') return 0 ;;
+        'infra') return 0 ;;
+        'infra plan') return 0 ;;
+        'init') return 0 ;;
+        'install') return 0 ;;
+        'mcp') return 0 ;;
+        'mcp install') return 0 ;;
+        'migrate') return 0 ;;
+        'migrate agent-content') return 0 ;;
+        'migrate vnext') return 0 ;;
+        'pin') return 0 ;;
+        'projects') return 0 ;;
+        'projects create') return 0 ;;
+        'projects describe') return 0 ;;
+        'projects list') return 0 ;;
+        'projects sync') return 0 ;;
+        'projects tag') return 0 ;;
+        'qualify') return 0 ;;
+        'report') return 0 ;;
+        'scopes') return 0 ;;
+        'scopes list') return 0 ;;
+        'sessions') return 0 ;;
+        'sessions export') return 0 ;;
+        'sessions inspect') return 0 ;;
+        'sessions list') return 0 ;;
+        'sessions replay') return 0 ;;
+        'sessions summary') return 0 ;;
+        'telemetry') return 0 ;;
+        'telemetry off') return 0 ;;
+        'telemetry on') return 0 ;;
+        'telemetry show') return 0 ;;
+        'telemetry status') return 0 ;;
+        'templates') return 0 ;;
+        'templates install') return 0 ;;
+        'templates list') return 0 ;;
+        'templates remove') return 0 ;;
+        'templates update') return 0 ;;
+        'tree') return 0 ;;
+        'tree fingerprint') return 0 ;;
+        'tree verify') return 0 ;;
+        'upgrade') return 0 ;;
+        'version') return 0 ;;
+        'version get') return 0 ;;
+        'version list') return 0 ;;
+        'version tag') return 0 ;;
+        'version use') return 0 ;;
+        'workspace') return 0 ;;
+        'workspace describe') return 0 ;;
+        'workspace init') return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+_putnami_flags_for() {
+    reply=()
+    case "$1" in
+        'change-plan')
+            reply=(
+                '--base[Required base commit or ref; emitted as its full immutable commit SHA]:commit:'
+                '--head[Optional head commit or ref; it must resolve to the checked-out HEAD]:commit:'
+            )
+            ;;
+        'channel set')
+            reply=(
+                '--expected[The id the channel must currently name; without it the channel'\''s current head is read and used]:rs_id:'
+                '--from[The channel whose head is re-released, or the immutable release-set id to point at]:channel|rs_id:'
+            )
+            ;;
+        'channel status')
+            reply=(
+                '--wait[Poll every 2s until every registry has applied the accepted head, or this Go duration elapses]:duration:'
+            )
+            ;;
+        'ci explain')
+            reply=(
+                '--branch[Updated push branch or pull-request head branch]:branch:'
+                '--event[Normalized Source event assumption]:push|tag|pull_request:'
+                '--pr[Pull-request number used to render the closed channel placeholder]:number:'
+                '--tag[Created tag, for --event tag]:tag:'
+            )
+            ;;
+        'ci fmt')
+            reply=(
+                '--check[Check canonical formatting without writing]'
+            )
+            ;;
+        'ci init')
+            reply=(
+                '--force[Replace an existing putnami.ci.json]'
+            )
+            ;;
+        'compose')
+            reply=(
+                '--no-watch[Run the target production-mode without watch, like its dependencies]'
+                '--port[Proxy port of the target; default options.serve.port then 3000; 0 picks an ephemeral port]:n:'
+                '--ready-timeout[Deadline for each member'\''s typed ready event; default 60s]:duration:'
+            )
+            ;;
+        'context generate')
+            reply=(
+                '--force[Rewrite a guidance block that was edited or written by an older release]'
+            )
+            ;;
+        'context map')
+            reply=(
+                '--print[Render the map to stdout (md by default, or json) and write nothing]'
+            )
+            ;;
+        'dev template')
+            reply=(
+                '--keep[With test: keep the rendered temporary workspace for inspection]'
+                '--skip-build[With test: render the template without running build and test on it]'
+                '--stable[With package: publish under a stable version instead of a prerelease]'
+                '--version[With package: version to stamp on the produced archive]:version:'
+            )
+            ;;
+        'doctor')
+            reply=(
+                '--profile[Deployment profile to evaluate under (dev|test|production); production is strictest]:profile:'
+                '--project[Project ID, path, or name (comma-separated); default is every workspace project]:selector:'
+            )
+            ;;
+        'extensions install')
+            reply=(
+                '--dest[Materialize into this artifact-store root instead of the machine-global one]:dir:'
+                '--latest[Ignore the lock file and resolve the latest versions]'
+                '--platform[Materialize artifacts for another platform (skips install hooks and the lock write)]:os/arch:'
+                '--user[Pin one registry extension in the user scope (~/.putnami/user) so its commands run outside any workspace]'
+            )
+            ;;
+        'extensions list')
+            reply=(
+                '--user[List the extensions pinned in the user scope (~/.putnami/user) instead of the workspace]'
+            )
+            ;;
+        'extensions remove')
+            reply=(
+                '--user[Remove the extension from the user scope (~/.putnami/user) instead of the workspace]'
+            )
+            ;;
+        'help')
+            reply=(
+                '--man[Render the full reference as a man page]'
+                '--markdown[Render the full reference as Markdown]'
+            )
+            ;;
+        'init')
+            reply=(
+                '--extension[Default extension to install]:ts|go|py:'
+                '--force[Reinitialize an existing workspace]'
+                '--project[Create an initial project]:name:'
+                '--project-path[Workspace-relative path for the initial project]:path:'
+                '--workspace[Workspace name override]:name:'
+            )
+            ;;
+        'install')
+            reply=(
+                '--latest[Ignore the lock file and resolve the latest extension and template versions]'
+            )
+            ;;
+        'migrate agent-content')
+            reply=(
+                '--apply[Perform the migration, or finish one that stopped]'
+                '--check[Plan the migration without writing (default); exits non-zero when a migration is pending]'
+                '--rollback[Restore the declarations, pins, ownership records and files recorded before the migration]'
+            )
+            ;;
+        'migrate vnext')
+            reply=(
+                '--apply[Perform the migration, atomically and idempotently]'
+                '--check[Report the pending migration without writing (default); exits non-zero when a migration is needed]'
+            )
+            ;;
+        'pin')
+            reply=(
+                '--remove[Remove the CLI version pin]'
+            )
+            ;;
+        'projects create')
+            reply=(
+                '--force[Overwrite an existing project directory]'
+                '--path[Workspace-relative project path]:path:'
+                '--template[Template to scaffold from]:template:'
+            )
+            ;;
+        'projects sync')
+            reply=(
+                '--prune[Drop config entries whose project directory no longer exists]'
+                '--skip-install[Do not run dependency installation after syncing]'
+            )
+            ;;
+        'projects tag')
+            reply=(
+                '--remove[Remove the given tags from the project]'
+                '--set[Replace the project'\''s tags with the given list]'
+            )
+            ;;
+        'qualify')
+            reply=(
+                '--expect-sha[Required with a URL target: the git sha the deployment must report on /version]:sha:'
+                '--platform-prefix[Prefix under which /readyz and /version are mounted; default: where the route inventory declares both, else the root]:path:'
+                '--print-contract[Print the derived contract and exit without a target]'
+                '--ready-timeout[Deadline for readiness; default 60s]:duration:'
+                '--request-timeout[Deadline per smoke request; default 5s]:duration:'
+                '--target[local composes the workload on this machine; an http(s) URL is a running deployment]:local|url:'
+            )
+            ;;
+        'report')
+            reply=(
+                '--session[Report to read, by session ID (default: the newest CLI-driven run'\''s)]:id:'
+            )
+            ;;
+        'sessions export')
+            reply=(
+                '--since[Keep only records whose recorded start time is at or after this RFC 3339 timestamp; a record with no readable start time is not emitted]:timestamp:'
+            )
+            ;;
+        'sessions inspect')
+            reply=(
+                '--run[Inspect the session of a remote attempt by its attempt reference or submission key, resuming the attempt first when it was never imported]:ref:'
+            )
+            ;;
+        'sessions list')
+            reply=(
+                '--revision[Keep only sessions whose recorded tree sat on this commit; a lowercase hex prefix of the commit id, never a ref name]:sha:'
+            )
+            ;;
+        'sessions replay')
+            reply=(
+                '--session[Exact retained session id; latest is not accepted]:id:'
+            )
+            ;;
+        'sessions summary')
+            reply=(
+                '--by-digest[Group the selected sessions'\'' task records by input digest: records per digest, and how many executed, reused or failed]'
+                '--command[Keep only top-level sessions whose recorded command set is exactly this comma-separated list, in any order; a nested run never matches]:list:'
+                '--since[Keep only records whose recorded start time is at or after this RFC 3339 timestamp; a record with no readable start time is not listed]:timestamp:'
+            )
+            ;;
+        'templates install')
+            reply=(
+                '--latest[Ignore the lock file and resolve the latest versions]'
+            )
+            ;;
+        'tree verify')
+            reply=(
+                '--base[Base revision; default origin/main for --snapshot and --gate, and for --record the base the dossier must name]:rev:'
+                '--gate[Check that the recorded gate session can replace the finalizer'\''s gate]:session:'
+                '--record[Verify the dossier this file holds and print the verified verdict]:file:'
+                '--ref[Print the reference to this file: its path as given and its SHA-256]:file:'
+                '--report[Session report of the --gate session]:report:'
+                '--snapshot[Print the dossier skeleton for the current tree]'
+            )
+            ;;
+        'upgrade')
+            reply=(
+                '--channel[Resolve a release channel (stable by default; canary for latest prerelease)]:channel:'
+                '--cli[Only upgrade the CLI binary]'
+                '--deps[Only upgrade framework dependencies]'
+                '--dry-run[Resolve and print the upgrade plan without modifying files]'
+                '--extensions[Only upgrade extensions and templates]'
+                '--from-source[Build the CLI from this workspace'\''s source and install it as the active binary, bypassing the download channel (self-host escape hatch; combine with --global to replace the global CLI)]'
+                '--global[Upgrade the global CLI in ~/.putnami/bin instead of the workspace pin; inside a workspace the other phases still run, outside one only the CLI is upgraded (alias: -g)]'
+                '--namespace[Release-set namespace that published the --release id; accepted only with --release]:namespace:'
+                '--release[Use one immutable release-set snapshot for npm and Go dependencies (needs --namespace)]:rs_id:'
+                '--version[Use an exact Putnami release version]:version:'
+            )
+            ;;
+        'version get')
+            reply=(
+                '--scope[Report only this version line, by its scope path]:line:'
+            )
+            ;;
+        'version list')
+            reply=(
+                '--global[List binaries in ~/.putnami/bin instead of the workspace (alias: -g)]'
+            )
+            ;;
+        'version tag')
+            reply=(
+                '--dry-run[Print the proposed tag and changelog without writing anything]'
+                '--push[Push the release commit and the tag to origin]'
+                '--scope[The version line to release, by its scope path (required when the workspace declares several)]:line:'
+                '--yes[Skip the confirmation and create the release commit and tag]'
+            )
+            ;;
+        'version use')
+            reply=(
+                '--global[Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)]'
+            )
+            ;;
+        'workspace init')
+            reply=(
+                '--extension[Default extension to install]:ts|go|py:'
+                '--force[Reinitialize an existing workspace]'
+                '--project[Create an initial project]:name:'
+                '--project-path[Workspace-relative path for the initial project]:path:'
+                '--workspace[Workspace name override]:name:'
+            )
+            ;;
+    esac
+}
+
+_putnami() {
+    local -a commands structured_commands global_flags projects project_basenames
+
+    commands=(
+        'D:Alias for deploy'
+        'P:Alias for publish'
+        'b:Alias for build'
+        'build:Compile or transpile project sources into runnable or distributable outputs.'
+        'd:Alias for deploy'
+        'deploy:Converge a cloud environment on the workload'\''s aggregated infra manifest.'
+        'f:Alias for format'
+        'format:Rewrite sources into canonical formatting.'
+        'generate:Run code generators.'
+        'l:Alias for lint'
+        'lint:Check code for style and correctness findings, emitting per-issue diagnostics.'
+        'p:Alias for publish'
+        'package:Assemble distributable artifacts for the project'\''s publish channels.'
+        'publish:Push packaged artifacts to registries.'
+        'run:Execute the project once and exit.'
+        's:Alias for serve'
+        'serve:Run the project'\''s dev server until interrupted.'
+        't:Alias for test'
+        'test:Run the project'\''s tests, emitting test counts and coverage metrics.'
+    )
+
+    structured_commands=(
+        'cache:Manage cache'
+        'change-plan:Emit an immutable impacted CI ChangePlan'
+        'channel:Move a distribution channel and report how far it is served'
+        'ci:Manage source-controlled workspace CI intent'
+        'completion:Generate shell completions (bash, zsh, fish)'
+        'compose:Serve a workload with the workloads it runs with'
+        'config:Manage configuration'
+        'context:Manage AI context'
+        'deps:Manage dependencies'
+        'dev:Author extensions and templates'
+        'doctor:Preflight production readiness under a deployment profile'
+        'extensions:Manage extensions'
+        'help:Show help for a command'
+        'infra:Plan workspace infrastructure'
+        'init:Initialize a new workspace'
+        'install:Install extensions and dependencies'
+        'mcp:Run the MCP server over stdio for AI agent harnesses'
+        'migrate:Migrate Putnami workspace files forward'
+        'pin:Pin the CLI version this workspace uses'
+        'projects:Manage projects'
+        'qualify:Run a workload'\''s derived smoke contract against a target and emit one verdict'
+        'report:Read back a run'\''s report'
+        'scopes:List workspace scopes'
+        'sessions:Inspect execution sessions'
+        'telemetry:Manage anonymous telemetry'
+        'templates:Manage templates'
+        'tree:Identify the worktree the CLI runs in and check evidence against it'
+        'upgrade:Upgrade CLI, extensions, and dependencies'
+        'version:Versions derived from git, release tags, and installed CLI binaries'
+        'workspace:Manage workspace'
+    )
+
+    global_flags=(
+        '--verbose[Show job results and diagnostics]'
+        '--debug[Stream all events in real-time]'
+        '--watch[Re-run on file changes]'
+        '--plan[Show execution plan without running]'
+        '--help[Show help]'
+        '--all[All projects]'
+        '--impacted[Projects affected by git changes]'
+        '--projects[Comma-separated project names]:list:'
+        '--tag[Filter by tags]:tags:'
+        '--exclude-tag[Exclude by tags]:tags:'
+        '--exclude[Exclude by name]:names:'
+        '--baseline[Custom git baseline for --impacted]:branch:'
+        '--impacted-strict[Fail when baseline can'\''t be resolved]'
+        '--where[Execution placement: local | remote (local when no runner provider is installed)]:placement:(local remote)'
+        '--providers[Credentials to ask the credential provider for: install, publish (comma list)]:list:(install publish)'
+        '--credential-fd[Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2]:n:'
+        '--no-cache[Force re-execution (skip cache)]'
+        '--no-cache-projects[Force re-execution of these projects only]:list:'
+        '--cache-trust[Remote cache trust: ci | any | none]:policy:(ci any none)'
+        '--continue-on-error[Don'\''t abort on first failure]'
+        '--max-parallel[Parallelism: auto | eco | max | number]:mode|n:(auto eco max)'
+        '--resource[Budget for a named shared resource (repeatable)]:name=units:'
+        '--cpu-policy[CPU ceiling policy: critical-path | measured]:policy:(critical-path measured)'
+        '--retry[Retry transient failures]:n:'
+        '--retry-failed[Re-run tasks whose identical failure is cached]'
+        '--profile[Deployment profile: dev | test | production]:profile:(dev test production)'
+        '--dry-run[Show changes without applying]'
+        '--output[Output format: text | json | jsonl | cloud-logging]:format:(text json jsonl cloud-logging)'
+        '--json[Shorthand for --output=json]'
+        '--quiet[Suppress non-error output]'
+        '--color[Force color output]'
+        '--no-color[Disable color output]'
+        '--trace-profile[Collect trace events (Chrome trace format)]:path:'
+        '--version[Show version]'
+    )
+
+    _arguments -C \
+        '1:command:->command' \
+        '*::arg:->args'
+
+    case $state in
+        command)
+            _describe -t commands 'job commands' commands
+            _describe -t structured 'structured commands' structured_commands
+            ;;
+        args)
+            local cur="${words[CURRENT]}"
+            local prev="${words[CURRENT-1]}"
+            local path="${words[1]}"
+            local i=2
+            while (( i < CURRENT )); do
+                local word="${words[i]}"
+                if [[ "${word}" == -* ]]; then
+                    break
+                fi
+                local candidate="${path} ${word}"
+                if _putnami_path_known "${candidate}"; then
+                    path="${candidate}"
+                    (( i++ ))
+                else
+                    break
+                fi
+            done
+
+            local -a nested_subcmds
+            _putnami_subcommands_for "${path}"
+            nested_subcmds=("${reply[@]}")
+            if (( ${#nested_subcmds} > 0 )) && [[ "${cur}" != -* ]] && (( i == CURRENT )); then
+                _describe -t subcmds 'subcommand' nested_subcmds
+            else
+                local -a cmd_values
+                case "${path} ${prev}" in
+                    'workspace init --extension')
+                        cmd_values=(
+                            'go:Go'
+                            'py:Python'
+                            'ts:TypeScript'
+                        )
+                        ;;
+                esac
+
+                if (( ${#cmd_values} > 0 )); then
+                    _describe -t values 'value' cmd_values
+                elif [[ "${prev}" == "--projects" ]]; then
+                        _describe -t project-ids 'project ID' project_ids
+                        _describe -t project-names 'project name' projects
+                        _describe -t project-names 'project name' project_basenames
+                    elif [[ "${prev}" == "--exclude" ]]; then
+                        _describe -t project-names 'project name' projects
+                    elif [[ "${prev}" == "--output" ]]; then
+                        compadd text json jsonl cloud-logging
+                    elif [[ "${cur}" == -* ]]; then
+                        local -a cmd_flags
+                        _putnami_flags_for "${path}"
+                        cmd_flags=("${reply[@]}")
+                        _values 'flags' $cmd_flags $global_flags
+                    else
+                        _describe -t project-ids 'project ID' project_ids
+                        _describe -t project-names 'project name' projects
+                        _describe -t project-names 'project name' project_basenames
+                        _values 'flags' $global_flags
+                    fi
+            fi
+            ;;
+    esac
+}
+
+_putnami "$@"

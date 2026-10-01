@@ -1,0 +1,14 @@
+{
+  "protocolVersion": 1,
+  "namespace": "billing",
+  "features": [
+    {
+      "id": "billing/invalid-stage",
+      "type": "feature",
+      "name": "Invalid stage",
+      "outcome": "Pins the closed maturity vocabulary",
+      "owner": "billing",
+      "target": "released"
+    }
+  ]
+}

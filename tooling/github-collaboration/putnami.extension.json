@@ -1,0 +1,446 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/github-collaboration",
+  "cliContract": 4,
+  "runtime": {
+    "executable": "compiled/putnami-github-collaboration",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "internal/**"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    }
+  },
+  "tools": {
+    "github-collaboration.tasks.find": {
+      "description": "Find issues of the bound GitHub repository by text, semantic state and labels, oldest first, one bounded page at a time. Without a query it reads the issue list; with one it reads GitHub's issue search, whose index trails recent writes. States map to labels through settings.states; find does not report parents.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The tasks.find request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "tasks",
+          "version": 1,
+          "operation": "find"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    },
+    "github-collaboration.tasks.get": {
+      "description": "Read one issue of the bound GitHub repository, with its parent issue when it has one. A pull request is not a task.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The tasks.get request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "tasks",
+          "version": 1,
+          "operation": "get"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    },
+    "github-collaboration.tasks.create": {
+      "description": "Open an issue in the bound GitHub repository. The idempotency key is recorded in the issue body as a hidden comment: a repeated key returns the issue it opened, the same key with other content is a conflict, and a create whose outcome is unknown is read back and answered unresolved rather than opened twice. Only an issue the credential's account opened answers for a key; two concurrent calls with one key are not detected.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The tasks.create request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "mutating",
+          "readOnly": false,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "tasks",
+          "version": 1,
+          "operation": "create"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    },
+    "github-collaboration.tasks.update": {
+      "description": "Change an issue's title, body or labels. Labels replace the task's labels; state labels change only through transition. expectedRevision is compared with the issue read just before the write: GitHub has no conditional issue write, so a writer between the two is not detected.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The tasks.update request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "mutating",
+          "readOnly": false,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "tasks",
+          "version": 1,
+          "operation": "update",
+          "preconditions": "checked"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    },
+    "github-collaboration.tasks.transition": {
+      "description": "Move an issue to a semantic state: open states by the labels settings.states names, done and canceled by closing it as completed or not planned. A state without a configured label is unsupported. expectedRevision is compared with the issue read just before the write.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The tasks.transition request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "mutating",
+          "readOnly": false,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "tasks",
+          "version": 1,
+          "operation": "transition",
+          "preconditions": "checked"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    },
+    "github-collaboration.tasks.assign": {
+      "description": "Replace an issue's assignees; @me names the credential's account. GitHub drops a login it cannot assign, and the answer lists the actual assignees. An assignee is information, never an exclusive claim: this provider offers no claim.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The tasks.assign request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "mutating",
+          "readOnly": false,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "tasks",
+          "version": 1,
+          "operation": "assign",
+          "preconditions": "checked"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    },
+    "github-collaboration.tasks.link": {
+      "description": "Set or remove an issue's parent through GitHub sub-issues. The parent must be an issue of the same repository. The parent is outside the issue's revision: link leaves the revision as it is, so an expectedRevision does not detect a concurrent link.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The tasks.link request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "mutating",
+          "readOnly": false,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "tasks",
+          "version": 1,
+          "operation": "link"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    },
+    "github-collaboration.proposals.find": {
+      "description": "Find the pull requests of an exact base and head in the bound GitHub repository; head is a branch of the repository or owner:branch of a fork.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The proposals.find request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "proposals",
+          "version": 1,
+          "operation": "find"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    },
+    "github-collaboration.proposals.upsert": {
+      "description": "Update the open pull request of an exact base and head, or open it. GitHub keeps one open pull request per base and head, so a repeated or concurrent upsert never opens a second. A requested headCommit must be the commit the head points at. expectedRevision is compared with the pull request read just before the write. settings.assignAuthor and settings.inheritLabelPrefixes add the account's assignment and the closed issues' labels, and the answer lists the pull request's assignees and labels.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The proposals.upsert request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "mutating",
+          "readOnly": false,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "proposals",
+          "version": 1,
+          "operation": "upsert",
+          "preconditions": "checked"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    },
+    "github-collaboration.proposals.status": {
+      "description": "Read a pull request, the GitHub check runs and commit statuses of its head commit, and its submitted reviews.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The proposals.status request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "proposals",
+          "version": 1,
+          "operation": "status"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    },
+    "github-collaboration.proposals.review": {
+      "description": "Submit a review of a pull request. The idempotency key is recorded in the review body as a hidden comment: a repeated key returns the review it published, and a review whose outcome is unknown is read back and answered unresolved rather than published twice. Only a review the credential's account submitted answers for a key. GitHub refuses an approval or a change request by the pull request's author.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The proposals.review request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "mutating",
+          "readOnly": false,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "proposals",
+          "version": 1,
+          "operation": "review"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    },
+    "github-collaboration.proposals.merge": {
+      "description": "Merge a pull request whose head is still the expected commit. Refused before anything is sent unless settings.allowMerge is true; binding this provider authorizes nobody to merge.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The proposals.merge request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "mutating",
+          "readOnly": false,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "proposals",
+          "version": 1,
+          "operation": "merge"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    }
+  }
+}

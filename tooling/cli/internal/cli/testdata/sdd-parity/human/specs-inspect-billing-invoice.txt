@@ -1,0 +1,15 @@
+exit 0
+--- stdout ---
+
+  Feature billing/invoice
+  Revision: worktree @ git:7c5122267ea7854954d543e1eda0a15c7cc56b08
+  Declared: Invoice export · billing/putnami.features.json
+    outcome: Customers export issued invoices
+    owner: billing
+  Spec: billing/specs/billing.invoice.json (@acme/billing)
+  Outcomes:
+    Customers export issued invoices
+  Requirements:
+    none authored yet
+
+--- stderr ---

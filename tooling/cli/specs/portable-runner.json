@@ -1,0 +1,45 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/portable-runner",
+  "outcomes": [
+    "Placement is explicit without making a runner provider mandatory",
+    "Source snapshots identify and retain working-tree bytes independently of HEAD",
+    "A present provider executes the exact bound request in isolation and returns the canonical session"
+  ],
+  "nonGoals": [
+    "A Cloud adapter, trusted cache reuse, change association and CI migration; submodule capture and provider-side blob authorization or retention",
+    "Replacing the existing engine, task cache keys, ChangePlan v1 or SessionTree fingerprint",
+    "Shipping a scheduler, source upload service or a second planner in any provider"
+  ],
+  "requirements": [
+    {
+      "id": "optional-placement",
+      "text": "Omitted placement and --where local execute through the ordinary local engine without resolving execution providers. --where remote with no runner-provider executes through that same engine once, preserving flags, required task extension checks, task outcomes and one canonical session. A recorded session states requested and actual placement. Ambiguous providers fail before task execution; absence alone permits fallback."
+    },
+    {
+      "id": "immutable-source",
+      "text": "Private source capture preserves tracked and non-ignored new worktree bytes, including unstaged/binary contents, deletions, executable modes and safe relative symlinks. Full scans and Git/index checks reject observed races. Materialization validates the bounded canonical manifest and every blob before returning an isolated directory. Source identity excludes HEAD and does not replace the tree fingerprint. Unsupported submodules, sparse and unmerged indexes fail explicitly."
+    },
+    {
+      "id": "portable-request",
+      "text": "After the final plan and preflight, a remote run becomes the strict versioned request: typed parameters, effective flags, frozen selection with its baseline commit, the expected plan through the ChangePlan projection, pinned engine, extensions, toolchains and platform. Watch, serve, run, format, dry-run and side-effect tasks are refused before submission. An unready provider is an error, never a local run. The executing engine plans the frozen selection and refuses a graph differing from the expected plan."
+    },
+    {
+      "id": "durable-lifecycle",
+      "text": "A submission is recorded before it is sent and its key is looked up before any submit, so a lost acknowledgement, a duplicate submit or a CLI restart never creates a second attempt; a settled one run again is new. Follow persists an ordered cursor; a disconnect replays from it without duplicates. An interrupt cancels within bounded time and terminates the process tree; a cancel racing a completion keeps the provider's outcome. Expired or corrupt evidence never rewrites the verdict or reruns work."
+    },
+    {
+      "id": "input-admission",
+      "text": "A remote request binds every git-ignored file a planned task declares as an input into the snapshot, flagged bound, so the source digest moves with it; paths under .gen, node_modules, .putnami or a declared output are never bound. A task declaring no file input keys on its whole tree: nothing it selects is bound and the ignored files are reported. An env-keyed cacheable task is refused before submission, naming task and variables. The executing engine refuses a divergent bound set."
+    },
+    {
+      "id": "isolated-execution",
+      "text": "With a compatible provider, the captured bytes execute in an isolated directory through the snapshot's pinned entrypoint; later edits never reach execution. Output is forwarded unchanged; the session bundle is validated and imported atomically with nested sessions and parent links, a repeat import is safe and a different record under the same id is refused. The local exit code follows the remote gate, a failing task keeps its message, and a completed attempt without a session never reads as success."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0032-portable-runner-foundation.md",
+    "tooling/cli/doc/adr/0037-ignored-input-admission.md"
+  ]
+}

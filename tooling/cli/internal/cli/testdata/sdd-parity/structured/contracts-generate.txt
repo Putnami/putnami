@@ -1,0 +1,19 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "contracts generate",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "artifacts": [
+      "schema/contracts.json",
+      "schema/contracts.gen.go",
+      "schema/contracts.schema.json",
+      "schema/contracts.md"
+    ],
+    "manifest": "go.putnami.dev/acme/billing",
+    "project": "/billing"
+  }
+}
+--- stderr ---

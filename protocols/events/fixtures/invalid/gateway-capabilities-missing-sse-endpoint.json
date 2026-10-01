@@ -1,0 +1,11 @@
+{
+  "protocol": "putnami.events.v1",
+  "transports": ["sse"],
+  "features": {
+    "replay": false,
+    "publish": false,
+    "ack": false,
+    "payload": ["json"]
+  },
+  "endpoints": {}
+}

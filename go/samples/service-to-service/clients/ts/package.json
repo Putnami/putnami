@@ -1,0 +1,13 @@
+{
+  "name": "@example/go-items-client",
+  "version": "0.0.1",
+  "description": "Generated API client for @example/go-items-client",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@putnami/client": "workspace:*"
+  },
+  "private": false
+}

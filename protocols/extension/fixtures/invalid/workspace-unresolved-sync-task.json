@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/workspace-unresolved-sync-task",
+  "workspace": {
+    "markers": ["package.json"],
+    "inputs": ["package.json"],
+    "syncTask": "workspace-sync"
+  },
+  "commands": {
+    "build": { "run": [{ "id": "build", "task": "build-exec" }] }
+  },
+  "tasks": {
+    "build-exec": { "kind": "command", "command": "echo" }
+  }
+}

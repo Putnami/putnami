@@ -1,0 +1,35 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "build": {
+      "run": [{ "id": "generate", "task": "build-generate" }]
+    }
+  },
+  "tasks": {
+    "build-generate": {
+      "kind": "command",
+      "command": "echo",
+      "outputs": {
+        "clientOutput": {
+          "description": "Project-relative directory of the generated client"
+        }
+      },
+      "declares": {
+        "outputs": {
+          "file": {
+            "kind": "file",
+            "path": "dist/app.js",
+            "excludes": ["dist/app.js/inner"],
+            "description": "A file has no subpath to cede, whatever the entry names."
+          },
+          "port": {
+            "kind": "directory",
+            "pathFrom": "clientOutput",
+            "excludes": ["clients/go/vendor"],
+            "description": "A runtime-reported path leaves 'strictly inside path' undecidable from the manifest."
+          }
+        }
+      }
+    }
+  }
+}

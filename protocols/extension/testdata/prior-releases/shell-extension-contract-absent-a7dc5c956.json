@@ -1,0 +1,62 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/shell-extension",
+  "commands": {
+    "build": {
+      "flags": {
+        "target": {
+          "type": "string",
+          "default": "release",
+          "description": "Build target",
+          "choices": ["debug", "release"]
+        },
+        "clean": {
+          "type": "boolean",
+          "default": false,
+          "description": "Clean before building"
+        }
+      },
+      "run": [{ "id": "build", "task": "build-exec", "dependsOn": ["^build"] }]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "flags": {
+        "test-verbose": {
+          "type": "boolean",
+          "default": false,
+          "description": "Verbose test output",
+          "short": "-l"
+        },
+        "filter": {
+          "type": "string",
+          "description": "Filter tests by name"
+        }
+      },
+      "run": [{ "id": "test", "task": "test-exec" }]
+    }
+  },
+  "tasks": {
+    "build-exec": {
+      "kind": "command",
+      "command": "{extensionRoot}/bin/build",
+      "cwd": "{projectRoot}",
+      "cache": {
+        "enabled": true,
+        "key": {
+          "files": ["**/*.c", "**/*.h", "Makefile"]
+        }
+      }
+    },
+    "test-exec": {
+      "kind": "command",
+      "command": "{extensionRoot}/bin/test",
+      "cwd": "{projectRoot}",
+      "cache": {
+        "enabled": true,
+        "key": {
+          "files": ["**/*.c", "**/*.h", "Makefile"]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "<%= projectName %>",
+  "type": "library",
+  "extensions": [
+    "@putnami/python"
+  ]
+}

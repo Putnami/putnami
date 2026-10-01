@@ -1,0 +1,56 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/collaboration-providers",
+  "outcomes": [
+    "A workspace chooses its task, change-proposal and memory providers independently, in one place, and changing one never changes another",
+    "An agent and a script call the same operation with the same request and read the same envelope, whether through MCP or the command line",
+    "A contract nobody bound, a capability the provider lacks, and a precondition it cannot enforce are refused before anything runs, never reported as done",
+    "A write whose outcome is unknown is reported as unresolved with the read that reconciles it, so nobody retries it blindly",
+    "Credentials stay with the provider: no binding, request, envelope or log carries one"
+  ],
+  "nonGoals": [
+    "Choosing a provider when the workspace binds none, or substituting another backend when the bound one fails",
+    "Retrying a provider call on the caller's behalf",
+    "Promising atomicity, exclusivity or merge support a provider does not enforce",
+    "Implementing a hosted backend: providers are extensions, and the local one records tasks and proposals without hosted checks or merge",
+    "Authorizing merges, deployments or any mutation the caller is not already allowed to make"
+  ],
+  "requirements": [
+    {
+      "id": "explicit-binding",
+      "text": "A workspace binds each contract in options.collaboration of putnami.workspace.json and nowhere else: one provider extension and one version. An unbound contract is unsupported (binding.missing), naming the block to add and the installed providers, none selected. A block that repeats a member is refused as binding.ambiguous. A provider that is absent, disabled or unprepared at its locked release is unavailable (binding.provider_missing) on CLI and MCP. No binding failure is retryable or starts the provider."
+    },
+    {
+      "id": "capability-discovery",
+      "text": "capabilities reports, without running the provider, the binding status, the provider, and every operation of the bound version with required, supported, preconditions and description. A binding to an unspoken version, or to a provider that lacks a required or binding-required operation or declares against the contract, is invalid. An optional operation the provider lacks is unsupported, and expectedRevision or mustNotExist sent to a provider declaring preconditions none is unsupported, never dropped."
+    },
+    {
+      "id": "one-route-two-entry-paths",
+      "text": "putnami <contract> <operation> --input and the MCP tool <contract>.<operation> share one route: the request is validated and normalized, then sent through the extension tool transport to the one tool the bound provider declares, with the binding settings and, for selection operations, the resolved selection. Both print the same envelope; the command exits 0 only for ok. Provider tools never appear under their own names, and a workspace that binds nothing reserves no name."
+    },
+    {
+      "id": "truthful-annotations",
+      "text": "Every routed MCP tool carries readOnlyHint true exactly for a read operation, destructiveHint true for an operation that may modify existing state, and contract metadata whose access agrees. A provider tool whose annotations or access disagree with its operation withdraws the whole contract version from the provider."
+    },
+    {
+      "id": "bounded-pages",
+      "text": "Every list operation returns a page of at most the requested size, 20 when the request names none and never more than 100, with an empty list rather than null and an opaque next cursor that is absent on the last page. A provider answer above the requested size is refused, and one above the 4 MiB document bound is refused with advice to ask for a smaller page.size. A page that would exceed that bound holds fewer items, with a next cursor, and a request may change its size between the pages of one traversal."
+    },
+    {
+      "id": "exact-identity",
+      "text": "A result must be about exactly what the request named: the same task, proposal or mission reference, the same repository, base and head for a proposal, the requested state after a transition. A read that answers for something else is unavailable with reason provider.identity_mismatch; a mutation that does is unresolved."
+    },
+    {
+      "id": "uncertain-writes-are-unresolved",
+      "text": "A read whose provider times out or is canceled is unavailable and retryable. A mutation whose provider process started and then timed out, was canceled, exited unsuccessfully or wrote no valid response is unresolved, never retryable, and names the read that reconciles it as <contract>.<operation> of the same contract. A provider that answers a failure keeps its outcome; a read may not answer conflict or unresolved."
+    },
+    {
+      "id": "no-credential-leakage",
+      "text": "Provider standard error never reaches an envelope. Every credential-named environment value the provider inherits, and every URL userinfo, is redacted from every envelope message and result by decoded value, whatever the JSON spelling; a result whose secret cannot be removed in place is withheld. A binding whose settings carry a credential-named member, or a URL value with a password or any http(s) user, is invalid, and capability discovery never echoes it."
+    }
+  ],
+  "decisions": [
+    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md"
+  ]
+}

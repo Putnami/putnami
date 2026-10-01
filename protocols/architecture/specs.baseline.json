@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "architecture/executable-contracts#contained-read-only-tooling",
+    "architecture/executable-contracts#coverage",
+    "architecture/executable-contracts#distributed-authority",
+    "architecture/executable-contracts#exact-drift",
+    "architecture/executable-contracts#framework-evidence",
+    "architecture/executable-contracts#planned-is-not-observed",
+    "architecture/executable-contracts#ratchet",
+    "architecture/executable-contracts#runtime-enforcement",
+    "architecture/executable-contracts#single-interpretation"
+  ]
+}

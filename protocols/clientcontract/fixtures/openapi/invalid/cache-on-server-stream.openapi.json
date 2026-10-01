@@ -1,0 +1,31 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "invalid", "version": "1" },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": { "id": "invalid", "audience": "urn:invalid" },
+    "credentials": {}
+  },
+  "paths": {
+    "/events": {
+      "get": {
+        "operationId": "watchEvents",
+        "responses": {
+          "200": {
+            "description": "Event stream",
+            "content": { "text/event-stream": { "schema": { "type": "string" } } }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "server",
+          "messages": { "output": { "type": "string" } },
+          "transports": [{ "protocol": "sse", "path": "/events", "encoding": "json" }],
+          "security": { "alternatives": [{ "allOf": [] }] },
+          "errors": [],
+          "idempotency": { "kind": "safe" },
+          "resilience": { "cache": { "freshMs": 5000 } }
+        }
+      }
+    }
+  }
+}

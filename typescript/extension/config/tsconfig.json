@@ -1,0 +1,26 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "module": "esnext",
+    "sourceMap": true,
+    "jsx": "react-jsx",
+    "declaration": true,
+    "moduleResolution": "bundler",
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "esnext",
+    "lib": ["ESNext", "DOM"],
+    "types": ["bun"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["**/*.tsx", "**/*.ts", "**/*.jsx", "**/*.js"],
+  "exclude": ["node_modules", "tmp", "dist"]
+}

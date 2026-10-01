@@ -1,0 +1,10 @@
+{
+  "contract": "tasks",
+  "version": 1,
+  "operation": "create",
+  "outcome": "unresolved",
+  "error": {
+    "message": "lost response",
+    "retryable": true
+  }
+}

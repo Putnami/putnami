@@ -1,0 +1,37 @@
+{
+  "proposal": {
+    "ref": {
+      "source": "local:3f9a0c1d",
+      "id": "P-1"
+    },
+    "revision": "r1",
+    "change": {
+      "repository": "local",
+      "base": "main",
+      "head": "fix-issue-42",
+      "headCommit": "55e2a8e42"
+    },
+    "title": "feat(cli): route collaboration contracts",
+    "body": "Implements the provider contracts.",
+    "state": "open",
+    "labels": [],
+    "assignees": [],
+    "updatedAt": "2026-09-24T08:05:00Z"
+  },
+  "checks": {
+    "state": "unsupported",
+    "detail": "the local provider runs no hosted checks"
+  },
+  "reviews": [
+    {
+      "ref": {
+        "source": "local:3f9a0c1d",
+        "id": "R-1"
+      },
+      "verdict": "approve",
+      "commit": "55e2a8e42",
+      "author": "agent-2",
+      "submittedAt": "2026-09-24T08:20:00Z"
+    }
+  ]
+}

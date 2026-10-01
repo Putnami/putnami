@@ -1,0 +1,51 @@
+exit 2
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "architecture inspect",
+  "status": "failure",
+  "exitCode": 2,
+  "data": {
+    "requested": "absent",
+    "inbound": [],
+    "outbound": [],
+    "observed": [],
+    "findings": [],
+    "coverage": {
+      "projectDependencies": "enforced-for-mapped-projects",
+      "database": "not-detected",
+      "http": "not-detected",
+      "events": "not-detected",
+      "domainAccess": "not-detected"
+    },
+    "ratchet": {
+      "new": 0,
+      "knownDebt": 0,
+      "waived": 0,
+      "staleBaseline": 0,
+      "staleWaiver": 0,
+      "baselineGrowth": 0,
+      "expiredWaiver": 0
+    },
+    "baseline": {
+      "requested": "main",
+      "commit": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08",
+      "compared": true,
+      "priorFile": true
+    },
+    "diagnostics": [
+      {
+        "severity": "error",
+        "code": "architecture.unknown_domain",
+        "message": "domain \"absent\" is not declared; use an exact manifest domain ID",
+        "field": "domain"
+      }
+    ]
+  },
+  "error": {
+    "code": "usage",
+    "message": "architecture domain \"absent\" was not found"
+  }
+}
+--- stderr ---
+putnami: architecture domain "absent" was not found

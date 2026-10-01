@@ -1,0 +1,18 @@
+{
+  "appName": "task-api",
+  "version": "1.0.0",
+  "schemaHash": "sha256:0123456789abcdef",
+  "configs": [
+    {
+      "path": "server",
+      "fields": [
+        {
+          "name": "lookup",
+          "type": "map",
+          "keys": "object",
+          "values": { "name": "", "type": "string" }
+        }
+      ]
+    }
+  ]
+}

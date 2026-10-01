@@ -1,0 +1,31 @@
+{
+  "name": "@putnami/storage",
+  "version": "0.0.0",
+  "description": "Object storage integration with pluggable backends (S3, local filesystem, in-memory), bucket declarations, and presigned URLs",
+  "keywords": [
+    "storage",
+    "s3",
+    "object-storage",
+    "file-storage"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/storage"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@putnami/application": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/utils": "workspace:*"
+  },
+  "private": false
+}

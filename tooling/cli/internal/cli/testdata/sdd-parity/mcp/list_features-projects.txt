@@ -1,0 +1,48 @@
+isError false
+--- block 0 ---
+{
+  "compatibility": "provisional",
+  "revision": {
+    "kind": "worktree",
+    "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08"
+  },
+  "selection": {
+    "mode": "projects",
+    "scoped": true,
+    "projects": [
+      "/billing"
+    ],
+    "features": 1,
+    "specs": 0,
+    "externalRecords": []
+  },
+  "graphs": 0,
+  "manifests": 1,
+  "features": [
+    {
+      "id": "billing/invoice",
+      "name": "Invoice export",
+      "outcome": "Customers export issued invoices",
+      "owner": "billing",
+      "projects": [
+        "@acme/billing"
+      ],
+      "declarations": [
+        {
+          "kind": "manifest",
+          "source": "billing/putnami.features.json",
+          "project": "@acme/billing",
+          "name": "Invoice export",
+          "outcome": "Customers export issued invoices",
+          "owner": "billing",
+          "type": "feature",
+          "target": "modeled",
+          "provenance": {
+            "path": "billing/putnami.features.json",
+            "symbol": "features[0]"
+          }
+        }
+      ]
+    }
+  ]
+}

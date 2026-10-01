@@ -1,0 +1,1 @@
+{ "protocolVersion": 1, "urlTemplate": "https://storage.googleapis.com/putnami-cache/ws/cas/sha256/{digest}", "method": "PUT", "headers": { "Authorization": "Bearer scoped-token", "x-goog-if-generation-match": "0", "Content-Type": "application/octet-stream" }, "conditionalExistsStatus": 412 }

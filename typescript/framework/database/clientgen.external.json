@@ -1,0 +1,26 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "Google Compute Engine metadata server v1 (cloud.google.com/compute/docs/metadata/overview)",
+      "adapter": "typescript/framework/database/src/postgres/gcp.utils.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/database/src/postgres/gcp.utils.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "184cc27a96bf1c09bcb102a4137044ee2e6c23111ff9a17cdf8eef5314f0bab9"
+        },
+        {
+          "path": "typescript/framework/database/src/postgres/gcp.utils.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "79c1ff3351286764c8ec123ca9118fe2f617ef4088bbb2510959136ebf8c6ba2"
+        }
+      ],
+      "owner": "@putnami/database",
+      "tests": ["typescript/framework/database/test/binding.test.ts"],
+      "reason": "Reads the workload service-account token and email used as the Cloud SQL IAM password."
+    }
+  ]
+}

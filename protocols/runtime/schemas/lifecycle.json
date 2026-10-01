@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/protocol/runtime/lifecycle.json",
+  "title": "Putnami Lifecycle Phases",
+  "description": "Defines the standard lifecycle phases that extensions implement as commands. Phases execute in dependency order and can be composed into pipelines.",
+  "type": "object",
+  "$defs": {
+    "LifecyclePhase": {
+      "type": "string",
+      "enum": [
+        "generate",
+        "build",
+        "test",
+        "lint",
+        "format",
+        "serve",
+        "run",
+        "publish",
+        "package"
+      ],
+      "description": "Standard lifecycle phase name."
+    },
+    "LifecyclePhaseDescriptor": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/LifecyclePhase"
+        },
+        "description": {
+          "type": "string"
+        },
+        "workloadTypes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Workload types this phase applies to."
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LifecyclePhase" },
+          "description": "Phases that must complete before this phase runs."
+        }
+      }
+    },
+    "Phases": {
+      "type": "array",
+      "description": "The ordered list of standard lifecycle phases with their metadata.",
+      "items": {
+        "$ref": "#/$defs/LifecyclePhaseDescriptor"
+      },
+      "default": [
+        {
+          "name": "generate",
+          "description": "Code generation from schemas, protobuf, OpenAPI, or other sources. Produces source files that subsequent phases consume.",
+          "workloadTypes": ["service", "worker", "job", "command"],
+          "dependsOn": []
+        },
+        {
+          "name": "build",
+          "description": "Compile, transpile, and bundle source code into executable artifacts. Includes type checking for statically typed languages.",
+          "workloadTypes": ["service", "worker", "job", "command"],
+          "dependsOn": ["generate"]
+        },
+        {
+          "name": "test",
+          "description": "Execute test suites and report results as diagnostics. Produces coverage metrics and test reports.",
+          "workloadTypes": ["service", "worker", "job", "command"],
+          "dependsOn": ["build"]
+        },
+        {
+          "name": "lint",
+          "description": "Static analysis, formatting checks, and code style enforcement. Produces diagnostics for violations.",
+          "workloadTypes": ["service", "worker", "job", "command"],
+          "dependsOn": []
+        },
+        {
+          "name": "format",
+          "description": "Auto-format source code according to project conventions. Modifies files in place.",
+          "workloadTypes": ["service", "worker", "job", "command"],
+          "dependsOn": []
+        },
+        {
+          "name": "serve",
+          "description": "Start the workload in development mode with file watching and hot reload. Only meaningful for service and worker workloads.",
+          "workloadTypes": ["service", "worker"],
+          "dependsOn": ["build"]
+        },
+        {
+          "name": "run",
+          "description": "Build the workload for the host, run it once with environment passthrough, and forward the child process exit code. Used for local validation of one-shot Jobs (migrations, batch workloads) and short-lived commands.",
+          "workloadTypes": ["service", "worker", "job", "command"],
+          "dependsOn": ["build"]
+        },
+        {
+          "name": "publish",
+          "description": "Publish packages to a registry (npm, Go modules, PyPI, container registry).",
+          "workloadTypes": ["service", "worker", "job", "command"],
+          "dependsOn": ["build", "test", "lint"]
+        },
+        {
+          "name": "package",
+          "description": "Create distributable packages (tarballs, container images, binaries) without publishing.",
+          "workloadTypes": ["service", "worker", "job", "command"],
+          "dependsOn": ["build"]
+        }
+      ]
+    },
+    "HookPoint": {
+      "type": "string",
+      "enum": [
+        "preBuild",
+        "postBuild",
+        "preTest",
+        "postTest",
+        "preLint",
+        "postLint",
+        "preServe",
+        "prePublish",
+        "postPublish"
+      ],
+      "description": "Named point in the lifecycle where extensions can inject custom logic."
+    },
+    "HookDefinition": {
+      "type": "object",
+      "description": "A hook that runs at a specific lifecycle point.",
+      "required": ["kind", "command"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "command",
+          "description": "Hook execution kind. Currently only 'command' is supported."
+        },
+        "command": {
+          "type": "string",
+          "description": "Command to execute."
+        },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Command arguments."
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Working directory for the hook command."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Environment variables for the hook."
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum execution time in milliseconds."
+        },
+        "cache": {
+          "type": "object",
+          "description": "Incremental build cache configuration.",
+          "properties": {
+            "inputs": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "File patterns that affect cache validity."
+            },
+            "outputs": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "File patterns produced by the hook."
+            }
+          }
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Other hooks that must run first."
+        }
+      }
+    }
+  }
+}

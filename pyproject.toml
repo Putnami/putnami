@@ -1,0 +1,15 @@
+[project]
+name = "putnami-workspace"
+version = "0.0.1"
+description = "Putnami monorepo workspace"
+requires-python = ">=3.11"
+
+[tool.uv.workspace]
+members = ["python/samples/application", "python/samples/library"]
+
+[tool.uv]
+
+
+[tool.uv.sources]
+py_example_application = { workspace = true }
+py_example_library = { workspace = true }

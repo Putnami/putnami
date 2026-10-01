@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+output=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --output)
+      [ "$#" -ge 2 ] || { printf '%s\n' "prepare: --output requires a value" >&2; exit 2; }
+      output="$2"
+      shift 2
+      ;;
+    *)
+      printf 'prepare: unknown argument %s\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+[ -n "$output" ] || { printf '%s\n' "prepare: --output is required" >&2; exit 2; }
+go_binary=""
+if [ -n "${GOROOT:-}" ] && [ -x "$GOROOT/bin/go" ]; then
+  go_binary="$GOROOT/bin/go"
+elif command -v go >/dev/null 2>&1; then
+  go_binary="$(command -v go)"
+else
+  printf '%s\n' 'prepare: Go compiler not found; checked $GOROOT/bin/go and PATH' >&2
+  exit 1
+fi
+mkdir -p "$output/compiled"
+tmp="$output/compiled/putnami-github-collaboration.tmp.$$"
+trap 'rm -f "$tmp"' EXIT INT TERM
+(
+  export GOENV=off
+  export GOFLAGS="-mod=mod -buildvcs=false -trimpath"
+  export GO111MODULE=on
+  export GOWORK=off
+  export GOTOOLCHAIN=local
+  export CGO_ENABLED=0
+
+  # Preserve intentional cache, proxy, and toolchain locations while removing
+  # ambient controls that can change the compiled artifact.
+  unset GOOS GOARCH
+  unset GO386 GOAMD64 GOARM GOARM64 GOMIPS GOMIPS64 GOPPC64 GORISCV64 GOWASM
+  unset GOEXPERIMENT GOFIPS140 GODEBUG GO_EXTLINK_ENABLED GO_LDSO
+
+  "$go_binary" build -o "$tmp" ./cmd/putnami-github-collaboration
+)
+chmod +x "$tmp"
+mv "$tmp" "$output/compiled/putnami-github-collaboration"
+trap - EXIT INT TERM

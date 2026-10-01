@@ -1,0 +1,272 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities-v2.json",
+  "protocolVersion": 2,
+  "project": "@example/14-capabilities",
+  "configDefinitions": [
+    {
+      "identity": {
+        "ownerProject": "@example/14-capabilities",
+        "kind": "config",
+        "key": "database.default"
+      },
+      "path": "database.default",
+      "fields": [
+        {
+          "name": "url",
+          "type": "string"
+        },
+        {
+          "name": "password",
+          "type": "string",
+          "sensitive": true
+        }
+      ],
+      "provenance": {
+        "project": "@example/14-capabilities",
+        "package": "@example/14-capabilities",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "discoverers": [
+    {
+      "identity": {
+        "ownerProject": "@example/14-capabilities",
+        "kind": "discoverer",
+        "subkind": "config",
+        "key": "database.default"
+      },
+      "name": "database.default",
+      "kind": "config",
+      "provenance": {
+        "project": "@example/14-capabilities",
+        "package": "@example/14-capabilities",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/14-capabilities",
+        "kind": "discoverer",
+        "subkind": "source",
+        "key": "sql:iam"
+      },
+      "name": "sql:iam",
+      "kind": "source",
+      "provenance": {
+        "project": "@example/14-capabilities",
+        "package": "@example/14-capabilities",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "migrations": [
+    {
+      "identity": {
+        "ownerProject": "@example/14-capabilities",
+        "kind": "migration",
+        "subkind": "sql",
+        "key": "iam"
+      },
+      "name": "iam",
+      "kind": "sql",
+      "datasource": "default",
+      "provenance": {
+        "project": "@example/14-capabilities",
+        "package": "@example/14-capabilities",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "infraRequirements": [
+    {
+      "identity": {
+        "ownerProject": "@example/14-capabilities",
+        "kind": "infra",
+        "subkind": "database",
+        "key": "default"
+      },
+      "name": "default",
+      "kind": "database",
+      "provenance": {
+        "project": "@example/14-capabilities",
+        "package": "@example/14-capabilities",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/infra/migration.json"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/14-capabilities",
+        "kind": "infra",
+        "subkind": "secret",
+        "key": "database.default.password"
+      },
+      "name": "database.default.password",
+      "kind": "secret",
+      "provenance": {
+        "project": "@example/14-capabilities",
+        "package": "@example/14-capabilities",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/infra/secrets.json"
+          }
+        ]
+      }
+    }
+  ],
+  "healthContributors": [
+    {
+      "identity": {
+        "ownerProject": "@example/14-capabilities",
+        "kind": "health",
+        "subkind": "health",
+        "key": "diskSpace"
+      },
+      "name": "diskSpace",
+      "probe": "health",
+      "provenance": {
+        "project": "@example/14-capabilities",
+        "package": "@example/14-capabilities",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/14-capabilities",
+        "kind": "health",
+        "subkind": "readiness",
+        "key": "primaryDatabase"
+      },
+      "name": "primaryDatabase",
+      "probe": "readiness",
+      "provenance": {
+        "project": "@example/14-capabilities",
+        "package": "@example/14-capabilities",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "lifecycleHooks": [
+    {
+      "identity": {
+        "ownerProject": "@example/14-capabilities",
+        "kind": "lifecycle",
+        "subkind": "starter",
+        "key": "connectionPool"
+      },
+      "name": "connectionPool",
+      "phase": "starter",
+      "provenance": {
+        "project": "@example/14-capabilities",
+        "package": "@example/14-capabilities",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/14-capabilities",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "connectionPool"
+      },
+      "name": "connectionPool",
+      "phase": "stopper",
+      "provenance": {
+        "project": "@example/14-capabilities",
+        "package": "@example/14-capabilities",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "packages": [
+    {
+      "identity": {
+        "ownerProject": "@example/14-capabilities",
+        "kind": "package",
+        "key": "@example/14-capabilities"
+      },
+      "package": "@example/14-capabilities",
+      "provenance": {
+        "project": "@example/14-capabilities",
+        "package": "@example/14-capabilities",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "requiredCapabilities": [
+    {
+      "identity": {
+        "ownerProject": "@example/14-capabilities",
+        "kind": "requiredCapability",
+        "key": "sql"
+      },
+      "name": "sql",
+      "requires": [
+        "datasource",
+        "migration",
+        "readiness"
+      ],
+      "provenance": {
+        "project": "@example/14-capabilities",
+        "package": "@example/14-capabilities",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ]
+}

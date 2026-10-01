@@ -1,0 +1,197 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/memory-store",
+  "cliContract": 4,
+  "runtime": {
+    "executable": "compiled/putnami-memory-store",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "internal/**"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    }
+  },
+  "tools": {
+    "memory-store.memory.context": {
+      "description": "Load the memory records relevant to an identity, kinds and the resolved project selection: each record's identity, kind and scope decide, never where the backend keeps it. One bounded page in kind-then-id order; freshness says when each record changed and when it was read. The binding's settings choose the backend: a store directory (file) or a branch of a Git repository (git). Only the git backend with a remote reaches the network.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The memory.context request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "memory",
+          "version": 1,
+          "operation": "context"
+        }
+      },
+      "workspaceSelection": true,
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 180000
+    },
+    "memory-store.memory.mission": {
+      "description": "Read one mission's checkpointed record with its revision, provenance and freshness. The binding's settings choose the backend: a store directory (file) or a branch of a Git repository (git). Only the git backend with a remote reaches the network.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The memory.mission request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "memory",
+          "version": 1,
+          "operation": "mission"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 180000
+    },
+    "memory-store.memory.checkpoint": {
+      "description": "Save a mission checkpoint against its expected revision, or create the mission with mustNotExist. The comparison and the write are one step (under the store lock for file, a conditional ref update or a leased push for git), so of two writers at one revision exactly one lands and the other gets a conflict. A repeated idempotency key replays the write it produced. A push whose outcome is unknown is reconciled by reading the branch again; when that fails the checkpoint is unresolved. Evidence entries are references: this provider never records that anything passed. The binding's settings choose the backend: a store directory (file) or a branch of a Git repository (git). Only the git backend with a remote reaches the network.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The memory.checkpoint request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "mutating",
+          "readOnly": false,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "memory",
+          "version": 1,
+          "operation": "checkpoint",
+          "preconditions": "atomic"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 180000
+    },
+    "memory-store.memory.search": {
+      "description": "Find memory records whose title or content contains the query, ignoring case, under the same selection as context. One bounded page in kind-then-id order; no index is kept. The binding's settings choose the backend: a store directory (file) or a branch of a Git repository (git). Only the git backend with a remote reaches the network.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The memory.search request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "memory",
+          "version": 1,
+          "operation": "search"
+        }
+      },
+      "workspaceSelection": true,
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 180000
+    }
+  }
+}

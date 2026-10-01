@@ -1,0 +1,8 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "line": {},
+  "includes": [
+    "putnami.dev",
+    "telemetry.putnami.dev"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "protocolVersion": 1,
+  "namespace": "billing",
+  "features": [
+    {
+      "id": "billing/invalid",
+      "type": "feature",
+      "name": "Invalid",
+      "outcome": "Pins modeled requirement rejection",
+      "owner": "billing",
+      "target": "modeled",
+      "requirements": [
+        { "id": "declaration", "stage": "modeled", "evidenceKinds": ["attestation"] }
+      ]
+    }
+  ]
+}

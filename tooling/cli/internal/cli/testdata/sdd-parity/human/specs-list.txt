@@ -1,0 +1,14 @@
+exit 0
+--- stdout ---
+
+  Specs (1)
+  Scope: the whole workspace
+  Revision: worktree @ git:7c5122267ea7854954d543e1eda0a15c7cc56b08
+  2 authored feature(s) · 1 without a spec
+
+  billing/invoice
+    source: billing/specs/billing.invoice.json (@acme/billing)
+    outcome: Customers export issued invoices
+    0 non-goal(s) · 0 requirement(s) · 0 decision(s)
+
+--- stderr ---

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/document-repository",
+  "outcomes": [
+    "An application declares a document collection once and receives typed identifiers, stored documents, filters, and repositories from that declaration",
+    "The memory and Firestore adapters implement the same portable repository contract and reject capabilities they cannot honor",
+    "A transaction either commits every write in one named store or exposes none of them",
+    "Operators can provision, observe, and close document backends without exposing credential values"
+  ],
+  "nonGoals": [
+    "Relational joins, SQL migrations, blobs, full-text search, aggregations, realtime listeners, or a backend-native query DSL",
+    "Transactions spanning more than one named document store",
+    "Promising identical optional capabilities for every adapter or parity with a document package in another language",
+    "Promising compatibility across every pre-1.0 minor release"
+  ],
+  "requirements": [
+    {
+      "id": "collection-contract",
+      "text": "Collection(), Field(), and DocumentId() produce one typed definition whose storage field mapping and full or partial validation are applied at the repository boundary."
+    },
+    {
+      "id": "stored-write-result",
+      "text": "save() replaces by default, merge writes are explicit, and save() or saveMany() returns the stored value read back from the adapter rather than echoing the caller's mutable input."
+    },
+    {
+      "id": "portable-query",
+      "text": "Repositories accept only the documented structured filter and order vocabulary, append document-id fields as deterministic ordering tie-breakers, and page through opaque cursors rather than offsets."
+    },
+    {
+      "id": "bounded-bulk-behavior",
+      "text": "A zero result limit means zero rows, adapter bulk operations chunk their work, and deleteMany rejects an empty or entirely undefined filter instead of turning it into an unbounded delete."
+    },
+    {
+      "id": "adapter-capabilities",
+      "text": "An adapter implements the shared contract and rejects unsupported capabilities with typed document errors; Firestore therefore rejects composite identifiers and incompatible negative-filter combinations instead of approximating them."
+    },
+    {
+      "id": "transaction-atomicity",
+      "text": "runInTransaction() provides read-your-writes and atomic commit or rollback within one named store, and rejects access to a second store before it can partially participate."
+    },
+    {
+      "id": "store-lifecycle",
+      "text": "A configured named store reuses one managed backend, different store names remain isolated, closeBackend() permits clean recreation, and the document plugin closes every managed backend at shutdown."
+    },
+    {
+      "id": "credential-redaction",
+      "text": "Firestore credentials accept inline JSON or a key-file path, malformed inline credentials raise a typed DocumentError, and no error includes the credential value."
+    },
+    {
+      "id": "infra-publication",
+      "text": "Build-time infrastructure discovery groups Firestore collections by sorted named store, omits memory stores, de-duplicates collection names, and matches the shared document requirement fixture byte-for-byte."
+    },
+    {
+      "id": "operation-observability",
+      "text": "Repository, backend lifecycle, and transaction outcomes emit collection-scoped duration, failure, slow-operation, and active-transaction measurements while remaining safe when telemetry is disabled."
+    }
+  ],
+  "decisions": ["typescript/framework/document/doc/adr/0001-portability-stops-at-explicit-adapter-capabilities.md"]
+}

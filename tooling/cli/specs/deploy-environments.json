@@ -1,0 +1,25 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/deploy-environments",
+  "outcomes": [
+    "A user synchronizes a declared environment on the release set its channel points at, with each workload receiving the exact members it owns",
+    "The channel an environment follows is read once per run, so every workload of that environment converges on one snapshot",
+    "A deploy that shares a session with a publish synchronizes on the set that publish just released"
+  ],
+  "nonGoals": [
+    "Executing the synchronization: the backend applies the migrations, the configuration, and the image switch, in that order",
+    "Ordering or reversing migrations: the CLI carries the members and the migration protocol decides whether a rollback is admissible",
+    "Running a progressive rollout: the CLI declares the strategy and the hosting provider performs the traffic split",
+    "Deriving an environment from a branch: a branch publishes, an environment follows a channel"
+  ],
+  "requirements": [
+    {
+      "id": "deploy-follows-the-environment-channel",
+      "text": "deploy --env resolves the environment's channel or takes --release, selects the workloads its rules name, and hands each deploy job the set ref and the members of every workload that job covers, whether it deploys one workload or the whole workspace."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md"
+  ]
+}

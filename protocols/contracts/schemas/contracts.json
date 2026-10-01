@@ -1,0 +1,243 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-contracts.json",
+  "title": "Putnami Contract IR",
+  "description": "The canonical, deterministic contract IR for a project's contract vocabulary: enums, tagged unions, structs, config fields with typed defaults, scopes, capabilities, grants, claims, principal kinds, and discovery metadata. Emitted to <project>/.gen/schema/contracts.json and promoted to the tracked tree at <project>/schema/contracts.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "protocolVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Current contract-IR protocol version."
+    },
+    "name": {
+      "type": "string",
+      "description": "The contract identity, typically the project this IR describes."
+    },
+    "enums": {
+      "type": "array",
+      "description": "Closed value sets referenced by fields and unions.",
+      "items": { "$ref": "#/$defs/enum" }
+    },
+    "unions": {
+      "type": "array",
+      "description": "Tagged (discriminated) unions.",
+      "items": { "$ref": "#/$defs/union" }
+    },
+    "structs": {
+      "type": "array",
+      "description": "Named struct / DTO shapes.",
+      "items": { "$ref": "#/$defs/struct" }
+    },
+    "configFields": {
+      "type": "array",
+      "description": "Configuration fields with typed defaults.",
+      "items": { "$ref": "#/$defs/configField" }
+    },
+    "scopes": {
+      "type": "array",
+      "description": "Security scopes.",
+      "items": { "$ref": "#/$defs/scope" }
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "Named authorization capabilities drawing on scopes.",
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "grants": {
+      "type": "array",
+      "description": "Named permission grants conferring a capability.",
+      "items": { "$ref": "#/$defs/grant" }
+    },
+    "claims": {
+      "type": "array",
+      "description": "Token / principal claims.",
+      "items": { "$ref": "#/$defs/claim" }
+    },
+    "principalKinds": {
+      "type": "array",
+      "description": "Recognized principal kinds.",
+      "items": { "$ref": "#/$defs/principalKind" }
+    },
+    "discovery": { "$ref": "#/$defs/discoveryMetadata" }
+  },
+  "$defs": {
+    "fieldType": {
+      "type": "string",
+      "description": "A primitive token or the name of a declared enum, union, or struct.",
+      "minLength": 1
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name":        { "type": "string" },
+        "type":        { "$ref": "#/$defs/fieldType" },
+        "description": { "type": "string" },
+        "optional":    { "type": "boolean" },
+        "repeated":    { "type": "boolean" }
+      }
+    },
+    "enum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "values"],
+      "properties": {
+        "name":        { "type": "string" },
+        "description": { "type": "string" },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/enumValue" }
+        }
+      }
+    },
+    "enumValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "name":        { "type": "string" },
+        "value":       { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "union": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "discriminator", "variants"],
+      "properties": {
+        "name":          { "type": "string" },
+        "description":   { "type": "string" },
+        "discriminator": { "type": "string", "minLength": 1 },
+        "variants": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/unionVariant" }
+        }
+      }
+    },
+    "unionVariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag"],
+      "properties": {
+        "tag":         { "type": "string" },
+        "description": { "type": "string" },
+        "struct":      { "type": "string" },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field" }
+        }
+      },
+      "oneOf": [
+        { "required": ["struct"], "not": { "required": ["fields"] } },
+        { "required": ["fields"], "not": { "required": ["struct"] } }
+      ]
+    },
+    "struct": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name":        { "type": "string" },
+        "description": { "type": "string" },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field" }
+        }
+      }
+    },
+    "configField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name":        { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["string", "int", "float", "bool", "duration", "object", "array", "map"]
+        },
+        "description": { "type": "string" },
+        "required":    { "type": "boolean" },
+        "default":     { "description": "Typed default; its JSON kind must agree with type." },
+        "sensitive":   { "type": "boolean" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name":        { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name":        { "type": "string" },
+        "description": { "type": "string" },
+        "scopes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "grant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name":        { "type": "string" },
+        "description": { "type": "string" },
+        "capability":  { "type": "string" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name":        { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["string", "int", "float", "bool", "duration", "object", "array", "map"]
+        },
+        "description": { "type": "string" },
+        "required":    { "type": "boolean" }
+      }
+    },
+    "principalKind": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name":        { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "discoveryMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title":   { "type": "string" },
+        "summary": { "type": "string" },
+        "version": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

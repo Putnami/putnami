@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "session": {
+      "additionalProperties": false,
+      "properties": {
+        "secure": {
+          "type": "boolean",
+          "default": true
+        },
+        "ttl": {
+          "type": "integer",
+          "default": 604800
+        },
+        "sampleRate": {
+          "type": "number",
+          "default": 0.5
+        },
+        "idleTimeout": {
+          "type": "string",
+          "format": "duration",
+          "default": "30s"
+        },
+        "store": {
+          "type": "string",
+          "default": "cookie"
+        },
+        "retries": {
+          "type": "integer",
+          "default": "not-a-number"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "session"
+  ],
+  "title": "typed-defaults config",
+  "type": "object"
+}

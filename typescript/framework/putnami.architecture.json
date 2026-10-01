@@ -1,0 +1,79 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "typescript-framework",
+  "owner": "framework",
+  "projects": [
+    "/typescript/framework/analytics",
+    "/typescript/framework/application",
+    "/typescript/framework/cli-protocol",
+    "/typescript/framework/client",
+    "/typescript/framework/database",
+    "/typescript/framework/document",
+    "/typescript/framework/events",
+    "/typescript/framework/migration",
+    "/typescript/framework/runtime",
+    "/typescript/framework/spectest",
+    "/typescript/framework/storage",
+    "/typescript/framework/ui",
+    "/typescript/framework/utils",
+    "/typescript/framework/web"
+  ],
+  "owns": [
+    {
+      "id": "typescript-framework.api-documentation",
+      "kind": "fact",
+      "description": "The authored TypeScript framework documentation tree under /typescript/doc/framework. This domain decides what the published TypeScript reference says; a site that publishes it copies the tree and never edits it."
+    },
+    {
+      "id": "typescript-framework.application-runtime",
+      "kind": "api",
+      "description": "The TypeScript application runtime surface published as @putnami/*: the application container and lifecycle, HTTP and web rendering, the UI component set, database and storage access, events, and the client. This domain decides what a Putnami TypeScript application can express; a tenant application composes that surface and owns none of its shape."
+    }
+  ],
+  "exports": [
+    {
+      "id": "typescript-framework.api-documentation.v1",
+      "version": 1,
+      "status": "active",
+      "description": "The authored TypeScript framework documentation tree (/typescript/doc/framework): the markdown a publisher copies verbatim, addressed by a deterministic digest over its sorted (relative path, content digest) pairs. The carrier contract is putnami.documentation-tree.v1.",
+      "facts": [
+        {
+          "name": "typescript_framework_documentation",
+          "authority": "typescript-framework",
+          "classification": "public",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "snapshot"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    },
+    {
+      "id": "typescript-framework.application-runtime.v1",
+      "version": 1,
+      "status": "active",
+      "description": "The published @putnami/* runtime packages a Putnami TypeScript application links: the application container and lifecycle, web rendering, the UI component set, database, storage, events, analytics collection, and the client. A consumer holds a stable reference to the packages; this domain retains sole authority over their API.",
+      "facts": [
+        {
+          "name": "typescript_application_runtime_api",
+          "authority": "typescript-framework",
+          "classification": "public",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "reference"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    }
+  ],
+  "imports": []
+}

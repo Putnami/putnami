@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-template.json",
+  "name": "python-library",
+  "description": "Experimental Python package (non-default; no Go or TypeScript parity)",
+  "extension": "@putnami/python",
+  "workspaceDevDependencies": {
+    "go.putnami.dev/python/extension": "latest"
+  }
+}

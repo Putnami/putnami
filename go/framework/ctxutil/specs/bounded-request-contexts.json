@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/bounded-request-contexts",
+  "outcomes": [
+    "Framework backends apply one reusable timeout rule to bounded request operations",
+    "A context detached from caller cancellation receives a new deadline before it reaches a dependency",
+    "Callers can defer the returned cancel function for every timeout configuration"
+  ],
+  "nonGoals": [
+    "Choosing timeout durations for consumers",
+    "Detaching a context from its caller",
+    "Bounding streaming response bodies whose lifetime extends past the helper call"
+  ],
+  "requirements": [
+    {
+      "id": "detached-context",
+      "text": "WithRequestTimeout re-installs a deadline on a context whose own deadline context.WithoutCancel stripped, so detached bounded work still fails closed instead of running unbounded."
+    },
+    {
+      "id": "non-positive-timeout",
+      "text": "A zero or negative timeout returns the original context and a safe no-op cancel function."
+    },
+    {
+      "id": "positive-timeout",
+      "text": "A positive timeout returns context.WithTimeout derived from the supplied context and preserves its values."
+    }
+  ],
+  "decisions": [
+    "go/framework/ctxutil/doc/adr/0001-detached-work-must-be-rebounded.md"
+  ]
+}

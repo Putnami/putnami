@@ -1,0 +1,14 @@
+exit 2
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "features inspect",
+  "status": "failure",
+  "exitCode": 2,
+  "error": {
+    "code": "usage",
+    "message": "features inspect takes an exact target, so project selection does not apply: drop --projects/--impacted/--all/--baseline/--tag/--exclude-tag/--exclude (use `putnami features list` or `putnami specs list` to narrow by project)"
+  }
+}
+--- stderr ---
+putnami: features inspect takes an exact target, so project selection does not apply: drop --projects/--impacted/--all/--baseline/--tag/--exclude-tag/--exclude (use `putnami features list` or `putnami specs list` to narrow by project)

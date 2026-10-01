@@ -1,0 +1,151 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "tooling",
+  "features": [
+    {
+      "id": "tooling/github-collaboration",
+      "type": "feature",
+      "name": "GitHub collaboration provider",
+      "outcome": "A workspace binds its tasks, its change proposals, or both to one GitHub repository and calls the collaboration contracts without knowing GitHub's labels, commands or identifiers, while a lost answer never duplicates an issue, pull request or review and a credential never leaves the provider",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "contract-scenarios",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-shared-proposal-scenarios-pass",
+              "the-shared-task-scenarios-pass"
+            ]
+          }
+        },
+        {
+          "id": "configurable-state-mapping",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-state-read-through-another-label-takes-its-first-label",
+              "a-create-applies-a-state-label-only-when-the-state-needs-one",
+              "a-transition-applies-the-configured-label-and-removes-the-others",
+              "a-transition-to-open-gives-an-issue-without-a-state-label-the-first-label",
+              "an-unmapped-state-is-unsupported",
+              "done-and-canceled-close-the-issue-with-their-reason",
+              "state-labels-change-only-through-transition"
+            ]
+          }
+        },
+        {
+          "id": "exact-proposal-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-fork-with-the-same-branch-is-another-identity",
+              "a-head-that-moved-is-a-conflict",
+              "another-repository-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "reported-publication",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-proposal-answer-reports-its-assignees-and-labels"
+            ]
+          }
+        },
+        {
+          "id": "reconciled-writes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-lookup-that-cannot-finish-says-whether-a-retry-can-succeed",
+              "a-lookup-that-cannot-tell-a-discussion-from-a-number-not-given-creates-nothing",
+              "a-lost-create-response-returns-the-issue-without-a-duplicate",
+              "a-lost-review-response-returns-the-review-without-a-duplicate",
+              "a-lost-transition-response-is-read-back",
+              "a-lost-upsert-response-returns-the-pull-request-without-a-duplicate",
+              "a-number-above-the-newest-issue-that-is-no-issue-does-not-hide-a-repeat",
+              "a-partly-applied-write-names-what-happened",
+              "a-repeat-before-github-lists-the-issue-returns-it",
+              "a-run-of-discussions-above-the-newest-issue-does-not-hide-a-repeat",
+              "an-unestablished-write-is-unresolved-and-sent-once",
+              "deleted-and-moved-issues-never-block-a-create"
+            ]
+          }
+        },
+        {
+          "id": "honest-failures",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-item-is-not-found",
+              "a-rate-limit-is-retryable-and-never-repeated",
+              "a-search-traversal-ends-at-its-thousand-results",
+              "an-outage-is-unavailable-and-writes-nothing",
+              "merge-is-refused-unless-allowed",
+              "no-claim-is-offered",
+              "pages-follow-github-pagination-exactly-once"
+            ]
+          }
+        },
+        {
+          "id": "credential-safety",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-credential-never-reaches-an-answer",
+              "credentials-follow-gh-precedence",
+              "the-override-reaches-only-the-loopback-interface"
+            ]
+          }
+        },
+        {
+          "id": "truthful-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-tool-reaches-outside-the-machine-and-says-so",
+              "the-manifest-passes-both-gates",
+              "the-parent-is-outside-the-revision-and-link-says-so"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

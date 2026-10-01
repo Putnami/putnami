@@ -1,0 +1,101 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/agent-workflow-lifecycle",
+  "outcomes": [
+    "A workspace that opts into an extension's agent content receives its files from putnami init, putnami install and putnami upgrade",
+    "A workspace that opts into no agent content is left exactly as it was by all three commands",
+    "A clone reproduces the exact files of the extension release the committed lock pins, without resolving a version",
+    "A user who edited a shipped workflow keeps that edit, and is told which file blocked the run",
+    "Repeating any of the three commands with the same pin changes nothing on disk",
+    "A v2 or v3 workspace can explicitly migrate its lock to v4",
+    "A workspace that opts into an extension's agent content receives the instructions of exactly the extension version it installed",
+    "A workspace that installs an extension from npm receives its agent content from the same installed package as its commands and tools",
+    "A workspace that still declares its workflows as separate artifacts is refused and told the one command that moves them to the extension that supersedes them, a step it can review, resume and roll back"
+  ],
+  "nonGoals": [
+    "A force-overwrite flag, or any other way to discard a user-owned file",
+    "Merging a shipped workflow with a local edit",
+    "Adding agent content to a workspace that did not opt into it",
+    "Installing agent workflows as an artifact outside an extension",
+    "Converting a lock older than format version 4 as a side effect",
+    "Downloading anything during putnami upgrade --dry-run"
+  ],
+  "requirements": [
+    {
+      "id": "optin",
+      "text": "A command materializes agent content only when putnami.workspace.json opts into it in agentArtifacts; an absent or empty declaration skips the phase without any lock read or output, and a starter that opts into nothing adds nothing."
+    },
+    {
+      "id": "legacy-declarations-refused",
+      "text": "An agentArtifacts entry in a form earlier releases installed, a registry artifact (`name` or `name:channel`) or an in-tree project path (`/path`), is never installed: every agent-content command refuses it with nothing written and names `putnami migrate agent-content` with the extension whose content supersedes it."
+    },
+    {
+      "id": "record-last",
+      "text": "Files are published transactionally, and the ownership record is written only after every file is, so any failure leaves the previous files and the previous record."
+    },
+    {
+      "id": "collision-aborts",
+      "text": "One collision aborts the whole run before the first write, and the error names the owner and every conflicting path with its reason."
+    },
+    {
+      "id": "no-secret-leak",
+      "text": "A failure message prints owner names, paths and reasons only: never file contents, credentials, registry URLs or store locations."
+    },
+    {
+      "id": "idempotent",
+      "text": "Repeating a run at the same extension release changes no byte, rewrites no file and leaves the ownership record as it was."
+    },
+    {
+      "id": "explicit-v4-migration",
+      "text": "putnami migrate vnext --check and --apply provide a read-only preview and atomic idempotent v2/v3 to v4 projection without changing existing pins; install never performs that projection as a side effect."
+    },
+    {
+      "id": "reinit-preserves-optin",
+      "text": "putnami init --force unions the starter's opt-in with the declarations already at that path, merged by what each entry names with the existing entry winning, so re-initializing never un-declares installed content."
+    },
+    {
+      "id": "session-start-reconcile",
+      "text": "When the MCP server starts, the agent content of each opted-in extension the committed lock pins is brought to that release from the installed extension, under the ordinary ownership rules; a record naming the pinned release ends the pass. The pass never downloads, resolves, writes the lock or builds a local extension, and every failure is a stderr warning: the server starts regardless."
+    },
+    {
+      "id": "undeclared-artifact-retired",
+      "text": "An adopting command retires an owner the clone recorded but the workspace no longer opts into: it removes the files that record still manages and that are unchanged, keeps and reports any the user edited without managing them further, then drops its lock pin, when there is one, and finally the record. Every opted-in contribution is verified and planned before the first removal, so one that cannot be verified, or that collides on a path retirement does not free, fails the run with nothing removed."
+    },
+    {
+      "id": "extension-agent-content",
+      "text": "An `agentArtifacts` entry `extension:<name>` opts into the agent content the declared extension <name> ships; declaring the extension alone activates nothing. The content takes the extension's resolved version and is never pinned under agentArtifacts: it follows the extension on upgrade, is retired when the entry is removed, and for a local extension is built from its authored source on every run."
+    },
+    {
+      "id": "extension-agent-content-integrity",
+      "text": "Every byte of an installed extension's content is bound through the extension's lock pin, its manifest digest and its content manifest digest, and a mismatch fails before the workspace is read. Collisions, symlinked destinations and overlaps with another extension abort with zero writes, a repeated install changes nothing, and an interrupted run converges on a rerun."
+    },
+    {
+      "id": "npm-extension-agent-content",
+      "text": "An npm extension declared in root package.json devDependencies ships its agent content from node_modules/<name>, where its commands load from: the package must carry the extension's name and manifest version and the packaged contribution. install, and an upgrade that runs the dependency phase, materialize it after the package manager runs, and never when it fails. A name declared both there and in extensions, or pinned while node_modules provides it, is refused with nothing written."
+    },
+    {
+      "id": "superseded-owners-refused",
+      "text": "While a workspace opts into an extension's agent content, every agent-content command refuses it when this clone still records an artifact that content supersedes (agentContent.supersedes), writes nothing and names `putnami migrate agent-content <extension> --apply`; that one command moves the records to the extension, keeps every file the user edited, and leaves one owner."
+    },
+    {
+      "id": "agent-content-migration",
+      "text": "`putnami migrate agent-content <extension>` moves the legacy artifacts an installed extension's content supersedes to it: their entries become one `extension:<name>` entry, their pins leave the lock and their ownership records merge into the extension's record, with nothing resolved or downloaded. A clone without records hands over no ownership. The check writes nothing and lists every file the content adds, changes, removes or releases."
+    },
+    {
+      "id": "agent-content-migration-safety",
+      "text": "A migration is planned in full before its first write: an edited file the content still ships, or a path two owners record with different bytes, blocks it with zero writes. A journal records every piece's before and after state; a stopped migration resumes on rerun, `--rollback` restores the previous declarations, pins, ownership records and files, and a concurrent run is refused. A completed journal stays the rollback point: a new migration to that extension is refused until it is rolled back."
+    },
+    {
+      "id": "starter-opts-into-contributor",
+      "text": "Every built-in starter declares the `@putnami/contributor` extension and opts into its agent content, and `putnami init` installs that extension and materializes its content. When the extension cannot be installed, init keeps both declarations, writes no agent file, and names `putnami install` as the next step."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0004-agent-artifact-ownership.md",
+    "tooling/cli/doc/adr/0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md",
+    "tooling/cli/doc/adr/0047-extension-owned-agent-content.md",
+    "tooling/cli/doc/adr/0048-migrating-agent-artifacts-to-extension-content.md",
+    "protocols/extension/doc/adr/0006-agent-content-is-an-additive-contract.md"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "protocolVersion": 1,
+  "project": "go.putnami.dev/example/clean",
+  "configDefinitions": [
+    {
+      "path": "server",
+      "fields": [{ "name": "port", "type": "int" }],
+      "provenance": {
+        "project": "go.putnami.dev/example/clean",
+        "sourceKind": "framework"
+      }
+    }
+  ],
+  "requiredCapabilities": [
+    {
+      "name": "http",
+      "requires": ["config"],
+      "provenance": {
+        "project": "go.putnami.dev/example/clean",
+        "sourceKind": "framework"
+      }
+    }
+  ]
+}

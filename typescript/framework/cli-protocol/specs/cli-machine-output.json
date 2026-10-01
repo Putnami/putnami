@@ -1,0 +1,63 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/cli-machine-output",
+  "outcomes": [
+    "A TypeScript program reads Putnami CLI machine output as typed documents instead of untyped JSON",
+    "An invalid document is reported as a list of exact violations rather than as a missing field several frames later",
+    "This reader and the Go reader agree, because both execute the same committed conformance corpus",
+    "A document recorded by an older CLI build stays readable"
+  ],
+  "nonGoals": [
+    "Owning the CLI machine contract, which belongs to the protocols/cli module",
+    "Running the CLI or selecting which producer events it emits",
+    "Promising that a pre-1.0 minor release keeps the previous binding surface"
+  ],
+  "requirements": [
+    {
+      "id": "execution-placement",
+      "text": "Session placement is optional for older records. When present it records both requested and actual execution as local or remote, including a remote request executed locally; malformed values are rejected without changing the session tree identity."
+    },
+    {
+      "id": "qualify-verdict-wire",
+      "text": "TypeScript and Go validate the same workload-qualification contract and verdict corpus and emit the same qualify.* codes: unknown or case-aliased members, a state outside the closed vocabulary, and a passed verdict without every phase and request passed, a matching sha and a clean teardown are refused. Both compute the same contract digest bytes."
+    },
+    {
+      "id": "session-reporter-wire",
+      "text": "TypeScript and Go parse the same session-reporter chunk and ACK corpus, verify the bounded base64 payload and SHA-256 digest, and match every per-artifact sequence/offset identity field without introducing a second session result shape."
+    },
+    {
+      "id": "version-token",
+      "text": "A machine document is version 2 exactly when it carries protocolVersion 2; a document without the field is version 1, and the version-1 envelope stays exported for reading recorded output."
+    },
+    {
+      "id": "shared-corpus",
+      "text": "Validating each fixture of the committed conformance corpus produces exactly the violation set the corpus pins, and the corpus covers every document kind and every violation code."
+    },
+    {
+      "id": "schema-pinned-members",
+      "text": "Every exported document type's member set is asserted field-by-field against the published JSON schema, so a schema change that this binding has not followed fails a test."
+    },
+    {
+      "id": "schema-pinned-bounds",
+      "text": "The report bounds, the machine-output budgets and the test-case bounds are asserted against the schema's own values instead of being restated as independent literals."
+    },
+    {
+      "id": "bounded-stream-policy",
+      "text": "Whole-stream validation applies the shared mode policy as well as the fixed budgets: normal suppresses debug task detail, including every test case, with exact ordinary elision accounting, while verbose admits it and both preserve failure priority."
+    },
+    {
+      "id": "deterministic-violations",
+      "text": "Violations are ordered by path and then by code, with paths compared by code unit rather than by locale, and array indices above nine ordered numerically."
+    },
+    {
+      "id": "strict-verdict",
+      "text": "Run success is reported by the strict unified verdict, and an aborted run is a distinct status that still lists the failures it accumulated."
+    },
+    {
+      "id": "sanitization",
+      "text": "The sanitization helper redacts every high-confidence credential family and strips control characters while retaining member names."
+    }
+  ],
+  "decisions": ["typescript/framework/cli-protocol/doc/adr/0001-binding-validates-against-the-shared-corpus.md"]
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/spec-test-binding",
+  "outcomes": [
+    "A TypeScript author binds an ordinary bun test to a declared check without changing how the test is written or what it returns",
+    "The verification wire receives what the runner observed, so a spec gate resolves TypeScript evidence exactly as it resolves Go and Python evidence",
+    "A repository that does not run the Putnami test adapter keeps its suite byte-for-byte unchanged"
+  ],
+  "nonGoals": [
+    "Deciding a verdict: the fragment states an observation and core recomputes every verdict against the authored criterion",
+    "Validating, attributing, or merging fragments — the test adapter owns all three",
+    "Supporting test runners other than bun"
+  ],
+  "requirements": [
+    {
+      "id": "honest-verdict",
+      "text": "A bound test publishes exactly the verdict the runner observed and never alters that verdict: a settled body records passed, a throwing body records failed, a skipped test records skipped, and a body that never settles records nothing. One atomic fragment is written per check, carrying the declaring file and the test name as provenance."
+    },
+    {
+      "id": "inert-without-the-adapter",
+      "text": "Outside a Putnami-provided fragment directory the helpers register every test exactly as the bare runner would, write nothing, and cannot fail a run over reporting."
+    },
+    {
+      "id": "verdict-or-measurement",
+      "text": "A fragment carries an acceptance verdict or a measurement, never both, so a producer can state a number but never its own verdict. A measuring body that threw or was skipped publishes nothing at all, and a published measurement carries the invocation window its body actually covered."
+    }
+  ],
+  "decisions": []
+}

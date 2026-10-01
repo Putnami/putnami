@@ -1,0 +1,6 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/never-declared",
+  "outcomes": ["Customers export issued invoices"],
+  "requirements": []
+}

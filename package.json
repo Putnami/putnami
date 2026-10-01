@@ -1,0 +1,72 @@
+{
+  "author": "putnami",
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.3",
+    "@types/bun": "^1.4.0",
+    "typescript": "^6.0.2"
+  },
+  "keywords": [
+    "framework",
+    "monorepo",
+    "build-tool",
+    "cli",
+    "polyglot",
+    "typescript",
+    "go",
+    "python",
+    "workspace",
+    "full-stack"
+  ],
+  "license": "FSL-1.1-MIT",
+  "name": "putnami-workspace",
+  "overrides": {
+    "@putnami/application": "workspace:*",
+    "@putnami/events": "workspace:*",
+    "@putnami/migration": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/spectest": "workspace:*",
+    "@putnami/utils": "workspace:*"
+  },
+  "packageManager": "bun@1.4.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/putnami/putnami.git"
+  },
+  "version": "0.0.0",
+  "workspaces": [
+    "go/samples/service-to-service/clients/ts",
+    "go/samples/service-to-service/consumer-ts",
+    "sites/putnami.dev",
+    "typescript/framework/analytics",
+    "typescript/framework/application",
+    "typescript/framework/cli-protocol",
+    "typescript/framework/client",
+    "typescript/framework/database",
+    "typescript/framework/document",
+    "typescript/framework/events",
+    "typescript/framework/migration",
+    "typescript/framework/runtime",
+    "typescript/framework/spectest",
+    "typescript/framework/storage",
+    "typescript/framework/ui",
+    "typescript/framework/utils",
+    "typescript/framework/web",
+    "typescript/samples/01-hello-world",
+    "typescript/samples/02-rest-api",
+    "typescript/samples/03-web",
+    "typescript/samples/04-configuration",
+    "typescript/samples/05-dependency-injection",
+    "typescript/samples/06-database",
+    "typescript/samples/07-authentication",
+    "typescript/samples/08-real-time",
+    "typescript/samples/09-events",
+    "typescript/samples/10-service-to-service",
+    "typescript/samples/10-service-to-service/clients/ts",
+    "typescript/samples/11-storage",
+    "typescript/samples/12-caching",
+    "typescript/samples/13-fullstack-app",
+    "typescript/samples/14-capabilities",
+    "typescript/templates/proof"
+  ]
+}

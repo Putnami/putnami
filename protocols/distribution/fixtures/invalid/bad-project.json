@@ -1,0 +1,17 @@
+{
+  "protocolVersion": 2,
+  "namespace": "putnami",
+  "members": [
+    {
+      "ecosystem": "oci",
+      "coordinate": "putnami/sites/putnami.dev",
+      "version": "0.3.0-8d5edb751",
+      "artifactDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "dependencies": [],
+      "sourceRevision": "8d5edb7513d93b9165ba2a7cb48466d022fc3f63",
+      "selectionFingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "project": "/sites/putnami.dev",
+      "kind": "image"
+    }
+  ]
+}

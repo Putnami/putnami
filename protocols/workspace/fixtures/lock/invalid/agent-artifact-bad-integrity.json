@@ -1,0 +1,12 @@
+{
+  "version": 4,
+  "extensions": {},
+  "templates": {},
+  "agentArtifacts": {
+    "@putnami/agent-workflows": {
+      "version": "1.0.0",
+      "integrity": "sha256:not-hex",
+      "manifestHash": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  }
+}

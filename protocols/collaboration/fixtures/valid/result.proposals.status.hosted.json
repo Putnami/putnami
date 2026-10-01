@@ -1,0 +1,37 @@
+{
+  "proposal": {
+    "ref": {
+      "source": "github:acme/app",
+      "id": "7"
+    },
+    "revision": "r1",
+    "change": {
+      "repository": "local",
+      "base": "main",
+      "head": "fix-issue-42",
+      "headCommit": "55e2a8e42"
+    },
+    "title": "feat(cli): route collaboration contracts",
+    "body": "Implements the provider contracts.",
+    "state": "open",
+    "labels": ["group/tooling", "domain/cli"],
+    "assignees": ["putnami-bot"],
+    "updatedAt": "2026-09-24T08:05:00Z",
+    "url": "https://github.com/acme/app/pull/7"
+  },
+  "checks": {
+    "state": "failing",
+    "commit": "55e2a8e42",
+    "items": [
+      {
+        "name": "gate",
+        "state": "failing",
+        "url": "https://ci.example.com/runs/1"
+      },
+      {
+        "name": "lint",
+        "state": "passing"
+      }
+    ]
+  }
+}

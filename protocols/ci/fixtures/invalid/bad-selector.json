@@ -1,0 +1,15 @@
+{
+  "version": 3,
+  "commands": [
+    "test"
+  ],
+  "distribution": {
+    "namespace": "putnami",
+    "members": [
+      {
+        "select": "label:public",
+        "visibility": "public"
+      }
+    ]
+  }
+}

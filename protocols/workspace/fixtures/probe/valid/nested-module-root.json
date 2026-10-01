@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "extension": "@putnami/typescript",
+  "projects": [
+    {
+      "path": "sites/putnami.dev",
+      "sourceName": "putnami.dev",
+      "sourceFile": "sites/putnami.dev/packages/app/package.json",
+      "dependencies": ["typescript/framework/web"]
+    }
+  ]
+}

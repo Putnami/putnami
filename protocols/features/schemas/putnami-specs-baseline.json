@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "title": "Putnami specs baseline v1 and v2",
+  "$comment": "The committed enforce floor of the executable-spec gate. Version 2 is one enforced project's file, in that project's directory: the directory names the project, the file's presence states enforce, and the file lists the executable requirements the project covers. Version 1 is the older single workspace-root file listing every enforced project; readers accept it only at the root, and `putnami specs baseline --update` moves it to version 2 files. Shrink-only: losing a listed requirement, or a project leaving enforce, without editing its file in the same change fails validate-workspace. Growth never requires an edit.",
+  "oneOf": [
+    { "$ref": "#/$defs/project-v2" },
+    { "$ref": "#/$defs/workspace-v1" }
+  ],
+  "$defs": {
+    "project-v2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "executableRequirements"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "protocolVersion": {
+          "$comment": "Readers require the exact JSON integer token 2; 2.0 and 2e0 are invalid.",
+          "type": "integer",
+          "const": 2
+        },
+        "executableRequirements": { "$ref": "#/$defs/requirements" }
+      }
+    },
+    "workspace-v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "projects"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "protocolVersion": {
+          "$comment": "Readers require the exact JSON integer token 1; 1.0 and 1e0 are invalid.",
+          "type": "integer",
+          "const": 1
+        },
+        "projects": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": { "$ref": "#/$defs/project" }
+        }
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "$comment": "A canonical `feature#requirement` identity pair.",
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)+#[a-z0-9]+(?:-[a-z0-9]+)*$"
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "mode", "executableRequirements"],
+      "properties": {
+        "project": { "type": "string", "minLength": 1 },
+        "mode": {
+          "$comment": "The baseline records the enforced floor; a report or off project has nothing to protect.",
+          "type": "string",
+          "const": "enforce"
+        },
+        "executableRequirements": { "$ref": "#/$defs/requirements" }
+      }
+    }
+  }
+}

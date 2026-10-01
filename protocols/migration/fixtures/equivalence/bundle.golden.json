@@ -1,0 +1,60 @@
+{
+  "protocol": "migration-bundle.v1",
+  "appName": "wealth",
+  "source": "go/samples/wealth",
+  "version": "2.1.0",
+  "git": {
+    "revision": "9f1c2ab",
+    "branch": "main"
+  },
+  "imageDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "digest": "6533cedd09aa95f9622ec420f675782c4ad34a7646702ed7ba9a0918d1feb86e",
+  "generatedAt": "2026-06-04T12:00:00Z",
+  "operations": [
+    {
+      "kind": "sql",
+      "target": "analytics",
+      "schema": "events",
+      "namespace": "events",
+      "name": "events/0001_init",
+      "up": {
+        "path": "payload/sql/analytics/events/0001_init.up.sql",
+        "hash": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "safety": "safe-online",
+      "capabilities": {
+        "transactional": true
+      }
+    },
+    {
+      "kind": "sql",
+      "target": "default",
+      "namespace": "iam",
+      "name": "iam/0001_create_users",
+      "up": {
+        "path": "payload/sql/default/iam/0001_create_users.up.sql",
+        "hash": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "down": {
+        "path": "payload/sql/default/iam/0001_create_users.down.sql",
+        "hash": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "safety": "destructive",
+      "capabilities": {
+        "transactional": true,
+        "reversible": true
+      }
+    },
+    {
+      "kind": "sql",
+      "target": "default",
+      "namespace": "billing",
+      "name": "billing/0002_add_invoices",
+      "up": {
+        "path": "payload/sql/default/billing/0002_add_invoices.up.sql",
+        "hash": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "safety": "long-running"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "python/experimental-server-template",
+  "outcomes": [
+    "An experimenter can explicitly create a minimal FastAPI service with a runnable entrypoint and a request test",
+    "The generated project opts into the Python extension and records the run and serve entrypoints",
+    "The template advertises its experimental, non-default, non-parity boundary in both its catalog metadata and generated README"
+  ],
+  "nonGoals": [
+    "Providing a production-ready Python service baseline",
+    "Matching the Go server or TypeScript server template capabilities",
+    "Generating deployment, authentication, persistence, or API-contract features"
+  ],
+  "requirements": [
+    {
+      "id": "explicit-template",
+      "text": "The template is selected by its explicit python-server name and declares @putnami/python in the generated project manifest."
+    },
+    {
+      "id": "minimal-server-shape",
+      "text": "The generated project contains a FastAPI application, uvicorn dependency, configured run and serve entrypoints, and a test for its root response."
+    },
+    {
+      "id": "experimental-disclosure",
+      "text": "The template's catalog record and generated README state that it is experimental, not default, and has no Go or TypeScript parity promise."
+    }
+  ],
+  "decisions": [
+    "python/extension/doc/adr/0001-experimental-python-surface.md"
+  ]
+}

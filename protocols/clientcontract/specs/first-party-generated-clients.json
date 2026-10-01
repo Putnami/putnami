@@ -1,0 +1,72 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "client-contract/first-party-generated-clients",
+  "outcomes": [
+    "The x-putnami-client schema can preserve service identity, security, errors, resilience, streaming, ordered transports and exact protobuf wire metadata",
+    "A closed parser and executable fixture corpus reject first-party metadata that this version cannot represent without loss",
+    "The generated-target manifest binds service identity, contract bytes, operation metadata and generated file bytes without containing credential values",
+    "Provider projection, language readers and emitters, service bindings and transport runtimes remain explicit follow-up adoption work",
+    "A published transition table and wire schema let every first-party WebSocket runtime share one admission and delivery state machine instead of restating it",
+    "A server stream carried by SSE can declare how a broken connection continues, by a provider-owned cursor or by best-effort reopening, and a shared wire corpus pins how a negotiated stream ends"
+  ],
+  "nonGoals": [
+    "Embedding credential values, tokens or secrets in contracts or generated manifests",
+    "Treating an unmarked third-party OpenAPI document as a strict first-party contract",
+    "Reconstructing protobuf field numbers, oneofs or enum values from OpenAPI schemas",
+    "Implementing a WebSocket transport runtime: the contract publishes the frames and the state machine, not the sockets"
+  ],
+  "requirements": [
+    {
+      "id": "strict-provider-authority",
+      "text": "The versioned provider metadata is a closed semantic authority. Recursive schemas and protobuf projections preserve exact representable values; duplicate fields, ambiguous nulls, unsafe paths, unknown keywords, unsupported versions and incomplete operation metadata fail explicitly. The Go reader proves that here; the TypeScript provider projection proves the same corpus in its own project, under typescript/api-contracts requirement client-contract-conformance."
+    },
+    {
+      "id": "generated-inventory",
+      "text": "A generated target manifest contains no credential values. It names the provider service, exact contract SHA-256, complete operation stream and ordered transport inventory, public registration symbols, and the SHA-256 of every mechanically generated file. An operation the target's configuration leaves out is named apart from the generated ones and never inventoried as generated, so the two lists account for every contract operation."
+    },
+    {
+      "id": "opaque-json-values",
+      "text": "A value the provider does not interpret has one closed spelling: x-putnami-json: any, with only title and description beside it, for any JSON value, and type: object with additionalProperties: true for a free-form object. The empty schema, another keyword value, any other sibling of the keyword and an x-putnami-json map value are refused. Generated clients carry these values uninterpreted: json.RawMessage and map[string]json.RawMessage in Go, unknown and Record<string, unknown> in TypeScript."
+    },
+    {
+      "id": "response-cache-policy",
+      "text": "Only a unary safe or idempotent operation may declare a response cache, never a stream, a non-idempotent operation or the document defaults. freshMs is required, staleMs must exceed it, maxEntries is positive and each key field names a declared input. Each invalidation field names a distinct non-octet string, integer or boolean body property. A generated manifest repeats each policy and requires the response-cache runtime capability exactly when one is declared; any other capability list is refused."
+    },
+    {
+      "id": "external-contract-operations",
+      "text": "An operation of a first-party document that an external authority owns carries x-putnami-external-contract, a non-blank string naming it, and no x-putnami-client. Every first-party reader skips it whole: no contract operation, protobuf method or generated client method, and its own schemas are not held to the first-party subset. Both extensions on one operation, a non-string marker and a blank authority are refused; an unmarked operation without x-putnami-client stays refused."
+    },
+    {
+      "id": "websocket-state-machine",
+      "text": "The first-party WebSocket wire is a closed, published state machine. Admission happens in band, in the first client frame, before any application message reaches a handler. Control, data, half-close, terminal and resume transitions are shipped code, not a test-only copy. Frame bounds, per-direction sequence continuity and wide uint64 sequences are enforced without loss, and the published wire schema enumerates exactly the frame types, cancel codes and payload encodings the parser accepts."
+    },
+    {
+      "id": "provider-owned-websocket-wires",
+      "text": "A websocket transport may declare wire: provider for a bidirectional stream the provider owns: encoding binary for raw octets with no messages, or json for values of the declared messages under a subprotocol it must name. The token is an RFC 9110 token outside putnami.service., resume is false, and it is the only transport. First-party transports keep their exact bytes, binary travels nowhere else, an unknown wire is refused, and the conversation never admits on a provider wire."
+    },
+    {
+      "id": "sse-continuation",
+      "text": "A safe server stream's sse transport may declare a continuation: cursor names a required plain-string output field and a declared plain-string query parameter that carries the last delivered position back; best-effort names neither and may lose or repeat messages. Reconnect needs a resumable websocket or continuable sse transport. Malformed or mismatched declarations are refused, a manifest requires the sse-continuation capability, and shared scenes pin the negotiated wire and its complete terminal."
+    },
+    {
+      "id": "shared-page-transport",
+      "text": "Domains share relation, afterKey and limit queries and a page envelope with exact int64 watermark, optional authoritative ownerConfirmedAt, relation, owner-encoded rows and opaque nextKey. Unset confirmation is omitted; zero watermark remains present. Owners may narrow vocabulary, rows and bounds; conformance rejects incompatible shapes. Only absent or empty nextKey ends paging. Caller path bindings require known fixed unary REST JSON operations and unescaped same-authority paths."
+    }
+  ],
+  "decisions": [
+    "protocols/clientcontract/doc/adr/0001-provider-metadata-is-the-generated-client-authority.md",
+    "protocols/clientcontract/doc/adr/0002-websocket-admission-uses-a-first-frame-state-machine.md",
+    "protocols/clientcontract/doc/adr/0003-stable-error-codes-are-the-go-framework-vocabulary.md",
+    "protocols/clientcontract/doc/adr/0004-integer-width-is-declared-not-inferred.md",
+    "protocols/clientcontract/doc/adr/0005-stream-sessions-have-five-phases-and-four-budgets.md",
+    "protocols/clientcontract/doc/adr/0006-a-declared-error-schema-describes-details.md",
+    "protocols/clientcontract/doc/adr/0007-a-response-cache-is-declared-per-operation.md",
+    "protocols/clientcontract/doc/adr/0008-opaque-json-is-a-declaration.md",
+    "protocols/clientcontract/doc/adr/0010-a-provider-owned-websocket-wire-is-declared-not-inferred.md",
+    "protocols/clientcontract/doc/adr/0011-an-external-authority-can-own-an-operation.md",
+    "protocols/clientcontract/doc/adr/0012-a-shared-page-protocol-is-bound-by-the-consumer.md",
+    "protocols/clientcontract/doc/adr/0013-an-sse-stream-declares-how-it-continues-and-a-negotiated-stream-ends-explicitly.md",
+    "protocols/clientcontract/doc/adr/0014-a-client-drops-a-response-property-it-does-not-declare.md"
+  ]
+}

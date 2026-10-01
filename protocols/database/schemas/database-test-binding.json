@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-database-test-binding.json",
+  "title": "Putnami Database Test Binding",
+  "description": "A database binding extended with test provisioning and isolation policy. Uses the same datasource/connection shape as the runtime binding, so a multi-datasource workload can request migrated Postgres bindings for one or more named datasources at once — without a single-DSN env-var convention.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference."
+    },
+    "protocolVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Current database-protocol version."
+    },
+    "mode": { "$ref": "#/$defs/mode" },
+    "isolation": { "$ref": "#/$defs/isolation" },
+    "reuse": { "$ref": "#/$defs/reuse" },
+    "applyMigrations": {
+      "type": "boolean",
+      "description": "When true, the provider applies and verifies migrations before returning bindings."
+    },
+    "keepDatabases": {
+      "type": "boolean",
+      "description": "When true, the provider leaves the isolated databases it created in place: the per-suite teardown closes its connections but skips DROP DATABASE. Set it when the server's own lifetime is the cleanup (e.g. a CI server that dies with the run) — every DROP forces an immediate cluster-wide checkpoint that stalls behind concurrent writes."
+    },
+    "databases": {
+      "type": "object",
+      "description": "Resolved datasources, keyed by logical datasource name.",
+      "propertyNames": { "$ref": "#/$defs/datasourceName" },
+      "additionalProperties": { "$ref": "#/$defs/database" }
+    }
+  },
+  "$defs": {
+    "datasourceName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_./-]{0,63}$",
+      "description": "Canonical logical datasource identifier: lowercase letters, digits, '-', '_', '.', '/'; 1–64 chars."
+    },
+    "engine": {
+      "type": "string",
+      "enum": ["postgres"],
+      "description": "Database engine. Closed enum; postgres is the only v1 implementation and adding an engine requires a protocol version bump."
+    },
+    "schemaName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+      "description": "Owning schema / search_path entry; an unquoted SQL identifier. Required for postgres."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["skip", "require", "auto"],
+      "description": "Provider behavior when no usable binding/provider exists. Closed enum."
+    },
+    "isolation": {
+      "type": "string",
+      "enum": ["database", "schema"],
+      "description": "Per-datasource isolation boundary the provider creates. Closed enum."
+    },
+    "reuse": {
+      "type": "string",
+      "enum": ["none", "bundle-template"],
+      "description": "Migrated-database caching policy. Closed enum."
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine", "schema", "connection"],
+      "description": "One datasource's resolved binding: engine, schema, and the physical connection.",
+      "properties": {
+        "engine": { "$ref": "#/$defs/engine" },
+        "schema": { "$ref": "#/$defs/schemaName" },
+        "connection": { "$ref": "#/$defs/connection" }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "oneOf": [
+        {
+          "required": ["dsn"],
+          "not": {
+            "anyOf": [
+              { "required": ["host"] },
+              { "required": ["port"] },
+              { "required": ["database"] },
+              { "required": ["user"] },
+              { "required": ["password"] },
+              { "required": ["ssl"] },
+              { "required": ["params"] },
+              { "required": ["instance"] }
+            ]
+          }
+        },
+        {
+          "required": ["host"],
+          "not": {
+            "anyOf": [
+              { "required": ["dsn"] },
+              { "required": ["instance"] }
+            ]
+          }
+        },
+        {
+          "required": ["instance"],
+          "not": {
+            "anyOf": [
+              { "required": ["dsn"] },
+              { "required": ["host"] },
+              { "required": ["port"] },
+              { "required": ["ssl"] }
+            ]
+          }
+        }
+      ],
+      "description": "Resolved physical connection. Declares exactly one transport strategy: a self-contained 'dsn'; or a structured TCP connection keyed by 'host'; or a cloud/provider socket keyed by 'instance'. A 'dsn' is self-contained and accepts no structured field. The exactly-one-transport and dsn-self-containment rules are enforced by the strict validator.",
+      "properties": {
+        "dsn": {
+          "type": "string",
+          "description": "Self-contained connection string. Mutually exclusive with every other field."
+        },
+        "host": {
+          "type": "string",
+          "description": "TCP host (structured strategy)."
+        },
+        "port": {
+          "type": "integer",
+          "description": "TCP port (structured strategy)."
+        },
+        "database": {
+          "type": "string",
+          "description": "Physical database name (structured or instance strategy)."
+        },
+        "user": {
+          "type": "string",
+          "description": "Login role (structured or instance strategy)."
+        },
+        "password": {
+          "type": "string",
+          "description": "Login secret (structured or instance strategy)."
+        },
+        "ssl": {
+          "type": "boolean",
+          "description": "Request TLS for the structured (TCP) strategy."
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Extra driver options (e.g. sslmode, application_name)."
+        },
+        "instance": {
+          "type": "string",
+          "description": "Cloud/provider instance identifier for the socket strategy."
+        }
+      }
+    }
+  }
+}

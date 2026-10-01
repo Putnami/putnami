@@ -1,0 +1,18 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "publish": {
+      "run": [{ "id": "push", "task": "publish-registry" }]
+    }
+  },
+  "tasks": {
+    "publish-registry": {
+      "kind": "command",
+      "command": "echo",
+      "cache": { "enabled": true },
+      "declares": {
+        "effects": ["registry"]
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-ci.json",
+  "version": 3,
+  "commands": [
+    "lint",
+    "test"
+  ],
+  "envs": {
+    "preview": {
+      "channel": "canary",
+      "rollout": {
+        "strategy": "all-at-once"
+      }
+    },
+    "prod": {
+      "channel": "latest",
+      "constraints": {
+        "approval": "manual"
+      },
+      "rollout": {
+        "strategy": "progressive",
+        "steps": [
+          25,
+          50,
+          100
+        ],
+        "advance": "5m"
+      },
+      "variants": {
+        "beta": {
+          "channel": "canary",
+          "routing": {
+            "header": "x-putnami-beta"
+          }
+        }
+      }
+    }
+  }
+}

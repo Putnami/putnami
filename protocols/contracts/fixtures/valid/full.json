@@ -1,0 +1,183 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-contracts.json",
+  "protocolVersion": 1,
+  "name": "go.putnami.dev/example/payments",
+  "enums": [
+    {
+      "name": "Currency",
+      "description": "ISO 4217 currency code subset.",
+      "values": [
+        {
+          "name": "USD",
+          "value": "usd",
+          "description": "United States dollar."
+        },
+        {
+          "name": "EUR",
+          "value": "eur"
+        }
+      ]
+    }
+  ],
+  "unions": [
+    {
+      "name": "PaymentMethod",
+      "description": "How a payment is tendered.",
+      "discriminator": "kind",
+      "variants": [
+        {
+          "tag": "card",
+          "description": "A card payment.",
+          "struct": "CardPayment"
+        },
+        {
+          "tag": "bank",
+          "fields": [
+            {
+              "name": "accountName",
+              "type": "string"
+            },
+            {
+              "name": "iban",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "structs": [
+    {
+      "name": "Money",
+      "description": "A monetary amount in a currency.",
+      "fields": [
+        {
+          "name": "amount",
+          "type": "int",
+          "description": "Amount in minor units."
+        },
+        {
+          "name": "currency",
+          "type": "Currency"
+        }
+      ]
+    },
+    {
+      "name": "CardPayment",
+      "fields": [
+        {
+          "name": "last4",
+          "type": "string"
+        },
+        {
+          "name": "brand",
+          "type": "string",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "Invoice",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string"
+        },
+        {
+          "name": "total",
+          "type": "Money"
+        },
+        {
+          "name": "method",
+          "type": "PaymentMethod"
+        },
+        {
+          "name": "lineItems",
+          "type": "Money",
+          "repeated": true
+        }
+      ]
+    }
+  ],
+  "configFields": [
+    {
+      "name": "endpoint",
+      "type": "string",
+      "description": "Payments API base URL.",
+      "required": true,
+      "default": "https://api.example.com"
+    },
+    {
+      "name": "timeoutSeconds",
+      "type": "int",
+      "default": 30
+    },
+    {
+      "name": "sandbox",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "apiKey",
+      "type": "string",
+      "sensitive": true
+    }
+  ],
+  "scopes": [
+    {
+      "name": "payments:read",
+      "description": "Read payments."
+    },
+    {
+      "name": "payments:write",
+      "description": "Create and modify payments."
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "processPayments",
+      "description": "Charge and refund payments.",
+      "scopes": [
+        "payments:write"
+      ]
+    }
+  ],
+  "grants": [
+    {
+      "name": "paymentsAdmin",
+      "description": "Full payments administration.",
+      "capability": "processPayments"
+    }
+  ],
+  "claims": [
+    {
+      "name": "sub",
+      "type": "string",
+      "description": "Subject principal.",
+      "required": true
+    },
+    {
+      "name": "tenantId",
+      "type": "string"
+    }
+  ],
+  "principalKinds": [
+    {
+      "name": "user",
+      "description": "An interactive human principal."
+    },
+    {
+      "name": "service",
+      "description": "A machine principal."
+    }
+  ],
+  "discovery": {
+    "title": "Payments Contract",
+    "summary": "The payments vocabulary for the example workload.",
+    "version": "1.0.0",
+    "tags": [
+      "payments",
+      "billing"
+    ]
+  }
+}

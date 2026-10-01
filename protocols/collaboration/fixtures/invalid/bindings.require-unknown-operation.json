@@ -1,0 +1,9 @@
+{
+  "proposals": {
+    "provider": "@acme/github",
+    "version": 1,
+    "require": [
+      "approve"
+    ]
+  }
+}

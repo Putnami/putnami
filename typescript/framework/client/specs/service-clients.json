@@ -1,0 +1,175 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/service-clients",
+  "outcomes": [
+    "A caller gets a typed client generated from the provider's committed contract, so a provider change that was not regenerated fails the build instead of the call",
+    "A call's worst-case latency is the timeout the caller configured, whatever the retry policy is",
+    "A caller can cancel a call, and cancellation ends the whole sequence rather than the attempt that happens to be running",
+    "A service that is already failing stops receiving traffic, and recovers through a bounded number of trial requests rather than a thundering herd",
+    "Every resilience decision the client makes \u2014 a retry, a circuit transition, a give-up \u2014 is visible in telemetry rather than inferred from latency",
+    "A stream \u2014 SSE or WebSocket \u2014 traverses one shared session, so admission, the single terminal, the breaker verdict and the call measurement are the same facts whichever transport carried it",
+    "A consumer that calls a provider on every request answers repeated reads from a bounded in-process cache the provider declared, keeps answering through a provider outage for a declared window, and drops an answer the moment it is revoked"
+  ],
+  "nonGoals": [
+    "Client-side load balancing, hedged requests, or service discovery",
+    "Retrying a request the caller cancelled, or a status the caller did not declare retryable",
+    "Promising that a pre-1.0 minor release keeps the previous client contract"
+  ],
+  "requirements": [
+    {
+      "id": "success-body",
+      "text": "The generated successBody call option makes the ordinary generated call also deliver its declared JSON success body byte for byte, after the declared security, resilience, status, media type, schema and decode checks accepted it. A cached answer delivers the stored bytes as a separate copy. A refused or failed call leaves the sink empty. Connect proto, void operations, raw octets and every stream shape refuse the sink before dispatch with a client.config error. A sink serves one call at a time."
+    },
+    {
+      "id": "per-call-endpoint",
+      "text": "The generated endpoint call option selects a trusted deployment endpoint using the binding's URL validation and allow-insecure policy. Concurrent calls retain independent signals, outcomes and endpoint circuits; response caches and in-flight calls never cross endpoints. GCP ID tokens default to the selected endpoint while an explicit audience remains authoritative. Declared credentials and request/response schemas still apply. Disposing the bound client disposes every endpoint view."
+    },
+    {
+      "id": "bounded-latency",
+      "text": "Retries never amplify latency past the configured per-attempt timeout: the overall deadline defaults to that timeout, each attempt's budget is clamped to what remains, and a backoff sleep that would overrun the deadline is skipped instead of taken. A provider Retry-After budget, in seconds or as a date, replaces the computed backoff and ends the sequence when the remaining deadline cannot absorb it; a status the operation declares non-retryable is never retried."
+    },
+    {
+      "id": "retry-scope",
+      "text": "Only network errors, per-attempt timeouts, and the configured retryable statuses are retried. A 4xx outside that list, a non-Error throwable, and a caller-cancelled request are returned or raised on the first attempt."
+    },
+    {
+      "id": "retry-cap",
+      "text": "The configured maximum retry count is clamped into [0, 10]; a negative value means no retries and a non-finite value means no retries, so a misconfiguration cannot become a retry storm."
+    },
+    {
+      "id": "cancellation",
+      "text": "A caller-supplied abort signal reaches the transport combined with the per-attempt timeout, aborts any pending backoff sleep, and ends the sequence: the aborted attempt is not retried."
+    },
+    {
+      "id": "circuit-isolation",
+      "text": "The breaker opens after the configured number of consecutive failures, admits at most `halfOpenMaxConcurrent` trial requests while half-open and rejects the rest with `CircuitOpenError`, and closes only after the configured number of successful trials."
+    },
+    {
+      "id": "resource-release",
+      "text": "Disposing a client tears down every interceptor-owned background resource, so a discarded client with an open circuit leaves no health-probe timer running."
+    },
+    {
+      "id": "transport-safety",
+      "text": "A base URL that is not http or https is rejected at construction by every transport, a response larger than the configured cap fails with a typed size error instead of buffering, and a decoded response that does not match the declared message shape raises a typed validation error."
+    },
+    {
+      "id": "generated-parity",
+      "text": "A committed generated client is reproducible from its provider contract. Standalone generation applies the provider's Biome configuration at the final file paths before replacing output, so generation and lint agree; formatting failure preserves existing client files."
+    },
+    {
+      "id": "strict-generation",
+      "text": "A first-party contract the generator cannot represent losslessly fails generation, naming the operation, before any file is written: a body on GET or HEAD, a WebSocket transport this runtime cannot open (a proto payload, a declared resume, a duplex stream missing a message schema), and an integer without a declared width. Every declared success variant is emitted as a status-discriminated result, and the emitted sources typecheck against the real client surface."
+    },
+    {
+      "id": "connect-transport",
+      "text": "A contract that declares Connect generates a client that calls it: the provider's protobuf descriptor travels with the generated client, the declared transport order decides the wire without the caller branching, and the deadline, retry, circuit and credential rules are the ones a REST call obeys. Connect narrows three things and each fails generation instead of shipping: more than one declared success status, a property whose protobuf json_name would rename it, and a nullable field."
+    },
+    {
+      "id": "canonical-generated-manifest",
+      "text": "Tracked TypeScript clients are formatted and lint-fixed with the provider project's resolved Biome package and configuration before their manifest hashes are computed, so generation, workspace lint and a fresh render preserve the same bytes."
+    },
+    {
+      "id": "declared-error-safety",
+      "text": "A first-party remote error is exposed only through its declared service, operation, status, code and schema: malformed payloads become a safe local response error, credential redaction that breaks the declared schema omits details, and generated guards narrow catch values by the complete operation identity. A details body a provider declares with .mayThrowDetails() arrives on the typed error for that code, validated against the declared schema."
+    },
+    {
+      "id": "resilience-telemetry",
+      "text": "Retry attempts, retry exhaustion, retry recovery, and every circuit transition emit counters and a state gauge under a per-service metric prefix, and fall back to an unnamed prefix rather than being dropped when no service name is configured."
+    },
+    {
+      "id": "stream-session-lifecycle",
+      "text": "Every first-party stream traverses five phases in order \u2014 connecting, admitted, active, terminal, closed \u2014 and always reaches closed. Admission is the provider's protocol acceptance, never the first message. It records one breaker success; after it the session writes nothing to the breaker and no attempt is retried. The handshake, idle, frame and queue budgets are distinct from the declared operation duration, and exactly one call measurement is emitted, at close."
+    },
+    {
+      "id": "websocket-streams",
+      "text": "A first-party WebSocket stream is opened as a browser must open it: the published subprotocol, no header, no credential in the URL. Identity, credentials, budget and propagation context travel in the init frame. The client drives the published conversation rather than a local phase table, refuses a frame the wire refuses with the corpus diagnostic code, accepts a resumed ready only when it asked for one, and invalidates its credential exactly once on a 401 or 403 admission refusal."
+    },
+    {
+      "id": "credential-registry",
+      "text": "One application owns one credential registry: its modules share it, two applications share nothing, and stopping the application closes it so a retained client stops calling. A refresh for one identity collapses onto one acquisition, expiry renews once inside its leeway, a source failure is never cached, and rejecting one credential evicts that one alone. An alternative is satisfied whole or not chosen, a chosen one that fails is not downgraded, and a forwarded user identity comes from the incoming context."
+    },
+    {
+      "id": "credential-audience",
+      "text": "A credential binding may name the audience its service token is requested for, and that value wins over the provider's profile and contract audience. A gcp-id-token binding with no audience requests the ID token for the binding URL, whatever the contract says: that is the URL the provider verifies it against, and it differs per environment."
+    },
+    {
+      "id": "websocket-stream-emission",
+      "text": "A declared stream is emitted from its shape, never from a consumer flag. A server stream emits one entrypoint that resolves SSE and WebSocket from the declared transport order at call time; a client stream and a bidirectional stream emit a typed duplex handle whose send and receive types are the declared message schemas, and whose single declared result is the last value delivered before completion. The emitted code carries no frame sequence, no half-close bookkeeping and no phase table."
+    },
+    {
+      "id": "declared-transport-preference",
+      "text": "The TypeScript client opens a generated server stream over the provider's declared transports, in the declared order, and the caller never branches on which one carries it. It opens the next declared transport only on an answer that says this wire is not served here \u2014 404, 405, 426, UNIMPLEMENTED, or a handshake that did not select the first-party subprotocol \u2014 and only for an operation declared safe or idempotent. Every other answer is surfaced as it is; after admission no fallback is left."
+    },
+    {
+      "id": "declared-sse-continuation",
+      "text": "The TypeScript client asks for the negotiated SSE wire on every connection of a declared continuation, refuses a provider that does not acknowledge it without fallback, and ends only at an explicit terminal. With reconnect, an interruption reopens in the same session at most five times, resolving credentials again and never resetting the idle budget. Cursor mode reopens after the last message the caller received; best-effort reopens the original query. A typed refusal or cancellation never reopens."
+    },
+    {
+      "id": "declared-stream-resume",
+      "text": "The TypeScript client continues a server stream over a new socket after a transport break, when the provider declared the stream resumable and the operation declares reconnect. The continuation presents the token the previous admission issued and the last sequence it completely received, re-resolves its credentials before it dials, and is bounded by MAX_STREAM_RESUME_ATTEMPTS. A provider that answers with a fresh stream, or refuses the token, ends the stream with a typed terminal."
+    },
+    {
+      "id": "response-cache",
+      "text": "A declared cache answers below freshMs; otherwise one call per key and forwarded identity goes upstream while callers wait. A transport failure, the operation timeout, an open circuit, retry exhaustion or the caller's own deadline passing while the provider hangs returns the stored answer below staleMs, counted and logged; a cancellation or a defect never does. Entries live on the registry lease, which aborts calls in flight when it ends, and drop by key prefix."
+    },
+    {
+      "id": "response-cache-bypass-and-field-invalidation",
+      "text": "A call made with withoutResponseCache goes to the provider: it neither reads, stores nor joins the cache, and no stored answer masks its failure. invalidateResponsesByField drops every answer whose declared response field carries a value, across the service's operations and identities, compared in the canonical form both runtimes render. A value neither can render throws, and a call in flight for a declaring operation is never stored."
+    },
+    {
+      "id": "streamed-binary-payloads",
+      "text": "An explicit raw HTTP stream generates a required request contentType with a BinarySource and returns a readable body with its status and full concrete Content-Type. The runtime does not buffer or JSON-decode it, returns before EOF, and retains cancellation through body consumption. Uploads cannot be replayed by ordinary retries or forwarded-user credential refresh. A streamed operation cannot declare a response cache. Declared auth, errors and unary HTTP transport stay in force."
+    },
+    {
+      "id": "binary-payloads",
+      "text": "The strict reader preserves a raw octet representation's media type and declared bound and refuses format: binary everywhere a JSON document reaches. The emitted client takes a bounded source, refuses an oversized one before draining it, sends the octets under the declared media type with no JSON or base64 hop, and refuses a transport that cannot carry them unchanged."
+    },
+    {
+      "id": "stream-call-telemetry",
+      "text": "A generated stream is one call measurement per opened session, and its span is the parent the provider receives: it is injected before the transport reads the request, so the SSE or Connect request head and the WebSocket init frame carry it. The measurement is labelled with the transport that carried the session, which after a declared fallback is not the first declared one, and with the status the provider admitted it with."
+    },
+    {
+      "id": "additive-responses",
+      "text": "The decoder of a success body, a stream message, a provider-owned frame or declared error details drops a property that a closed object of the generated schema does not declare, so it never reaches the returned value or the error's details. Every declared property is validated as before, a union without a discriminator must still select exactly one variant, and encoding a request body or a client message with an undeclared property is still refused."
+    },
+    {
+      "id": "opaque-json",
+      "text": "The reader accepts x-putnami-json: any and additionalProperties: true in their one closed spelling and refuses the empty schema and other spellings with the Go reader's codes. The emitter types them unknown and Record<string, unknown> and refuses an opaque parameter or a Connect dispatch. The codec carries plain JSON values, reads an integer outside the safe range as a bigint and writes back the same digits, keeps null apart from absent, and refuses values outside the JSON model."
+    },
+    {
+      "id": "provider-owned-websocket-wires",
+      "text": "The emitted TypeScript client returns Promise<ByteStream>, a readable and writable pair of octets, for a byte stream and a FrameStream of the declared messages for a provider-owned subprotocol. The socket opens with the upgrade's own headers and the declared token; a runtime that cannot carry them is refused before dialing. Frames are validated, the frame, idle, heartbeat and operation budgets apply, and a close other than 1000 fails with its code."
+    },
+    {
+      "id": "external-contract-operations",
+      "text": "An operation of a first-party document that carries x-putnami-external-contract belongs to its external authority. The TypeScript reader skips it whole, without reading its schemas, and refuses it beside x-putnami-client, as a non-string or with a blank authority, with the Go reader's codes. The generated client has no method for it, and it calls the provider's first-party routes over a real socket while the provider still serves the external one."
+    },
+    {
+      "id": "caller-resolved-bindings",
+      "text": "Generated bind helpers apply the safe service binding chain to caller-resolved endpoints. Explicit operation path bindings reject unknown, unsafe and incompatible routes, isolate owner caches and snapshot caller maps. Disposing a bound client releases its private resources and refuses later anonymous and authenticated calls. The shared page schema helper matches the Go contract and permits owner narrowing."
+    },
+    {
+      "id": "binding-headers",
+      "text": "Static non-secret binding headers, programmatic or from clients.services.<id>.headers, are snapshotted and canonicalized at construction. Invalid names, values outside visible ASCII or with surrounding whitespace, case aliases, reserved and declared credential headers fail with client.config, as the Go runtime decides for the shared corpus. Operation headers win; a static idempotency key fails before dispatch. Cache keys, retries and every stream carrier see the effective values; credentials are unchanged."
+    }
+  ],
+  "decisions": [
+    "go/framework/api/doc/adr/0011-streamed-octets-carry-their-own-media-type.md",
+    "typescript/framework/client/doc/adr/0001-one-latency-budget-per-call.md",
+    "typescript/framework/client/doc/adr/0002-format-generated-files-before-writing.md",
+    "typescript/framework/client/doc/adr/0003-one-stream-session-owns-every-transport-lifecycle.md",
+    "typescript/framework/client/doc/adr/0004-a-first-party-call-takes-the-transport-the-provider-declared-first.md",
+    "go/framework/api/doc/adr/0007-a-raw-octet-payload-is-declared-and-bounded.md",
+    "protocols/clientcontract/doc/adr/0007-a-response-cache-is-declared-per-operation.md",
+    "protocols/clientcontract/doc/adr/0008-opaque-json-is-a-declaration.md",
+    "protocols/clientcontract/doc/adr/0010-a-provider-owned-websocket-wire-is-declared-not-inferred.md",
+    "typescript/framework/application/doc/adr/0005-a-provider-owned-wire-admits-on-the-upgrade.md",
+    "protocols/clientcontract/doc/adr/0011-an-external-authority-can-own-an-operation.md",
+    "typescript/framework/client/doc/adr/0006-static-binding-headers-are-non-credential-defaults.md",
+    "go/framework/client/doc/adr/0007-static-binding-headers-are-non-credential-defaults.md",
+    "typescript/framework/client/doc/adr/0007-a-call-delivers-its-success-body-through-a-caller-owned-sink.md",
+    "protocols/clientcontract/doc/adr/0013-an-sse-stream-declares-how-it-continues-and-a-negotiated-stream-ends-explicitly.md",
+    "protocols/clientcontract/doc/adr/0014-a-client-drops-a-response-property-it-does-not-declare.md"
+  ]
+}

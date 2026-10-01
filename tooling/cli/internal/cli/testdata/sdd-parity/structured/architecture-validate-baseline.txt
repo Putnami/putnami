@@ -1,0 +1,49 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "architecture validate",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "baseline": {
+      "commit": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08",
+      "compared": true,
+      "priorFile": true,
+      "requested": "HEAD"
+    },
+    "coverage": {
+      "database": "not-detected",
+      "domainAccess": "not-detected",
+      "events": "not-detected",
+      "http": "not-detected",
+      "projectDependencies": "enforced-for-mapped-projects"
+    },
+    "diagnosticCounts": {
+      "errors": 0,
+      "info": 0,
+      "warnings": 0
+    },
+    "diagnostics": [],
+    "findings": [],
+    "ratchet": {
+      "baselineGrowth": 0,
+      "expiredWaiver": 0,
+      "knownDebt": 0,
+      "new": 0,
+      "staleBaseline": 0,
+      "staleWaiver": 0,
+      "waived": 0
+    },
+    "summary": {
+      "declaredEdges": 1,
+      "domains": 2,
+      "exports": 1,
+      "findings": 0,
+      "imports": 1,
+      "observedEdges": 1
+    },
+    "valid": true
+  }
+}
+--- stderr ---

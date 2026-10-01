@@ -1,0 +1,4 @@
+name: execute
+description: Execute an authorized change through implementation, independent review and current evidence
+allowed-tools: Bash, Read, Grep, Glob, TodoWrite, Edit, Write, Agent, ToolSearch, mcp__putnami__putnami_search, mcp__putnami__putnami_symbol, mcp__putnami__putnami_context, mcp__putnami__putnami_impact, mcp__putnami__putnami_related, mcp__putnami__putnami_summary, mcp__putnami__list_projects, mcp__putnami__describe_project, mcp__putnami__deps, mcp__putnami__find_owner, mcp__putnami__why_impacted, mcp__putnami__topo_sort, mcp__putnami__impacted, mcp__putnami__get_diagnostics
+argument-hint: [<intention|task|proposal>] [--resume <dossier>] [--tier <light|standard|heavy>] [--base <ref>] [--dry-run]

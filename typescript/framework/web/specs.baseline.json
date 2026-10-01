@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/web-application-delivery#browser-security-hint",
+    "typescript/web-application-delivery#cache-isolation",
+    "typescript/web-application-delivery#csrf-and-csp",
+    "typescript/web-application-delivery#document-isolation",
+    "typescript/web-application-delivery#entrypoint-boundary",
+    "typescript/web-application-delivery#explicit-render-mode",
+    "typescript/web-application-delivery#generation-configuration",
+    "typescript/web-application-delivery#hydration-containment",
+    "typescript/web-application-delivery#island-hydration",
+    "typescript/web-application-delivery#render-manifest",
+    "typescript/web-application-delivery#route-graph",
+    "typescript/web-application-delivery#security-propagation",
+    "typescript/web-application-delivery#server-data-boundary",
+    "typescript/web-application-delivery#ssr-response"
+  ]
+}

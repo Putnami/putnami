@@ -1,0 +1,28 @@
+{
+  "protocolVersion": 2,
+  "command": "run",
+  "status": "aborted",
+  "exitCode": 130,
+  "run": {
+    "outcome": "aborted",
+    "abortedBy": "user",
+    "exitCode": 130,
+    "counts": {
+      "total": 3,
+      "succeeded": 1,
+      "failed": 0,
+      "canceled": 2,
+      "skipped": 0
+    },
+    "reuse": {
+      "localCache": 0,
+      "remoteCache": 0,
+      "coalesced": 0
+    },
+    "durationMs": -1
+  },
+  "error": {
+    "code": "signal",
+    "message": "session interrupted by user"
+  }
+}

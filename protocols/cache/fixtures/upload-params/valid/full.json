@@ -1,0 +1,1 @@
+{ "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "result": { "status": "success", "durationMs": 900 }, "manifest": { "files": [ { "path": "dist/a.js", "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "mode": 420, "size": 12 } ] } }

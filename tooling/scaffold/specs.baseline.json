@@ -1,0 +1,24 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "tooling/project-scaffolding#archive-contents",
+    "tooling/project-scaffolding#committed-template-validity",
+    "tooling/project-scaffolding#content-only-extension-packaging",
+    "tooling/project-scaffolding#declared-extension-activates",
+    "tooling/project-scaffolding#declared-output-ownership",
+    "tooling/project-scaffolding#dry-run-produces-nothing",
+    "tooling/project-scaffolding#go-imports-are-required",
+    "tooling/project-scaffolding#go-mod-survives-tidy",
+    "tooling/project-scaffolding#manifest-selects-the-template",
+    "tooling/project-scaffolding#no-source-mutation",
+    "tooling/project-scaffolding#placeholders-are-substituted",
+    "tooling/project-scaffolding#rendered-manifests-parse",
+    "tooling/project-scaffolding#resolved-version",
+    "tooling/project-scaffolding#servable-applications",
+    "tooling/project-scaffolding#shared-metadata-index",
+    "tooling/project-scaffolding#source-selects-the-content-form",
+    "tooling/project-scaffolding#stamped-manifest",
+    "tooling/project-scaffolding#templates-ship-a-readme"
+  ]
+}

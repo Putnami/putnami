@@ -1,0 +1,350 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities-v2.json",
+  "protocolVersion": 2,
+  "project": "telemetry.putnami.dev",
+  "discoverers": [
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "discoverer",
+        "subkind": "source",
+        "key": "sql:cliagg"
+      },
+      "name": "sql:cliagg",
+      "kind": "source",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "telemetry.putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "cliagg/aggregator.go",
+          "symbol": "telemetry.putnami.dev/cliagg.(*Aggregator).MigrationSources"
+        }
+      }
+    }
+  ],
+  "migrations": [
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "migration",
+        "subkind": "sql",
+        "key": "cliagg"
+      },
+      "name": "cliagg",
+      "kind": "sql",
+      "datasource": "telemetry",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "telemetry.putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "cliagg/aggregator.go",
+          "symbol": "telemetry.putnami.dev/cliagg.(*Aggregator).MigrationSources"
+        }
+      }
+    }
+  ],
+  "infraRequirements": [
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "infra",
+        "subkind": "database",
+        "key": "telemetry"
+      },
+      "name": "telemetry",
+      "kind": "database",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "go.putnami.dev/database",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "infra.go",
+          "symbol": "go.putnami.dev/database.(*Plugin).Describe"
+        }
+      }
+    }
+  ],
+  "healthContributors": [
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "health",
+        "subkind": "health",
+        "key": "database"
+      },
+      "name": "database",
+      "probe": "health",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "go.putnami.dev/database",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/database.(*Plugin).CheckHealth"
+        }
+      }
+    }
+  ],
+  "lifecycleHooks": [
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "lifecycle",
+        "subkind": "starter",
+        "key": "cli-usage-aggregator"
+      },
+      "name": "cli-usage-aggregator",
+      "phase": "starter",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "telemetry.putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "cliagg/aggregator.go",
+          "symbol": "telemetry.putnami.dev/cliagg.(*Aggregator).Start"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "lifecycle",
+        "subkind": "starter",
+        "key": "health"
+      },
+      "name": "health",
+      "phase": "starter",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "health.go",
+          "symbol": "go.putnami.dev/http.(*HealthPlugin).Start"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "lifecycle",
+        "subkind": "starter",
+        "key": "http"
+      },
+      "name": "http",
+      "phase": "starter",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "server.go",
+          "symbol": "go.putnami.dev/http.(*ServerPlugin).Start"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "cli-usage-aggregator"
+      },
+      "name": "cli-usage-aggregator",
+      "phase": "stopper",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "telemetry.putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "cliagg/aggregator.go",
+          "symbol": "telemetry.putnami.dev/cliagg.(*Aggregator).Stop"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "database"
+      },
+      "name": "database",
+      "phase": "stopper",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "go.putnami.dev/database",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/database.(*Plugin).Stop"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "health"
+      },
+      "name": "health",
+      "phase": "stopper",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "health.go",
+          "symbol": "go.putnami.dev/http.(*HealthPlugin).Stop"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "http"
+      },
+      "name": "http",
+      "phase": "stopper",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "server.go",
+          "symbol": "go.putnami.dev/http.(*ServerPlugin).Stop"
+        }
+      }
+    }
+  ],
+  "packages": [
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/app",
+        "kind": "package",
+        "key": "go.putnami.dev/app"
+      },
+      "package": "go.putnami.dev/app",
+      "provenance": {
+        "project": "go.putnami.dev/app",
+        "package": "go.putnami.dev/app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/database",
+        "kind": "package",
+        "key": "go.putnami.dev/database"
+      },
+      "package": "go.putnami.dev/database",
+      "provenance": {
+        "project": "go.putnami.dev/database",
+        "package": "go.putnami.dev/database",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/http",
+        "kind": "package",
+        "key": "go.putnami.dev/http"
+      },
+      "package": "go.putnami.dev/http",
+      "provenance": {
+        "project": "go.putnami.dev/http",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "package",
+        "key": "telemetry.putnami.dev"
+      },
+      "package": "telemetry.putnami.dev",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "telemetry.putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "domainAccess": [
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "domainAccess",
+        "subkind": "reference",
+        "key": "observability.application-runtime.v1"
+      },
+      "import": "observability.application-runtime.v1",
+      "mode": "reference",
+      "status": "active",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "go.putnami.dev/app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "darc/evidence.go",
+          "symbol": "go.putnami.dev/app/darc.(*Plugin).DomainAccessContracts"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "telemetry.putnami.dev",
+        "kind": "domainAccess",
+        "subkind": "reference",
+        "key": "observability.protocol-contracts.v1"
+      },
+      "import": "observability.protocol-contracts.v1",
+      "mode": "reference",
+      "status": "active",
+      "provenance": {
+        "project": "telemetry.putnami.dev",
+        "package": "go.putnami.dev/app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "darc/evidence.go",
+          "symbol": "go.putnami.dev/app/darc.(*Plugin).DomainAccessContracts"
+        }
+      }
+    }
+  ]
+}

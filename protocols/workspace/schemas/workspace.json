@@ -1,0 +1,221 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-workspace.json",
+  "title": "Putnami Workspace Configuration",
+  "description": "Workspace-level configuration file (putnami.workspace.json). Placed at workspace root (~/.putnami/config.json for global, or workspace root for workspace-level).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference"
+    },
+    "name": {
+      "type": "string",
+      "description": "Workspace name. Used as display name for the workspace."
+    },
+    "output": {
+      "type": "string",
+      "enum": ["text", "json", "jsonl", "cloud-logging"],
+      "description": "Default output format for CLI commands."
+    },
+    "baseline": {
+      "type": "string",
+      "description": "Default git ref used by --impacted when --baseline is not provided."
+    },
+    "epicBranches": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Long-lived integration branch names or globs (e.g. 'epic/*'). Without --baseline, --impacted measures a branch against the nearest of these branches or the trunk — never against the branch itself."
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["dev", "test", "production"],
+      "description": "Default deployment profile. Resolved with precedence: --profile flag > PUTNAMI_PROFILE env > this value > dev."
+    },
+    "quiet": {
+      "type": "boolean",
+      "description": "Suppress non-error output."
+    },
+    "verbose": {
+      "type": "boolean",
+      "description": "Enable verbose output."
+    },
+    "includes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Workspace membership paths relative to the workspace root. Each entry may point to an autonomous scope directory or a direct project directory."
+    },
+    "options": {
+      "type": "object",
+      "description": "Per-command and per-extension parameter defaults. Keys: '*' (global defaults), command names ('build'), extension names ('@putnami/typescript'), or qualified names ('@putnami/typescript:build').",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "cache-trust": {
+            "type": "string",
+            "enum": ["ci", "any", "none"],
+            "description": "Remote-cache trust policy for this command: ci accepts only trusted provider entries, any accepts hints and legacy entries, and none disables remote caching."
+          },
+          "cpu-policy": {
+            "type": "string",
+            "enum": ["critical-path", "measured"],
+            "description": "How each task's exported CPU ceiling is derived: critical-path sizes it by the task's share of the plan's makespan, floored by measured occupancy; measured uses measured occupancy alone. Execution hint only — never affects cache keys."
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "aliases": {
+      "type": "object",
+      "description": "Command aliases mapping alias name to target command.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "extensions": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Extension references as array. Prefer extension names (for example @putnami/go)."
+        },
+        {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Extension version map. Maps extension names to version constraints (for example { \"@putnami/go\": \"^1.0.0\" })."
+        }
+      ],
+      "description": "Extensions configuration. Accepts either an array of names or a version map with constraints."
+    },
+    "registries": {
+      "type": "object",
+      "description": "Registry endpoints, one entry per ecosystem id (npm, go, oci, put, …). The keys of an entry are defined by that ecosystem's profile, declared by the extension that owns it; this schema validates only the outer map. A project may override an entry in its own putnami.json, and the override replaces the entry whole.",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+      "additionalProperties": { "type": "object" }
+    },
+    "projectAliases": {
+      "type": "object",
+      "description": "Project aliases (alias → target project ID). Aggregated with scope-level projectAliases; duplicates are an error.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "groups": {
+      "type": "object",
+      "description": "Project groups (group name → pattern). Aggregated with scope-level groups; duplicates are an error.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "templates": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Template paths or references for project scaffolding."
+    },
+    "agentArtifacts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Opt-ins, spelled `extension:<name>`, into the agent content of a declared extension, materialized into this workspace at the version the extension resolves to. The forms earlier releases installed — registry references (`name` or `name:channel`) and in-tree project paths (`/path`) — are refused; `putnami migrate agent-content <name>` moves them to the extension whose content supersedes them. A CLI that predates the opt-in reads `extension:<name>` as an agent artifact named `extension`, which no lock pins, and its install fails with nothing written."
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Lifecycle hooks at the workspace level.",
+      "additionalProperties": false,
+      "properties": {
+        "cli": {
+          "$ref": "#/definitions/hookPhaseConfig"
+        },
+        "commands": {
+          "type": "object",
+          "description": "Per-command lifecycle hooks. Keys are command names.",
+          "additionalProperties": {
+            "$ref": "#/definitions/hookPhaseConfig"
+          }
+        }
+      }
+    },
+    "disable": {
+      "type": "object",
+      "description": "Opt-out configuration for extensions and jobs.",
+      "properties": {
+        "extensions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Extension names to disable (opt-out). Extensions are auto-discovered from devDependencies and workspace packages."
+        },
+        "jobs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Jobs to disable workspace-wide. Supports job names ('lint') or qualified names ('@putnami/typescript:lint')."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Project tags to exclude from default project selection (e.g., skip 'e2e' projects in --all and --impacted runs)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "store": {
+      "type": "object",
+      "description": "Machine-global build store garbage-collection tuning. Resolution precedence: PUTNAMI_STORE_* env vars > workspace config > global config > defaults. The store location itself is set only via PUTNAMI_STORE_DIR (machine-specific).",
+      "properties": {
+        "maxBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Global byte budget across all per-repo stores (default 10 GiB). GC evicts least-recently-used entries when usage exceeds this."
+        },
+        "gcGrace": {
+          "type": "string",
+          "description": "Go duration (e.g. '1h', '30m') protecting recently-used and in-flight cache entries from eviction (default '1h'). Must comfortably exceed your longest build."
+        },
+        "maxIdleBuilds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Evict entries not hit in this many builds, regardless of budget (default 100). 0 disables idle reclaim."
+        }
+      },
+      "additionalProperties": false
+    },
+    "sessions": {
+      "type": "object",
+      "description": "Per-worktree session-record retention for <workspace>/.putnami/sessions. Resolution precedence: workspace config > global config > default. There is deliberately no environment override: session records are per-worktree, unlike the machine-global build store.",
+      "properties": {
+        "keep": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many session directories the store retains when it prunes (default 20). The minimum of 1 rules out 0, which could be read as either 'unlimited' or 'delete everything'."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "hookPhaseConfig": {
+      "type": "object",
+      "description": "Before/after hook phases.",
+      "additionalProperties": false,
+      "properties": {
+        "before": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Commands to run before the phase."
+        },
+        "after": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Commands to run after the phase."
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "description": "Timeout in milliseconds applied to each command of this hook group. Omitted or <= 0 uses the CLI default of 120000."
+        },
+        "loginShell": {
+          "type": "boolean",
+          "description": "Run this group's commands through a login shell (sh -lc), sourcing /etc/profile and ~/.profile. Off by default: a login shell makes hooks depend on per-developer dotfiles. Opt in only when a hook needs a version-manager PATH."
+        }
+      }
+    }
+  }
+}

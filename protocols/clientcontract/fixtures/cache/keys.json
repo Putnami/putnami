@@ -1,0 +1,114 @@
+{
+  "$comment": "Shared cache key vectors (ADR 0007). The Go and TypeScript runtimes must render every key byte for byte. binaryBody is the standard base64 of a raw octet request body; body is the JSON text the runtime sends.",
+  "cases": [
+    {
+      "name": "the default key lists path, query and header parameters sorted within their section, then the canonical body",
+      "operationId": "getAccount",
+      "idempotencyKeyHeader": "X-Idempotency-Key",
+      "request": {
+        "path": {
+          "id": "a/1"
+        },
+        "query": {
+          "tag": [
+            "b",
+            "a"
+          ],
+          "limit": [
+            "10"
+          ]
+        },
+        "headers": {
+          "X-Tenant": [
+            "t1"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "X-Idempotency-Key": [
+            "k-123"
+          ]
+        },
+        "body": "{\"z\":1.50,\"a\":{\"y\":\"é\\n\\u0001\",\"b\":[true,null,-0,12345678901234567890]}}"
+      },
+      "key": "getAccount?path.id=%22a%2F1%22&query.limit=%2210%22&query.tag=%5B%22b%22%2C%22a%22%5D&header.x-tenant=%22t1%22&body=%7B%22a%22%3A%7B%22b%22%3A%5Btrue%2Cnull%2C-0%2C12345678901234567890%5D%2C%22y%22%3A%22%C3%A9%5Cn%5Cu0001%22%7D%2C%22z%22%3A1.50%7D"
+    },
+    {
+      "name": "declared key fields render in declared order and an absent field is its bare name",
+      "operationId": "effectiveAccess",
+      "keyFields": [
+        "body.principal",
+        "path.org",
+        "query.missing",
+        "header.X-Tenant",
+        "body.scopes"
+      ],
+      "request": {
+        "path": {
+          "org": "acme"
+        },
+        "query": {
+          "verbose": [
+            "true"
+          ]
+        },
+        "headers": {
+          "x-tenant": [
+            "t 1"
+          ]
+        },
+        "body": "{\"principal\":\"p1\",\"action\":\"read\",\"scopes\":[\"b\",\"a\"]}"
+      },
+      "key": "effectiveAccess?body.principal=%22p1%22&path.org=%22acme%22&query.missing&header.X-Tenant=%22t%201%22&body.scopes=%5B%22b%22%2C%22a%22%5D"
+    },
+    {
+      "name": "an operation without inputs keys on its identity alone",
+      "operationId": "listRegions",
+      "request": {},
+      "key": "listRegions?"
+    },
+    {
+      "name": "a raw octet body keys on its standard base64",
+      "operationId": "hashBlob",
+      "request": {
+        "binaryBody": "AQID/w=="
+      },
+      "key": "hashBlob?body=%22AQID%2Fw%3D%3D%22"
+    },
+    {
+      "name": "the whole body can be the only key field",
+      "operationId": "search",
+      "keyFields": [
+        "body"
+      ],
+      "request": {
+        "query": {
+          "page": [
+            "2"
+          ]
+        },
+        "body": "{\"b\":{\"y\":2,\"x\":1},\"a\":\"\\\"quoted\\\" & <tag>\"}"
+      },
+      "key": "search?body=%7B%22a%22%3A%22%5C%22quoted%5C%22%20%26%20%3Ctag%3E%22%2C%22b%22%3A%7B%22x%22%3A1%2C%22y%22%3A2%7D%7D"
+    },
+    {
+      "name": "a repeated header renders as one JSON array however the field was combined",
+      "operationId": "listRegions",
+      "request": {
+        "headers": {
+          "X-Region": [
+            "eu",
+            "us"
+          ],
+          "X-Zone": [
+            "a, b"
+          ],
+          "X-Tenant": [
+            "t1"
+          ]
+        }
+      },
+      "key": "listRegions?header.x-region=%5B%22eu%22%2C%22us%22%5D&header.x-tenant=%22t1%22&header.x-zone=%5B%22a%22%2C%22b%22%5D"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "protocol": "putnami.transaction.v1",
+  "suite": "putnami.transaction.conformance.v1",
+  "protocolVersion": 1,
+  "cases": [
+    {
+      "id": "concurrent.consumers",
+      "level": "required",
+      "setup": {
+        "tables": [
+          {
+            "name": "creds",
+            "columns": [
+              { "name": "id", "type": "text", "primaryKey": true },
+              { "name": "consumed", "type": "boolean", "notNull": true, "default": "false" }
+            ],
+            "seed": [{ "id": "c1", "consumed": false }]
+          }
+        ]
+      },
+      "operations": [
+        {
+          "id": "a",
+          "table": "creds",
+          "primitive": "consume-once",
+          "args": { "keyColumn": "id", "key": "c1", "claimGuard": "consumed = false", "set": "consumed = true" }
+        },
+        {
+          "id": "b",
+          "table": "creds",
+          "primitive": "consume-once",
+          "args": { "keyColumn": "id", "key": "c1", "claimGuard": "consumed = false", "set": "consumed = true" }
+        }
+      ],
+      "concurrency": [
+        { "id": "g", "operations": ["a", "b"], "expect": { "applied": 1, "already-consumed-conflict": 1 } }
+      ],
+      "asserts": [{ "table": "creds", "where": "consumed = true", "count": 1 }]
+    }
+  ]
+}

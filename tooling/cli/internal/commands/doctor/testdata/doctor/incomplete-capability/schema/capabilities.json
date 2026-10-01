@@ -1,0 +1,14 @@
+{
+  "protocolVersion": 1,
+  "project": "go.putnami.dev/example/incomplete",
+  "requiredCapabilities": [
+    {
+      "name": "sql",
+      "requires": ["datasource", "migration"],
+      "provenance": {
+        "project": "go.putnami.dev/example/incomplete",
+        "sourceKind": "framework"
+      }
+    }
+  ]
+}

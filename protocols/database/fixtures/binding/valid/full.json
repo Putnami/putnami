@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-database-binding.json",
+  "protocolVersion": 1,
+  "databases": {
+    "auth": {
+      "engine": "postgres",
+      "schema": "iam",
+      "connection": {
+        "host": "localhost",
+        "port": 5432,
+        "database": "auth",
+        "user": "postgres",
+        "password": "postgres",
+        "ssl": false
+      }
+    },
+    "billing": {
+      "engine": "postgres",
+      "schema": "billing",
+      "connection": {
+        "instance": "project:region:billing-db"
+      }
+    },
+    "analytics": {
+      "engine": "postgres",
+      "schema": "events",
+      "connection": {
+        "dsn": "postgres://postgres:postgres@localhost:5432/analytics?sslmode=disable"
+      }
+    }
+  }
+}

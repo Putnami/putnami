@@ -1,0 +1,267 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "putnami-dev",
+  "features": [
+    {
+      "id": "putnami-dev/cookieless-audience-measurement",
+      "type": "feature",
+      "name": "Cookieless audience measurement",
+      "outcome": "The site knows which pages are read, which searches find nothing, and which platforms the CLI is downloaded for, without a cookie, a consent banner, or a third party — and a visitor can read exactly what is recorded on a page the footer links from",
+      "owner": "putnami.dev",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "what-the-site-records-is-what-the-notice-says",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-tracked-action-is-declared",
+              "the-notice-names-every-declared-action",
+              "the-notice-states-the-configured-retention"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "putnami-dev/public-documentation",
+      "type": "feature",
+      "name": "Public documentation site",
+      "outcome": "A visitor reaches what Putnami is, how to install it, which language surfaces exist, and where each package and feature is documented, from one site, without reading the repository",
+      "owner": "putnami.dev",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "one-source-per-section",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "language-sections-use-owning-sources",
+              "bundle-mounts-cannot-overlap-owned-sections",
+              "generated-support-section-has-no-asset-copy",
+              "generated-doc-output-is-not-versioned"
+            ]
+          }
+        },
+        {
+          "id": "documentation-sources-are-version-addressed-snapshots",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "missing-documentation-source-fails-closed",
+              "missing-documentation-source-fails-the-generate-pass",
+              "documentation-tree-version-is-content-addressed",
+              "documentation-snapshot-version-is-immutable",
+              "stale-documentation-copy-is-served-and-labelled",
+              "documentation-access-evidence-is-complete-and-deterministic"
+            ]
+          }
+        },
+        {
+          "id": "no-generated-mirror-in-source",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["generated-source-mirror-fails-route-emission"]
+          }
+        },
+        {
+          "id": "python-is-marked-experimental",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "framework-index-labels-python-experimental",
+              "published-python-boundary-is-explicit",
+              "llms-index-publishes-full-python-boundary",
+              "python-getting-started-requires-opt-in",
+              "concepts-do-not-imply-python-parity"
+            ]
+          }
+        },
+        {
+          "id": "route-inventory-is-complete",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "static-doc-paths-are-inventoried",
+              "typed-api-routes-are-inventoried",
+              "web-page-routes-are-inventoried",
+              "warmup-endpoints-are-inventoried",
+              "committed-public-files-are-inventoried",
+              "asset-copy-routes-are-inventoried"
+            ]
+          }
+        },
+        {
+          "id": "unmatched-paths-are-not-routed",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["root-and-catch-all-routes-are-absent"]
+          }
+        },
+        {
+          "id": "agent-surfaces-track-the-docs-tree",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["index-and-raw-markdown-share-a-doc-route"]
+          }
+        },
+        {
+          "id": "sparse-release-delivery-is-explicit",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-empty-channel-needs-no-bootstrap",
+              "release-set-handoff-keeps-exact-id-and-digest",
+              "cloudless-path-stays-full-and-non-release-set"
+            ]
+          }
+        },
+        {
+          "id": "docs-enumeration-is-build-order-independent",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["generated-doc-sources-precede-enumeration"]
+          }
+        },
+        {
+          "id": "system-model-is-published",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["system-model-pages-are-published"]
+          }
+        },
+        {
+          "id": "model-pages-are-not-surfaces",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["system-model-is-separated-from-product-surfaces"]
+          }
+        },
+        {
+          "id": "python-is-browseable-not-anchored",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["python-is-listed-without-a-first-level-anchor"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "putnami-dev/published-support-catalog",
+      "type": "feature",
+      "name": "Published support catalog",
+      "outcome": "A visitor sees the reviewed public support status of every classified package and protocol, rendered from the single reviewed catalog so the published page cannot disagree with it",
+      "owner": "putnami.dev",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "catalog-is-the-only-source",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "published-page-matches-reviewed-catalog",
+              "documented-surface-badges-resolve-from-reviewed-catalog"
+            ]
+          }
+        },
+        {
+          "id": "closed-status-vocabulary",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["unknown-status-token-fails-before-rendering", "closed-statuses-have-published-labels"]
+          }
+        },
+        {
+          "id": "invalid-catalog-fails-the-build",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "unreadable-catalog-fails",
+              "unsupported-protocol-version-fails",
+              "duplicate-subject-identity-fails",
+              "experimental-default-on-fails"
+            ]
+          }
+        },
+        {
+          "id": "independent-claims-are-rendered",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["reviewed-independent-claims-only-are-rendered"]
+          }
+        },
+        {
+          "id": "unclassified-subject-shows-no-status",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["unclassified-surface-renders-no-badge", "unlisted-subject-disclaimer-is-published"]
+          }
+        },
+        {
+          "id": "support-is-not-maturity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["support-page-separates-status-from-maturity"]
+          }
+        },
+        {
+          "id": "generated-page-is-deterministic",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["repeated-rendering-writes-identical-bytes", "support-rows-have-stable-order"]
+          }
+        },
+        {
+          "id": "cold-build-enumerates-the-page",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["support-page-is-published-before-enumeration"]
+          }
+        }
+      ]
+    }
+  ]
+}

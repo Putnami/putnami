@@ -1,0 +1,73 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "@putnami/storage",
+      "status": "pending-provider-contract",
+      "adapter": "typescript/framework/storage/src/backend/remote.backend.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/storage/src/backend/remote.backend.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "2406914974c66d917f2985004e526f6d2f0cc07aff418e395e11d8b910ee6df6"
+        },
+        {
+          "path": "typescript/framework/storage/src/backend/remote.backend.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "40effa3f92a1438ab7c0279b8366bb1800f68bf11d61240a021379f5fa7993e5"
+        },
+        {
+          "path": "typescript/framework/storage/src/backend/remote.backend.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "410ab0eb6fbd38e07d1c2109e6eb579746573e5acf053a48bec00f2eae0f31bd"
+        },
+        {
+          "path": "typescript/framework/storage/src/backend/remote.backend.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "4b4cc1e81c0e00f9e2b2e7f951f9d5797f53442d41e83382e9e7b310994a4dd5"
+        },
+        {
+          "path": "typescript/framework/storage/src/backend/remote.backend.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "92de29a4c88d79645e7efe26fdb7d8b2f3a0af53f59c7c432853f565e8ed3ce5"
+        },
+        {
+          "path": "typescript/framework/storage/src/backend/remote.backend.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "96af3da8979684e5d519f4eba0becb0e5add05b3f5903aef2dc222b15920ee39"
+        },
+        {
+          "path": "typescript/framework/storage/src/backend/remote.backend.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "ad13a0f457aab156e69bddb055ebace221f49fcaa98a966216348e7618a5db5b"
+        },
+        {
+          "path": "typescript/framework/storage/src/backend/remote.backend.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "fb0bcf21977fab1fab4550c22983338c1a35cae9144a4d0c558c22094b29fbf9"
+        }
+      ],
+      "owner": "@putnami/storage",
+      "tests": ["typescript/framework/storage/test/remote-backend.test.ts"],
+      "reason": "Speaks the storage.putnami.cloud object API. First-party Putnami service; its provider-side client declaration is owned by Putnami Cloud.",
+      "operations": [
+        "storage.copy",
+        "storage.delete",
+        "storage.get",
+        "storage.head",
+        "storage.list",
+        "storage.put",
+        "storage.sign"
+      ],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    }
+  ]
+}

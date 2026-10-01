@@ -1,0 +1,136 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/authentication-authorization",
+      "type": "feature",
+      "name": "Go authentication and authorization",
+      "outcome": "Go services resolve bounded caller identities and enforce explicit role, scope, client, and contextual authorization decisions fail-closed",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "authorization-decision",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "client-denial-returns-403",
+              "guard-denial-returns-403",
+              "missing-identity-returns-401",
+              "only-excluded-paths-bypass-the-rule",
+              "role-denial-returns-403",
+              "scope-denial-returns-403"
+            ]
+          }
+        },
+        {
+          "id": "credential-validation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "introspection-inactive-token-yields-no-identity",
+              "introspection-is-deadline-bounded",
+              "introspection-rejects-audience-mismatch",
+              "introspection-throttling-fails-closed-without-opening-the-breaker",
+              "jwks-rejects-algorithm-confusion",
+              "jwks-rejects-audience-mismatch",
+              "jwks-rejects-forged-signature",
+              "jwks-rejects-issuer-mismatch",
+              "jwks-rejects-missing-expiry-by-default",
+              "jwt-rejects-bad-signature",
+              "jwt-rejects-expired-token"
+            ]
+          }
+        },
+        {
+          "id": "fail-closed-configuration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "allow-unauthenticated-must-be-explicit",
+              "unconfigured-plugin-denies-even-with-an-existing-user",
+              "unconfigured-plugin-denies-requests"
+            ]
+          }
+        },
+        {
+          "id": "optional-authentication",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-rule-requires-authentication-unless-it-declares-optional",
+              "an-optional-rule-authorizes-an-authenticated-caller-like-a-required-one",
+              "an-optional-rule-refuses-a-credential-that-resolved-no-identity",
+              "an-optional-rule-serves-a-request-that-presents-no-credential"
+            ]
+          }
+        },
+        {
+          "id": "jwks-overlap-and-revocation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "retiring-key-leaves-the-jwks-past-its-overlap-window",
+              "revoked-key-is-removed-from-the-jwks"
+            ]
+          }
+        },
+        {
+          "id": "password-secret-policy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "malformed-hash-fails-closed",
+              "rehash-policy-is-explicit",
+              "secret-comparison-is-constant-time",
+              "versioned-hash-round-trip"
+            ]
+          }
+        },
+        {
+          "id": "secret-non-disclosure",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "decision-metrics-expose-only-counters",
+              "introspection-cache-never-stores-a-raw-token",
+              "managed-key-string-redacts-private-material",
+              "public-jwks-never-contains-private-material",
+              "sign-source-emits-no-log"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

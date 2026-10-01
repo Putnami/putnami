@@ -1,0 +1,55 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/cache-lifecycle",
+      "type": "feature",
+      "name": "Go cache lifecycle",
+      "outcome": "Go services cache owned byte values with explicit expiration and bounded eviction",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "eviction",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "memory-capacity-evictions-counted",
+              "memory-max-entries-bounds-cache",
+              "overwrite-does-not-count-as-eviction",
+              "overwrite-does-not-evict"
+            ]
+          }
+        },
+        {
+          "id": "expiration",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "memory-positive-ttl-expires",
+              "memory-zero-ttl-never-expires"
+            ]
+          }
+        },
+        {
+          "id": "ownership",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "get-returns-caller-owned-copy",
+              "set-copies-caller-slice"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

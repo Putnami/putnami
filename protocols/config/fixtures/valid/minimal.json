@@ -1,0 +1,14 @@
+{
+  "appName": "my-app",
+  "version": "1.0.0",
+  "schemaHash": "sha256:abcdef0123456789",
+  "configs": [
+    {
+      "path": "server",
+      "fields": [
+        { "name": "host", "type": "string", "default": "localhost" },
+        { "name": "port", "type": "int", "default": "8080", "env": "PORT" }
+      ]
+    }
+  ]
+}

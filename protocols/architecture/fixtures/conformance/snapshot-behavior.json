@@ -1,0 +1,145 @@
+{
+  "protocolVersion": 1,
+  "comment": "What a snapshot contract DOES: a version identifies a producer state, so the state may be redelivered but never changed, and the declared consistency governs the LATEST read rather than a version-addressed one.",
+  "bases": {
+    "snapshot": {
+      "id": "consumer.producer-snapshot.v1",
+      "version": 1,
+      "from": { "domain": "producer", "export": "producer.observations.v1" },
+      "as": "consumer.producer-observations",
+      "mode": "snapshot",
+      "status": "active",
+      "facts": ["observation_batch"],
+      "transport": { "kind": "file", "contract": "putnami.observations.v1", "availability": "active" },
+      "consistency": {
+        "maxStaleness": "1h",
+        "onMissing": "fail-closed",
+        "onStale": "fail-closed",
+        "ordering": "none",
+        "sourceVersion": "session_id",
+        "idempotencyKey": "task_key",
+        "lateEvents": "reject"
+      },
+      "justification": "The consumer joins an immutable producer state attached under its exact version."
+    }
+  },
+  "consistencyPresets": {
+    "use-stale": {
+      "maxStaleness": "1h", "onMissing": "fail-open", "onStale": "use-stale",
+      "ordering": "none", "sourceVersion": "session_id",
+      "idempotencyKey": "task_key", "lateEvents": "reject"
+    }
+  },
+  "cases": [
+    {
+      "name": "a version addresses the exact producer state attached under it",
+      "base": "snapshot",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        { "op": "attach", "version": "s-1", "value": "r1", "expect": {} },
+        { "op": "attach", "version": "s-2", "value": "r2", "expect": {} },
+        { "op": "at", "version": "s-1", "expect": { "found": true, "value": "r1", "provenance": "producer.observations.v1" } },
+        { "op": "at", "version": "s-9", "expect": { "found": false } },
+        { "op": "versions", "expect": { "versions": ["s-1", "s-2"] } }
+      ]
+    },
+    {
+      "name": "re-attaching identical content is a redelivery, not an error",
+      "base": "snapshot",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        { "op": "attach", "version": "s-1", "value": "r1", "expect": {} },
+        { "op": "attach", "version": "s-1", "value": "r1", "expect": {} },
+        { "op": "at", "version": "s-1", "expect": { "found": true, "value": "r1" } }
+      ]
+    },
+    {
+      "name": "re-attaching a version with different content rewrites history and is refused",
+      "base": "snapshot",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        { "op": "attach", "version": "s-1", "value": "r1", "expect": {} },
+        { "op": "attach", "version": "s-1", "value": "rewritten", "expect": { "error": "immutable" } },
+        { "op": "at", "version": "s-1", "expect": { "found": true, "value": "r1" } }
+      ]
+    },
+    {
+      "name": "an unversioned state cannot be attached",
+      "base": "snapshot",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [{ "op": "attach", "version": "", "value": "r1", "expect": { "error": "refused" } }]
+    },
+    {
+      "name": "latest follows the version order rather than the attachment order",
+      "base": "snapshot",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        { "op": "attach", "version": "s-2", "value": "r2", "expect": {} },
+        { "op": "attach", "version": "s-1", "value": "r1", "expect": {} },
+        { "op": "latest", "expect": { "found": true, "value": "r2" } }
+      ]
+    },
+    {
+      "name": "an empty snapshot takes the declared missing behavior",
+      "base": "snapshot",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [{ "op": "latest", "expect": { "found": false, "error": "missing" } }]
+    },
+    {
+      "name": "an empty snapshot is not an error under fail-open",
+      "base": "snapshot",
+      "consistency": "use-stale",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [{ "op": "latest", "expect": { "found": false } }]
+    },
+    {
+      "name": "a latest read past the declared bound is refused under fail-closed and still returned",
+      "base": "snapshot",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        { "op": "attach", "version": "s-1", "value": "r1", "expect": {} },
+        { "op": "latest", "expect": { "found": true, "value": "r1", "freshness": "fresh" } },
+        { "op": "advance", "seconds": 7200 },
+        { "op": "latest", "expect": { "found": true, "value": "r1", "freshness": "stale", "error": "stale" } }
+      ]
+    },
+    {
+      "name": "a latest read past the declared bound is served stamped under use-stale",
+      "base": "snapshot",
+      "consistency": "use-stale",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        { "op": "attach", "version": "s-1", "value": "r1", "expect": {} },
+        { "op": "advance", "seconds": 7200 },
+        { "op": "latest", "expect": { "found": true, "value": "r1", "freshness": "stale" } }
+      ]
+    },
+    {
+      "name": "a version-addressed read carries no staleness verdict, only an honest stamp",
+      "base": "snapshot",
+      "now": "2026-01-01T00:00:00Z",
+      "steps": [
+        { "op": "attach", "version": "s-1", "value": "r1", "expect": {} },
+        { "op": "advance", "seconds": 7200 },
+        { "op": "at", "version": "s-1", "expect": { "found": true, "value": "r1", "freshness": "stale" } }
+      ]
+    },
+    {
+      "name": "a planned snapshot is refused at construction",
+      "base": "snapshot",
+      "set": {
+        "status": "planned",
+        "transport": { "kind": "file", "contract": "putnami.observations.v1", "availability": "planned" }
+      },
+      "now": "2026-01-01T00:00:00Z",
+      "expectError": "not-active"
+    },
+    {
+      "name": "a projection contract is refused by the snapshot component",
+      "base": "snapshot",
+      "set": { "mode": "query" },
+      "now": "2026-01-01T00:00:00Z",
+      "expectError": "contract"
+    }
+  ]
+}

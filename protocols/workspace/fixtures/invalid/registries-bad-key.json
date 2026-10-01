@@ -1,0 +1,7 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-workspace.json",
+  "name": "ws",
+  "registries": {
+    "NPM": { "publish": "https://npm.putnami.dev" }
+  }
+}

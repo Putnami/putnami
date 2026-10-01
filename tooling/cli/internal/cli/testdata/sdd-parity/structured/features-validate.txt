@@ -1,0 +1,44 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "features validate",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "diagnosticCounts": {
+      "errors": 0,
+      "info": 0,
+      "warnings": 0
+    },
+    "diagnostics": [],
+    "revision": {
+      "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08",
+      "kind": "worktree"
+    },
+    "selection": {
+      "externalRecords": [],
+      "features": 2,
+      "mode": "all",
+      "projects": [
+        "/billing",
+        "/shipping"
+      ],
+      "scoped": false,
+      "specs": 0
+    },
+    "summary": {
+      "contradicted": 0,
+      "evidence": 0,
+      "features": 2,
+      "incompleteFeatures": 0,
+      "missing": 0,
+      "requirements": 0,
+      "stale": 0,
+      "unclassified": 0,
+      "verified": 0
+    },
+    "valid": true
+  }
+}
+--- stderr ---

@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/putnami-collaboration.json",
+  "title": "Putnami collaboration envelope",
+  "description": "The answer to every collaboration operation call, on the MCP and CLI entry paths alike. contract, version, operation and provider are the orchestrator's statement of what was routed where. Only an ok outcome carries a result; every other outcome carries an error.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "operation", "outcome"],
+  "properties": {
+    "contract": { "$ref": "#/$defs/contract" },
+    "version": { "type": "integer", "minimum": 1 },
+    "operation": { "type": "string", "minLength": 1 },
+    "provider": { "$ref": "#/$defs/providerIdentity" },
+    "outcome": { "$ref": "#/$defs/outcome" },
+    "result": {
+      "description": "The operation's result document, present exactly when outcome is ok. Its schema is the operation's <operation>Result definition in the contract schema; capabilities answers with #/$defs/capabilities."
+    },
+    "error": { "$ref": "#/$defs/error" }
+  },
+  "$defs": {
+    "contract": {
+      "type": "string",
+      "enum": ["memory", "proposals", "tasks"]
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["conflict", "denied", "invalid", "not_found", "ok", "unavailable", "unresolved", "unsupported"],
+      "description": "ok: completed. not_found: a referenced item does not exist. conflict: a precondition failed and nothing was written. unsupported: unbound contract, or an operation, version or precondition the bound provider does not offer. invalid: the request violates the contract. denied: credentials or permissions refused. unavailable: nothing can have been written. unresolved: a mutation may or may not have happened; reconcile before any retry."
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message", "retryable"],
+      "properties": {
+        "message": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "description": "Stable machine-readable code: binding.*, operation.*, precondition.*, request.*, provider.*, idempotency.*, revision.*, record.*, claim.*, or a provider-chosen dotted code." },
+        "retryable": { "type": "boolean", "description": "Whether repeating the identical request can succeed. Never true for unresolved." },
+        "current": { "$ref": "#/$defs/token", "description": "The current revision, on a conflict." },
+        "reconcile": { "type": "string", "description": "The read, or the idempotent repeat, that establishes whether an unresolved mutation happened: prose that names the operation as <contract>.<operation> of the same contract, for example \"run proposals.find for the same change\"." }
+      }
+    },
+    "response": {
+      "type": "object",
+      "description": "The document a provider writes as the single text block of its tool result.",
+      "additionalProperties": false,
+      "required": ["outcome"],
+      "properties": {
+        "outcome": { "$ref": "#/$defs/outcome" },
+        "result": {},
+        "error": { "$ref": "#/$defs/error" }
+      }
+    },
+    "providerIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "description": "The provider extension's identifier." },
+        "version": { "type": "string", "description": "The provider extension's resolved version, when known." }
+      }
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^\\S+$"
+    },
+    "ref": {
+      "type": "object",
+      "description": "A source-qualified opaque reference. source is \"<kind>:<locator>\"; id is meaningful only to that source. Callers store and pass the pair back, never parse it.",
+      "additionalProperties": false,
+      "required": ["source", "id"],
+      "properties": {
+        "source": { "type": "string", "maxLength": 200, "pattern": "^[a-z][a-z0-9-]{0,31}:\\S+$" },
+        "id": { "$ref": "#/$defs/token" }
+      }
+    },
+    "url": {
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^https?://",
+      "description": "A display link. Never an identity, never carrying credentials."
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,64}$"
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:/-]{1,128}$",
+      "description": "Names one intended write. A provider returns the effect of an earlier call with the same key instead of writing twice, and refuses the same key with different content as a conflict."
+    },
+    "labels": {
+      "type": "array",
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+    },
+    "pageRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "size": { "type": "integer", "minimum": 0, "maximum": 100, "description": "At most this many items; 0 or absent means the default, 20. A provider returns fewer, with page.next, rather than exceed the document bound." },
+        "cursor": { "type": "string", "maxLength": 1024, "description": "The previous page's page.next." }
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "next": { "type": "string", "maxLength": 1024, "description": "Absent on the last page." }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "version"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1, "maxLength": 214, "description": "The provider extension's name." },
+        "version": { "type": "integer", "minimum": 1, "description": "The contract version the workspace speaks." },
+        "require": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string" },
+          "description": "Optional operations the workspace depends on."
+        },
+        "settings": {
+          "type": "object",
+          "description": "The provider's own configuration, passed verbatim on every call. Never a credential."
+        }
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "description": "The options.collaboration block of putnami.workspace.json: one binding per contract.",
+      "additionalProperties": false,
+      "properties": {
+        "memory": { "$ref": "#/$defs/binding" },
+        "proposals": { "$ref": "#/$defs/binding" },
+        "tasks": { "$ref": "#/$defs/binding" }
+      }
+    },
+    "providerDeclaration": {
+      "type": "object",
+      "description": "The value of a manifest tool's _meta[\"putnami.dev/provider\"]: the contract operation the tool implements.",
+      "additionalProperties": false,
+      "required": ["contract", "version", "operation"],
+      "properties": {
+        "contract": { "$ref": "#/$defs/contract" },
+        "version": { "type": "integer", "minimum": 1 },
+        "operation": { "type": "string", "minLength": 1 },
+        "preconditions": { "$ref": "#/$defs/preconditions" }
+      }
+    },
+    "preconditions": {
+      "type": "string",
+      "enum": ["atomic", "checked", "none"],
+      "description": "atomic: compare and write in one step the backend guarantees. checked: compare then write; a concurrent writer can interleave. none: no comparison; a request carrying expectedRevision is refused as unsupported."
+    },
+    "capabilitiesInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {}
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "The capabilities result, produced by the orchestrator from the binding and the provider's manifest without running the provider.",
+      "additionalProperties": false,
+      "required": ["contract", "supportedVersions", "status", "operations"],
+      "properties": {
+        "contract": { "$ref": "#/$defs/contract" },
+        "supportedVersions": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+        "status": { "type": "string", "enum": ["bound", "invalid", "unbound"] },
+        "binding": { "$ref": "#/$defs/binding" },
+        "provider": { "$ref": "#/$defs/providerIdentity" },
+        "operations": { "type": "array", "items": { "$ref": "#/$defs/operationCapability" } },
+        "issues": { "type": "array", "items": { "$ref": "#/$defs/capabilityIssue" } },
+        "candidates": {
+          "type": "array",
+          "description": "Available extensions declaring this contract. Reported, never selected.",
+          "items": { "$ref": "#/$defs/providerIdentity" }
+        }
+      }
+    },
+    "operationCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "access", "required", "supported"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "description": "The operation's name within its contract." },
+        "access": { "type": "string", "enum": ["mutating", "read"], "description": "Whether the operation reads or mutates provider state." },
+        "required": { "type": "boolean", "description": "Whether the contract mandates this operation." },
+        "supported": { "type": "boolean", "description": "Whether the bound provider offers this operation." },
+        "preconditions": { "$ref": "#/$defs/preconditions" },
+        "openWorld": { "type": "boolean", "description": "Whether the operation reaches a system outside this machine." },
+        "description": { "type": "string", "description": "The provider tool's own description of provider-specific behavior and limits." }
+      }
+    },
+    "capabilityIssue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "message"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1, "description": "A stable machine-readable code for why the binding is invalid." },
+        "message": { "type": "string", "minLength": 1, "description": "Explains reason for a person." }
+      }
+    }
+  }
+}

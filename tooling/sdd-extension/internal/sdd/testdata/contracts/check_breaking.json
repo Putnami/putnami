@@ -1,0 +1,31 @@
+{
+  "project": "/example/payments",
+  "manifest": "go.putnami.dev/example/payments",
+  "outcome": "breaking",
+  "breakingChanges": [
+    {
+      "category": "enumValue",
+      "kind": "removed",
+      "name": "Currency.GBP",
+      "detail": "enum value \"Currency.GBP\" was removed or renamed"
+    },
+    {
+      "category": "scope",
+      "kind": "removed",
+      "name": "payments:refund",
+      "detail": "scope \"payments:refund\" was removed or renamed"
+    },
+    {
+      "category": "claim",
+      "kind": "removed",
+      "name": "role",
+      "detail": "claim \"role\" was removed or renamed"
+    },
+    {
+      "category": "grant",
+      "kind": "removed",
+      "name": "refunder",
+      "detail": "grant \"refunder\" was removed or renamed"
+    }
+  ]
+}

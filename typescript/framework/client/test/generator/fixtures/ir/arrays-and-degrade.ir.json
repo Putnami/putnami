@@ -1,0 +1,24 @@
+{
+  "irVersion": 1,
+  "transport": "http",
+  "services": [
+    {
+      "name": "ItemsService",
+      "className": "ItemsClient",
+      "methods": [
+        {
+          "name": "listItems",
+          "operationId": "listItems",
+          "httpMethod": "GET",
+          "path": "/items",
+          "response": [
+            { "name": "tags", "tsType": "string", "optional": false, "array": true },
+            { "name": "counts", "tsType": "number", "optional": true, "array": true },
+            { "name": "meta", "tsType": "Record<string, unknown>", "optional": true, "array": false },
+            { "name": "rows", "tsType": "Record<string, unknown>", "optional": true, "array": true }
+          ]
+        }
+      ]
+    }
+  ]
+}

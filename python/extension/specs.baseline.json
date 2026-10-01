@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "python/experimental-library-template#experimental-disclosure",
+    "python/experimental-library-template#explicit-template",
+    "python/experimental-library-template#minimal-library-shape",
+    "python/experimental-server-template#experimental-disclosure",
+    "python/experimental-server-template#explicit-template",
+    "python/experimental-server-template#minimal-server-shape",
+    "python/experimental-workspace-integration#experimental-boundary",
+    "python/experimental-workspace-integration#explicit-opt-in",
+    "python/experimental-workspace-integration#native-tools",
+    "python/experimental-workspace-integration#workspace-scope"
+  ]
+}

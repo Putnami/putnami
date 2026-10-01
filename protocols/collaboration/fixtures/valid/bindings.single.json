@@ -1,0 +1,11 @@
+{
+  "tasks": {
+    "provider": "@acme/github",
+    "version": 1,
+    "settings": {
+      "labels": {
+        "in_progress": "status/doing"
+      }
+    }
+  }
+}

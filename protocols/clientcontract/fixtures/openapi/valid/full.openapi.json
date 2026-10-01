@@ -1,0 +1,508 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Client contract fixture",
+    "version": "1.0.0"
+  },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": {
+      "id": "fixtures.widgets",
+      "audience": "urn:putnami:fixtures:widgets"
+    },
+    "credentials": {
+      "service": {
+        "kind": "service-token",
+        "scopes": ["widgets:read", "widgets:write"]
+      },
+      "caller": {
+        "kind": "forwarded-user-token"
+      },
+      "apiKey": {
+        "kind": "api-key",
+        "header": "X-Widget-Key"
+      },
+      "tenant": {
+        "kind": "named-header",
+        "header": "X-Tenant-ID"
+      }
+    },
+    "defaults": {
+      "resilience": {
+        "timeoutMs": 10000,
+        "attemptTimeoutMs": 3000,
+        "maxResponseBytes": 1048576,
+        "retry": {
+          "maxAttempts": 3,
+          "statuses": [429, 502, 503, 504],
+          "codes": ["unavailable"]
+        },
+        "circuit": {
+          "failureThreshold": 5,
+          "resetTimeoutMs": 30000
+        },
+        "stream": {
+          "handshakeTimeoutMs": 2000,
+          "idleTimeoutMs": 60000,
+          "heartbeatMs": 15000,
+          "reconnect": false,
+          "maxBufferedMessages": 128,
+          "maxFrameBytes": 1048576
+        }
+      }
+    },
+    "protobuf": {
+      "syntax": "proto3",
+      "package": "fixtures.widgets.v1",
+      "services": [
+        {
+          "name": "WidgetsService",
+          "methods": [
+            {
+              "name": "GetWidget",
+              "input": "GetWidgetRequest",
+              "output": "Widget",
+              "clientStreaming": false,
+              "serverStreaming": false
+            },
+            {
+              "name": "WatchWidgets",
+              "input": "WatchWidgetsRequest",
+              "output": "WidgetEvent",
+              "clientStreaming": false,
+              "serverStreaming": true
+            },
+            {
+              "name": "UploadWidgets",
+              "input": "WidgetMutation",
+              "output": "Widget",
+              "clientStreaming": true,
+              "serverStreaming": false
+            },
+            {
+              "name": "ChatWidgets",
+              "input": "WidgetMutation",
+              "output": "WidgetEvent",
+              "clientStreaming": true,
+              "serverStreaming": true
+            }
+          ]
+        }
+      ],
+      "messages": [
+        {
+          "name": "GetWidgetRequest",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "WatchWidgetsRequest",
+          "fields": [
+            {
+              "name": "cursor",
+              "jsonName": "cursor",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "uint64",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "name": "Widget",
+          "oneofs": ["owner"],
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "payload",
+              "jsonName": "payload",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "bytes"
+            },
+            {
+              "name": "state",
+              "jsonName": "state",
+              "number": 3,
+              "typeKind": "enum",
+              "type": "WidgetState"
+            },
+            {
+              "name": "labels",
+              "jsonName": "labels",
+              "number": 4,
+              "typeKind": "map",
+              "type": "map",
+              "map": {
+                "keyType": "string",
+                "valueKind": "scalar",
+                "valueType": "string"
+              }
+            },
+            {
+              "name": "user_owner",
+              "jsonName": "userOwner",
+              "number": 5,
+              "typeKind": "scalar",
+              "type": "string",
+              "oneof": "owner"
+            },
+            {
+              "name": "service_owner",
+              "jsonName": "serviceOwner",
+              "number": 6,
+              "typeKind": "scalar",
+              "type": "string",
+              "oneof": "owner"
+            }
+          ]
+        },
+        {
+          "name": "WidgetMutation",
+          "fields": [
+            {
+              "name": "widget",
+              "jsonName": "widget",
+              "number": 1,
+              "typeKind": "message",
+              "type": "Widget"
+            }
+          ]
+        },
+        {
+          "name": "WidgetEvent",
+          "fields": [
+            {
+              "name": "sequence",
+              "jsonName": "sequence",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "uint64"
+            },
+            {
+              "name": "widget",
+              "jsonName": "widget",
+              "number": 2,
+              "typeKind": "message",
+              "type": "Widget"
+            }
+          ]
+        }
+      ],
+      "enums": [
+        {
+          "name": "WidgetState",
+          "values": [
+            { "name": "WIDGET_STATE_UNSPECIFIED", "number": 0 },
+            { "name": "WIDGET_STATE_ACTIVE", "number": 1 },
+            { "name": "WIDGET_STATE_ARCHIVED", "number": 7 }
+          ]
+        }
+      ]
+    }
+  },
+  "paths": {
+    "/widgets/{id}": {
+      "get": {
+        "operationId": "getWidget",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Widget",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Widget", "nullable": false }
+              }
+            }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "unary",
+          "transports": [
+            {
+              "protocol": "connect",
+              "path": "/fixtures.widgets.v1.WidgetsService/GetWidget",
+              "encoding": "proto",
+              "protobufMethod": "/fixtures.widgets.v1.WidgetsService/GetWidget"
+            },
+            {
+              "protocol": "rest-json",
+              "path": "/widgets/{id}",
+              "encoding": "json"
+            }
+          ],
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service",
+                    "scopes": ["widgets:read"],
+                    "roles": ["widget-reader"]
+                  },
+                  { "profile": "tenant" }
+                ]
+              },
+              { "allOf": [{ "profile": "caller" }] }
+            ],
+            "authorization": {
+              "issuers": ["https://identity.putnami.test"],
+              "audiences": ["urn:putnami:fixtures:widgets"],
+              "principalKinds": ["service", "user"],
+              "clients": ["fixtures-consumer"],
+              "scopesAll": ["widgets:read"],
+              "rolesAny": ["widget-reader", "widget-admin"],
+              "scopeClaims": ["scope"],
+              "roleClaims": ["roles"]
+            }
+          },
+          "errors": [
+            {
+              "status": 404,
+              "code": "not_found",
+              "grpcCode": 5,
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resource": { "type": "string", "minLength": 1, "maxLength": 128 },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": { "type": "string" }
+                  }
+                },
+                "required": ["resource"],
+                "additionalProperties": false
+              },
+              "retryable": false
+            }
+          ],
+          "idempotency": { "kind": "safe" },
+          "resilience": {
+            "timeoutMs": 5000,
+            "attemptTimeoutMs": 2000,
+            "retry": { "maxAttempts": 2, "statuses": [503] },
+            "cache": {
+              "freshMs": 5000,
+              "staleMs": 300000,
+              "maxEntries": 256,
+              "keyFields": ["path.id"],
+              "invalidationFields": ["id"]
+            }
+          }
+        }
+      }
+    },
+    "/widgets/watch": {
+      "get": {
+        "operationId": "watchWidgets",
+        "responses": {
+          "200": {
+            "description": "Event stream",
+            "content": {
+              "text/event-stream": {
+                "schema": { "$ref": "#/components/schemas/WidgetEvent" }
+              }
+            }
+          }
+        },
+        "x-putnami-client": {
+          "stream": "server",
+          "messages": { "output": { "$ref": "#/components/schemas/WidgetEvent" } },
+          "transports": [
+            {
+              "protocol": "connect",
+              "path": "/fixtures.widgets.v1.WidgetsService/WatchWidgets",
+              "encoding": "json",
+              "protobufMethod": "/fixtures.widgets.v1.WidgetsService/WatchWidgets"
+            },
+            { "protocol": "sse", "path": "/widgets/watch", "encoding": "json" },
+            {
+              "protocol": "websocket",
+              "path": "/widgets/watch",
+              "encoding": "json",
+              "websocket": { "subprotocol": "putnami.service.v1", "resume": true }
+            }
+          ],
+          "security": { "alternatives": [{ "allOf": [] }] },
+          "errors": [],
+          "idempotency": { "kind": "safe" },
+          "resilience": { "stream": { "reconnect": true } }
+        }
+      }
+    },
+    "/widgets/upload": {
+      "get": {
+        "operationId": "uploadWidgets",
+        "responses": { "101": { "description": "Switching Protocols" } },
+        "x-putnami-client": {
+          "stream": "client",
+          "messages": {
+            "input": { "$ref": "#/components/schemas/Widget" },
+            "output": { "$ref": "#/components/schemas/Widget" }
+          },
+          "transports": [
+            {
+              "protocol": "connect",
+              "path": "/fixtures.widgets.v1.WidgetsService/UploadWidgets",
+              "encoding": "proto",
+              "protobufMethod": "/fixtures.widgets.v1.WidgetsService/UploadWidgets"
+            },
+            {
+              "protocol": "websocket",
+              "path": "/widgets/upload",
+              "encoding": "proto",
+              "protobufMethod": "/fixtures.widgets.v1.WidgetsService/UploadWidgets",
+              "websocket": { "subprotocol": "putnami.service.v1", "resume": false }
+            }
+          ],
+          "security": { "alternatives": [{ "allOf": [{ "profile": "apiKey" }] }] },
+          "errors": [],
+          "idempotency": { "kind": "idempotent", "keyHeader": "Idempotency-Key" }
+        }
+      }
+    },
+    "/widgets/chat": {
+      "get": {
+        "operationId": "chatWidgets",
+        "responses": { "101": { "description": "Switching Protocols" } },
+        "x-putnami-client": {
+          "stream": "bidirectional",
+          "messages": {
+            "input": { "$ref": "#/components/schemas/WidgetEvent" },
+            "output": { "$ref": "#/components/schemas/WidgetEvent" }
+          },
+          "transports": [
+            {
+              "protocol": "connect",
+              "path": "/fixtures.widgets.v1.WidgetsService/ChatWidgets",
+              "encoding": "proto",
+              "protobufMethod": "/fixtures.widgets.v1.WidgetsService/ChatWidgets"
+            },
+            {
+              "protocol": "websocket",
+              "path": "/widgets/chat",
+              "encoding": "proto",
+              "protobufMethod": "/fixtures.widgets.v1.WidgetsService/ChatWidgets",
+              "websocket": { "subprotocol": "putnami.service.v1", "resume": false }
+            }
+          ],
+          "security": {
+            "alternatives": [
+              { "allOf": [{ "profile": "service", "scopes": ["widgets:write"] }] }
+            ]
+          },
+          "errors": [
+            {
+              "status": 503,
+              "code": "unavailable",
+              "grpcCode": 14,
+              "retryable": true
+            }
+          ],
+          "idempotency": { "kind": "non-idempotent" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Widget": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "payload": { "type": "string", "format": "byte" },
+          "state": { "$ref": "#/components/schemas/WidgetState" },
+          "labels": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "contact": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/UserOwner" },
+              { "$ref": "#/components/schemas/ServiceOwner" }
+            ],
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "user": "#/components/schemas/UserOwner",
+                "service": "#/components/schemas/ServiceOwner"
+              }
+            }
+          }
+        },
+        "required": ["id", "payload", "state"],
+        "additionalProperties": false
+      },
+      "WidgetState": {
+        "type": "string",
+        "enum": ["active", "archived"]
+      },
+      "UserOwner": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string" }
+        },
+        "required": ["userId"],
+        "additionalProperties": false
+      },
+      "ServiceOwner": {
+        "type": "object",
+        "properties": {
+          "serviceId": { "type": "string" }
+        },
+        "required": ["serviceId"],
+        "additionalProperties": false
+      },
+      "WidgetAudit": {
+        "type": "object",
+        "properties": {
+          "attributes": { "type": "object", "additionalProperties": true },
+          "before": {
+            "x-putnami-json": "any",
+            "description": "The widget exactly as the actor saw it, carried without interpretation"
+          },
+          "trail": {
+            "type": "array",
+            "items": { "x-putnami-json": "any" }
+          }
+        },
+        "required": ["attributes", "before"],
+        "additionalProperties": false
+      },
+      "WidgetEvent": {
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "maximum": 18446744073709551615
+          },
+          "widget": { "$ref": "#/components/schemas/Widget" }
+        },
+        "required": ["sequence", "widget"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

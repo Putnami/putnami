@@ -1,0 +1,10 @@
+{
+  "protocolVersion": 1,
+  "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "manifest": {
+    "files": [
+      { "path": "dist/index.js", "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "mode": 420, "size": 10240 },
+      { "path": "dist/index.js.map", "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "mode": 420, "size": 2048 }
+    ]
+  }
+}

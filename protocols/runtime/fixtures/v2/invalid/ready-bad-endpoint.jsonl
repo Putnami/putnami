@@ -1,0 +1,2 @@
+{"v":2,"type":"ready","data":{"target":"server","endpoints":[{"scheme":"ftp","host":"","port":0,"path":"api"}]}}
+{"v":2,"type":"result","data":{"status":"OK"}}

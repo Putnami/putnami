@@ -1,0 +1,14 @@
+exit 2
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "contracts check",
+  "status": "failure",
+  "exitCode": 2,
+  "error": {
+    "code": "usage",
+    "message": "contracts requires a single target project: pass --project \u003cid|name|path\u003e"
+  }
+}
+--- stderr ---
+putnami: contracts requires a single target project: pass --project <id|name|path>

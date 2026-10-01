@@ -1,0 +1,31 @@
+{
+  "appName": "nested-hash",
+  "version": "1.0.0",
+  "schemaHash": "sha256:551a96befc86adb8",
+  "configs": [
+    {
+      "path": "app",
+      "fields": [
+        {
+          "name": "tls",
+          "type": "object",
+          "fields": [
+            { "name": "cert", "type": "string" },
+            { "name": "key", "type": "string", "sensitive": true }
+          ]
+        },
+        {
+          "name": "ports",
+          "type": "array",
+          "items": { "name": "", "type": "int" }
+        },
+        {
+          "name": "labels",
+          "type": "map",
+          "keys": "string",
+          "values": { "name": "", "type": "string" }
+        }
+      ]
+    }
+  ]
+}

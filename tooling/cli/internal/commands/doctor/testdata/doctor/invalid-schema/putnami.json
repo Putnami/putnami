@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "example/invalid-schema",
+  "options": {
+    "generate": {
+      "schema": true
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "protocolVersion": 1,
+  "namespace": "billing",
+  "features": [
+    {
+      "id": "billing/dangling",
+      "type": "feature",
+      "name": "Dangling relation",
+      "outcome": "Pins aggregate relation resolution",
+      "owner": "billing",
+      "target": "modeled",
+      "relations": [
+        { "kind": "dependsOn", "target": "missing/feature" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+{"v":2,"type":"ready","data":{"target":"database","endpoints":[{"scheme":"tcp","host":"localhost","port":5432}]}}
+{"v":2,"type":"result","data":{"status":"OK"}}

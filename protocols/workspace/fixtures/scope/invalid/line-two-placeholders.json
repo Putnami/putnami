@@ -1,0 +1,5 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "includes": ["extension"],
+  "line": { "tag": "ts/v{version}-{version}" }
+}

@@ -1,0 +1,11 @@
+{
+  "contract": "tasks",
+  "version": 1,
+  "operation": "get",
+  "Outcome": "ok",
+  "outcome": "not_found",
+  "error": {
+    "message": "no such task",
+    "retryable": false
+  }
+}

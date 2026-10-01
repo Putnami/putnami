@@ -1,0 +1,57 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "OCI Distribution Specification v1.1 (github.com/opencontainers/distribution-spec)",
+      "adapter": "tooling/extension-sdk/oci/tagdigest.go",
+      "callsites": [
+        {
+          "path": "tooling/extension-sdk/oci/tagdigest.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "a6c42f03bf7b52418667acebff8c4f612d10898065a99632d682bf4453f9b43b"
+        },
+        {
+          "path": "tooling/extension-sdk/oci/tagdigest.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "4567b888bf05088ea6d3a82d13376deb8459f0701b21da599cfa47a4cec46aad"
+        },
+        {
+          "path": "tooling/extension-sdk/oci/tagdigest.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "fe2f8cad7a784dd70b8df70f42bf32509c79e556eabe3c3ca6e6aedc8a6549b0"
+        }
+      ],
+      "owner": "putnami-extension-sdk",
+      "tests": [
+        "tooling/extension-sdk/oci/tagdigest_test.go"
+      ],
+      "reason": "Resolves a tag to its manifest digest against an OCI registry."
+    },
+    {
+      "authority": "HTTP GET of the archive URL a lock pins with its SHA-256 digest (RFC 9110); the Go binary distributions at go.dev/dl are the first consumer",
+      "adapter": "tooling/extension-sdk/pinnedarchive/pinnedarchive.go",
+      "callsites": [
+        {
+          "path": "tooling/extension-sdk/pinnedarchive/pinnedarchive.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "382c16658407924cf4abaab7905af792be9d3b9ef13b8735d11f5faf481af4a4"
+        },
+        {
+          "path": "tooling/extension-sdk/pinnedarchive/pinnedarchive.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "a4df64ee8c8b0498429834484c9a13e9e993a6e93ace499046a95801b6db06a7"
+        }
+      ],
+      "owner": "putnami-extension-sdk",
+      "tests": [
+        "tooling/extension-sdk/pinnedarchive/pinnedarchive_test.go"
+      ],
+      "reason": "Downloads a toolchain archive from the URL putnami.lock.json pins and refuses it unless its SHA-256 matches. The upstream is a static file host, not a Putnami provider, so no provider declaration can generate this client."
+    }
+  ]
+}

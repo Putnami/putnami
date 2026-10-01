@@ -1,0 +1,60 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Fixtures", "version": "1.0.0" },
+  "paths": {
+    "/things/first": {
+      "get": {
+        "operationId": "respFirst",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "a": { "type": "string" } }, "required": ["a"] }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "b": { "type": "string" } }, "required": ["b"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/things/second": {
+      "get": {
+        "operationId": "respSecond",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "b": { "type": "number" } }, "required": ["b"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/things/third": {
+      "get": {
+        "operationId": "respThird",
+        "responses": {
+          "200": { "description": "OK without a body" },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "c": { "type": "boolean" } }, "required": ["c"] }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

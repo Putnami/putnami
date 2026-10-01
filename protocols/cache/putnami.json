@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/protocol/cache",
+  "visibility": "public",
+  "tags": ["go", "protocol"],
+  "extensions": ["/go/extension"],
+  "publish": ["go"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "test": {
+      "filePatterns": ["fixtures/**"]
+    },
+    "publish": {
+      "archives": false
+    }
+  },
+  "featureAuthority": {
+    "none": "A cache wire contract is an execution detail of the jobs a user runs, not a feature they choose."
+  }
+}

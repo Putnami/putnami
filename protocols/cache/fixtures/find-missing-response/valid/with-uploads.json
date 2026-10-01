@@ -1,0 +1,1 @@
+{ "protocolVersion": 1, "uploads": [ { "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "url": "https://cas.example/up/e", "method": "PUT", "headers": { "Content-Type": "application/octet-stream" }, "sizeBytes": 2048 } ] }

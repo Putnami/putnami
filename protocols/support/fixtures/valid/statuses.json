@@ -1,0 +1,16 @@
+{
+  "protocolVersion": 1,
+  "entries": [
+    {
+      "id": "events",
+      "kind": "feature",
+      "status": "preview"
+    },
+    {
+      "id": "go.putnami.dev/protocol/runtime",
+      "kind": "protocol",
+      "status": "stable",
+      "default": true
+    }
+  ]
+}

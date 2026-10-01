@@ -1,0 +1,56 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "telemetry.putnami.dev",
+  "description": "Anonymous Putnami CLI-usage telemetry receiver (origin=cli-anon): a normal tenant workload serving OTLP/JSON logs on telemetry.putnami.dev",
+  "tags": [
+    "go",
+    "sites"
+  ],
+  "extensions": [
+    "@putnami/go",
+    "/tooling/sdd-extension"
+  ],
+  "dependencies": [
+    "/go/framework/app",
+    "/go/framework/config",
+    "/go/framework/database",
+    "/go/framework/http",
+    "/go/framework/logger",
+    "/go/framework/migration",
+    "/go/framework/security",
+    "/protocols/database",
+    "/protocols/http-routes",
+    "/protocols/telemetry",
+    "/protocols/diagnostic"
+  ],
+  "options": {
+    "package": {
+      "docker": true,
+      "port": 8080
+    },
+    "publish": {
+      "docker": true
+    },
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    },
+    "@putnami/cloud": {
+      "deploy": {
+        "enforceHttpRoutes": true,
+        "enabled": true
+      }
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    },
+    "@putnami/cloud:publish-migration": {
+      "namespace": "putnami"
+    },
+    "@putnami/cloud:publish-config": {
+      "namespace": "putnami"
+    }
+  }
+}

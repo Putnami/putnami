@@ -1,0 +1,102 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/object-storage",
+      "type": "feature",
+      "name": "Go object storage",
+      "outcome": "Go services store and retrieve objects through isolated memory, filesystem, S3, GCS, or managed-binding backends, with upload constraints enforced on the plugin-provided backend",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "backend-contract",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "cross-runtime-backend-conformance",
+              "filesystem-backend-copy",
+              "filesystem-backend-failed-put-keeps-object",
+              "filesystem-backend-round-trip",
+              "filesystem-missing-get-returns-no-object",
+              "gcs-missing-get-returns-no-object",
+              "memory-backend-copy",
+              "memory-backend-round-trip",
+              "memory-missing-get-returns-no-object",
+              "memory-s3-gcs-failed-put-keeps-object",
+              "s3-missing-get-returns-no-object"
+            ]
+          }
+        },
+        {
+          "id": "constraints",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "constrained-backend-bounds-growing-known-length-body",
+              "constrained-backend-deletes-truncated-commit",
+              "constrained-backend-enforces-mime-allowlist",
+              "constrained-backend-enforces-size-limit",
+              "constrained-backend-growing-body-keeps-s3-object",
+              "constrained-backend-known-length-end-is-sticky",
+              "constrained-backend-rejected-overwrite-keeps-object",
+              "constrained-backend-rejects-known-oversized-body-without-io",
+              "plugin-backend-enforces-bucket-constraints",
+              "signed-put-url-enforces-mime-allowlist"
+            ]
+          }
+        },
+        {
+          "id": "deadlines-and-streams",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "gcs-get-metadata-honors-request-timeout",
+              "s3-request-timeout-bounds-control-plane-not-get"
+            ]
+          }
+        },
+        {
+          "id": "isolation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "binding-applies-key-prefix",
+              "binding-list-translates-prefix",
+              "binding-remaps-logical-to-provider-bucket",
+              "filesystem-path-traversal-refused",
+              "filesystem-reserved-key-suffix-refused",
+              "filesystem-valid-paths-accepted",
+              "http-backend-owns-its-transport",
+              "unbound-logical-bucket-fails-closed"
+            ]
+          }
+        },
+        {
+          "id": "signed-access",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "binding-grants-signed-urls-explicitly",
+              "gcs-signed-get-url-requires-credentials",
+              "gcs-signed-put-url-requires-credentials",
+              "s3-signed-url-requires-credentials"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

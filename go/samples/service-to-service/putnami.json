@@ -1,0 +1,42 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/examples/service-to-service",
+  "description": "Go example: typed service-to-service clients \u2014 an Items provider that generates clients/go from its OpenAPI spec via api.Clients()",
+  "tags": [
+    "go",
+    "e2e"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/clientgen-extension",
+    "/tooling/sdd-extension"
+  ],
+  "featureAuthority": {
+    "owner": "tooling/cross-language-rest-clients"
+  },
+  "dependencies": [
+    "/go/framework/api",
+    "/go/framework/app",
+    "/go/framework/client",
+    "/go/framework/grpc",
+    "/go/framework/http",
+    "/go/framework/openapi",
+    "/go/framework/platform",
+    "/go/framework/proto",
+    "/go/framework/telemetry"
+  ],
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    },
+    "serve": {
+      "port": 3910
+    },
+    "sdd": {
+      "verification": {
+        "specs": "report"
+      }
+    }
+  }
+}

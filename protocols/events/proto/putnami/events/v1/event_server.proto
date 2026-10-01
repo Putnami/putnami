@@ -1,0 +1,182 @@
+syntax = "proto3";
+
+package putnami.events.v1;
+
+import "google/protobuf/struct.proto";
+
+// NON-NORMATIVE REFERENCE.
+//
+// The canonical Putnami events contract is the set of JSON Schemas in
+// ../../../../schemas (backed by the Go strict parsers and validators in the
+// go.putnami.dev/protocol/events package) together with the fixture corpus in
+// ../../../../fixtures. This file illustrates the gRPC endpoint profile only; it
+// is not used for code generation and must not be treated as a second source of
+// truth. If it disagrees with the schemas, the schemas win. The decision, and
+// the alternatives that were rejected, are recorded in
+// ../../../../doc/adr/0001-schemas-are-the-source-of-truth.md.
+
+// EventServer is the gRPC endpoint profile for Putnami Event Servers.
+//
+// The service name is advertised in discovery as endpoints.grpc.service and
+// defaults to putnami.events.v1.EventServer. JSON, SSE, WebSocket, HTTP, and
+// gRPC profiles all share the same protocol identifier and field vocabulary.
+service EventServer {
+  // Capabilities returns the same document exposed by
+  // GET /.well-known/putnami/events.
+  rpc Capabilities(CapabilitiesRequest) returns (EventServerCapabilities);
+
+  // Subscribe opens a server stream of canonical Event Server frames.
+  rpc Subscribe(SubscribeRequest) returns (stream EventServerFrame);
+
+  // Publish accepts one event publish request and returns the accepted event
+  // reference. Durability follows the backend selected by the Event Server.
+  rpc Publish(PublishRequest) returns (PublishResponse);
+
+  // Health returns implementation health for readiness checks and diagnostics.
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+message CapabilitiesRequest {
+  // Must be empty or putnami.events.v1.
+  string protocol = 1;
+}
+
+message EventServerCapabilities {
+  string protocol = 1;
+  EventServerInfo server = 2;
+  repeated string transports = 3;
+  EventServerFeatures features = 4;
+  EventServerEndpoints endpoints = 5;
+  EventServerLimits limits = 6;
+}
+
+message EventServerInfo {
+  string name = 1;
+  string version = 2;
+}
+
+message EventServerFeatures {
+  bool replay = 1;
+  bool publish = 2;
+  bool ack = 3;
+  repeated string auth = 4;
+  repeated string cursor = 5;
+  repeated string payload = 6;
+}
+
+message EventServerEndpoints {
+  EventServerEndpoint sse = 1;
+  EventServerEndpoint websocket = 2;
+  EventServerEndpoint publish = 3;
+  EventServerEndpoint health = 4;
+  EventServerEndpoint grpc = 5;
+}
+
+message EventServerEndpoint {
+  string method = 1;
+  string path = 2;
+  string service = 3;
+}
+
+message EventServerLimits {
+  int64 max_payload_bytes = 1 [json_name = "maxPayloadBytes"];
+  int64 max_frame_bytes = 2 [json_name = "maxFrameBytes"];
+  int64 max_subscriptions = 3 [json_name = "maxSubscriptions"];
+  int64 max_topics_per_subscription = 4 [json_name = "maxTopicsPerSubscription"];
+}
+
+message SubscribeRequest {
+  string protocol = 1;
+  string topic = 2;
+  string channel = 3;
+  string from = 4;
+  map<string, string> attributes = 5;
+}
+
+message PublishRequest {
+  string protocol = 1;
+  string topic = 2;
+  string channel = 3;
+  google.protobuf.Value payload = 4;
+  string key = 5;
+  string dedupe_key = 6 [json_name = "dedupeKey"];
+  string topic_version = 7 [json_name = "topicVersion"];
+  map<string, string> attributes = 8;
+  string trace_id = 9 [json_name = "traceId"];
+}
+
+message PublishResponse {
+  string protocol = 1;
+  string id = 2;
+  string topic = 3;
+  string timestamp = 4;
+}
+
+message EventEnvelope {
+  string protocol = 1;
+  string id = 2;
+  string topic = 3;
+  string channel = 4;
+  google.protobuf.Value payload = 5;
+  string key = 6;
+  string dedupe_key = 7 [json_name = "dedupeKey"];
+  string topic_version = 8 [json_name = "topicVersion"];
+  string timestamp = 9;
+  map<string, string> attributes = 10;
+  int32 attempt = 11;
+  string trace_id = 12 [json_name = "traceId"];
+}
+
+message EventServerFrame {
+  string protocol = 1;
+
+  // Canonical lowercase frame type:
+  // auth, subscribe, publish, event, ack, nack, error, or complete.
+  string type = 2;
+
+  string id = 3;
+  string topic = 4;
+  string channel = 5;
+  string from = 6;
+  google.protobuf.Value payload = 7;
+  string key = 8;
+  string dedupe_key = 9 [json_name = "dedupeKey"];
+  string topic_version = 10 [json_name = "topicVersion"];
+  string timestamp = 11;
+  map<string, string> attributes = 12;
+  string trace_id = 13 [json_name = "traceId"];
+
+  // Present only for auth frames when a transport uses frame-level auth.
+  // gRPC implementations should prefer request metadata for credentials.
+  string token = 14;
+  map<string, string> headers = 15;
+
+  string message = 16;
+  string error = 17;
+}
+
+message EventServerError {
+  string protocol = 1;
+
+  // Canonical lowercase error code, for example unauthorized,
+  // protocol_mismatch, invalid_frame, or upstream_unavailable.
+  string code = 2;
+
+  string message = 3;
+  bool retryable = 4;
+  map<string, string> details = 5;
+}
+
+message HealthRequest {
+  string protocol = 1;
+}
+
+message HealthResponse {
+  string protocol = 1;
+
+  // Canonical lowercase status: ok, degraded, or unavailable.
+  string status = 2;
+
+  EventServerInfo server = 3;
+  map<string, string> details = 4;
+}

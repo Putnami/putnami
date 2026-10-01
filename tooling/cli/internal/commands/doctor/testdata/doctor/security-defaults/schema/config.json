@@ -1,0 +1,30 @@
+{
+  "appName": "go.putnami.dev/example/security",
+  "version": "0.1.0",
+  "configs": [
+    {
+      "path": "database",
+      "fields": [
+        { "name": "driver", "type": "string", "default": "memory", "productionUnsafeDefault": true }
+      ]
+    },
+    {
+      "path": "auth",
+      "fields": [
+        { "name": "signingKey", "type": "string", "sensitive": true, "productionUnsafeDefault": true }
+      ]
+    },
+    {
+      "path": "session",
+      "fields": [
+        { "name": "cookieSecure", "type": "bool", "default": "false", "productionUnsafeDefault": true }
+      ]
+    },
+    {
+      "path": "rateLimit",
+      "fields": [
+        { "name": "store", "type": "string", "default": "memory", "productionUnsafeDefault": true }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/config-schema-manifest.json",
+  "title": "Putnami config schema manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["appName", "version", "schemaHash", "configs"],
+  "properties": {
+    "appName": { "type": "string" },
+    "version": { "type": "string" },
+    "schemaHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{16}$" },
+    "configs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/configBlock" },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "configBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "fields"],
+      "properties": {
+        "path": { "type": "string" },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/namedField" }
+        },
+        "optional": { "type": "boolean" }
+      }
+    },
+    "namedField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "$ref": "#/$defs/fieldType" },
+        "description": { "type": "string" },
+        "required": { "type": "boolean" },
+        "default": { "type": "string" },
+        "env": { "type": "string" },
+        "sensitive": { "type": "boolean" },
+        "productionUnsafeDefault": { "type": "boolean" },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/namedField" }
+        },
+        "items": { "$ref": "#/$defs/childField" },
+        "keys": { "$ref": "#/$defs/mapKeyType" },
+        "values": { "$ref": "#/$defs/childField" }
+      },
+      "allOf": [{ "$ref": "#/$defs/compositeSlotRules" }]
+    },
+    "childField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "$ref": "#/$defs/fieldType" },
+        "description": { "type": "string" },
+        "required": { "type": "boolean" },
+        "default": { "type": "string" },
+        "env": { "type": "string" },
+        "sensitive": { "type": "boolean" },
+        "productionUnsafeDefault": { "type": "boolean" },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/namedField" }
+        },
+        "items": { "$ref": "#/$defs/childField" },
+        "keys": { "$ref": "#/$defs/mapKeyType" },
+        "values": { "$ref": "#/$defs/childField" }
+      },
+      "allOf": [{ "$ref": "#/$defs/compositeSlotRules" }]
+    },
+    "fieldType": {
+      "type": "string",
+      "enum": ["string", "int", "float", "bool", "duration", "object", "array", "map"]
+    },
+    "mapKeyType": {
+      "type": "string",
+      "enum": ["string", "int", "bool"]
+    },
+    "compositeSlotRules": {
+      "allOf": [
+        {
+          "if": {
+            "required": ["type"],
+            "properties": { "type": { "const": "object" } }
+          },
+          "else": { "not": { "required": ["fields"] } }
+        },
+        {
+          "if": {
+            "required": ["type"],
+            "properties": { "type": { "const": "array" } }
+          },
+          "then": { "required": ["items"] },
+          "else": { "not": { "required": ["items"] } }
+        },
+        {
+          "if": {
+            "required": ["type"],
+            "properties": { "type": { "const": "map" } }
+          },
+          "then": { "required": ["keys", "values"] },
+          "else": {
+            "not": {
+              "anyOf": [
+                { "required": ["keys"] },
+                { "required": ["values"] }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

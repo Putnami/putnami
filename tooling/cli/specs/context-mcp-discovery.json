@@ -1,0 +1,68 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/context-mcp-discovery",
+  "outcomes": [
+    "A contributor can discover workspace structure and project context without enumerating the repository by hand",
+    "A human and an MCP client receive the same project, context, and workspace-map facts",
+    "An MCP client can tell which tools are read-only, which tool executes jobs, and what each method returns before calling it",
+    "An extension can contribute a workspace-answering tool without re-deriving membership, selection, or impact",
+    "Opening a fresh or resumed workspace prepares exact locked read surfaces within a fixed budget and supplies versioned extension guidance without a manual context-generation step"
+  ],
+  "nonGoals": [
+    "Making MCP a separate source of workspace truth",
+    "Allowing MCP to author specifications or execute external side effects",
+    "Owning the specification-driven surface: features, specs, architecture, and contracts belong to the @putnami/sdd extension, and the CLI carries no copy of them",
+    "Running workspace installation, dependency installation, Cloud setup, subscription, or activation as a side effect of analysis"
+  ],
+  "requirements": [
+    {
+      "id": "generated-context",
+      "text": "Context generation writes deterministic shared guidance, owns exactly one delimited block inside AGENTS.md and CLAUDE.md, inserts it into existing files without altering any other byte, preserves an edited block, and writes nothing else into the workspace root: no .mcp.json. It never writes an existing .mcp.json, and the human-maintained .agents/constraints.md is only ever read."
+    },
+    {
+      "id": "implicit-mcp-registration",
+      "text": "init, and an explicit install or upgrade, add a missing putnami entry to .mcp.json through the merge putnami mcp install uses, keeping other servers and unknown keys. Unlike that command, they keep a diverged putnami entry byte for byte, and leave an unparseable file untouched with a warning instead of failing. The first-use install that runs before an unrelated command writes no .mcp.json."
+    },
+    {
+      "id": "workspace-map",
+      "text": "The workspace map is a deterministic projection of committed inputs; printing it writes nothing, and MCP rebuilds the same projection in memory for each call."
+    },
+    {
+      "id": "extension-tool-workspace-facts",
+      "text": "A tool that declares workspaceSelection receives resolved workspace membership and the resolved selection on its request, from the same resolver the CLI's own commands use, so an extension never re-derives project identity or impact; a tool that does not declare it receives neither."
+    },
+    {
+      "id": "mcp-description",
+      "text": "Every core MCP tool advertises its user outcome, input schema, and access classification; run_jobs documents its dry-run behavior, refusal boundary, bounded result, and diagnostic-recall path."
+    },
+    {
+      "id": "mcp-equivalence",
+      "text": "MCP project, context, impact, plan, execution, and diagnostic tools call the same builders and engine paths as their CLI counterparts, and every graph answer reports the recorded workspace view it was derived from: a copy still absent after bounded graph preparation fails closed with the command that rebuilds it, and a copy past the declared freshness bound is answered from and marked stale."
+    },
+    {
+      "id": "mcp-side-effect-boundary",
+      "text": "MCP exposes one workspace-mutating tool for job execution, supports a no-execution dry run, and refuses blocking or externally mutating jobs."
+    },
+    {
+      "id": "read-preparation",
+      "text": "Analysis prepares exact locked registry extensions through the verified shared cache within a bounded deadline, falls back locally without ambient replacements, and never runs the full install lifecycle. MCP may prepare its disposable provider index through bounded probes. Human files, sessions, locks and agent-artifact ownership receipts remain unchanged unless regeneration is explicitly forced."
+    },
+    {
+      "id": "live-extension-guidance",
+      "text": "MCP initialization identifies its bound workspace and gives a self-contained active-worktree, Intelligence, freshness and fallback rule before exact locked AI.md, within a bounded total instruction size that names rather than truncates an oversized guide. A resumed session or subagent on another worktree uses the local Putnami CLI. Versioned resources return exact guidance or unavailable without latest; language extensions own resolved dependency documentation."
+    },
+    {
+      "id": "host-session-launcher",
+      "text": "The installer registers a missing user-scoped stable Putnami launcher through the supported Claude Code and Codex CLIs, recognizes its own definition by meaning rather than host formatting, migrates a registration it wrote earlier, preserves a customized human definition, and can be declined outright. The launcher resolves the active host workspace before lock-pinned relaunch and consumes its configured variable, storing no repository cwd; host policy, precedence, and trust remain authoritative."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md",
+    "tooling/cli/doc/adr/0013-sdd-as-a-standalone-extension.md",
+    "tooling/cli/doc/adr/0022-analysis-prepares-only-locked-read-surfaces.md",
+    "tooling/cli/doc/adr/0024-lazy-workspace-initialization.md",
+    "tooling/cli/doc/adr/0055-repository-rules-live-in-agents-constraints.md",
+    "tooling/cli/doc/adr/0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md"
+  ]
+}

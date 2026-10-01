@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "putnami-dev/cookieless-audience-measurement",
+  "outcomes": [
+    "A visitor reads what the site records about them, how they are counted, how long it is kept, and how to object, from a page the footer links on every page",
+    "The site measures its own audience in its own database: no cookie, no consent banner, no third-party script, and no egress"
+  ],
+  "nonGoals": [
+    "Dashboards or any read surface over the collected data (Putnami Cloud, later)",
+    "Identified mode, accounts, or anything that links a visit to a person — this site has no sign-in",
+    "Collecting search queries, page titles, or any other text a visitor typed"
+  ],
+  "requirements": [
+    {
+      "id": "what-the-site-records-is-what-the-notice-says",
+      "text": "Every action name the site tracks is declared in one vocabulary, is named on the privacy page, and the retention the page states is the retention the configuration applies; the page is reachable from the footer of every page."
+    }
+  ]
+}

@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/protocol/runtime/event.json",
+  "title": "Putnami JSONL Event Format (v1)",
+  "description": "Defines the structured JSONL event format emitted by Putnami job subprocesses. Each line of stdout is a self-contained JSON object conforming to this schema.",
+  "type": "object",
+  "required": ["v", "type"],
+  "properties": {
+    "v": {
+      "type": "integer",
+      "const": 1,
+      "description": "Protocol version. Must be 1."
+    },
+    "type": {
+      "$ref": "#/$defs/EventType"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp (UTC). Format: 2006-01-02T15:04:05.000Z"
+    },
+    "level": {
+      "$ref": "#/$defs/LogLevel"
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable message."
+    },
+    "data": {
+      "type": "object",
+      "description": "Type-specific structured payload.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "discriminator": {
+    "propertyName": "type"
+  },
+  "$defs": {
+    "EventType": {
+      "type": "string",
+      "enum": ["log", "progress", "artifact", "diagnostic", "metric", "phase", "summary", "result", "meta"],
+      "description": "The event type determines the structure of the payload."
+    },
+    "LogLevel": {
+      "type": "string",
+      "enum": ["debug", "info", "warn", "error"],
+      "description": "Log severity level."
+    },
+    "LogEvent": {
+      "description": "Freeform log output from a job.",
+      "type": "object",
+      "required": ["v", "type", "level", "message"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "log" },
+        "time": { "type": "string" },
+        "level": { "$ref": "#/$defs/LogLevel" },
+        "message": { "type": "string" },
+        "context": {
+          "type": "object",
+          "description": "Optional structured context for the log entry.",
+          "additionalProperties": true
+        },
+        "error": {
+          "type": "object",
+          "description": "Optional error details.",
+          "properties": {
+            "message": { "type": "string" },
+            "stack": { "type": "string" }
+          }
+        }
+      }
+    },
+    "ProgressEvent": {
+      "description": "Progress indicator for long-running operations.",
+      "type": "object",
+      "required": ["v", "type", "current", "total"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "progress" },
+        "time": { "type": "string" },
+        "current": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Current progress count."
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total expected count."
+        },
+        "message": {
+          "type": "string",
+          "description": "Optional progress label."
+        }
+      }
+    },
+    "DiagnosticEvent": {
+      "description": "Structured warning or error with optional source location.",
+      "type": "object",
+      "required": ["v", "type", "severity", "message"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "diagnostic" },
+        "time": { "type": "string" },
+        "severity": {
+          "type": "string",
+          "enum": ["error", "warning", "info", "hint"],
+          "description": "Diagnostic severity."
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable diagnostic message."
+        },
+        "code": {
+          "type": "string",
+          "description": "Machine-readable diagnostic code (e.g., 'TS2304', 'lint/no-unused-vars')."
+        },
+        "location": {
+          "$ref": "#/$defs/SourceLocation"
+        }
+      }
+    },
+    "MetricEvent": {
+      "description": "Named measurement emitted by a job.",
+      "type": "object",
+      "required": ["v", "type", "name", "value"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "metric" },
+        "time": { "type": "string" },
+        "name": {
+          "type": "string",
+          "description": "Metric identifier (e.g., 'binary-size', 'test-count', 'compile-time')."
+        },
+        "value": {
+          "type": "number",
+          "description": "Metric value."
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit of measurement (e.g., 'bytes', 'ms', 'count', 'percent')."
+        }
+      }
+    },
+    "PhaseEvent": {
+      "description": "Lifecycle phase boundary marker.",
+      "type": "object",
+      "required": ["v", "type", "name", "action"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "phase" },
+        "time": { "type": "string" },
+        "name": {
+          "type": "string",
+          "description": "Phase name (e.g., 'compile', 'typecheck', 'bundle')."
+        },
+        "action": {
+          "type": "string",
+          "enum": ["start", "end"],
+          "description": "Whether the phase is starting or ending."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "failed", "skipped"],
+          "description": "Phase outcome (only on action=end)."
+        }
+      }
+    },
+    "ArtifactEvent": {
+      "description": "Output artifact produced by a job.",
+      "type": "object",
+      "required": ["v", "type", "id", "name", "kind", "path"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "artifact" },
+        "time": { "type": "string" },
+        "id": {
+          "type": "string",
+          "description": "Unique artifact identifier."
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable artifact name."
+        },
+        "kind": {
+          "type": "string",
+          "description": "Artifact kind (e.g., 'binary', 'bundle', 'package', 'report')."
+        },
+        "path": {
+          "type": "string",
+          "description": "Filesystem path to the artifact."
+        }
+      },
+      "additionalProperties": true
+    },
+    "SummaryEvent": {
+      "description": "Human-readable summary label for the job recap.",
+      "type": "object",
+      "required": ["v", "type", "message"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "summary" },
+        "time": { "type": "string" },
+        "message": {
+          "type": "string",
+          "description": "Summary text shown in the job recap."
+        }
+      }
+    },
+    "ResultEvent": {
+      "description": "Final result event emitted at job completion. Exactly one result event must be emitted per job execution.",
+      "type": "object",
+      "required": ["v", "type"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "result" },
+        "time": { "type": "string" },
+        "level": { "type": "string" },
+        "message": { "type": "string" },
+        "data": {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["OK", "FAILED", "SKIP"],
+              "description": "Job outcome status."
+            },
+            "data": {
+              "type": "object",
+              "description": "Typed and producer-specific result data. A successful managed release-set publication uses only the releaseSet member below.",
+              "properties": {
+                "releaseSet": {
+                  "description": "The sole successful distribution/release-set/v2 publish outcome. Dry-run, partial failure, provider failure, and CAS conflict omit it.",
+                  "$ref": "https://putnami.dev/schemas/distribution-release-set-publish-outcome-v2.json"
+                }
+              },
+              "additionalProperties": true
+            },
+            "error": {
+              "$ref": "#/$defs/JobError"
+            }
+          }
+        }
+      }
+    },
+    "MetaEvent": {
+      "description": "Metadata event identifying the extension and job. Emitted once at the start of job execution.",
+      "type": "object",
+      "required": ["v", "type"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "meta" },
+        "time": { "type": "string" },
+        "level": { "type": "string" },
+        "message": { "type": "string" },
+        "data": {
+          "type": "object",
+          "properties": {
+            "extension": { "type": "string" },
+            "job": { "type": "string" }
+          }
+        }
+      }
+    },
+    "SourceLocation": {
+      "type": "object",
+      "description": "Source code location for diagnostics.",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "File path (relative to project root)."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Line number (1-based)."
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Column number (1-based)."
+        }
+      }
+    },
+    "JobError": {
+      "type": "object",
+      "description": "Structured error information from a failed job.",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message."
+        },
+        "code": {
+          "type": "string",
+          "description": "Machine-readable error code."
+        }
+      }
+    }
+  }
+}

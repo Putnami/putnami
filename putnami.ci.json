@@ -1,0 +1,78 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-ci.json",
+  "version": 3,
+  "commands": [
+    "lint",
+    "test",
+    "build",
+    "validate"
+  ],
+  "flags": [
+    "--enforce-coverage",
+    "--continue-on-error"
+  ],
+  "distribution": {
+    "namespace": "putnami",
+    "visibility": "private",
+    "memberAttribution": true,
+    "channels": {
+      "canary": {
+        "visibility": "private"
+      },
+      "latest": {
+        "visibility": "private",
+        "protected": true
+      },
+      "stable": {
+        "visibility": "private"
+      }
+    },
+    "members": [
+      {
+        "select": [
+          "/protocols/...",
+          "/tooling/...",
+          "/go/...",
+          "/python/...",
+          "/typescript/..."
+        ],
+        "visibility": "public"
+      },
+      {
+        "select": [
+          "/sites/...",
+          "/go/samples/application",
+          "/python/samples/application"
+        ],
+        "visibility": "private"
+      }
+    ]
+  },
+  "rules": [
+    {
+      "pullRequests": true,
+      "publish": [
+        "pr-{number}"
+      ]
+    },
+    {
+      "branches": "main",
+      "publish": [
+        "canary"
+      ]
+    }
+  ],
+  "envs": {
+    "prod": {
+      "channel": "canary",
+      "workloads": [
+        {
+          "select": [
+            "sites/putnami.dev",
+            "sites/telemetry.putnami.dev"
+          ]
+        }
+      ]
+    }
+  }
+}

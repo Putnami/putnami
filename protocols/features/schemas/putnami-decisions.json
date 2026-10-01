@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-decisions.json",
+  "title": "Putnami decision registry v1",
+  "$comment": "A committed register of settled decisions. The one at the workspace root holds the decisions every project follows; the one in a project directory holds that project's own, and every path it names is relative to that directory. Ids are unique across every registry of a workspace. Each entry carries a stable id, the one-line statement, the date it was settled, who settled it, and either a check `validate` can prove or the `reviewOnly` mark. The format lives in Putnami; the content lives in each repository. Changing a settled value means editing this file in the same change, which makes the re-decision visible in review. An absent file is adoption, never a failure.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "decisions"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "protocolVersion": {
+      "$comment": "Readers require the exact JSON integer token 1; 1.0 and 1e0 are invalid.",
+      "type": "integer",
+      "const": 1
+    },
+    "decisions": {
+      "type": "array",
+      "maxItems": 256,
+      "items": { "$ref": "#/$defs/decision" }
+    }
+  },
+  "$defs": {
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "settled", "settledBy"],
+      "oneOf": [
+        { "required": ["check"] },
+        { "required": ["reviewOnly"] }
+      ],
+      "properties": {
+        "id": {
+          "$comment": "The stable identity a failure message quotes and a pull request cites. No whitespace, no control character, so the citation is unambiguous.",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62}[A-Za-z0-9])?$"
+        },
+        "statement": {
+          "$comment": "The settled value in ONE line. Every failure message quotes it verbatim, so it reads as the rule rather than as a lint code.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "settled": {
+          "$comment": "The calendar date the decision was taken, in the one accepted spelling.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "settledBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "adr": {
+          "$comment": "Justification only. The record under the existing doc/adr convention, relative to the registry's directory, explains WHY; it never restates the statement above, so there is no second copy of the rule to drift. It must resolve to a file in the worktree.",
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^(?:[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?/)*doc/adr/[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?\\.md$"
+        },
+        "reviewOnly": {
+          "$comment": "The mark of a decision no check can prove. It is injected into the generated agent context and never fails a build. Only `true` is meaningful: `false` states neither a check nor a review-only decision and is refused.",
+          "type": "boolean",
+          "const": true
+        },
+        "check": { "$ref": "#/$defs/jsonValueCheck" }
+      }
+    },
+    "jsonValueCheck": {
+      "$comment": "v1 has exactly ONE check kind, and the boundary is deliberate: `json-value` expresses \"this declared value is (not) X\", which is what the decisions this registry was built for need. Anything it cannot express stays `reviewOnly` until a real decision needs more. Rules nobody has a decision for are not added.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "files", "pointer", "rule", "value"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "json-value"
+        },
+        "files": {
+          "$comment": "Globs relative to the registry's directory, at least one; they cannot leave it. A whole `**` segment matches zero or more path segments; every other segment never crosses a separator. Zero matching files is SATISFIED: a repository with no such file cannot violate the decision. A matched file that is not valid JSON is a violation naming the parse error, never a skip.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        },
+        "pointer": {
+          "$comment": "An RFC 6901 JSON Pointer, including the ~0 and ~1 escapes. The empty pointer names the whole document.",
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^(?:/(?:[^~/]|~[01])*)*$"
+        },
+        "rule": {
+          "$comment": "equals is violated when the resolved value differs; notEquals is violated when it matches. Numbers compare by value, so 0, 0.0 and -0 agree, and a resolved object or array never equals a scalar.",
+          "type": "string",
+          "enum": ["equals", "notEquals"]
+        },
+        "value": {
+          "type": ["string", "number", "boolean"]
+        },
+        "whenMissing": {
+          "$comment": "Decides a matched file whose pointer resolves to nothing. Default satisfied: a file that does not declare the member says nothing about the decision. Use violated when the whole point is that the member must be declared.",
+          "type": "string",
+          "enum": ["satisfied", "violated"],
+          "default": "satisfied"
+        }
+      }
+    }
+  }
+}

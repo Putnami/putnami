@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audit"
+  short_description: "Audit projects and maintain GitHub findings"
+  default_prompt: "Use $audit to scan the requested Putnami scope and maintain findings."

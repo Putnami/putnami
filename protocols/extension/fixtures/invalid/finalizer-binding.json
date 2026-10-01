@@ -1,0 +1,41 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/finalizer-binding",
+  "commands": {
+    "test": {
+      "run": [
+        { "id": "setup", "task": "test-setup" },
+        { "id": "run", "task": "test-exec", "dependsOn": ["setup"] },
+        {
+          "id": "teardown",
+          "task": "test-exec",
+          "runOn": "finally",
+          "finalizes": { "producer": "setup", "consumers": ["run"] }
+        },
+        {
+          "id": "report",
+          "task": "test-exec",
+          "dependsOn": ["teardown"],
+          "with": { "summary": { "fromStep": "teardown", "output": "summary" } }
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "test-setup": {
+      "kind": "command",
+      "command": "echo",
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "lease": {
+            "kind": "file",
+            "scope": "invocation",
+            "path": "lease.json"
+          }
+        }
+      }
+    },
+    "test-exec": { "kind": "command", "command": "echo" }
+  }
+}

@@ -1,0 +1,298 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-architecture-snapshot.json",
+  "title": "Putnami deterministic architecture snapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "coverage", "graph", "observed", "evidence", "findings", "ratchet"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "protocolVersion": { "const": 1 },
+    "coverage": { "$ref": "#/$defs/coverage" },
+    "graph": { "$ref": "#/$defs/graph" },
+    "observed": { "type": "array", "items": { "$ref": "#/$defs/observedEdge" } },
+    "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidenceRecord" } },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "ratchet": { "$ref": "#/$defs/ratchet" }
+  },
+  "$defs": {
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectDependencies", "database", "http", "events", "domainAccess"],
+      "properties": {
+        "projectDependencies": { "type": "string" },
+        "database": { "type": "string" },
+        "http": { "type": "string" },
+        "events": { "type": "string" },
+        "domainAccess": { "type": "string" }
+      }
+    },
+    "ownedConcept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "description"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["fact", "model", "schema", "api", "event"] },
+        "description": { "type": "string" }
+      }
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "authority"],
+      "properties": {
+        "name": { "type": "string" },
+        "authority": { "type": "string" },
+        "classification": { "enum": ["public", "internal", "confidential", "restricted"] },
+        "personalData": { "enum": ["none", "personal", "sensitive"] }
+      },
+      "oneOf": [
+        { "required": ["classification", "personalData"] },
+        {
+          "not": {
+            "anyOf": [
+              { "required": ["classification"] },
+              { "required": ["personalData"] }
+            ]
+          }
+        }
+      ]
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "minimumConsumerVersion"],
+      "properties": {
+        "strategy": { "enum": ["additive", "versioned", "breaking-with-migration"] },
+        "minimumConsumerVersion": { "type": "integer" }
+      }
+    },
+    "export": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "status", "description", "facts", "modes", "compatibility"],
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "type": "integer" },
+        "status": { "$ref": "#/$defs/status" },
+        "description": { "type": "string" },
+        "facts": { "type": "array", "items": { "$ref": "#/$defs/fact" } },
+        "modes": { "type": "array", "items": { "$ref": "#/$defs/mode" } },
+        "compatibility": { "$ref": "#/$defs/compatibility" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "modes": {
+                "contains": { "enum": ["query", "snapshot", "projection", "command"] }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "facts": {
+                "items": { "required": ["classification", "personalData"] }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "availability"],
+      "properties": {
+        "kind": { "enum": ["none", "in-process", "api", "event", "file"] },
+        "contract": { "type": "string" },
+        "availability": { "$ref": "#/$defs/status" }
+      }
+    },
+    "consistency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxStaleness", "onMissing", "onStale", "ordering", "sourceVersion", "idempotencyKey", "lateEvents"],
+      "properties": {
+        "maxStaleness": { "type": "string" },
+        "onMissing": { "type": "string" },
+        "onStale": { "type": "string" },
+        "ordering": { "type": "string" },
+        "sourceVersion": { "type": "string" },
+        "idempotencyKey": { "type": "string" },
+        "lateEvents": { "type": "string" }
+      }
+    },
+    "deletion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy"],
+      "properties": {
+        "strategy": { "type": "string" },
+        "tombstoneField": { "type": "string" }
+      }
+    },
+    "localModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "sourceIdentity", "projectedFields", "provenanceField", "observedAtField", "freshnessField", "writer", "rebuildable", "rebuild"],
+      "properties": {
+        "name": { "type": "string" },
+        "kind": { "enum": ["projection", "snapshot", "reference"] },
+        "sourceIdentity": { "type": "string" },
+        "projectedFields": { "type": "array", "items": { "type": "string" } },
+        "localFields": { "type": "array", "items": { "type": "string" } },
+        "provenanceField": { "type": "string" },
+        "observedAtField": { "type": "string" },
+        "freshnessField": { "type": "string" },
+        "writer": { "type": "string" },
+        "rebuildable": { "type": "boolean" },
+        "rebuild": { "type": "string" }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "consumerProject", "producerProject"],
+      "properties": {
+        "kind": { "const": "project-dependency" },
+        "consumerProject": { "type": "string" },
+        "producerProject": { "type": "string" }
+      }
+    },
+    "import": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "from", "as", "mode", "status", "facts", "justification"],
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "type": "integer" },
+        "from": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["domain", "export"],
+          "properties": { "domain": { "type": "string" }, "export": { "type": "string" } }
+        },
+        "as": { "type": "string" },
+        "mode": { "$ref": "#/$defs/mode" },
+        "status": { "$ref": "#/$defs/status" },
+        "facts": { "type": "array", "items": { "type": "string" } },
+        "transport": { "$ref": "#/$defs/transport" },
+        "bootstrap": { "$ref": "#/$defs/transport" },
+        "updates": { "$ref": "#/$defs/transport" },
+        "consistency": { "$ref": "#/$defs/consistency" },
+        "deletion": { "$ref": "#/$defs/deletion" },
+        "localModel": { "$ref": "#/$defs/localModel" },
+        "bindings": { "type": "array", "items": { "$ref": "#/$defs/binding" } },
+        "justification": { "type": "string" }
+      }
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "owner", "source", "projects", "owns", "exports", "imports"],
+      "properties": {
+        "id": { "type": "string" },
+        "owner": { "type": "string" },
+        "source": { "type": "string" },
+        "projects": { "type": "array", "items": { "type": "string" } },
+        "owns": { "type": "array", "items": { "$ref": "#/$defs/ownedConcept" } },
+        "exports": { "type": "array", "items": { "$ref": "#/$defs/export" } },
+        "imports": { "type": "array", "items": { "$ref": "#/$defs/import" } }
+      }
+    },
+    "declaredEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "export", "producerDomain", "consumerDomain", "mode", "status", "facts"],
+      "properties": {
+        "id": { "type": "string" },
+        "export": { "type": "string" },
+        "producerDomain": { "type": "string" },
+        "consumerDomain": { "type": "string" },
+        "mode": { "$ref": "#/$defs/mode" },
+        "status": { "$ref": "#/$defs/status" },
+        "facts": { "type": "array", "items": { "type": "string" } },
+        "localModel": { "$ref": "#/$defs/localModel" },
+        "bindings": { "type": "array", "items": { "$ref": "#/$defs/binding" } }
+      }
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domains", "edges"],
+      "properties": {
+        "domains": { "type": "array", "items": { "$ref": "#/$defs/domain" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/declaredEdge" } }
+      }
+    },
+    "observedEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "producerDomain", "consumerDomain", "producerProject", "consumerProject"],
+      "properties": {
+        "kind": { "const": "project-dependency" },
+        "producerDomain": { "type": "string" },
+        "consumerDomain": { "type": "string" },
+        "producerProject": { "type": "string" },
+        "consumerProject": { "type": "string" }
+      }
+    },
+    "evidenceTransport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "kind", "availability"],
+      "properties": {
+        "role": { "type": "string" },
+        "kind": { "enum": ["none", "in-process", "api", "event", "file"] },
+        "availability": { "$ref": "#/$defs/status" }
+      }
+    },
+    "evidenceRecord": {
+      "$comment": "A framework implementation of a declared import, observed from committed build evidence. It is derived fact and creates no permission.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "consumerDomain", "import", "mode"],
+      "properties": {
+        "kind": { "const": "framework-primitive" },
+        "consumerDomain": { "type": "string" },
+        "consumerProject": { "type": "string" },
+        "import": { "type": "string" },
+        "mode": { "$ref": "#/$defs/mode" },
+        "transports": { "type": "array", "items": { "$ref": "#/$defs/evidenceTransport" } }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "code", "severity", "disposition", "message"],
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "severity": { "enum": ["error", "warning", "info"] },
+        "disposition": { "enum": ["new", "known-debt", "waived", "stale-baseline", "stale-waiver", "baseline-growth", "expired-waiver"] },
+        "message": { "type": "string" },
+        "edge": { "$ref": "#/$defs/observedEdge" },
+        "evidence": { "$ref": "#/$defs/evidenceRecord" }
+      }
+    },
+    "ratchet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["new", "knownDebt", "waived", "staleBaseline", "staleWaiver", "baselineGrowth", "expiredWaiver"],
+      "properties": {
+        "new": { "type": "integer", "minimum": 0 },
+        "knownDebt": { "type": "integer", "minimum": 0 },
+        "waived": { "type": "integer", "minimum": 0 },
+        "staleBaseline": { "type": "integer", "minimum": 0 },
+        "staleWaiver": { "type": "integer", "minimum": 0 },
+        "baselineGrowth": { "type": "integer", "minimum": 0 },
+        "expiredWaiver": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "status": { "enum": ["planned", "active", "legacy", "deprecated"] },
+    "mode": { "enum": ["reference", "query", "snapshot", "projection", "command"] }
+  }
+}

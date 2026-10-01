@@ -1,0 +1,53 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/runtime-toolchain-pinning",
+  "outcomes": [
+    "An extension runtime is prepared with the compiler the workspace lock pins, on any machine, whatever the developer's PATH offers",
+    "A task declared against a runtime toolchain runs with that exact executable and an environment derived from it",
+    "A result produced by one pinned toolchain is never served for a run that pins another",
+    "A toolchain the lock does not satisfy stops a run that plans a job requiring it, naming the extension, the alias and the pin",
+    "A run that plans no job requiring a toolchain, such as a build in a workspace with an extension and no project of its language, never stops on that toolchain",
+    "A workspace whose lock pins no toolchain yet still runs workspace-install, the command whose files the pin derives from",
+    "A toolchain an extension installed inside the workspace resolves like one it finds on PATH"
+  ],
+  "nonGoals": [
+    "Downloading, installing or provisioning a toolchain",
+    "Naming any language, compiler or package manager inside the CLI",
+    "Pinning the ambient tools a build legitimately reaches, such as a shell, a linker or git"
+  ],
+  "requirements": [
+    {
+      "id": "exact-lock-resolution",
+      "text": "A candidate qualifies only when its probe output, with the locked version substituted, equals the expectation exactly. Outside workspace-install, a lock that exists but does not pin a required alias, or has no host-platform integrity, fails a run whose plan needs it, naming the extension and the alias; a workspace with no lock bootstraps under an unavailable identity. An optional toolchain no candidate satisfies publishes empty executable bindings. No mismatching ambient binary is ever substituted."
+    },
+    {
+      "id": "minimal-child-environment",
+      "text": "A subprocess bound to a resolved toolchain receives the resolved executable's directory first on PATH, ahead of the CLI's directory and every inherited one, and keeps each inherited directory once in its original order. A pinned tool's bare name therefore resolves to the locked executable while tools sharing its directory stay reachable. A home-rooted candidate resolves through the platform user home, not $HOME alone."
+    },
+    {
+      "id": "identity-keys-results",
+      "text": "The resolved toolchain identity \u2014 the declaration, the locked version, the host platform, the platform integrity and availability, and no host path \u2014 is folded into the task cache key and into the prepared runtime's artifact digest. Resolution completes during runtime synchronization, before selection and planning; an alias synchronization leaves unresolved resolves once the plan is final, before any job runs or reaches the cache. A job is therefore keyed under the identity it runs with."
+    },
+    {
+      "id": "workspace-installed-candidates",
+      "text": "An environment candidate expands against the environment the workspace's jobs receive: PUTNAMI_WORKSPACE_ROOT names that workspace's root, never a value the CLI inherited, so a toolchain an extension installed inside the workspace, such as a managed Go release, qualifies when its probe matches the locked version."
+    },
+    {
+      "id": "provisioning-runs-unpinned",
+      "text": "workspace-install writes the files toolchain pins derive from, and workspace-fetch runs before it, so an alias only they need resolves as if optional: a missing pin, missing host-platform integrity or no matching candidate yields the unavailable identity and never fails the run. A local extension's prepare toolchains do too, in a run of only those two. An alias a planned job of another command requires resolves strictly, and such a job refuses a required alias resolved unavailable while a lock exists."
+    },
+    {
+      "id": "unplanned-toolchains-do-not-stop-the-run",
+      "text": "Runtime synchronization leaves a command's required alias the lock does not satisfy unresolved. Once the plan is final, before any job runs or is keyed, a planned job requiring it fails the run with the strict resolution's error, and a missing pin names adding a project that declares it or putnami install; a run that plans no such job goes on. Engine-owned provider launches still resolve strictly."
+    },
+    {
+      "id": "provisioning-reports-the-installed-toolchain",
+      "text": "workspace-install that starts before a required alias's pinned toolchain exists logs no warning then, since installing it can be what the run does. After the run, however it ends and including a run that plans no job, it probes each such alias again: a candidate that now matches the pin is reported at info level, and an alias still unmatched is a warning naming the extension, the alias and each rejected candidate. A run that holds no workspace-install reports nothing."
+    }
+  ],
+  "decisions": [
+    "protocols/extension/doc/adr/0002-runtime-toolchains-are-lock-pinned-under-the-current-contract.md",
+    "tooling/cli/doc/adr/0019-toolchain-lock-follows-provisioned-runtimes.md"
+  ]
+}

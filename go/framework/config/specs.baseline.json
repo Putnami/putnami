@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/typed-configuration#cancellation",
+    "go/typed-configuration#mapping",
+    "go/typed-configuration#precedence",
+    "go/typed-configuration#sensitive-values"
+  ]
+}

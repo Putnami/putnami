@@ -1,0 +1,100 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "logging",
+  "features": [
+    {
+      "id": "logging/flush-performance",
+      "type": "feature",
+      "name": "Flush performance",
+      "outcome": "Flushing a logger stays fast enough to run on every request path",
+      "owner": "platform",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "flush-latency",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "threshold",
+            "checks": [
+              "flush-benchmark"
+            ],
+            "metric": "logger.flush.duration",
+            "aggregation": "p95",
+            "operator": "lte",
+            "target": 25,
+            "unit": "ms",
+            "window": {
+              "kind": "invocation"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "logging/structured-logging",
+      "type": "feature",
+      "name": "Structured logging",
+      "outcome": "Applications emit structured records through every configured sink",
+      "owner": "platform",
+      "target": "live-verified",
+      "requirements": [
+        {
+          "id": "lifecycle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "close-visits-every-sink",
+              "flush-visits-every-sink"
+            ]
+          }
+        },
+        {
+          "id": "sink-wiring",
+          "stage": "wired",
+          "evidenceKinds": [
+            "capability"
+          ]
+        },
+        {
+          "id": "enabled-by-default",
+          "stage": "default-on",
+          "evidenceKinds": [
+            "capability"
+          ]
+        },
+        {
+          "id": "delivery-slo",
+          "stage": "live-verified",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "threshold",
+            "checks": [
+              "production-delivery-slo"
+            ],
+            "metric": "logging.delivery.success",
+            "aggregation": "ratio",
+            "operator": "gte",
+            "target": 0.999,
+            "unit": "ratio",
+            "window": {
+              "kind": "rolling",
+              "seconds": 2592000
+            },
+            "environment": "production",
+            "maxAgeSeconds": 3600
+          }
+        }
+      ]
+    }
+  ]
+}

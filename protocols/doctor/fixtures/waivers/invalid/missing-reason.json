@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-doctor.json",
+  "protocolVersion": 1,
+  "waivers": [
+    {
+      "code": "doctor.volatile_persistence",
+      "project": "go.putnami.dev/example/iam",
+      "owner": "platform-team",
+      "reason": "",
+      "expires": "2027-06-30"
+    }
+  ]
+}

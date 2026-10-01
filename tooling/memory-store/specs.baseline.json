@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "tooling/memory-store#compare-and-set-checkpoints",
+    "tooling/memory-store#contextual-memory",
+    "tooling/memory-store#explicit-backend",
+    "tooling/memory-store#explicit-outage",
+    "tooling/memory-store#layout-independent-context",
+    "tooling/memory-store#one-contract-every-backend",
+    "tooling/memory-store#portable-git-writes",
+    "tooling/memory-store#readable-records",
+    "tooling/memory-store#retries-never-duplicate",
+    "tooling/memory-store#truthful-manifest"
+  ]
+}

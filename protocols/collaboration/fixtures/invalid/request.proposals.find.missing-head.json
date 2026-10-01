@@ -1,0 +1,6 @@
+{
+  "change": {
+    "repository": "github.com/acme/app",
+    "base": "main"
+  }
+}

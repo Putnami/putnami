@@ -1,0 +1,72 @@
+{
+  "$defs": {
+    "AuthDecision": {
+      "description": "The outcome label for an authorization check. The values double as the metric counter keys and the \"decision\" log attribute, so the Go and TypeScript frameworks share one vocabulary for dashboards and log queries.",
+      "enum": [
+        "allow",
+        "deny_unauthenticated",
+        "deny_client",
+        "deny_scope",
+        "deny_role",
+        "deny_guard"
+      ],
+      "type": "string"
+    },
+    "ClaimName": {
+      "description": "Wire names of the well-known token claims the framework extracts from a verified payload. Adopting these constants replaces hand-written claim-key literals in the framework auth code.",
+      "enum": [
+        "sub",
+        "iss",
+        "client_id",
+        "roles",
+        "scope",
+        "aud",
+        "exp"
+      ],
+      "type": "string"
+    },
+    "Claims": {
+      "additionalProperties": false,
+      "description": "The well-known claims the framework extracts from a verified token payload into typed fields (go/framework/http ClaimsFromMap). Every field is optional on the wire; unrecognized claims travel out-of-band in an extra map.",
+      "properties": {
+        "client_id": {
+          "description": "OAuth2 client identifier the token was issued to.",
+          "type": "string"
+        },
+        "iss": {
+          "description": "Issuer: who issued the token (JWT \"iss\").",
+          "type": "string"
+        },
+        "roles": {
+          "description": "Role names assigned to the principal.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "scope": {
+          "description": "Scopes granted to the principal, extracted from the \"scope\" claim.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sub": {
+          "description": "Subject: the principal identifier (JWT \"sub\").",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PrincipalKind": {
+      "description": "The recognized kinds of authenticated principal. Adopting these constants replaces hand-written principal-kind literals in the framework auth code.",
+      "enum": [
+        "user",
+        "apikey"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "go.putnami.dev/protocol/identity contracts"
+}

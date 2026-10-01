@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "app": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "analytics": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "mode": {
+          "type": "string",
+          "default": "cookieless",
+          "x-constraints": ["oneOf"]
+        },
+        "datasource": {
+          "type": "string",
+          "default": "analytics"
+        },
+        "secret": {
+          "type": "string",
+          "x-sensitive": true
+        },
+        "serverPageViews": {
+          "type": "boolean",
+          "default": true
+        },
+        "respectGpc": {
+          "type": "boolean",
+          "default": true
+        },
+        "respectDnt": {
+          "type": "boolean",
+          "default": true
+        },
+        "countryHeader": {
+          "type": "string"
+        },
+        "trustedProxies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "retentionRawDays": {
+          "type": "integer",
+          "default": 90,
+          "x-constraints": ["integer"]
+        },
+        "retentionAggregateDays": {
+          "type": "integer",
+          "default": 760,
+          "x-constraints": ["integer"]
+        },
+        "retentionMode": {
+          "type": "string",
+          "default": "sweep",
+          "x-constraints": ["oneOf"]
+        },
+        "maxPathKeysPerDay": {
+          "type": "integer",
+          "default": 2000,
+          "x-constraints": ["integer"]
+        },
+        "rateLimitPerMinute": {
+          "type": "integer",
+          "default": 120,
+          "x-constraints": ["integer"]
+        },
+        "flushIntervalMs": {
+          "type": "integer",
+          "default": 5000,
+          "x-constraints": ["integer"]
+        },
+        "flushWaitMs": {
+          "type": "integer",
+          "default": 1000,
+          "x-constraints": ["integer"]
+        },
+        "queueCapacity": {
+          "type": "integer",
+          "default": 5000,
+          "x-constraints": ["integer"]
+        },
+        "flushBatch": {
+          "type": "integer",
+          "default": 200,
+          "x-constraints": ["integer"]
+        },
+        "flushDeadlineMs": {
+          "type": "integer",
+          "default": 5000,
+          "x-constraints": ["integer"]
+        },
+        "cookieName": {
+          "type": "string",
+          "default": "_pa"
+        },
+        "cookieMaxAgeDays": {
+          "type": "integer",
+          "default": 390,
+          "x-constraints": ["integer"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "required": ["analytics", "app"],
+  "title": "putnami.dev config"
+}

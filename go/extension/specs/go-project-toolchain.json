@@ -1,0 +1,199 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/go-project-toolchain",
+  "outcomes": [
+    "A directory with a go.mod becomes a buildable, testable, lintable Putnami project without the orchestrator being taught anything about Go",
+    "A workspace of interdependent Go modules keeps resolving offline, because the extension maintains the replace closure module-mode go commands need",
+    "One command produces the same binaries, the same generated contracts and the same test verdict on a developer machine, on CI, and from a restored cache entry",
+    "A project's published contracts — its OpenAPI document, its proto schema, its config schema, its infrastructure requirements — are generated from the project's own code rather than hand-maintained beside it"
+  ],
+  "nonGoals": [
+    "Choosing a project's architecture, module layout, or framework packages",
+    "Publishing to a registry: package prepares artifacts and records channels, publish uploads them",
+    "Type-checking or generating for languages other than Go, including the clients another extension generates from a Go provider's OpenAPI document",
+    "Promising compatibility across every pre-1.0 minor release, which RELEASE.md governs"
+  ],
+  "requirements": [
+    {
+      "id": "managed-toolchain",
+      "text": "The Go toolchain is resolved from the workspace go.work directive before the project's go.mod, and a child go invocation runs against the managed toolchain and managed caches while explicit credential and third-party proxy settings the caller set are preserved; a proxy chain led by the workspace's declared module origin is normalized so that origin's modules resolve directly without a public-proxy fallback, for any vanity module server a workspace declares rather than a built-in host."
+    },
+    {
+      "id": "shared-build-cache",
+      "text": "When the run's cache provider serves an object cache and the remote-build-cache option is on, Go's build cache is backed by the extension's own GOCACHEPROG helper: a lookup answers locally first and asks the provider only on a miss, served bytes are verified against the output id they were announced under, stores are offered asynchronously, and a provider failure degrades to the local cache. The trust policy decides which channels a lookup accepts, and the option never keys a task."
+    },
+    {
+      "id": "pinned-lint-tools",
+      "text": "Lint tools resolve to the versions pinned in tools/versions.json; a PATH binary is reused only when it matches the pin, and a stale one is replaced rather than trusted."
+    },
+    {
+      "id": "probe-purity",
+      "text": "The workspace probe's answer is a function of the tree alone: it is identical across repeated runs, across request orderings, across the reason it was asked for, and across the host that asked."
+    },
+    {
+      "id": "probe-graph-fidelity",
+      "text": "The probe reports each project's module path as its identity and its dependency edges as repo-relative paths resolved from require and replace directives; external modules contribute no edge and a project never depends on itself."
+    },
+    {
+      "id": "replace-closure",
+      "text": "Workspace sync appends only the missing transitive workspace replaces, after existing content, never rewriting bytes it did not add; a second run changes nothing, a dry run writes nothing, and a run with no resolved project selection fails closed."
+    },
+    {
+      "id": "repository-reads-are-declared-inputs",
+      "text": "Every repository file the Go extension's tests read outside the project (go.work, every go.work member's go.mod, every first-party extension manifest, the content policy and authored agent content of each manifest that ships content, and the npm packager's gate twin) is a declared test input, so editing one re-runs the suite instead of replaying an old verdict."
+    },
+    {
+      "id": "modfile-restoration",
+      "text": "A build that mutates go.mod or go.sum restores the tracked content it found, including deleting a file the run created and recreating one the run removed."
+    },
+    {
+      "id": "tidy-drift-visibility",
+      "text": "A successful tidy that adds a workspace module to go.mod — including one only test files import — reports the added modules as a build diagnostic naming the commit-and-sync remedy, because the release-set member's dependencies are derived from the committed go.mod and a requirement the plan does not carry makes package~go refuse the module."
+    },
+    {
+      "id": "offline-tidy-is-a-cacheable-no-op",
+      "text": "A build whose environment disables module downloads (GOPROXY=off) runs no `go mod tidy`: tidy resolves a module graph wider than the build list an install warms, so the phase reports a no-op the next build of the same tree reuses from the cache, and go.mod and go.sum keep the content it found. GOPROXY keys the task, so that entry never answers a run that can resolve modules; a tidy that ran and failed stays an uncacheable skip, so a transient failure is never recorded."
+    },
+    {
+      "id": "declared-compile-matrix",
+      "text": "The set of compiled platforms comes from the project's declared matrix, the requested target, or the package channel being produced — never from the host — and a malformed platform request is an error rather than a silent fallback."
+    },
+    {
+      "id": "explicit-entrypoint",
+      "text": "Serve, run and describe select an entrypoint explicitly: a root main package or a single cmd/<name>/main.go is used automatically, a configured entrypoint overrides that, and an unreadable or absent configuration falls back to the documented default rather than failing."
+    },
+    {
+      "id": "single-schema-committer",
+      "text": "Each committed generated contract has exactly one committer for a given run: when describe will run, generate defers the committed sidecar instead of writing a partial one, only changed files are committed, and formatting-only publication of an unmerged framework OpenAPI document preserves its bytes and hash."
+    },
+    {
+      "id": "generation-opt-out",
+      "text": "A project that opts out of committing generated schemas still gets the build-only .gen copy, and the generation manifest's export points at that copy; the opt-out is refused for a project with no describe phase, whose .gen copy no task would restore, instead of losing the contract on the first cached build."
+    },
+    {
+      "id": "relocatable-generation-manifest",
+      "text": "Every path the generation manifest serializes is project-relative, so a cache entry produced in one checkout restores correctly into another."
+    },
+    {
+      "id": "generation-path-safety",
+      "text": "A generator that asks to write outside the project root is rejected instead of escaping it."
+    },
+    {
+      "id": "merged-config-survives-a-cache-hit",
+      "text": "The merged config file config-merge writes under .gen/conf is a declared output of both config-merge tasks, inside a subpath build-generate cedes: a config-merge cache hit restores it, a build-generate restore leaves it alone, the task reports it project-relative on success and not at all on a skip, and a dependency's config change moves the config-merge cache key."
+    },
+    {
+      "id": "test-host-identity-scrub",
+      "text": "A test subprocess does not inherit the managed-runtime platform identity of the machine that launched it, while every other inherited environment variable is preserved."
+    },
+    {
+      "id": "test-failure-attribution",
+      "text": "A batched test run reports each failure and each coverage verdict against the project that produced it, and a failure with no parseable per-test output is still reported as a failure rather than swallowed."
+    },
+    {
+      "id": "test-batch-size",
+      "text": "The go-test batch policy takes its project cap from the batch-max-projects option of the test command, set in workspace or project options: unset leaves go-test batches unbounded, a positive integer caps how many projects share one go test invocation, 1 runs each project alone, and any other value fails the plan. The option only groups projects and never enters a task cache key."
+    },
+    {
+      "id": "project-scoped-coverage",
+      "text": "Under coverage-scope project, a batched test run gives each member its own go test invocation whose -coverpkg names only that member's packages, so its coverage profile and go test arguments are the same whichever projects share its batch. The default batch scope keeps one invocation over the union of the members' packages and splits its profile by the package each member's module owns. The scope keys the test task, and an unknown scope fails the task before any go invocation."
+    },
+    {
+      "id": "module-bounded-coverage",
+      "text": "A project's coverage profile holds the packages its own module owns, listed explicitly rather than matched by a directory pattern. A module nested under the project's directory and reachable through go.work is never instrumented into the project's profile nor charged to it by prefix — on the solo path, in a one-member batch, in a batch that includes the nested module, and under both coverage scopes — and the nested module keeps its own independent measurement."
+    },
+    {
+      "id": "bounded-test-output",
+      "text": "Test runs emit one deterministic structured outcome summary by default, retain the complete transcript as session-detail log events, bound causal failure diagnostics to the CLI report limits with explicit omission accounting, and let test-verbose change visibility without changing result data or verdicts."
+    },
+    {
+      "id": "lint-batch-equivalence",
+      "text": "Linting several projects in one invocation produces the diagnostics a solo run produces, attributes each to the longest matching project root, and never groups projects from distinct go.work roots together."
+    },
+    {
+      "id": "image-input-producers",
+      "text": "Image packaging materializes the project's declared build producers before assembly, including when the image is selected through an upstream package dependency; it does not enter Go compiler steps for an image project."
+    },
+    {
+      "id": "package-channel-index",
+      "text": "Packaging records the channels it produced inside the output directory it owns, so the index publishers read is derived from every owned record and a cache restore of one packager's output restores its channel without a sibling running. Nothing is written outside a declared output. The archive packager alone writes the archive publication manifest naming the version, artifact and channel an archive uploader reads."
+    },
+    {
+      "id": "archive-matrix-honesty",
+      "text": "An extension archive stages exactly the declared platform matrix and refuses to ship an archive whose prepared runtime is missing, rather than publishing a binary nobody built."
+    },
+    {
+      "id": "archive-agent-content",
+      "text": "An extension that declares agent content ships, in every platform archive, the same tree built once from its authored source under its own name and version, bound by the digest the packaged manifest declares and stamped with the agent-content contract; a manifest without agent content keeps the base contract. Content the declared policy forbids, content under another name, and staged bytes that differ from the digest fail packaging."
+    },
+    {
+      "id": "go-ecosystem-profile",
+      "text": "The extension owns go and uses oci. Declared module or image publication yields the member with exact package and publish steps. An opted-in type:image project needs no go.mod: its OCI coordinate uses the canonical project name and declared registry namespace, with package/image then publish/docker. A managed target defaults to the workspace name only when no registry namespace is declared; the distribution namespace is independent."
+    },
+    {
+      "id": "registries-drive-go-origin",
+      "text": "The Go origin and proxy list come from the workspace registries entry; GOPROXY never leads with the origin."
+    },
+    {
+      "id": "per-module-channel-resolution",
+      "text": "upgrade --channel resolves each module through its own @v/<channel>.info and pins each module to its own version."
+    },
+    {
+      "id": "channel-query-credentials",
+      "text": "A channel query to an https module origin carries the netrc credential the go command would send there, following NETRC and GOAUTH. An anonymous 401, 403 or 404 names the missing credential."
+    },
+    {
+      "id": "member-event-per-publication",
+      "text": "Every Go module publication, new or reused, reports one published member with the digest the registry served back, and writes no dist tag."
+    },
+    {
+      "id": "resolved-dependency-documentation",
+      "text": "The putnami.go_docs MCP tool returns AI.md only from the exact module cmd/go selects for the requested project, including go.work and local replacements, with the selected package, version, source kind, path and content digest. Resolution is bounded, offline and read-only; absent cached bytes, ambiguous projects, escaping symlinks and unversioned extension-carried copies produce an explicit unavailable result rather than documentation for a different module version."
+    },
+    {
+      "id": "reproducible-archives",
+      "text": "Extension and template archives preserve staged file bytes, executable modes and symbolic links, while sorting entries and normalizing timestamps and host ownership so retries with unchanged inputs produce the same immutable archive digest."
+    },
+    {
+      "id": "contract-canonicalization-preserves-declared-order",
+      "text": "Canonicalizing or merging a published OpenAPI document normalizes only the structure the specification declares unordered. Provider-authored values under default, example, examples, enum, const and x- extensions are copied verbatim, servers, security and tags keep their declared order, a describing producer replaces a shared value whole rather than field by field, and a second canonical pass returns the same bytes."
+    },
+    {
+      "id": "committed-client-drift",
+      "text": "The generated Go client build-describe mirrors into the project tree is committed, and build-describe is its first writer in a session; its declared client output carries drift: fail, so the engine compares what the task writes (or a cache hit restores) with the bytes present before and fails the task with generated-output-drift when they differ, leaving the regenerated client in the worktree to commit. Build-time generation under .gen carries no policy."
+    },
+    {
+      "id": "locked-go-is-exact",
+      "text": "When the workspace lock pins a Go release that meets the workspace's go directive, the extension runs only that release: a go on PATH that reports another release is passed over for the managed install of the pinned one, downloaded once and verified against the pinned digest. Without a pin, or with a pin older than the directive, the directive stays a minimum."
+    },
+    {
+      "id": "install-without-go",
+      "text": "workspace-install on a workspace that declares no Go (no Go member, no go.work, no root go.mod, no Go lock pin) and offers no go command skips the Go phase instead of failing. A workspace that declares Go still fails when no verified Go can be installed."
+    },
+    {
+      "id": "included-members-join-go-work",
+      "text": "workspace-install adds to an existing go.work, with go work use, each Go member of the membership the CLI resolves, members reached through includes among them, that go.work does not use yet. It creates no go.work."
+    },
+    {
+      "id": "included-members-are-go-projects",
+      "text": "The Go projects workspace-install and deps-upgrade act on are those of the legacy projects member when it names one, else the Go members of the membership the CLI resolves, members reached through includes among them. A standalone member declared only through includes has its GOWORK=off build list warmed, with its go.sum put back, and its go.putnami.dev requirements upgraded."
+    },
+    {
+      "id": "hosted-run-dependencies",
+      "text": "On a hosted run, workspace-fetch is the one Go job given the registry credential. It reads it from the engine's descriptor before starting any process, runs no program from the workspace tree, and gives it only to downloading go commands, as a 0600 NETRC with GOAUTH=netrc removed after each one, on failure and on a signal. Every job with the offline signal runs go with GOPROXY=off, GONOPROXY=none and -mod=readonly and writes no credential; without the signal, go commands are unchanged."
+    }
+  ],
+  "decisions": [
+    "go/extension/doc/adr/0001-the-extension-owns-go-project-identity.md",
+    "go/extension/doc/adr/0002-generated-contracts-have-one-committer.md",
+    "go/extension/doc/adr/0003-the-compile-matrix-is-declared-never-observed.md",
+    "go/extension/doc/adr/0004-archive-bytes-exclude-staging-metadata.md",
+    "go/extension/doc/adr/0005-describe-owns-the-migration-bundle-inside-gen.md",
+    "go/extension/doc/adr/0008-coverage-scope-decides-whose-tests-count.md",
+    "go/extension/doc/adr/0009-coverage-names-the-packages-a-module-owns.md",
+    "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
+    "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",
+    "protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md"
+  ]
+}

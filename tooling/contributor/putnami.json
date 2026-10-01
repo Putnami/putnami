@@ -1,0 +1,65 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/contributor",
+  "tags": ["tooling"],
+  "extensions": ["@putnami/scaffold"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "publish": {
+      "archives": true
+    },
+    "agent-artifact": {
+      "forbiddenContent": [
+        "password",
+        "access token",
+        "api key",
+        "https://user:",
+        "npm_",
+        "ghp_",
+        "`gh ",
+        "gh pr create",
+        "gh pr edit",
+        "gh pr list",
+        "gh pr review",
+        "gh pr view",
+        "gh issue create",
+        "gh issue edit",
+        "gh issue list",
+        "gh issue view",
+        "gh issue comment",
+        "gh api user",
+        "gh label create",
+        "gh label list",
+        "github.com",
+        "status/",
+        "source/plan",
+        "severity/",
+        "priority/",
+        "group/",
+        "domain/",
+        "missions/",
+        ".ai/domains.json",
+        "sites/putnami.dev"
+      ],
+      "requiredSkills": [
+        "plan",
+        "execute",
+        "fix",
+        "epic",
+        "check",
+        "code-review",
+        "fix-loop",
+        "content-bump",
+        "putnami-plan",
+        "putnami-change",
+        "putnami-check",
+        "putnami-review"
+      ]
+    }
+  },
+  "featureAuthority": {
+    "owner": "cli/contributor-workflows"
+  }
+}

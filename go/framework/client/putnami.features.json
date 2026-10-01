@@ -1,0 +1,627 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/typed-service-clients",
+      "type": "feature",
+      "name": "Go typed service clients",
+      "outcome": "A Go service calls another service through a client generated from the provider's published contract, with bounded retries, a circuit breaker, and per-operation producer lineage",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "success-body",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-success-body-is-delivered-byte-for-byte-after-the-calls-own-checks",
+              "a-cached-answer-delivers-the-bytes-the-provider-sent",
+              "a-refused-or-failed-call-delivers-no-bytes",
+              "a-transport-that-rewrites-the-body-is-refused-before-dispatch",
+              "a-sink-belongs-to-one-call-at-a-time"
+            ]
+          }
+        },
+        {
+          "id": "per-call-endpoint",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "concurrent-targets-isolate-credentials-circuits-and-cached-responses",
+              "an-invalid-override-fails-before-credentials-or-network",
+              "an-override-preserves-explicit-audiences-and-declared-schemas"
+            ]
+          }
+        },
+        {
+          "id": "resilience-order",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-chain-runs-in-the-specified-order",
+              "the-chain-is-composed-once-per-client"
+            ]
+          }
+        },
+        {
+          "id": "bounded-retries",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "backoff-is-exponential-with-jitter-capped-at-the-maximum",
+              "backoff-stays-positive-at-high-attempt-counts",
+              "retries-abort-when-the-callers-context-is-done",
+              "the-total-timeout-bounds-the-whole-retry-loop"
+            ]
+          }
+        },
+        {
+          "id": "circuit-states",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-breaker-opens-after-consecutive-failures-and-fails-fast",
+              "half-open-admits-a-bounded-number-of-trial-requests",
+              "the-breaker-closes-only-after-the-configured-successes"
+            ]
+          }
+        },
+        {
+          "id": "error-redaction",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-http-transport-error-never-carries-query-values",
+              "a-connect-transport-error-never-carries-query-values"
+            ]
+          }
+        },
+        {
+          "id": "local-request-validation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-invalid-generated-json-request-is-rejected-before-dispatch"
+            ]
+          }
+        },
+        {
+          "id": "additive-responses",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-response-property-the-client-does-not-declare-is-dropped",
+              "a-declared-response-property-is-still-validated",
+              "a-request-property-the-contract-does-not-declare-is-still-refused"
+            ]
+          }
+        },
+        {
+          "id": "bounded-responses",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-http-transport-caps-the-response-body-it-reads",
+              "the-connect-transport-caps-the-response-body-it-reads"
+            ]
+          }
+        },
+        {
+          "id": "credential-alternatives",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-credential-alternative-is-selected-and-injected",
+              "an-operation-that-declares-credentials-is-never-sent-anonymously",
+              "a-rejected-service-credential-is-invalidated-and-reacquired"
+            ]
+          }
+        },
+        {
+          "id": "remote-error-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-remote-error-names-the-service-and-the-operation",
+              "a-non-success-response-never-carries-raw-response-bytes"
+            ]
+          }
+        },
+        {
+          "id": "error-payload-redaction",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-credential-carried-as-a-number-or-a-boolean-never-reaches-the-payload",
+              "a-credential-carried-as-base64-bytes-never-reaches-the-payload",
+              "a-declared-business-field-survives-redaction"
+            ]
+          }
+        },
+        {
+          "id": "retry-after-budget",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "retry-after-is-read-in-seconds-and-as-an-http-date",
+              "a-wait-longer-than-the-remaining-budget-stops-the-retries",
+              "backoff-is-bounded-by-the-declared-policy"
+            ]
+          }
+        },
+        {
+          "id": "typed-service-binding",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-generated-client-resolves-its-endpoint-and-identity-from-the-binding",
+              "a-binding-url-that-is-not-a-safe-absolute-endpoint-fails-closed"
+            ]
+          }
+        },
+        {
+          "id": "credential-audience",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-gcp-id-token-is-requested-for-the-binding-url-whatever-the-contract-says",
+              "a-binding-audience-wins-over-the-profile-and-contract-audience"
+            ]
+          }
+        },
+        {
+          "id": "declared-server-streams",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-sse-message-is-validated-against-the-declared-output-schema",
+              "a-terminal-stream-error-is-projected-as-a-typed-remote-error",
+              "a-stalled-stream-is-released-by-the-declared-idle-timeout"
+            ]
+          }
+        },
+        {
+          "id": "sse-admission-and-parsing",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-non-2xx-handshake-reaches-the-caller-before-any-message",
+              "a-rejected-credential-is-reacquired-once-without-replaying-the-stream",
+              "a-segmented-response-is-parsed-across-chunk-and-rune-boundaries",
+              "a-heartbeat-comment-keeps-an-idle-stream-alive",
+              "stopping-the-application-closes-an-open-server-stream"
+            ]
+          }
+        },
+        {
+          "id": "stream-session-lifecycle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-session-walks-connecting-admitted-active-terminal-closed",
+              "one-terminal-and-one-call-measurement-survive-concurrent-stop-and-terminal"
+            ]
+          }
+        },
+        {
+          "id": "stream-session-phase-rules",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-breaker-records-admission-once-and-nothing-after-it",
+              "a-credential-that-expired-during-its-acquisition-is-re-resolved-before-the-first-frame"
+            ]
+          }
+        },
+        {
+          "id": "stream-session-budgets",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-handshake-and-idle-budgets-are-distinct-from-the-declared-operation-duration",
+              "the-handshake-budget-stops-bounding-the-stream-at-admission",
+              "the-declared-operation-duration-bounds-an-admitted-stream"
+            ]
+          }
+        },
+        {
+          "id": "service-call-telemetry",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-generated-call-reports-its-attempts-and-final-result",
+              "the-outgoing-request-carries-the-injected-trace-context"
+            ]
+          }
+        },
+        {
+          "id": "response-cache",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-upstream-call-per-key-and-identity-per-fresh-window-under-concurrent-load",
+              "a-provider-failure-inside-the-stale-window-returns-the-stored-answer-and-is-counted",
+              "a-failure-after-the-stale-window-or-outside-the-provider-failure-classes-reaches-the-caller",
+              "a-caller-deadline-that-passes-while-the-provider-hangs-returns-the-stored-answer",
+              "an-invalidation-sends-the-next-call-upstream",
+              "entries-never-cross-a-forwarded-identity-or-outlive-the-registry",
+              "the-cache-key-matches-the-shared-vectors",
+              "the-runtime-implements-exactly-the-published-capabilities"
+            ]
+          }
+        },
+        {
+          "id": "response-cache-bypass-and-field-invalidation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bypassed-call-neither-reads-nor-stores-nor-joins-a-call-in-flight",
+              "an-invalidation-by-a-response-field-drops-every-answer-carrying-the-value",
+              "the-response-field-tags-match-the-shared-vectors"
+            ]
+          }
+        },
+        {
+          "id": "application-scoped-registry",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "modules-of-one-application-share-one-registry-and-two-applications-share-none",
+              "the-package-holds-no-ambient-credential-cache"
+            ]
+          }
+        },
+        {
+          "id": "registry-lifetime",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-application-stop-phase-closes-the-registry-it-published",
+              "closing-the-registry-cancels-the-refreshes-in-flight-and-keeps-no-credential",
+              "closing-the-registry-closes-the-stream-sessions-it-tracks",
+              "a-late-acquisition-is-refused-with-one-stable-typed-error"
+            ]
+          }
+        },
+        {
+          "id": "credential-lifetime",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-expiring-credential-is-renewed-once-for-every-concurrent-caller",
+              "a-token-source-outage-is-never-cached-and-recovery-reacquires-once",
+              "a-malformed-oversized-or-immediately-expired-token-response-fails-without-leaking",
+              "credential-acquisition-is-spent-inside-the-declared-call-budget"
+            ]
+          }
+        },
+        {
+          "id": "credential-placement",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-forwarded-user-identity-is-read-from-the-inbound-context-and-never-from-the-service-cache",
+              "a-rejected-credential-is-reacquired-without-replaying-an-unsafe-operation",
+              "every-requirement-of-the-chosen-alternative-is-applied-and-a-failed-choice-is-never-downgraded"
+            ]
+          }
+        },
+        {
+          "id": "websocket-in-band-admission",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "admission-credentials-travel-in-the-first-application-frame",
+              "an-undeliverable-websocket-transport-fails-closed-before-any-network-byte"
+            ]
+          }
+        },
+        {
+          "id": "websocket-typed-streams",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-websocket-message-is-validated-against-the-declared-output-schema",
+              "client-and-bidirectional-streams-half-close-once-and-take-one-terminal",
+              "a-terminal-websocket-error-is-projected-as-a-typed-remote-error",
+              "wide-sequences-and-empty-payloads-survive-the-wire-unchanged"
+            ]
+          }
+        },
+        {
+          "id": "websocket-shared-lifecycle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-websocket-runtime-drives-the-shared-session-and-states-no-phase-rule",
+              "a-canceled-websocket-stream-tells-the-provider-once-and-measures-once",
+              "the-websocket-runtime-drives-the-published-conversation-and-names-no-state"
+            ]
+          }
+        },
+        {
+          "id": "connect-transport",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-generated-call-dispatches-on-the-first-declared-transport",
+              "the-proto-codec-comes-from-the-published-descriptor",
+              "a-connect-error-arrives-as-the-declared-typed-error",
+              "the-connect-path-reuses-the-declared-resilience-contract",
+              "a-connect-server-stream-ends-on-exactly-one-terminal-envelope"
+            ]
+          }
+        },
+        {
+          "id": "websocket-corpus-conformance",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-client-refuses-every-invalid-corpus-scene-with-the-published-diagnostic-code"
+            ]
+          }
+        },
+        {
+          "id": "declared-transport-preference",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-break-after-admission-never-opens-another-declared-transport",
+              "a-declaration-with-no-carriable-transport-is-refused-before-any-socket",
+              "a-provider-that-does-not-negotiate-the-first-party-wire-falls-back",
+              "a-repeated-fallback-does-not-open-the-circuit-for-the-operation",
+              "a-transport-the-provider-does-not-serve-falls-back-to-the-next-declared-one",
+              "an-answer-about-the-call-is-surfaced-instead-of-trying-another-wire",
+              "an-exhausted-fallback-surfaces-the-answer-of-the-last-declared-transport",
+              "an-operation-that-is-not-declared-replayable-is-never-opened-twice",
+              "the-declared-order-is-the-dispatch-order"
+            ]
+          }
+        },
+        {
+          "id": "declared-stream-resume",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-caller-withdrawal-on-a-continued-stream-reaches-the-live-socket",
+              "a-continuation-carries-a-credential-renewed-at-the-instant-it-dials",
+              "a-declared-server-stream-continues-after-the-last-sequence-the-caller-received",
+              "a-provider-that-answers-a-continuation-with-a-fresh-stream-is-refused",
+              "a-stream-that-keeps-breaking-stops-at-the-framework-resume-bound",
+              "a-stream-that-was-not-declared-resumable-ends-at-the-break",
+              "a-token-the-provider-no-longer-honors-ends-the-stream-with-a-typed-terminal",
+              "each-continuation-presents-the-token-the-previous-connection-issued",
+              "reconnect-without-provider-resume-is-refused-before-any-socket"
+            ]
+          }
+        },
+        {
+          "id": "declared-sse-continuation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-shared-sse-scenes-replay-against-the-real-runtime",
+              "values-queued-but-not-received-never-advance-the-position-nor-arrive-twice",
+              "a-cursor-stream-continues-on-another-instance-after-the-last-position-the-caller-received",
+              "a-best-effort-stream-reopens-the-original-query-and-keeps-its-queue",
+              "a-typed-refusal-of-a-position-ends-the-session-without-another-reopening",
+              "a-negotiated-stream-that-keeps-breaking-stops-at-the-framework-bound",
+              "every-reopening-resolves-credentials-and-a-refused-one-re-mints-a-forwarded-user-credential-once",
+              "a-provider-that-does-not-acknowledge-the-wire-is-refused-without-fallback",
+              "closing-a-reopening-stream-releases-its-connection-and-emits-one-measurement",
+              "a-reopening-never-resets-the-idle-budget",
+              "a-reopening-has-its-own-bounded-handshake-and-its-failure-ends-the-session"
+            ]
+          }
+        },
+        {
+          "id": "binary-payloads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-oversized-raw-octet-request-is-refused-before-the-source-is-drained",
+              "the-declared-octet-media-type-and-bound-are-applied-to-the-request",
+              "raw-octets-are-refused-on-a-transport-that-cannot-carry-them",
+              "the-json-decoder-never-guesses-an-encoding-for-raw-octets",
+              "unframed-binary-streams-preserve-bytes-media-type-and-lifetime"
+            ]
+          }
+        },
+        {
+          "id": "provider-owned-websocket-wires",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-byte-stream-is-a-read-write-closer-admitted-on-the-upgrade",
+              "a-frame-stream-carries-validated-json-frames-under-the-declared-subprotocol",
+              "a-provider-owned-wire-ends-on-its-close-code-and-a-refusal-is-typed",
+              "the-declared-budgets-bound-a-provider-owned-wire"
+            ]
+          }
+        },
+        {
+          "id": "caller-resolved-bindings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-caller-binding-snapshots-routing-and-closes-only-its-own-registry",
+              "an-invalid-caller-binding-is-refused-before-dispatch"
+            ]
+          }
+        },
+        {
+          "id": "binding-headers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "static-headers-accompany-each-calls-credentials",
+              "invalid-or-reserved-headers-fail-before-dispatch",
+              "binding-headers-are-an-immutable-snapshot",
+              "operation-headers-win-and-cache-keys-see-the-sent-value",
+              "stream-headers-use-each-transports-declared-carrier",
+              "binding-headers-match-the-shared-corpus"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

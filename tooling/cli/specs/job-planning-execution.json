@@ -1,0 +1,105 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/job-planning-execution",
+  "outcomes": [
+    "A user can discover the jobs installed in the current workspace and run one or several of them with one project selection",
+    "A user can preview the exact dependency plan without executing subprocesses or mutating workspace state",
+    "Terminal, extension, watch, lifecycle, and MCP adapters execute through one engine and one result model"
+  ],
+  "nonGoals": [
+    "Publishing, installer distribution, release governance, or the open-source license switch",
+    "Making the internal cli-model module a public package",
+    "Removing narrow ratcheted command-vertical or model-decoupling exceptions merely to reduce their count"
+  ],
+  "requirements": [
+    {
+      "id": "git-candidate-inputs",
+      "text": "A git: file-pattern input selects tracked and non-ignored untracked candidates from the containing repository, matched against project-relative paths. Its key covers raw file bytes and symlink target text, preserves file type, changes on addition, edit, rename or deletion, excludes ignored untracked state, and refuses unavailable Git enumeration. git:** covers the whole repository. Impact matches the same path grammar without requiring the changed path still to exist."
+    },
+    {
+      "id": "command-catalog",
+      "text": "One command catalog defines public command paths, aliases, flags, help, completion, structured-output capability, and workspace requirements."
+    },
+    {
+      "id": "selection-before-plan",
+      "text": "Every job run resolves one explicit project selection before planning and applies that selection to every requested command. A channel publish sharing the session narrows itself alone: its members come from the channel head, every other command keeps the caller's selection, and the run reports both sets."
+    },
+    {
+      "id": "dependency-plan",
+      "text": "Planning produces a deterministic dependency DAG that preserves functional dependencies separately from write-serialization edges, resolves dependent-owned same-session prerequisites across every contributing provider, and rejects missing selected commands. A captured runner AFTER contract adds functional dependencies from every protected write to every required gate leaf before final authorization; missing gates and dependency cycles still fail closed."
+    },
+    {
+      "id": "preview-no-effects",
+      "text": "Plan-only previews and MCP dry runs do not execute subprocesses, update successful-run markers, or write generated workspace state; a command-level dry run executes only when its catalog or extension contract explicitly forwards a dry-run simulation. For --plan and plan-only --dry-run, explicit JSON output carries one typed plan envelope and JSONL carries one terminal plan:end record, including an explicit zero-task plan when empty; neither shape claims a run, session:end, or persisted session artifact."
+    },
+    {
+      "id": "single-engine",
+      "text": "All execution adapters invoke the shared engine instead of constructing a scheduler or reproducing the run lifecycle."
+    },
+    {
+      "id": "canonical-result",
+      "text": "All renderers and machine surfaces reduce execution events through the canonical result model, with status and reuse represented independently."
+    },
+    {
+      "id": "declared-output-cache-boundary",
+      "text": "Cache eligibility under package is the task's own declaration, as in every other command: a package step that writes only inside its declared outputs is captured and restored like any other, the channel it recorded travels with the output that carries it, and a restored current Docker candidate selected by the plan stays authoritative whatever a sibling packager recorded."
+    },
+    {
+      "id": "release-set-channel-advance",
+      "text": "Resolve all heads once in the declared distribution namespace (workspace name by default). Measure impact against the first advanced channel, or, when it has no head, against the named baseline channel, resolved with them and never advanced: republish members whose package execution-key fingerprint (excluding embedded version) changed and their dependents; inherit the rest. One release stores the snapshot and advances every channel by compare-and-swap. Any conflict writes nothing and names every head."
+    },
+    {
+      "id": "release-set-attribution-opt-in",
+      "text": "A selected member records its source project and artifact kind only when the repository's distribution policy declares memberAttribution; by default the plan handed to publishing extensions and the released set carry neither field, so an extension or provider built before the fields existed decodes them strictly without error. An unchanged member inherits its head record verbatim either way."
+    },
+    {
+      "id": "release-set-source-tree-opt-in",
+      "text": "With distribution.memberSourceTree declared, a republished member records sourceTree, HEAD's git tree, even when PUTNAMI_SOURCE_REVISION names another commit. A dirty checkout, an unreadable tree, or a checkout that moved before the commit records none and never fails the publication. By default neither plan nor released set carries the field. An unchanged member inherits its head's tree either way."
+    },
+    {
+      "id": "release-set-members-by-ecosystem",
+      "text": "Members retain ecosystem/coordinate identity, owning publish/package routes and dependency closure; unselected sibling steps are excluded. Mixed runs retain requested verification providers without their unrelated publish jobs, even when no member changes. The provider receives selected tuples and frozen route provenance through an invocation-owned private versioned file. Inherited members and ambient/repository paths cannot supply same-run evidence."
+    },
+    {
+      "id": "private-selected-publication-handoff",
+      "text": "After final executing plan attachment, a runner-private loopback callback receives the canonical selected publication tuple. Callback and capability are captured before repository execution, never serialized into jobs. Exact digest acknowledgment neither bypasses gates nor returns registry credentials. Preview/dry-run do not arm publication. An empty-member handoff arms only release-set authority to confirm the head. A callback without AFTER is refused at capture with a credential-free diagnostic."
+    },
+    {
+      "id": "generated-output-drift",
+      "text": "A declared output with a drift policy is compared with the bytes at its path immediately before the task wrote it: before the subprocess when executed, before the recorded tree is swapped in on a hit. A difference is the diagnostic generated-output-drift naming added, removed and changed paths; fail fails the task with its outputs still written, warn keeps its status. A pathFrom output is judged inside a digest of its project root. Neither reference nor verdict reaches a key, an entry or the failure cache."
+    },
+    {
+      "id": "spec-gate-evidence-scope",
+      "text": "A selected project's requirements resolve from observations its transitive dependencies and its DIRECT dependents already published: an attester the run did not plan is answered from that project's own test cache entry, provenance still contained in the reporting project. Transitive dependents stay out of scope. A consulted source that did not support a check still blocks under enforce, as does an exhausted scope; a check no reachable source could report is recorded unobserved and warned, never blocked."
+    },
+    {
+      "id": "scoped-cache-bypass",
+      "text": "--no-cache-projects <selector> refuses cache reuse for the named projects' tasks and every planned task that transitively depends on one, while the rest of the run keeps its reuse. A bypassed task is never looked up, served, published or failure-replayed, and records no failure; only its success deletes one. The selector speaks the --projects grammar, ignores tag and exclude filters, and fails the run when it matches nothing. --no-cache subsumes it. Neither reaches a cache key or task params."
+    },
+    {
+      "id": "concurrent-session-output-exclusion",
+      "text": "Sessions of one workspace never write one task output at once. A task locks, in one global order, its command-output directory plus the project or workspace with a durable output, across a cache restore and an execution through capture; a preparation writing the project tree locks the project until the subprocess starts. A contended task prints one line naming the holder's session, pid and tasks, then waits for release or cancellation. Nested sessions hold their spawner's locks. No lock is a cache input."
+    },
+    {
+      "id": "scratch-generation-retention",
+      "text": "Workspace scratch has a 30-day generation lifetime. The next idle execution, install hook, or workspace cache gc reclaims the expired generation independently of extension names or project inventory. Shared leases protect runs and subprocesses; nested consumers never wait for exclusive ownership. An active lease is the only silent skip; others warn. Reaping requires cross-process locks, never follows symlinks, and retries failed deletion without extending retention. This is retention, not a byte quota."
+    },
+    {
+      "id": "failure-replay-cache",
+      "text": "A failed task is recorded locally at the cache key that would have served its success; a later run with unchanged inputs replays that verdict instead of running, with the same status, exit code, diagnostics and logs plus its age and attempt count. Canceled, skipped, bailed-out, timed-out and leak results are never recorded, and one run counts one observation per key. A success at that key deletes the record under any selection or bypass, --retry-failed re-executes, and no record reaches a remote cache."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0041-git-candidate-file-inputs.md",
+    "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md",
+    "tooling/cli/doc/adr/0002-cli-vnext-contracts.md",
+    "tooling/cli/doc/adr/0006-cli-model-and-command-verticals.md",
+    "tooling/cli/doc/adr/0017-one-release-set-plan-against-the-channel-head.md",
+    "tooling/cli/doc/adr/0023-private-selected-publication-handoff.md",
+    "tooling/cli/doc/adr/0026-spec-gate-evidence-scope.md",
+    "tooling/cli/doc/adr/0030-a-failed-task-is-cached-until-its-inputs-change.md",
+    "tooling/cli/doc/adr/0031-scratch-generations-expire-between-consumers.md",
+    "tooling/cli/doc/adr/0034-a-declared-output-polices-its-own-drift.md"
+  ]
+}

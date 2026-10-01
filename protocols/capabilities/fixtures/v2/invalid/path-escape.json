@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 2,
+  "project": "example",
+  "configDefinitions": [
+    {
+      "identity": { "ownerProject": "example", "kind": "config", "key": "database.default" },
+      "path": "database.default",
+      "provenance": {
+        "project": "example",
+        "sourceKind": "manual",
+        "declaration": { "root": "project", "path": "../secret" }
+      }
+    }
+  ]
+}

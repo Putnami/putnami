@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-feature-verification.json",
+  "title": "Putnami feature verification report v1",
+  "$comment": "A run-scoped result envelope, not a durable authored inventory. It declares no issuer, project, source binding, threshold, or objective verdict: core derives those from the scheduled task, the owning project, the current source binding, and the authored criterion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "observations"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "protocolVersion": {
+      "$comment": "Readers require the exact JSON integer token 1; 1.0 and 1e0 are invalid.",
+      "type": "integer",
+      "const": 1
+    },
+    "observations": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": { "$ref": "#/$defs/observation" }
+    }
+  },
+  "$defs": {
+    "featureID": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)+$"
+    },
+    "segmentID": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "checkID": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "semanticCode": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "aggregation", "value", "unit"],
+      "properties": {
+        "name": { "$ref": "#/$defs/semanticCode" },
+        "aggregation": {
+          "type": "string",
+          "enum": ["value", "count", "sum", "avg", "min", "max", "p50", "p95", "p99", "ratio"]
+        },
+        "value": { "type": "number" },
+        "unit": { "$ref": "#/$defs/semanticCode" }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "string", "format": "date-time" },
+        "end": { "type": "string", "format": "date-time" }
+      }
+    },
+    "provenance": {
+      "$comment": "Resolved against the reporting task's own project root; a report cannot name another root.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "symbol": { "type": "string", "maxLength": 512 }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["feature", "requirement", "check", "provenance"],
+      "properties": {
+        "feature": { "$ref": "#/$defs/featureID" },
+        "requirement": { "$ref": "#/$defs/segmentID" },
+        "check": { "$ref": "#/$defs/checkID" },
+        "status": { "type": "string", "enum": ["passed", "failed", "skipped"] },
+        "measurement": { "$ref": "#/$defs/measurement" },
+        "window": { "$ref": "#/$defs/window" },
+        "environment": { "$ref": "#/$defs/semanticCode" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      },
+      "oneOf": [
+        {
+          "$comment": "An acceptance observation states a verdict and nothing measured.",
+          "required": ["status"],
+          "not": {
+            "anyOf": [{ "required": ["measurement"] }, { "required": ["window"] }, { "required": ["environment"] }]
+          }
+        },
+        {
+          "$comment": "A measured observation states what was observed; core recomputes the verdict.",
+          "required": ["measurement", "window"],
+          "not": { "required": ["status"] }
+        }
+      ]
+    }
+  }
+}

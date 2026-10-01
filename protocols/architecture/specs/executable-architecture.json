@@ -1,0 +1,63 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "architecture/executable-contracts",
+  "outcomes": [
+    "A domain authors one strict local manifest for its authority, exports, imports and exact current project bindings",
+    "Validation joins producer and consumer declarations, compares them with the resolved Putnami project graph and returns deterministic diagnostics",
+    "An adoption baseline can only shrink, while later exceptions remain explicit, temporary and independently reviewable",
+    "Humans and automation can inspect the same canonical architecture snapshot without contacting Putnami Cloud",
+    "Every snapshot states which dependency classes were actually detected and which were not"
+  ],
+  "nonGoals": [
+    "Making Putnami Cloud the parser or policy authority",
+    "Creating one central hand-maintained matrix of every domain relation",
+    "Treating a planned API or event as evidence that the transport exists",
+    "Requiring one shared Workspace model or one database per domain",
+    "Claiming database, HTTP or event enforcement before those detectors exist",
+    "Automatically adding new violations to the frozen adoption baseline"
+  ],
+  "requirements": [
+    {
+      "id": "single-interpretation",
+      "text": "The framework-neutral protocol owns strict parsing, semantic validation, canonicalization, graph comparison, stable finding IDs and ratchet policy; CLI and future agent surfaces reuse it rather than reimplementing its meaning."
+    },
+    {
+      "id": "distributed-authority",
+      "text": "Each domain manifest owns its semantic identity and its half of every contract; the generated global graph is a projection and never becomes a second authored authority. A fact on an export whose sole mode is reference may omit data classification metadata; an export that allows any other mode requires both classification and personal-data declarations for every fact."
+    },
+    {
+      "id": "planned-is-not-observed",
+      "text": "A planned import cannot carry a current project binding, and a declared transport never creates observed evidence."
+    },
+    {
+      "id": "exact-drift",
+      "text": "The v1 detector compares exact consumer-project to producer-project edges only when both projects map to declared domains; a domain-pair match cannot authorize additional dependencies."
+    },
+    {
+      "id": "ratchet",
+      "text": "New violations, stale debt entries, expired waivers and additions to a previously committed baseline fail; current baseline debt and live waivers remain visible warnings."
+    },
+    {
+      "id": "coverage",
+      "text": "Structured snapshots explicitly report project dependency enforcement for mapped projects and database, HTTP and event observation as not detected in v1."
+    },
+    {
+      "id": "framework-evidence",
+      "text": "Framework evidence is compared with the declarations without either becoming the other: an implementation no declaration matches always fails, a declaration is expected to be implemented only inside a domain that already implements something, and the coverage report names the framework-evidence tier rather than claiming runtime observation."
+    },
+    {
+      "id": "contained-read-only-tooling",
+      "text": "Validation, snapshot and inspection are read-only, discover only exact contained authority filenames outside generated or dependency trees, and read a prior baseline directly from immutable Git objects without checkout."
+    },
+    {
+      "id": "runtime-enforcement",
+      "text": "A darc component takes its declared import as configuration and refuses one the architecture gate would reject. A projection applies the declared freshness bound and missing/stale behavior, orders and de-duplicates updates under the declared late-event rule, gives the write handle only to the writer the local model names, and rebuilds and deletes through the declared strategies. A snapshot version is immutable and addressable. A command refuses an inactive contract and never fails a fire-and-forget caller."
+    }
+  ],
+  "decisions": [
+    "protocols/architecture/doc/adr/0001-declarations-are-authority-observations-are-evidence.md",
+    "protocols/architecture/doc/adr/0002-runtime-evidence-needs-an-application-carrier.md",
+    "tooling/cli/doc/adr/0008-executable-architecture-command-boundary.md"
+  ]
+}

@@ -1,0 +1,1 @@
+{"version":1,"entries":[{"path":"a","kind":"symlink","target":"b"},{"path":"b","kind":"symlink","target":"a"}]}

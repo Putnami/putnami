@@ -1,0 +1,21 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/finalizer-producer-without-invocation-output",
+  "commands": {
+    "test": {
+      "run": [
+        { "id": "setup", "task": "ordinary" },
+        { "id": "run", "task": "ordinary", "dependsOn": ["setup"] },
+        {
+          "id": "teardown",
+          "task": "ordinary",
+          "runOn": "finally",
+          "finalizes": { "producer": "setup", "consumers": ["run"] }
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "ordinary": { "kind": "command", "command": "echo" }
+  }
+}

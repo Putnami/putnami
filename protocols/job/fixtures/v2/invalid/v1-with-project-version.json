@@ -1,0 +1,1 @@
+{"workspaceRoot":"/ws","outputPath":"/o","cacheRoot":"/c","workspace":{"name":"w"},"project":{"name":"p","path":"p","fullPath":"/ws/p"},"selectedProjects":[{"name":"a","path":"a","fullPath":"/ws/a"},{"name":"@acme/b","version":"1.4.0","path":"libs/b","fullPath":"/ws/libs/b"}],"extension":{"name":"e","root":"/e"},"job":{"name":"build"},"params":{}}

@@ -1,0 +1,196 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-contracts.json",
+  "protocolVersion": 1,
+  "name": "go.putnami.dev/protocol/identity",
+  "enums": [
+    {
+      "name": "ClaimName",
+      "description": "Wire names of the well-known token claims the framework extracts from a verified payload. Adopting these constants replaces hand-written claim-key literals in the framework auth code.",
+      "values": [
+        {
+          "name": "Sub",
+          "value": "sub",
+          "description": "Subject: the principal identifier (JWT \"sub\")."
+        },
+        {
+          "name": "Iss",
+          "value": "iss",
+          "description": "Issuer: who issued the token (JWT \"iss\")."
+        },
+        {
+          "name": "ClientId",
+          "value": "client_id",
+          "description": "OAuth2 client identifier the token was issued to."
+        },
+        {
+          "name": "Roles",
+          "value": "roles",
+          "description": "Role names assigned to the principal."
+        },
+        {
+          "name": "Scope",
+          "value": "scope",
+          "description": "Scopes granted to the principal."
+        },
+        {
+          "name": "Aud",
+          "value": "aud",
+          "description": "Audience(s) the token is intended for."
+        },
+        {
+          "name": "Exp",
+          "value": "exp",
+          "description": "Expiration time in seconds since the Unix epoch (RFC 7519 NumericDate)."
+        }
+      ]
+    },
+    {
+      "name": "PrincipalKind",
+      "description": "The recognized kinds of authenticated principal. Adopting these constants replaces hand-written principal-kind literals in the framework auth code.",
+      "values": [
+        {
+          "name": "User",
+          "value": "user",
+          "description": "A bearer/OIDC principal: claims come from a validated JWT or an RFC 7662 token-introspection response."
+        },
+        {
+          "name": "ApiKey",
+          "value": "apikey",
+          "description": "A static API-key principal: a fixed subject and client identifier with statically granted scopes and no expiry."
+        }
+      ]
+    },
+    {
+      "name": "AuthDecision",
+      "description": "The outcome label for an authorization check. The values double as the metric counter keys and the \"decision\" log attribute, so the Go and TypeScript frameworks share one vocabulary for dashboards and log queries.",
+      "values": [
+        {
+          "name": "Allow",
+          "value": "allow",
+          "description": "The request satisfied every access rule and proceeds to the handler (HTTP 200)."
+        },
+        {
+          "name": "DenyUnauthenticated",
+          "value": "deny_unauthenticated",
+          "description": "No verified identity was present, so the request is rejected before any rule check (HTTP 401)."
+        },
+        {
+          "name": "DenyClient",
+          "value": "deny_client",
+          "description": "The authenticated principal is not an accepted client, issuer, audience, or principal kind (HTTP 403)."
+        },
+        {
+          "name": "DenyScope",
+          "value": "deny_scope",
+          "description": "The principal is missing a required scope (HTTP 403)."
+        },
+        {
+          "name": "DenyRole",
+          "value": "deny_role",
+          "description": "The principal is missing a required role (HTTP 403)."
+        },
+        {
+          "name": "DenyGuard",
+          "value": "deny_guard",
+          "description": "A custom guard function rejected the request (HTTP 403)."
+        }
+      ]
+    }
+  ],
+  "structs": [
+    {
+      "name": "Claims",
+      "description": "The well-known claims the framework extracts from a verified token payload into typed fields (go/framework/http ClaimsFromMap). Every field is optional on the wire; unrecognized claims travel out-of-band in an extra map.",
+      "fields": [
+        {
+          "name": "sub",
+          "type": "string",
+          "description": "Subject: the principal identifier (JWT \"sub\").",
+          "optional": true
+        },
+        {
+          "name": "iss",
+          "type": "string",
+          "description": "Issuer: who issued the token (JWT \"iss\").",
+          "optional": true
+        },
+        {
+          "name": "client_id",
+          "type": "string",
+          "description": "OAuth2 client identifier the token was issued to.",
+          "optional": true
+        },
+        {
+          "name": "roles",
+          "type": "string",
+          "description": "Role names assigned to the principal.",
+          "optional": true,
+          "repeated": true
+        },
+        {
+          "name": "scope",
+          "type": "string",
+          "description": "Scopes granted to the principal, extracted from the \"scope\" claim.",
+          "optional": true,
+          "repeated": true
+        }
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "name": "sub",
+      "type": "string",
+      "description": "Subject: the principal identifier."
+    },
+    {
+      "name": "iss",
+      "type": "string",
+      "description": "Issuer: who issued the token. Bearer-token validation asserts it against the expected issuer when one is configured."
+    },
+    {
+      "name": "client_id",
+      "type": "string",
+      "description": "OAuth2 client identifier the token was issued to."
+    },
+    {
+      "name": "roles",
+      "type": "array",
+      "description": "Role names assigned to the principal; a space-delimited string is also accepted on the wire."
+    },
+    {
+      "name": "scope",
+      "type": "array",
+      "description": "Scopes granted to the principal; the OAuth2 space-delimited string form is also accepted on the wire."
+    },
+    {
+      "name": "aud",
+      "type": "array",
+      "description": "Audience(s) the token is intended for; a single string is also accepted per RFC 7519. Asserted when an expected audience is configured."
+    },
+    {
+      "name": "exp",
+      "type": "int",
+      "description": "Expiration time in seconds since the Unix epoch (RFC 7519 NumericDate). Bearer-token validation rejects tokens without it by default."
+    }
+  ],
+  "principalKinds": [
+    {
+      "name": "user",
+      "description": "A bearer/OIDC principal: claims come from a validated JWT or an RFC 7662 token-introspection response."
+    },
+    {
+      "name": "apikey",
+      "description": "A static API-key principal: a fixed subject and client identifier with statically granted scopes and no expiry."
+    }
+  ],
+  "discovery": {
+    "title": "Identity Contract",
+    "summary": "The consumer-side identity vocabulary of the Putnami frameworks: the well-known token claims they extract and the principal kinds they recognize.",
+    "version": "0.1.0",
+    "tags": [
+      "identity",
+      "security"
+    ]
+  }
+}

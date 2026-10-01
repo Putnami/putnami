@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "typescript-library",
+  "type": "template",
+  "extensions": [
+    "@putnami/scaffold"
+  ],
+  "publish": [
+    "template-archives"
+  ],
+  "options": {
+    "publish": {
+      "archives": true
+    }
+  }
+}

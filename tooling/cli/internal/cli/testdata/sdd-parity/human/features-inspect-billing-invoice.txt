@@ -1,0 +1,13 @@
+exit 0
+--- stdout ---
+
+  Feature billing/invoice · Invoice export
+  Outcome: Customers export issued invoices
+  Owner: billing
+  Source: billing/putnami.features.json
+  Revision: worktree @ git:7c5122267ea7854954d543e1eda0a15c7cc56b08
+  Maturity: modeled → modeled
+  Requirements:
+    none (modeled intent only)
+
+--- stderr ---

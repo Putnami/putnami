@@ -1,0 +1,21 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/examples/capabilities-proof",
+  "description": "Go example: stable capability v2 provenance and native feature graph proof",
+  "tags": ["go", "e2e"],
+  "extensions": ["/go/extension"],
+  "dependencies": [
+    "/go/framework/app",
+    "/go/framework/config",
+    "/go/framework/migration",
+    "/protocols/capabilities",
+    "/protocols/features",
+    "/protocols/infra"
+  ],
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/sensitive-output-durable",
+  "commands": {
+    "test": { "run": [{ "id": "setup", "task": "test-setup" }] }
+  },
+  "tasks": {
+    "test-setup": {
+      "kind": "command",
+      "command": "echo",
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "dsn": { "kind": "file", "sensitive": true, "path": "database/dsn.env" }
+        }
+      }
+    }
+  }
+}

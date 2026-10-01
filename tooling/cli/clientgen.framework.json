@@ -1,0 +1,113 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "@putnami/cli",
+      "status": "pending-provider-contract",
+      "adapter": "tooling/cli/internal/clibin/clibin.go",
+      "callsites": [
+        {
+          "path": "tooling/cli/internal/clibin/clibin.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "5ad5e1b0cac1fc4aa37af6dc5826707c52cacee458029c11bd08d2d346453cc7"
+        }
+      ],
+      "owner": "@putnami/cli",
+      "tests": ["tooling/cli/internal/clibin/clibin_test.go"],
+      "reason": "Resolves a CLI release through the put distribution resolver. First-party Putnami service; the wire contract lives in protocols/distribution and no provider declares a client for it yet.",
+      "operations": ["distribution.resolve"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    },
+    {
+      "runtime": "@putnami/cli",
+      "status": "pending-provider-contract",
+      "adapter": "tooling/cli/internal/commands/versioncmd/version.go",
+      "callsites": [
+        {
+          "path": "tooling/cli/internal/commands/versioncmd/version.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "5a759ddb4833431f9e8d341388c08915a55c19d636ec6ffc1eca3713463c75c0"
+        },
+        {
+          "path": "tooling/cli/internal/commands/versioncmd/version.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "f736bbdc032e15da7c16441dd56689e16321ab336cc5ce10cb86c137d3764ee4"
+        }
+      ],
+      "owner": "@putnami/cli",
+      "tests": ["tooling/cli/internal/commands/versioncmd/version_test.go"],
+      "reason": "Resolves and downloads a CLI self-update from the put registry.",
+      "operations": ["distribution.download", "distribution.resolve"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    },
+    {
+      "runtime": "@putnami/cli",
+      "status": "pending-provider-contract",
+      "adapter": "tooling/cli/internal/extension/http_client.go",
+      "callsites": [
+        {
+          "path": "tooling/cli/internal/extension/http_client.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "5f0549a58869f1e0b65ad16568e38a4987875400be88dd70a9d46a6e6c0c9111"
+        }
+      ],
+      "owner": "@putnami/cli",
+      "tests": ["tooling/cli/internal/extension/http_client_test.go"],
+      "reason": "Builds the HTTP client every put registry request uses. Same first-party registry, same missing provider declaration.",
+      "operations": ["distribution.download"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    },
+    {
+      "runtime": "@putnami/cli",
+      "status": "pending-provider-contract",
+      "adapter": "tooling/cli/internal/extension/install_archive.go",
+      "callsites": [
+        {
+          "path": "tooling/cli/internal/extension/install_archive.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "12b3e0c200a92f01098d6cb368c5e2be6508300f229ec9e1243f3c966004b1af"
+        }
+      ],
+      "owner": "@putnami/cli",
+      "tests": ["tooling/cli/internal/extension/install_integrity_test.go"],
+      "reason": "Downloads an extension archive from the put registry.",
+      "operations": ["distribution.download"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    },
+    {
+      "runtime": "@putnami/cli",
+      "status": "pending-provider-contract",
+      "adapter": "tooling/cli/internal/jobs/release_plan_handoff.go",
+      "callsites": [
+        {
+          "path": "tooling/cli/internal/jobs/release_plan_handoff.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "5ecc94783d17b655f8dadea64b2dc7d359c449bc3157da0d53df852c98734b3f"
+        },
+        {
+          "path": "tooling/cli/internal/jobs/release_plan_handoff.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "0ff2f8401cb977dd4dc7e0e68c731ac68ea0afa351fae274ae6c896805c73bbd"
+        },
+        {
+          "path": "tooling/cli/internal/jobs/release_plan_handoff.go",
+          "transport": "http",
+          "symbol": "http.Transport",
+          "fingerprint": "ea318cdf21778bd73a97bbcf976b1ed45a002eb399923366643f30245fb5ab47"
+        }
+      ],
+      "owner": "@putnami/cli",
+      "tests": ["tooling/cli/internal/jobs/release_plan_handoff_test.go"],
+      "reason": "Posts the release plan back to the Putnami Cloud native runner capability endpoint. First-party service, provider declaration owned by Putnami Cloud.",
+      "operations": ["runner.release-plan-handoff"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    }
+  ]
+}

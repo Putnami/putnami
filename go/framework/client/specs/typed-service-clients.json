@@ -1,0 +1,203 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/typed-service-clients",
+  "outcomes": [
+    "A consumer calls a provider through typed methods generated from the provider's published contract instead of hand-written request plumbing",
+    "A generated call states which project and feature produced the operation it invokes",
+    "A failing or slow dependency degrades the caller in a bounded way instead of exhausting it",
+    "A transport failure is reportable without disclosing the credentials or identifiers carried in the request",
+    "An invalid request body is rejected locally from the provider's generated schema before any network dispatch",
+    "A consumer authenticates a generated call from the provider's declared credential alternatives instead of wiring token acquisition and refresh by hand",
+    "A failed call is reportable as a typed error naming the dependency, without leaking the credentials the call carried",
+    "A provider-declared server stream is consumed with the same credentials, deadlines and typed errors as a unary call",
+    "A stream lifecycle is owned by one session shared by every first-party stream transport, so admission, budgets, retry and circuit rules are stated once instead of once per transport",
+    "A generated client's credentials and open streams belong to the application that registered them, so stopping the application ends them and no other application in the process observes them",
+    "A provider-declared WebSocket stream is opened, admitted, consumed and canceled through the same session, credentials and typed errors as every other first-party transport, with the wire rules read from the published contract rather than restated",
+    "A consumer that calls a provider on every request answers repeated reads from a bounded in-process cache the provider declared, keeps answering through a provider outage for a declared window, and drops an answer the moment it is revoked"
+  ],
+  "nonGoals": [
+    "Service discovery, load balancing, or connection pooling policy beyond what the standard library transport provides",
+    "Generating a client from a hand-written schema that no provider publishes",
+    "Retrying a request the caller marked non-retryable, or making a non-idempotent call safe to repeat",
+    "Promising strict compatibility between every pre-1.0 minor release",
+    "Specifying generator emission behavior, which go/api-contracts owns (generated-from-contract, optional-fields, producer-attribution, shared-contract-source; descriptor identity folded into stable-operation-identity)"
+  ],
+  "requirements": [
+    {
+      "id": "success-body",
+      "text": "WithSuccessBody makes the ordinary generated call also deliver its declared JSON success body byte for byte, after the declared security, resilience, status, media type, schema and decode checks accepted it. A cached answer delivers the stored bytes as a separate copy. A refused or failed call leaves the sink empty. Connect proto, void operations, raw octets and streams refuse the sink before dispatch with client.config. A sink serves one call at a time and never reaches a nested generated call."
+    },
+    {
+      "id": "per-call-endpoint",
+      "text": "WithEndpoint selects a trusted endpoint for one call to one named service and validates it with the binding URL policy. A shared context cannot redirect another service, and callbacks cannot pass the selection into nested generated calls. Concurrent calls keep independent deadlines, outcomes, circuits, caches and in-flight calls per canonical endpoint. GCP ID tokens default to the selected endpoint unless an explicit audience wins. Declared credentials and schemas still apply."
+    },
+    {
+      "id": "resilience-order",
+      "text": "The interceptor chain runs client identity, then caller-supplied interceptors, then the total-timeout bound, then the circuit breaker, then retries, then the transport, and the chain is composed once per client rather than per request."
+    },
+    {
+      "id": "bounded-retries",
+      "text": "Retries use exponential backoff with jitter capped at the configured maximum delay, stay positive at high attempt counts, abort as soon as the caller's context is done, and are bounded as a whole by the total timeout when one is configured."
+    },
+    {
+      "id": "circuit-states",
+      "text": "The circuit breaker opens after the configured consecutive failures, fails fast while open, admits a bounded number of concurrent trial requests when half-open, and only closes after the configured number of successes."
+    },
+    {
+      "id": "error-redaction",
+      "text": "A transport error names the request's scheme, host, and path but never its query values, so credentials and identifiers passed as query parameters do not reach logs through an error string."
+    },
+    {
+      "id": "local-request-validation",
+      "text": "A generated JSON request is checked against the provider's request schema before transport dispatch, and a violation returns a typed client.request error without sending bytes to the service."
+    },
+    {
+      "id": "additive-responses",
+      "text": "A success body, a stream message, a provider-owned frame or declared error details that carries a property a closed object of the generated schema does not declare is accepted, and the property is dropped from the typed value and from RemoteError.Payload. Every declared property is validated as before, a union without a discriminator must still select exactly one variant, and a request body or client message with an undeclared property is still refused before dispatch."
+    },
+    {
+      "id": "bounded-responses",
+      "text": "Both the HTTP and Connect transports cap how much response body they buffer, so a hostile or malfunctioning provider cannot exhaust the caller's memory. A declared binary stream transfers its successful body to the caller without buffering; non-success bodies keep the ordinary cap."
+    },
+    {
+      "id": "credential-alternatives",
+      "text": "A generated call selects the first provider-declared credential alternative the binding can satisfy and injects it; when none is satisfiable the call is refused before dispatch, and an operation that declares a credential is never sent anonymously, including through a descriptor-only client. A rejected service credential is invalidated so the next attempt reacquires it."
+    },
+    {
+      "id": "remote-error-identity",
+      "text": "A non-success response becomes a typed remote error carrying the provider's stable code, the bound service id and the operation id, and never the raw response bytes, headers or URL."
+    },
+    {
+      "id": "error-payload-redaction",
+      "text": "Declared error details are exposed only after credential material is removed in every encoding it can take: a string, a JSON number, a boolean, or base64 bytes compared decoded. A provider-declared business field is kept whatever its name resembles, and a value that cannot be redacted without breaking the declared schema drops the whole payload."
+    },
+    {
+      "id": "retry-after-budget",
+      "text": "A 429 or 503 Retry-After advisory, expressed in seconds or as an HTTP date, replaces the computed backoff. Any wait that does not fit the call's remaining budget stops the retries and surfaces the typed remote error instead of the deadline, and the backoff base and ceiling come from the declared resilience policy rather than fixed constants."
+    },
+    {
+      "id": "typed-service-binding",
+      "text": "A generated client takes its endpoint, client identity and credential bindings from the registered service binding, and a binding URL that is not a safe absolute endpoint fails construction instead of degrading."
+    },
+    {
+      "id": "credential-audience",
+      "text": "A credential binding may name the audience its service token is requested for, and that value wins over the provider's profile and contract audience. A gcp-id-token binding with no audience requests the ID token for the binding URL, whatever the contract says: that is the URL the provider verifies it against, and it differs per environment."
+    },
+    {
+      "id": "declared-server-streams",
+      "text": "A provider-declared server stream opens over SSE with the call's credentials and deadlines, validates every message against the declared output schema, projects a terminal error as a typed remote error, and releases a stalled stream on the declared idle timeout."
+    },
+    {
+      "id": "sse-admission-and-parsing",
+      "text": "An SSE stream reaches the caller only after a 2xx handshake carrying the declared media type. A non-2xx handshake surfaces as a typed error before any message, and a credential the provider rejected is reacquired once without replaying the stream. The reader parses events across arbitrary chunk boundaries, including split runes and split CRLF pairs, counts a provider heartbeat comment as liveness for the idle budget, and stopping the application closes the streams it opened."
+    },
+    {
+      "id": "stream-session-lifecycle",
+      "text": "A stream session traverses connecting, admitted, active, terminal and closed in that order and always reaches closed. Admission is the provider's protocol acceptance - a 2xx response carrying the declared content type for SSE - never the first application message. Exactly one terminal among complete, error and cancel reaches the caller, the message channel closes exactly once, closing is idempotent, and the telemetry call measurement is emitted exactly once on entry into the closed phase."
+    },
+    {
+      "id": "stream-session-phase-rules",
+      "text": "A stream has no automatic opening retry; provider-declared stream resumption is the only replay mechanism. The circuit breaker records the admission once and nothing after it, and records nothing for a request it rejected, for a failure that never reached the provider, or for a caller cancellation. A credential resolved by an asynchronous acquisition is re-resolved at the send point, so an expired value is never emitted."
+    },
+    {
+      "id": "stream-session-budgets",
+      "text": "The handshake, idle, frame-size and queue-depth budgets bound a stream session independently of one another. The declared operation duration bounds the whole session only when it is declared; absent, the session is unbounded in time and the other budgets still apply. Exceeding the handshake budget fails the session before admission and exceeding the idle budget fails it after admission, both as a typed client deadline."
+    },
+    {
+      "id": "service-call-telemetry",
+      "text": "A generated call reports the service, the operation and the protocol once per call and once per attempt, injects the trace context into the outgoing request, and carries no credential value in any attribute."
+    },
+    {
+      "id": "response-cache",
+      "text": "A declared cache answers below freshMs; otherwise one call per key and forwarded identity goes upstream while callers wait. A transport error, the operation timeout, an open circuit, retry exhaustion or the caller's own deadline passing while the provider hangs returns the stored answer below staleMs, counted and logged; a cancellation never does. Entries live on the registry, which cancels calls in flight when it closes, never cross a forwarded identity and drop by key prefix."
+    },
+    {
+      "id": "response-cache-bypass-and-field-invalidation",
+      "text": "A call made with WithoutResponseCache goes to the provider: it neither reads, stores nor joins the cache, and no stored answer masks its failure. InvalidateResponsesByField drops every answer whose declared response field carries a value, across the service's operations and identities, compared in the canonical form both runtimes render. A value neither can render is refused, and a call in flight for a declaring operation is never stored."
+    },
+    {
+      "id": "application-scoped-registry",
+      "text": "One application owns one service-binding registry: every module of that application resolves the same instance and shares one credential cache, two applications in the same process share none, and the package holds no ambient cache that could outlive either."
+    },
+    {
+      "id": "registry-lifetime",
+      "text": "Closing the registry is idempotent and ends everything it owns: the credential refreshes still running are canceled, no credential is kept, the stream sessions it tracks are closed with their single call measurement, and the application stop phase performs it. An explicit caller-supplied token source stays caller-owned."
+    },
+    {
+      "id": "credential-lifetime",
+      "text": "A cached credential is renewed exactly once when it reaches its refresh leeway, however many callers ask at that moment. A token-source outage is never cached and recovery reacquires once. A malformed, oversized, or immediately expired token response fails with a typed error that carries neither the secret nor the endpoint. Acquisition is spent inside the declared call budget."
+    },
+    {
+      "id": "credential-placement",
+      "text": "Each declared alternative is applied whole or not at all: every requirement is injected in its declared header, a partially bound alternative is refused before dispatch, and a chosen alternative that fails to acquire is never downgraded to a weaker one. A forwarded user identity comes only from a real inbound request context, never from the service credential cache, and a rejected credential is reacquired without replaying an unsafe operation."
+    },
+    {
+      "id": "websocket-in-band-admission",
+      "text": "A first-party WebSocket stream is admitted in band: the opening handshake offers only the RFC 6455 negotiation headers and the putnami.service.v1 subprotocol, and the operation identity, client identity, deadline, budget, declared ordinary headers, propagation context and credentials all travel in the first application frame. A transport this runtime cannot encode exactly is refused before any network byte, naming the operation and the encoding."
+    },
+    {
+      "id": "websocket-typed-streams",
+      "text": "Server, client and bidirectional streams are typed handles. Every provider message is validated against the declared output schema before the caller sees it, the client message direction half-closes exactly once, exactly one terminal frame reaches the caller, and a provider error frame is projected onto the operation's declared errors as a typed remote error naming the service and the operation without credential material. Wide uint64 sequences and empty payloads cross the wire unchanged."
+    },
+    {
+      "id": "websocket-shared-lifecycle",
+      "text": "The WebSocket runtime drives the shared stream session and the published WebSocket conversation. It states no phase rule and names no conversation state of its own: admission is the ready frame, the circuit breaker is written by the session alone, and a canceled stream tells the provider once with a cancel frame and emits exactly one call measurement."
+    },
+    {
+      "id": "connect-transport",
+      "text": "A generated call runs on the first transport the contract declares that this runtime drives, with no fallback and no second resilience implementation: the Connect path reuses the credential, deadline, retry, circuit and telemetry chain the REST path uses. Its proto codec comes from the published descriptor, never a generated stub. A Connect error becomes the declared typed error, and a Connect server stream drives the shared stream session and ends on exactly one terminal envelope."
+    },
+    {
+      "id": "websocket-corpus-conformance",
+      "text": "The client replays the published WebSocket corpus. Every valid scene is accepted, and every invalid scene whose refused frame the client can observe is refused with the same diagnostic code the corpus declares. A scene whose invalid frame this runtime cannot compose is proved by the frames it does emit staying contract-clean."
+    },
+    {
+      "id": "declared-transport-preference",
+      "text": "The Go client opens a generated server stream over the provider's declared transports, in the declared order, and the caller never branches on which one carries it. It opens the next declared transport only on an answer that says this wire is not served here — 404, 405, 426, gRPC UNIMPLEMENTED, or a handshake that did not select the first-party subprotocol — and only for an operation declared safe or idempotent. Every other answer is surfaced as it is, and after admission there is no fallback left."
+    },
+    {
+      "id": "declared-stream-resume",
+      "text": "The Go client continues a server stream over a new socket after a transport break, when the provider declared the stream resumable and the operation declares reconnect. The continuation presents the token the previous admission issued and the last sequence the caller completely received, re-resolves its credentials before it dials, and is bounded by the framework resume limit. A provider that answers with a fresh stream, or refuses the token, ends the stream with a typed terminal."
+    },
+    {
+      "id": "declared-sse-continuation",
+      "text": "The Go client asks for the negotiated SSE wire on every connection of an operation whose SSE transport declares a continuation, refuses a provider that does not acknowledge it, and ends the session only at an explicit terminal. With reconnect declared, an interruption reopens the same operation in the same session at most five times, with credentials resolved again. Cursor mode reopens after the last message the caller received and drops undelivered queued values; best-effort reopens the original query."
+    },
+    {
+      "id": "binary-payloads",
+      "text": "Bounded binary calls preserve bytes and declared limits. Streamed unary HTTP sends a single-use reader without prebuffering or replay and returns a caller-owned ReadCloser before completion. Concrete wire media types and parameters survive; JSON-labeled bytes remain opaque. Auth precedes reads; error bodies stay bounded and typed. Caching and framed transports are refused. Deadlines stay active until EOF, read error, Close, cancellation or application stop releases the body once."
+    },
+    {
+      "id": "provider-owned-websocket-wires",
+      "text": "The Go client opens a provider-owned byte stream as a *client.ByteStream (io.ReadWriteCloser) and a provider-owned subprotocol as a *client.FrameStream. The upgrade carries the declared credential, identities and trace context and offers exactly the declared token; a refusal is the declared typed error. Frames are validated, writes split under the frame budget, idle, heartbeat and operation budgets apply, and a close other than 1000 is a typed error naming its code."
+    },
+    {
+      "id": "caller-resolved-bindings",
+      "text": "An explicit caller binding snapshots its operation paths and owns its credential, response and stream registry. Closing it refuses every later call without closing a shared application registry. Only declared fixed unary REST operations can be routed to a caller path."
+    },
+    {
+      "id": "binding-headers",
+      "text": "Static non-secret headers are snapshotted and canonicalized at binding construction; invalid names, values outside visible ASCII or with surrounding whitespace, case aliases, reserved headers and declared credential headers fail closed, and TypeScript decides the same shared corpus. Operation headers win, while a static idempotency key is refused before dispatch. Cache keys and every attempt see the effective values. All transports carry them beside credentials; first-party WebSocket uses its init frame."
+    }
+  ],
+  "decisions": [
+    "go/framework/client/doc/adr/0001-resilience-is-an-ordered-chain.md",
+    "go/framework/api/doc/adr/0002-generated-clients-carry-producer-lineage.md",
+    "go/framework/client/doc/adr/0002-stream-sessions-have-five-phases-and-four-budgets.md",
+    "go/framework/client/doc/adr/0003-the-websocket-client-is-hand-written-and-admits-in-band.md",
+    "go/framework/client/doc/adr/0004-the-connect-transport-is-a-projection-of-one-declaration.md",
+    "go/framework/api/doc/adr/0007-a-raw-octet-payload-is-declared-and-bounded.md",
+    "go/framework/client/doc/adr/0005-the-service-registry-is-scoped-to-the-application.md",
+    "go/framework/client/doc/adr/0006-a-declared-fallback-happens-before-admission-and-a-continuation-never-repeats-a-value.md",
+    "protocols/clientcontract/doc/adr/0007-a-response-cache-is-declared-per-operation.md",
+    "protocols/clientcontract/doc/adr/0010-a-provider-owned-websocket-wire-is-declared-not-inferred.md",
+    "go/framework/api/doc/adr/0010-a-provider-owned-wire-admits-on-the-upgrade.md",
+    "go/framework/client/doc/adr/0007-unframed-binary-bodies-transfer-ownership.md",
+    "go/framework/client/doc/adr/0007-static-binding-headers-are-non-credential-defaults.md",
+    "typescript/framework/client/doc/adr/0006-static-binding-headers-are-non-credential-defaults.md",
+    "go/framework/client/doc/adr/0008-a-call-delivers-its-success-body-through-a-caller-owned-sink.md",
+    "protocols/clientcontract/doc/adr/0013-an-sse-stream-declares-how-it-continues-and-a-negotiated-stream-ends-explicitly.md",
+    "protocols/clientcontract/doc/adr/0014-a-client-drops-a-response-property-it-does-not-declare.md"
+  ]
+}

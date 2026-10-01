@@ -1,0 +1,6 @@
+{
+  "protocol": "putnami.events.v1",
+  "type": "auth",
+  "token": "Bearer token",
+  "headers": { "x-device-id": "device-1" }
+}

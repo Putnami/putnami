@@ -1,0 +1,1202 @@
+{
+  "protocolVersion": 1,
+  "comment": "Which import contracts the protocol refuses, and where. Each case starts from one named base contract, applies a shallow top-level 'set' and 'remove', and states the exact (code, field) pairs the validator must produce. Shallow on purpose: a deep merge would need identical merge semantics in every language, which is one more thing to get subtly different.",
+  "bases": {
+    "projection": {
+      "id": "consumer.producer-projection.v1",
+      "version": 1,
+      "from": {
+        "domain": "producer",
+        "export": "producer.facts.v1"
+      },
+      "as": "consumer.producer-copy",
+      "mode": "projection",
+      "status": "active",
+      "facts": [
+        "project_identity",
+        "dependency_edges"
+      ],
+      "bootstrap": {
+        "kind": "in-process",
+        "contract": "putnami.probe.v1",
+        "availability": "active"
+      },
+      "updates": {
+        "kind": "in-process",
+        "contract": "putnami.probe.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "24h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "sourceVersion": "probe_digest",
+        "idempotencyKey": "identity_digest",
+        "lateEvents": "ignore-older"
+      },
+      "localModel": {
+        "name": "consumer.producer-copy",
+        "kind": "projection",
+        "sourceIdentity": "project_identity",
+        "projectedFields": [
+          "project_identity",
+          "dependency_edges"
+        ],
+        "localFields": [],
+        "provenanceField": "probe_digest",
+        "observedAtField": "observed_at",
+        "freshnessField": "freshness_state",
+        "writer": "consumer.loader",
+        "rebuildable": true,
+        "rebuild": "bootstrap"
+      },
+      "deletion": {
+        "strategy": "not-applicable"
+      },
+      "justification": "The consumer keeps a rebuildable local copy so read-only paths answer without paying a probe."
+    },
+    "snapshot": {
+      "id": "consumer.producer-snapshot.v1",
+      "version": 1,
+      "from": {
+        "domain": "producer",
+        "export": "producer.observations.v1"
+      },
+      "as": "consumer.producer-observations",
+      "mode": "snapshot",
+      "status": "active",
+      "facts": [
+        "observation_batch"
+      ],
+      "transport": {
+        "kind": "file",
+        "contract": "putnami.observations.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "1h",
+        "onMissing": "fail-closed",
+        "onStale": "fail-closed",
+        "ordering": "none",
+        "sourceVersion": "session_id",
+        "idempotencyKey": "task_key",
+        "lateEvents": "reject"
+      },
+      "justification": "The consumer joins an immutable producer state attached under its exact version."
+    },
+    "query": {
+      "id": "consumer.producer-query.v1",
+      "version": 1,
+      "from": {
+        "domain": "producer",
+        "export": "producer.lookup.v1"
+      },
+      "as": "consumer.producer-lookup",
+      "mode": "query",
+      "status": "active",
+      "facts": [
+        "lookup_answer"
+      ],
+      "transport": {
+        "kind": "api",
+        "contract": "putnami.lookup.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "30s",
+        "onMissing": "fail-closed",
+        "onStale": "fail-closed",
+        "ordering": "none",
+        "sourceVersion": "answer_version",
+        "idempotencyKey": "answer_key",
+        "lateEvents": "reject"
+      },
+      "justification": "The consumer asks the owner each time and copies nothing."
+    },
+    "command": {
+      "id": "consumer.producer-command.v1",
+      "version": 1,
+      "from": {
+        "domain": "producer",
+        "export": "producer.ingest.v1"
+      },
+      "as": "consumer.producer-ingest",
+      "mode": "command",
+      "status": "active",
+      "facts": [
+        "usage_ingest"
+      ],
+      "transport": {
+        "kind": "event",
+        "contract": "putnami.usage.v1",
+        "availability": "active"
+      },
+      "justification": "The consumer may ask the owner to ingest a record; the owner decides whether it happens."
+    },
+    "reference": {
+      "id": "consumer.producer-reference.v1",
+      "version": 1,
+      "from": {
+        "domain": "producer",
+        "export": "producer.contracts.v1"
+      },
+      "as": "consumer.producer-contracts",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "wire_contract_definitions"
+      ],
+      "justification": "The consumer holds a stable handle and resolves it at the owner."
+    }
+  },
+  "cases": [
+    {
+      "name": "a well-formed projection is accepted",
+      "base": "projection",
+      "diagnostics": []
+    },
+    {
+      "name": "a well-formed snapshot is accepted",
+      "base": "snapshot",
+      "diagnostics": []
+    },
+    {
+      "name": "a well-formed query is accepted",
+      "base": "query",
+      "diagnostics": []
+    },
+    {
+      "name": "a well-formed command is accepted",
+      "base": "command",
+      "diagnostics": []
+    },
+    {
+      "name": "a well-formed reference is accepted",
+      "base": "reference",
+      "diagnostics": []
+    },
+    {
+      "name": "a projection cannot name one ambiguous transport",
+      "base": "projection",
+      "set": {
+        "transport": {
+          "kind": "api",
+          "contract": "putnami.probe.v1",
+          "availability": "active"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_projection",
+          "field": "imports[0].transport"
+        }
+      ]
+    },
+    {
+      "name": "a projection requires an explicit bootstrap transport",
+      "base": "projection",
+      "remove": [
+        "bootstrap"
+      ],
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_projection",
+          "field": "imports[0].bootstrap"
+        }
+      ]
+    },
+    {
+      "name": "a projection requires an explicit updates transport",
+      "base": "projection",
+      "remove": [
+        "updates"
+      ],
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_projection",
+          "field": "imports[0].updates"
+        }
+      ]
+    },
+    {
+      "name": "a projection requires a consistency block",
+      "base": "projection",
+      "remove": [
+        "consistency"
+      ],
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_projection",
+          "field": "imports[0].consistency"
+        }
+      ]
+    },
+    {
+      "name": "a projection requires a deletion strategy",
+      "base": "projection",
+      "remove": [
+        "deletion"
+      ],
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_projection",
+          "field": "imports[0].deletion"
+        }
+      ]
+    },
+    {
+      "name": "a projection requires an explicit local model",
+      "base": "projection",
+      "remove": [
+        "localModel"
+      ],
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_projection",
+          "field": "imports[0].localModel"
+        }
+      ]
+    },
+    {
+      "name": "a projection requires monotone ordering",
+      "base": "projection",
+      "set": {
+        "consistency": {
+          "maxStaleness": "24h",
+          "onMissing": "fail-closed",
+          "onStale": "use-stale",
+          "ordering": "none",
+          "sourceVersion": "probe_digest",
+          "idempotencyKey": "identity_digest",
+          "lateEvents": "ignore-older"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_projection",
+          "field": "imports[0].consistency.ordering"
+        }
+      ]
+    },
+    {
+      "name": "a projection must be rebuildable",
+      "base": "projection",
+      "set": {
+        "localModel": {
+          "name": "consumer.producer-copy",
+          "kind": "projection",
+          "sourceIdentity": "project_identity",
+          "projectedFields": [
+            "project_identity",
+            "dependency_edges"
+          ],
+          "provenanceField": "probe_digest",
+          "observedAtField": "observed_at",
+          "freshnessField": "freshness_state",
+          "writer": "consumer.loader",
+          "rebuildable": false,
+          "rebuild": "not-applicable"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_projection",
+          "field": "imports[0].localModel.rebuildable"
+        }
+      ]
+    },
+    {
+      "name": "projected fields must exactly match the minimized imported facts",
+      "base": "projection",
+      "set": {
+        "facts": [
+          "project_identity"
+        ]
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_projection",
+          "field": "imports[0].localModel.projectedFields"
+        }
+      ]
+    },
+    {
+      "name": "the source identity must be one of the projected fields",
+      "base": "projection",
+      "set": {
+        "localModel": {
+          "name": "consumer.producer-copy",
+          "kind": "projection",
+          "sourceIdentity": "unprojected_key",
+          "projectedFields": [
+            "project_identity",
+            "dependency_edges"
+          ],
+          "provenanceField": "probe_digest",
+          "observedAtField": "observed_at",
+          "freshnessField": "freshness_state",
+          "writer": "consumer.loader",
+          "rebuildable": true,
+          "rebuild": "bootstrap"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_projection",
+          "field": "imports[0].localModel.sourceIdentity"
+        }
+      ]
+    },
+    {
+      "name": "a field cannot be both projected and locally authoritative",
+      "base": "projection",
+      "set": {
+        "localModel": {
+          "name": "consumer.producer-copy",
+          "kind": "projection",
+          "sourceIdentity": "project_identity",
+          "projectedFields": [
+            "project_identity",
+            "dependency_edges"
+          ],
+          "localFields": [
+            "project_identity"
+          ],
+          "provenanceField": "probe_digest",
+          "observedAtField": "observed_at",
+          "freshnessField": "freshness_state",
+          "writer": "consumer.loader",
+          "rebuildable": true,
+          "rebuild": "bootstrap"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_projection",
+          "field": "imports[0].localModel.localFields[0]"
+        }
+      ]
+    },
+    {
+      "name": "snapshot access requires one explicit transport",
+      "base": "snapshot",
+      "remove": [
+        "transport"
+      ],
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_transport",
+          "field": "imports[0].transport"
+        }
+      ]
+    },
+    {
+      "name": "snapshot access requires explicit freshness and failure behavior",
+      "base": "snapshot",
+      "remove": [
+        "consistency"
+      ],
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency"
+        }
+      ]
+    },
+    {
+      "name": "snapshot access cannot declare projection bootstrap or updates",
+      "base": "snapshot",
+      "set": {
+        "updates": {
+          "kind": "event",
+          "contract": "putnami.observations.v1",
+          "availability": "active"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_transport",
+          "field": "imports[0]"
+        }
+      ]
+    },
+    {
+      "name": "query access requires explicit freshness and failure behavior",
+      "base": "query",
+      "remove": [
+        "consistency"
+      ],
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency"
+        }
+      ]
+    },
+    {
+      "name": "command access requires one explicit transport",
+      "base": "command",
+      "remove": [
+        "transport"
+      ],
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_transport",
+          "field": "imports[0].transport"
+        }
+      ]
+    },
+    {
+      "name": "reference access cannot declare projection bootstrap or updates",
+      "base": "reference",
+      "set": {
+        "bootstrap": {
+          "kind": "in-process",
+          "contract": "putnami.contracts.v1",
+          "availability": "active"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_transport",
+          "field": "imports[0]"
+        }
+      ]
+    },
+    {
+      "name": "an active import cannot depend on a planned transport",
+      "base": "snapshot",
+      "set": {
+        "transport": {
+          "kind": "file",
+          "contract": "putnami.observations.v1",
+          "availability": "planned"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_status",
+          "field": "imports[0].transport.availability"
+        }
+      ]
+    },
+    {
+      "name": "a none transport cannot name a contract",
+      "base": "reference",
+      "set": {
+        "transport": {
+          "kind": "none",
+          "contract": "putnami.contracts.v1",
+          "availability": "active"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_transport",
+          "field": "imports[0].transport.contract"
+        }
+      ]
+    },
+    {
+      "name": "a transport contract must be a versioned dotted ID",
+      "base": "snapshot",
+      "set": {
+        "transport": {
+          "kind": "file",
+          "contract": "Observations",
+          "availability": "active"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_transport",
+          "field": "imports[0].transport.contract"
+        }
+      ]
+    },
+    {
+      "name": "a planned target cannot claim a current observed project binding",
+      "base": "reference",
+      "set": {
+        "status": "planned",
+        "bindings": [
+          {
+            "kind": "project-dependency",
+            "consumerProject": "/consumer",
+            "producerProject": "/producer"
+          }
+        ]
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_binding",
+          "field": "imports[0].bindings[0]"
+        }
+      ]
+    },
+    {
+      "name": "a repeated binding is reported once, on the repeat",
+      "base": "reference",
+      "set": {
+        "bindings": [
+          {
+            "kind": "project-dependency",
+            "consumerProject": "/consumer",
+            "producerProject": "/producer"
+          },
+          {
+            "kind": "project-dependency",
+            "consumerProject": "/consumer",
+            "producerProject": "/producer"
+          }
+        ]
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.duplicate_binding",
+          "field": "imports[0].bindings[1]"
+        }
+      ]
+    },
+    {
+      "name": "a binding must name canonical project IDs",
+      "base": "reference",
+      "set": {
+        "bindings": [
+          {
+            "kind": "project-dependency",
+            "consumerProject": "consumer",
+            "producerProject": "/producer/"
+          }
+        ]
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_project",
+          "field": "imports[0].bindings[0].consumerProject"
+        },
+        {
+          "code": "architecture.invalid_project",
+          "field": "imports[0].bindings[0].producerProject"
+        }
+      ]
+    },
+    {
+      "name": "max staleness must be one positive duration",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "soon",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    },
+    {
+      "name": "a zero staleness bound is not a bound",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "0s",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    },
+    {
+      "name": "fractional nanoseconds truncate to zero before positivity is checked",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "0.1ns",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    },
+    {
+      "name": "a duration outside signed int64 nanoseconds is refused",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "3000000h",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    },
+    {
+      "name": "compound and fractional durations are accepted",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "1h30m",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "name": "a sub-second bound is accepted",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "1.5s",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "name": "use-stale is not a missing-data behavior",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "1h",
+          "onMissing": "use-stale",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.onMissing"
+        }
+      ]
+    },
+    {
+      "name": "unavailable is not a stale-data behavior",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "1h",
+          "onMissing": "fail-closed",
+          "onStale": "unavailable",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.onStale"
+        }
+      ]
+    },
+    {
+      "name": "ordered updates require an idempotency key field",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "1h",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "source-version",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.idempotencyKey"
+        }
+      ]
+    },
+    {
+      "name": "tombstone deletion requires one tombstone field",
+      "base": "projection",
+      "set": {
+        "deletion": {
+          "strategy": "tombstone"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_deletion",
+          "field": "imports[0].deletion.tombstoneField"
+        }
+      ]
+    },
+    {
+      "name": "only tombstone deletion names a tombstone field",
+      "base": "projection",
+      "set": {
+        "deletion": {
+          "strategy": "retain",
+          "tombstoneField": "deleted_at"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_deletion",
+          "field": "imports[0].deletion.tombstoneField"
+        }
+      ]
+    },
+    {
+      "name": "an unknown deletion strategy is refused",
+      "base": "projection",
+      "set": {
+        "deletion": {
+          "strategy": "forget"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_deletion",
+          "field": "imports[0].deletion.strategy"
+        }
+      ]
+    },
+    {
+      "name": "an import must minimize and name at least one fact",
+      "base": "reference",
+      "set": {
+        "facts": []
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_fact",
+          "field": "imports[0].facts"
+        }
+      ]
+    },
+    {
+      "name": "a fact name must be lower snake case",
+      "base": "reference",
+      "set": {
+        "facts": [
+          "WireContractDefinitions"
+        ]
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_fact",
+          "field": "imports[0].facts[0]"
+        }
+      ]
+    },
+    {
+      "name": "an import ID must end in the declared version",
+      "base": "reference",
+      "set": {
+        "id": "consumer.producer-reference.v2"
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_id",
+          "field": "imports[0].id"
+        }
+      ]
+    },
+    {
+      "name": "an import justification is required",
+      "base": "reference",
+      "set": {
+        "justification": ""
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_id",
+          "field": "imports[0].justification"
+        }
+      ]
+    },
+    {
+      "name": "a justification cannot be padded whitespace",
+      "base": "reference",
+      "set": {
+        "justification": " The consumer holds a stable handle. "
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_id",
+          "field": "imports[0].justification"
+        }
+      ]
+    },
+    {
+      "name": "an unknown access mode is refused",
+      "base": "reference",
+      "set": {
+        "mode": "borrow"
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_mode",
+          "field": "imports[0].mode"
+        }
+      ]
+    },
+    {
+      "name": "an unknown lifecycle status is refused",
+      "base": "reference",
+      "set": {
+        "status": "retired"
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_status",
+          "field": "imports[0].status"
+        }
+      ]
+    },
+    {
+      "name": "a producer domain must be a lower-case slash-separated semantic ID",
+      "base": "reference",
+      "set": {
+        "from": {
+          "domain": "Producer",
+          "export": "producer.contracts.v1"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_domain",
+          "field": "imports[0].from.domain"
+        }
+      ]
+    },
+    {
+      "name": "a local import name must be a dotted semantic ID",
+      "base": "reference",
+      "set": {
+        "as": "contracts"
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_id",
+          "field": "imports[0].as"
+        }
+      ]
+    },
+    {
+      "name": "the duration literal \"500ms\" is accepted",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "500ms",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "name": "the duration literal \"1h30m0s\" is accepted",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "1h30m0s",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "name": "the duration literal \"0.5h\" is accepted",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "0.5h",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "name": "the duration literal \"1ns\" is accepted",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "1ns",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "name": "the duration literal \"+2h\" is accepted",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "+2h",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": []
+    },
+    {
+      "name": "the duration literal \"1d\" is refused",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "1d",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    },
+    {
+      "name": "the duration literal \"-5m\" is refused",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "-5m",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    },
+    {
+      "name": "the duration literal \"5\" is refused",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "5",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    },
+    {
+      "name": "the duration literal \"\" is refused",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    },
+    {
+      "name": "the duration literal \"1m30\" is refused",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "1m30",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    },
+    {
+      "name": "the duration literal \"h\" is refused",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "h",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    },
+    {
+      "name": "the duration literal \".s\" is refused",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": ".s",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    },
+    {
+      "name": "the duration literal \"1.5\" is refused",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "1.5",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    },
+    {
+      "name": "the duration literal \"1 h\" is refused",
+      "base": "snapshot",
+      "set": {
+        "consistency": {
+          "maxStaleness": "1 h",
+          "onMissing": "fail-closed",
+          "onStale": "fail-closed",
+          "ordering": "none",
+          "sourceVersion": "session_id",
+          "idempotencyKey": "task_key",
+          "lateEvents": "reject"
+        }
+      },
+      "diagnostics": [
+        {
+          "code": "architecture.invalid_consistency",
+          "field": "imports[0].consistency.maxStaleness"
+        }
+      ]
+    }
+  ]
+}

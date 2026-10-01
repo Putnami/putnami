@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/runner-session-bundle-v1.json",
+  "title": "Runner session bundle version 1",
+  "description": "The canonical evidence of one attempt: the executing engine's exit code and the session directories it recorded, the gate session first. File bytes travel through the exchange directory by digest. Implementations must also enforce the ordering and parent-link rules in protocols/runner/README.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["attempt", "exitCode", "sessionId", "sessions"],
+  "properties": {
+    "attempt": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "exitCode": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "sessionId": { "type": "string", "pattern": "^(?:|[0-9]{8}-[0-9]{6}-[0-9a-f]{6})$" },
+    "sessions": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "files"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$" },
+          "parentId": { "type": "string", "pattern": "^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$" },
+          "files": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "digest", "size"],
+              "properties": {
+                "name": { "enum": ["session.json", "plan.json", "events.jsonl", "report.json", "spec-verification.json", "run-report.json"] },
+                "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "size": { "type": "integer", "minimum": 0, "maximum": 1073741824 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

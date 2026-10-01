@@ -1,0 +1,80 @@
+{
+  "irVersion": 1,
+  "transport": "http",
+  "services": [
+    {
+      "name": "OrdersService",
+      "className": "OrdersClient",
+      "methods": [
+        {
+          "name": "getOrder",
+          "operationId": "getOrder",
+          "httpMethod": "GET",
+          "path": "/orders/{id}",
+          "params": [
+            {
+              "name": "id",
+              "goType": "string",
+              "optional": false,
+              "array": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "UsersService",
+      "className": "UsersClient",
+      "methods": [
+        {
+          "name": "listUsers",
+          "operationId": "listUsers",
+          "httpMethod": "GET",
+          "path": "/users",
+          "query": [
+            {
+              "name": "page",
+              "goType": "int64",
+              "optional": true,
+              "array": false
+            }
+          ],
+          "response": [
+            {
+              "name": "id",
+              "goType": "string",
+              "optional": false,
+              "array": false
+            },
+            {
+              "name": "name",
+              "goType": "string",
+              "optional": false,
+              "array": false
+            }
+          ]
+        },
+        {
+          "name": "postUsers",
+          "operationId": "postUsers",
+          "httpMethod": "POST",
+          "path": "/users",
+          "body": [
+            {
+              "name": "email",
+              "goType": "string",
+              "optional": true,
+              "array": false
+            },
+            {
+              "name": "name",
+              "goType": "string",
+              "optional": false,
+              "array": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

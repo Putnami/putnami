@@ -1,0 +1,87 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 1,
+  "namespace": "billing",
+  "features": [
+    {
+      "id": "billing/availability",
+      "type": "feature",
+      "name": "Billing availability",
+      "outcome": "Billing has an explicit availability promise",
+      "owner": "billing",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "implementation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "capability"
+          ]
+        },
+        {
+          "id": "availability-review",
+          "stage": "design-partner-proven",
+          "evidenceKinds": [
+            "attestation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "billing/invoice-export",
+      "type": "feature",
+      "name": "Invoice export",
+      "outcome": "Customers can export issued invoices",
+      "owner": "billing",
+      "target": "coded",
+      "relations": [
+        {
+          "kind": "dependsOn",
+          "target": "billing/invoicing"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "implementation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "capability"
+          ]
+        },
+        {
+          "id": "integration-test",
+          "stage": "wired",
+          "evidenceKinds": [
+            "artifact"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "billing/invoicing",
+      "type": "feature",
+      "name": "Invoicing",
+      "outcome": "Customers can issue invoices",
+      "owner": "billing",
+      "target": "modeled"
+    },
+    {
+      "id": "billing/purchase-journey",
+      "type": "journey",
+      "name": "Purchase journey",
+      "outcome": "Customers complete a purchase and receive an invoice",
+      "owner": "billing",
+      "target": "modeled",
+      "relations": [
+        {
+          "kind": "includes",
+          "target": "billing/invoice-export"
+        },
+        {
+          "kind": "includes",
+          "target": "billing/invoicing"
+        }
+      ]
+    }
+  ]
+}

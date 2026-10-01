@@ -1,0 +1,267 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/persistence-transactions",
+      "type": "feature",
+      "name": "Go persistence and transactions",
+      "outcome": "Go services persist PostgreSQL data through pool-scoped repositories and explicit transaction or request unit-of-work boundaries",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "multi-datasource-boundary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "panic-rolls-back-every-enrolled-pool",
+              "partial-commit-reports-prefix-and-rolls-back-remainder",
+              "two-pools-commit-sequentially-on-success"
+            ]
+          }
+        },
+        {
+          "id": "pool-scoped-transaction",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "foreign-pool-never-receives-the-transaction",
+              "nested-work-on-the-same-pool-reuses-the-transaction",
+              "two-pools-get-independent-finalizers"
+            ]
+          }
+        },
+        {
+          "id": "secret-safe-telemetry",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "rollback-telemetry-carries-no-secret-payload",
+              "rollback-telemetry-uses-fixed-outcome-vocabulary",
+              "unit-of-work-telemetry-uses-fixed-outcome-vocabulary"
+            ]
+          }
+        },
+        {
+          "id": "transaction-finalization",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "commits-after-a-nil-callback-result",
+              "failed-commit-releases-the-connection",
+              "rolls-back-exactly-once-on-error",
+              "rolls-back-on-panic"
+            ]
+          }
+        },
+        {
+          "id": "unit-of-work",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "finalize-is-idempotent",
+              "finalize-scope-reconciles-the-request-outcome",
+              "one-transaction-per-enrolled-pool",
+              "rollback-only-rolls-back-despite-success",
+              "rollback-runs-on-a-canceled-context",
+              "withtx-joins-ambient-unit-of-work"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "go/shared-datasource-pooling",
+      "type": "feature",
+      "name": "Shared physical pool per database with acquire-time search_path",
+      "outcome": "Go workloads that declare several datasources on one physical database share one connection pool per database, and every unqualified query still resolves in its own datasource's schema",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "acquire-time-search-path",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-changed-search-path-is-set-before-hand-out",
+              "a-failed-set-destroys-the-connection",
+              "a-missing-request-fails-closed",
+              "an-empty-request-resets-a-set-search-path",
+              "an-unchanged-search-path-issues-no-statement",
+              "the-physical-pool-carries-no-startup-search-path"
+            ]
+          }
+        },
+        {
+          "id": "datasource-bound-acquire",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-pool-surface-marks-the-acquire-with-its-datasource",
+              "the-stdlib-connector-marks-every-connect"
+            ]
+          }
+        },
+        {
+          "id": "one-pool-per-physical-database",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "concurrent-first-opens-connect-once",
+              "distinct-connection-identities-open-distinct-pools",
+              "same-connection-identity-shares-one-physical-pool"
+            ]
+          }
+        },
+        {
+          "id": "shared-pool-lifetime",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-closed-datasource-fails-with-an-error-not-a-panic",
+              "closing-one-datasource-keeps-the-shared-pool-open",
+              "closing-the-last-datasource-closes-the-shared-pool",
+              "registry-close-is-idempotent-and-reopens"
+            ]
+          }
+        },
+        {
+          "id": "tuning-agreement",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "different-identity-hooks-on-one-database-is-a-declaration-error",
+              "different-tuning-on-one-database-is-a-declaration-error"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "go/sql-migration-execution",
+      "type": "feature",
+      "name": "SQL migration execution",
+      "outcome": "A SQL migration body and the record marking it applied commit or roll back together, read-only observation works without migration authority, re-application is idempotent with divergence surfaced as drift, and rollback only ever runs persisted hash-verified SQL",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "atomic-record",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-body-and-its-record-commit-in-one-transaction",
+              "a-failed-body-rolls-back-and-is-never-applied",
+              "the-advisory-lock-is-scoped-per-datasource"
+            ]
+          }
+        },
+        {
+          "id": "deterministic-execution",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "datasources-execute-in-lexicographic-order",
+              "definitions-execute-in-canonical-name-order",
+              "rollback-proceeds-in-reverse-recorded-order"
+            ]
+          }
+        },
+        {
+          "id": "repeatability-and-drift",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "re-applying-a-matching-set-is-idempotent",
+              "a-clean-up-reports-no-drift",
+              "changed-missing-and-pending-definitions-appear-in-the-report"
+            ]
+          }
+        },
+        {
+          "id": "read-only-observation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "status-with-a-runtime-role-never-creates-or-locks-the-state-store",
+              "a-missing-state-store-is-reported-as-all-definitions-pending"
+            ]
+          }
+        },
+        {
+          "id": "reversibility",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "rollback-runs-only-the-persisted-down-body",
+              "a-tampered-down-body-is-refused",
+              "a-missing-down-body-is-refused"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

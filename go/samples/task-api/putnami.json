@@ -1,0 +1,30 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/examples/task-api",
+  "description": "Go example: task tracker API demonstrating HTTP + events + DI + config + logger",
+  "tags": ["go", "e2e"],
+  "extensions": ["/go/extension"],
+  "featureAuthority": {"none": "This sample composes several framework features and is not a product deliverable."},
+  "dependencies": [
+    "/go/framework/api",
+    "/go/framework/app",
+    "/go/framework/config",
+    "/go/framework/errors",
+    "/go/framework/events",
+    "/go/framework/http",
+    "/go/framework/inject",
+    "/go/framework/logger",
+    "/go/framework/migration",
+    "/protocols/features",
+    "/protocols/infra"
+  ],
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    },
+    "serve": {
+      "port": 3801
+    }
+  }
+}

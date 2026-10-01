@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@example/08-real-time",
+  "tags": ["e2e", "ts"],
+  "extensions": ["/typescript/extension"],
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    },
+    "serve": {
+      "port": 3908
+    }
+  }
+}

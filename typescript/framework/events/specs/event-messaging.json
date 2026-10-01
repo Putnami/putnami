@@ -1,0 +1,70 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/event-messaging",
+  "outcomes": [
+    "A publisher and a handler agree on a payload shape at compile time, and a message that does not match it fails the delivery instead of reaching the handler",
+    "A failing handler is retried a bounded number of times and then dead-lettered, without the application writing a retry loop",
+    "A message that is genuinely lost always leaves exactly one record saying so, so 'nothing was lost' is checkable rather than assumed",
+    "Local development behaves like production — competing consumers, retries, dead letters, backpressure — with no broker installed",
+    "Shutting down does not discard work the broker already admitted"
+  ],
+  "nonGoals": [
+    "Exactly-once delivery: handlers must be idempotent, and the in-memory broker can be told to prove it by redelivering",
+    "Ordering guarantees across messages or partitions",
+    "Depending on a vendor SDK: Redis, Google Pub/Sub, and Postgres transports are structural interfaces the application supplies",
+    "Owning the outbox table, its transaction, or its relay loop — `outbox()` is a declaration, not a runtime",
+    "Promising that a pre-1.0 minor release keeps the previous messaging contract"
+  ],
+  "requirements": [
+    {
+      "id": "at-least-once",
+      "text": "Delivery is at-least-once and duplicates are a normal outcome. The in-memory broker can deliberately redeliver a sample of handled messages when a developer opts in, so a non-idempotent handler is found locally rather than in production."
+    },
+    {
+      "id": "payload-validation",
+      "text": "A delivery whose payload does not satisfy the topic's declared schema fails through the ordinary failure path — validated inside the dispatch pipeline — instead of reaching the handler with the wrong shape."
+    },
+    {
+      "id": "bounded-retry",
+      "text": "A failed delivery is retried with exponential backoff and jitter up to the handler's configured maximum, and each retry increments the delivery attempt so the handler can see it."
+    },
+    {
+      "id": "dead-letter-or-drop",
+      "text": "Once retries are exhausted, a handler that declared a dead-letter queue routes the message to `<topic>.dlq` with the original topic, attempt, and error as attributes; a handler that did not declares the message dropped."
+    },
+    {
+      "id": "no-silent-loss",
+      "text": "A dead-letter with no `<topic>.dlq` subscriber is captured in a bounded in-memory buffer with its full envelope and error, rather than being reduced to a log line, so an operator can inspect or replay it."
+    },
+    {
+      "id": "one-record-per-message",
+      "text": "A terminal outcome emits exactly one record for the message, never one per refusing subscriber: a dead-letter record only once the dead-letter has been accepted, a drop record only when nothing accepted it, and never both."
+    },
+    {
+      "id": "bounded-concurrency",
+      "text": "Each handler admits at most its configured concurrency, parks the rest in a bounded queue, and on overflow either drops with a recorded reason or throws according to its declared policy — a queue-full drop is recorded like every other drop."
+    },
+    {
+      "id": "graceful-drain",
+      "text": "Stopping the broker refuses new publishes but keeps draining both in-flight and queued deliveries until they finish or the drain timeout elapses, and reports what was still pending when it timed out."
+    },
+    {
+      "id": "isolated-invocation",
+      "text": "Every handler invocation runs in its own async context carrying the trace id, topic, message id, and attempt, and in its own dependency-injection scope which is closed when the invocation ends — including when the scope factory itself fails."
+    },
+    {
+      "id": "residual-failures-are-routed",
+      "text": "A rejection that escapes the dispatch pipeline is routed to the failure router rather than surfacing as an unhandled rejection, and a failure of the routing itself is logged as an independent operational signal instead of escaping again."
+    },
+    {
+      "id": "browser-surface",
+      "text": "The browser entry point exposes only the topic declarations, the client, and the wire protocol; no broker, transport, or server code is reachable from it."
+    },
+    {
+      "id": "cross-language-records",
+      "text": "The delivery lifecycle records match the shared cross-language corpus, so the TypeScript and Go brokers cannot drift on record vocabulary, ordering, or the attempt numbers they report."
+    }
+  ],
+  "decisions": ["typescript/framework/events/doc/adr/0001-delivery-is-at-least-once-and-loss-is-recorded.md"]
+}

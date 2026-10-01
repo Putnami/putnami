@@ -1,0 +1,7 @@
+# Bun 1.4 global virtual store: isolated linker installs symlink into a shared
+# cache instead of copying, cutting warm CI installs. Workspace libs are only
+# linked where declared — framework code that imports a dependency on behalf of
+# a workload must resolve it from the workload root first (see
+# typescript/framework/database/src/sql.plugin.ts).
+[install]
+linker = "isolated"

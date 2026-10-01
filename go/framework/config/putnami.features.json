@@ -1,0 +1,74 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/typed-configuration",
+      "type": "feature",
+      "name": "Go typed configuration",
+      "outcome": "Go applications load typed configuration from ordered sources without silently accepting invalid or exposed sensitive values",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "cancellation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "load-context-falls-back-to-synchronous-source",
+              "load-context-prefers-context-source"
+            ]
+          }
+        },
+        {
+          "id": "mapping",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "rejects-invalid-env-scalar",
+              "rejects-invalid-scalar-string",
+              "rejects-slice-element-type-mismatch",
+              "rejects-unmappable-value",
+              "rejects-unsupported-kind-with-default-tag",
+              "rejects-unsupported-kind-with-env-tag"
+            ]
+          }
+        },
+        {
+          "id": "precedence",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "defaults-apply-without-a-source",
+              "env-tag-overrides-sources",
+              "nested-maps-merge-recursively",
+              "source-value-overrides-default",
+              "sources-merge-low-to-high-priority"
+            ]
+          }
+        },
+        {
+          "id": "sensitive-values",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "redacts-sensitive-bool-value",
+              "redacts-sensitive-default-value",
+              "redacts-sensitive-env-value",
+              "redacts-sensitive-map-string-value"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

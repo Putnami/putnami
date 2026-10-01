@@ -1,0 +1,12 @@
+{
+  "protocol": "migration-bundle.v1",
+  "appName": "svc",
+  "operations": [
+    {
+      "kind": "sql",
+      "name": "default/0001_init",
+      "up": { "path": "../../../etc/passwd", "hash": "1111111111111111111111111111111111111111111111111111111111111111" },
+      "safety": "safe-online"
+    }
+  ]
+}

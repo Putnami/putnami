@@ -1,0 +1,65 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/http-services",
+  "outcomes": [
+    "A service registers routes and middleware once and serves them through a single trie router",
+    "Every request runs inside its own dependency scope whose transactional work is reconciled with the response the client actually receives",
+    "A long-lived connection, a stalled reader, and a shutdown are each bounded by a timeout the framework owns",
+    "A supervising tool learns the address the server actually bound from the record the server already logs"
+  ],
+  "nonGoals": [
+    "Terminating TLS: the server listens in cleartext and expects a TLS-terminating proxy in front of it",
+    "Deciding authorization policy, which belongs to the security package and the route boundary",
+    "Publishing API contracts, which belongs to the api, openapi, and proto packages",
+    "Promising strict compatibility between every pre-1.0 minor release"
+  ],
+  "requirements": [
+    {
+      "id": "streamed-responses",
+      "text": "Stream transfers one reader to the response writer without buffering or JSON conversion, preserving the supplied media type. The writer closes closable sources on completion, write failure, or request cancellation. BodyBytes refuses a streamed response without reading it and compression leaves it untouched. Request transactions still finalize before headers, while scoped resources stay open through the body copy."
+    },
+    {
+      "id": "routing",
+      "text": "A single-segment parameter captures exactly one segment and never matches a slash, a catch-all parameter captures one or more joined segments and may sit before a literal suffix, and registering the same method and pattern twice is a registration-time failure rather than a silent override."
+    },
+    {
+      "id": "method-fallbacks",
+      "text": "A HEAD request falls back to the GET handler, and an OPTIONS request to a known path with no OPTIONS route is answered through the composed middleware chain so a configured CORS middleware sees the preflight."
+    },
+    {
+      "id": "middleware-order",
+      "text": "Server middleware wraps every registered route in registration order, is composed once before the first request, and a middleware that does not call next short-circuits the chain."
+    },
+    {
+      "id": "request-scope",
+      "text": "Each request gets its own dependency scope: a success or client-error response commits its unit of work, a server-error response, a canceled request, or a panic rolls it back, and a commit that fails replaces the success response with a sanitized 500."
+    },
+    {
+      "id": "graceful-shutdown",
+      "text": "Stop drains in-flight requests under the configured shutdown timeout; an unset timeout resolves to the documented ten-second default rather than an already-expired deadline, and a negative value defers to the caller's context."
+    },
+    {
+      "id": "bounded-streams",
+      "text": "A hijacked WebSocket connection is dropped after its idle timeout and unblocks on context cancellation, and each server-sent-event write is bounded by its own write deadline so a client that stops reading cannot pin a goroutine."
+    },
+    {
+      "id": "readiness-marker",
+      "text": "The listening log record carries the canonical readiness marker with the port the listener actually bound, and degrades to a workload claim rather than announcing an address nobody can reach."
+    },
+    {
+      "id": "websocket-framing",
+      "text": "A negotiated WebSocket connection reassembles continuation frames under the framework body bound, answers a ping, reports a peer close with its code, and refuses the framing RFC 6455 forbids with the close code that names the violation: reserved bits and opcodes, an unmasked client frame, a fragmented or oversized control frame, an orphan continuation, and invalid UTF-8 text. A route echoes only a subprotocol the client offered and refuses an upgrade whose vocabulary it cannot speak."
+    },
+    {
+      "id": "upgrade-admitted-wires",
+      "text": "A stream route may admit on the upgrade. Its security and validation chain runs on the upgrade request and refuses with an HTTP response before any socket exists. The route speaks exactly its declared subprotocol, or none: another offer, or no offer when one is declared, is refused with 400, and every admitted socket reaches the wire's own driver, never the raw stream or SSE. A binary message is written under the same bound as text."
+    }
+  ],
+  "decisions": [
+    "go/framework/api/doc/adr/0011-streamed-octets-carry-their-own-media-type.md",
+    "go/framework/http/doc/adr/0001-request-scope-follows-the-response.md",
+    "go/framework/http/doc/adr/0002-framework-owned-bounds.md",
+    "protocols/clientcontract/doc/adr/0010-a-provider-owned-websocket-wire-is-declared-not-inferred.md"
+  ]
+}

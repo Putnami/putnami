@@ -1,0 +1,83 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/web-application-delivery",
+  "outcomes": [
+    "A route tree declared by files renders the same nested page, layout, error, loader, and action graph on the server and in the browser",
+    "An application chooses SSR, static generation, revalidation, or bounded islands explicitly and can review the resulting client-JavaScript budget",
+    "Loaders read and actions mutate server-side state through validated input and request-scoped dependency injection",
+    "Server authorization, CSRF, CSP, cache isolation, and hostile hydration-data handling stay effective when client JavaScript is absent, delayed, or broken"
+  ],
+  "nonGoals": [
+    "React Server Components, a general browser bundler, or inferring a rendering mode from component source",
+    "Treating client-side route visibility as authorization or serializing tokens and personally identifiable claims into the browser",
+    "Owning OAuth identity establishment, API streaming, UI styling, or persistence implementations supplied by other framework packages",
+    "Promising compatibility across every pre-1.0 minor release"
+  ],
+  "requirements": [
+    {
+      "id": "entrypoint-boundary",
+      "text": "Publication builds the default SSR entry and browser entry as separate graphs; the browser graph exports client helpers but contains no SSR implementation or server-only runtime import."
+    },
+    {
+      "id": "route-graph",
+      "text": "Generation maps page, layout, loader, action, error, not-found, dynamic segment, route group, and prefixed scan-root files into one deterministic nested route graph with matching server and client route identifiers."
+    },
+    {
+      "id": "generation-configuration",
+      "text": "Generation resolves shared and React settings independently, gives nested project react settings precedence over package metadata, and retains flat package.json#putnami compatibility. A known React-only key placed directly at options[\"@putnami/web:generate\"].<key> fails before route scanning or artifact writes and names options[\"@putnami/web:generate\"].react.<key> as the corrected path."
+    },
+    {
+      "id": "ssr-response",
+      "text": "SSR executes the static handler and loaders before rendering, preserves redirects and router status, waits for lazy head contributions, then emits one HTML document whose React body is streamed and whose timer is released on success or error."
+    },
+    {
+      "id": "document-isolation",
+      "text": "Title, language, meta, link, style, and script contributions are held in per-request context during SSR and de-duplicated in the browser, so interleaved requests cannot read or clear one another's document state."
+    },
+    {
+      "id": "hydration-containment",
+      "text": "Hydration serializes loader, action, error, basename, timeout, and bounded role/scope state with script-safe escaping; a chunk or hydration failure preserves or restores server HTML instead of blanking the page."
+    },
+    {
+      "id": "explicit-render-mode",
+      "text": "Only page().static() selects SSG or ISR; static loaders execute in a request-free context, request access raises StaticRenderViolation, dynamic paths cannot escape the output root, and routes without finite paths remain live."
+    },
+    {
+      "id": "static-build-version",
+      "text": "When a pre-rendered page shows a build version that ends with its commit suffix, static prerender records that version beside the static HTML, and serving the SSG or ISR page at its route replaces it with the running build's version, so a page restored from the build cache or deployed under another release id shows the running version."
+    },
+    {
+      "id": "island-hydration",
+      "text": "A static page ships no full-page hydration bundle, serializes script-safe island props into named boundaries, and hydrates each island only by its declared load, idle, visible, or media strategy with a safe immediate fallback when the requested browser observer is unavailable."
+    },
+    {
+      "id": "server-data-boundary",
+      "text": "Loader and action builders validate and coerce declared input, resolve declared dependencies from the active request scope, and execute their handlers only on the server; browser builder middleware methods cannot import or execute server middleware."
+    },
+    {
+      "id": "security-propagation",
+      "text": "Security middleware declared on a layout or page wraps its SSR page, loader JSON endpoint, action endpoint, and not-found boundary, including lazy descendants; routes outside that layout remain unaffected."
+    },
+    {
+      "id": "browser-security-hint",
+      "text": "Hydration serializes only authentication, role, and scope facts for UI gating, treats function guards as indeterminate and denied on the client, and never treats that hint as a replacement for server middleware."
+    },
+    {
+      "id": "csrf-and-csp",
+      "text": "React routes apply CSP with a per-request nonce, nosniff, Referrer-Policy, and action CSRF validation by default; state-changing submissions require the cookie token echoed by the client header or no-JavaScript form field unless the application explicitly opts out."
+    },
+    {
+      "id": "cache-isolation",
+      "text": "Default page-cache keys include a stable user fingerprint and query string, loader-cache keys include query parameters, redirects are not cached, and successful actions evict every declared static or computed pattern."
+    },
+    {
+      "id": "render-manifest",
+      "text": "Every build serializes a sorted, newline-terminated route manifest containing mode, hydration, DI proof, and per-route client-JavaScript bytes, and the budget gate rejects absolute or baseline-relative regressions deterministically."
+    }
+  ],
+  "decisions": [
+    "typescript/framework/web/doc/adr/0001-rendering-is-explicit-across-separate-runtime-graphs.md",
+    "typescript/framework/web/doc/adr/0002-data-and-request-security-remain-server-authoritative.md"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "reason": "load",
+  "paths": ["go/framework/http", "protocols/workspace"],
+  "files": ["go/framework/http/go.mod", "protocols/workspace/go.mod"]
+}

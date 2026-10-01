@@ -1,0 +1,61 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/migration-orchestration",
+  "outcomes": [
+    "A plugin ships its own migrations and the application picks them up without naming them",
+    "An application that ships migrations for a backend it never wired is told so, by name, instead of starting with a silently unmigrated store",
+    "Cross-kind output — status, apply, verify — reads the same on every run",
+    "The infrastructure a project's migrations need is derived from the migrations themselves",
+    "The migration bundle a TypeScript build produces is byte-identical to the one the Go build produces for the same inputs"
+  ],
+  "nonGoals": [
+    "Shipping any backend: SQL lives in `@putnami/database`, and the other kinds are declarations until a runner exists",
+    "Defining an authoring format for migration bodies",
+    "Ordering migrations across kinds relative to one another beyond a reproducible kind order",
+    "Promising that a pre-1.0 minor release keeps the previous orchestration contract"
+  ],
+  "requirements": [
+    {
+      "id": "backend-free",
+      "text": "The package contains contracts and an in-process registry only: no driver, no connection, no SQL. A kind is served by a runner registered from the package that owns that backend."
+    },
+    {
+      "id": "one-runner-per-kind",
+      "text": "Exactly one runner may register per kind; a second registration for the same kind throws a `MigrationConfigError` rather than replacing the first."
+    },
+    {
+      "id": "source-validation",
+      "text": "A contributed source with a missing kind or an empty namespace is rejected when it is contributed, not when a runner later tries to use it."
+    },
+    {
+      "id": "orphan-sources-fail",
+      "text": "Sources contributed for a kind with no registered runner fail explicit apply, status, and verify with an `UnknownKindError` naming the contributing namespaces. Only the automatic start-up apply opts into tolerating them."
+    },
+    {
+      "id": "deterministic-kind-order",
+      "text": "Kinds are enumerated in lexicographic order and every cross-kind operation iterates in that order, so aggregated output does not depend on registration order."
+    },
+    {
+      "id": "registry-is-per-boot",
+      "text": "The registry is held in dependency injection and rebuilt at every boot; there is no module-level singleton that could carry contributions between applications in one process."
+    },
+    {
+      "id": "infra-aggregation",
+      "text": "The registry walks every contributed source's infrastructure contribution and merges them into databases keyed by name and engine, so one project emits one requirement per database with the union of its schemas."
+    },
+    {
+      "id": "cross-language-bundle",
+      "text": "The bundle payload hash and digest are computed over a canonical form, so the same migration inputs produce the same bundle identity in TypeScript and in Go."
+    },
+    {
+      "id": "compatible-marker-parity",
+      "text": "The TypeScript canonical form of a migration bundle carries the compatible capability exactly as Go does, so both languages compute one digest for a bundle that sets it."
+    },
+    {
+      "id": "defensive-reads",
+      "text": "Reading the sources for a kind returns a copy, so a caller cannot mutate the registry's contribution list by holding the result."
+    }
+  ],
+  "decisions": ["typescript/framework/migration/doc/adr/0001-kinds-are-contracts-not-backends.md"]
+}

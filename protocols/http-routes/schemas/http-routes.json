@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "title": "Putnami HTTP Routes v1",
+  "description": "Provider-neutral application reachability inventory used to construct a public HTTP edge allowlist.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "protocol", "routes", "digest"],
+  "properties": {
+    "$schema": {
+      "const": "https://putnami.dev/schemas/putnami-http-routes-v1.json"
+    },
+    "protocol": {
+      "const": "putnami.http-routes.v1"
+    },
+    "routes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/route" }
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 of the canonical protocol/routes projection."
+    }
+  },
+  "$defs": {
+    "sourceKind": {
+      "type": "string",
+      "enum": ["typed-api", "file-route", "static-mount", "public-file", "manual"]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "sourceKind"],
+      "properties": {
+        "project": { "type": "string", "minLength": 1 },
+        "package": { "type": "string" },
+        "sourceKind": { "$ref": "#/$defs/sourceKind" },
+        "evidencePath": {
+          "type": "string",
+          "description": "Normalized workspace-relative evidence path."
+        }
+      }
+    },
+    "method": {
+      "type": "string",
+      "enum": ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    },
+    "routeBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["match", "path", "methods", "publicEdge", "provenance"],
+      "properties": {
+        "match": { "enum": ["exact", "prefix", "template"] },
+        "path": { "type": "string", "pattern": "^/" },
+        "methods": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/method" }
+        },
+        "publicEdge": { "type": "boolean" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "route": {
+      "allOf": [
+        { "$ref": "#/$defs/routeBase" },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "match": { "const": "exact" },
+                "path": { "not": { "pattern": "[{}]" } }
+              }
+            },
+            {
+              "properties": {
+                "match": { "const": "prefix" },
+                "path": { "pattern": "^/.+/$", "not": { "pattern": "[{}]" } }
+              }
+            },
+            {
+              "properties": {
+                "match": { "const": "template" },
+                "path": { "pattern": "/\\{[A-Za-z_][A-Za-z0-9_]*(\\.\\.\\.)?\\}(/|$)" }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

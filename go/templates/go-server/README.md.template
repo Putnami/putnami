@@ -1,0 +1,17 @@
+# <%= projectName %>
+
+A Go HTTP server on the Putnami framework, created from Putnami's `go-server`
+template.
+
+## Commands
+
+```bash
+putnami serve <%= projectName %>            # run it locally, reloading on change
+putnami lint,test,build <%= projectName %>  # check it the way CI does
+```
+
+## Documentation
+
+This README is the project's entry point. Put longer pages under `doc/` and
+link them from here: `putnami lint` fails on a relative link or an anchor that
+does not resolve. Putnami itself is documented at <https://putnami.dev/docs>.

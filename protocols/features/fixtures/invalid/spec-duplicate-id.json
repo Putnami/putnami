@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": ["Customers export issued invoices"],
+  "requirements": [
+    { "id": "export-format", "text": "An export states its format in the response content type." },
+    { "id": "export-format", "text": "An export names its format in the file extension." }
+  ]
+}

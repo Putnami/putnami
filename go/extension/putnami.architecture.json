@@ -1,0 +1,924 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "extension-providers",
+  "owner": "extension-providers",
+  "projects": [
+    "/go/extension",
+    "/python/extension",
+    "/tooling/clientgen-extension",
+    "/tooling/github-collaboration",
+    "/tooling/local-collaboration",
+    "/tooling/memory-store",
+    "/tooling/scaffold",
+    "/typescript/extension"
+  ],
+  "owns": [
+    {
+      "id": "extension-providers.probe-answers",
+      "kind": "fact",
+      "description": "Workspace probe answers: each provider's authoritative statement of the projects it owns and their dependency edges."
+    },
+    {
+      "id": "extension-providers.python-surface-documentation",
+      "kind": "fact",
+      "description": "The authored Python surface documentation tree under /python/doc/framework. The Python surface is the extension and its templates only, and this domain decides what that reference claims about it; no Putnami Python framework package family ships today."
+    },
+    {
+      "id": "extension-providers.verification-observations",
+      "kind": "fact",
+      "description": "Per-session feature-verification observation reports emitted by the language test jobs; the executable-spec gate consumes them, it never fabricates one."
+    }
+  ],
+  "exports": [
+    {
+      "id": "extension-providers.probe-answers.v1",
+      "version": 1,
+      "status": "active",
+      "description": "Merged probe answers: project identity and dependency edges. The recorded workspace index is a local projection of this authority; the providers remain the only source of truth.",
+      "facts": [
+        {
+          "name": "dependency_edges",
+          "authority": "extension-providers",
+          "classification": "internal",
+          "personalData": "none"
+        },
+        {
+          "name": "project_identity",
+          "authority": "extension-providers",
+          "classification": "internal",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "projection"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    },
+    {
+      "id": "extension-providers.python-surface-documentation.v1",
+      "version": 1,
+      "status": "active",
+      "description": "The authored Python surface documentation tree (/python/doc/framework): the markdown a publisher copies verbatim, addressed by a deterministic digest over its sorted (relative path, content digest) pairs. The carrier contract is putnami.documentation-tree.v1. The Python surface is experimental and opt-in, and publishing this tree next to the Go and TypeScript references does not promote it.",
+      "facts": [
+        {
+          "name": "python_surface_documentation",
+          "authority": "extension-providers",
+          "classification": "public",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "snapshot"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    },
+    {
+      "id": "extension-providers.verification-observations.v1",
+      "version": 1,
+      "status": "active",
+      "description": "The putnami-feature-verification artifacts a test run produces: which spec requirements each project's tests proved, with provenance bound to the emitting project.",
+      "facts": [
+        {
+          "name": "feature_verification_observations",
+          "authority": "extension-providers",
+          "classification": "internal",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "snapshot"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    }
+  ],
+  "imports": [
+    {
+      "id": "extension-providers.extension-runtime.v1",
+      "version": 1,
+      "from": {
+        "domain": "extension-sdk",
+        "export": "extension-sdk.extension-runtime.v1"
+      },
+      "as": "extension-providers.extension-runtime",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "extension_runtime_api"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/tooling/extension-sdk"
+        }
+      ],
+      "justification": "Every provider in this domain is an extension binary: it parses its job context, emits phases, progress, diagnostics and artifacts, and serves its workspace probe through the SDK runtime rather than writing the JSONL wire itself. One shared runtime is what keeps three language providers and the template packager answering the orchestrator identically. The collaboration and memory stores take their cross-process file lock from the same SDK, so every Putnami binary locks one way on every platform."
+    },
+    {
+      "id": "extension-providers.go-client-emitter.v1",
+      "version": 1,
+      "from": {
+        "domain": "go-framework",
+        "export": "go-framework.application-runtime.v1"
+      },
+      "as": "extension-providers.go-client-emitter",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "go_application_runtime_api"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/go/framework/api"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/go/framework/app"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/go/framework/config"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/go/framework/errors"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/go/framework/http"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/go/framework/inject"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/go/framework/logger"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/go/framework/migration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/go/framework/schema"
+        }
+      ],
+      "justification": "The workspace client extension packages the Go framework's own generator command and invokes that pinned emitter; it does not maintain a second Go emitter or resolve source from the consumer checkout."
+    },
+    {
+      "id": "extension-providers.protocol-contracts.v1",
+      "version": 1,
+      "from": {
+        "domain": "protocols",
+        "export": "protocols.wire-contracts.v1"
+      },
+      "as": "extension-providers.protocol-contracts",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "wire_contract_definitions"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/cache"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/config"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/clientcontract"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/config"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/contracts"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/http-routes"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/identity"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/migration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/platform"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/collaboration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/collaboration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/collaboration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/template"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/http-routes"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/workspace"
+        }
+      ],
+      "justification": "The language and provider extensions speak to the CLI exclusively through the shared strict wire contracts: job context and provider requests in, task events, artifacts and provider results out."
+    },
+    {
+      "id": "extension-providers.typescript-client-emitter.v1",
+      "version": 1,
+      "from": {
+        "domain": "typescript-framework",
+        "export": "typescript-framework.application-runtime.v1"
+      },
+      "as": "extension-providers.typescript-client-emitter",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "typescript_application_runtime_api"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/typescript/framework/client"
+        }
+      ],
+      "justification": "The workspace client extension invokes the @putnami/client package binary installed by Putnami; it never reaches into a consumer checkout for the framework source or maintains a second TypeScript emitter."
+    }
+  ]
+}

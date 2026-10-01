@@ -1,0 +1,14 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "contracts check",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "manifest": "go.putnami.dev/acme/billing",
+    "outcome": "clean",
+    "project": "/billing"
+  }
+}
+--- stderr ---

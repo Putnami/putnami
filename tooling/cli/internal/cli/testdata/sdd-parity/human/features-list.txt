@@ -1,0 +1,21 @@
+exit 0
+--- stdout ---
+
+  Features (2)
+  Scope: the whole workspace
+  Revision: worktree @ git:7c5122267ea7854954d543e1eda0a15c7cc56b08
+  0 design graph(s) · 2 durable manifest(s)
+
+  billing/invoice · Invoice export
+    outcome: Customers export issued invoices
+    owner: billing
+    projects: @acme/billing
+    [manifest] billing/putnami.features.json
+
+  shipping/labels · Shipping labels
+    outcome: Operators print shipping labels
+    owner: shipping
+    projects: @acme/shipping
+    [manifest] shipping/putnami.features.json
+
+--- stderr ---

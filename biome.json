@@ -1,0 +1,340 @@
+{
+  "root": true,
+  "$schema": "https://biomejs.dev/schemas/2.5.3/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": ["**", "!!**/.claude", "!!**/.context"],
+    "ignoreUnknown": false,
+    "maxSize": 1048576
+  },
+  "formatter": {
+    "enabled": true,
+    "formatWithErrors": false,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120,
+    "lineEnding": "lf",
+    "attributePosition": "auto",
+    "bracketSpacing": true,
+    "bracketSameLine": false,
+    "expand": "auto"
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "a11y": {
+        "preset": "recommended"
+      },
+      "complexity": {
+        "preset": "recommended",
+        "useLiteralKeys": "off",
+        "noExcessiveCognitiveComplexity": {
+          "level": "warn",
+          "options": {
+            "maxAllowedComplexity": 15
+          }
+        },
+        "noExcessiveLinesPerFunction": {
+          "level": "warn",
+          "options": {
+            "maxLines": 100,
+            "skipBlankLines": true,
+            "skipIifes": true
+          }
+        },
+        "noForEach": "warn",
+        "noUselessUndefinedInitialization": "warn",
+        "noVoid": "warn",
+        "useArrayFind": "warn"
+      },
+      "correctness": {
+        "preset": "recommended",
+        "noNodejsModules": "off",
+        "noPrivateImports": "off",
+        "noProcessGlobal": "off",
+        "noQwikUseVisibleTask": "off",
+        "noRestrictedElements": "off",
+        "noSolidDestructuredProps": "off",
+        "noUndeclaredDependencies": "off",
+        "noUnusedFunctionParameters": "warn",
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error",
+        "useExhaustiveDependencies": "warn",
+        "useGraphqlNamedOperations": "off",
+        "useImageSize": "warn",
+        "useImportExtensions": "off",
+        "useJsonImportAttributes": "off",
+        "useQwikClasslist": "off",
+        "useSingleJsDocAsterisk": "warn",
+        "useUniqueElementIds": "warn"
+      },
+      "performance": {
+        "preset": "recommended",
+        "noAccumulatingSpread": "warn",
+        "noAwaitInLoops": "warn",
+        "noBarrelFile": "off",
+        "noDelete": "warn",
+        "noReExportAll": "off"
+      },
+      "security": {
+        "preset": "recommended"
+      },
+      "style": {
+        "preset": "recommended",
+        "noDefaultExport": "off",
+        "noNamespace": "off",
+        "noParameterProperties": "off",
+        "noRestrictedGlobals": "off",
+        "noRestrictedImports": "off",
+        "noRestrictedTypes": "off",
+        "noValueAtRule": "off",
+        "useConsistentArrayType": {
+          "level": "warn",
+          "options": {
+            "syntax": "shorthand"
+          }
+        },
+        "useFilenamingConvention": {
+          "level": "warn",
+          "options": {
+            "requireAscii": true,
+            "filenameCases": ["camelCase", "PascalCase", "kebab-case"]
+          }
+        },
+        "useNamingConvention": "off",
+        "useNumericSeparators": "warn",
+        "useConsistentArrowReturn": "warn",
+        "noMultilineString": "error",
+        "useSpreadOverApply": "warn"
+      },
+      "suspicious": {
+        "preset": "recommended",
+        "noConsole": {
+          "level": "error",
+          "options": {
+            "allow": []
+          }
+        },
+        "noEvolvingTypes": "warn",
+        "noExplicitAny": "warn",
+        "noSkippedTests": "off",
+        "noLeakedRender": "warn",
+        "noProto": "error",
+        "noDuplicateDependencies": "warn",
+        "useArraySortCompare": "warn"
+      }
+    }
+  },
+  "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true,
+      "jsxEverywhere": true,
+      "gritMetavariables": false
+    },
+    "formatter": {
+      "enabled": true,
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "single",
+      "quoteProperties": "asNeeded",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always",
+      "bracketSpacing": true,
+      "bracketSameLine": false,
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "lineWidth": 120,
+      "lineEnding": "lf",
+      "attributePosition": "auto",
+      "expand": "auto",
+      "operatorLinebreak": "after"
+    },
+    "linter": {
+      "enabled": true
+    },
+    "assist": {
+      "enabled": true
+    },
+    "globals": [],
+    "jsxRuntime": "transparent"
+  },
+  "json": {
+    "parser": {
+      "allowComments": true,
+      "allowTrailingCommas": true
+    },
+    "formatter": {
+      "enabled": true,
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "lineWidth": 120,
+      "lineEnding": "lf",
+      "trailingCommas": "none",
+      "expand": "auto",
+      "bracketSpacing": true
+    },
+    "linter": {
+      "enabled": true
+    },
+    "assist": {
+      "enabled": true
+    }
+  },
+  "css": {
+    "parser": {
+      "cssModules": true,
+      "allowWrongLineComments": false,
+      "tailwindDirectives": true
+    },
+    "formatter": {
+      "enabled": true,
+      "indentStyle": "tab",
+      "indentWidth": 2,
+      "lineWidth": 120,
+      "lineEnding": "lf",
+      "quoteStyle": "single"
+    },
+    "linter": {
+      "enabled": true
+    },
+    "assist": {
+      "enabled": true
+    },
+    "globals": []
+  },
+  "graphql": {
+    "formatter": {
+      "enabled": true,
+      "indentStyle": "tab",
+      "indentWidth": 2,
+      "lineWidth": 120,
+      "lineEnding": "lf",
+      "quoteStyle": "single",
+      "bracketSpacing": true
+    },
+    "linter": {
+      "enabled": true
+    },
+    "assist": {
+      "enabled": true
+    }
+  },
+  "html": {
+    "formatter": {
+      "enabled": true,
+      "indentStyle": "tab",
+      "indentWidth": 2,
+      "lineWidth": 120,
+      "lineEnding": "lf",
+      "attributePosition": "auto",
+      "bracketSameLine": false,
+      "whitespaceSensitivity": "css",
+      "indentScriptAndStyle": false,
+      "selfCloseVoidElements": "never"
+    },
+    "linter": {
+      "enabled": true
+    },
+    "assist": {
+      "enabled": true
+    },
+    "parser": {
+      "interpolation": false
+    },
+    "experimentalFullSupportEnabled": false
+  },
+  "grit": {
+    "formatter": {
+      "enabled": true,
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "lineWidth": 120,
+      "lineEnding": "lf"
+    },
+    "linter": {
+      "enabled": true
+    },
+    "assist": {
+      "enabled": true
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "recommended": true,
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "identifierOrder": "natural",
+            "groups": [":BUN:", ":NODE:", ":PACKAGE:", ":ALIAS:", ":PATH:"]
+          }
+        }
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/typescript/framework/database/src/conformance/manifest.json"],
+      "formatter": { "enabled": false }
+    },
+    {
+      "includes": ["**/sites/putnami.dev/hosted-schemas/**"],
+      "formatter": { "enabled": false }
+    },
+    {
+      "includes": ["**/package.json"],
+      "json": {
+        "formatter": {
+          "expand": "always"
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/schema/openapi.json",
+        "**/schema/capabilities.json",
+        "**/putnami.architecture.json",
+        "**/client.putnami.json"
+      ],
+      "json": {
+        "formatter": {
+          "expand": "always"
+        }
+      }
+    },
+    {
+      "includes": ["**/*.golden.json"],
+      "json": {
+        "formatter": {
+          "expand": "always"
+        }
+      }
+    },
+    {
+      "includes": ["**/*.test.ts", "**/*.spec.ts", "**/__tests__/**"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveLinesPerFunction": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.ts"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "useHookAtTopLevel": "off"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "query": "provider",
+  "states": [
+    "open",
+    "in_progress"
+  ],
+  "labels": [
+    "area/protocols"
+  ],
+  "page": {
+    "size": 50,
+    "cursor": "a20"
+  }
+}

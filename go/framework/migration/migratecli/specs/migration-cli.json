@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/migration-cli",
+  "outcomes": [
+    "An operator uses the production application builder to discover the exact migration registry",
+    "Apply and rollback commands expose every completed record before a later failure",
+    "Automation distinguishes user errors, operational failures, and detected drift by exit code",
+    "Every command closes dependency resources owned by the container created during application preparation"
+  ],
+  "nonGoals": [
+    "Starting HTTP servers, event consumers, application invokers, or background workloads",
+    "Owning backend-specific migration execution or atomicity",
+    "Treating inspect as guaranteed offline when plugins open dependencies during configuration"
+  ],
+  "requirements": [
+    {
+      "id": "prepare-only",
+      "text": "Every subcommand builds and prepares the service application to collect its registry but never starts runtime plugins or invokes application workloads."
+    },
+    {
+      "id": "command-contract",
+      "text": "Up, down, status, verify, and inspect reject unexpected arguments, forward explicit targets, and return stable exit codes for user, operational, and drift outcomes."
+    },
+    {
+      "id": "machine-output",
+      "text": "Record-producing commands emit parseable table, JSON array, or JSONL output, including a valid empty JSON result and records completed before an error."
+    },
+    {
+      "id": "cancellation-cleanup",
+      "text": "Signals cancel in-flight registry work, while command return always closes any dependency container created during preparation using a fresh cleanup context, including when preparation itself or later registry work fails."
+    }
+  ],
+  "decisions": [
+    "go/framework/migration/migratecli/doc/adr/0001-prepare-production-graph-without-runtime-start.md"
+  ]
+}

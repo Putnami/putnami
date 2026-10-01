@@ -1,0 +1,6 @@
+{
+  "protocolVersion": 1,
+  "entries": [
+    { "id": "python", "kind": "surface", "status": "experimental" }
+  ]
+}

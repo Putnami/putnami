@@ -1,0 +1,30 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/app/build",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {"name": "putnami"},
+  "project": {
+    "name": "app",
+    "path": "apps/app",
+    "fullPath": "/ws/apps/app",
+    "type": "application",
+    "dependencyClosure": [
+      {"id": "/apps/app", "name": "app", "path": "apps/app", "fullPath": "/ws/apps/app"},
+      {"id": "/libs/core", "name": "core", "path": "libs/core", "fullPath": "/ws/libs/core"}
+    ]
+  },
+  "extension": {
+    "name": "@putnami/go",
+    "root": "/ws/go/extension"
+  },
+  "job": {"name": "build~infra"},
+  "identity": {
+    "key": "/apps/app:build~infra",
+    "scope": "project",
+    "project": {"id": "/apps/app", "name": "app"},
+    "task": {"name": "build~infra", "command": "build", "kind": "build"},
+    "provider": {"extension": "@putnami/go"}
+  },
+  "params": {}
+}

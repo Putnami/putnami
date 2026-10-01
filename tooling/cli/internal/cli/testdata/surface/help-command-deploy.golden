@@ -1,0 +1,20 @@
+putnami deploy
+
+Command Flags:
+  -c, --confirm  Confirm deployment
+  --environment  Deployment environment
+  --replicas  Replica count (default: 3)
+  --undocumented  undocumented
+
+Global Options:
+  Common: --verbose, --debug, --watch, --plan, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
+  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Output: --output, --json, --quiet, --color, --no-color
+  Advanced: --trace-profile
+
+Related Commands:
+  putnami build
+  putnami package
+  putnami publish
+

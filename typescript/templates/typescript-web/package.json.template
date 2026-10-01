@@ -1,0 +1,21 @@
+{
+  "name": "<%= projectName %>",
+  "version": "0.0.1",
+  "private": true,
+  "main": "src/main.ts",
+  "exports": {
+    "./serve": "./src/serve.ts"
+  },
+  "dependencies": {
+    "@putnami/application": "catalog:",
+    "@putnami/runtime": "catalog:",
+    "@putnami/web": "catalog:",
+    "@putnami/ui": "catalog:",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.3",
+    "@types/react-dom": "^19.2.3"
+  }
+}

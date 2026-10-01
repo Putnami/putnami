@@ -1,0 +1,55 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "cliContract": 4,
+  "commands": {
+    "package": {
+      "description": "Package a content project into a distributable archive: a project template, or a content-only extension that declares agentContent.",
+      "activationFiles": ["putnami.template.json", "putnami.extension.json"],
+      "flags": {
+        "stable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Package stable version (strips pre-release suffix)"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show what would be packaged without creating artifacts"
+        }
+      },
+      "run": [
+        { "id": "template", "task": "package-content", "activation": { "files": ["putnami.template.json"] } },
+        { "id": "agent-content", "task": "package-content", "activation": { "contains": { "putnami.extension.json": "\"agentContent\"" } } }
+      ]
+    }
+  },
+  "tasks": {
+    "package-content": {
+      "description": "Package a content project into a distributable .tar.gz: a project template (selected by putnami.template.json), or a content-only extension (selected by a putnami.extension.json that declares agentContent, packaged once per registry platform key with identical bytes). One task rather than two because both write the same archive directory and every output has exactly one owner; a project carries one content form, two forms fail the task, and the task skips when it carries none. Ownership decision: it owns <command-output>/archives, the same subpath the Go extension's package-archives owns in ITS manifest — the two never meet, because a Go project is selected by go.mod and neither content form is. It owns <command-output>/metadata.json for the same reason: the archive publication manifest the archive uploader reads has one writer per project, and for a content project that writer is this task. Its channel record goes inside archives/, beside the archive it describes, so both documents are restored by this task's own declaration. Template staging happens in a temp directory that is removed before the task returns, so it is never an output; the task shells out only to cp and tar and therefore declares no effects at all.",
+      "kind": "command",
+      "command": "{extensionRoot}/bin/scaffold-run",
+      "args": ["package-content"],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 300000,
+      "cache": { "versionAware": true },
+      "declares": {
+        "outputs": {
+          "archives": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "archives",
+            "optionalEmpty": true,
+            "description": "The packaged content archive (<template-name>-<version>.tar.gz for a template, <encoded-name>-<os>-<arch>.tar.gz for each registry platform key of a content-only extension) and the channel record beside it. Sole owner of <command-output>/archives. Absent on a dry run, which reports what it would build without creating it."
+          },
+          "publication-manifest": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "metadata.json",
+            "optionalEmpty": true,
+            "description": "Archive publication manifest read by the archive uploader (@putnami/cloud publish-archives): version, artifact, stable, channels, template. Sole owner of <command-output>/metadata.json for a content project — no other task writes it, and this one states the whole document rather than merging into it. Absent on a dry run."
+          }
+        }
+      }
+    }
+  }
+}

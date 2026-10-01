@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/cli-machine-output#bounded-stream-policy",
+    "typescript/cli-machine-output#deterministic-violations",
+    "typescript/cli-machine-output#execution-placement",
+    "typescript/cli-machine-output#qualify-verdict-wire",
+    "typescript/cli-machine-output#sanitization",
+    "typescript/cli-machine-output#schema-pinned-bounds",
+    "typescript/cli-machine-output#schema-pinned-members",
+    "typescript/cli-machine-output#session-reporter-wire",
+    "typescript/cli-machine-output#shared-corpus",
+    "typescript/cli-machine-output#strict-verdict",
+    "typescript/cli-machine-output#version-token"
+  ]
+}

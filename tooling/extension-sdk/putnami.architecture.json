@@ -1,0 +1,138 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "extension-sdk",
+  "owner": "tooling",
+  "projects": [
+    "/tooling/extension-sdk"
+  ],
+  "owns": [
+    {
+      "id": "extension-sdk.extension-runtime",
+      "kind": "api",
+      "description": "The Go runtime an extension binary links: the JSONL event emitter, the job-context parser, the lifecycle runner, the result envelope, and the shared adapters an extension may reuse. This domain decides what an extension is able to say to the orchestrator and in what shape; what the orchestrator then does with it is the cli domain's authority."
+    }
+  ],
+  "exports": [
+    {
+      "id": "extension-sdk.extension-runtime.v1",
+      "version": 1,
+      "status": "active",
+      "description": "The linkable Go extension runtime: JSONL protocol emission, job-context parsing, subcommand dispatch, flag parsing, result envelopes, release-set reading, and the ARC manifest authoring builder. A consumer holds a stable reference to the SDK packages; this domain retains sole authority over the runtime's shape.",
+      "facts": [
+        {
+          "name": "extension_runtime_api",
+          "authority": "extension-sdk",
+          "classification": "internal",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "reference"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    }
+  ],
+  "imports": [
+    {
+      "id": "extension-sdk.protocol-contracts.v1",
+      "version": 1,
+      "from": {
+        "domain": "protocols",
+        "export": "protocols.wire-contracts.v1"
+      },
+      "as": "extension-sdk.protocol-contracts",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "wire_contract_definitions"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/workspace"
+        }
+      ],
+      "justification": "The SDK parses the job context and renders every event, artifact, and result envelope with the shared strict contract packages, so an extension binary and the CLI read one document exactly the same way. Re-implementing the wire here would create a second interpretation of every Putnami document."
+    }
+  ]
+}

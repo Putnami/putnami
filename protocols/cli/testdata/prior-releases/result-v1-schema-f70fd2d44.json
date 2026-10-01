@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-cli-result.json",
+  "title": "Putnami CLI result envelope",
+  "description": "Canonical machine-readable envelope emitted by putnami commands in --output=json mode.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["command", "status", "exitCode"],
+  "properties": {
+    "command": {
+      "type": "string",
+      "description": "Full command path, e.g. \"build\" or \"cloud status\"."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "failure"]
+    },
+    "data": {
+      "description": "Command-specific payload (a run summary, a list, ...)."
+    },
+    "error": {
+      "$ref": "#/$defs/resultError"
+    },
+    "exitCode": {
+      "type": "integer",
+      "description": "Process exit code the command returns (see the exit-code taxonomy)."
+    }
+  },
+  "$defs": {
+    "resultError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": ["usage", "auth", "api", "signal", "failure"],
+          "description": "Stable error class matching the exit-code taxonomy."
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable failure message."
+        },
+        "next": {
+          "type": "string",
+          "description": "Suggested next command or doc link the user can run to recover, or empty."
+        }
+      }
+    }
+  }
+}

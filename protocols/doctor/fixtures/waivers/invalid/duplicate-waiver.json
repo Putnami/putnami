@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-doctor.json",
+  "protocolVersion": 1,
+  "waivers": [
+    {
+      "code": "doctor.volatile_persistence",
+      "project": "go.putnami.dev/example/iam",
+      "owner": "platform-team",
+      "reason": "staging bake still uses the in-memory store",
+      "expires": "2027-06-30"
+    },
+    {
+      "code": "doctor.volatile_persistence",
+      "project": "go.putnami.dev/example/iam",
+      "owner": "data-team",
+      "reason": "duplicate accepting the same finding",
+      "expires": "2027-09-30"
+    }
+  ]
+}

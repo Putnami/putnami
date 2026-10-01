@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-template.json",
+  "name": "typescript-web-app",
+  "version": "1.0.0",
+  "description": "TypeScript web application with React SSR",
+  "extension": "@putnami/typescript",
+  "workspaceDevDependencies": {
+    "@putnami/typescript": "latest"
+  },
+  "testVariables": {
+    "projectName": "my-web-app"
+  }
+}

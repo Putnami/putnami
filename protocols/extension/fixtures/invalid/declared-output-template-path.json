@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "build": {
+      "run": [{ "id": "build", "task": "build-exec" }]
+    }
+  },
+  "tasks": {
+    "build-exec": {
+      "kind": "command",
+      "command": "echo",
+      "declares": {
+        "outputs": {
+          "template": { "kind": "directory", "path": "{projectRoot}/.gen" },
+          "windows": { "kind": "file", "path": "dist\\app.exe" }
+        }
+      }
+    }
+  }
+}

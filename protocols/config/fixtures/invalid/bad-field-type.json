@@ -1,0 +1,13 @@
+{
+  "appName": "type-app",
+  "version": "1.0.0",
+  "schemaHash": "sha256:abcdef0123456789",
+  "configs": [
+    {
+      "path": "server",
+      "fields": [
+        { "name": "port", "type": "number" }
+      ]
+    }
+  ]
+}

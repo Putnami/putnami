@@ -1,0 +1,23 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/protocol/workspace",
+  "type": "library",
+  "description": "Workspace protocol package",
+  "tags": ["go", "protocol"],
+  "publish": ["go"],
+  "dependencies": ["/protocols/diagnostic"],
+  "extensions": ["/go/extension"],
+  "visibility": "public",
+  "distribution": { "visibility": "private" },
+  "options": {
+    "build": { "coverage": true }
+  },
+  "jobs": {
+    "gen": { "kind": "command", "command": "go generate ./..." }
+  },
+  "tasks": {
+    "lint": { "cpuWeight": 4 },
+    "lint~golangci-lint": { "timeoutMs": 900000 }
+  },
+  "disable": { "jobs": ["serve"] }
+}

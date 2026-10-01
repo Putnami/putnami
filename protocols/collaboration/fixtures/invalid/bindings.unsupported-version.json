@@ -1,0 +1,6 @@
+{
+  "tasks": {
+    "provider": "@acme/github",
+    "version": 2
+  }
+}

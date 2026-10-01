@@ -1,0 +1,5 @@
+name: epic-analyst
+description: Read-only deep-reasoning worker for the /epic skill — scope decomposition, cross-slice repair diagnosis, and whole-epic integration review. Use only when the /epic skill delegates a stage; not for general delegation.
+tools: Bash, Read, Grep, Glob, mcp__putnami__putnami_search, mcp__putnami__putnami_symbol, mcp__putnami__putnami_context, mcp__putnami__putnami_impact, mcp__putnami__putnami_related, mcp__putnami__putnami_summary, mcp__putnami__list_projects, mcp__putnami__describe_project, mcp__putnami__deps, mcp__putnami__find_owner, mcp__putnami__why_impacted, mcp__putnami__topo_sort, mcp__putnami__impacted, mcp__putnami__get_diagnostics
+model: claude-fable-5-1
+effort: xhigh

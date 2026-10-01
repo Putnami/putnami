@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/protocol/runtime/output.json",
+  "title": "Putnami Output Contract",
+  "description": "Defines the observable outputs a Putnami workload produces. All workloads communicate through structured JSONL on stdout. This schema describes the categories of output and their expected formats.",
+  "type": "object",
+  "$defs": {
+    "OutputChannel": {
+      "type": "string",
+      "enum": ["stdout", "stderr"],
+      "description": "Output stream. Structured JSONL goes to stdout. Unstructured human-readable output goes to stderr."
+    },
+    "OutputFormat": {
+      "type": "string",
+      "enum": ["jsonl", "text", "cloud-logging"],
+      "description": "Output format mode. 'jsonl' streams structured events. 'text' renders human-readable output. 'cloud-logging' emits Google Cloud structured JSON."
+    },
+    "OutputContract": {
+      "type": "object",
+      "description": "The complete output contract for a job execution.",
+      "properties": {
+        "logs": {
+          "$ref": "#/$defs/LogOutput"
+        },
+        "metrics": {
+          "$ref": "#/$defs/MetricOutput"
+        },
+        "diagnostics": {
+          "$ref": "#/$defs/DiagnosticOutput"
+        },
+        "artifacts": {
+          "$ref": "#/$defs/ArtifactOutput"
+        },
+        "traces": {
+          "$ref": "#/$defs/TraceOutput"
+        }
+      }
+    },
+    "LogOutput": {
+      "type": "object",
+      "description": "Structured log output via JSONL 'log' events.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/OutputChannel",
+          "default": "stdout"
+        },
+        "levels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["debug", "info", "warn", "error"]
+          },
+          "default": ["debug", "info", "warn", "error"],
+          "description": "Supported log levels. All levels should be supported; filtering is done by the consumer."
+        }
+      }
+    },
+    "MetricOutput": {
+      "type": "object",
+      "description": "Named measurements emitted via JSONL 'metric' events.",
+      "properties": {
+        "wellKnown": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WellKnownMetric"
+          },
+          "description": "Well-known metric names that tools can aggregate and display."
+        }
+      }
+    },
+    "WellKnownMetric": {
+      "type": "object",
+      "required": ["name", "unit"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Metric identifier."
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit of measurement."
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "DiagnosticOutput": {
+      "type": "object",
+      "description": "Structured warnings and errors emitted via JSONL 'diagnostic' events. Diagnostics include optional source location for IDE integration.",
+      "properties": {
+        "severities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["error", "warning", "info", "hint"]
+          },
+          "default": ["error", "warning", "info", "hint"],
+          "description": "Supported diagnostic severities."
+        }
+      }
+    },
+    "ArtifactOutput": {
+      "type": "object",
+      "description": "Named output files or directories emitted via JSONL 'artifact' events.",
+      "properties": {
+        "kinds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Known artifact kinds (e.g., 'binary', 'bundle', 'package', 'report', 'coverage')."
+        }
+      }
+    },
+    "TraceOutput": {
+      "type": "object",
+      "description": "OpenTelemetry trace integration. Reserved for future use.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether OpenTelemetry trace export is supported."
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "OTLP endpoint for trace export."
+        }
+      }
+    }
+  }
+}

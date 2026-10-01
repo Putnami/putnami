@@ -1,0 +1,90 @@
+{
+  "description": "Cross-language corpus for the private-keyring document and its PUBLIC JWKS projection. For each case, projecting 'private' with PublicJWKS must equal 'public' exactly, and the projected output must contain NONE of the private-material field names (d, p, q, dp, dq, qi, k). The projection drops revoked and expired keys (a verifier must never see a distrusted key) and symmetric 'oct' keys (which have no public form).",
+  "cases": [
+    {
+      "id": "projection-strips-private-and-filters-state",
+      "note": "5 private keys → 2 published: the active EC key and the retiring RSA key. The oct key, the revoked EC key, and the expired EC key are all excluded.",
+      "private": {
+        "$schema": "https://putnami.dev/schemas/putnami-keyring.json",
+        "protocolVersion": 1,
+        "keys": [
+          {
+            "kty": "EC",
+            "kid": "ec-active",
+            "use": "sig",
+            "alg": "ES256",
+            "state": "active",
+            "crv": "P-256",
+            "x": "ldU7ev5JtThfL1ZQYHDQ0bdKtF5zBA6x532O6OMqMSE",
+            "y": "iWyo5Oba6r0hs9qJkOe5YjQjnrfK9dwWmlP6_Uj3Xlw",
+            "d": "16YPtQ8Ppfdze3-1D9-PzX9rrMhZVTDQY-fEB2BYSQA"
+          },
+          {
+            "kty": "RSA",
+            "kid": "rsa-retiring",
+            "use": "sig",
+            "alg": "RS256",
+            "state": "retiring",
+            "n": "zqVsoOngCvI5rW9nHEbpiTRVcVeiKyT8L-2HcQ3puhoaX4pZxg5EVBsfaxnmV7jnKKYxZAJb1ukgEfymGsNlckbLKej62NIaWWPknrmVeQt1WfK6VQ2DUAmctFco8c3HsSinOzSYJ3tcYaZKURwid9I5y7OAT5mkaWPWdV8IMx5NOjL8i8CZE9rgBsdX-7EglndH5zHx7aVIg6qSQ3lHHILm21XqYR1N4UVWqAYnhQyDBOGjMY-YEQ1FyLXWFQN3zq9KVkxXf1OxLQlrzjyLFxgmJ6sWV5wxTykrtSGyQ1X-I04zuA3-uTOVVOc6i7Gw2wUbp2BktZIQ1yeE_BDj5Q",
+            "e": "AQAB",
+            "d": "MDmCP4484wkSxUMLitmQrByauQP0vEFaGhxCYLOYwT3QvE2m9DXFo-QdgarOatfjmESqn5Z-VMncWl497F5_uPrE9F-i1ME5dXV-t70DITe3l_lxmyI3bBEGMT7q9v0pNlKQrlwwivw6u64pR0L71z8oDj3yeoEWUaMDPCpkmTr0NkcWDlPEzrQMAtenOsGeDAl-19i4WMK6D7PFVDbsSxDs0ym8cKiC91x197fZiwvdRx8qm94ajbBkykJjAC6SwO68dbqqOw6210WGO_r8sEjicLVp598F8LBkVqlofMlx1sdVeVeeOcIf1wrUJAyr6ruCpPUUNrJL_wgfGx5GAQ",
+            "p": "1i3JHrAIuTp7xVtFEIf7qUd3MN1ryQ6Fpw_kJ5HM50-75KF_WInl0zlSmdmsET0QSlZgbDLXh-0aUzI6hwi7nLznBF29o2JC7vSG30kq49ClUAilqCcN5yYw7inMDVlmdYiiE6cSDNEjwlENWYJ0a43hHneOnOzratI0X5W9JgE",
+            "q": "9v8aAbi4q-Gb8-bUt-KAmOD-1Ah9A5_9VSkCAB8VU9hBluLEwzhyO5Ndj2VtN_-Ch0bTCUYSJVOEGTRpwRoJ0PWcpY5AE3SYYN71QalqrF8j-4z5NaSTEDIlJQjHqK9ek-Lh_CSZlMKEHtY6XS-sdJ4zh0Y2KmSaCHB3Zbzf5eU",
+            "dp": "xvt8qdUUFbqe-QlFjgk4JtotgymDlSS3yTE7YAPWIWTzhIMCA-kBq47LDgKsGMvpkZbUOFG36iG_XmIA_CmB3CmoW2cX425MDyMBFvssLMFQhJ20Ahhek0zpEqukVxai2TlakvWaEGxRU5vn0iwgKziCWMLsrSBzyyeF3vQH6gE",
+            "dq": "cJu3iKdmEn8GcfmAa-GpTYnuxE6maFutzQCoN9P0DkjfBmKW4IZAlmbGVhUg6VHlebVRi73Vkgz0geVCfdZYOVtxMo2bKwOSYT_lQy1xQ-sQZaRNDibdIZorEypglMh3bycWbrVlC8xvHfv_mfKdRoHF7luVYFiDXWuhE9I7pf0",
+            "qi": "Z5RGk3-at49xaGoDZZ3v_G7biUqvI-RF7mgGAa3piu7jkqO58A2ifLfYIQQTG7HoRiP32asRw88JHrSBn07EGGXxk7ivsLm2VH0v0HmT4Q14oHt-rtnsTz3P239rY51FMK92AvuftwCmaoCvMykdow27OpyeR6crcHhvdm8gpRw"
+          },
+          {
+            "kty": "oct",
+            "kid": "hmac-active",
+            "use": "sig",
+            "alg": "HS256",
+            "state": "active",
+            "k": "c3ltbWV0cmljLWtleS1tYXRlcmlhbC0zMmJ5dGVzISE"
+          },
+          {
+            "kty": "EC",
+            "kid": "ec-revoked",
+            "use": "sig",
+            "alg": "ES256",
+            "state": "revoked",
+            "crv": "P-256",
+            "x": "ldU7ev5JtThfL1ZQYHDQ0bdKtF5zBA6x532O6OMqMSE",
+            "y": "iWyo5Oba6r0hs9qJkOe5YjQjnrfK9dwWmlP6_Uj3Xlw"
+          },
+          {
+            "kty": "EC",
+            "kid": "ec-expired",
+            "use": "sig",
+            "alg": "ES256",
+            "state": "expired",
+            "crv": "P-256",
+            "x": "ldU7ev5JtThfL1ZQYHDQ0bdKtF5zBA6x532O6OMqMSE",
+            "y": "iWyo5Oba6r0hs9qJkOe5YjQjnrfK9dwWmlP6_Uj3Xlw"
+          }
+        ]
+      },
+      "public": {
+        "keys": [
+          {
+            "kty": "EC",
+            "kid": "ec-active",
+            "use": "sig",
+            "alg": "ES256",
+            "crv": "P-256",
+            "x": "ldU7ev5JtThfL1ZQYHDQ0bdKtF5zBA6x532O6OMqMSE",
+            "y": "iWyo5Oba6r0hs9qJkOe5YjQjnrfK9dwWmlP6_Uj3Xlw"
+          },
+          {
+            "kty": "RSA",
+            "kid": "rsa-retiring",
+            "use": "sig",
+            "alg": "RS256",
+            "n": "zqVsoOngCvI5rW9nHEbpiTRVcVeiKyT8L-2HcQ3puhoaX4pZxg5EVBsfaxnmV7jnKKYxZAJb1ukgEfymGsNlckbLKej62NIaWWPknrmVeQt1WfK6VQ2DUAmctFco8c3HsSinOzSYJ3tcYaZKURwid9I5y7OAT5mkaWPWdV8IMx5NOjL8i8CZE9rgBsdX-7EglndH5zHx7aVIg6qSQ3lHHILm21XqYR1N4UVWqAYnhQyDBOGjMY-YEQ1FyLXWFQN3zq9KVkxXf1OxLQlrzjyLFxgmJ6sWV5wxTykrtSGyQ1X-I04zuA3-uTOVVOc6i7Gw2wUbp2BktZIQ1yeE_BDj5Q",
+            "e": "AQAB"
+          }
+        ]
+      }
+    }
+  ]
+}

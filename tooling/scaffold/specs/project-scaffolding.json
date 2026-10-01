@@ -1,0 +1,103 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/project-scaffolding",
+  "outcomes": [
+    "A template is a first-class publishable artifact: packaged into a versioned archive, indexed for publishing, and installable into a workspace that does not contain this repository",
+    "A directory becomes a template by declaring one manifest, in any language, without teaching the packager anything about that language",
+    "Every committed template renders into a project whose manifests parse and whose declared extension actually activates",
+    "An archive a user installs contains the template's content and its stamped version, and does not contain the configuration that made it a project in this workspace",
+    "A content-only extension is packaged by the same content packager into the extension archive every host installs, with its agent content built, bound by digest and stamped at the contract its manifest requires"
+  ],
+  "nonGoals": [
+    "Owning the rendering engine, its placeholder vocabulary, or template discovery and install — those are `@putnami/cli` behaviour, deliberately outside the template manifest protocol",
+    "Uploading the archive: packaging records the `template-archives` or `archives` channel and publish consumes it",
+    "Byte-reproducible template archives — a template archive is produced by the host `tar`, whose gzip header carries a timestamp; a content-only extension archive is written by the SDK's package step and is reproducible",
+    "Building or testing a scaffolded project, which the language extension the template names does",
+    "Authoring the workflow content itself, or deciding which workspace opts into an extension's agent content — the extension owns its source and `@putnami/cli` owns the lifecycle",
+    "Packaging agent content outside an extension: a bare src/skills/ tree is no content form, because nothing installs a separately declared agent artifact"
+  ],
+  "requirements": [
+    {
+      "id": "manifest-selects-the-template",
+      "text": "A project is packaged as a template only when it carries a putnami.template.json; a missing or unparseable manifest fails the job with a diagnostic instead of producing an archive."
+    },
+    {
+      "id": "resolved-version",
+      "text": "The archive version comes from the invocation's resolved version when there is one and the workspace version otherwise, and --stable strips the pre-release suffix."
+    },
+    {
+      "id": "stamped-manifest",
+      "text": "The packaged manifest carries the same version the archive filename claims; a stamp that cannot be written fails the job rather than shipping a version-less manifest."
+    },
+    {
+      "id": "archive-contents",
+      "text": "The archive contains the template's manifest and every template file, and excludes root putnami.json, putnami.features.json, specs/, and node_modules/ entries that configure or describe the template project rather than the scaffolded project."
+    },
+    {
+      "id": "dry-run-produces-nothing",
+      "text": "A dry run reports the archive it would build and creates no archive and no metadata."
+    },
+    {
+      "id": "source-selects-the-content-form",
+      "text": "One packaging task serves every content form and the project selects which: putnami.template.json packages a template, a putnami.extension.json that declares agentContent packages a content-only extension, none skips, and a project declaring both fails rather than silently choosing one."
+    },
+    {
+      "id": "content-only-extension-packaging",
+      "text": "A content-only extension is packaged by the SDK's extension package step into one platform-independent archive, written with identical bytes under every key of the SDK's distribution matrix as <encoded-name>-<os>-<arch>.tar.gz on the archives channel; a dry run writes nothing. An extension that runs something, or breaks its content policy, is refused and writes nothing. @putnami/contributor packages through this job."
+    },
+    {
+      "id": "shared-metadata-index",
+      "text": "Packaging records the template-archives channel inside the archives directory it owns, so a sibling packager's record in its own directory survives untouched and the derived index reports both. The task alone writes the archive publication manifest, stating its whole document."
+    },
+    {
+      "id": "declared-output-ownership",
+      "text": "The packaging task declares itself the sole owner of the archives output directory and of the archive publication manifest metadata.json, writes nothing outside them, and the extension manifest passes the same protocol validation the CLI applies."
+    },
+    {
+      "id": "no-source-mutation",
+      "text": "No task in this extension mutates the template's source tree; staging happens in a temporary directory that is removed before the task returns."
+    },
+    {
+      "id": "committed-template-validity",
+      "text": "Every committed template's manifest parses and validates under the template protocol, and its sibling putnami.json declares the same name, the template type, the scaffold extension, and the template-archives publish channel."
+    },
+    {
+      "id": "placeholders-are-substituted",
+      "text": "A render placeholder appears only in a file the render engine substitutes into — one whose name ends in .template — because a placeholder anywhere else is copied to the user verbatim."
+    },
+    {
+      "id": "rendered-manifests-parse",
+      "text": "Every JSON template file renders to valid JSON, so a scaffolded project's manifests parse."
+    },
+    {
+      "id": "declared-extension-activates",
+      "text": "The extension a template's manifest names is the extension its rendered putnami.json declares, so the scaffolded project activates the toolchain the template was written for."
+    },
+    {
+      "id": "servable-applications",
+      "text": "A template that renders an application declares the \"./serve\" export `putnami serve` resolves its entrypoint from, and ships the file that export points at."
+    },
+    {
+      "id": "generated-imports-are-declared",
+      "text": "A TypeScript application template's package.json declares every package the TypeScript extension's generated serve entry imports, @putnami/application and @putnami/runtime, because bun's isolated linker links into a project only what it declares, so the scaffolded project's first build resolves them."
+    },
+    {
+      "id": "go-imports-are-required",
+      "text": "A Go template's go.mod requires every go.putnami.dev module its sources import, so the scaffolded project's first build resolves."
+    },
+    {
+      "id": "go-mod-survives-tidy",
+      "text": "A Go template's go.mod declares nothing go mod tidy removes, such as a toolchain line that names the go line's version, so the first install leaves the scaffolded go.mod as the template wrote it and the next build keys on the same file."
+    },
+    {
+      "id": "templates-ship-a-readme",
+      "text": "Every committed template ships a README.md.template that renders to a README stating the project's purpose, its putnami commands and where its docs live, and whose relative links and anchors resolve under the documentation link rule the project's first putnami lint applies."
+    }
+  ],
+  "decisions": [
+    "tooling/scaffold/doc/adr/0001-a-template-is-a-published-artifact.md",
+    "tooling/scaffold/doc/adr/0002-templates-are-checked-by-their-packager.md",
+    "tooling/scaffold/doc/adr/0004-one-packager-for-every-content-project.md"
+  ]
+}

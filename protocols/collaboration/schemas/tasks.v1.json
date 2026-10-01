@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/putnami-collaboration-tasks.v1.json",
+  "title": "Putnami tasks contract, version 1",
+  "description": "Request (<operation>Input) and result (<operation>Result) documents of every tasks v1 operation. Required: find, get, create, update, transition. Optional: assign, link, claim.",
+  "$defs": {
+    "taskState": {
+      "type": "string",
+      "enum": ["blocked", "canceled", "done", "in_progress", "open"]
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "revision", "title", "state"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "revision": { "$ref": "collaboration.json#/$defs/token" },
+        "url": { "$ref": "collaboration.json#/$defs/url" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "body": { "type": "string" },
+        "state": { "$ref": "#/$defs/taskState" },
+        "providerState": { "type": "string", "maxLength": 64 },
+        "labels": { "$ref": "collaboration.json#/$defs/labels" },
+        "assignees": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 100,
+          "items": { "$ref": "collaboration.json#/$defs/token" },
+          "description": "Informational. Never an exclusive lease."
+        },
+        "parent": {
+          "$ref": "collaboration.json#/$defs/ref",
+          "description": "The containing task. The one member a provider may leave outside revision; such a provider says so in its link operation's description."
+        },
+        "holder": { "$ref": "collaboration.json#/$defs/token", "description": "The exclusive claimant, from a provider offering claim." },
+        "updatedAt": { "$ref": "collaboration.json#/$defs/timestamp" }
+      }
+    },
+    "findInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "query": { "type": "string", "maxLength": 256, "description": "Text matched against title and body." },
+        "states": { "type": "array", "items": { "$ref": "#/$defs/taskState" } },
+        "labels": { "$ref": "collaboration.json#/$defs/labels", "description": "Every label must be present." },
+        "page": { "$ref": "collaboration.json#/$defs/pageRequest" }
+      }
+    },
+    "findResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items", "page"],
+      "properties": {
+        "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/task" } },
+        "page": { "$ref": "collaboration.json#/$defs/page" }
+      }
+    },
+    "getInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" }
+      }
+    },
+    "taskResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task"],
+      "properties": {
+        "task": { "$ref": "#/$defs/task" }
+      }
+    },
+    "getResult": { "$ref": "#/$defs/taskResult" },
+    "createInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "idempotencyKey"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "body": { "type": "string" },
+        "labels": { "$ref": "collaboration.json#/$defs/labels" },
+        "state": { "$ref": "#/$defs/taskState", "description": "Initial state; defaults to open." },
+        "idempotencyKey": { "$ref": "collaboration.json#/$defs/idempotencyKey" }
+      }
+    },
+    "createResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task", "created"],
+      "properties": {
+        "task": { "$ref": "#/$defs/task" },
+        "created": { "type": "boolean", "description": "False when the idempotency key matched an earlier creation." }
+      }
+    },
+    "updateInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "expectedRevision": { "$ref": "collaboration.json#/$defs/token" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "body": { "type": "string" },
+        "labels": { "$ref": "collaboration.json#/$defs/labels", "description": "Replaces the whole label set." }
+      }
+    },
+    "updateResult": { "$ref": "#/$defs/taskResult" },
+    "transitionInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "state"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "state": { "$ref": "#/$defs/taskState" },
+        "expectedRevision": { "$ref": "collaboration.json#/$defs/token" },
+        "reason": { "type": "string", "maxLength": 256 }
+      }
+    },
+    "transitionResult": { "$ref": "#/$defs/taskResult" },
+    "assignInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "assignees"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "assignees": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 100,
+          "items": { "$ref": "collaboration.json#/$defs/token" }
+        },
+        "expectedRevision": { "$ref": "collaboration.json#/$defs/token" }
+      }
+    },
+    "assignResult": { "$ref": "#/$defs/taskResult" },
+    "linkInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "parent": { "$ref": "collaboration.json#/$defs/ref" },
+        "unlink": { "type": "boolean", "description": "Remove the parent. Exclusive with parent." }
+      }
+    },
+    "linkResult": { "$ref": "#/$defs/taskResult" },
+    "claimInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "holder"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "holder": { "$ref": "collaboration.json#/$defs/token" },
+        "release": { "type": "boolean" }
+      }
+    },
+    "claimResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task", "held"],
+      "properties": {
+        "task": { "$ref": "#/$defs/task" },
+        "held": { "type": "boolean" }
+      }
+    }
+  }
+}

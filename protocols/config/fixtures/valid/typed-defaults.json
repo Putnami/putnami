@@ -1,0 +1,18 @@
+{
+  "appName": "typed-defaults",
+  "version": "1.0.0",
+  "schemaHash": "sha256:c3a2785c877035d4",
+  "configs": [
+    {
+      "path": "session",
+      "fields": [
+        { "name": "secure", "type": "bool", "default": "true" },
+        { "name": "ttl", "type": "int", "default": "604800" },
+        { "name": "sampleRate", "type": "float", "default": "0.5" },
+        { "name": "idleTimeout", "type": "duration", "default": "30s" },
+        { "name": "store", "type": "string", "default": "cookie" },
+        { "name": "retries", "type": "int", "default": "not-a-number" }
+      ]
+    }
+  ]
+}

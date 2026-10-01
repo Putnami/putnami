@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "waivers": [
+    {
+      "code": "doctor.not_a_real_check",
+      "project": "/app",
+      "owner": "platform-team",
+      "reason": "typo in the check code; should match nothing",
+      "expires": "2099-01-01"
+    }
+  ]
+}

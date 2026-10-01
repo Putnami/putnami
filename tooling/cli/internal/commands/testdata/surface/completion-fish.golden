@@ -1,0 +1,285 @@
+# fish completion for putnami
+# Install: putnami completion fish > ~/.config/fish/completions/putnami.fish
+
+# Disable file completions by default
+complete -c putnami -f
+
+function __putnami_complete_children
+    set -l path $argv
+    set -l tokens (commandline -opc)
+    set -l current (commandline -ct)
+    set -l completed_count (count $tokens)
+    if test -n "$current"
+        set completed_count (math $completed_count - 1)
+    end
+    set -l expected (math (count $path) + 1)
+    if test $completed_count -ne $expected
+        return 1
+    end
+    for i in (seq (count $path))
+        set -l token_index (math $i + 1)
+        if test "$tokens[$token_index]" != "$path[$i]"
+            return 1
+        end
+    end
+    return 0
+end
+
+function __putnami_seen_path
+    set -l path $argv
+    set -l tokens (commandline -opc)
+    if test (count $tokens) -lt (math (count $path) + 1)
+        return 1
+    end
+    for i in (seq (count $path))
+        set -l token_index (math $i + 1)
+        if test "$tokens[$token_index]" != "$path[$i]"
+            return 1
+        end
+    end
+    return 0
+end
+
+# Job commands
+complete -c putnami -n '__fish_use_subcommand' -a 'D' -d 'Alias for deploy'
+complete -c putnami -n '__fish_use_subcommand' -a 'P' -d 'Alias for publish'
+complete -c putnami -n '__fish_use_subcommand' -a 'b' -d 'Alias for build'
+complete -c putnami -n '__fish_use_subcommand' -a 'build' -d 'Compile or transpile project sources into runnable or distributable outputs.'
+complete -c putnami -n '__fish_use_subcommand' -a 'd' -d 'Alias for deploy'
+complete -c putnami -n '__fish_use_subcommand' -a 'deploy' -d 'Converge a cloud environment on the workload\'s aggregated infra manifest.'
+complete -c putnami -n '__fish_use_subcommand' -a 'f' -d 'Alias for format'
+complete -c putnami -n '__fish_use_subcommand' -a 'format' -d 'Rewrite sources into canonical formatting.'
+complete -c putnami -n '__fish_use_subcommand' -a 'generate' -d 'Run code generators.'
+complete -c putnami -n '__fish_use_subcommand' -a 'l' -d 'Alias for lint'
+complete -c putnami -n '__fish_use_subcommand' -a 'lint' -d 'Check code for style and correctness findings, emitting per-issue diagnostics.'
+complete -c putnami -n '__fish_use_subcommand' -a 'p' -d 'Alias for publish'
+complete -c putnami -n '__fish_use_subcommand' -a 'package' -d 'Assemble distributable artifacts for the project\'s publish channels.'
+complete -c putnami -n '__fish_use_subcommand' -a 'publish' -d 'Push packaged artifacts to registries.'
+complete -c putnami -n '__fish_use_subcommand' -a 'run' -d 'Execute the project once and exit.'
+complete -c putnami -n '__fish_use_subcommand' -a 's' -d 'Alias for serve'
+complete -c putnami -n '__fish_use_subcommand' -a 'serve' -d 'Run the project\'s dev server until interrupted.'
+complete -c putnami -n '__fish_use_subcommand' -a 't' -d 'Alias for test'
+complete -c putnami -n '__fish_use_subcommand' -a 'test' -d 'Run the project\'s tests, emitting test counts and coverage metrics.'
+
+# Structured commands
+complete -c putnami -n '__fish_use_subcommand' -a 'cache' -d 'Manage cache'
+complete -c putnami -n '__fish_use_subcommand' -a 'change-plan' -d 'Emit an immutable impacted CI ChangePlan'
+complete -c putnami -n '__fish_use_subcommand' -a 'channel' -d 'Move a distribution channel and report how far it is served'
+complete -c putnami -n '__fish_use_subcommand' -a 'ci' -d 'Manage source-controlled workspace CI intent'
+complete -c putnami -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completions (bash, zsh, fish)'
+complete -c putnami -n '__fish_use_subcommand' -a 'compose' -d 'Serve a workload with the workloads it runs with'
+complete -c putnami -n '__fish_use_subcommand' -a 'config' -d 'Manage configuration'
+complete -c putnami -n '__fish_use_subcommand' -a 'context' -d 'Manage AI context'
+complete -c putnami -n '__fish_use_subcommand' -a 'deps' -d 'Manage dependencies'
+complete -c putnami -n '__fish_use_subcommand' -a 'dev' -d 'Author extensions and templates'
+complete -c putnami -n '__fish_use_subcommand' -a 'doctor' -d 'Preflight production readiness under a deployment profile'
+complete -c putnami -n '__fish_use_subcommand' -a 'extensions' -d 'Manage extensions'
+complete -c putnami -n '__fish_use_subcommand' -a 'help' -d 'Show help for a command'
+complete -c putnami -n '__fish_use_subcommand' -a 'infra' -d 'Plan workspace infrastructure'
+complete -c putnami -n '__fish_use_subcommand' -a 'init' -d 'Initialize a new workspace'
+complete -c putnami -n '__fish_use_subcommand' -a 'install' -d 'Install extensions and dependencies'
+complete -c putnami -n '__fish_use_subcommand' -a 'mcp' -d 'Run the MCP server over stdio for AI agent harnesses'
+complete -c putnami -n '__fish_use_subcommand' -a 'migrate' -d 'Migrate Putnami workspace files forward'
+complete -c putnami -n '__fish_use_subcommand' -a 'pin' -d 'Pin the CLI version this workspace uses'
+complete -c putnami -n '__fish_use_subcommand' -a 'projects' -d 'Manage projects'
+complete -c putnami -n '__fish_use_subcommand' -a 'qualify' -d 'Run a workload\'s derived smoke contract against a target and emit one verdict'
+complete -c putnami -n '__fish_use_subcommand' -a 'report' -d 'Read back a run\'s report'
+complete -c putnami -n '__fish_use_subcommand' -a 'scopes' -d 'List workspace scopes'
+complete -c putnami -n '__fish_use_subcommand' -a 'sessions' -d 'Inspect execution sessions'
+complete -c putnami -n '__fish_use_subcommand' -a 'telemetry' -d 'Manage anonymous telemetry'
+complete -c putnami -n '__fish_use_subcommand' -a 'templates' -d 'Manage templates'
+complete -c putnami -n '__fish_use_subcommand' -a 'tree' -d 'Identify the worktree the CLI runs in and check evidence against it'
+complete -c putnami -n '__fish_use_subcommand' -a 'upgrade' -d 'Upgrade CLI, extensions, and dependencies'
+complete -c putnami -n '__fish_use_subcommand' -a 'version' -d 'Versions derived from git, release tags, and installed CLI binaries'
+complete -c putnami -n '__fish_use_subcommand' -a 'workspace' -d 'Manage workspace'
+
+# Subcommands
+complete -c putnami -n '__putnami_complete_children cache' -a 'clean'
+complete -c putnami -n '__putnami_complete_children cache' -a 'gc'
+complete -c putnami -n '__putnami_complete_children cache' -a 'verify'
+complete -c putnami -n '__putnami_complete_children channel' -a 'set'
+complete -c putnami -n '__putnami_complete_children channel' -a 'status'
+complete -c putnami -n '__putnami_complete_children ci' -a 'explain'
+complete -c putnami -n '__putnami_complete_children ci' -a 'fmt'
+complete -c putnami -n '__putnami_complete_children ci' -a 'init'
+complete -c putnami -n '__putnami_complete_children ci' -a 'validate'
+complete -c putnami -n '__putnami_complete_children completion' -a 'bash'
+complete -c putnami -n '__putnami_complete_children completion' -a 'fish'
+complete -c putnami -n '__putnami_complete_children completion' -a 'zsh'
+complete -c putnami -n '__putnami_complete_children config' -a 'set'
+complete -c putnami -n '__putnami_complete_children config' -a 'show'
+complete -c putnami -n '__putnami_complete_children context' -a 'generate'
+complete -c putnami -n '__putnami_complete_children context' -a 'map'
+complete -c putnami -n '__putnami_complete_children deps' -a 'add'
+complete -c putnami -n '__putnami_complete_children deps' -a 'install'
+complete -c putnami -n '__putnami_complete_children deps' -a 'remove'
+complete -c putnami -n '__putnami_complete_children dev' -a 'extension'
+complete -c putnami -n '__putnami_complete_children dev' -a 'template'
+complete -c putnami -n '__putnami_complete_children extensions' -a 'install'
+complete -c putnami -n '__putnami_complete_children extensions' -a 'list'
+complete -c putnami -n '__putnami_complete_children extensions' -a 'remove'
+complete -c putnami -n '__putnami_complete_children extensions' -a 'update'
+complete -c putnami -n '__putnami_complete_children infra' -a 'plan'
+complete -c putnami -n '__putnami_complete_children mcp' -a 'install'
+complete -c putnami -n '__putnami_complete_children migrate' -a 'agent-content'
+complete -c putnami -n '__putnami_complete_children migrate' -a 'vnext'
+complete -c putnami -n '__putnami_complete_children projects' -a 'create'
+complete -c putnami -n '__putnami_complete_children projects' -a 'describe'
+complete -c putnami -n '__putnami_complete_children projects' -a 'list'
+complete -c putnami -n '__putnami_complete_children projects' -a 'sync'
+complete -c putnami -n '__putnami_complete_children projects' -a 'tag'
+complete -c putnami -n '__putnami_complete_children scopes' -a 'list'
+complete -c putnami -n '__putnami_complete_children sessions' -a 'export'
+complete -c putnami -n '__putnami_complete_children sessions' -a 'inspect'
+complete -c putnami -n '__putnami_complete_children sessions' -a 'list'
+complete -c putnami -n '__putnami_complete_children sessions' -a 'replay'
+complete -c putnami -n '__putnami_complete_children sessions' -a 'summary'
+complete -c putnami -n '__putnami_complete_children telemetry' -a 'off'
+complete -c putnami -n '__putnami_complete_children telemetry' -a 'on'
+complete -c putnami -n '__putnami_complete_children telemetry' -a 'show'
+complete -c putnami -n '__putnami_complete_children telemetry' -a 'status'
+complete -c putnami -n '__putnami_complete_children templates' -a 'install'
+complete -c putnami -n '__putnami_complete_children templates' -a 'list'
+complete -c putnami -n '__putnami_complete_children templates' -a 'remove'
+complete -c putnami -n '__putnami_complete_children templates' -a 'update'
+complete -c putnami -n '__putnami_complete_children tree' -a 'fingerprint'
+complete -c putnami -n '__putnami_complete_children tree' -a 'verify'
+complete -c putnami -n '__putnami_complete_children version' -a 'get'
+complete -c putnami -n '__putnami_complete_children version' -a 'list'
+complete -c putnami -n '__putnami_complete_children version' -a 'tag'
+complete -c putnami -n '__putnami_complete_children version' -a 'use'
+complete -c putnami -n '__putnami_complete_children workspace' -a 'describe'
+complete -c putnami -n '__putnami_complete_children workspace' -a 'init'
+
+# Global flags
+complete -c putnami -l 'verbose' -d 'Show job results and diagnostics'
+complete -c putnami -l 'debug' -d 'Stream all events in real-time'
+complete -c putnami -l 'watch' -d 'Re-run on file changes'
+complete -c putnami -l 'plan' -d 'Show execution plan without running'
+complete -c putnami -l 'help' -d 'Show help'
+complete -c putnami -l 'all' -d 'All projects'
+complete -c putnami -l 'impacted' -d 'Projects affected by git changes'
+complete -c putnami -l 'projects' -d 'Comma-separated project names'
+complete -c putnami -l 'tag' -d 'Filter by tags'
+complete -c putnami -l 'exclude-tag' -d 'Exclude by tags'
+complete -c putnami -l 'exclude' -d 'Exclude by name'
+complete -c putnami -l 'baseline' -d 'Custom git baseline for --impacted'
+complete -c putnami -l 'impacted-strict' -d 'Fail when baseline can\'t be resolved'
+complete -c putnami -l 'where' -d 'Execution placement: local | remote (local when no runner provider is installed)'
+complete -c putnami -l 'providers' -d 'Credentials to ask the credential provider for: install, publish (comma list)'
+complete -c putnami -l 'credential-fd' -d 'Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2'
+complete -c putnami -l 'no-cache' -d 'Force re-execution (skip cache)'
+complete -c putnami -l 'no-cache-projects' -d 'Force re-execution of these projects only'
+complete -c putnami -l 'cache-trust' -d 'Remote cache trust: ci | any | none'
+complete -c putnami -l 'continue-on-error' -d 'Don\'t abort on first failure'
+complete -c putnami -l 'max-parallel' -d 'Parallelism: auto | eco | max | number'
+complete -c putnami -l 'resource' -d 'Budget for a named shared resource (repeatable)'
+complete -c putnami -l 'cpu-policy' -d 'CPU ceiling policy: critical-path | measured'
+complete -c putnami -l 'retry' -d 'Retry transient failures'
+complete -c putnami -l 'retry-failed' -d 'Re-run tasks whose identical failure is cached'
+complete -c putnami -l 'profile' -d 'Deployment profile: dev | test | production'
+complete -c putnami -l 'dry-run' -d 'Show changes without applying'
+complete -c putnami -l 'output' -d 'Output format: text | json | jsonl | cloud-logging'
+complete -c putnami -l 'json' -d 'Shorthand for --output=json'
+complete -c putnami -l 'quiet' -d 'Suppress non-error output'
+complete -c putnami -l 'color' -d 'Force color output'
+complete -c putnami -l 'no-color' -d 'Disable color output'
+complete -c putnami -l 'trace-profile' -d 'Collect trace events (Chrome trace format)'
+complete -c putnami -l 'version' -d 'Show version'
+
+# Structured command flags
+complete -c putnami -n '__putnami_seen_path change-plan' -l 'base' -d 'Required base commit or ref; emitted as its full immutable commit SHA' -r
+complete -c putnami -n '__putnami_seen_path change-plan' -l 'head' -d 'Optional head commit or ref; it must resolve to the checked-out HEAD' -r
+complete -c putnami -n '__putnami_seen_path channel set' -l 'expected' -d 'The id the channel must currently name; without it the channel\'s current head is read and used' -r
+complete -c putnami -n '__putnami_seen_path channel set' -l 'from' -d 'The channel whose head is re-released, or the immutable release-set id to point at' -r
+complete -c putnami -n '__putnami_seen_path channel status' -l 'wait' -d 'Poll every 2s until every registry has applied the accepted head, or this Go duration elapses' -r
+complete -c putnami -n '__putnami_seen_path ci explain' -l 'branch' -d 'Updated push branch or pull-request head branch' -r
+complete -c putnami -n '__putnami_seen_path ci explain' -l 'event' -d 'Normalized Source event assumption' -r
+complete -c putnami -n '__putnami_seen_path ci explain' -l 'pr' -d 'Pull-request number used to render the closed channel placeholder' -r
+complete -c putnami -n '__putnami_seen_path ci explain' -l 'tag' -d 'Created tag, for --event tag' -r
+complete -c putnami -n '__putnami_seen_path ci fmt' -l 'check' -d 'Check canonical formatting without writing'
+complete -c putnami -n '__putnami_seen_path ci init' -l 'force' -d 'Replace an existing putnami.ci.json'
+complete -c putnami -n '__putnami_seen_path compose' -l 'no-watch' -d 'Run the target production-mode without watch, like its dependencies'
+complete -c putnami -n '__putnami_seen_path compose' -l 'port' -d 'Proxy port of the target; default options.serve.port then 3000; 0 picks an ephemeral port' -r
+complete -c putnami -n '__putnami_seen_path compose' -l 'ready-timeout' -d 'Deadline for each member\'s typed ready event; default 60s' -r
+complete -c putnami -n '__putnami_seen_path context generate' -l 'force' -d 'Rewrite a guidance block that was edited or written by an older release'
+complete -c putnami -n '__putnami_seen_path context map' -l 'print' -d 'Render the map to stdout (md by default, or json) and write nothing'
+complete -c putnami -n '__putnami_seen_path dev template' -l 'keep' -d 'With test: keep the rendered temporary workspace for inspection'
+complete -c putnami -n '__putnami_seen_path dev template' -l 'skip-build' -d 'With test: render the template without running build and test on it'
+complete -c putnami -n '__putnami_seen_path dev template' -l 'stable' -d 'With package: publish under a stable version instead of a prerelease'
+complete -c putnami -n '__putnami_seen_path dev template' -l 'version' -d 'With package: version to stamp on the produced archive' -r
+complete -c putnami -n '__putnami_seen_path doctor' -l 'profile' -d 'Deployment profile to evaluate under (dev|test|production); production is strictest' -r
+complete -c putnami -n '__putnami_seen_path doctor' -l 'project' -d 'Project ID, path, or name (comma-separated); default is every workspace project' -r
+complete -c putnami -n '__putnami_seen_path extensions install' -l 'dest' -d 'Materialize into this artifact-store root instead of the machine-global one' -r
+complete -c putnami -n '__putnami_seen_path extensions install' -l 'latest' -d 'Ignore the lock file and resolve the latest versions'
+complete -c putnami -n '__putnami_seen_path extensions install' -l 'platform' -d 'Materialize artifacts for another platform (skips install hooks and the lock write)' -r
+complete -c putnami -n '__putnami_seen_path extensions install' -l 'user' -d 'Pin one registry extension in the user scope (~/.putnami/user) so its commands run outside any workspace'
+complete -c putnami -n '__putnami_seen_path extensions list' -l 'user' -d 'List the extensions pinned in the user scope (~/.putnami/user) instead of the workspace'
+complete -c putnami -n '__putnami_seen_path extensions remove' -l 'user' -d 'Remove the extension from the user scope (~/.putnami/user) instead of the workspace'
+complete -c putnami -n '__putnami_seen_path help' -l 'man' -d 'Render the full reference as a man page'
+complete -c putnami -n '__putnami_seen_path help' -l 'markdown' -d 'Render the full reference as Markdown'
+complete -c putnami -n '__putnami_seen_path init' -l 'extension' -d 'Default extension to install' -r
+complete -c putnami -n '__putnami_seen_path init' -l 'force' -d 'Reinitialize an existing workspace'
+complete -c putnami -n '__putnami_seen_path init' -l 'project' -d 'Create an initial project' -r
+complete -c putnami -n '__putnami_seen_path init' -l 'project-path' -d 'Workspace-relative path for the initial project' -r
+complete -c putnami -n '__putnami_seen_path init' -l 'workspace' -d 'Workspace name override' -r
+complete -c putnami -n '__putnami_seen_path install' -l 'latest' -d 'Ignore the lock file and resolve the latest extension and template versions'
+complete -c putnami -n '__putnami_seen_path migrate agent-content' -l 'apply' -d 'Perform the migration, or finish one that stopped'
+complete -c putnami -n '__putnami_seen_path migrate agent-content' -l 'check' -d 'Plan the migration without writing (default); exits non-zero when a migration is pending'
+complete -c putnami -n '__putnami_seen_path migrate agent-content' -l 'rollback' -d 'Restore the declarations, pins, ownership records and files recorded before the migration'
+complete -c putnami -n '__putnami_seen_path migrate vnext' -l 'apply' -d 'Perform the migration, atomically and idempotently'
+complete -c putnami -n '__putnami_seen_path migrate vnext' -l 'check' -d 'Report the pending migration without writing (default); exits non-zero when a migration is needed'
+complete -c putnami -n '__putnami_seen_path pin' -l 'remove' -d 'Remove the CLI version pin'
+complete -c putnami -n '__putnami_seen_path projects create' -l 'force' -d 'Overwrite an existing project directory'
+complete -c putnami -n '__putnami_seen_path projects create' -l 'path' -d 'Workspace-relative project path' -r
+complete -c putnami -n '__putnami_seen_path projects create' -l 'template' -d 'Template to scaffold from' -r
+complete -c putnami -n '__putnami_seen_path projects sync' -l 'prune' -d 'Drop config entries whose project directory no longer exists'
+complete -c putnami -n '__putnami_seen_path projects sync' -l 'skip-install' -d 'Do not run dependency installation after syncing'
+complete -c putnami -n '__putnami_seen_path projects tag' -l 'remove' -d 'Remove the given tags from the project'
+complete -c putnami -n '__putnami_seen_path projects tag' -l 'set' -d 'Replace the project\'s tags with the given list'
+complete -c putnami -n '__putnami_seen_path qualify' -l 'expect-sha' -d 'Required with a URL target: the git sha the deployment must report on /version' -r
+complete -c putnami -n '__putnami_seen_path qualify' -l 'platform-prefix' -d 'Prefix under which /readyz and /version are mounted; default: where the route inventory declares both, else the root' -r
+complete -c putnami -n '__putnami_seen_path qualify' -l 'print-contract' -d 'Print the derived contract and exit without a target'
+complete -c putnami -n '__putnami_seen_path qualify' -l 'ready-timeout' -d 'Deadline for readiness; default 60s' -r
+complete -c putnami -n '__putnami_seen_path qualify' -l 'request-timeout' -d 'Deadline per smoke request; default 5s' -r
+complete -c putnami -n '__putnami_seen_path qualify' -l 'target' -d 'local composes the workload on this machine; an http(s) URL is a running deployment' -r
+complete -c putnami -n '__putnami_seen_path report' -l 'session' -d 'Report to read, by session ID (default: the newest CLI-driven run\'s)' -r
+complete -c putnami -n '__putnami_seen_path sessions export' -l 'since' -d 'Keep only records whose recorded start time is at or after this RFC 3339 timestamp; a record with no readable start time is not emitted' -r
+complete -c putnami -n '__putnami_seen_path sessions inspect' -l 'run' -d 'Inspect the session of a remote attempt by its attempt reference or submission key, resuming the attempt first when it was never imported' -r
+complete -c putnami -n '__putnami_seen_path sessions list' -l 'revision' -d 'Keep only sessions whose recorded tree sat on this commit; a lowercase hex prefix of the commit id, never a ref name' -r
+complete -c putnami -n '__putnami_seen_path sessions replay' -l 'session' -d 'Exact retained session id; latest is not accepted' -r
+complete -c putnami -n '__putnami_seen_path sessions summary' -l 'by-digest' -d 'Group the selected sessions\' task records by input digest: records per digest, and how many executed, reused or failed'
+complete -c putnami -n '__putnami_seen_path sessions summary' -l 'command' -d 'Keep only top-level sessions whose recorded command set is exactly this comma-separated list, in any order; a nested run never matches' -r
+complete -c putnami -n '__putnami_seen_path sessions summary' -l 'since' -d 'Keep only records whose recorded start time is at or after this RFC 3339 timestamp; a record with no readable start time is not listed' -r
+complete -c putnami -n '__putnami_seen_path templates install' -l 'latest' -d 'Ignore the lock file and resolve the latest versions'
+complete -c putnami -n '__putnami_seen_path tree verify' -l 'base' -d 'Base revision; default origin/main for --snapshot and --gate, and for --record the base the dossier must name' -r
+complete -c putnami -n '__putnami_seen_path tree verify' -l 'gate' -d 'Check that the recorded gate session can replace the finalizer\'s gate' -r
+complete -c putnami -n '__putnami_seen_path tree verify' -l 'record' -d 'Verify the dossier this file holds and print the verified verdict' -r
+complete -c putnami -n '__putnami_seen_path tree verify' -l 'ref' -d 'Print the reference to this file: its path as given and its SHA-256' -r
+complete -c putnami -n '__putnami_seen_path tree verify' -l 'report' -d 'Session report of the --gate session' -r
+complete -c putnami -n '__putnami_seen_path tree verify' -l 'snapshot' -d 'Print the dossier skeleton for the current tree'
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'channel' -d 'Resolve a release channel (stable by default; canary for latest prerelease)' -r
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'cli' -d 'Only upgrade the CLI binary'
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'deps' -d 'Only upgrade framework dependencies'
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'dry-run' -d 'Resolve and print the upgrade plan without modifying files'
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'extensions' -d 'Only upgrade extensions and templates'
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'from-source' -d 'Build the CLI from this workspace\'s source and install it as the active binary, bypassing the download channel (self-host escape hatch; combine with --global to replace the global CLI)'
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'global' -d 'Upgrade the global CLI in ~/.putnami/bin instead of the workspace pin; inside a workspace the other phases still run, outside one only the CLI is upgraded (alias: -g)'
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'namespace' -d 'Release-set namespace that published the --release id; accepted only with --release' -r
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'release' -d 'Use one immutable release-set snapshot for npm and Go dependencies (needs --namespace)' -r
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'version' -d 'Use an exact Putnami release version' -r
+complete -c putnami -n '__putnami_seen_path version get' -l 'scope' -d 'Report only this version line, by its scope path' -r
+complete -c putnami -n '__putnami_seen_path version list' -l 'global' -d 'List binaries in ~/.putnami/bin instead of the workspace (alias: -g)'
+complete -c putnami -n '__putnami_seen_path version tag' -l 'dry-run' -d 'Print the proposed tag and changelog without writing anything'
+complete -c putnami -n '__putnami_seen_path version tag' -l 'push' -d 'Push the release commit and the tag to origin'
+complete -c putnami -n '__putnami_seen_path version tag' -l 'scope' -d 'The version line to release, by its scope path (required when the workspace declares several)' -r
+complete -c putnami -n '__putnami_seen_path version tag' -l 'yes' -d 'Skip the confirmation and create the release commit and tag'
+complete -c putnami -n '__putnami_seen_path version use' -l 'global' -d 'Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)'
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'extension' -d 'Default extension to install' -a 'go py ts' -r
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'force' -d 'Reinitialize an existing workspace'
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'project' -d 'Create an initial project' -r
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'project-path' -d 'Workspace-relative path for the initial project' -r
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'workspace' -d 'Workspace name override' -r
+
+# Output format values
+complete -c putnami -n '__fish_seen_subcommand_from --output' -a 'text json jsonl cloud-logging'

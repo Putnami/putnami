@@ -1,0 +1,825 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities-v2.json",
+  "protocolVersion": 2,
+  "project": "go.putnami.dev/examples/service-to-service",
+  "schemas": [
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "openapi",
+        "key": "openapi"
+      },
+      "name": "openapi",
+      "kind": "openapi",
+      "path": "schema/openapi.json",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/openapi",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/openapi.(*Plugin).CapabilitySchemas"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": "schema/openapi.json"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "proto",
+        "key": "api-proto"
+      },
+      "name": "api-proto",
+      "kind": "proto",
+      "path": "schema/api.proto",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/proto",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/proto.(*Plugin).CapabilitySchemas"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": "schema/api.proto"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /blobs/{id}"
+      },
+      "name": "GET /blobs/{id}",
+      "kind": "route",
+      "path": "/blobs/{id}",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /credential-check"
+      },
+      "name": "GET /credential-check",
+      "kind": "route",
+      "path": "/credential-check",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /items"
+      },
+      "name": "GET /items",
+      "kind": "route",
+      "path": "/items",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /items/changes"
+      },
+      "name": "GET /items/changes",
+      "kind": "route",
+      "path": "/items/changes",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /items/{id}"
+      },
+      "name": "GET /items/{id}",
+      "kind": "route",
+      "path": "/items/{id}",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /items/{id}/adjust"
+      },
+      "name": "GET /items/{id}/adjust",
+      "kind": "route",
+      "path": "/items/{id}/adjust",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /items/{id}/history"
+      },
+      "name": "GET /items/{id}/history",
+      "kind": "route",
+      "path": "/items/{id}/history",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /items/{id}/negotiate"
+      },
+      "name": "GET /items/{id}/negotiate",
+      "kind": "route",
+      "path": "/items/{id}/negotiate",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /items/{id}/watch"
+      },
+      "name": "GET /items/{id}/watch",
+      "kind": "route",
+      "path": "/items/{id}/watch",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /quotes/{id}"
+      },
+      "name": "GET /quotes/{id}",
+      "kind": "route",
+      "path": "/quotes/{id}",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /quotes/{id}/snapshot"
+      },
+      "name": "GET /quotes/{id}/snapshot",
+      "kind": "route",
+      "path": "/quotes/{id}/snapshot",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /quotes/{id}/ticks"
+      },
+      "name": "GET /quotes/{id}/ticks",
+      "kind": "route",
+      "path": "/quotes/{id}/ticks",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /tenant-check"
+      },
+      "name": "GET /tenant-check",
+      "kind": "route",
+      "path": "/tenant-check",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "GET /whoami"
+      },
+      "name": "GET /whoami",
+      "kind": "route",
+      "path": "/whoami",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "POST /audit"
+      },
+      "name": "POST /audit",
+      "kind": "route",
+      "path": "/audit",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "POST /blobs/echo"
+      },
+      "name": "POST /blobs/echo",
+      "kind": "route",
+      "path": "/blobs/echo",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "POST /body-counter"
+      },
+      "name": "POST /body-counter",
+      "kind": "route",
+      "path": "/body-counter",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "POST /body-fidelity"
+      },
+      "name": "POST /body-fidelity",
+      "kind": "route",
+      "path": "/body-fidelity",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "POST /body-nullable"
+      },
+      "name": "POST /body-nullable",
+      "kind": "route",
+      "path": "/body-nullable",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "POST /body-values"
+      },
+      "name": "POST /body-values",
+      "kind": "route",
+      "path": "/body-values",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "POST /items"
+      },
+      "name": "POST /items",
+      "kind": "route",
+      "path": "/items",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/api.(*Plugin).CapabilitySchemas"
+        }
+      }
+    }
+  ],
+  "lifecycleHooks": [
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "lifecycle",
+        "subkind": "starter",
+        "key": "grpc-api-bridge"
+      },
+      "name": "grpc-api-bridge",
+      "phase": "starter",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/grpc",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "api_bridge.go",
+          "symbol": "go.putnami.dev/grpc.(*ApiBridge).Start"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "lifecycle",
+        "subkind": "starter",
+        "key": "http"
+      },
+      "name": "http",
+      "phase": "starter",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "server.go",
+          "symbol": "go.putnami.dev/http.(*ServerPlugin).Start"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "lifecycle",
+        "subkind": "starter",
+        "key": "openapi"
+      },
+      "name": "openapi",
+      "phase": "starter",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/openapi",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/openapi.(*Plugin).Start"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "lifecycle",
+        "subkind": "starter",
+        "key": "platform"
+      },
+      "name": "platform",
+      "phase": "starter",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/platform",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/platform.(*Plugin).Start"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "lifecycle",
+        "subkind": "starter",
+        "key": "proto"
+      },
+      "name": "proto",
+      "phase": "starter",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/proto",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/proto.(*Plugin).Start"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "grpc-api-bridge"
+      },
+      "name": "grpc-api-bridge",
+      "phase": "stopper",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/grpc",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "api_bridge.go",
+          "symbol": "go.putnami.dev/grpc.(*ApiBridge).Stop"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "http"
+      },
+      "name": "http",
+      "phase": "stopper",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "server.go",
+          "symbol": "go.putnami.dev/http.(*ServerPlugin).Stop"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "openapi"
+      },
+      "name": "openapi",
+      "phase": "stopper",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/openapi",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/openapi.(*Plugin).Stop"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "platform"
+      },
+      "name": "platform",
+      "phase": "stopper",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/platform",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/platform.(*Plugin).Stop"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "lifecycle",
+        "subkind": "stopper",
+        "key": "proto"
+      },
+      "name": "proto",
+      "phase": "stopper",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/proto",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "package",
+          "path": "plugin.go",
+          "symbol": "go.putnami.dev/proto.(*Plugin).Stop"
+        }
+      }
+    }
+  ],
+  "packages": [
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/api",
+        "kind": "package",
+        "key": "go.putnami.dev/api"
+      },
+      "package": "go.putnami.dev/api",
+      "provenance": {
+        "project": "go.putnami.dev/api",
+        "package": "go.putnami.dev/api",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "kind": "package",
+        "key": "go.putnami.dev/examples/service-to-service"
+      },
+      "package": "go.putnami.dev/examples/service-to-service",
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/examples/service-to-service",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/grpc",
+        "kind": "package",
+        "key": "go.putnami.dev/grpc"
+      },
+      "package": "go.putnami.dev/grpc",
+      "provenance": {
+        "project": "go.putnami.dev/grpc",
+        "package": "go.putnami.dev/grpc",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/http",
+        "kind": "package",
+        "key": "go.putnami.dev/http"
+      },
+      "package": "go.putnami.dev/http",
+      "provenance": {
+        "project": "go.putnami.dev/http",
+        "package": "go.putnami.dev/http",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/openapi",
+        "kind": "package",
+        "key": "go.putnami.dev/openapi"
+      },
+      "package": "go.putnami.dev/openapi",
+      "provenance": {
+        "project": "go.putnami.dev/openapi",
+        "package": "go.putnami.dev/openapi",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/platform",
+        "kind": "package",
+        "key": "go.putnami.dev/platform"
+      },
+      "package": "go.putnami.dev/platform",
+      "provenance": {
+        "project": "go.putnami.dev/platform",
+        "package": "go.putnami.dev/platform",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "go.putnami.dev/proto",
+        "kind": "package",
+        "key": "go.putnami.dev/proto"
+      },
+      "package": "go.putnami.dev/proto",
+      "provenance": {
+        "project": "go.putnami.dev/proto",
+        "package": "go.putnami.dev/proto",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ]
+}

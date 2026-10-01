@@ -1,0 +1,2 @@
+putnami: flag --host is not declared by `cloud`; passing undeclared flags is deprecated: it will be rejected in the next minor release
+putnami: no project matched --projects "registry-token"; the workspace resolved 0 project(s)

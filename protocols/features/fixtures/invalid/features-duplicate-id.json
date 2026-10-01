@@ -1,0 +1,22 @@
+{
+  "protocolVersion": 1,
+  "namespace": "billing",
+  "features": [
+    {
+      "id": "billing/duplicate",
+      "type": "feature",
+      "name": "First",
+      "outcome": "First declaration",
+      "owner": "billing",
+      "target": "modeled"
+    },
+    {
+      "id": "billing/duplicate",
+      "type": "feature",
+      "name": "Second",
+      "outcome": "Second declaration",
+      "owner": "billing",
+      "target": "modeled"
+    }
+  ]
+}

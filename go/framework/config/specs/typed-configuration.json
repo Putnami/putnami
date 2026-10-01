@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/typed-configuration",
+  "outcomes": [
+    "An application maps ordered configuration sources into typed Go structs",
+    "Environment and default tags have explicit precedence over or beneath source values",
+    "Invalid values fail during loading instead of silently becoming zero values",
+    "Sensitive malformed values remain redacted in structured diagnostics"
+  ],
+  "nonGoals": [
+    "Bundling a remote configuration or secret-store client into the core package",
+    "Replacing application-level semantic validation after a struct is loaded",
+    "Inferring environment variable names for multi-word fields without explicit tags"
+  ],
+  "requirements": [
+    {
+      "id": "cancellation",
+      "text": "LoadContext uses ContextSource when available and propagates cancellation without changing the Source interface used by synchronous sources."
+    },
+    {
+      "id": "mapping",
+      "text": "Mapping rejects invalid scalar strings, unsupported string-tagged kinds, and values that cannot be assigned, converted, or recursively mapped to the destination field."
+    },
+    {
+      "id": "precedence",
+      "text": "Sources merge from lower to higher priority, nested maps merge recursively, an explicitly set env tag wins over every source, and a default tag applies only when no source supplies the field."
+    },
+    {
+      "id": "sensitive-values",
+      "text": "A field tagged sensitive never includes its malformed raw env, default, YAML, map, or remote-source value in structured error attributes."
+    }
+  ],
+  "decisions": [
+    "go/framework/config/doc/adr/0001-precedence-and-fail-loud-mapping.md"
+  ]
+}

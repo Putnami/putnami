@@ -1,0 +1,334 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "tooling",
+  "features": [
+    {
+      "id": "tooling/extension-authoring",
+      "type": "feature",
+      "name": "Extension authoring SDK",
+      "outcome": "Someone writing a Putnami extension gets the orchestrator-facing halves \u2014 the event stream, the job context, the manifest with its validated task declarations, subprocess execution, and the shared lifecycle primitives \u2014 as a library, so the extension only has to supply what its own ecosystem knows",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "release-plan-compatibility",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "supported-plans-accept-additive-fields",
+              "future-plans-name-received-and-supported-versions",
+              "plan-framing-and-size-limits-remain-enforced"
+            ]
+          }
+        },
+        {
+          "id": "event-stream-conformance",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-emitter-conforms-to-the-runtime-protocol-wire-shape",
+              "the-readiness-marker-has-the-protocol-wire-shape",
+              "a-typed-readiness-marker-is-emitted-at-the-negotiated-version",
+              "no-readiness-marker-leaks-at-a-version-that-lacks-it",
+              "an-unrepresentable-value-is-dropped-rather-than-emitted-malformed"
+            ]
+          }
+        },
+        {
+          "id": "log-forwarding-fidelity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-structured-child-line-keeps-its-severity-and-fields",
+              "a-plain-child-line-is-forwarded-as-text",
+              "an-unparseable-child-line-is-not-dropped",
+              "reserved-protocol-keys-cannot-overwrite-the-envelope"
+            ]
+          }
+        },
+        {
+          "id": "manifest-validated-at-build-time",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "building-refuses-a-task-contract-violation",
+              "building-refuses-a-structurally-defective-manifest",
+              "writing-emits-canonical-json",
+              "writing-refuses-an-invalid-manifest"
+            ]
+          }
+        },
+        {
+          "id": "builder-does-not-alias",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-later-builder-mutation-cannot-change-a-built-manifest"
+            ]
+          }
+        },
+        {
+          "id": "architecture-authored-in-code",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "building-refuses-an-invalid-domain-manifest",
+              "the-canonical-rendering-round-trips-through-the-strict-reader",
+              "the-import-constructors-cannot-state-a-mode-they-do-not-mean",
+              "authoring-never-mints-a-permission",
+              "the-pin-fails-on-a-hand-edited-manifest",
+              "reference-only-facts-do-not-require-placeholder-data-metadata"
+            ]
+          }
+        },
+        {
+          "id": "subprocess-control",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-working-directory-is-honored",
+              "an-explicit-environment-is-honored",
+              "an-unset-list-preserves-every-other-variable",
+              "a-timeout-is-honored",
+              "an-external-cancellation-is-honored",
+              "stdin-is-forwarded",
+              "a-missing-binary-is-an-error-not-a-failed-run"
+            ]
+          }
+        },
+        {
+          "id": "host-identity-scrub",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-list-covers-the-managed-runtime-identity-variables",
+              "credential-and-endpoint-bearing-variables-are-excluded",
+              "the-list-is-sorted-and-unique",
+              "matching-is-case-sensitive",
+              "the-list-is-returned-as-an-independent-copy"
+            ]
+          }
+        },
+        {
+          "id": "checkout-independent-generation-paths",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-serialized-path-is-project-relative",
+              "relativizing-and-resolving-round-trip",
+              "an-already-absolute-value-resolves-to-itself",
+              "every-value-in-a-map-is-rewritten",
+              "every-value-in-a-list-is-rewritten"
+            ]
+          }
+        },
+        {
+          "id": "cache-eviction-policy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "collection-evicts-oldest-first-to-the-low-watermark",
+              "entries-inside-the-grace-window-are-protected",
+              "victim-selection-is-deterministic-for-identical-inputs",
+              "an-absent-budget-is-unbounded-not-zero",
+              "a-missing-cache-root-is-success",
+              "a-root-another-collector-holds-is-skipped-not-blocked-on"
+            ]
+          }
+        },
+        {
+          "id": "credential-confinement",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-event-stream-is-credential-free",
+              "the-credential-is-confined-to-the-sensitive-artifact",
+              "the-credential-never-reaches-the-provisioner-argv"
+            ]
+          }
+        },
+        {
+          "id": "test-environment-policy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-mode-resolves-by-a-fixed-precedence",
+              "no-infrastructure-is-created-outside-auto-mode",
+              "a-server-the-pipeline-named-is-used",
+              "a-closure-declaring-no-database-is-a-no-op",
+              "every-emitted-binding-bounds-the-test-pool",
+              "an-externally-supplied-binding-wins-over-any-provider"
+            ]
+          }
+        },
+        {
+          "id": "infra-aggregation-neutrality",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "aggregation-merges-the-dependency-closure",
+              "libraries-are-skipped",
+              "an-unclassified-project-is-treated-as-a-workload",
+              "generator-scratch-is-ignored",
+              "a-v1-generated-manifest-is-normalized",
+              "a-conflict-is-reported-as-a-diagnostic",
+              "a-compatibility-hook-applies-to-runtime-defaults",
+              "a-compatibility-hook-applies-to-an-authored-runtime",
+              "findings-never-fail-the-task"
+            ]
+          }
+        },
+        {
+          "id": "shared-package-metadata-writer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-record-is-written-inside-the-directory-its-packager-owns",
+              "the-index-unions-every-owned-record-in-sorted-directory-order",
+              "a-record-left-by-an-earlier-run-is-still-reported",
+              "empty-and-duplicate-channel-names-are-dropped",
+              "a-damaged-record-is-skipped-rather-than-failing-the-read",
+              "an-absent-record-set-reports-not-exist",
+              "the-manifest-is-overwritten-by-its-single-owner"
+            ]
+          }
+        },
+        {
+          "id": "local-image-publication-boundary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-owns-only-local-candidate-evidence",
+              "publish-owns-only-verified-remote-evidence",
+              "private-loopback-preserves-logical-evidence",
+              "project-bases-consume-local-candidates"
+            ]
+          }
+        },
+        {
+          "id": "ecosystem-profiles",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "oci-profile-resolves-with-extension-manifests"
+            ]
+          }
+        },
+        {
+          "id": "oci-publish-by-digest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "version-is-the-only-tag",
+              "member-event-carries-the-digest",
+              "private-loopback-routes-workload-images",
+              "one-manifest-existence-check-per-image",
+              "image-member-matches-native-plan",
+              "image-private-publish-writes-only-digest"
+            ]
+          }
+        },
+        {
+          "id": "agent-content-packaging",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "extension-content-is-built-under-the-extension-identity",
+              "a-content-only-extension-packages-with-the-additive-stamp",
+              "packaging-refuses-what-it-cannot-certify",
+              "the-manifest-builder-stamps-the-additive-contract"
+            ]
+          }
+        },
+        {
+          "id": "agent-content-staging",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-staged-extension-carries-the-built-content-bound-by-digest",
+              "staging-refuses-what-it-cannot-bind",
+              "the-staged-content-is-verified-byte-for-byte"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

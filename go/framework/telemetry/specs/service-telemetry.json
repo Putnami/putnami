@@ -1,0 +1,71 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/service-telemetry",
+  "outcomes": [
+    "A serverless or short-lived workload exports its telemetry by pushing it, without needing to be scraped",
+    "An unreachable or failing collector degrades observability and nothing else",
+    "A container that exits promptly still delivers its last batch of measurements",
+    "A request's span is attributed to the right service and joined to the caller's trace"
+  ],
+  "nonGoals": [
+    "Running a collector, or defining collector-side retention, sampling, or routing",
+    "Exporting via gRPC OTLP or via an OpenTelemetry exporter SDK; the wire is rendered directly as OTLP/JSON over HTTP",
+    "Exporting logs implicitly: the log sink is attached to the application logger deliberately",
+    "Promising strict compatibility between every pre-1.0 minor release"
+  ],
+  "requirements": [
+    {
+      "id": "push-transport",
+      "text": "Configuring an OTLP endpoint wires a periodic metric reader and a span exporter that POST OTLP/JSON to the collector's metrics and traces paths, and an explicitly supplied reader or exporter is never replaced by that auto-wiring."
+    },
+    {
+      "id": "endpoint-required",
+      "text": "An OTLP configuration with an empty endpoint fails at configure rather than starting a workload whose telemetry silently goes nowhere."
+    },
+    {
+      "id": "never-fails-the-workload",
+      "text": "Collector errors are dropped rather than propagated, and the log sink batches records onto a background flush, so neither export failures nor collector latency reach the request path."
+    },
+    {
+      "id": "final-flush",
+      "text": "The metric reader flushes periodically and once more during provider shutdown, so a short-lived container does not drop its last batch."
+    },
+    {
+      "id": "bounded-shutdown",
+      "text": "Shutdown bounds the flush by the configured shutdown timeout and reports tracer and meter shutdown failures together rather than stopping at the first one."
+    },
+    {
+      "id": "service-identity",
+      "text": "A configured service name or version is merged onto the SDK's default resource so telemetry SDK attributes are preserved, and leaving both unset leaves the providers' own default resource untouched."
+    },
+    {
+      "id": "explicit-sampling",
+      "text": "An unset sample rate samples every trace, while an explicit rate of zero samples none, so \"not configured\" and \"deliberately disabled\" stay distinguishable."
+    },
+    {
+      "id": "span-always-ends",
+      "text": "The HTTP middleware ends its span for every outcome: a nil response, a server-error response marked errored, and a downstream panic that is recorded on the span and then re-raised so an outer recovery middleware still behaves normally."
+    },
+    {
+      "id": "trace-propagation",
+      "text": "An inbound W3C traceparent header is extracted so the request's span continues the caller's trace instead of starting an unrelated one."
+    },
+    {
+      "id": "duration-precision",
+      "text": "Request durations shorter than a millisecond are recorded with their real value rather than truncated to zero."
+    },
+    {
+      "id": "generated-client-telemetry",
+      "text": "The generated-client bridge counts every stored answer a generated client returns after its provider call failed as rpc.client.cache.stale_served, on the same rpc.system, rpc.service, rpc.method and network.protocol.name attributes as the call metrics, and never as an attribute carrying the answer's age."
+    },
+    {
+      "id": "lifecycle-purity",
+      "text": "Reading the plugin's provider registrations has no side effect, configure installs the global providers exactly once per application lifetime, the plugin rebuilds cleanly after a stop, and the error-count bridge hook is removed on stop."
+    }
+  ],
+  "decisions": [
+    "go/framework/telemetry/doc/adr/0001-push-otlp-json-without-an-exporter-sdk.md",
+    "go/framework/telemetry/doc/adr/0002-the-middleware-owns-the-span.md"
+  ]
+}

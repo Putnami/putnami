@@ -1,0 +1,333 @@
+syntax = "proto3";
+
+package items.v1;
+
+message ListItemsQuery {
+  string search = 1;
+  int64 limit = 2;
+}
+
+message ListItemsRequest {
+  ListItemsQuery query = 1;
+}
+
+message Item {
+  string id = 1;
+  string name = 2;
+  optional int64 price = 3;
+}
+
+message ListItemsReply {
+  repeated Item items = 1;
+}
+
+message ListCredentialCheckRequest {
+}
+
+message ListCredentialCheckReply {
+  string profile = 1;
+  string header = 2;
+  bool presented = 3;
+}
+
+message GetItemsParams {
+  string id = 1;
+}
+
+message GetItemsRequest {
+  GetItemsParams params = 1;
+}
+
+message GetItemsReply {
+  string id = 1;
+  string name = 2;
+  optional int64 price = 3;
+}
+
+message CreateItemsBody {
+  string name = 1;
+  optional int64 price = 2;
+}
+
+message CreateItemsRequest {
+  CreateItemsBody body = 1;
+}
+
+message CreateItemsReply {
+  string id = 1;
+  string name = 2;
+  optional int64 price = 3;
+}
+
+message CreateBodyFidelityBody {
+  bool enabled = 1;
+  int64 count = 2;
+  string label = 3;
+  int64 signed = 4;
+  uint64 unsigned = 5;
+  optional string nullable = 6;
+}
+
+message CreateBodyFidelityRequest {
+  CreateBodyFidelityBody body = 1;
+}
+
+message CreateBodyFidelityReply {
+  bool enabled = 1;
+  int64 count = 2;
+  string label = 3;
+  int64 signed = 4;
+  uint64 unsigned = 5;
+  optional string nullable = 6;
+}
+
+message CreateBodyValuesBody {
+  repeated int64 value = 1;
+}
+
+message CreateBodyValuesRequest {
+  CreateBodyValuesBody body = 1;
+}
+
+message CreateBodyValuesReply {
+  repeated int64 value = 1;
+}
+
+message CreateBodyCounterBody {
+  uint64 value = 1;
+}
+
+message CreateBodyCounterRequest {
+  CreateBodyCounterBody body = 1;
+}
+
+message CreateBodyCounterReply {
+  uint64 value = 1;
+}
+
+message CreateBodyNullableBody {
+  optional string value = 1;
+}
+
+message CreateBodyNullableRequest {
+  CreateBodyNullableBody body = 1;
+}
+
+message CreateBodyNullableReply {
+  optional string value = 1;
+}
+
+message CreateBlobsEchoBody {
+  bytes value = 1;
+}
+
+message CreateBlobsEchoRequest {
+  CreateBlobsEchoBody body = 1;
+}
+
+message CreateBlobsEchoReply {
+  bytes value = 1;
+}
+
+message GetBlobsParams {
+  string id = 1;
+}
+
+message GetBlobsRequest {
+  GetBlobsParams params = 1;
+}
+
+message GetBlobsReply {
+  bytes value = 1;
+}
+
+message GetItemsWatchParams {
+  string id = 1;
+}
+
+message GetItemsWatchQuery {
+  bool follow = 1;
+}
+
+message GetItemsWatchRequest {
+  GetItemsWatchParams params = 1;
+  GetItemsWatchQuery query = 2;
+}
+
+message GetItemsWatchReply {
+  string id = 1;
+  string name = 2;
+  optional int64 price = 3;
+}
+
+message GetItemsHistoryParams {
+  string id = 1;
+}
+
+message GetItemsHistoryRequest {
+  GetItemsHistoryParams params = 1;
+}
+
+message GetItemsHistoryReply {
+  string id = 1;
+  string revision = 2;
+}
+
+message ListItemsChangesQuery {
+  optional string cursor = 1;
+  int64 until = 2;
+}
+
+message ListItemsChangesRequest {
+  ListItemsChangesQuery query = 1;
+}
+
+message ListItemsChangesReply {
+  string cursor = 1;
+  int64 revision = 2;
+  string id = 3;
+  string name = 4;
+}
+
+message GetItemsAdjustParams {
+  string id = 1;
+}
+
+message GetItemsAdjustBody {
+  int64 delta = 1;
+}
+
+message GetItemsAdjustRequest {
+  GetItemsAdjustParams params = 1;
+  GetItemsAdjustBody body = 2;
+}
+
+message GetItemsAdjustReply {
+  string id = 1;
+  int64 applied = 2;
+  int64 total = 3;
+}
+
+message GetItemsNegotiateParams {
+  string id = 1;
+}
+
+message GetItemsNegotiateBody {
+  int64 delta = 1;
+}
+
+message GetItemsNegotiateRequest {
+  GetItemsNegotiateParams params = 1;
+  GetItemsNegotiateBody body = 2;
+}
+
+message GetItemsNegotiateReply {
+  string id = 1;
+  int64 applied = 2;
+  int64 total = 3;
+}
+
+message GetQuotesParams {
+  string id = 1;
+}
+
+message GetQuotesRequest {
+  GetQuotesParams params = 1;
+}
+
+message GetQuotesReply {
+  string id = 1;
+  uint64 units = 2;
+  int32 offset = 3;
+  bytes fingerprint = 4;
+  repeated string tags = 5;
+  map<string, string> labels = 6;
+}
+
+message GetQuotesSnapshotParams {
+  string id = 1;
+}
+
+message GetQuotesSnapshotRequest {
+  GetQuotesSnapshotParams params = 1;
+}
+
+message GetQuotesSnapshotReply {
+  string id = 1;
+  uint64 units = 2;
+  int32 offset = 3;
+  bytes fingerprint = 4;
+  repeated string tags = 5;
+  map<string, string> labels = 6;
+}
+
+message GetQuotesTicksParams {
+  string id = 1;
+}
+
+message GetQuotesTicksRequest {
+  GetQuotesTicksParams params = 1;
+}
+
+message GetQuotesTicksReply {
+  string id = 1;
+  uint64 sequence = 2;
+}
+
+message ListTenantCheckRequest {
+}
+
+message ListTenantCheckReply {
+  bool key = 1;
+  bool tenant = 2;
+}
+
+message ListWhoamiRequest {
+}
+
+message ListWhoamiReply {
+  string subject = 1;
+}
+
+service ApiService {
+  // List all items
+  rpc ListItems(ListItemsRequest) returns (ListItemsReply);
+  // Report the credential the caller's binding injected
+  rpc ListCredentialCheck(ListCredentialCheckRequest) returns (ListCredentialCheckReply);
+  // Get a single item by id
+  rpc GetItems(GetItemsRequest) returns (GetItemsReply);
+  // Create an item
+  rpc CreateItems(CreateItemsRequest) returns (CreateItemsReply);
+  // Echo exact JSON object values
+  rpc CreateBodyFidelity(CreateBodyFidelityRequest) returns (CreateBodyFidelityReply);
+  // Echo an exact root JSON array
+  rpc CreateBodyValues(CreateBodyValuesRequest) returns (CreateBodyValuesReply);
+  // Echo an exact root JSON integer
+  rpc CreateBodyCounter(CreateBodyCounterRequest) returns (CreateBodyCounterReply);
+  // Echo a nullable root JSON value
+  rpc CreateBodyNullable(CreateBodyNullableRequest) returns (CreateBodyNullableReply);
+  // Echo raw octets unchanged
+  rpc CreateBlobsEcho(CreateBlobsEchoRequest) returns (CreateBlobsEchoReply);
+  // Read one stored blob verbatim
+  rpc GetBlobs(GetBlobsRequest) returns (GetBlobsReply);
+  // Watch a single item
+  rpc GetItemsWatch(GetItemsWatchRequest) returns (stream GetItemsWatchReply);
+  // Read the revision feed of a single item
+  rpc GetItemsHistory(GetItemsHistoryRequest) returns (stream GetItemsHistoryReply);
+  // Follow the catalog change feed after a position
+  rpc ListItemsChanges(ListItemsChangesRequest) returns (stream ListItemsChangesReply);
+  // Apply a stream of stock deltas and return the total
+  rpc GetItemsAdjust(stream GetItemsAdjustRequest) returns (GetItemsAdjustReply);
+  // Exchange stock deltas and running totals
+  rpc GetItemsNegotiate(stream GetItemsNegotiateRequest) returns (stream GetItemsNegotiateReply);
+  // Read one quote over Connect
+  rpc GetQuotes(GetQuotesRequest) returns (GetQuotesReply);
+  // Read one quote over Connect, protobuf first
+  rpc GetQuotesSnapshot(GetQuotesSnapshotRequest) returns (GetQuotesSnapshotReply);
+  // Stream the ticks of one quote over Connect
+  rpc GetQuotesTicks(GetQuotesTicksRequest) returns (stream GetQuotesTicksReply);
+  // Report that the api key and the tenant both arrived
+  rpc ListTenantCheck(ListTenantCheckRequest) returns (ListTenantCheckReply);
+  // Name the user the caller forwarded
+  rpc ListWhoami(ListWhoamiRequest) returns (ListWhoamiReply);
+}

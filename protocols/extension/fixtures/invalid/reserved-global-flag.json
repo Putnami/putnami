@@ -1,0 +1,18 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "test": {
+      "flags": {
+        "json": { "type": "boolean" },
+        "details": { "type": "boolean", "short": "-v" }
+      },
+      "run": [{ "id": "test", "task": "test-exec" }]
+    }
+  },
+  "tasks": {
+    "test-exec": {
+      "kind": "command",
+      "command": "echo"
+    }
+  }
+}

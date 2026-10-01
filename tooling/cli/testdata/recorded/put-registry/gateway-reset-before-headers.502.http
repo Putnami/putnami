@@ -1,0 +1,5 @@
+HTTP/1.1 502 Bad Gateway
+content-type: text/plain
+content-length: 87
+
+upstream connect error or disconnect/reset before headers. reset reason: protocol error

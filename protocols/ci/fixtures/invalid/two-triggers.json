@@ -1,0 +1,15 @@
+{
+  "version": 3,
+  "commands": [
+    "test"
+  ],
+  "rules": [
+    {
+      "branches": "main",
+      "tags": "v*",
+      "publish": [
+        "canary"
+      ]
+    }
+  ]
+}

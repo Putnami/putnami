@@ -1,0 +1,5 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-storage.json",
+  "protocolVersion": 2,
+  "resources": [{ "name": "uploads" }]
+}

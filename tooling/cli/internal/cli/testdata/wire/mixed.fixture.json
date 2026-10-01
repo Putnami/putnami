@@ -1,0 +1,401 @@
+{
+  "name": "mixed",
+  "command": "run",
+  "commands": ["build", "test", "lint"],
+  "sessionId": "20260101-000000-a1b2c3",
+  "startTime": "2026-01-01T00:00:00.000000000Z",
+  "outcome": {
+    "aborted": false,
+    "abortedBy": ""
+  },
+  "scheduler": {
+    "parallel": {
+      "mode": "auto",
+      "workers": 4,
+      "logicalCpu": 8,
+      "memoryTotalMiB": 16384,
+      "memoryCapWorkers": 0,
+      "plannedJobs": 8,
+      "heavyJobPermille": 250
+    },
+    "heavyJobRatio": 0.25,
+    "readyWait": [
+      { "command": "build", "jobs": 3, "totalMs": 24, "maxMs": 18 }
+    ],
+    "criticalPath": {
+      "durationMs": 2050,
+      "chain": [
+        { "job": "/services/api:build", "command": "build", "durationMs": 1200 },
+        { "job": "/services/api:test", "command": "test", "durationMs": 850 }
+      ]
+    },
+    "cpuBudgets": [
+      { "job": "/services/api:build", "weight": 2, "expectedCpuMs": 2400, "budget": 4 },
+      { "job": "/services/api:test", "weight": 1, "expectedCpuMs": 850, "budget": 2 }
+    ]
+  },
+  "cache": {
+    "setupMs": 4,
+    "negotiateMs": 31,
+    "keysRequested": 8,
+    "hits": 2,
+    "misses": 6,
+    "restored": 1,
+    "hintsWarmed": 0,
+    "timeSavedMs": 940,
+    "bytesFetched": 20480,
+    "restoreMs": 12,
+    "uploads": 3,
+    "blobsUploaded": 5,
+    "bytesUploaded": 61440,
+    "bytesDeduped": 8192,
+    "uploadMs": 44,
+    "uploadErrors": 0,
+    "uploadsSkipped": 1,
+    "providerSummaryRestoredCount": 1,
+    "providerSummaryRestoredBytes": 20480,
+    "providerSummaryUploadedCount": 5,
+    "providerSummaryUploadedBytes": 61440,
+    "providerSummaryAvailable": true
+  },
+  "tasks": [
+    {
+      "key": "/services/api:build",
+      "projectId": "/services/api",
+      "projectName": "@acme/api",
+      "extension": "go",
+      "job": "build",
+      "cacheable": true,
+      "reportedToRenderer": true,
+      "status": "success",
+      "durationMs": 1200,
+      "taskWallMs": 1310,
+      "cpuTimeMs": 2400,
+      "spawnToFirstEventMs": 41,
+      "firstEventObserved": true,
+      "cacheHit": false,
+      "coalesced": false,
+      "reuse": "",
+      "events": [
+        {
+          "v": 2,
+          "type": "log",
+          "time": "2026-01-01T00:00:01.000000000Z",
+          "level": "info",
+          "message": "compiling 12 packages",
+          "data": {
+            "type": "log",
+            "time": "2026-01-01T00:00:01.000000000Z",
+            "level": "info",
+            "message": "compiling 12 packages"
+          }
+        },
+        {
+          "v": 2,
+          "type": "artifact",
+          "time": "2026-01-01T00:00:02.000000000Z",
+          "data": {
+            "type": "artifact",
+            "time": "2026-01-01T00:00:02.000000000Z",
+            "name": "api",
+            "kind": "binary",
+            "path": "dist/api"
+          }
+        },
+        {
+          "v": 2,
+          "type": "metric",
+          "time": "2026-01-01T00:00:03.000000000Z",
+          "data": {
+            "type": "metric",
+            "time": "2026-01-01T00:00:03.000000000Z",
+            "name": "binary.size",
+            "unit": "bytes",
+            "value": 18432000
+          }
+        }
+      ],
+      "sessionEvent": {
+        "time": "2026-01-01T00:00:04.000000000Z",
+        "type": "job:end",
+        "data": {
+          "project": "@acme/api",
+          "job": "build",
+          "taskKind": "build",
+          "extension": "go",
+          "status": "success",
+          "outcome": "success",
+          "duration": 1200,
+          "taskWallMs": 1310,
+          "cache": false,
+          "coalesced": false,
+          "spawnToFirstEventMs": 41,
+          "cpuBudget": 4,
+          "cpuTimeMs": 2400
+        }
+      }
+    },
+    {
+      "key": "/services/api:test",
+      "projectId": "/services/api",
+      "projectName": "@acme/api",
+      "extension": "go",
+      "job": "test",
+      "cacheable": true,
+      "dependsOn": ["/services/api:build"],
+      "reportedToRenderer": true,
+      "status": "failed",
+      "durationMs": 850,
+      "taskWallMs": 902,
+      "cpuTimeMs": 1500,
+      "spawnToFirstEventMs": 37,
+      "firstEventObserved": true,
+      "cacheHit": false,
+      "coalesced": false,
+      "reuse": "",
+      "error": {
+        "message": "2 assertions failed",
+        "code": "TEST_FAILED"
+      },
+      "events": [
+        {
+          "v": 2,
+          "type": "diagnostic",
+          "time": "2026-01-01T00:00:05.000000000Z",
+          "data": {
+            "type": "diagnostic",
+            "time": "2026-01-01T00:00:05.000000000Z",
+            "severity": "error",
+            "code": "ASSERT",
+            "message": "expected 3, got 4",
+            "location": {
+              "file": "internal/sum/sum_test.go",
+              "line": 42,
+              "column": 3
+            }
+          }
+        },
+        {
+          "v": 2,
+          "type": "log",
+          "time": "2026-01-01T00:00:06.000000000Z",
+          "level": "error",
+          "message": "FAIL internal/sum",
+          "data": {
+            "type": "log",
+            "time": "2026-01-01T00:00:06.000000000Z",
+            "level": "error",
+            "message": "FAIL internal/sum"
+          }
+        }
+      ],
+      "sessionEvent": {
+        "time": "2026-01-01T00:00:07.000000000Z",
+        "type": "job:end",
+        "data": {
+          "project": "@acme/api",
+          "job": "test",
+          "taskKind": "test",
+          "extension": "go",
+          "status": "failed",
+          "outcome": "failed",
+          "duration": 850,
+          "taskWallMs": 902,
+          "cache": false,
+          "coalesced": false,
+          "spawnToFirstEventMs": 37,
+          "cpuBudget": 2,
+          "cpuTimeMs": 1500,
+          "error": "2 assertions failed"
+        }
+      }
+    },
+    {
+      "key": "/apps/web:build",
+      "projectId": "/apps/web",
+      "projectName": "@acme/web",
+      "extension": "typescript",
+      "job": "build",
+      "cacheable": true,
+      "reportedToRenderer": true,
+      "status": "success",
+      "durationMs": 3,
+      "taskWallMs": 12,
+      "cacheHit": true,
+      "coalesced": false,
+      "reuse": "local-cache",
+      "sessionEvent": {
+        "time": "2026-01-01T00:00:08.000000000Z",
+        "type": "job:end",
+        "data": {
+          "project": "@acme/web",
+          "job": "build",
+          "taskKind": "build",
+          "extension": "typescript",
+          "status": "success",
+          "outcome": "cached",
+          "duration": 3,
+          "taskWallMs": 12,
+          "cache": true,
+          "coalesced": false
+        }
+      }
+    },
+    {
+      "key": "/apps/web:test",
+      "projectId": "/apps/web",
+      "projectName": "@acme/web",
+      "extension": "typescript",
+      "job": "test",
+      "cacheable": true,
+      "dependsOn": ["/apps/web:build"],
+      "reportedToRenderer": true,
+      "status": "success",
+      "durationMs": 0,
+      "taskWallMs": 640,
+      "cacheHit": false,
+      "coalesced": true,
+      "reuse": "coalesced",
+      "sessionEvent": {
+        "time": "2026-01-01T00:00:09.000000000Z",
+        "type": "job:end",
+        "data": {
+          "project": "@acme/web",
+          "job": "test",
+          "taskKind": "test",
+          "extension": "typescript",
+          "status": "success",
+          "outcome": "coalesced",
+          "duration": 0,
+          "taskWallMs": 640,
+          "cache": false,
+          "coalesced": true
+        }
+      }
+    },
+    {
+      "key": "/apps/web:lint",
+      "projectId": "/apps/web",
+      "projectName": "@acme/web",
+      "extension": "typescript",
+      "job": "lint",
+      "cacheable": true,
+      "reportedToRenderer": true,
+      "status": "success",
+      "durationMs": 7,
+      "taskWallMs": 58,
+      "cacheHit": true,
+      "coalesced": false,
+      "reuse": "remote-cache",
+      "sessionEvent": {
+        "time": "2026-01-01T00:00:10.000000000Z",
+        "type": "job:end",
+        "data": {
+          "project": "@acme/web",
+          "job": "lint",
+          "taskKind": "lint",
+          "extension": "typescript",
+          "status": "success",
+          "outcome": "cached",
+          "duration": 7,
+          "cache": true,
+          "coalesced": false
+        }
+      }
+    },
+    {
+      "key": "/tools/lint:build",
+      "projectId": "/tools/lint",
+      "projectName": "@acme/tools",
+      "extension": "go",
+      "job": "build",
+      "cacheable": true,
+      "serializeAfter": ["/services/api:build"],
+      "reportedToRenderer": true,
+      "status": "success",
+      "durationMs": 410,
+      "taskWallMs": 455,
+      "cacheHit": false,
+      "coalesced": false,
+      "reuse": "",
+      "sessionEvent": {
+        "time": "2026-01-01T00:00:11.000000000Z",
+        "type": "job:end",
+        "data": {
+          "project": "@acme/tools",
+          "job": "build",
+          "extension": "go",
+          "status": "success",
+          "outcome": "success",
+          "duration": 410,
+          "taskWallMs": 455,
+          "cache": false,
+          "coalesced": false
+        }
+      }
+    },
+    {
+      "key": "/tools/lint:test",
+      "projectId": "/tools/lint",
+      "projectName": "@acme/tools",
+      "extension": "go",
+      "job": "test",
+      "cacheable": true,
+      "dependsOn": ["/tools/lint:build", "/services/api:test"],
+      "reportedToRenderer": true,
+      "status": "skipped",
+      "durationMs": 0,
+      "taskWallMs": 1,
+      "cacheHit": false,
+      "coalesced": false,
+      "reuse": "",
+      "sessionEvent": {
+        "time": "2026-01-01T00:00:12.000000000Z",
+        "type": "job:end",
+        "data": {
+          "project": "@acme/tools",
+          "job": "test",
+          "taskKind": "test",
+          "extension": "go",
+          "status": "skipped",
+          "duration": 0,
+          "taskWallMs": 1,
+          "cache": false,
+          "coalesced": false
+        }
+      }
+    },
+    {
+      "key": "/tools/lint:deploy",
+      "projectId": "/tools/lint",
+      "projectName": "@acme/tools",
+      "extension": "go",
+      "job": "deploy",
+      "cacheable": false,
+      "dependsOn": ["/tools/lint:build"],
+      "reportedToRenderer": false,
+      "status": "canceled",
+      "durationMs": 0,
+      "taskWallMs": 2,
+      "cacheHit": false,
+      "coalesced": false,
+      "reuse": "",
+      "sessionEvent": {
+        "time": "2026-01-01T00:00:13.000000000Z",
+        "type": "job:end",
+        "data": {
+          "project": "@acme/tools",
+          "job": "deploy",
+          "taskKind": "deploy",
+          "extension": "go",
+          "status": "canceled",
+          "outcome": "canceled",
+          "duration": 0,
+          "taskWallMs": 2,
+          "cache": false,
+          "coalesced": false
+        }
+      }
+    }
+  ]
+}

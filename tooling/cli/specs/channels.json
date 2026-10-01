@@ -1,0 +1,49 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/channels",
+  "outcomes": [
+    "A user moves the CLI, the extensions, and the framework dependencies onto a distribution channel through the registries the workspace declares, with the credential that channel needs",
+    "A private channel is reachable: the archive request carries the user's credential, and a refusal names the command that fixes it",
+    "A tag releases its line as one cohort on an immutable channel, a protected channel moves only by hand, and every publication carries the visibility the repository declared"
+  ],
+  "nonGoals": [
+    "Downloading dependencies itself: the native tools do that once the pins are written",
+    "Deriving a channel from a branch name",
+    "Holding a Putnami-specific credential store: the credential comes from the native seam @putnami/cloud owns",
+    "Computing a visibility level: the CLI resolves the declared chain's selectors and carries it; the provider resolves and ratchets the level"
+  ],
+  "requirements": [
+    {
+      "id": "archives-follow-the-put-projection",
+      "text": "CLI upgrade, pin, cold pinned launch and extension upgrade read native Put archive projections with the host credential. A cold CLI pin resolves that credential through the selected executable without recursive pin relaunch, then verifies the pinned digest before execution. A refusal of a request that went out without the credential it asked for names the credential command and its reason. --branch no longer exists."
+    },
+    {
+      "id": "tagged-publish-is-a-cohort",
+      "text": "A publish on a tagged commit republishes every member of the tag's line at the tag's version and creates an immutable channel named after the tag in the portable encoding."
+    },
+    {
+      "id": "protected-channels",
+      "text": "A protected channel is refused by publish and by a branch rule; only channel set from a user moves it."
+    },
+    {
+      "id": "channel-set-is-metadata-only",
+      "text": "channel set moves a channel to an existing set through one provider call, without any publisher."
+    },
+    {
+      "id": "visibility-is-carried-not-computed",
+      "text": "publish carries the visibility chain declared in putnami.ci.json, with member selectors resolved to coordinates and --visibility as the set level, and computes no level itself."
+    },
+    {
+      "id": "project-declares-its-distribution-visibility",
+      "text": "A project states the member level of every artifact it publishes with distribution.visibility in its own putnami.json, or inherits it from the deepest scope that declares one. That level wins over the putnami.ci.json distribution.members[] rules, publish refuses a rule that disagrees with it, and an unknown or missing level fails closed."
+    },
+    {
+      "id": "mirror-intent-follows-the-release",
+      "text": "publish carries distribution.registries.<ecosystem>.mirror.to in the same release request, including an already-current publication. The CLI does not widen visibility, choose eligible members or send mirror credentials; the provider durably accepts authorized copies of public immutable members."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md"
+  ]
+}

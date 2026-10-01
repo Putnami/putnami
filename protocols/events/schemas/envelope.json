@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/events/envelope.json",
+  "title": "Putnami Events Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "topic", "payload", "timestamp", "attempt"],
+  "properties": {
+    "protocol": { "const": "putnami.events.v1" },
+    "id": { "type": "string", "minLength": 1 },
+    "topic": { "type": "string", "minLength": 1 },
+    "channel": { "type": "string", "minLength": 1 },
+    "payload": true,
+    "key": { "type": "string" },
+    "dedupeKey": { "type": "string" },
+    "topicVersion": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "attributes": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "traceId": { "type": "string" }
+  }
+}

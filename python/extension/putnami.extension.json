@@ -1,0 +1,397 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "cliContract": 4,
+  "runtime": {
+    "executable": "compiled/putnami-python",
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": ["--output", "{runtimeOutput}"],
+      "inputs": ["bin/prepare", "cmd/**", "go.mod", "go.sum", "internal/**"]
+    }
+  },
+  "workspace": {
+    "markers": ["pyproject.toml"],
+    "inputs": ["pyproject.toml", "uv.lock"],
+    "excludes": [".pytest_cache", ".ruff_cache", ".venv", "__pycache__", "build", "dist", "venv"],
+    "syncTask": "workspace-sync-exec"
+  },
+  "commands": {
+    "lint": {
+      "description": "Lint and format Python code.",
+      "flags": {
+        "fix": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-fix issues"
+        },
+        "docs-links": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check every relative link and anchor in the project's README.md files and doc/ trees; a broken one fails lint."
+        }
+      },
+      "run": [
+        { "id": "format", "task": "lint-format-fix", "dependsOn": ["/workspace-install"], "if": "params.fix" },
+        { "id": "check", "task": "lint-check-fix", "dependsOn": ["format"], "if": "params.fix" },
+        {
+          "id": "format-check-only",
+          "task": "lint-format-readonly",
+          "dependsOn": ["/workspace-install"],
+          "if": "!params.fix"
+        },
+        {
+          "id": "check-check-only",
+          "task": "lint-check-readonly",
+          "dependsOn": ["format-check-only"],
+          "if": "!params.fix"
+        },
+        { "id": "docs", "task": "lint-docs", "if": "params.docs-links" }
+      ]
+    },
+    "test": {
+      "description": "Run Python tests.",
+      "activationFiles": ["**/test_*.py", "**/*_test.py"],
+      "flags": {
+        "log": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable logging output"
+        },
+        "update-snapshots": {
+          "type": "boolean",
+          "default": false,
+          "description": "Update snapshot files"
+        },
+        "test": {
+          "type": "string",
+          "short": "-t",
+          "description": "Test filter to run"
+        }
+      },
+      "run": [{ "id": "test", "heavy": true, "task": "test-run", "dependsOn": ["/workspace-install"] }]
+    },
+    "serve": {
+      "description": "Serve a Python application with hot-reload.",
+      "flags": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Entry point to serve"
+        },
+        "port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for the server"
+        },
+        "watch": {
+          "type": "boolean",
+          "default": true,
+          "short": "-w",
+          "description": "Restart server on file changes"
+        }
+      },
+      "run": [{ "id": "serve", "task": "serve-run", "dependsOn": ["/workspace-install"] }]
+    },
+    "run": {
+      "description": "Run a Python workload once for the host and forward its exit code.",
+      "activationFiles": ["pyproject.toml", "src/**/*.py"],
+      "flags": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Entry point to run (defaults to src/main.py)"
+        },
+        "port": {
+          "type": "number",
+          "description": "Port (set via the PORT environment variable)"
+        }
+      },
+      "run": [{ "id": "run", "task": "run-exec", "dependsOn": ["/workspace-install"] }]
+    },
+    "workspace-install": {
+      "description": "Install Python workspace dependencies.",
+      "quiet": true,
+      "flags": {
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "Regenerate uv.lock even if it already exists"
+        }
+      },
+      "run": [{ "id": "workspace-install", "task": "workspace-install-exec" }]
+    },
+    "workspace-sync": {
+      "description": "Synchronize Python-owned workspace state (pyproject.toml project identities).",
+      "visibility": "internal",
+      "quiet": true,
+      "activation": "workspace-once",
+      "run": [{ "id": "workspace-sync", "task": "workspace-sync-exec" }]
+    },
+    "deps-upgrade": {
+      "description": "Upgrade dependencies of explicitly configured experimental Python projects.",
+      "visibility": "internal",
+      "quiet": true,
+      "run": [{ "id": "deps-upgrade", "task": "deps-upgrade-exec", "dependsOn": ["/workspace-install"] }]
+    }
+  },
+  "tasks": {
+    "workspace-install-exec": {
+      "description": "Sync the uv workspace members and run `uv lock`. Declares no outputs: everything it produces is either a shared workspace file (the root pyproject.toml it rewrites, uv.lock) — which the workspace-files effect states — or lives outside the workspace in the machine-global uv cache and the resolved virtualenv.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["workspace-install"],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": ["network", "toolchain-cache", "workspace-files"]
+      }
+    },
+    "workspace-sync-exec": {
+      "description": "Align every selected Python project's pyproject.toml [project] name with its resolved project name. Declares no outputs: it rewrites tracked source manifests, which the workspace-files effect states.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["workspace-sync"],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 120000,
+      "declares": {
+        "effects": ["workspace-files"]
+      }
+    },
+    "deps-upgrade-exec": {
+      "description": "Run `uv lock --upgrade` for explicitly configured Python workspace projects. It updates their resolved dependency set, not a Putnami Python framework release set. Declares no outputs: it rewrites the shared uv.lock and the root pyproject.toml, which is a workspace-files effect rather than a captured artifact.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["deps-upgrade"],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": ["network", "toolchain-cache", "workspace-files"]
+      }
+    },
+    "lint-format-fix": {
+      "description": "ruff pass that APPLIES formatting (`ruff format`). The mutating half of the format check/fix split: it is one of the two lint tasks that declare mutatesSources, together with the project-scoped \"sources\" write resource the planner serializes conflicting jobs on. The lint pipeline schedules it only when params.fix is true; the read-only counterpart is lint-format-readonly. Every ruff task first syncs the uv workspace, which rewrites the root pyproject.toml — hence the workspace-files effect — and runs ruff through `uv run`, which resolves and downloads the tool (network) into the machine-global uv cache and writes ruff's own cache directory (toolchain-cache).",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["lint-format"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.py"] },
+        "config": { "from": "project", "files": ["pyproject.toml"] },
+        "workspaceConfig": { "from": "workspace", "files": ["pyproject.toml", "uv.lock"] },
+        "fix": { "from": "params" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Format result" }
+      },
+      "writes": ["sources"],
+      "batchable": {
+        "tool": "ruff",
+        "configFiles": [
+          "{projectRoot}/ruff.toml",
+          "{projectRoot}/.ruff.toml",
+          "{workspaceRoot}/ruff.toml",
+          "{workspaceRoot}/.ruff.toml",
+          "{workspaceRoot}/pyproject.toml"
+        ]
+      },
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {
+        "mutatesSources": true,
+        "effects": ["network", "toolchain-cache", "workspace-files"]
+      }
+    },
+    "lint-format-readonly": {
+      "description": "ruff pass that only REPORTS formatting drift (`ruff format --check`, no rewrite). The pure-check half of the format check/fix split: it reads sources, never writes them, and therefore declares neither mutatesSources nor the \"sources\" write resource. The lint pipeline schedules it only when params.fix is false; the runtime picks --check from the same fix param the pipeline guard reads, so the two can never disagree.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["lint-format"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.py"] },
+        "config": { "from": "project", "files": ["pyproject.toml"] },
+        "workspaceConfig": { "from": "workspace", "files": ["pyproject.toml", "uv.lock"] },
+        "fix": { "from": "params" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Format result" }
+      },
+      "reads": ["sources"],
+      "batchable": {
+        "tool": "ruff",
+        "configFiles": [
+          "{projectRoot}/ruff.toml",
+          "{projectRoot}/.ruff.toml",
+          "{workspaceRoot}/ruff.toml",
+          "{workspaceRoot}/.ruff.toml",
+          "{workspaceRoot}/pyproject.toml"
+        ]
+      },
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {
+        "effects": ["network", "toolchain-cache", "workspace-files"]
+      }
+    },
+    "lint-check-fix": {
+      "description": "ruff pass that APPLIES lint fixes (`ruff check --fix`). The mutating half of the check/fix split: it declares mutatesSources together with the project-scoped \"sources\" write resource the planner serializes conflicting jobs on, and the lint pipeline schedules it only when params.fix is true. The read-only counterpart is lint-check-readonly.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["lint-check"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.py"] },
+        "config": { "from": "project", "files": ["pyproject.toml"] },
+        "workspaceConfig": { "from": "workspace", "files": ["pyproject.toml", "uv.lock"] },
+        "fix": { "from": "params" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Lint check result with diagnostics" }
+      },
+      "writes": ["sources"],
+      "batchable": {
+        "tool": "ruff",
+        "configFiles": [
+          "{projectRoot}/ruff.toml",
+          "{projectRoot}/.ruff.toml",
+          "{workspaceRoot}/ruff.toml",
+          "{workspaceRoot}/.ruff.toml",
+          "{workspaceRoot}/pyproject.toml"
+        ]
+      },
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {
+        "mutatesSources": true,
+        "effects": ["network", "toolchain-cache", "workspace-files"]
+      }
+    },
+    "lint-docs": {
+      "description": "Documentation link check: every relative link and anchor in the project's README.md files and doc/ trees must resolve, with the case of the file on disk. The task body is the SDK's docslinks.Job, shared with every language extension. UNCACHEABLE on purpose: a link may name any file of the workspace, so no file-pattern key covers the read set, and a key that missed a deleted target would serve a green verdict for a broken link. It needs neither uv nor ruff.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["lint-docs"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "outputs": {
+        "data": { "description": "Documentation link result with diagnostics" }
+      },
+      "reads": ["sources"],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "lint-check-readonly": {
+      "description": "ruff pass that only REPORTS lint findings (`ruff check`, no --fix). The pure-check half of the check/fix split: it reads sources, never writes them, and declares neither mutatesSources nor the \"sources\" write resource. The lint pipeline schedules it only when params.fix is false.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["lint-check"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.py"] },
+        "config": { "from": "project", "files": ["pyproject.toml"] },
+        "workspaceConfig": { "from": "workspace", "files": ["pyproject.toml", "uv.lock"] },
+        "fix": { "from": "params" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Lint check result with diagnostics" }
+      },
+      "reads": ["sources"],
+      "batchable": {
+        "tool": "ruff",
+        "configFiles": [
+          "{projectRoot}/ruff.toml",
+          "{projectRoot}/.ruff.toml",
+          "{workspaceRoot}/ruff.toml",
+          "{workspaceRoot}/.ruff.toml",
+          "{workspaceRoot}/pyproject.toml"
+        ]
+      },
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {
+        "effects": ["network", "toolchain-cache", "workspace-files"]
+      }
+    },
+    "test-run": {
+      "description": "Run the project's pytest suite. Ownership decision: pytest is still invoked with no coverage or JUnit reporter — no --cov, no --junitxml — so the run owns no coverage profile and no JUnit report, and its result travels as the structured testSummary payload parsed from pytest's stdout, plus the per-case testCases that the injected putnami_testcases plugin records in a scratch file outside the project. The ONE declared output is the reserved spec-verification report (featureVerification), written by the adapter's merge of the fragments the injected putnami_spectest plugin records for tests bound with the putnami_proves marker; it is optionalEmpty because a project with no bound test writes none. The artifacts the run otherwise leaves (pytest's cache directory under .putnami/bin/extensions/putnami-python, the uv cache and virtualenv, the __pycache__ bytecode trees) are tool caches that are neither captured nor restored, which is what the toolchain-cache effect states. TestPytestOwnsNoReportsUntilItWritesThem pins the remaining gap: the day this task grows coverage or JUnit reporting, the declaration has to grow the matching command-output files the Go and TypeScript test tasks already declare.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["test"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 600000,
+      "inputs": {
+        "sources": { "from": "project", "files": ["**/*.py"] },
+        "config": { "from": "project", "files": ["pyproject.toml"] },
+        "workspaceConfig": { "from": "workspace", "files": ["pyproject.toml", "uv.lock"] },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Test execution result" }
+      },
+      "batchable": {
+        "tool": "pytest",
+        "maxWorkers": 1,
+        "maxProjects": 4,
+        "configFiles": ["{workspaceRoot}/uv.lock", "{workspaceRoot}/pyproject.toml"]
+      },
+      "cache": {
+        "enabled": true
+      },
+      "declares": {
+        "outputs": {
+          "featureVerification": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "putnami-feature-verification.json",
+            "optionalEmpty": true,
+            "description": "The reserved run-scoped feature verification report: the merged observations of every test bound to a declared check through the putnami_proves pytest marker. Absent when no test in the project bound one. Written per member under batching, so per-project attribution and cache restore hold for both the singleton and the batched run — a cache hit that lost this report would silently disarm the spec gate."
+          }
+        },
+        "effects": ["network", "toolchain-cache", "workspace-files"]
+      }
+    },
+    "serve-run": {
+      "description": "Serve the project with hot-reload. Declares no outputs: it runs the entrypoint through `uv run` and restarts it on change. Unlike the Go extension's serve task (whose \"process\" effect is deferred behind a known cache-policy gap), this task already sets cache:false, so the external process effect it genuinely has is declared here rather than documented as a gap.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["serve"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": ["network", "process", "toolchain-cache", "workspace-files"]
+      }
+    },
+    "run-exec": {
+      "description": "Run the workload once through `uv run` and forward its exit code. Declares no outputs: it produces only the program's own exit status and streams. cache:false is what lets it declare the external process effect honestly.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["run"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "timeoutMs": -1,
+      "declares": {
+        "effects": ["network", "process", "toolchain-cache", "workspace-files"]
+      }
+    }
+  }
+}

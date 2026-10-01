@@ -1,0 +1,18 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "extensionDependencies": ["@putnami/application"],
+  "hooks": {
+    "preBuild": {
+      "kind": "command",
+      "command": "bun",
+      "args": ["run", "{extensionRoot}/bin/generate"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "cache": {
+        "inputs": ["src/**/layout.tsx", "src/**/page.tsx", "src/**/error.tsx", "src/**/not-found.tsx"],
+        "outputs": [".gen/**/*"]
+      }
+    }
+  },
+  "commands": {}
+}

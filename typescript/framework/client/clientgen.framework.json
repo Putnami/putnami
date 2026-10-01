@@ -1,0 +1,167 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "@putnami/client",
+      "status": "framework-runtime",
+      "adapter": "typescript/framework/client/src/runtime/circuit-breaker.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/client/src/runtime/circuit-breaker.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "6ad0c55e327a73ecc8ee1f0b09b5e65028556054ffc32f80ef149b39ffd334d9"
+        }
+      ],
+      "owner": "@putnami/client",
+      "tests": ["typescript/framework/client/test/runtime/circuit-breaker.test.ts"],
+      "reason": "The breaker probe that decides whether a generated binding may dispatch again."
+    },
+    {
+      "runtime": "@putnami/client",
+      "status": "framework-runtime",
+      "adapter": "typescript/framework/client/src/runtime/client-builder.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/client/src/runtime/client-builder.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "4319ed295825b379412f3f7f1a6d07d49aecebe489597fa92ac9e1bd00d55d01"
+        }
+      ],
+      "owner": "@putnami/client",
+      "tests": ["typescript/framework/client/test/runtime/client-builder.test.ts"],
+      "reason": "The default transport a generated binding is built with when the consumer supplies none."
+    },
+    {
+      "runtime": "@putnami/client",
+      "status": "framework-runtime",
+      "adapter": "typescript/framework/client/src/runtime/connect-transport.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/client/src/runtime/connect-transport.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "9511e3b31ddcdfd204d821896dfd2d984eeee7e6a8f8dfa49d78f5622a7345ce"
+        },
+        {
+          "path": "typescript/framework/client/src/runtime/connect-transport.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "e1f4d5d7d1477556bca805709a13c40941603dd9db3ebd88c1e3b9f9d4e97e07"
+        },
+        {
+          "path": "typescript/framework/client/src/runtime/connect-transport.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "fa35345598aa30eabb91857f59be14d6d5e2199f37760e6bcac1f4f0ca0571cb"
+        }
+      ],
+      "owner": "@putnami/client",
+      "tests": ["typescript/framework/client/test/runtime/connect-transport.test.ts"],
+      "reason": "The Connect transport a generated binding dispatches to, including its unary and server-stream paths."
+    },
+    {
+      "runtime": "@putnami/client",
+      "status": "framework-runtime",
+      "adapter": "typescript/framework/client/src/runtime/credential.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/client/src/runtime/credential.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "5047ed1e7c9a1fc6b59964b3bc6c81451a6ef31874cef3bebda940a2050546b4"
+        },
+        {
+          "path": "typescript/framework/client/src/runtime/credential.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "dcc7bbb83c3d7689ee030071a11be55633d0ac97cbfab5e544dde1201a9bb242"
+        }
+      ],
+      "owner": "@putnami/client",
+      "tests": ["typescript/framework/client/test/runtime/credential-registry.test.ts"],
+      "reason": "Service-token acquisition and refresh for every generated binding. The token endpoint is the identity provider named by the binding, not a Putnami operation."
+    },
+    {
+      "runtime": "@putnami/client",
+      "status": "framework-runtime",
+      "adapter": "typescript/framework/client/src/runtime/http-transport.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/client/src/runtime/http-transport.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "522c66557c074d20519b5570fecd7e9cfd0fb27f878daae79a162297d561e756"
+        }
+      ],
+      "owner": "@putnami/client",
+      "tests": ["typescript/framework/client/test/runtime/http-transport.test.ts"],
+      "reason": "The unary REST transport a generated binding dispatches to."
+    },
+    {
+      "runtime": "@putnami/client",
+      "status": "framework-runtime",
+      "adapter": "typescript/framework/client/src/runtime/service-ws-transport.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/client/src/runtime/service-ws-transport.ts",
+          "transport": "websocket",
+          "symbol": "WebSocket",
+          "fingerprint": "f8e939c34e40cd0693d6fdf0a74fe370993714b146ad9555bcde44508554df85"
+        }
+      ],
+      "owner": "@putnami/client",
+      "tests": ["typescript/framework/client/test/runtime/service-ws-transport.test.ts"],
+      "reason": "The RFC 6455 socket a generated binding opens for server, client and bidirectional streams."
+    },
+    {
+      "runtime": "@putnami/client",
+      "status": "framework-runtime",
+      "adapter": "typescript/framework/client/src/runtime/spec-drift.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/client/src/runtime/spec-drift.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "203bc57697f69617890c83e0f83893086a773cbe8d3bdb17ba3e6f68a63e03c4"
+        }
+      ],
+      "owner": "@putnami/client",
+      "tests": ["typescript/framework/client/test/runtime/spec-drift.test.ts"],
+      "reason": "Reads the provider contract a generated binding was emitted from so a drifted deployment is refused at construction."
+    },
+    {
+      "runtime": "@putnami/client",
+      "status": "framework-runtime",
+      "adapter": "typescript/framework/client/src/runtime/sse-continuation.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/client/src/runtime/sse-continuation.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "eb1ec0d6cd701efd548be143fba96e5e28a73ef6ca74d1db4170d565f9eceba9"
+        }
+      ],
+      "owner": "@putnami/client",
+      "tests": ["typescript/framework/client/test/runtime/sse-continuation.test.ts"],
+      "reason": "The negotiated SSE wire (clientcontract ADR 0013) a generated binding dispatches to for a declared continuation; every reopening of the session is this callsite."
+    },
+    {
+      "runtime": "@putnami/client",
+      "status": "framework-runtime",
+      "adapter": "typescript/framework/client/src/runtime/sse-transport.ts",
+      "callsites": [
+        {
+          "path": "typescript/framework/client/src/runtime/sse-transport.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "a2872ae54bb2ffcad5dad3fb3835d489d6b948ea1be5f713fda103905b9cb61c"
+        }
+      ],
+      "owner": "@putnami/client",
+      "tests": ["typescript/framework/client/test/runtime/sse-transport.test.ts"],
+      "reason": "The SSE server-stream transport a generated binding dispatches to."
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/declarative-schema",
+      "type": "feature",
+      "name": "TypeScript declarative schema",
+      "outcome": "A TypeScript author declares one data shape and reuses it for configuration, request and response validation, and generated documentation, in both server and browser builds",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "required-and-default",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-missing-required-field-is-an-error", "a-default-fills-absence-and-is-present-in-output"]
+          }
+        },
+        {
+          "id": "type-enforcement",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-type-mismatch-is-a-field-level-error", "an-invalid-value-is-kept-as-authored-never-replaced"]
+          }
+        },
+        {
+          "id": "opt-in-coercion",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "enabled-coercion-converts-numeric-and-boolean-strings",
+              "an-uncoercible-string-is-still-a-type-mismatch",
+              "no-coercion-unless-enabled"
+            ]
+          }
+        },
+        {
+          "id": "nested-and-collections",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-wrong-container-type-is-rejected", "the-failing-path-is-reported"]
+          }
+        },
+        {
+          "id": "stateless-constraints",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["repeated-validation-yields-the-same-verdict", "a-constraint-never-mutates-caller-values"]
+          }
+        },
+        {
+          "id": "compiled-parity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "valid-input-agrees-inline",
+              "rejections-agree-and-delegate",
+              "defaults-agree",
+              "unsupported-cases-are-delegated"
+            ]
+          }
+        },
+        {
+          "id": "browser-safe-barrel",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-schema-vocabulary-is-browser-exported",
+              "no-server-only-utility-in-the-browser-barrel",
+              "shared-modules-import-no-node-builtin"
+            ]
+          }
+        },
+        {
+          "id": "hooks-are-opt-in",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["hooks-live-only-on-the-dedicated-subpath"]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fix"
+  short_description: "Resolve a task through the execute review loop"
+  default_prompt: "Use $fix to select this task and execute its implementation, independent review, repairs and verification."

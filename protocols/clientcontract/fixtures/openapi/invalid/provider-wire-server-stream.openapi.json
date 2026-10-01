@@ -1,0 +1,30 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "invalid", "version": "1" },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": { "id": "invalid", "audience": "urn:invalid" },
+    "credentials": {}
+  },
+  "paths": {
+    "/wire": {
+      "get": {
+        "operationId": "invalid.wire",
+        "responses": { "101": { "description": "Switching Protocols" } },
+        "x-putnami-client": {
+          "stream": "server",
+          "messages": { "output": { "type": "string" } },
+          "transports": [{
+            "protocol": "websocket",
+            "path": "/wire",
+            "encoding": "json",
+            "websocket": { "subprotocol": "acme.feed.v1", "resume": false, "wire": "provider" }
+          }],
+          "security": { "alternatives": [{ "allOf": [] }] },
+          "errors": [],
+          "idempotency": { "kind": "non-idempotent" }
+        }
+      }
+    }
+  }
+}

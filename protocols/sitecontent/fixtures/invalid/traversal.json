@@ -1,0 +1,17 @@
+{
+  "formatVersion": "1.0",
+  "name": "cloud-docs",
+  "mounts": [
+    { "urlPrefix": "/docs/cloud" }
+  ],
+  "source": {
+    "repo": "acme-platform",
+    "commit": "abc123"
+  },
+  "files": [
+    {
+      "path": "../secret.html",
+      "digest": "41b20806979a13f9037e99c61a755ce56f9dc5f3e1933605dc68b68170cb0a64"
+    }
+  ]
+}

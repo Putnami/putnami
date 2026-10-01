@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "python/experimental-workspace-integration",
+  "outcomes": [
+    "An experimenter can explicitly add the Python extension and run Python lint, test, serve, run, and dependency-install jobs through Putnami",
+    "Python dependency installation and upgrades remain scoped to explicitly configured Python workspace projects",
+    "Python integration remains usable for experiments without claiming stable compatibility, default adoption, or parity with Go or TypeScript"
+  ],
+  "nonGoals": [
+    "Providing a Python application framework or framework-package compatibility layer",
+    "Making Python a default workspace path",
+    "Providing feature, API, or operational parity with Go or TypeScript",
+    "Changing CLI extension discovery, workspace initialization, or upgrade orchestration"
+  ],
+  "requirements": [
+    {
+      "id": "explicit-opt-in",
+      "text": "Documentation and generated project manifests require an explicit Python extension selection; no Python template or sample is presented as the default project path."
+    },
+    {
+      "id": "workspace-scope",
+      "text": "Python workspace installation and upgrade jobs operate on the Python projects selected from the workspace and report a skipped or failed result instead of inventing a missing project."
+    },
+    {
+      "id": "native-tools",
+      "text": "The extension delegates Python dependency, lint, test, and workload execution to uv, Ruff, pytest, and the configured application entrypoint, exposing their result through Putnami jobs."
+    },
+    {
+      "id": "experimental-boundary",
+      "text": "The extension's support status is experimental, non-default, and unsupported for parity; upgrade documentation must not imply a supported Python framework release set."
+    }
+  ],
+  "decisions": [
+    "python/extension/doc/adr/0001-experimental-python-surface.md"
+  ]
+}

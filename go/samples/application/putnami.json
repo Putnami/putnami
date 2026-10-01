@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/examples/application",
+  "tags": ["sample", "e2e"],
+  "extensions": ["/go/extension"],
+  "dependencies": ["/go/samples/library"],
+  "options": {
+    "package": {
+      "docker": true
+    },
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    },
+    "publish": {
+      "archives": false,
+      "docker": true
+    }
+  }
+}

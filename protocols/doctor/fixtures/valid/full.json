@@ -1,0 +1,56 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-doctor.json",
+  "protocolVersion": 1,
+  "profile": "production",
+  "findings": [
+    {
+      "code": "doctor.ephemeral_signing_key",
+      "severity": "critical",
+      "profile": "production",
+      "project": "go.putnami.dev/example/iam",
+      "message": "the auth signing key is generated in-process and will not survive a restart",
+      "evidence": [
+        {
+          "path": "example/iam/auth.go",
+          "field": "security.jwt.signingKey"
+        }
+      ],
+      "remediation": "Configure a persistent, externally managed signing key instead of a process-generated ephemeral key so issued tokens survive a restart."
+    },
+    {
+      "code": "doctor.volatile_persistence",
+      "severity": "high",
+      "profile": "production",
+      "project": "go.putnami.dev/example/iam",
+      "message": "datasource \"default\" is bound to an in-memory store",
+      "evidence": [
+        {
+          "path": "example/iam/config.yaml",
+          "field": "database.default.driver"
+        }
+      ],
+      "remediation": "Bind the datasource to a durable, provisioned store instead of an in-memory or ephemeral one before promoting to production.",
+      "waivedBy": {
+        "owner": "platform-team",
+        "reason": "staging bake still uses the in-memory store; tracked in PUT-1234",
+        "expires": "2027-06-30"
+      }
+    },
+    {
+      "code": "doctor.insecure_transport",
+      "severity": "warning",
+      "profile": "production",
+      "project": "go.putnami.dev/example/gateway",
+      "message": "the metrics endpoint is served over plaintext HTTP",
+      "remediation": "Require TLS/HTTPS for this endpoint; plaintext transport is not allowed under the production profile."
+    }
+  ],
+  "summary": {
+    "findings": 3,
+    "info": 0,
+    "warning": 1,
+    "high": 1,
+    "critical": 1,
+    "waived": 1
+  }
+}

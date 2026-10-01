@@ -1,0 +1,4 @@
+{
+  "module": "go.putnami.dev/protocol/distribution",
+  "visibility": "public"
+}

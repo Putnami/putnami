@@ -1,0 +1,153 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/http-services",
+      "type": "feature",
+      "name": "Go HTTP services",
+      "outcome": "Go services route HTTP requests through an ordered middleware chain with per-request dependency scopes, bounded streams, and a graceful shutdown",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "streamed-responses",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-streamed-response-is-copied-without-buffering-and-closed-on-success-or-failure"]
+          }
+        },
+        {
+          "id": "bounded-streams",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "sse-writes-are-deadline-bounded",
+              "websocket-idle-timeout-drops-the-connection",
+              "websocket-read-loop-unblocks-on-cancellation"
+            ]
+          }
+        },
+        {
+          "id": "graceful-shutdown",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "default-tags-match-the-resolved-defaults",
+              "shutdown-timeout-resolves-zero-explicit-and-negative",
+              "stop-announces-the-drain-to-hijacked-connections",
+              "stop-drains-in-flight-requests-with-an-unset-timeout"
+            ]
+          }
+        },
+        {
+          "id": "method-fallbacks",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "head-falls-back-to-the-get-handler",
+              "options-fallback-answers-a-known-path",
+              "options-preflight-passes-through-the-middleware-chain"
+            ]
+          }
+        },
+        {
+          "id": "middleware-order",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "middleware-is-composed-once-not-per-request",
+              "middleware-runs-in-registration-order",
+              "middleware-that-skips-next-short-circuits"
+            ]
+          }
+        },
+        {
+          "id": "readiness-marker",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "listening-log-carries-the-readiness-marker",
+              "readiness-degrades-to-a-workload-claim",
+              "readiness-marker-is-canonical"
+            ]
+          }
+        },
+        {
+          "id": "request-scope",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "failed-commit-downgrades-to-a-sanitized-500",
+              "scope-commits-on-client-error",
+              "scope-commits-on-success",
+              "scope-rolls-back-on-panic",
+              "scope-rolls-back-on-server-error",
+              "scope-rolls-back-under-recovery-middleware"
+            ]
+          }
+        },
+        {
+          "id": "routing",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "catch-all-captures-joined-segments",
+              "catch-all-may-precede-a-literal-suffix",
+              "catch-all-requires-at-least-one-segment",
+              "duplicate-method-and-pattern-fails-registration",
+              "single-segment-param-never-matches-a-slash"
+            ]
+          }
+        },
+        {
+          "id": "websocket-framing",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-close-reason-stays-inside-the-control-frame-bound",
+              "a-ping-is-answered-and-a-peer-close-is-reported",
+              "an-unspeakable-subprotocol-refuses-the-upgrade",
+              "continuation-frames-are-reassembled-under-the-body-bound",
+              "framing-the-protocol-forbids-is-refused-with-its-close-code",
+              "only-an-offered-subprotocol-is-echoed",
+              "the-accept-token-matches-the-published-rfc-vector"
+            ]
+          }
+        },
+        {
+          "id": "upgrade-admitted-wires",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-chain-runs-on-the-upgrade-request",
+              "the-route-speaks-exactly-its-declared-token",
+              "a-binary-message-is-written-under-the-message-bound"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

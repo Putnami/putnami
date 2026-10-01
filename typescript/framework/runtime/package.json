@@ -1,0 +1,49 @@
+{
+  "name": "@putnami/runtime",
+  "version": "0.0.0",
+  "description": "Core utilities for dependency injection, context management, HTTP handling, and validation",
+  "keywords": [
+    "dependency-injection",
+    "configuration",
+    "validation",
+    "runtime",
+    "di"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/runtime"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "browser": "./src/index.browser.ts",
+      "default": "./src/index.ts"
+    },
+    "./inject": {
+      "default": "./src/inject/index.ts"
+    },
+    "./jobs": {
+      "default": "./src/jobs/index.ts"
+    },
+    "./robustio": {
+      "default": "./src/robustio/index.ts"
+    },
+    "./testing": {
+      "default": "./src/testing/index.ts"
+    },
+    "./spectest": {
+      "default": "./src/spectest/index.ts"
+    }
+  },
+  "dependencies": {
+    "@putnami/utils": "workspace:*",
+    "@putnami/spectest": "workspace:*"
+  },
+  "private": false
+}

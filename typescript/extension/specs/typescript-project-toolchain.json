@@ -1,0 +1,139 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/typescript-project-toolchain",
+  "outcomes": [
+    "A TypeScript project builds, type-checks, tests, lints, serves and packages without a per-project bundler, runner or formatter configuration",
+    "Building many projects in one invocation produces exactly what building each of them alone produces, and one project's failure does not change another project's output",
+    "A workspace pins one version per shared dependency, and a freshly scaffolded project installs against that pin without editing the workspace root by hand",
+    "An npm tarball or Docker image loads under the same loader rules the workspace used, so a packaged project does not fail at import time in a consumer's runtime"
+  ],
+  "nonGoals": [
+    "Replacing Bun or Biome with a configurable toolchain choice, or exposing their configuration surface as Putnami configuration",
+    "Owning application framework behaviour — routing, rendering, persistence and DI belong to the @putnami/* packages this extension builds",
+    "Publishing to a registry: package prepares the tarball or image and records channels, publish uploads them",
+    "Promising compatibility across every pre-1.0 minor release, which RELEASE.md governs"
+  ],
+  "requirements": [
+    {
+      "id": "phase-isolation",
+      "text": "Build runs as independently cached phases — generate, transpile and types, plus compile — and each project in a batched phase writes only into its own output directory, including the type-checker's incremental build-info state."
+    },
+    {
+      "id": "batch-equals-solo",
+      "text": "A batched phase produces the same per-project artifacts as running that phase for one project alone."
+    },
+    {
+      "id": "batch-failure-isolation",
+      "text": "When one project in a batch fails, the failure is attributed to that project and the sibling projects' outputs are still produced; a generate failure always emits a diagnostic rather than an empty non-zero result."
+    },
+    {
+      "id": "deterministic-content-identity",
+      "text": "A project's build content hash is a deterministic function of its inputs, so an unchanged project produces an unchanged identity."
+    },
+    {
+      "id": "catalog-seeding",
+      "text": "Workspace install seeds a catalog entry for every @putnami/* dependency a member references through the catalog: protocol and that the referenced catalog is missing, selects the named catalog when one was requested, leaves existing entries alone, and preserves the root manifest's top-level key order."
+    },
+    {
+      "id": "serve-entrypoint",
+      "text": "Serve resolves its entrypoint from the project's \"./serve\" export unless one is passed explicitly, and reports a user-facing error when no package manifest or no such export exists instead of guessing a file."
+    },
+    {
+      "id": "serve-supervision",
+      "text": "A served or run child process forwards its own exit code; an interrupt terminates the whole child process group and reports 130, escalating to SIGKILL when the group does not exit within the grace period."
+    },
+    {
+      "id": "environment-independent-library-output",
+      "text": "Transpiled library output does not depend on the builder's environment: JSX compiles to the production automatic runtime (react/jsx-runtime) whatever NODE_ENV or bunfig.toml the builder has, and process.env reads, NODE_ENV included, stay runtime reads for the consumer."
+    },
+    {
+      "id": "packaged-loadability",
+      "text": "A staged npm package loads under the loader rules of the CLI contract it claims: a manifest claiming a contract newer than the packager's is rejected, a stale lower claim is ratcheted to the earned one, and an unloadable hook-only manifest fails packaging."
+    },
+    {
+      "id": "npm-agent-content",
+      "text": "An npm package whose extension manifest declares agent content carries the tree built from its authored source under the package's name and version, bound by the digest the packaged manifest declares and stamped with the agent-content contract; a manifest without agent content keeps the base contract. A files allowlist that would drop the content, content the policy forbids, and a content path the package already holds fail packaging."
+    },
+    {
+      "id": "package-channel-index",
+      "text": "Packaging records the channel it produced inside the output directory it owns, never at the package root; the index is derived over every owned record, sibling packagers record independently, and a channel is never recorded twice."
+    },
+    {
+      "id": "declared-assets-must-exist",
+      "text": "A project that declares public assets fails packaging loudly when those assets are absent, rather than producing an image that 404s at runtime."
+    },
+    {
+      "id": "lint-covers-the-project",
+      "text": "The lint command and its tasks cover every project file Biome can rewrite and never read or rewrite a file under a nested project root (a subdirectory with its own putnami.json, outside a symbolic link and the directories the cache key skips), resolve the workspace configuration from the config root while keeping an external configuration anchored at the project root, and bind the scheduler's CPU budget without overriding an explicit thread setting."
+    },
+    {
+      "id": "workspace-biome-default",
+      "text": "Workspace dependency installation materializes the Biome rules owned by the resolved TypeScript extension with the workspace-root role when the workspace has no configuration, preserves an existing workspace configuration byte-for-byte, and fails explicitly when the extension default cannot be read or parsed."
+    },
+    {
+      "id": "workspace-bun-pin",
+      "text": "Workspace install declares the bun it installs with as the root package.json packageManager, bun@<version>, when that manifest exists and declares none, so the lock written after the installers pins the bun the task runtime probes. It keeps an existing declaration and the manifest's key order, creates no manifest, and declares no bun whose version is not a plain release."
+    },
+    {
+      "id": "workspace-install-lists-the-members",
+      "text": "Workspace install writes the root package.json workspaces from the complete workspace membership in the job context, with the workspace-sync task's code, before it seeds the catalog and runs bun install, so a project created after the last projects sync is installed. It writes the list projects sync writes, leaves an unchanged list and a context without the membership untouched, and fails before bun runs when it cannot read or write the list."
+    },
+    {
+      "id": "hosted-install-fetches-first",
+      "text": "On a hosted run, workspace-fetch reads the handed credential before it starts a process and downloads what the committed bun.lock names into bun's cache from a scratch copy, running no package script, with the bearer only in a private .npmrc it removes. workspace-install then installs frozen from that cache and writes no credential. Both read the committed manifests unshaped; without a committed bun.lock the fetch fails, and neither job rewrites the lock or .npmrc."
+    },
+    {
+      "id": "hook-order-determinism",
+      "text": "Build hooks contributed by dependencies are discovered and invoked in a deterministic order: ranked manifests first, remaining manifests in a stable order, and invocation follows discovery."
+    },
+    {
+      "id": "structured-reports",
+      "text": "Test and coverage results are parsed into structured per-file and per-project reports, uncovered project sources are counted, external dependencies are excluded, and a missing report file is an empty result rather than a crash."
+    },
+    {
+      "id": "bounded-test-output",
+      "text": "Test runs emit one deterministic structured outcome summary by default, retain the complete transcript as session-detail log events, bound causal failure diagnostics to the CLI report limits with explicit omission accounting, and let test-verbose change visibility without changing the Bun invocation, result data or verdicts."
+    },
+    {
+      "id": "runtime-manifest-parity",
+      "text": "The runtime manifest a locally-prepared extension serves and the one a packaged archive ships describe the same runtime, so an installed extension behaves as the workspace one did."
+    },
+    {
+      "id": "npm-ecosystem-profile",
+      "text": "The extension owns the npm ecosystem profile and uses the oci profile; a project yields an npm member only for declared package publication intent and an oci member only for declared image publication intent, with the exact package and publish steps recorded so malformed packaging is diagnosed instead of silently hiding a requested artifact. OCI coordinates retain the native repository namespace from the effective workspace or project registry entry, excluding only the host."
+    },
+    {
+      "id": "registries-drive-npmrc",
+      "text": "The workspace registries entry for npm drives the scope lines written to .npmrc and the publish registry; no registry URL is hard-coded."
+    },
+    {
+      "id": "member-event-per-publication",
+      "text": "Every npm publication, new or reused, reports one published member with its verified digest and writes no dist-tag."
+    },
+    {
+      "id": "upgrade-table-shows-source-revision",
+      "text": "The upgrade table shows, for every resolved version, the source revision carried by its suffix."
+    },
+    {
+      "id": "resolved-dependency-documentation",
+      "text": "The putnami.typescript_docs MCP tool returns AI.md only from the exact npm package found by the requested project's nearest-node_modules resolution, with the installed package name, version, source kind, path and content digest. Resolution is bounded, offline and read-only; missing installed bytes, missing docs, ambiguous projects and escaping symlinks produce an explicit unavailable result rather than consulting a registry or substituting extension-carried documentation."
+    },
+    {
+      "id": "committed-client-drift",
+      "text": "The generated TypeScript client build-generate emits into the project tree is committed, and build-generate is its first writer in a session; its declared client output carries drift: fail, so the engine compares what the task writes (or a cache hit restores) with the bytes present before and fails the task with generated-output-drift when they differ, leaving the regenerated client in the worktree to commit. Build-time generation under .gen carries no policy."
+    },
+    {
+      "id": "committed-openapi-drift",
+      "text": "The OpenAPI contract build-generate writes to schema/openapi.json is committed, and build-generate is its first writer in a session; its declared openapi output carries drift: fail, so a committed contract that differs from the one openapi() regenerates fails the task with generated-output-drift, leaving the regenerated contract in the worktree to commit."
+    }
+  ],
+  "decisions": [
+    "typescript/extension/doc/adr/0001-batched-phases-must-equal-solo-runs.md",
+    "typescript/extension/doc/adr/0002-one-workspace-catalog-owns-shared-versions.md",
+    "typescript/extension/doc/adr/0003-a-package-must-load-before-it-ships.md",
+    "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
+    "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",
+    "protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md"
+  ]
+}

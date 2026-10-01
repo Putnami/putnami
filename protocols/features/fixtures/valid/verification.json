@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature-verification.json",
+  "protocolVersion": 1,
+  "observations": [
+    {
+      "feature": "billing/invoice-export",
+      "requirement": "export-format",
+      "check": "export-states-content-type",
+      "status": "passed",
+      "provenance": { "path": "export_test.go", "symbol": "TestExportStatesContentType" }
+    },
+    {
+      "feature": "billing/invoice-export",
+      "requirement": "export-format",
+      "check": "export-never-guesses-from-filename",
+      "status": "skipped",
+      "provenance": { "path": "export_test.go", "symbol": "TestExportNeverGuessesFromFilename" }
+    }
+  ]
+}

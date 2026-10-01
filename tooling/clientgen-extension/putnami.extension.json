@@ -1,0 +1,210 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "cliContract": 4,
+  "name": "@putnami/clientgen",
+  "runtime": {
+    "executable": "compiled/putnami-clientgen",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          { "from": "environment", "environment": "GOROOT", "path": "bin/go" },
+          { "from": "path", "path": "go" },
+          { "from": "putnami-home", "path": "toolchains/go/go-{version}/go/bin/go" }
+        ],
+        "probe": {
+          "args": ["env", "GOVERSION"],
+          "expect": "go{version}",
+          "unset": ["GOROOT"],
+          "environment": { "GOTOOLCHAIN": "local" }
+        },
+        "environment": {
+          "GOROOT": { "from": "ancestor", "levels": 2 },
+          "GOTOOLCHAIN": { "from": "literal", "value": "local" }
+        },
+        "prependPath": true
+      },
+      "typescriptEmitter": {
+        "lock": "bun",
+        "optional": true,
+        "candidates": [
+          { "from": "path", "path": "bun" },
+          { "from": "environment", "environment": "BUN_INSTALL", "path": "bin/bun" },
+          { "from": "home", "path": ".bun/bin/bun" }
+        ],
+        "probe": { "args": ["--version"], "expect": "{version}" },
+        "environment": {
+          "BUN_INSTALL": { "from": "ancestor", "levels": 2 },
+          "PUTNAMI_CLIENTGEN_TYPESCRIPT_RUNTIME": { "from": "executable" }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": ["--output", "{runtimeOutput}"],
+      "inputs": ["bin/prepare", "cmd/**", "go.mod", "go.sum", "internal/**", "tools.go"],
+      "toolchains": ["runtimeCompiler"]
+    }
+  },
+  "commands": {
+    "clientgen": {
+      "description": "Generate strict first-party Go and TypeScript clients from a provider's built contract.",
+      "dependsOn": ["build"],
+      "run": [
+        { "id": "generate-go", "task": "clientgen-go" },
+        { "id": "generate-ts", "task": "clientgen-ts" }
+      ]
+    },
+    "clientgen-sync": {
+      "description": "Discover, regenerate, synchronize and measure every first-party client in the workspace.",
+      "activation": "workspace-once",
+      "run": [{ "id": "sync", "task": "clientgen-workspace-sync" }]
+    },
+    "clientgen-adopt": {
+      "description": "Synchronizes generated clients and rewrites the binding package and constructor moves a generated manifest proves; other changes stay in the adaptation queue.",
+      "activation": "workspace-once",
+      "run": [{ "id": "adopt", "task": "clientgen-workspace-adopt" }]
+    },
+    "clientgen-check": {
+      "description": "Fail on generated-client drift, incomplete coverage, forged artifacts or handwritten first-party transports.",
+      "activation": "workspace-once",
+      "run": [{ "id": "check", "task": "clientgen-workspace-check" }]
+    },
+    "validate": {
+      "description": "Reject new handwritten first-party transports and inconsistent committed clients for the whole workspace, once per session, after every selected provider has regenerated its targets in place. The !clientgen barrier plans the clientgen command for the selected projects — nothing on a consumer-only selection — so drift in a selected provider is judged by the engine on the generator tasks' declared outputs, and this guard reads committed inputs only.",
+      "activation": "workspace-once",
+      "dependsOn": ["!clientgen"],
+      "run": [{ "id": "clientgen-guard", "task": "clientgen-workspace-check" }]
+    }
+  },
+  "tasks": {
+    "clientgen-go": {
+      "description": "Emit the configured Go target and report its dynamic output directory for exact cache ownership.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["generate-go"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "outputs": {
+        "goClientOutput": {
+          "description": "Project-relative generated Go client directory, absent when the Go target is disabled."
+        }
+      },
+      "reads": ["gen", "sources"],
+      "writes": ["clients-go"],
+      "cache": {
+        "enabled": true,
+        "deterministic": true,
+        "key": {
+          "files": [
+            ".gen/clientgen/config.json",
+            ".gen/schema/openapi.json",
+            ".gen/schema/openapi.json.gz",
+            "go.mod",
+            "schema/openapi.json"
+          ]
+        }
+      },
+      "declares": {
+        "outputs": {
+          "client": {
+            "kind": "directory",
+            "pathFrom": "goClientOutput",
+            "optionalEmpty": true,
+            "preserves": [".gen", "go.mod", "go.sum", "putnami.json"],
+            "drift": "fail",
+            "description": "The complete generated Go target selected by .gen/clientgen/config.json. It is committed, so the engine compares what this task writes (or a cache hit restores) with the bytes present before, and fails the task on a difference: the worktree then holds the regenerated client to commit (protocols/extension ADR 0004). The project document and module files a workspace commits inside the directory are preserved: never captured, restored over, or judged (protocols/extension ADR 0005). The client project's own .gen directory, which the engine and that project's tasks write, is preserved the same way."
+          }
+        }
+      }
+    },
+    "clientgen-ts": {
+      "description": "Emit the configured TypeScript target and report its dynamic output directory for exact cache ownership.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": ["typescriptEmitter"],
+      "args": ["generate-ts"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "outputs": {
+        "typescriptClientOutput": {
+          "description": "Project-relative generated TypeScript client directory, absent when the TypeScript target is disabled."
+        }
+      },
+      "reads": ["gen", "sources"],
+      "writes": ["clients-ts"],
+      "cache": {
+        "enabled": true,
+        "deterministic": true,
+        "key": {
+          "files": [
+            ".editorconfig",
+            ".gen/clientgen/config.json",
+            ".gen/schema/openapi.json",
+            ".gen/schema/openapi.json.gz",
+            "biome.json",
+            "package.json",
+            "schema/openapi.json"
+          ],
+          "workspaceFiles": [".editorconfig", "biome.json", "tsconfig.base.json"]
+        }
+      },
+      "declares": {
+        "outputs": {
+          "client": {
+            "kind": "directory",
+            "pathFrom": "typescriptClientOutput",
+            "optionalEmpty": true,
+            "preserves": [".gen", "node_modules", "putnami.json"],
+            "drift": "fail",
+            "description": "The complete generated TypeScript target selected by .gen/clientgen/config.json. It is committed, so the engine compares what this task writes (or a cache hit restores) with the bytes present before, and fails the task on a difference: the worktree then holds the regenerated client to commit (protocols/extension ADR 0004). The project document a workspace commits inside the directory, and the dependency install the workspace materializes there when the client is a package of its own, are preserved: never captured, restored over, or judged (protocols/extension ADR 0005). Without the install carve-out the capture walked into node_modules, failed on its first symlinked directory, and cached nothing. The client project's own .gen directory, which the engine and that project's tasks write, is preserved the same way."
+          }
+        },
+        "effects": ["toolchain-cache"]
+      }
+    },
+    "clientgen-workspace-sync": {
+      "description": "Regenerate every marked provider target without cache reuse, then verify and report complete workspace coverage.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": ["typescriptEmitter"],
+      "args": ["workspace-sync"],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 900000,
+      "reads": [{ "id": "workspace-sources", "scope": "workspace" }],
+      "writes": [{ "id": "workspace-clients", "scope": "workspace" }],
+      "cache": { "enabled": false },
+      "declares": {
+        "effects": ["network", "toolchain-cache"]
+      }
+    },
+    "clientgen-workspace-check": {
+      "description": "Judge every committed generated client against its committed manifest and the committed provider contract (hashes, coverage, forged markers), validate the two inventories, and scan all consumer sources for handwritten first-party transports. It builds nothing, renders nothing and spawns no Putnami: whether a committed client is what the current contract generates is the generator task's own verdict (declared-output drift), so this check reads committed inputs only and its verdict is the same on a cold clone and on a tree the session just built.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["workspace-check"],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 900000,
+      "reads": [{ "id": "workspace-sources", "scope": "workspace" }],
+      "cache": { "enabled": false },
+      "declares": {}
+    },
+    "clientgen-workspace-adopt": {
+      "description": "Regenerate every marked provider target, then rewrite the authored imports and binding constructions two real emitter manifests prove, and report what stays in the manual queue.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "toolchains": ["typescriptEmitter"],
+      "args": ["workspace-adopt"],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 900000,
+      "reads": [{ "id": "workspace-sources", "scope": "workspace" }],
+      "writes": [
+        { "id": "workspace-clients", "scope": "workspace" },
+        { "id": "workspace-authored-sources", "scope": "workspace" }
+      ],
+      "cache": { "enabled": false },
+      "declares": { "effects": ["network", "toolchain-cache", "workspace-files"] }
+    }
+  }
+}

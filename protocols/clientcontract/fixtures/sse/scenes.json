@@ -1,0 +1,337 @@
+{
+  "description": "Reader scenes for one SSE connection (ADR 0013). A scene names the operation's declared continuation, whether the runtime requested the negotiated wire, the response's X-Putnami-Stream-Wire field lines, the original query, the body chunks and how the transport ended (close: clean end of body; reset: connection error). expect names the outcome, the messages delivered in order, the position of the last delivered message (cursor mode on the negotiated wire only), the typed error, and for an interruption the query the reopened connection sends. Outcomes: complete, error, interrupted (the negotiated wire ended before a terminal: the one outcome a continuation may follow), contract-error and transport-error (legacy framing only). An interruption reopens only when reconnect is effective and the session budgets allow it; the scene states the request, not that policy.",
+  "maxFrameBytes": 4096,
+  "continuations": {
+    "cursor": { "mode": "cursor", "cursor": { "outputField": "cursor", "queryParameter": "cursor" } },
+    "best-effort": { "mode": "best-effort" }
+  },
+  "scenes": [
+    {
+      "name": "a negotiated stream ends with the explicit terminal, which delivers no value",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "body": [
+        "data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n",
+        ": heartbeat\n\n",
+        "data: {\"cursor\":\"c2\",\"line\":\"b\"}\n\n",
+        "event: complete\ndata: {}\n\n"
+      ],
+      "end": "close",
+      "expect": {
+        "outcome": "complete",
+        "messages": [{ "cursor": "c1", "line": "a" }, { "cursor": "c2", "line": "b" }],
+        "deliveredCursor": "c2"
+      }
+    },
+    {
+      "name": "a reader stops at the terminal",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "body": [
+        "data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\nevent: complete\ndata: {}\n\n",
+        "data: {\"cursor\":\"c2\",\"line\":\"b\"}\n\n"
+      ],
+      "end": "close",
+      "expect": {
+        "outcome": "complete",
+        "messages": [{ "cursor": "c1", "line": "a" }],
+        "deliveredCursor": "c1"
+      }
+    },
+    {
+      "name": "a clean close before the terminal is an interruption that reopens after the delivered cursor",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": { "selector": ["svc=api"], "cursor": ["c0"] },
+      "body": [
+        "data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n",
+        "data: {\"cursor\":\"c2\",\"line\":\"b\"}\n\n"
+      ],
+      "end": "close",
+      "expect": {
+        "outcome": "interrupted",
+        "messages": [{ "cursor": "c1", "line": "a" }, { "cursor": "c2", "line": "b" }],
+        "deliveredCursor": "c2",
+        "reopen": { "query": { "selector": ["svc=api"], "cursor": ["c2"] } }
+      }
+    },
+    {
+      "name": "a truncated event is discarded and recovered from the delivered cursor",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": { "selector": ["svc=api"] },
+      "body": [
+        "data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n",
+        "data: {\"cursor\":\"c2\",\"li"
+      ],
+      "end": "close",
+      "expect": {
+        "outcome": "interrupted",
+        "messages": [{ "cursor": "c1", "line": "a" }],
+        "deliveredCursor": "c1",
+        "reopen": { "query": { "selector": ["svc=api"], "cursor": ["c1"] } }
+      }
+    },
+    {
+      "name": "a connection reset is an interruption",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "body": ["data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n"],
+      "end": "reset",
+      "expect": {
+        "outcome": "interrupted",
+        "messages": [{ "cursor": "c1", "line": "a" }],
+        "deliveredCursor": "c1",
+        "reopen": { "query": { "cursor": ["c1"] } }
+      }
+    },
+    {
+      "name": "an interruption before any delivery keeps the original selector and initial cursor",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": { "selector": ["svc=api"], "cursor": ["c0"] },
+      "body": [": heartbeat\n\n"],
+      "end": "close",
+      "expect": {
+        "outcome": "interrupted",
+        "messages": [],
+        "deliveredCursor": null,
+        "reopen": { "query": { "selector": ["svc=api"], "cursor": ["c0"] } }
+      }
+    },
+    {
+      "name": "best-effort reopens the original selector and never synthesizes a position",
+      "continuation": "best-effort",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": { "selector": ["svc=api"] },
+      "body": ["data: {\"service\":\"api\",\"line\":\"a\"}\n\n"],
+      "end": "close",
+      "expect": {
+        "outcome": "interrupted",
+        "messages": [{ "service": "api", "line": "a" }],
+        "deliveredCursor": null,
+        "reopen": { "query": { "selector": ["svc=api"] } }
+      }
+    },
+    {
+      "name": "a typed error is a terminal on the negotiated wire",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "body": [
+        "data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n",
+        "event: error\ndata: {\"status\":404,\"code\":\"not_found\",\"error\":\"Not Found\",\"message\":\"run not found\"}\n\n"
+      ],
+      "end": "close",
+      "expect": {
+        "outcome": "error",
+        "messages": [{ "cursor": "c1", "line": "a" }],
+        "deliveredCursor": "c1",
+        "error": { "status": 404, "code": "not_found" }
+      }
+    },
+    {
+      "name": "a complete event with another payload is a contract error",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "body": ["event: complete\ndata: {\"done\":true}\n\n"],
+      "end": "close",
+      "expect": { "outcome": "contract-error", "messages": [], "deliveredCursor": null }
+    },
+    {
+      "name": "a complete event without data is a contract error, never an interruption",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "body": ["event: complete\n\n"],
+      "end": "close",
+      "expect": { "outcome": "contract-error", "messages": [], "deliveredCursor": null }
+    },
+    {
+      "name": "an event type outside the negotiated vocabulary is a contract error",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "body": ["event: progress\ndata: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n"],
+      "end": "close",
+      "expect": { "outcome": "contract-error", "messages": [], "deliveredCursor": null }
+    },
+    {
+      "name": "the explicit default event type carries a message",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "body": [
+        "event: message\ndata: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n",
+        "event: complete\ndata: {}\n\n"
+      ],
+      "end": "close",
+      "expect": {
+        "outcome": "complete",
+        "messages": [{ "cursor": "c1", "line": "a" }],
+        "deliveredCursor": "c1"
+      }
+    },
+    {
+      "name": "a message without its cursor is a contract error",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "body": [
+        "data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n",
+        "data: {\"line\":\"b\"}\n\n"
+      ],
+      "end": "close",
+      "expect": {
+        "outcome": "contract-error",
+        "messages": [{ "cursor": "c1", "line": "a" }],
+        "deliveredCursor": "c1"
+      }
+    },
+    {
+      "name": "a cursor that is not a string is a contract error",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "body": ["data: {\"cursor\":7,\"line\":\"a\"}\n\n"],
+      "end": "close",
+      "expect": { "outcome": "contract-error", "messages": [], "deliveredCursor": null }
+    },
+    {
+      "name": "an empty cursor is a contract error",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "body": ["data: {\"cursor\":\"\",\"line\":\"a\"}\n\n"],
+      "end": "close",
+      "expect": { "outcome": "contract-error", "messages": [], "deliveredCursor": null }
+    },
+    {
+      "name": "an oversize event is a contract error, never an interruption",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "maxFrameBytes": 32,
+      "body": ["data: {\"cursor\":\"c1\",\"line\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}\n\n"],
+      "end": "close",
+      "expect": { "outcome": "contract-error", "messages": [], "deliveredCursor": null }
+    },
+    {
+      "name": "a new runtime refuses a provider that does not acknowledge the wire",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": [],
+      "query": {},
+      "body": [
+        "data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n",
+        "data: {\"cursor\":\"c2\",\"line\":\"b\"}\n\n"
+      ],
+      "end": "close",
+      "expect": { "outcome": "contract-error", "messages": [], "deliveredCursor": null }
+    },
+    {
+      "name": "a new runtime refuses another wire version",
+      "continuation": "cursor",
+      "requested": true,
+      "acknowledgment": ["putnami.sse.v2"],
+      "query": {},
+      "body": ["data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n", "event: complete\ndata: {}\n\n"],
+      "end": "close",
+      "expect": { "outcome": "contract-error", "messages": [], "deliveredCursor": null }
+    },
+    {
+      "name": "an old runtime reads the legacy framing to its end",
+      "continuation": "cursor",
+      "requested": false,
+      "acknowledgment": [],
+      "query": {},
+      "body": [
+        "data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n",
+        "data: {\"cursor\":\"c2\",\"line\":\"b\"}\n\n"
+      ],
+      "end": "close",
+      "expect": {
+        "outcome": "complete",
+        "messages": [{ "cursor": "c1", "line": "a" }, { "cursor": "c2", "line": "b" }],
+        "deliveredCursor": null
+      }
+    },
+    {
+      "name": "a legacy reset is a transport error",
+      "continuation": "cursor",
+      "requested": false,
+      "acknowledgment": [],
+      "query": {},
+      "body": ["data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n"],
+      "end": "reset",
+      "expect": {
+        "outcome": "transport-error",
+        "messages": [{ "cursor": "c1", "line": "a" }],
+        "deliveredCursor": null
+      }
+    },
+    {
+      "name": "a legacy incomplete event is a contract error",
+      "continuation": "cursor",
+      "requested": false,
+      "acknowledgment": [],
+      "query": {},
+      "body": ["data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n", "data: {\"cursor\":\"c2\""],
+      "end": "close",
+      "expect": {
+        "outcome": "contract-error",
+        "messages": [{ "cursor": "c1", "line": "a" }],
+        "deliveredCursor": null
+      }
+    },
+    {
+      "name": "a legacy typed error stays a terminal",
+      "continuation": "cursor",
+      "requested": false,
+      "acknowledgment": [],
+      "query": {},
+      "body": ["event: error\ndata: {\"status\":403,\"code\":\"forbidden\",\"error\":\"Forbidden\",\"message\":\"denied\"}\n\n"],
+      "end": "close",
+      "expect": {
+        "outcome": "error",
+        "messages": [],
+        "deliveredCursor": null,
+        "error": { "status": 403, "code": "forbidden" }
+      }
+    },
+    {
+      "name": "a runtime that did not ask ignores an acknowledgment",
+      "continuation": "cursor",
+      "requested": false,
+      "acknowledgment": ["putnami.sse.v1"],
+      "query": {},
+      "body": ["data: {\"cursor\":\"c1\",\"line\":\"a\"}\n\n"],
+      "end": "close",
+      "expect": {
+        "outcome": "complete",
+        "messages": [{ "cursor": "c1", "line": "a" }],
+        "deliveredCursor": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/example-missing-command",
+  "commandGroups": {
+    "cloud": {
+      "subcommands": {
+        "status": {
+          "command": "cloud-status",
+          "examples": [
+            { "description": "missing the required command line" }
+          ]
+        }
+      }
+    }
+  },
+  "commands": {
+    "cloud-status": {
+      "run": [{ "id": "status", "task": "status-exec" }]
+    }
+  },
+  "tasks": {
+    "status-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["status"]
+    }
+  }
+}

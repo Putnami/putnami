@@ -1,0 +1,5 @@
+{
+  "appName": "task-api",
+  "environment": "production",
+  "path": "server"
+}

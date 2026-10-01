@@ -1,0 +1,35 @@
+{
+  "name": "@putnami/cloud",
+  "tools": {
+    "putnami.search": {
+      "description": "Search the hosted workspace intelligence index.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        }
+      },
+      "command": "{extensionRoot}/bin/acme-tool",
+      "args": ["mcp-tool"],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 30000
+    }
+  }
+}

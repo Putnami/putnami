@@ -1,0 +1,29 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "features diff",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "added": [],
+    "base": {
+      "commit": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08",
+      "kind": "git"
+    },
+    "baseDiagnostics": [],
+    "compatibility": "provisional",
+    "contradicted": [],
+    "head": {
+      "commit": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08",
+      "kind": "git"
+    },
+    "headDiagnostics": [],
+    "newlyUnclassified": [],
+    "promoted": [],
+    "regressed": [],
+    "removed": [],
+    "stale": []
+  }
+}
+--- stderr ---

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/typed-configuration",
+  "outcomes": [
+    "A workload declares a configuration block once and reads it as a validated, typed value",
+    "The same declaration behaves identically in every environment because precedence between sources is fixed",
+    "A secret is declared beside the value it protects and never appears in a log, an error, a description, or a committed manifest",
+    "A browser build reads the same declaration without pretending it has server configuration sources"
+  ],
+  "nonGoals": [
+    "Reloading configuration in a running process when a file or environment variable changes",
+    "Storing, distributing, or rotating secret values",
+    "Promising that a pre-1.0 minor release keeps the previous precedence order"
+  ],
+  "requirements": [
+    {
+      "id": "source-precedence",
+      "text": "Configuration sources merge from lowest to highest as base file, environment file, build-merged file, local secrets file, registered extension sources, then CONFIG_DATA."
+    },
+    {
+      "id": "env-fills-gaps",
+      "text": "A field-level Env() descriptor supplies a value only when no merged source provided that key, so any file or CONFIG_DATA value overrides the environment variable."
+    },
+    {
+      "id": "fail-loud",
+      "text": "A missing required field or a value that does not match its declared type fails the read instead of yielding a partially valid configuration object."
+    },
+    {
+      "id": "secret-redaction",
+      "text": "A field declared Sensitive() is redacted in validation errors and in the config description, including when it is nested inside another block."
+    },
+    {
+      "id": "secret-names-only",
+      "text": "Emitted infrastructure requirements carry the canonicalized names of sensitive fields and never their values, and the sidecar is removed when no sensitive field remains."
+    },
+    {
+      "id": "untrusted-input",
+      "text": "Parsed configuration cannot pollute Object.prototype: __proto__, constructor, and prototype keys are stripped from every source before merging."
+    },
+    {
+      "id": "contributed-paths",
+      "text": "A dependency-contributed config block registers under its own path; re-registering the identical definition is a no-op and a different definition claiming the same path fails."
+    },
+    {
+      "id": "browser-surface",
+      "text": "The browser entry point applies declared defaults and call-site overrides, reports the browser environment, and never reads files, CONFIG_DATA, or environment variables nor throws on a missing required field."
+    }
+  ],
+  "decisions": ["typescript/framework/runtime/doc/adr/0002-configuration-precedence-and-name-only-secrets.md"]
+}

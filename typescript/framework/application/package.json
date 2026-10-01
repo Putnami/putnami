@@ -1,0 +1,44 @@
+{
+  "name": "@putnami/application",
+  "version": "0.0.0",
+  "description": "Application framework for building HTTP servers with routing, middleware, and OAuth support",
+  "keywords": [
+    "http",
+    "server",
+    "routing",
+    "middleware",
+    "oauth",
+    "web-framework"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "typescript/framework/application"
+  },
+  "bin": {
+    "putnami-application-generate": "./bin/generate.ts",
+    "putnami-application-config-extract": "./bin/config-extract.ts"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./conformance": "./src/conformance/index.ts",
+    "./contracts": "./src/contracts/index.ts",
+    "./http-routes": "./src/http-routes/index.ts",
+    "./testing": "./src/testing/index.ts",
+    "./serve": {
+      "default": ".gen/src/serve.ts"
+    }
+  },
+  "dependencies": {
+    "@putnami/migration": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/utils": "workspace:*"
+  },
+  "private": false
+}

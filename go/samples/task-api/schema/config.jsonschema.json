@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "events": {
+      "additionalProperties": false,
+      "properties": {
+        "delivery": {
+          "type": "string"
+        },
+        "eventServer": {
+          "additionalProperties": false,
+          "properties": {
+            "audience": {
+              "type": "string"
+            },
+            "contractVersion": {
+              "type": "integer"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "protocol": {
+              "type": "string"
+            },
+            "topologyGenerationId": {
+              "type": "string"
+            },
+            "workload": {
+              "type": "string"
+            },
+            "workspaceId": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "pubsub": {
+          "additionalProperties": false,
+          "properties": {
+            "projectId": {
+              "type": "string"
+            },
+            "topicTemplate": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "push": {
+          "additionalProperties": false,
+          "properties": {
+            "allowInsecure": {
+              "type": "boolean"
+            },
+            "allowedServiceAccounts": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "audience": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "issuer": {
+              "type": "string"
+            },
+            "jwksUrl": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "transport": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "server": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    }
+  },
+  "required": [
+    "events",
+    "server"
+  ],
+  "title": "go.putnami.dev/examples/task-api config",
+  "type": "object"
+}

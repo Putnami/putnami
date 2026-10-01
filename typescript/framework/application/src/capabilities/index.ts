@@ -1,0 +1,92 @@
+export {
+  CAPABILITIES_PROTOCOL_VERSION,
+  FEATURE_EVIDENCE_FILENAME,
+  type CapabilitiesProducerOptions,
+  createCapabilitiesProducer,
+} from './capabilities.producer';
+export {
+  type DomainAccessContributor,
+  type DomainAccessDeclaration,
+  isDomainAccessContributor,
+} from './domain-access';
+export { type LifecycleContribution, type LifecycleContributor, isLifecycleContributor } from './lifecycle';
+export {
+  type CapabilityInventory,
+  type CapabilityInventoryContributor,
+  isCapabilityInventoryContributor,
+} from './inventory';
+export {
+  buildCapabilityManifest,
+  CAPABILITY_DIAGNOSTIC_CODES,
+  type CapabilityDiagnostic,
+  type CapabilityManifestInput,
+  CapabilityManifestValidationError,
+  serializeCapabilityManifest,
+  validateCapabilityManifest,
+} from './manifest';
+export {
+  availableProviderKindsV2,
+  canonicalCapabilityManifestV2,
+  canonicalSourceBindingInput,
+  computeSourceBinding,
+  parseCapabilityManifestDocument,
+  serializeCapabilityManifestV2,
+  sourceDigest,
+  type SourceBindingFile,
+  type SourceFileMode,
+  validateCapabilityManifestV2,
+} from './manifest.v2';
+export {
+  type CapabilityProvenanceContributor,
+  type CapabilityProvenanceMetadata,
+  isCapabilityProvenanceContributor,
+} from './provenance';
+export {
+  type CapabilityRequirement,
+  type RequiredCapabilityContributor,
+  isRequiredCapabilityContributor,
+} from './requirement';
+export {
+  CAPABILITIES_SCHEMA_URL,
+  CAPABILITIES_V2_SCHEMA_URL,
+  COMMITTED_PATH,
+  type CapabilityKind,
+  type ConfigDefinition as CapabilityConfigDefinition,
+  type ConfigDefinitionV2 as CapabilityConfigDefinitionV2,
+  type ConfigField as CapabilityConfigField,
+  type Discoverer as CapabilityDiscoverer,
+  type DiscovererV2 as CapabilityDiscovererV2,
+  type DiscovererKind,
+  EMIT_DIR,
+  type HealthContributor as CapabilityHealthContributor,
+  type HealthContributorV2 as CapabilityHealthContributorV2,
+  type InfraKind,
+  type InfraRequirement as CapabilityInfraRequirement,
+  type InfraRequirementV2 as CapabilityInfraRequirementV2,
+  type LifecycleHook as CapabilityLifecycleHook,
+  type LifecycleHookV2 as CapabilityLifecycleHookV2,
+  type LifecyclePhase,
+  type Manifest as CapabilityManifest,
+  type ManifestV2 as CapabilityManifestV2,
+  MANIFEST_FILENAME,
+  type MigrationBundle as CapabilityMigrationBundle,
+  type MigrationBundleV2 as CapabilityMigrationBundleV2,
+  type PackageVersion as CapabilityPackageVersion,
+  type PackageVersionV2 as CapabilityPackageVersionV2,
+  type ProbeKind,
+  type Provenance as CapabilityProvenance,
+  type ProvenanceV2 as CapabilityProvenanceV2,
+  type RequiredCapability,
+  type RequiredCapabilityV2,
+  type SchemaContribution as CapabilitySchemaContribution,
+  type SchemaContributionV2 as CapabilitySchemaContributionV2,
+  type SchemaKind,
+  type SourceKind,
+  type ArtifactLocation,
+  type CapabilityManifestDocument,
+  type ContributionIdentity,
+  type ContributionKind,
+  type ContributionReference,
+  type DeclarationLocation,
+  type LocationRoot,
+} from './manifest.types';

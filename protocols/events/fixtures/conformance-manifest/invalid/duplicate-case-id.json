@@ -1,0 +1,24 @@
+{
+  "protocol": "putnami.events.v1",
+  "suite": "putnami.events.conformance.v1",
+  "target": {
+    "discoveryPath": "/.well-known/putnami/events",
+    "grpcService": "putnami.events.v1.EventServer"
+  },
+  "cases": [
+    {
+      "id": "discovery.capabilities.valid",
+      "level": "required",
+      "transport": "discovery",
+      "steps": ["GET the discovery document"],
+      "expect": ["protocol is putnami.events.v1"]
+    },
+    {
+      "id": "discovery.capabilities.valid",
+      "level": "required",
+      "transport": "discovery",
+      "steps": ["GET the discovery document again"],
+      "expect": ["protocol is putnami.events.v1"]
+    }
+  ]
+}

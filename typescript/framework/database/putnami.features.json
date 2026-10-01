@@ -1,0 +1,278 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/relational-persistence",
+      "type": "feature",
+      "name": "TypeScript relational persistence",
+      "outcome": "A TypeScript workload persists relational data through typed tables and repositories whose transaction boundary is the request, whose cancellation reaches the database, and whose failures are reported as classified causes that carry no secret",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "lazy-transaction",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "begin-is-issued-once-per-datasource",
+              "no-reserve-or-begin-before-the-first-write-and-one-shared-opening"
+            ]
+          }
+        },
+        {
+          "id": "single-committer",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["finalize-happens-at-most-once", "a-nested-run-in-transaction-joins-the-outer-unit"]
+          }
+        },
+        {
+          "id": "partial-commit-is-an-error",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-mid-commit-failure-surfaces-and-releases-connections",
+              "multi-datasource-commit-failures-aggregate"
+            ]
+          }
+        },
+        {
+          "id": "timeout-rollback",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["timeout-rolls-back-once-and-a-racing-commit-awaits-it-and-fails"]
+          }
+        },
+        {
+          "id": "cancellation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-query-after-abort-raises-query-abort-error"]
+          }
+        },
+        {
+          "id": "secret-free-telemetry",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["rollback-telemetry-carries-a-classified-cause-code-only", "no-secret-reaches-metrics-or-logs"]
+          }
+        },
+        {
+          "id": "cross-language-conformance",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-producer-matches-the-shared-golden-fixture", "the-vendored-corpus-is-byte-identical"]
+          }
+        },
+        {
+          "id": "declared-infrastructure",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["tables-derive-the-infra-requirements-sidecar", "pool-schemas-union-deduped-and-sorted"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "typescript/shared-datasource-pooling",
+      "type": "feature",
+      "name": "Shared physical pool per database with per-operation search_path",
+      "outcome": "TypeScript workloads that declare several datasources on one physical database share one connection pool per database, and every unqualified query still resolves in its own datasource's schema",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "acquire-time-search-path",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-set-rejects-the-operation-and-releases-the-connection",
+              "a-server-default-datasource-resets-search-path",
+              "the-physical-pool-carries-no-startup-search-path",
+              "the-set-precedes-the-statement-on-the-reserved-connection",
+              "unsafe-sets-the-search-path-like-a-tagged-query"
+            ]
+          }
+        },
+        {
+          "id": "datasource-bound-acquire",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "begin-sets-the-search-path-before-the-callback",
+              "builders-forward-to-the-physical-pool-untouched",
+              "cancel-and-modes-reach-the-inner-query",
+              "cancel-during-reserve-releases-the-connection",
+              "reserve-hands-out-a-connection-bound-to-the-datasource"
+            ]
+          }
+        },
+        {
+          "id": "one-pool-per-physical-database",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "concurrent-first-opens-connect-once",
+              "distinct-connection-identities-open-distinct-pools",
+              "same-connection-identity-shares-one-physical-pool"
+            ]
+          }
+        },
+        {
+          "id": "shared-pool-lifetime",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-closed-datasource-fails-with-an-error",
+              "close-all-ends-every-pool-and-a-later-open-reconnects",
+              "closing-one-datasource-keeps-the-shared-pool-open",
+              "closing-the-last-datasource-ends-the-shared-pool",
+              "end-releases-the-handle-once"
+            ]
+          }
+        },
+        {
+          "id": "tuning-agreement",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["different-tuning-on-one-database-is-a-declaration-error"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "typescript/sql-migrations",
+      "type": "feature",
+      "name": "TypeScript SQL migrations",
+      "outcome": "A relational schema evolves through migrations that apply in one order on every machine and in every language, that cannot half-apply, and that refuse to run when the committed SQL no longer matches what was applied",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "byte-order-apply",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["definitions-sort-in-code-unit-order", "pending-migrations-apply-in-code-unit-order"]
+          }
+        },
+        {
+          "id": "reverse-order-rollback",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["reset-reverses-the-apply-order", "rollback-to-unwinds-in-reverse-name-order"]
+          }
+        },
+        {
+          "id": "atomic-bookkeeping",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["body-and-success-row-commit-in-one-transaction"]
+          }
+        },
+        {
+          "id": "failure-is-recorded",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-failed-body-rolls-back-and-the-failure-row-survives"]
+          }
+        },
+        {
+          "id": "body-drift-fails",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-drifted-applied-body-fails-the-run", "the-drift-error-names-the-migration-and-both-hashes"]
+          }
+        },
+        {
+          "id": "rollback-integrity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["tampered-down-sql-is-refused", "an-unclaimed-row-never-runs-the-down-body"]
+          }
+        },
+        {
+          "id": "single-writer",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-advisory-lock-uses-the-shared-literal"]
+          }
+        },
+        {
+          "id": "unbounded-statement",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "statement-timeout-is-disabled-transaction-locally-before-the-up-ddl",
+              "statement-timeout-is-disabled-before-the-down-ddl"
+            ]
+          }
+        },
+        {
+          "id": "schema-scoped-ddl",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-datasource-schema-threads-onto-its-migrator",
+              "conflicting-schema-declarations-are-rejected"
+            ]
+          }
+        },
+        {
+          "id": "unambiguous-target",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["an-ambiguous-basename-fails-with-candidates"]
+          }
+        }
+      ]
+    }
+  ]
+}

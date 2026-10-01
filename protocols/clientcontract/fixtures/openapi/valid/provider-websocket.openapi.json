@@ -1,0 +1,92 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Provider-owned WebSocket wires", "version": "1.0.0" },
+  "x-putnami-client": {
+    "protocolVersion": 1,
+    "service": { "id": "fixtures.gateway", "audience": "urn:putnami:fixtures:gateway" },
+    "credentials": {
+      "service": { "kind": "service-token", "scopes": ["gateway:connect"] }
+    },
+    "defaults": {
+      "resilience": {
+        "stream": { "handshakeTimeoutMs": 2000, "idleTimeoutMs": 60000, "heartbeatMs": 15000, "maxFrameBytes": 65536 }
+      }
+    }
+  },
+  "paths": {
+    "/v1/databases/connect": {
+      "get": {
+        "operationId": "connectDatabase",
+        "parameters": [
+          { "name": "database", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "101": { "description": "Switching Protocols" },
+          "403": { "description": "Forbidden" }
+        },
+        "x-putnami-client": {
+          "stream": "bidirectional",
+          "transports": [
+            {
+              "protocol": "websocket",
+              "path": "/v1/databases/connect",
+              "encoding": "binary",
+              "websocket": { "resume": false, "wire": "provider" }
+            }
+          ],
+          "security": { "alternatives": [{ "allOf": [{ "profile": "service", "scopes": ["gateway:connect"] }] }] },
+          "errors": [{ "status": 403, "code": "forbidden" }],
+          "idempotency": { "kind": "non-idempotent" }
+        }
+      }
+    },
+    "/events/ws": {
+      "get": {
+        "operationId": "subscribeEvents",
+        "responses": { "101": { "description": "Switching Protocols" } },
+        "x-putnami-client": {
+          "stream": "bidirectional",
+          "messages": {
+            "input": { "$ref": "#/components/schemas/EventClientFrame" },
+            "output": { "$ref": "#/components/schemas/EventServerFrame" }
+          },
+          "transports": [
+            {
+              "protocol": "websocket",
+              "path": "/events/ws",
+              "encoding": "json",
+              "websocket": { "subprotocol": "putnami.events.v1", "resume": false, "wire": "provider" }
+            }
+          ],
+          "security": { "alternatives": [{ "allOf": [{ "profile": "service" }] }] },
+          "errors": [],
+          "idempotency": { "kind": "non-idempotent" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EventClientFrame": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string", "enum": ["subscribe", "ack", "nack"] },
+          "topic": { "type": "string" },
+          "cursor": { "type": "string" }
+        }
+      },
+      "EventServerFrame": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string", "enum": ["event", "error"] },
+          "cursor": { "type": "string" },
+          "data": { "type": "string" }
+        }
+      }
+    }
+  }
+}

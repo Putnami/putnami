@@ -1,0 +1,42 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/sql-migration-execution",
+  "outcomes": [
+    "A SQL migration body and the record that marks it applied can never disagree, because they commit or roll back together",
+    "Runtime migration status and drift inspection require only read access and never initialize or lock the state store",
+    "Re-applying a registered set is idempotent and any divergence between registry and store surfaces as drift before release",
+    "Rollback only ever runs SQL the author persisted, verified against its stored hash"
+  ],
+  "nonGoals": [
+    "Making all datasources one distributed atomic transaction",
+    "Inferring rollback SQL when a migration author did not provide it",
+    "Owning migration source registration or kind routing, which stay with go/migration-execution"
+  ],
+  "requirements": [
+    {
+      "id": "atomic-record",
+      "text": "Each migration body and its success state-store record commit in one transaction under the datasource advisory lock; failure rolls back that transaction and is never returned as applied."
+    },
+    {
+      "id": "deterministic-execution",
+      "text": "Datasource targets execute in lexicographic order, SQL definitions execute in canonical name order, and rollback proceeds in reverse recorded execution order."
+    },
+    {
+      "id": "repeatability-and-drift",
+      "text": "Already-applied matching migrations are skipped, stored hashes remain comparable to current definitions, and changed, missing, or pending definitions appear in the drift report."
+    },
+    {
+      "id": "read-only-observation",
+      "text": "Status and drift inspection never create the migration state store or acquire its writer lock; when the store does not exist yet, registered definitions are reported as pending."
+    },
+    {
+      "id": "reversibility",
+      "text": "Rollback runs only a persisted, hash-verified down body and refuses a missing or tampered reversal rather than guessing destructive SQL."
+    }
+  ],
+  "decisions": [
+    "go/framework/migration/doc/adr/0001-deterministic-per-migration-atomicity.md",
+    "go/framework/database/doc/adr/0002-read-only-migration-observation.md"
+  ]
+}

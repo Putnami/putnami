@@ -1,0 +1,7 @@
+{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": ["Customers export issued invoices"],
+  "requirements": [],
+  "maturity": "coded"
+}

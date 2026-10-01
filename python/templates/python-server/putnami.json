@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "python-server",
+  "type": "template",
+  "extensions": ["@putnami/scaffold"],
+  "publish": ["template-archives"],
+  "options": {
+    "publish": { "archives": true }
+  },
+  "featureAuthority": {
+    "none": "Durable feature authority is deliberately kept out of files rendered into a user's project; the experimental Python surface is declared once in `python/extension`."
+  }
+}

@@ -1,0 +1,14 @@
+exit 2
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "contracts check",
+  "status": "failure",
+  "exitCode": 2,
+  "error": {
+    "code": "usage",
+    "message": "project not found: @acme/nope"
+  }
+}
+--- stderr ---
+putnami: project not found: @acme/nope

@@ -1,0 +1,29 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "GitHub REST API 2022-11-28 and GraphQL API (docs.github.com/rest, docs.github.com/graphql)",
+      "adapter": "tooling/github-collaboration/internal/github/client.go",
+      "callsites": [
+        {
+          "path": "tooling/github-collaboration/internal/github/client.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "2910ec7982d88e1021225f3a7ef9305d1538b520e4358d972590b4eae6794614"
+        },
+        {
+          "path": "tooling/github-collaboration/internal/github/client.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "1faa24fa00363f93c4ff2387b3be97b0331ef29c120350904458208c8b73df16"
+        }
+      ],
+      "owner": "@putnami/github-collaboration",
+      "tests": [
+        "tooling/github-collaboration/internal/github/client_test.go",
+        "tooling/github-collaboration/internal/provider/conformance_test.go"
+      ],
+      "reason": "Implements the tasks and proposals collaboration contracts on the issues and pull requests of one GitHub repository."
+    }
+  ]
+}

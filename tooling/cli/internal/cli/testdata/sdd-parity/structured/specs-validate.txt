@@ -1,0 +1,59 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "specs validate",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "completeness": {
+      "featuresWithoutSpec": [
+        "shipping/labels"
+      ],
+      "projectsWithoutFeature": [],
+      "projectsWithoutSupport": [],
+      "supportAssessed": false
+    },
+    "diagnosticCounts": {
+      "errors": 0,
+      "info": 0,
+      "warnings": 2
+    },
+    "diagnostics": [
+      {
+        "code": "specs.missing_spec",
+        "field": "feature",
+        "message": "authored feature \"shipping/labels\" has no durable spec",
+        "severity": "warning"
+      },
+      {
+        "code": "specs.missing_support_catalog",
+        "field": "putnami.support.json",
+        "message": "no support catalog was found, so project support completeness was not assessed",
+        "severity": "warning"
+      }
+    ],
+    "revision": {
+      "head": "git:7c5122267ea7854954d543e1eda0a15c7cc56b08",
+      "kind": "worktree"
+    },
+    "selection": {
+      "externalRecords": [],
+      "features": 2,
+      "mode": "all",
+      "projects": [
+        "/billing",
+        "/shipping"
+      ],
+      "scoped": false,
+      "specs": 1
+    },
+    "summary": {
+      "authoredFeatures": 2,
+      "publishableProjects": 0,
+      "specs": 1
+    },
+    "valid": true
+  }
+}
+--- stderr ---

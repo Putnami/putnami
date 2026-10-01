@@ -1,0 +1,25 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities.json",
+  "protocolVersion": 1,
+  "project": "example/conflicting-provider",
+  "configDefinitions": [
+    {
+      "path": "iam",
+      "fields": [{ "name": "primary" }],
+      "provenance": {
+        "project": "example/conflicting-provider",
+        "package": "example/first",
+        "sourceKind": "framework"
+      }
+    },
+    {
+      "path": "iam",
+      "fields": [{ "name": "replica" }],
+      "provenance": {
+        "project": "example/conflicting-provider",
+        "package": "example/second",
+        "sourceKind": "framework"
+      }
+    }
+  ]
+}

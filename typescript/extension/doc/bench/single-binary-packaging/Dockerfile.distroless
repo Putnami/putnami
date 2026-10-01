@@ -1,0 +1,22 @@
+# Today's `putnami package --docker` shape, reproduced with a Dockerfile:
+# a `bun build --compile` executable on distroless, with the .gen asset tree
+# copied in as a separate layer (typescript/extension/internal/pkg/docker.go).
+#
+# The extension pins gcr.io/distroless/cc-debian12 (glibc + libstdc++). The
+# bun 1.4.0 linux-x64 executable only needs libc/libm/libpthread/libdl, so the
+# smaller `base` image is enough — that delta is one of the measured rows.
+#
+# Build context: $BENCH_WORK/ctx (see bench.sh prepare_ctx).
+ARG BASE_IMAGE=gcr.io/distroless/base-debian12
+FROM ${BASE_IMAGE}
+
+WORKDIR /app
+COPY srv-binary /app/server
+COPY public /app/.gen/public
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV PWD=/app
+
+EXPOSE 3000
+ENTRYPOINT ["/app/server"]

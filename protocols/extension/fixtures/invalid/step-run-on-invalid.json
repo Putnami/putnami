@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/step-run-on-invalid",
+  "commands": {
+    "test": {
+      "run": [
+        { "id": "run", "task": "test-exec" },
+        { "id": "report", "task": "test-exec", "dependsOn": ["run"], "runOn": "failure" }
+      ]
+    }
+  },
+  "tasks": {
+    "test-exec": { "kind": "command", "command": "echo" }
+  }
+}

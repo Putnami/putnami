@@ -1,0 +1,14 @@
+{
+  "appName": "lib-service",
+  "version": "",
+  "schemaHash": "sha256:fedcba9876543210",
+  "configs": [
+    {
+      "path": "cache",
+      "fields": [
+        { "name": "ttl", "type": "duration", "default": "60s" },
+        { "name": "maxSize", "type": "int", "default": "1000" }
+      ]
+    }
+  ]
+}

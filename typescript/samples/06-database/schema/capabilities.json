@@ -1,0 +1,58 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities.json",
+  "protocolVersion": 1,
+  "project": "@example/06-database",
+  "schemas": [
+    {
+      "name": "api-loader",
+      "kind": "route",
+      "path": ".gen/src/api/.api-application.gen.ts",
+      "provenance": {
+        "project": "@example/06-database",
+        "sourceKind": "generated",
+        "evidencePath": ".gen/src/api/.api-application.gen.ts"
+      }
+    }
+  ],
+  "discoverers": [
+    {
+      "name": "sql-loader",
+      "kind": "source",
+      "provenance": {
+        "project": "@example/06-database",
+        "sourceKind": "generated",
+        "evidencePath": ".gen/src/.sql.gen.ts"
+      }
+    }
+  ],
+  "migrations": [
+    {
+      "name": "app",
+      "datasource": "default",
+      "provenance": {
+        "project": "@example/06-database",
+        "sourceKind": "framework"
+      }
+    }
+  ],
+  "infraRequirements": [
+    {
+      "name": "default",
+      "kind": "database",
+      "provenance": {
+        "project": "@example/06-database",
+        "sourceKind": "framework"
+      }
+    }
+  ],
+  "healthContributors": [
+    {
+      "name": "database",
+      "probe": "health",
+      "provenance": {
+        "project": "@example/06-database",
+        "sourceKind": "framework"
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+# <%= projectName %>
+
+This project was created from Putnami's **experimental** `python-library`
+template. Python is an explicit opt-in path: it is not a default project type
+and has no feature or compatibility parity promise with Go or TypeScript.
+
+The template provides only a minimal src-layout package, setuptools metadata,
+and a unit test. Treat it as a starting point for an experiment, validate its
+dependencies and packaging behavior in your environment, and add release
+concerns deliberately.
+
+## Verify
+
+```bash
+putnami lint,test <%= projectName %>
+```
+
+## Documentation
+
+This README is the project's entry point. Put longer pages under `doc/` and
+link them from here: `putnami lint` fails on a relative link or an anchor that
+does not resolve.

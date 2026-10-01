@@ -1,0 +1,37 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Fixtures", "version": "1.0.0" },
+  "paths": {
+    "/items": {
+      "get": {
+        "operationId": "listItems",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tags": { "type": "array", "items": { "type": "string" } },
+                    "counts": { "type": "array", "items": { "type": "integer" } },
+                    "meta": {
+                      "type": "object",
+                      "properties": { "k": { "type": "string" } },
+                      "required": ["k"]
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": { "type": "object", "properties": { "v": { "type": "string" } } }
+                    }
+                  },
+                  "required": ["tags"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

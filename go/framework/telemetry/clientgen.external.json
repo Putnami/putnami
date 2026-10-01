@@ -1,0 +1,51 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "Google Compute Engine metadata server v1 (cloud.google.com/compute/docs/metadata/overview)",
+      "adapter": "go/framework/telemetry/gcp_token_source.go",
+      "callsites": [
+        {
+          "path": "go/framework/telemetry/gcp_token_source.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "834e4b751191022b602456613e506b6bc7f803322f08627ef28c3b9a84108656"
+        },
+        {
+          "path": "go/framework/telemetry/gcp_token_source.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "94258137003c32c0c1601432da05cd7c6de30d59b4c97915c4f8004b9f4c87fc"
+        }
+      ],
+      "owner": "go.putnami.dev/telemetry",
+      "tests": [
+        "go/framework/telemetry/gcp_token_source_test.go"
+      ],
+      "reason": "Reads a workload access token from the GCP metadata server to authenticate the OTLP exporter."
+    },
+    {
+      "authority": "OpenTelemetry OTLP/HTTP v1 (opentelemetry.io/docs/specs/otlp), mirrored by protocols/telemetry",
+      "adapter": "go/framework/telemetry/otlp.go",
+      "callsites": [
+        {
+          "path": "go/framework/telemetry/otlp.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "2843b80df55560a24bfe36f3ba219864bb6e800f8fdab4449ebb745f318f5e51"
+        },
+        {
+          "path": "go/framework/telemetry/otlp.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "b01f289d56ed3e949e798a1770cfbf72e36fd4e30598b5e866b63e1b342a5070"
+        }
+      ],
+      "owner": "go.putnami.dev/telemetry",
+      "tests": [
+        "go/framework/telemetry/otlp_test.go"
+      ],
+      "reason": "Exports application spans, metrics and logs over OTLP/HTTP to the configured collector."
+    }
+  ]
+}

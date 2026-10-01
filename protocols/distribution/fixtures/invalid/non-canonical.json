@@ -1,0 +1,15 @@
+{
+  "members": [
+    {
+      "selectionFingerprint": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "sourceRevision": "8d5edb7513d93b9165ba2a7cb48466d022fc3f63",
+      "dependencies": [],
+      "artifactDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "version": "0.3.0-8d5edb751",
+      "coordinate": "@putnami/core",
+      "ecosystem": "npm"
+    }
+  ],
+  "namespace": "putnami",
+  "protocolVersion": 2
+}

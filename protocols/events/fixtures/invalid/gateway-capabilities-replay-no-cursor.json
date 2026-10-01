@@ -1,0 +1,14 @@
+{
+  "protocol": "putnami.events.v1",
+  "transports": ["websocket"],
+  "features": {
+    "replay": true,
+    "publish": false,
+    "ack": false,
+    "cursor": ["latest", "earliest"],
+    "payload": ["json"]
+  },
+  "endpoints": {
+    "websocket": { "method": "GET", "path": "/events/ws" }
+  }
+}

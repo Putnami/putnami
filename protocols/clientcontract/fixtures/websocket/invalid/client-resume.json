@@ -1,0 +1,25 @@
+{
+  "operationId": "widgets.upload",
+  "stream": "client",
+  "encoding": "proto",
+  "idempotency": "idempotent",
+  "resume": false,
+  "maxFrameBytes": 4096,
+  "maxBufferedMessages": 2,
+  "steps": [
+    {
+      "direction": "client-to-server",
+      "frame": {
+        "v": 1,
+        "type": "init",
+        "operationId": "widgets.upload",
+        "clientId": "fixtures-consumer",
+        "deadlineUnixMs": "1800000000000",
+        "budgetMs": "30000",
+        "credentials": [{ "profile": "service", "value": "Bearer fixture-token" }],
+        "headers": [],
+        "resume": { "token": "fixture-resume-token", "afterSequence": "1" }
+      }
+    }
+  ]
+}

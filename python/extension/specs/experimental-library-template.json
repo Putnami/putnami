@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "python/experimental-library-template",
+  "outcomes": [
+    "An experimenter can explicitly create an importable Python package with src-layout packaging metadata and a unit test",
+    "The generated project opts into the Python extension",
+    "The template advertises its experimental, non-default, non-parity boundary in both its catalog metadata and generated README"
+  ],
+  "nonGoals": [
+    "Providing a stable Python package distribution baseline",
+    "Matching the Go library or TypeScript library template capabilities",
+    "Generating API, dependency-injection, persistence, or release automation features"
+  ],
+  "requirements": [
+    {
+      "id": "explicit-template",
+      "text": "The template is selected by its explicit python-library name and declares @putnami/python in the generated project manifest."
+    },
+    {
+      "id": "minimal-library-shape",
+      "text": "The generated project contains a src-layout package, setuptools metadata, and a unit test for the package's exported greeting."
+    },
+    {
+      "id": "experimental-disclosure",
+      "text": "The template's catalog record and generated README state that it is experimental, not default, and has no Go or TypeScript parity promise."
+    }
+  ],
+  "decisions": [
+    "python/extension/doc/adr/0001-experimental-python-surface.md"
+  ]
+}
