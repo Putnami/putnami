@@ -83,9 +83,17 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "engine",
 		prefix: "internal/engine/",
-		files:  23,
-		funcs:  144,
-		why: "RAISED 141→144 (ADR 0055 part 4): a hosted `build` whose first-use bootstrap " +
+		files:  24,
+		funcs:  153,
+		why: "RAISED 23/144→24/153 (cli/provider-publication): a run that may publish reads its " +
+			"bound commit's ancestry before the first hook, because repository code can rewrite refs, " +
+			"replace refs and grafts afterwards. ancestry.go holds AncestrySnapshot (five nil-safe " +
+			"readers), captureAncestrySnapshot and readsAncestry; only Engine.Run sees the point before " +
+			"the hooks. engine.go holds keyingPlan and refusesUnauthorizedPublication, which refuse a " +
+			"bound request without invocation.publication on its keying plan, before the release-set " +
+			"preparation can start a provider; only this unit holds that plan, and keyingPlan keeps " +
+			"Engine.run inside its statement budget. No flag, no mode. " +
+			"RAISED 141→144 (ADR 0055 part 4): a hosted `build` whose first-use bootstrap " +
 			"runs an install must start its cache provider after the install's credentialed " +
 			"workspace-fetch and before the install's first repository code, and the run that follows " +
 			"must read the remote cache through that provider instead of starting a second one after " +

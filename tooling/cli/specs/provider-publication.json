@@ -1,0 +1,27 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/provider-publication",
+  "outcomes": [
+    "A run that may publish knows its bound commit's ancestry and holds its publish credential before any repository code runs",
+    "A bound request without invocation.publication only gates: it plans no publication and starts no publication provider"
+  ],
+  "nonGoals": [
+    "Checking a published revision against the ancestry; the publication path reads the snapshot",
+    "Reading the ancestry before the first-use bootstrap install, which runs before the engine"
+  ],
+  "requirements": [
+    {
+      "id": "ancestry-is-read-before-repository-code",
+      "text": "A run naming publish or deploy, or a bound request with invocation.publication, reads its bound commit's ancestry into memory before the first hook: PUTNAMI_SOURCE_REVISION, else HEAD, ignoring replace refs, grafts and the commit-graph, so later writes change no answer. It names a shallow clone; above 1,000,000 commits it holds a named error and no commit. Other runs read none. With publish enabled, the credential provider starts before the first hook, locally as on a hosted run."
+    },
+    {
+      "id": "gate-only-launches-no-publication",
+      "text": "A bound request without invocation.publication enables no publish purpose, even when its invocation.providers names publish, and says so on stderr. When its plan holds a task of a publication command or with declared registry or cloud effects, or its versions start a release-set publication, the executing engine refuses it before any release-set or deploy provider starts. A gate-only request plans no publish job and starts no release-set provider."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0055-run-credentials-stay-out-of-repository-processes.md",
+    "protocols/runner/doc/adr/0005-invocation-providers-and-publication-barrier.md"
+  ]
+}

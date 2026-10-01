@@ -2791,6 +2791,45 @@
           }
         }
       ]
+    },
+    {
+      "id": "cli/provider-publication",
+      "type": "feature",
+      "name": "Publication through providers",
+      "outcome": "A user who publishes, locally or on a hosted runner, gets a run whose ancestry and publish credential are fixed before any repository code runs, while a run or a bound request that only gates starts no publication",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "ancestry-is-read-before-repository-code",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-snapshot-precedes-the-first-hook",
+              "replace-refs-and-grafts-change-no-answer",
+              "a-shallow-clone-is-named",
+              "a-history-above-the-limit-contains-nothing",
+              "a-gate-only-run-reads-no-ancestry",
+              "the-publish-purpose-starts-its-provider-before-the-first-hook"
+            ]
+          }
+        },
+        {
+          "id": "gate-only-launches-no-publication",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-publishing-request-without-the-block-is-refused-before-any-provider",
+              "a-request-without-the-block-enables-no-publish-purpose",
+              "a-gate-only-request-plans-no-publish-job"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

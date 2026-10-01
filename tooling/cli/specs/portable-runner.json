@@ -23,7 +23,7 @@
     },
     {
       "id": "portable-request",
-      "text": "After the final plan and preflight, a remote run becomes the strict versioned request: typed parameters, effective flags, frozen selection with its baseline commit, the expected plan through the ChangePlan projection, pinned engine, extensions, toolchains and platform. Watch, serve, run, format, dry-run and side-effect tasks are refused before submission. An unready provider is an error, never a local run. The executing engine plans the frozen selection and refuses a graph differing from the expected plan."
+      "text": "After preflight, a remote run becomes a strict versioned request: typed parameters and flags, frozen selection and baseline, expected ChangePlan, pinned engine, extensions, toolchains and platform. Watch, serve, run, format, dry-run and side-effect tasks are refused before submission. An unready provider is an error, never a local run. The executing engine plans the frozen selection; it refuses a graph unlike the expected plan and, before a provider starts, a publishing plan without invocation.publication."
     },
     {
       "id": "durable-lifecycle",

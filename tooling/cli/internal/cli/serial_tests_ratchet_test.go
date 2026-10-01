@@ -35,10 +35,15 @@ import (
 // TestBootstrapProviderServesOnlyTheLockedDownloads calls the package-private
 // openBootstrapProvider, so it cannot move to an e2e package.
 //
+// RAISED 127→128 (cli/provider-publication), for
+// TestPublishPurposeStartsTheProviderBeforeTheFirstHook: it calls the
+// package-private installCredentialProviders, and its install-only control
+// installs a read credential source for the whole process.
+//
 // The measurement is the AST, not a regexp: a top-level Test function whose
 // body has no `t.Parallel()` statement at its top level. A t.Parallel() inside
 // a subtest closure does not free the parent, so it does not count.
-const serialTestCeiling = 127
+const serialTestCeiling = 128
 
 func TestSerialTests_StayUnderTheCeiling(t *testing.T) {
 	t.Parallel()

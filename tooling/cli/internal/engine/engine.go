@@ -39,6 +39,8 @@ package engine
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"maps"
 	"os"
@@ -47,6 +49,7 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 	protocolcli "go.putnami.dev/protocol/cli"
 	protocoljob "go.putnami.dev/protocol/job"
+	runner "go.putnami.dev/protocol/runner"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
@@ -383,6 +386,12 @@ type Request struct {
 	// run proceeds either way (jobs.BuildRunVersions); --debug prints it, so a
 	// 0.0.0 stamp can be told apart from a line that is really untagged.
 	versionsErr error
+	// ancestry is the bound commit's ancestry, read before the first hook by a
+	// run that may publish (readsAncestry), nil for every other run.
+	//
+	// UNEXPORTED for the same reason preparation is: Engine.Run reads it
+	// itself, and nothing an adapter can set replaces it.
+	ancestry *AncestrySnapshot
 	// Stdout receives the notices the ENGINE itself prints on the human stdout
 	// stream: "No impacted projects found", "No projects matched", "No jobs
 	// matched", the --plan table, the auto-selection line, and a blocked
@@ -490,6 +499,9 @@ type SessionResult struct {
 	// Withheld are the serve steps a Request.WithholdServeSteps run planned and
 	// did not start, one per selected project that has one, in plan order.
 	Withheld []*jobs.ScheduledJob
+	// ancestry is the snapshot the run read before its first hook, or nil
+	// (Request.ancestry).
+	ancestry *AncestrySnapshot
 }
 
 // Engine runs the job lifecycle. It is stateless today; the type exists so
@@ -534,6 +546,14 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 		req.VersionSnapshot = snapshot
 	}
 
+	// A run that may publish reads its bound commit's ancestry here, before
+	// the first hook runs repository code that could rewrite refs or replace
+	// objects (AncestrySnapshot).
+	req.ancestry = nil
+	if readsAncestry(req) {
+		req.ancestry = captureAncestrySnapshot(req.WorkspaceRoot, MaxAncestryCommits)
+	}
+
 	// Hook verbosity is resolved once, here, from the flags as parsed. The run
 	// stages layer env/config overrides onto Global later (applyEnvOverrides);
 	// re-reading it for the after-hooks would make a PUTNAMI_VERBOSE run print
@@ -576,7 +596,7 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 
 	// After hooks run even if jobs failed.
 	code, hookErr := runAfterHooks(ctx, req, verbose, result.ExitCode)
-	result.ExitCode = code
+	result.ExitCode, result.ancestry = code, req.ancestry
 	if runErr == nil {
 		runErr = hookErr
 	}
@@ -690,7 +710,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// and the run's own plan is rebuilt below from the projects and extensions
 	// the coordinator leaves. It is never filtered in place: a narrowed plan
 	// would key a different task graph than it measured.
-	planned, code := buildPlan(req, ws, selectedProjects, planningExtensions, discovered)
+	planned, code := keyingPlan(req, ws, selectedProjects, planningExtensions, discovered, releaseSetOptions)
 	if code != ExitSuccess {
 		return SessionResult{ExitCode: code}, nil
 	}
@@ -900,6 +920,51 @@ func buildReleaseSetOptions(req *Request, ws *workspace.Workspace) (jobs.Release
 		Impacted: req.Global.Impacted, All: req.Global.All,
 		Versions: req.runVersions(ws),
 	})
+}
+
+// keyingPlan builds the run's first plan, the keying plan, and refuses it
+// with ExitError when it belongs to a bound request that may publish without
+// invocation.publication (refusesUnauthorizedPublication).
+func keyingPlan(
+	req *Request,
+	ws *workspace.Workspace,
+	selectedProjects []*workspace.Project,
+	planningExtensions []*extension.ExtensionDescription,
+	discovered *extension.DiscoveryResult,
+	options jobs.ReleaseSetOptions,
+) ([]*jobs.ScheduledJob, int) {
+	planned, code := buildPlan(req, ws, selectedProjects, planningExtensions, discovered)
+	if code == ExitSuccess && refusesUnauthorizedPublication(req, options, planned) {
+		return planned, ExitError
+	}
+	return planned, code
+}
+
+// refusesUnauthorizedPublication refuses a bound request that carries no
+// invocation.publication when its keying plan may publish: a planned task of a
+// publication command or with declared registry or cloud effects, or a
+// release-set publication the request enables. It runs before the release-set
+// preparation and every later stage that can start a provider, so a gate-only
+// request starts none. It prints the refusal and reports whether it refused.
+func refusesUnauthorizedPublication(req *Request, options jobs.ReleaseSetOptions, planned []*jobs.ScheduledJob) bool {
+	if req.Portable == nil || req.Portable.Request.Invocation.Publication != nil {
+		return false
+	}
+	var err error
+	for _, job := range planned {
+		if slices.Contains(runner.PublicationCommands, job.CommandName()) || jobs.HasExternalEffects(job) {
+			err = fmt.Errorf("runner: plan task %s publishes, but the request carries no invocation.publication", job.TypedIdentity().Key)
+			break
+		}
+	}
+	if err == nil && jobs.RequestedReleaseSetMode(options) != jobs.ReleaseSetDisabled {
+		err = errors.New("runner: the request starts a release-set publication, but carries no invocation.publication")
+	}
+	if err == nil {
+		return false
+	}
+	iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
+	return true
 }
 
 // deployNarrowsToChannelMembers reports whether an --impacted deploy must

@@ -3,8 +3,10 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	runner "go.putnami.dev/protocol/runner"
@@ -73,7 +75,7 @@ func (a *App) runBoundRequest(ctx context.Context, wsRoot string, cfg *wsproto.C
 	ensureArtifactsForProcessMode(ctx, wsRoot, cfg, false)
 	// The request's providers, never PUTNAMI_PROVIDERS, decide which purposes
 	// the credential provider serves in the executing engine.
-	providers, source, _ := invocationProviders(&request, nil, providersEnv)
+	providers, source := boundRequestProviders(&request, providersEnv, os.Stderr)
 	if err := guardCredentials(providers); err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return ExitError
@@ -111,6 +113,23 @@ func (a *App) runBoundRequest(ctx context.Context, wsRoot string, cfg *wsproto.C
 		Portable:        &engine.PortableExecution{Request: request},
 	}, nil)
 	return result.ExitCode
+}
+
+// boundRequestProviders returns the invocation providers the executing engine
+// enables for request, and their source. They are the request's
+// invocation.providers, except publish when the request carries no
+// invocation.publication: such a request plans no publication, so the publish
+// purpose stays off, and stderr says so.
+func boundRequestProviders(request *runner.ExecutionRequest, providersEnv string, stderr io.Writer) ([]string, string) {
+	providers, source, _ := invocationProviders(request, nil, providersEnv)
+	if request.Invocation.Publication != nil || !slices.Contains(providers, runner.InvocationProviderPublish) {
+		return providers, source
+	}
+	iox.Fprintf(stderr, "putnami: %s names %s without invocation.publication; the publish purpose stays off\n",
+		source, runner.InvocationProviderPublish)
+	return slices.DeleteFunc(providers, func(provider string) bool {
+		return provider == runner.InvocationProviderPublish
+	}), source
 }
 
 func loadBoundRequest(path string) (runner.ExecutionRequest, error) {

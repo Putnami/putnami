@@ -232,6 +232,17 @@ a nested `putnami` run that a job starts describes its own checkout.
 `putnami version tag` refuses to run while `PUTNAMI_SOURCE_REVISION` names a
 commit other than `HEAD`: the tag it creates names the checked-out commit.
 
+A run that may publish also reads that commit's ancestry before its first
+hook: a run that names `publish` or `deploy`, or a bound execution request that
+carries `invocation.publication`. The ancestry is every commit that
+`PUTNAMI_SOURCE_REVISION`, else `HEAD`, reaches through the parents its commit
+objects record; replace refs, grafts and the commit-graph file are ignored. The
+run holds it in memory, so a hook or a task that later moves a ref or adds a
+replace ref changes none of its answers. The run records whether the clone is
+shallow, where older ancestors are missing. A history above 1,000,000 commits
+is not read, and the ancestry then contains no commit. Every other run reads
+none.
+
 ### Channel semantics
 
 | Channel | Resolves to |

@@ -1188,7 +1188,9 @@ The credential provider is the one installed extension that declares the
 [ADR 0002](../../../protocols/registry/doc/adr/0002-one-credential-call-per-purpose.md)).
 The CLI starts it on the first download that needs a credential and asks it
 once per credential for the whole process, again only when the credential
-nears its expiry.
+nears its expiry. When `publish` is on, the CLI starts it before the first
+hook instead, locally as on a hosted run, so the publish credential comes from
+a provider that started before any repository code.
 
 - **No provider.** When no installed extension declares the command, the flag
   changes nothing: every download uses the host-keyed credential
@@ -1219,7 +1221,9 @@ through the SDK's `registrycred` helpers gets none.
 A `--where remote` run carries the list in the execution request only when the
 runner provider echoes the `invocation-providers-v1` capability at initialize;
 the executing engine then enables exactly those purposes and ignores its own
-`PUTNAMI_PROVIDERS`. When the runner provider does not echo the capability,
+`PUTNAMI_PROVIDERS`. The one exception is `publish`: a request without
+`invocation.publication` plans no publication, so the executing engine leaves
+`publish` off and says so on stderr. When the runner provider does not echo the capability,
 the CLI refuses the run with a usage error that names it, before anything is
 submitted.
 

@@ -159,7 +159,7 @@ var spawnSites = map[string]spawnSite{
 	"git/candidate.go:CandidatePaths": {spawns: 1, verdict: noRepositoryCode,
 		why: "git ls-files"},
 	"git/git.go:runCaptureEnv": {spawns: 1, verdict: noRepositoryCode,
-		why: "read verbs only: show, rev-parse, status, diff, merge-base, config --get, for-each-ref, ls-files, symbolic-ref"},
+		why: "read verbs only: show, rev-parse, rev-list, status, diff, merge-base, config --get, for-each-ref, ls-files, symbolic-ref"},
 	"githooks/install.go:Install": {spawns: 1, verdict: noRepositoryCode,
 		why: "git rev-parse"},
 	"jobs/environment.go:hostCPUModel": {spawns: 1, verdict: noRepositoryCode,

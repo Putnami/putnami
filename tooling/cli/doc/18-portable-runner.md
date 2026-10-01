@@ -113,8 +113,12 @@ workspace state through the ordinary first-use bootstrap, plans exactly the
 frozen project ids while keeping the recorded selection mode, and compares
 its plan against the expected one before scheduling: any difference in
 identities, edges, contracts, deadlines, cacheability or declared resources
-refuses the run and records no session. Its session states
-`placement: {requested: remote, actual: remote}`, the submitter's tree
+refuses the run and records no session. A request without
+`invocation.publication` is refused earlier, on the first plan, when that plan
+holds a `publish` or `deploy` task, a task that declares registry or cloud
+effects, or a release-set publication its tagged versions start: no
+release-set or deploy provider starts for it. The session of an executed
+request states `placement: {requested: remote, actual: remote}`, the submitter's tree
 fingerprint and branch, and the frozen baseline.
 
 ## Durable attempts, resume and cancellation
