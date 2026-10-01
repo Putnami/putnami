@@ -138,11 +138,29 @@ type PublishedMember struct {
 // PublishedMember under.
 const PublishedMemberEventKind = "published-member"
 
+// ArtifactEventEnvelope lists the fields an artifact runtime event carries
+// beside its payload when its JSON line is read as one flat object: the event
+// envelope and the artifact's id, name, kind and path.
+var ArtifactEventEnvelope = []string{"v", "type", "time", "level", "message", "id", "name", "kind", "path"}
+
+// ArtifactEventPayload returns the JSON of the payload of a flattened artifact
+// event: every field except the ArtifactEventEnvelope ones. A reader passes it
+// to ParsePublishedMember or ParseMemberProbe, which reject an unknown field.
+func ArtifactEventPayload(event map[string]any) ([]byte, error) {
+	payload := make(map[string]any, len(event))
+	for key, value := range event {
+		payload[key] = value
+	}
+	for _, key := range ArtifactEventEnvelope {
+		delete(payload, key)
+	}
+	return json.Marshal(payload)
+}
+
 // MemberProbe is what a publish job emits under a dry run, once per member it
 // would publish: the answer of the target registry to "do you already hold this
-// version?". A registry refuses to overwrite a published version, so the answer
-// decides whether the real publish can succeed. A probe is obtained with
-// read-only requests and is never publication evidence.
+// version?", and whether the real publish can write or reuse what it holds. A
+// probe is obtained with read-only requests and is never publication evidence.
 type MemberProbe struct {
 	// Ecosystem is the id of the profile this member belongs to.
 	Ecosystem string `json:"ecosystem"`
@@ -181,9 +199,9 @@ type MemberProbe struct {
 // MemberProbe under.
 const MemberProbeEventKind = "member-probe"
 
-// The states of a MemberProbe. The set is closed: a consumer fails a dry run on
-// the two states that make the real publish fail or leave it unknown, and a
-// fifth state it did not know would pass silently.
+// The states of a MemberProbe. The set is closed: ValidateMemberProbe rejects
+// any other state. A consumer fails a dry run on MemberProbeConflict and
+// MemberProbeUnverified, and warns on MemberProbeRetag.
 const (
 	// MemberProbeAbsent means the registry does not hold the version: the real
 	// publish uploads it.
@@ -191,14 +209,21 @@ const (
 	// MemberProbeIdentical means the registry holds the version with the digest
 	// of the local artifact: the real publish reuses it.
 	MemberProbeIdentical = "identical"
-	// MemberProbeConflict means the registry holds the version and either its
-	// digest differs from the local artifact or the dry run built no artifact
-	// to compare: the real publish is refused.
+	// MemberProbeConflict means the registry holds the version and the real
+	// publish cannot reuse it: the digest differs from the local artifact, the
+	// dry run has no local artifact to compare, or the publisher may refuse the
+	// held version whatever its bytes. Reason says which, and what the real
+	// publish does.
 	MemberProbeConflict = "conflict"
 	// MemberProbeUnverified means the registry could not answer: a network
 	// error, a timeout, a refused credential, a server error or a malformed
 	// answer. The outcome of the real publish is unknown.
 	MemberProbeUnverified = "unverified"
+	// MemberProbeRetag means the registry holds the version tag at other
+	// content and the real publish moves the tag to the local artifact.
+	// RegistryDigest names the content the tag points at; ArtifactDigest, when
+	// the dry run built an artifact, differs from it.
+	MemberProbeRetag = "retag"
 )
 
 // NamedManifest pairs a parsed manifest with the extension name it was loaded
@@ -556,8 +581,7 @@ func ValidatePublishedMember(m *PublishedMember) []diag.Diagnostic {
 }
 
 // ParseMemberProbe decodes a member-probe event strictly: an unknown field is a
-// rejection, because a publish job that emitted a field this build does not
-// know could be stating a verdict this build would drop.
+// rejection.
 func ParseMemberProbe(data []byte) (*MemberProbe, []diag.Diagnostic) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
@@ -572,9 +596,9 @@ func ParseMemberProbe(data []byte) (*MemberProbe, []diag.Diagnostic) {
 }
 
 // ValidateMemberProbe checks a member-probe event's own invariants: the closed
-// state vocabulary, the digest evidence each state requires, and that the
-// registry endpoint carries no credential. Like ValidatePublishedMember it does
-// not consult a ProfileRegistry.
+// state vocabulary, the digest evidence and the reason each state requires, and
+// that the registry endpoint carries no credential. Like
+// ValidatePublishedMember it does not consult a ProfileRegistry.
 func ValidateMemberProbe(p *MemberProbe) []diag.Diagnostic {
 	if p == nil {
 		return []diag.Diagnostic{diag.Errorf("invalid-member-probe", "", "member probe is nil")}
@@ -606,14 +630,13 @@ func ValidateMemberProbe(p *MemberProbe) []diag.Diagnostic {
 	}
 	diags = append(diags, validateProbeState(p)...)
 
-	// Sort so a probe with several defects reports the same order every run.
+	// The diagnostics are sorted by field.
 	sort.SliceStable(diags, func(i, j int) bool { return diags[i].Field < diags[j].Field })
 	return diags
 }
 
 // validateProbeRegistry checks that the endpoint a probe names is present and
-// credential-free. The event is printed and stored with the job result, so URL
-// user information or a query string would leak whatever they carry.
+// carries no URL user information and no query string.
 func validateProbeRegistry(registry string) []diag.Diagnostic {
 	if registry == "" {
 		return []diag.Diagnostic{diag.Errorf("invalid-member-probe", "registry", "registry is required")}
@@ -637,9 +660,10 @@ func validateProbeRegistry(registry string) []diag.Diagnostic {
 	return nil
 }
 
-// validateProbeState checks the evidence each state requires. An identical
-// verdict without two equal digests, or a conflict between two equal digests,
-// is a contradiction a consumer must not have to resolve.
+// validateProbeState checks the evidence each state requires: absent carries
+// no registry digest, identical carries two equal digests, retag carries a
+// registry digest that differs from the artifact digest, and conflict and
+// unverified carry a reason.
 func validateProbeState(p *MemberProbe) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	switch p.State {
@@ -653,16 +677,16 @@ func validateProbeState(p *MemberProbe) []diag.Diagnostic {
 			diags = append(diags, diag.Errorf("invalid-member-probe", "registryDigest",
 				"state %s requires an artifactDigest and an equal registryDigest", p.State))
 		}
-	case MemberProbeConflict:
-		if p.ArtifactDigest != "" && p.ArtifactDigest == p.RegistryDigest {
+	case MemberProbeRetag:
+		if p.RegistryDigest == "" || p.ArtifactDigest == p.RegistryDigest {
 			diags = append(diags, diag.Errorf("invalid-member-probe", "registryDigest",
-				"state %s must not carry two equal digests", p.State))
+				"state %s requires a registryDigest that differs from the artifactDigest", p.State))
 		}
-	case MemberProbeUnverified:
+	case MemberProbeConflict, MemberProbeUnverified:
 	default:
 		return []diag.Diagnostic{diag.Errorf("invalid-member-probe", "state",
-			"state %q must be one of: %s, %s, %s, %s", p.State,
-			MemberProbeAbsent, MemberProbeIdentical, MemberProbeConflict, MemberProbeUnverified)}
+			"state %q must be one of: %s, %s, %s, %s, %s", p.State,
+			MemberProbeAbsent, MemberProbeIdentical, MemberProbeConflict, MemberProbeUnverified, MemberProbeRetag)}
 	}
 	if (p.State == MemberProbeConflict || p.State == MemberProbeUnverified) && strings.TrimSpace(p.Reason) == "" {
 		diags = append(diags, diag.Errorf("invalid-member-probe", "reason",

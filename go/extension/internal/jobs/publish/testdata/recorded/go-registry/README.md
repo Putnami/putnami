@@ -20,8 +20,12 @@ Trace and request identifiers are kept as recorded.
 
 - A response for a version the registry serves is not recorded: it is the
   module zip itself. The tests build that answer from the bytes they stage.
-- A `401` or a `403` is not recorded: the registry answers an anonymous request
-  for a module it serves, and a refused credential needs a live bearer.
+- A `401` or a `403` is not recorded. On 2026-10-01 every anonymous `GET` tried
+  was answered `200` or `404`, a private module path included: the zip, `.mod`
+  and `@v/list` paths of a served module and of `go.putnami.dev/cloud`, the
+  version and release paths, the blob upload path and `/`. A refused credential
+  needs a live bearer. The probe's handling of a status outside the protocol is
+  tested with a `502` the test builds.
 
 ## Recording a new response
 

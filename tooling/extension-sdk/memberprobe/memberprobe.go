@@ -2,24 +2,23 @@
 // its registry whether it already holds a member at the version the real
 // publish would write, and reports the answer as one member-probe event.
 //
-// A registry refuses to overwrite a published version. A dry run that never
-// asks therefore passes on a release the real publish fails part-way through.
-// Every publisher asks with read-only requests (GET or HEAD), and the
-// orchestrator fails the dry run when any answer is a conflict or is missing.
+// A probe sends read-only requests (GET or HEAD). It carries the credential the
+// publisher's own sources yield, which for a managed host is the host-only
+// registry-token seam the real publish asks, and is anonymous when none
+// resolves. The orchestrator fails the dry run on a conflict or an unverified
+// answer, and warns on a retag.
 //
 // The package owns what the four registry kinds share: the verdict rules, the
 // wording of a reason, the credential-free form of an endpoint and the emit
 // helper. It also owns the probe of an archive member on the put registry. The
-// npm, Go module and OCI probes live with their publishers, because each one
-// reuses its publisher's route, credential and HTTP policy.
+// npm, Go module and OCI probes live with their publishers and use their
+// publisher's route, credential sources and HTTP policy.
 package memberprobe
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -31,9 +30,8 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
-// Timeout bounds one probe. A probe answers a question about a single version,
-// so a registry that has not answered within it is reported as unverified
-// rather than left to hold the dry run.
+// Timeout bounds one probe. A registry that has not answered within it is
+// reported as unverified.
 const Timeout = 2 * time.Minute
 
 // reasonLimit bounds, in characters, the reason a probe carries.
@@ -41,8 +39,13 @@ const reasonLimit = 300
 
 // Reasons a held version is a conflict.
 const (
-	reasonNoArtifact  = "the registry already holds this version and the dry run built no artifact to compare"
-	reasonOtherDigest = "the registry already holds this version with another digest"
+	// ReasonNoArtifact is the reason of a held version the dry run has no
+	// local artifact to compare with. It names the remedy.
+	ReasonNoArtifact = "the registry already holds this version and the dry run built no artifact to compare; " +
+		"run package for this project without --dry-run, then the dry run again, to compare the bytes"
+	// ReasonOtherDigest is the reason of a held version whose digest differs
+	// from the local artifact's, for a registry that keeps a version immutable.
+	ReasonOtherDigest = "the registry already holds this version with another digest; the real publish cannot overwrite it"
 )
 
 // Subject is one question to one registry: the member a dry run would publish,
@@ -86,13 +89,20 @@ func (s Subject) Absent() extproto.MemberProbe {
 }
 
 // Held is the verdict for a registry that holds the version with
-// registryDigest. It is identical when that digest equals the local artifact's,
-// a conflict when it differs or when the dry run built no artifact, and
-// unverified when the registry advertised no digest to compare with.
+// registryDigest, for a publisher whose real publish reuses a version with the
+// local artifact's digest and is refused on any other. It is identical when
+// the digests are equal, a conflict when they differ or when the dry run built
+// no artifact, and unverified when the registry advertised no digest.
 func (s Subject) Held(registryDigest string) extproto.MemberProbe {
+	return s.HeldWith(registryDigest, ReasonOtherDigest)
+}
+
+// HeldWith is Held with the reason of a held version whose digest differs from
+// the local artifact's. otherDigest says what the real publish does with it.
+func (s Subject) HeldWith(registryDigest, otherDigest string) extproto.MemberProbe {
 	switch {
 	case s.ArtifactDigest == "":
-		return s.Conflict(registryDigest, reasonNoArtifact)
+		return s.Conflict(registryDigest, ReasonNoArtifact)
 	case registryDigest == "":
 		return s.Unverified("the registry holds this version but advertised no digest to compare")
 	case registryDigest == s.ArtifactDigest:
@@ -100,13 +110,34 @@ func (s Subject) Held(registryDigest string) extproto.MemberProbe {
 		probe.RegistryDigest = registryDigest
 		return probe
 	default:
-		return s.Conflict(registryDigest, reasonOtherDigest)
+		return s.Conflict(registryDigest, otherDigest)
+	}
+}
+
+// HeldTag is the verdict for a registry that holds the version tag at
+// registryDigest, for a publisher whose real publish moves the tag to the local
+// artifact. It is identical when the digests are equal, retag when they differ
+// or when the dry run built no artifact, and unverified when the registry
+// advertised no digest.
+func (s Subject) HeldTag(registryDigest string) extproto.MemberProbe {
+	switch {
+	case registryDigest == "":
+		return s.Unverified("the registry holds this version tag but advertised no digest to compare")
+	case registryDigest == s.ArtifactDigest:
+		probe := s.probe(extproto.MemberProbeIdentical)
+		probe.RegistryDigest = registryDigest
+		return probe
+	default:
+		probe := s.probe(extproto.MemberProbeRetag)
+		probe.RegistryDigest = registryDigest
+		return probe
 	}
 }
 
 // Conflict is the verdict for a held version the real publish cannot reuse.
 // registryDigest may be empty when the registry advertised none in the form a
-// probe carries.
+// probe carries, and may equal the local artifact's digest when the publisher
+// may refuse the held version whatever its bytes.
 func (s Subject) Conflict(registryDigest, reason string) extproto.MemberProbe {
 	probe := s.probe(extproto.MemberProbeConflict)
 	probe.RegistryDigest = registryDigest
@@ -155,8 +186,8 @@ func UnreachableReason(err error) string {
 }
 
 // RefusedReason says which HTTP status a registry answered and what to do about
-// it. A 401 or a 403 names the credential, because a request without one can
-// neither confirm nor rule out a private member.
+// it. For a 401 or a 403 it names the credential: an anonymous request is told
+// to sign in or supply the registry token.
 func RefusedReason(status int, anonymous bool, excerpt string) string {
 	answer := fmt.Sprintf("%d %s", status, http.StatusText(status))
 	if excerpt = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(excerpt), ":")); excerpt != "" {
@@ -177,9 +208,7 @@ var bearerCredential = regexp.MustCompile(`(?i)bearer\s+[^\s"',;]+`)
 
 // Redact makes upstream-controlled text safe to carry in a probe: it replaces
 // every given secret and every bearer value, turns control characters into
-// spaces and cuts the text to a bounded length. A registry may echo the
-// request's Authorization in an error body, and a probe is printed and stored
-// with the job result.
+// spaces and cuts the text to a bounded length.
 func Redact(text string, secrets ...string) string {
 	for _, secret := range secrets {
 		if secret == "" {
@@ -229,10 +258,8 @@ func Endpoint(raw string) string {
 	return parsed.String()
 }
 
-// Emit reports one probe as a member-probe event. The event is the dry run's
-// only statement about the registry: it is never publication evidence, and the
-// job that emits it still succeeds on a conflict so the orchestrator can report
-// every member in one pass.
+// Emit reports one probe as a member-probe artifact event. The event is not
+// publication evidence, and emitting a conflict does not fail the job.
 func Emit(emit *jsonl.Emitter, probe extproto.MemberProbe) {
 	data := map[string]any{
 		"ecosystem":  probe.Ecosystem,
@@ -257,21 +284,11 @@ func Emit(emit *jsonl.Emitter, probe extproto.MemberProbe) {
 	emit.ArtifactWithData(probe.Ecosystem, probe.Coordinate, extproto.MemberProbeEventKind, "", data)
 }
 
-// envelopeKeys are the runtime-event fields an artifact event carries beside
-// its payload. They are the envelope, not the probe.
-var envelopeKeys = []string{"v", "type", "time", "level", "message", "id", "name", "kind", "path"}
-
-// Decode reads the probe one member-probe artifact event carries. It is the
-// inverse of Emit and the only reader of the event: everything left after the
-// envelope goes through the protocol's strict parser and its validator, so a
-// field or a state this build does not know is an error rather than a verdict
-// dropped in silence.
+// Decode reads the probe one flattened member-probe artifact event carries. It
+// is the inverse of Emit: the payload goes through the protocol's strict
+// parser and its validator, so an unknown field or state is an error.
 func Decode(event map[string]any) (*extproto.MemberProbe, error) {
-	payload := maps.Clone(event)
-	for _, key := range envelopeKeys {
-		delete(payload, key)
-	}
-	encoded, err := json.Marshal(payload)
+	encoded, err := extproto.ArtifactEventPayload(event)
 	if err != nil {
 		return nil, err
 	}
@@ -285,9 +302,9 @@ func Decode(event map[string]any) (*extproto.MemberProbe, error) {
 	return probe, nil
 }
 
-// NewHTTPClient returns the client a probe sends its requests with. Ambient
-// HTTP(S)_PROXY is ignored and a redirect is returned instead of followed: a
-// bearer bound to the registry origin must not reach a second recipient.
+// NewHTTPClient returns the client a probe sends its requests with. It ignores
+// ambient HTTP(S)_PROXY and returns a redirect instead of following it, so a
+// request and its bearer reach the registry origin only.
 func NewHTTPClient() (*http.Client, error) {
 	base, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {

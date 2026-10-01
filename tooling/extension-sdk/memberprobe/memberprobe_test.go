@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	extproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
@@ -39,7 +40,7 @@ func TestHeldVersionVerdict(t *testing.T) {
 	}{
 		"equal digests are identical":        {localDigest, localDigest, extproto.MemberProbeIdentical, ""},
 		"different digests are a conflict":   {localDigest, otherDigest, extproto.MemberProbeConflict, "another digest"},
-		"no local artifact is a conflict":    {"", otherDigest, extproto.MemberProbeConflict, "built no artifact to compare"},
+		"no local artifact is a conflict":    {"", otherDigest, extproto.MemberProbeConflict, "run package for this project without --dry-run"},
 		"no local and no registry digest":    {"", "", extproto.MemberProbeConflict, "built no artifact to compare"},
 		"no advertised digest is unverified": {localDigest, "", extproto.MemberProbeUnverified, "advertised no digest"},
 	} {
@@ -49,6 +50,55 @@ func TestHeldVersionVerdict(t *testing.T) {
 			probe := subject.Held(tc.registry)
 			if probe.State != tc.wantState || !strings.Contains(probe.Reason, tc.wantReason) {
 				t.Fatalf("Held(%q) = %+v, want %s with reason %q", tc.registry, probe, tc.wantState, tc.wantReason)
+			}
+			if diagnostics := extproto.ValidateMemberProbe(&probe); len(diagnostics) != 0 {
+				t.Fatalf("verdict %+v is not a valid member-probe: %v", probe, diagnostics)
+			}
+		})
+	}
+}
+
+// HeldWith keeps the verdict rules of Held and states the publisher's own
+// reason for a held version with another digest.
+func TestHeldWithStatesThePublishersReason(t *testing.T) {
+	const reason = "the real publish fails its verification of the served bytes"
+	subject := testSubject()
+	if probe := subject.HeldWith(otherDigest, reason); probe.State != extproto.MemberProbeConflict || probe.Reason != reason {
+		t.Fatalf("HeldWith(other) = %+v, want a conflict with the given reason", probe)
+	}
+	if probe := subject.HeldWith(localDigest, reason); probe.State != extproto.MemberProbeIdentical || probe.Reason != "" {
+		t.Fatalf("HeldWith(local) = %+v, want identical", probe)
+	}
+	subject.ArtifactDigest = ""
+	if probe := subject.HeldWith(otherDigest, reason); probe.State != extproto.MemberProbeConflict || probe.Reason != ReasonNoArtifact {
+		t.Fatalf("HeldWith without a local artifact = %+v, want the no-artifact reason", probe)
+	}
+}
+
+// A version tag held at other content is a retag, not a conflict: the real
+// publish moves the tag. Without a local artifact it is still a retag, to the
+// image the publish builds.
+func TestHeldTagVerdict(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "dry-run-member-probe", "held-tag-is-a-retag")
+	for name, tc := range map[string]struct {
+		local, registry string
+		wantState       string
+	}{
+		"equal digests are identical":        {localDigest, localDigest, extproto.MemberProbeIdentical},
+		"different digests are a retag":      {localDigest, otherDigest, extproto.MemberProbeRetag},
+		"no local artifact is a retag":       {"", otherDigest, extproto.MemberProbeRetag},
+		"no advertised digest is unverified": {localDigest, "", extproto.MemberProbeUnverified},
+		"nothing to compare is unverified":   {"", "", extproto.MemberProbeUnverified},
+	} {
+		t.Run(name, func(t *testing.T) {
+			subject := testSubject()
+			subject.ArtifactDigest = tc.local
+			probe := subject.HeldTag(tc.registry)
+			if probe.State != tc.wantState {
+				t.Fatalf("HeldTag(%q) = %+v, want %s", tc.registry, probe, tc.wantState)
+			}
+			if probe.State == extproto.MemberProbeRetag && (probe.RegistryDigest != tc.registry || probe.Reason != "") {
+				t.Fatalf("HeldTag(%q) = %+v, want the registry digest and no reason", tc.registry, probe)
 			}
 			if diagnostics := extproto.ValidateMemberProbe(&probe); len(diagnostics) != 0 {
 				t.Fatalf("verdict %+v is not a valid member-probe: %v", probe, diagnostics)
@@ -174,6 +224,7 @@ func TestEmitRoundTripsThroughTheStrictReader(t *testing.T) {
 		"identical":  subject.Held(localDigest),
 		"conflict":   subject.Held(otherDigest),
 		"unverified": subject.Unreachable(errors.New("no route to host")),
+		"retag":      subject.HeldTag(otherDigest),
 	} {
 		for _, version := range []int{1, 2} {
 			t.Run(fmt.Sprintf("%s v%d", name, version), func(t *testing.T) {

@@ -173,10 +173,14 @@ How it asks depends on the publication:
 
 - **A release-set member** sends one GET of the version's tarball through the
   HTTP client of the managed publication, and runs no `npm` process. The
-  request carries a bearer only when the credential seam yields one; otherwise
-  it is anonymous and the event says so. It requests no publish lease. It packs
-  the staged package with `bun pm pack` only when the registry holds the
-  version, and compares SHA-256 digests.
+  request carries the bearer the real publish asks the host-only credential
+  seam for. The seam carries the registry host and nothing else, so the cloud
+  decides what the credential grants; the probe sends reads only with it. A
+  public package needs no credential: when the seam yields none, the request is
+  anonymous and the event says so. The probe packs the staged package with
+  `bun pm pack` only when the registry holds the version, and compares SHA-256
+  digests. A private registry that refuses an anonymous read fails the dry run
+  as `unverified`.
 - **Any other publication** asks through `npm view <name>@<version> dist --json`
   with the environment the real publish runs `npm` with, because npm's
   configuration owns the registry and the credential. It compares the
@@ -184,7 +188,8 @@ How it asks depends on the publication:
   writes. It cannot observe whether npm sent a credential, so it never marks an
   answer anonymous. A host without `npm` reports `unverified`. The real publish
   of such a package reuses any version the registry already holds without
-  comparing content, so the dry run is stricter than the publish.
+  comparing the bytes, so the dry run is stricter than the publish, and its
+  conflict reason says so.
 
 The task succeeds whatever the answer; the CLI fails the run on `conflict` and
 `unverified`

@@ -175,7 +175,7 @@ it already holds the member at that version:
 | `ecosystem`, `coordinate`, `version` | The member the real publish would write. |
 | `platform` | Optional `os/arch`, for a member published as one artifact per platform. |
 | `registry` | The endpoint asked, without credential, query or fragment. |
-| `state` | `absent`, `identical`, `conflict` or `unverified`. |
+| `state` | `absent`, `identical`, `retag`, `conflict` or `unverified`. |
 | `artifactDigest` | Optional digest of the local artifact (`sha256:` plus 64 lowercase hex characters). |
 | `registryDigest` | Optional digest the registry serves, in the same form. |
 | `reason` | Required for `conflict` and `unverified`. |
@@ -183,12 +183,20 @@ it already holds the member at that version:
 
 `absent` means the registry does not hold the version. `identical` means it
 holds it with the digest of the local artifact, and requires both digests.
-`conflict` means it holds it with another digest, or the dry run has no local
-artifact to compare with. `unverified` means the registry gave no usable
-answer. `ParseMemberProbe` is strict and `ValidateMemberProbe` closes the
-`state` vocabulary: an unknown field or state is a rejection, because a verdict
-this build cannot read must not be dropped silently. A `member-probe` is never
-publication evidence.
+`retag` means it holds the version tag at other content and the real publish
+moves the tag; it requires a `registryDigest` that differs from any
+`artifactDigest`, and a consumer warns on it instead of failing the dry run.
+`conflict` means it holds it and the real publish cannot reuse it: another
+digest, no local artifact to compare with, or a held version the publisher
+refuses whatever its bytes, in which case both digests may be equal. `unverified` means
+the registry gave no usable answer. `ParseMemberProbe` is strict and
+`ValidateMemberProbe` closes the `state` vocabulary: an unknown field or state
+is a rejection, because a verdict this build cannot read must not be dropped
+silently. A `member-probe` is never publication evidence.
+
+Both events travel as flattened artifact events: the payload fields sit beside
+the event envelope (`ArtifactEventEnvelope`). `ArtifactEventPayload` drops the
+envelope and returns the payload a strict parser reads.
 
 ## Producers and consumers
 

@@ -149,7 +149,7 @@
     },
     {
       "id": "dry-run-registry-probe",
-      "text": "A dry-run Go module publication asks the registry, with one GET of the proxy zip and no write, whether it already serves the module at the version the real publish would write, and emits one member-probe event: absent, identical when the served zip equals the staged zip, conflict when it differs or no zip is staged, unverified when the registry cannot answer. A bearer is sent only when one resolved. Without a release-set plan, the go channel record names the module and version when no module is staged."
+      "text": "A dry-run Go module publication asks the registry, with one GET of the proxy zip, whether it serves the module at the version the publish would write, and emits one member-probe event. Without a release-set plan a served version is a conflict: the real publish fails if the registry released it. Under a plan it is identical when the served zip equals the zip an earlier package staged, a conflict when it differs, and a conflict naming the remedy when none is staged. An unreadable staged zip is unverified."
     },
     {
       "id": "resolved-dependency-documentation",

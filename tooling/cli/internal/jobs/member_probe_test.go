@@ -52,6 +52,8 @@ func probeOf(ecosystem, coordinate, version, registry, state string) extensionpr
 		probe.ArtifactDigest, probe.RegistryDigest = digestFor('a'), digestFor('a')
 	case extensionproto.MemberProbeUnverified:
 		probe.Reason = "the registry could not be reached: connection refused"
+	case extensionproto.MemberProbeRetag:
+		probe.ArtifactDigest, probe.RegistryDigest = digestFor('a'), digestFor('b')
 	}
 	return probe
 }
@@ -211,6 +213,58 @@ func TestDryRunReportsAnIdenticalMemberAsReused(t *testing.T) {
 	}
 }
 
+// A version tag the registry holds at other content is a warning, not a
+// failure: the real publish moves the tag. The warning names the tag, the
+// member, the registry and both digests, or the image the publish builds when
+// the dry run has no local digest, and quiet keeps it.
+func TestDryRunWarnsAboutAMovedTag(t *testing.T) {
+	spectest.Proves(t, "cli/publish-dry-run-probe", "one-pass-verdict", "retag-is-a-warning")
+	moved := probeOf("oci", "putnami/api", "1.4.0", testOCIRegistry, extensionproto.MemberProbeRetag)
+	unbuilt := probeOf("oci", "putnami/worker", "1.4.0", testOCIRegistry, extensionproto.MemberProbeRetag)
+	unbuilt.ArtifactDigest = ""
+	results := dryRunResults(t, moved, unbuilt)
+	var out bytes.Buffer
+	MemberProbeReport{Commands: []string{"publish"}, DryRun: true, Quiet: true, Out: &out}.Finalizer()(results)
+
+	if result := results[memberProbeResultKey]; result != nil {
+		t.Fatalf("a moved tag failed the dry run: %+v", result)
+	}
+	report := out.String()
+	for _, want := range []string{
+		"warning: publish will move tag 1.4.0 of putnami/api on oci.putnami.dev from " + digestFor('b') + " to " + digestFor('a'),
+		"warning: publish will move tag 1.4.0 of putnami/worker on oci.putnami.dev from " + digestFor('b') + " to the image this publish builds",
+	} {
+		if !strings.Contains(report, want) {
+			t.Fatalf("report does not contain %q:\n%s", want, report)
+		}
+	}
+}
+
+// A moved tag does not hide a conflict elsewhere: the run fails on the
+// conflict alone, and the moved tag stays a warning.
+func TestDryRunFailsOnAConflictBesideAMovedTag(t *testing.T) {
+	spectest.Proves(t, "cli/publish-dry-run-probe", "one-pass-verdict", "retag-does-not-hide-a-conflict")
+	results := dryRunResults(t,
+		probeOf("oci", "putnami/api", "1.4.0", testOCIRegistry, extensionproto.MemberProbeRetag),
+		probeOf("go", "go.putnami.dev/sdk/extension", "v1.4.0", testGoRegistry, extensionproto.MemberProbeConflict),
+	)
+
+	report, failure := finalizeDryRun(t, nil, results)
+
+	if !strings.Contains(failure, "1 registry check(s)") || !strings.Contains(failure, "conflict go go.putnami.dev/sdk/extension@v1.4.0") {
+		t.Fatalf("failure = %q, want the one conflict", failure)
+	}
+	if strings.Contains(failure, "putnami/api") {
+		t.Fatalf("failure = %q names the moved tag", failure)
+	}
+	if events := results[memberProbeResultKey].Events; len(events) != 1 {
+		t.Fatalf("failed row carries %d diagnostics, want the conflict's alone", len(events))
+	}
+	if !strings.Contains(report, "warning: publish will move tag 1.4.0 of putnami/api") {
+		t.Fatalf("report does not warn about the moved tag:\n%s", report)
+	}
+}
+
 func probePlanRun(members ...releaseset.PlannedMember) *ReleaseSetRun {
 	run := &ReleaseSetRun{plan: &releaseset.Plan{Members: members}, dryRun: true, routes: map[string]releaseMemberRoute{}}
 	for _, member := range members {
@@ -249,6 +303,94 @@ func TestDryRunWarnsAboutAPlannedMemberNoPublisherProbed(t *testing.T) {
 	}
 	if strings.Contains(report, "@putnami/runtime") {
 		t.Fatalf("report expects a probe for a member the plan does not select:\n%s", report)
+	}
+}
+
+// Under a plan, a probe for a member the plan does not select, or does not
+// know, is rejected and fails the run, as an unexpected publication does. A
+// selected member whose route the run does not know is named without an empty
+// publisher or step.
+func TestDryRunRejectsAProbeForAMemberThePlanDoesNotSelect(t *testing.T) {
+	spectest.Proves(t, "cli/publish-dry-run-probe", "plan-coverage", "unexpected-probe-fails")
+	run := probePlanRun(
+		releaseset.PlannedMember{Ecosystem: "go", Coordinate: "go.putnami.dev/sdk/extension", Version: "v1.4.0", Selected: true, ProjectID: "/sdk"},
+		releaseset.PlannedMember{Ecosystem: "npm", Coordinate: "@putnami/runtime", Version: "1.3.0", ProjectID: "/runtime"},
+		releaseset.PlannedMember{Ecosystem: "oci", Coordinate: "putnami/cli", Version: "1.4.0", Selected: true, ProjectID: "/cli"},
+	)
+	delete(run.routes, releaseset.MemberKey("oci", "putnami/cli"))
+	results := dryRunResults(t,
+		probeOf("go", "go.putnami.dev/sdk/extension", "v1.4.0", testGoRegistry, extensionproto.MemberProbeAbsent),
+		probeOf("npm", "@putnami/runtime", "1.3.0", testNPMRegistry, extensionproto.MemberProbeAbsent),
+		probeOf("npm", "@putnami/unknown", "1.0.0", testNPMRegistry, extensionproto.MemberProbeIdentical),
+	)
+
+	report, failure := finalizeDryRun(t, run, results)
+
+	for _, want := range []string{
+		`job "b:publish~npm" probed unexpected release-set member npm/@putnami/runtime`,
+		`job "c:publish~npm" probed unexpected release-set member npm/@putnami/unknown`,
+		"2 registry check(s)",
+	} {
+		if !strings.Contains(failure, want) {
+			t.Fatalf("failure = %q, want %q", failure, want)
+		}
+	}
+	if strings.Contains(report, "reused") || !strings.Contains(report, "1 member(s) are not in their registry") {
+		t.Fatalf("report counts an unexpected probe:\n%s", report)
+	}
+	if !strings.Contains(report, "not probed: oci putnami/cli@1.4.0 (the publish route is unknown)") {
+		t.Fatalf("report does not say the route is unknown:\n%s", report)
+	}
+}
+
+// The route of an unprobed member names what the run knows of it.
+func TestMemberRouteLabelNamesWhatIsKnown(t *testing.T) {
+	for _, tc := range []struct {
+		route releaseMemberRoute
+		want  string
+	}{
+		{releaseMemberRoute{publisher: "@putnami/go", publishStep: "go"}, "publisher @putnami/go, step go"},
+		{releaseMemberRoute{publisher: "@putnami/go"}, "publisher @putnami/go"},
+		{releaseMemberRoute{publishStep: "go"}, "step go"},
+		{releaseMemberRoute{}, "the publish route is unknown"},
+	} {
+		if got := memberRouteLabel(tc.route); got != tc.want {
+			t.Errorf("memberRouteLabel(%+v) = %q, want %q", tc.route, got, tc.want)
+		}
+	}
+}
+
+// The failed result row carries one error diagnostic per blocking verdict, so
+// the machine output lists each one with its code.
+func TestDryRunFailureCarriesOneDiagnosticPerVerdict(t *testing.T) {
+	spectest.Proves(t, "cli/publish-dry-run-probe", "one-pass-verdict", "verdicts-reach-the-machine-output")
+	results := dryRunResults(t,
+		probeOf("go", "go.putnami.dev/sdk/extension", "v1.4.0", testGoRegistry, extensionproto.MemberProbeConflict),
+		probeOf("npm", "@putnami/runtime", "1.4.0", testNPMRegistry, extensionproto.MemberProbeUnverified),
+		probeOf("oci", "putnami/cli", "1.4.0", testOCIRegistry, extensionproto.MemberProbeAbsent),
+	)
+	results["d:publish~put"] = &JobResult{Status: "success", Events: []RawJobEvent{
+		rawArtifactEvent(t, "put", "putnami/cli", extensionproto.MemberProbeEventKind, map[string]any{"state": "superseded"}),
+	}}
+
+	_, failure := finalizeDryRun(t, nil, results)
+
+	task := TaskResultOf(nil, results[memberProbeResultKey])
+	want := []struct{ code, message string }{
+		{MemberProbeConflictCode, "conflict go go.putnami.dev/sdk/extension@v1.4.0 at https://go.putnami.dev: "},
+		{MemberProbeUnverifiedCode, "unverified npm @putnami/runtime@1.4.0 at https://npm.putnami.dev: "},
+		{MemberProbeRejectedCode, `job "d:publish~put" emitted an invalid member probe`},
+	}
+	if len(task.Diagnostics) != len(want) {
+		t.Fatalf("diagnostics = %+v, want one per blocking verdict", task.Diagnostics)
+	}
+	for index, diagnostic := range task.Diagnostics {
+		if diagnostic.Severity != "error" || diagnostic.Code != want[index].code || !strings.HasPrefix(diagnostic.Message, want[index].message) {
+			t.Fatalf("diagnostic %d = %+v, want error %s %q", index, diagnostic, want[index].code, want[index].message)
+		}
+		if !strings.Contains(failure, diagnostic.Message) {
+			t.Fatalf("failure %q does not carry diagnostic %q", failure, diagnostic.Message)
+		}
 	}
 }
 

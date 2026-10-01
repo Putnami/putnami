@@ -65,8 +65,13 @@ func TestGoModule_DryRun(t *testing.T) {
 		[]byte(`{"version":"1.0.0","channels":["go"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// The probe hashes the staged zip, so it exists.
+	zipPath := filepath.Join(dir, "x.zip")
+	if err := os.WriteFile(zipPath, []byte("staged module zip"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(pkgDir, "go", "module.json"),
-		[]byte(`{"modulePath":"go.putnami.dev/mod","version":"1.0.0","zipPath":"/tmp/x.zip","modPath":"/tmp/go.mod"}`), 0o644); err != nil {
+		fmt.Appendf(nil, `{"modulePath":"go.putnami.dev/mod","version":"1.0.0","zipPath":%q,"modPath":"/tmp/go.mod"}`, zipPath), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

@@ -81,10 +81,8 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	dockerManifest, err := pkgmeta.ReadDockerManifest(wsRoot, projectPath)
 	if err != nil {
 		// A dry-run package may plan the image without assembling it, and then it
-		// writes no manifest. The dry-run publish has no candidate to list: it
-		// says so and pushes nothing, as every other dry-run exit does. The
-		// release-set plan still names the member, so the registry is asked about
-		// the planned coordinate and version.
+		// writes no manifest. The dry-run publish lists no ref, pushes nothing,
+		// and probes the members the release-set plan selects for the project.
 		if common.DryRun && errors.Is(err, fs.ErrNotExist) {
 			emit.Summary("Dry run: package assembled no Docker image for " + ctx.Project.Name + ", so no ref is listed")
 			probePlannedImageMembers(ctx, emit, dockerRegistry)
@@ -166,12 +164,12 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 			emit.Info("  - " + ref)
 		}
 		emitPublishedDocker(emit, qualifiedImage, version, runtime.PublishRecord{DryRun: true})
-		// The version is the one tag this publisher writes, so it is the one
-		// reference the registry is asked about. An empty registry pushes
-		// nothing and is asked nothing.
+		// The probe asks for the version tag, the one tag this publisher writes
+		// and moves, and compares it with the packaged manifest digest. An empty
+		// registry is asked nothing.
 		emitImageProbe(emit, imageProbe{
 			host: regHost, repository: qualifiedImage, version: version, ref: versionRef,
-			digest: contentDigest, keychain: keychain, transport: route.transport,
+			digest: contentDigest, movesTag: true, keychain: keychain, transport: route.transport,
 		})
 		return "OK", map[string]any{"dryRun": true, "imageName": imageName, "refs": allRefs, "contentTag": contentTag}, nil
 	}
@@ -494,8 +492,8 @@ func publishImmutableImageProject(ctx *pctx.Context, emit *jsonl.Emitter, dryRun
 
 	if dryRun {
 		emit.Summary("Dry run: would publish and verify immutable image " + immutableRef)
-		// An image project is addressed by its digest, so the registry is asked
-		// about that digest: it either holds these exact bytes or it does not.
+		// The probe asks for the image digest, with the credential the real
+		// publish resolves for the same host.
 		token, _ := registrycred.ResolveToken(credentialHost)
 		emitImageProbe(emit, imageProbe{
 			host: target.Host, repository: target.Repository, version: memberVersion, ref: immutableRef,

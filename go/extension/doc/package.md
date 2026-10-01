@@ -258,17 +258,31 @@ HTTP client as a real publication, and emits one `member-probe` event:
 | State | When |
 |-------|------|
 | `absent` | The registry answers 404 or 410. |
-| `identical` | The served zip has the SHA-256 of the staged zip. The real publish reuses it. |
-| `conflict` | The served zip differs, or the dry run staged no zip to compare. |
-| `unverified` | The registry cannot be reached, refuses the request, or answers outside the protocol. |
+| `identical` | Under a release-set plan, the served zip has the SHA-256 of the zip an earlier `package` staged for the planned module and version. The real publish reuses it. |
+| `conflict` | Without a plan, the registry serves the version: a Go publish outside a release set fails when the registry has publicly released it, and a read cannot tell a released version from a private one. Under a plan, the served zip differs from the staged one, or no zip is staged for that version. |
+| `unverified` | The staged zip cannot be read, or the registry cannot be reached, refuses the request, or answers outside the protocol. |
 
-The request carries a bearer only when an explicit token or the credential seam
-yields one; otherwise it is anonymous and the event says so. The dry run
-requests no publish lease. Under a release-set plan the module and version come
-from the plan and no zip is staged, so a version the registry already serves is
-a `conflict`. Without a plan they come from the staged module, or from the `go`
-channel record when the dry-run package staged none. The task succeeds whatever
-the answer; the CLI fails the run on `conflict` and `unverified`
+A dry-run `package` stages no zip. Under a plan the module and version come from
+the plan, and the dry run compares with the zip a real `package` staged
+earlier for that module and version. With none, the conflict says so: run
+`putnami package` for the project without `--dry-run`, then the dry run again.
+Without a plan the module and version come from the staged module, or from the
+`go` channel record when the dry-run package staged none.
+
+A served zip with another digest is a `conflict` with or without a plan. The
+registry answers a publish of a version it has publicly released with 409, and
+a publish of a private version with 201 while it keeps the bytes it holds. The
+real publish verifies the zip the registry serves after either answer, so it
+fails on other bytes.
+
+The request carries the credential the real publish asks for: an explicit token
+first, then the host-only credential seam. The seam carries the registry host
+and nothing else, so the cloud decides what the credential grants; the probe
+sends reads only with it. A public module needs no credential: when none
+resolves, the request is anonymous and the event says so. A private registry
+that refuses an anonymous read fails the dry run as `unverified`. The task
+succeeds whatever the answer; the CLI fails the run on `conflict` and
+`unverified`
 (see [Publish and `--dry-run`](../../../tooling/cli/doc/03-commands.md#registry-checks)).
 
 On a linked developer checkout, the publisher obtains its write credential only

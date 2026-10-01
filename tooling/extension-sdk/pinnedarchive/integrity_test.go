@@ -1,4 +1,4 @@
-package extension
+package pinnedarchive
 
 import (
 	"net/http"

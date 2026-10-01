@@ -201,8 +201,10 @@ func TestPublishedMemberIsStrict(t *testing.T) {
 }
 
 // TestMemberProbeIsStrict pins the dry-run probe's parse and validation
-// contract: an unknown field or state is a rejection, each state carries the
-// digest evidence it claims, and the registry endpoint carries no credential.
+// contract: an unknown field or state is a rejection, absent, identical and
+// retag carry the digest evidence they claim, conflict and unverified carry a
+// reason, and the registry endpoint carries no credential. A conflict may carry
+// equal digests: the publisher's reuse rule, not the digests, decides it.
 func TestMemberProbeIsStrict(t *testing.T) {
 	const local = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 	const remote = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
@@ -214,7 +216,13 @@ func TestMemberProbeIsStrict(t *testing.T) {
 		"identical":         `{` + base + `,"state":"identical","artifactDigest":"` + local + `","registryDigest":"` + local + `"}`,
 		"conflict":          `{` + base + `,"state":"conflict","artifactDigest":"` + local + `","registryDigest":"` + remote + `","reason":"digests differ"}`,
 		"conflict no local": `{` + base + `,"state":"conflict","reason":"the dry run built no artifact to compare"}`,
-		"unverified":        `{` + base + `,"state":"unverified","reason":"connection refused"}`,
+		"conflict with equal digests": `{` + base + `,"state":"conflict","artifactDigest":"` + local + `","registryDigest":"` + local +
+			`","reason":"the publisher refuses an existing version"}`,
+		"unverified": `{` + base + `,"state":"unverified","reason":"connection refused"}`,
+		"retag": `{"ecosystem":"oci","coordinate":"acme/api","version":"1.2.3","registry":"registry.example.test",` +
+			`"state":"retag","artifactDigest":"` + local + `","registryDigest":"` + remote + `"}`,
+		"retag no local": `{"ecosystem":"oci","coordinate":"acme/api","version":"1.2.3","registry":"registry.example.test",` +
+			`"state":"retag","registryDigest":"` + remote + `"}`,
 		"bare host": `{"ecosystem":"oci","coordinate":"acme/api","version":"1.2.3","registry":"registry.example.test:5000",` +
 			`"state":"absent"}`,
 		"one platform": `{` + base + `,"state":"absent","platform":"linux/arm64"}`,
@@ -261,8 +269,9 @@ func TestMemberProbeIsStrict(t *testing.T) {
 		"identical with other digest": {
 			`{` + base + `,"state":"identical","artifactDigest":"` + local + `","registryDigest":"` + remote + `"}`, "registryDigest",
 		},
-		"conflict with equal digests": {
-			`{` + base + `,"state":"conflict","artifactDigest":"` + local + `","registryDigest":"` + local + `","reason":"r"}`, "registryDigest",
+		"retag without registry digest": {`{` + base + `,"state":"retag","artifactDigest":"` + local + `"}`, "registryDigest"},
+		"retag with equal digests": {
+			`{` + base + `,"state":"retag","artifactDigest":"` + local + `","registryDigest":"` + local + `"}`, "registryDigest",
 		},
 		"conflict without reason":   {`{` + base + `,"state":"conflict","registryDigest":"` + remote + `"}`, "reason"},
 		"unverified without reason": {`{` + base + `,"state":"unverified","reason":"  "}`, "reason"},
@@ -316,6 +325,43 @@ var ecosystemInvalidFixtureCodes = map[string][]string{
 // rule through the entry point consumers call. Exact-match rather than
 // contains: a fixture that started failing for a second, unrelated reason would
 // stop certifying the rule it was written for.
+// An artifact event's payload is every field but the envelope, so the strict
+// parsers meet exactly what the publisher emitted. The event is not modified.
+func TestArtifactEventPayloadDropsTheEnvelope(t *testing.T) {
+	event := map[string]any{
+		"v": 2, "type": "artifact", "time": "2026-10-01T00:00:00Z", "level": "info", "message": "m",
+		"id": "npm", "name": "@acme/widget", "kind": MemberProbeEventKind, "path": "",
+		"ecosystem": "npm", "coordinate": "@acme/widget", "version": "1.4.0",
+		"registry": "https://registry.example.test", "state": MemberProbeAbsent,
+	}
+
+	encoded, err := ArtifactEventPayload(event)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{
+		"ecosystem": "npm", "coordinate": "@acme/widget", "version": "1.4.0",
+		"registry": "https://registry.example.test", "state": MemberProbeAbsent,
+	}
+	if !reflect.DeepEqual(payload, want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+	if len(event) != 14 {
+		t.Fatalf("the event lost fields: %v", event)
+	}
+	if probe, diagnostics := ParseMemberProbe(encoded); probe == nil || len(diagnostics) != 0 {
+		t.Fatalf("the payload does not pass the strict parser: %v", diagnostics)
+	}
+	if _, err := ArtifactEventPayload(map[string]any{"bad": func() {}}); err == nil {
+		t.Fatal("a payload that does not encode was accepted")
+	}
+}
+
 func TestEcosystemFixturesReportStableCodes(t *testing.T) {
 	for name, codes := range ecosystemInvalidFixtureCodes {
 		t.Run(name, func(t *testing.T) {

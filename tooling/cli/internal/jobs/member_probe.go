@@ -9,6 +9,7 @@ import (
 
 	distribution "go.putnami.dev/protocol/distribution"
 	extproto "go.putnami.dev/protocol/extension"
+	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/sdk/extension/memberprobe"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
@@ -20,12 +21,10 @@ const memberProbeResultKey = "putnami:publish~member-probe"
 // MemberProbeReport aggregates the member-probe events of an executing dry-run
 // publish into one report and one verdict.
 //
-// Each publisher asks its own registry and reports one probe per member; a
-// publish job succeeds whatever the answer. This is the single place the
-// answers are read, so every conflict shows in one pass and the run fails once,
-// naming all of them. It knows no ecosystem: it reads records through the
-// protocol's strict reader and compares them with the release-set plan when
-// the run has one.
+// It reads every member-probe event of the session through the protocol's
+// strict reader, compares each one with the release-set plan when the run has
+// one, prints every blocking verdict and every moved tag, and fails the run
+// once, naming every blocking verdict. It reads no ecosystem-specific field.
 type MemberProbeReport struct {
 	// Run is the release-set coordination of this session, or nil for a publish
 	// without a plan.
@@ -41,7 +40,9 @@ type MemberProbeReport struct {
 }
 
 // Finalizer returns the result finalizer of a dry-run publish, or nil for any
-// other session: only a dry run emits probes.
+// other session. On a blocking verdict it adds a failed result row whose error
+// names every one and which carries one error diagnostic per verdict, so the
+// machine output lists them.
 func (report MemberProbeReport) Finalizer() func(map[string]*JobResult) {
 	if !report.DryRun || !slices.Contains(report.Commands, "publish") {
 		return nil
@@ -50,10 +51,25 @@ func (report MemberProbeReport) Finalizer() func(map[string]*JobResult) {
 		summary := summarizeMemberProbes(report.Run, results)
 		summary.print(report.Out, report.Quiet)
 		if failure := summary.failure(); failure != "" {
-			results[memberProbeResultKey] = &JobResult{Status: "failed", Error: &JobError{Message: failure}}
+			results[memberProbeResultKey] = &JobResult{
+				Status: "failed",
+				Error:  &JobError{Message: failure},
+				Events: summary.diagnosticEvents(),
+			}
 		}
 	}
 }
+
+// Diagnostic codes of the failed member-probe result row.
+const (
+	// MemberProbeConflictCode marks a conflict verdict.
+	MemberProbeConflictCode = "member-probe-conflict"
+	// MemberProbeUnverifiedCode marks an unverified verdict.
+	MemberProbeUnverifiedCode = "member-probe-unverified"
+	// MemberProbeRejectedCode marks a member-probe event that is no usable
+	// verdict.
+	MemberProbeRejectedCode = "member-probe-rejected"
+)
 
 // memberProbeSummary is what the probes of one dry run say, in report order.
 type memberProbeSummary struct {
@@ -62,12 +78,15 @@ type memberProbeSummary struct {
 	// reused are the identical probes: the real publish reuses what the
 	// registry holds.
 	reused []*extproto.MemberProbe
+	// retagged are the retag probes: the real publish moves a version tag to
+	// other content. Each one is a warning.
+	retagged []*extproto.MemberProbe
 	// absent counts the probes whose registry does not hold the version, and
 	// anonymousAbsent those of them answered without a credential.
 	absent, anonymousAbsent int
 	// rejected are the events that are no usable verdict: one the strict reader
-	// refuses, or one about another version than the plan publishes. Each one
-	// fails the run.
+	// refuses, one about a member the plan does not select, or one about
+	// another version than the plan publishes. Each one fails the run.
 	rejected []string
 	// notProbed are the selected members of the plan no probe speaks about.
 	notProbed []string
@@ -77,7 +96,9 @@ type memberProbeSummary struct {
 
 // summarizeMemberProbes reads every member-probe event of the session. Results
 // are walked in key order and probes sorted by member, so the same session
-// prints the same report.
+// prints the same report. Under a plan, a probe for a member the plan does not
+// select is rejected, as reconcilePublishedReleaseSet rejects an unexpected
+// publication.
 func summarizeMemberProbes(run *ReleaseSetRun, results map[string]*JobResult) memberProbeSummary {
 	var summary memberProbeSummary
 	planned := run != nil && run.plan != nil
@@ -111,8 +132,14 @@ func summarizeMemberProbes(run *ReleaseSetRun, results map[string]*JobResult) me
 				continue
 			}
 			key := releaseset.MemberKey(distribution.Ecosystem(probe.Ecosystem), probe.Coordinate)
+			member, expected := selected[key]
+			if planned && !expected {
+				summary.rejected = append(summary.rejected, fmt.Sprintf(
+					"job %q probed unexpected release-set member %s", resultKey, printableReleaseKey(key)))
+				continue
+			}
 			probed[key] = true
-			if member, expected := selected[key]; expected && probe.Version != member.Version {
+			if expected && probe.Version != member.Version {
 				summary.rejected = append(summary.rejected, fmt.Sprintf(
 					"job %q probed %s %s at version %q, and the release-set plan publishes %q",
 					resultKey, probe.Ecosystem, probe.Coordinate, probe.Version, member.Version))
@@ -132,26 +159,42 @@ func summarizeMemberProbes(run *ReleaseSetRun, results map[string]*JobResult) me
 			}
 		case extproto.MemberProbeIdentical:
 			summary.reused = append(summary.reused, probe)
+		case extproto.MemberProbeRetag:
+			summary.retagged = append(summary.retagged, probe)
 		default:
-			// The strict reader admits four states; the two left make the real
-			// publish fail or leave its outcome unknown.
+			// MemberProbeConflict and MemberProbeUnverified.
 			summary.blocking = append(summary.blocking, probe)
 		}
 	}
-	// With a plan, each selected member no probe speaks about is named with the
-	// publisher and the publish step that would have asked. Without one, the
-	// run can only say that nothing asked.
+	// With a plan, each selected member no probe speaks about is named with
+	// what the run knows of the step that would have asked. Without one, the
+	// report says only that nothing asked.
 	for key, member := range selected {
 		if probed[key] {
 			continue
 		}
-		route := run.routes[key]
-		summary.notProbed = append(summary.notProbed, fmt.Sprintf("%s %s@%s (publisher %s, step %s)",
-			member.Ecosystem, member.Coordinate, member.Version, route.publisher, route.publishStep))
+		summary.notProbed = append(summary.notProbed, fmt.Sprintf("%s %s@%s (%s)",
+			member.Ecosystem, member.Coordinate, member.Version, memberRouteLabel(run.routes[key])))
 	}
 	sort.Strings(summary.notProbed)
 	summary.unasked = !planned && len(probed) == 0 && len(summary.rejected) == 0 && len(results) > 0
 	return summary
+}
+
+// memberRouteLabel names the publisher and the publish step of a member's
+// route, each one only when the run knows it.
+func memberRouteLabel(route releaseMemberRoute) string {
+	var parts []string
+	if route.publisher != "" {
+		parts = append(parts, "publisher "+route.publisher)
+	}
+	if route.publishStep != "" {
+		parts = append(parts, "step "+route.publishStep)
+	}
+	if len(parts) == 0 {
+		return "the publish route is unknown"
+	}
+	return strings.Join(parts, ", ")
 }
 
 // memberProbeLabel names what a probe asked: the member, its version, the
@@ -164,19 +207,62 @@ func memberProbeLabel(probe *extproto.MemberProbe) string {
 	return label + " at " + probe.Registry
 }
 
+// blockingVerdict is one verdict that fails the run: its diagnostic code and
+// the sentence that names it.
+type blockingVerdict struct {
+	code, message string
+}
+
+// blocked lists every verdict that fails the run, blocking probes first in
+// report order, then rejected events.
+func (summary memberProbeSummary) blocked() []blockingVerdict {
+	verdicts := make([]blockingVerdict, 0, len(summary.blocking)+len(summary.rejected))
+	for _, probe := range summary.blocking {
+		code := MemberProbeConflictCode
+		if probe.State == extproto.MemberProbeUnverified {
+			code = MemberProbeUnverifiedCode
+		}
+		verdicts = append(verdicts, blockingVerdict{code, fmt.Sprintf("%s %s: %s", probe.State, memberProbeLabel(probe), probe.Reason)})
+	}
+	for _, rejected := range summary.rejected {
+		verdicts = append(verdicts, blockingVerdict{MemberProbeRejectedCode, rejected})
+	}
+	return verdicts
+}
+
 // failure is the message the run fails with, naming every member the real
 // publish cannot write as planned. It is empty when nothing blocks.
 func (summary memberProbeSummary) failure() string {
-	blocked := make([]string, 0, len(summary.blocking)+len(summary.rejected))
-	for _, probe := range summary.blocking {
-		blocked = append(blocked, fmt.Sprintf("%s %s: %s", probe.State, memberProbeLabel(probe), probe.Reason))
-	}
-	blocked = append(blocked, summary.rejected...)
-	if len(blocked) == 0 {
+	verdicts := summary.blocked()
+	if len(verdicts) == 0 {
 		return ""
 	}
+	messages := make([]string, 0, len(verdicts))
+	for _, verdict := range verdicts {
+		messages = append(messages, verdict.message)
+	}
 	return fmt.Sprintf("publish --dry-run: %d registry check(s) say the publish cannot run as planned: %s",
-		len(blocked), strings.Join(blocked, "; "))
+		len(verdicts), strings.Join(messages, "; "))
+}
+
+// diagnosticEvents is one error diagnostic event per blocking verdict, in the
+// shape a job's own diagnostic has.
+func (summary memberProbeSummary) diagnosticEvents() []RawJobEvent {
+	verdicts := summary.blocked()
+	events := make([]RawJobEvent, 0, len(verdicts))
+	for _, verdict := range verdicts {
+		events = append(events, RawJobEvent{
+			Version: runtimeproto.MaxKnownProtocolVersion,
+			Type:    EventTypeDiagnostic,
+			Message: verdict.message,
+			Data: map[string]any{
+				"severity": string(runtimeproto.SeverityError),
+				"message":  verdict.message,
+				"code":     verdict.code,
+			},
+		})
+	}
+	return events
 }
 
 // print writes the report: every blocking probe and every warning always, and
@@ -197,6 +283,14 @@ func (summary memberProbeSummary) print(out io.Writer, quiet bool) {
 		if summary.absent > 0 {
 			lines = append(lines, fmt.Sprintf("  %-10s  %d member(s) are not in their registry: the publish uploads them", "absent", summary.absent))
 		}
+	}
+	for _, probe := range summary.retagged {
+		target := probe.ArtifactDigest
+		if target == "" {
+			target = "the image this publish builds"
+		}
+		lines = append(lines, fmt.Sprintf("  warning: publish will move tag %s of %s on %s from %s to %s",
+			probe.Version, probe.Coordinate, probe.Registry, probe.RegistryDigest, target))
 	}
 	if summary.anonymousAbsent > 0 {
 		lines = append(lines, fmt.Sprintf(

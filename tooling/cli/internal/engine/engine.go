@@ -886,14 +886,14 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 // publishFinalizers returns the finalizers a publish session ends with, in
 // order.
 //
-// A dry-run publish reads its publishers' registry probes once, so every
-// conflict shows in one pass; that report is nil for any other run. The dry-run
-// parameter the jobs receive decides, as it does for the release set: a preview
-// executes no job and runs no finalizer.
+// The first reads the registry probes of a dry-run publish once, after every
+// job, and is nil for any other run. The dry-run parameter the jobs receive
+// selects it, as it selects the release-set mode: a preview executes no job and
+// runs no finalizer.
 //
-// Advancing a release-set channel is irreversible for this publish attempt, so
-// it comes last: a synthetic failure of a session gate or of the probe report
-// is visible to the coordinator and cannot publish a successful outcome.
+// The release-set coordinator comes last. It sees the synthetic failure of a
+// session gate or of the probe report, and publishes no successful outcome
+// after one.
 func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *jobs.ReleaseSetRun) []func(map[string]*jobs.JobResult) {
 	dryRun, _ := req.CommandParams["dry-run"].(bool)
 	finalizers := []func(map[string]*jobs.JobResult){jobs.MemberProbeReport{

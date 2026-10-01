@@ -306,6 +306,23 @@ func TestManagedNPMDryRunProbesThroughThePrivateBroker(t *testing.T) {
 	assertOneTarballRead(t, broker, "Bearer "+probeNPMToken)
 }
 
+// A registry that refuses an anonymous read is unverified, and the reason says
+// to sign in. The refusal is the one npm.putnami.dev sends.
+func TestManagedNPMProbeReportsARefusedAnonymousRead(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "dry-run-registry-probe", "npm-refusal-is-unverified")
+	managedProbeSeams(t, "", nil)
+	server := recorded.NewServer(t, nil, recordedNPMResponse(t, "anonymous-request.401.http"))
+	registry := server.URL + "/npm"
+
+	probe := oneNPMProbe(t, managedDryRunCtx(t, registry))
+
+	if probe.State != extproto.MemberProbeUnverified || !probe.Anonymous ||
+		!strings.Contains(probe.Reason, `401 Unauthorized: {"error":"authentication required"} to a request without a credential; sign in`) {
+		t.Fatalf("probe = %+v, want an anonymous unverified verdict with the registry's refusal and the remedy", probe)
+	}
+	assertOneTarballRead(t, server, "")
+}
+
 // A registry answer that states neither a held version nor an absent one is
 // unverified, and the reason carries neither the body's echo of the credential
 // nor an unbounded body. The redirect is not followed: the bearer reaches one
@@ -397,8 +414,8 @@ func unmanagedDryRunCtx(t *testing.T) *pctx.Context {
 	return ctx
 }
 
-// The unmanaged npm dry run asks through npm, because npm's own configuration
-// owns the registry and the credential there. It runs `npm view` once, packs
+// The unmanaged npm dry run asks through npm, whose configuration owns the
+// registry and the credential there. It runs `npm view` once, packs
 // with `npm pack` only to compare a held version, and never runs a command
 // that writes. Every refusal is what npm printed against a real registry.
 func TestUnmanagedNPMDryRunAsksThroughNPM(t *testing.T) {
@@ -448,14 +465,14 @@ func TestUnmanagedNPMDryRunAsksThroughNPM(t *testing.T) {
 		{
 			name:      "another sha512 integrity is a conflict",
 			view:      func(t *testing.T) *exec.Result { return recordedNPMCommand(t, "view-version-held") },
-			wantState: extproto.MemberProbeConflict, wantLocal: stagedDigest, wantReason: "another digest", wantPack: true,
+			wantState: extproto.MemberProbeConflict, wantLocal: stagedDigest, wantReason: "reuses the existing version without comparing", wantPack: true,
 		},
 		{
 			name:      "another sha256 integrity is a conflict that names the registry digest",
 			view:      func(t *testing.T) *exec.Result { return recordedNPMCommand(t, "view-private-registry") },
 			wantState: extproto.MemberProbeConflict, wantLocal: stagedDigest,
 			wantRegistry: "sha256:c84acb73640240b3be4bca3a67c5cb9c5b1039c260f79aff9dd33bdab518d2be",
-			wantReason:   "another digest", wantPack: true,
+			wantReason:   "with other bytes than the packed package", wantPack: true,
 		},
 		{
 			name:      "an integrity the probe cannot compare is unverified",

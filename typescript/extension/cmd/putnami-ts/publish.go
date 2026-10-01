@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -213,8 +214,8 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 			// Preserve the legacy/full event contract outside managed release sets.
 			emitPublished(emit, "npm", packageName, version, true)
 		}
-		// The dry run's one question to the registry: does it already hold this
-		// version. It reads only, and a missing credential never fails it.
+		// The probe sends reads only. A missing credential sends them
+		// anonymously.
 		probeNPMPackage(emit, npmDryRun{
 			managed: managedReleaseSet, wsRoot: wsRoot, projectPath: projectPath, npmDir: npmDir,
 			packageName: packageName, version: version, registry: registry,
@@ -224,7 +225,7 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 	}
 
 	// Ask Cloud for the publication credential. The dry run above asks the same
-	// seam, only to read, and never fails on its answer.
+	// host-only seam and sends reads only with its answer.
 	// The seam carries the registry HOST and nothing else: the cloud owns what
 	// authority the credential grants, so no package coordinate or action name
 	// crosses it. A managed host with no credential fails closed; only the
@@ -684,20 +685,11 @@ func newManagedNPMHTTPClient() (*http.Client, error) {
 }
 
 func probeManagedNPMArtifact(registry, token, packageName, version, wantDigest string, wantSize int64) (bool, error) {
-	tarballURL, err := managedNPMTarballURL(registry, packageName, version)
-	if err != nil {
-		return false, err
-	}
-	req, err := http.NewRequest(http.MethodGet, tarballURL, nil)
-	if err != nil {
-		return false, fmt.Errorf("build managed npm verification request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
 	client, err := newManagedNPMHTTPClient()
 	if err != nil {
 		return false, err
 	}
-	resp, err := client.Do(req) //nolint:gosec // tarball URL is constructed from the validated registry origin and staged coordinate
+	resp, err := getManagedNPMTarball(client, registry, token, packageName, version)
 	if err != nil {
 		return false, fmt.Errorf("download managed npm artifact: %w", err)
 	}
@@ -724,6 +716,24 @@ func probeManagedNPMArtifact(registry, token, packageName, version, wantDigest s
 		return false, fmt.Errorf("published npm artifact digest mismatch: staged %s, registry %s", wantDigest, gotDigest)
 	}
 	return true, nil
+}
+
+// getManagedNPMTarball sends a GET of the tarball of packageName at version to
+// registry, with the bearer when token is set. A send error is a *url.Error; a
+// coordinate or request error is not.
+func getManagedNPMTarball(client *http.Client, registry, token, packageName, version string) (*http.Response, error) {
+	tarballURL, err := managedNPMTarballURL(registry, packageName, version)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodGet, tarballURL, nil)
+	if err != nil {
+		return nil, errors.New("the managed npm tarball request could not be built")
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	return client.Do(req) //nolint:gosec // tarball URL is constructed from the validated registry origin and staged coordinate
 }
 
 func managedNPMTarballURL(registry, packageName, version string) (string, error) {

@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/memberprobe"
+	"go.putnami.dev/sdk/extension/registrycred"
 )
 
 // stubManifestHead replaces the probe's manifest HEAD for a test about another
@@ -135,14 +136,14 @@ func TestDryRunProbesTheVersionTag(t *testing.T) {
 		assertReadOnly(t, fixture.registry.recordedCalls()[before:])
 	})
 
-	t.Run("another digest is a conflict", func(t *testing.T) {
+	t.Run("another digest is a retag", func(t *testing.T) {
 		fixture := newDockerPublishFixture(t)
 		held := pushOtherImage(t, fixture.host+"/"+fixture.repository+":"+fixture.version)
 		before := len(fixture.registry.recordedCalls())
 		probe := oneProbe(t, dryRunProbes(t, dryRun(fixture)))
 		assertMember(t, fixture, probe)
-		if probe.State != extproto.MemberProbeConflict || probe.RegistryDigest != held || !strings.Contains(probe.Reason, "another digest") {
-			t.Fatalf("probe = %+v, want a conflict with the held digest %s", probe, held)
+		if probe.State != extproto.MemberProbeRetag || probe.RegistryDigest != held {
+			t.Fatalf("probe = %+v, want a retag from the held digest %s: the real publish moves the tag", probe, held)
 		}
 		assertReadOnly(t, fixture.registry.recordedCalls()[before:])
 	})
@@ -213,9 +214,9 @@ func TestDryRunProbesTheVersionTag(t *testing.T) {
 	})
 }
 
-// When package assembled no image, the release-set plan still names the member:
-// the dry run asks about the planned coordinate and version, and a version the
-// registry already holds is a conflict because no local digest exists.
+// When package assembled no image, the dry run asks about the coordinate and
+// version the release-set plan names. A workload's held version tag is a retag
+// with no local digest: the real publish moves the tag to the image it builds.
 func TestDryRunProbesThePlannedMemberWithoutAnAssembledImage(t *testing.T) {
 	fixture := newDockerPublishFixture(t)
 	ctx := fixture.ctx
@@ -240,10 +241,41 @@ func TestDryRunProbesThePlannedMemberWithoutAnAssembledImage(t *testing.T) {
 	held := pushOtherImage(t, fixture.host+"/team/app:4.0.0")
 	before := len(fixture.registry.recordedCalls())
 	probe = oneProbe(t, dryRunProbes(t, dryRun))
-	if probe.State != extproto.MemberProbeConflict || probe.RegistryDigest != held || !strings.Contains(probe.Reason, "built no artifact to compare") {
-		t.Fatalf("probe = %+v, want a conflict that says the dry run built no artifact", probe)
+	if probe.State != extproto.MemberProbeRetag || probe.RegistryDigest != held || probe.ArtifactDigest != "" {
+		t.Fatalf("probe = %+v, want a retag from the held digest %s with no local digest", probe, held)
 	}
 	assertReadOnly(t, fixture.registry.recordedCalls()[before:])
+}
+
+// The planned members of one project share a host, so their probes share one
+// credential request.
+func TestDryRunResolvesThePlannedMembersCredentialOnce(t *testing.T) {
+	fixture := newDockerPublishFixture(t)
+	ctx := fixture.ctx
+	ctx.WorkspaceRoot = t.TempDir()
+	plan := imageReleasePlan(ctx)
+	plan.Members[0].Coordinate = "team/app"
+	second := plan.Members[0]
+	second.Coordinate = "team/app-debug"
+	plan.Members = append(plan.Members, second)
+	bindImageReleasePlan(t, ctx, plan)
+	ctx.Params["registries"] = json.RawMessage(`{"oci":{"publish":"` + fixture.host + `"}}`)
+	var hosts []string
+	original := registrycred.ResolveToken
+	registrycred.ResolveToken = func(host string) (string, string) {
+		hosts = append(hosts, host)
+		return "", ""
+	}
+	t.Cleanup(func() { registrycred.ResolveToken = original })
+
+	probes := dryRunProbes(t, func() (string, map[string]any, error) { return Publish(ctx, jsonl.New(), []string{"--dry-run"}) })
+
+	if len(probes) != 2 || probes[0].Coordinate != "team/app" || probes[1].Coordinate != "team/app-debug" {
+		t.Fatalf("probes = %+v, want one per planned member", probes)
+	}
+	if len(hosts) != 1 || hosts[0] != fixture.host {
+		t.Fatalf("credential requests = %v, want one for %s", hosts, fixture.host)
+	}
 }
 
 // An image project is addressed by its digest, so the dry run asks about that

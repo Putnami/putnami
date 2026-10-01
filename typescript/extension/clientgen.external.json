@@ -49,26 +49,10 @@
       ],
       "owner": "@putnami/typescript",
       "tests": [
+        "typescript/extension/cmd/putnami-ts/publish_probe_test.go",
         "typescript/extension/cmd/putnami-ts/publish_test.go"
       ],
-      "reason": "Publishes a package tarball and reads back its published metadata."
-    },
-    {
-      "authority": "npm registry API (github.com/npm/registry/blob/master/docs/REGISTRY-API.md)",
-      "adapter": "typescript/extension/cmd/putnami-ts/publish_probe.go",
-      "callsites": [
-        {
-          "path": "typescript/extension/cmd/putnami-ts/publish_probe.go",
-          "transport": "http",
-          "symbol": "http.NewRequest",
-          "fingerprint": "0d3a08ffb0dfc742bcc7f28328ffb9d6e0544fe7b054baf0bfbd237a16ba113d"
-        }
-      ],
-      "owner": "@putnami/typescript",
-      "tests": [
-        "typescript/extension/cmd/putnami-ts/publish_probe_test.go"
-      ],
-      "reason": "Asks the registry, with one GET of the version's tarball, whether it already holds the package a dry-run publish would upload."
+      "reason": "Publishes a package tarball and reads back its published metadata. A dry-run publish sends one GET of the version's tarball to ask whether the registry already holds the package."
     }
   ]
 }

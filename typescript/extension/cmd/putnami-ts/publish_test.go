@@ -132,9 +132,9 @@ func TestRunPublishNpm_DryRun(t *testing.T) {
 }
 
 func TestRunPublishNpm_ManagedDryRunDoesNotClaimPublication(t *testing.T) {
-	// The dry run reads the registry once and resolves no publication
-	// credential: the seam yields nothing here and the task still succeeds.
-	managedProbeSeams(t, "", nil)
+	// The dry run asks the host-only credential seam once, which yields nothing
+	// here, sends one anonymous read, and succeeds without publication evidence.
+	_, tokenHosts := managedProbeSeams(t, "", nil)
 	registry := recorded.NewServer(t, nil, recordedNPMResponse(t, "tarball-version-not-found.404.http"))
 	ctx, dir := makeTestCtx(t)
 	ctx.Params = pctx.Params{
@@ -157,6 +157,9 @@ func TestRunPublishNpm_ManagedDryRunDoesNotClaimPublication(t *testing.T) {
 		}
 	}
 	assertOneTarballRead(t, registry, "")
+	if len(*tokenHosts) != 1 {
+		t.Fatalf("credential seam asked %d times (%v), want once", len(*tokenHosts), *tokenHosts)
+	}
 }
 
 func TestRunPublishNpm_ManagedStaysPrivateAndVerifiesExactTarball(t *testing.T) {

@@ -10,18 +10,19 @@
   ],
   "nonGoals": [
     "Knowing a registry protocol: each publisher asks its own registry, and the CLI only aggregates the records they emit",
-    "Writing to a registry, requesting a publish lease, or requiring a publish credential for a public member",
+    "Writing to a registry, or requiring a credential for a public member",
+    "Asking for a read-only credential: a probe asks the host-only seam the real publish asks, and the cloud decides what the credential grants",
     "Proving that a private member is absent from an answer obtained without a credential",
     "Probing during a plan-only preview: --plan and a plan-only --dry-run execute no job"
   ],
   "requirements": [
     {
       "id": "one-pass-verdict",
-      "text": "An executing publish --dry-run reads every member-probe event of its jobs through the strict protocol reader, with or without a release-set plan. It prints one report: each conflict and each unverified probe with its member, registry, version and reason, each identical member as reused, and a count of absent members. The run fails once, naming every conflict and unverified probe, and also fails on a probe the reader refuses. Absent and identical probes pass."
+      "text": "An executing publish --dry-run reads every member-probe event of its jobs through the strict protocol reader, with or without a release-set plan. It prints one report: each conflict and unverified probe with its member, registry, version and reason, each identical member as reused, each retag as a warning naming the tag and both digests, and a count of absent members. The run fails once, naming every conflict, unverified and refused probe, each also as an error diagnostic. Absent, identical and retag pass."
     },
     {
       "id": "plan-coverage",
-      "text": "With a release-set plan, each selected member no probe speaks about is reported as not probed, with its publisher and publish step: a warning, never a failure, never silent. A probe whose version differs from the planned member's version is rejected and fails the run. An absent answer obtained without a credential produces one warning for the run, because a registry answers such a request for a private member as it does for a missing one."
+      "text": "With a release-set plan, each selected member no probe speaks about is reported as not probed, with its publisher and publish step or as a member whose route is unknown: a warning, never silent. A probe for a member the plan does not select, or whose version differs from the planned version, is rejected and fails the run. An absent answer obtained without a credential produces one warning, because a registry answers such a request for a private member as for a missing one."
     }
   ],
   "decisions": [

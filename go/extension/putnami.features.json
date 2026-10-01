@@ -208,7 +208,8 @@
             "kind": "acceptance",
             "checks": [
               "go-module-probe-is-read-only",
-              "unplanned-dry-run-probes-without-a-staged-module"
+              "unplanned-dry-run-probes-without-a-staged-module",
+              "unreadable-staged-zip-is-unverified"
             ]
           }
         },

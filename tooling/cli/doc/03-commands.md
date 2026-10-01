@@ -54,39 +54,59 @@ Side-effect-free dependencies (`package~*`) still run — dry-run output is comp
 
 A registry refuses to overwrite a published version. A dry-run publish
 therefore asks each target registry, with GET or HEAD requests only, whether it
-already holds each member at the version the publish would write. It sends a
-credential only when one resolves, and needs none for a public member.
+already holds each member at the version the publish would write. Each request
+carries the credential the real publish asks for: the host-only credential
+seam carries the registry host and nothing else, so the cloud decides what the
+credential grants. A public member needs no credential: when none resolves,
+the request is anonymous.
 
 When every job has ended, the CLI prints one report on standard error:
 
 ```text
 putnami: publish --dry-run registry checks
-  conflict    npm @acme/widget@2.0.0 at https://registry.npmjs.org: the registry already holds this version with another digest
+  conflict    npm @acme/widget@2.0.0 at https://registry.npmjs.org: the registry already holds this version with another digest; the real publish cannot overwrite it
   unverified  go example.com/mod@v2.0.0 at https://go.example.com: the registry could not be reached: connection refused
   reused      oci acme/api@2.0.0 at registry.example.com: the registry holds the same digest sha256:…, so the publish reuses it
   absent      3 member(s) are not in their registry: the publish uploads them
+  warning: publish will move tag 2.0.0 of acme/worker on registry.example.com from sha256:… to sha256:…
 ```
 
 | State | Meaning | Dry run |
 |-------|---------|---------|
 | `absent` | The registry does not hold the version. | Passes. |
 | `identical` (printed `reused`) | The registry holds the version with the same content digest. The publish reuses it. | Passes. |
-| `conflict` | The registry holds the version with another digest, or the dry run built no artifact to compare. | Fails. |
+| `retag` (printed as a warning) | The registry holds an image's version tag at another digest. The publish moves the tag to the image it builds. | Passes. |
+| `conflict` | The registry holds the version and the real publish cannot reuse it: the digest differs, the dry run has no artifact to compare, or the registry may have released the version, which the publisher refuses. The reason says which. | Fails. |
 | `unverified` | The registry gave no usable answer: no network, a timeout, a 401 or 403, a server error. | Fails. |
 
-The run exits non-zero when any check is `conflict` or `unverified`. The
-failure names every such member, its registry and its version, so one dry run
-shows every conflict of the release. A dry run without network access fails as
+A dry-run `package` builds no artifact for some publishers. Under a release-set
+plan such a publisher compares with the artifact the last real `package` left;
+with none, the conflict names the remedy: run `putnami package` for the project
+without `--dry-run`, then the dry run again.
+
+The run exits non-zero when any check is `conflict` or `unverified`, and when
+a probe under a release-set plan speaks about a member the plan does not select
+or at another version than the planned one. The failure names every such
+member, its registry and its version, so one dry run shows every conflict of
+the release. With `--output=json`, the failed row of the run also carries one
+error diagnostic per such member. A dry run without network access fails as
 `unverified`: it never passes without an answer.
 
 The report also prints warnings, which do not fail the run:
 
+- `publish will move tag …`: a `retag`, with the registry digest and the local
+  one, or `the image this publish builds` when the dry run has no image. A
+  registry with immutable tags refuses the move, which a read cannot see.
 - `not probed`: under a release-set plan, a selected member whose publisher
-  reported no check, with the publisher and the publish step.
+  reported no check, with the publisher and the publish step, or with the
+  statement that the publish route is unknown.
 - An `absent` answer obtained without a credential. A registry answers such a
   request for a private member as it does for a missing one. Sign in and run
   the dry run again to confirm.
 - No publish step reported a check, for a publish without a plan.
+
+A dry run without a credential reads anonymously. A private registry that
+refuses the read fails the dry run as `unverified`.
 
 `--quiet` keeps the failures and the warnings. The design is recorded in
 [ADR 0056](adr/0056-a-publish-dry-run-asks-each-registry.md).

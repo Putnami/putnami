@@ -7,9 +7,8 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
-
-	"golang.org/x/mod/module"
 
 	"go.putnami.dev/go/extension/internal/releaseplan"
 	extproto "go.putnami.dev/protocol/extension"
@@ -20,22 +19,34 @@ import (
 )
 
 // maxGoModuleProbeZipBytes bounds how much of a served module zip a probe
-// hashes. It is the size limit the go command itself puts on a module zip, so
-// a larger answer is not a module a publication could have written.
+// hashes. It is the size limit the go command puts on a module zip.
 const maxGoModuleProbeZipBytes = 500 << 20
 
-// probeGoModule asks the registry whether it already serves the module at the
-// version a publish would write, and reports the answer as one member-probe
-// event. It is the only registry request a dry run sends.
+// reasonGoReleased is the reason of a held version outside a release set that
+// the dry run cannot prove differs from the staged zip.
+const reasonGoReleased = "the registry already serves this version; a Go publish outside a release set fails " +
+	"when the registry has publicly released it, and a read cannot tell a released version from a private one"
+
+// reasonGoOtherDigest is the reason of a held version whose zip differs from
+// the staged one.
+const reasonGoOtherDigest = "the registry already holds this version with another zip digest; it keeps those bytes " +
+	"when the version is sent again, so the real publish fails its verification of the served zip"
+
+// probeGoModule asks the registry whether it already serves modulePath at
+// version and emits the answer as one member-probe event.
 //
-// zipPath is the staged module zip, or empty when the dry run built none: a
-// planned dry run packages nothing, so a version the registry already serves
-// is then a conflict the dry run cannot compare.
+// zipPath is the staged module zip the answer is compared with, or empty when
+// no staged zip is that module and version. A zip that cannot be read makes
+// the probe unverified. planned selects the rule of the real publish. Both
+// verify the zip the registry serves after the upload, so a held version with
+// another zip digest is a conflict. Under a release-set plan a held version
+// with the staged digest is identical. Outside one, the real publish fails on
+// a version the registry has publicly released, which a read cannot tell from
+// a private one, so any held version is a conflict.
 //
-// The bearer is sent when one of the publisher's own sources yields it and the
-// request is anonymous otherwise. A missing credential never fails the probe:
-// the registry's answer to the anonymous request is what gets reported.
-func probeGoModule(params pctx.Params, emit *jsonl.Emitter, route goPublishRoute, registryURL, modulePath, version, zipPath string) {
+// The request carries the bearer resolveGoPublishToken yields, and is
+// anonymous when it yields none.
+func probeGoModule(params pctx.Params, emit *jsonl.Emitter, route goPublishRoute, registryURL, modulePath, version, zipPath string, planned bool) {
 	token, _ := resolveGoPublishToken(params, route.credentialHost)
 	subject := memberprobe.Subject{
 		Ecosystem:  string(releaseplan.GoEcosystem),
@@ -47,41 +58,28 @@ func probeGoModule(params pctx.Params, emit *jsonl.Emitter, route goPublishRoute
 	if zipPath != "" {
 		digest, err := sha256OfFile(zipPath)
 		if err != nil {
-			emit.Warn("Dry run: the staged module zip could not be read, so the registry copy cannot be compared: " + err.Error())
+			memberprobe.Emit(emit, subject.Unverified("the staged module zip cannot be read: "+err.Error()))
+			return
 		}
 		subject.ArtifactDigest = digest
 	}
-	memberprobe.Emit(emit, askGoRegistry(subject, route.endpoint, token))
+	memberprobe.Emit(emit, askGoRegistry(subject, route.endpoint, token, planned))
 }
 
-// askGoRegistry sends the probe's one request: a GET of the standard Go proxy
-// zip, the immutable bytes a consumer downloads. A 404 or a 410 means the
-// version does not exist. A 200 is hashed, so the verdict compares the bytes
-// the registry serves rather than a digest it claims.
-func askGoRegistry(subject memberprobe.Subject, endpoint, token string) extproto.MemberProbe {
-	escapedPath, err := module.EscapePath(subject.Coordinate)
-	if err != nil {
-		return subject.Unverified(fmt.Sprintf("the module path cannot be escaped: %v", err))
-	}
-	escapedVersion, err := module.EscapeVersion(subject.Version)
-	if err != nil {
-		return subject.Unverified(fmt.Sprintf("the module version cannot be escaped: %v", err))
-	}
+// askGoRegistry sends the probe's one request, a GET of the standard Go proxy
+// zip, and hashes a 200 body. A 404 or a 410 is absent.
+func askGoRegistry(subject memberprobe.Subject, endpoint, token string, planned bool) extproto.MemberProbe {
 	client, err := newGoRegistryHTTPClient()
 	if err != nil {
 		return subject.Unverified(err.Error())
 	}
 	client.Timeout = memberprobe.Timeout
-	req, err := http.NewRequest(http.MethodGet, endpoint+"/"+escapedPath+"/@v/"+escapedVersion+".zip", nil)
+	resp, err := getGoModuleZip(client, endpoint, token, subject.Coordinate, subject.Version)
 	if err != nil {
-		return subject.Unverified("the Go registry request could not be built")
-	}
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	resp, err := client.Do(req) //nolint:gosec // registryURL is validated from explicit publish configuration
-	if err != nil {
-		return subject.Unreachable(err)
+		if sendErr := (*url.Error)(nil); errors.As(err, &sendErr) {
+			return subject.Unreachable(err)
+		}
+		return subject.Unverified(err.Error())
 	}
 	defer resp.Body.Close()
 
@@ -95,26 +93,36 @@ func askGoRegistry(subject memberprobe.Subject, endpoint, token string) extproto
 		if read > maxGoModuleProbeZipBytes {
 			return subject.Unverified(fmt.Sprintf("the registry serves a module zip larger than %d bytes", maxGoModuleProbeZipBytes))
 		}
-		return subject.Held(fmt.Sprintf("sha256:%x", hash.Sum(nil)))
+		registryDigest := fmt.Sprintf("sha256:%x", hash.Sum(nil))
+		if !planned && (subject.ArtifactDigest == "" || subject.ArtifactDigest == registryDigest) {
+			return subject.Conflict(registryDigest, reasonGoReleased)
+		}
+		return subject.HeldWith(registryDigest, reasonGoOtherDigest)
 	case http.StatusNotFound, http.StatusGone:
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxGoRegistryResponseBytes))
 		return subject.Absent()
 	default:
-		// The body is upstream-controlled and may echo the request's
-		// Authorization, so it is bounded and redacted before it is shown.
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxGoRegistryResponseBytes))
 		return subject.Refused(resp.StatusCode, memberprobe.Redact(string(body), token))
 	}
 }
 
+// stagedGoZip returns the zip an earlier package staged when its metadata
+// names modulePath at version, or empty otherwise.
+func stagedGoZip(wsRoot, projectPath, modulePath, version string) string {
+	staged, err := pkgmeta.ReadGoModuleMetadata(wsRoot, projectPath)
+	if err != nil || staged.ModulePath != modulePath || staged.Version != version {
+		return ""
+	}
+	return staged.ZipPath
+}
+
 // stagedGoModule returns the module a publication would write.
 //
-// A real publish reads the metadata package staged beside the zip. A dry-run
-// package stages nothing: it writes only the go channel record, which names
-// the module path and the version it would stage. A dry run therefore takes
-// the module from that record, and keeps the staged metadata, and with it the
-// zip to compare, only when it describes that same module and version. A zip
-// left by an earlier run at another version says nothing about this one.
+// A real publish reads the staged module metadata. A dry run reads the module
+// path and version from the go channel record, which a dry-run package writes,
+// and keeps the staged metadata, and with it the zip to compare, only when it
+// names that same module and version.
 func stagedGoModule(channels *pkgmeta.ChannelIndex, wsRoot, projectPath string, dryRun bool) (*pkgmeta.GoModuleMetadata, error) {
 	staged, err := pkgmeta.ReadGoModuleMetadata(wsRoot, projectPath)
 	if !dryRun {

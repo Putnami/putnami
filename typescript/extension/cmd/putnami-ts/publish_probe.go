@@ -6,10 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -22,8 +24,6 @@ import (
 )
 
 // maxNPMProbeTarballBytes bounds how much of a served tarball a probe hashes.
-// It is far above the size a registry accepts for one package, so a longer
-// answer is not a tarball a publication could have written.
 const maxNPMProbeTarballBytes = 1 << 30
 
 // npmDryRun is what a dry-run npm publication asks its registry about: the
@@ -50,13 +50,11 @@ type npmDryRun struct {
 }
 
 // probeNPMPackage asks the registry whether it already holds the staged package
-// at its version and reports the answer as one member-probe event. It never
-// fails the dry run: the orchestrator reads the verdict and decides.
+// at its version and emits the answer as one member-probe event.
 //
-// Each path asks the way its real publish reads. A managed publication sends
-// one GET of the tarball, with the bearer when the seam yields one. An
-// unmanaged publication runs `npm view`, because npm's own configuration owns
-// the registry and the credential there.
+// A managed publication sends one GET of the tarball, with the bearer when the
+// host-only seam yields one. An unmanaged publication runs `npm view` with the
+// npm environment of the real publish.
 func probeNPMPackage(emit *jsonl.Emitter, run npmDryRun) {
 	if run.managed {
 		memberprobe.Emit(emit, probeManagedNPM(run))
@@ -66,9 +64,8 @@ func probeNPMPackage(emit *jsonl.Emitter, run npmDryRun) {
 }
 
 // probeManagedNPM compares the tarball the registry serves with the tarball the
-// managed publish would upload. The staged package is packed only when the
-// registry holds the version, so the common answer costs one request and no
-// child process.
+// managed publish would upload. It packs the staged package only when the
+// registry holds the version.
 func probeManagedNPM(run npmDryRun) extproto.MemberProbe {
 	token, _ := npmResolveRegistryToken(run.credentialHost)
 	subject := memberprobe.Subject{
@@ -108,25 +105,17 @@ func notComparedReason(err error) string {
 // could not answer.
 func readNPMTarballDigest(subject memberprobe.Subject, endpoint, token string) (string, *extproto.MemberProbe) {
 	verdict := func(probe extproto.MemberProbe) (string, *extproto.MemberProbe) { return "", &probe }
-	tarballURL, err := managedNPMTarballURL(endpoint, subject.Coordinate, subject.Version)
-	if err != nil {
-		return verdict(subject.Unverified(err.Error()))
-	}
-	req, err := http.NewRequest(http.MethodGet, tarballURL, nil)
-	if err != nil {
-		return verdict(subject.Unverified("the npm registry request could not be built"))
-	}
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
 	client, err := newManagedNPMHTTPClient()
 	if err != nil {
 		return verdict(subject.Unverified(err.Error()))
 	}
 	client.Timeout = memberprobe.Timeout
-	resp, err := client.Do(req) //nolint:gosec // tarball URL is constructed from the validated registry origin and staged coordinate
+	resp, err := getManagedNPMTarball(client, endpoint, token, subject.Coordinate, subject.Version)
 	if err != nil {
-		return verdict(subject.Unreachable(err))
+		if sendErr := (*url.Error)(nil); errors.As(err, &sendErr) {
+			return verdict(subject.Unreachable(err))
+		}
+		return verdict(subject.Unverified(err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -169,10 +158,10 @@ var npmUnreachableCodes = map[string]bool{
 
 // probeUnmanagedNPM asks through npm, with the environment the real publish
 // runs npm with. It runs `npm view`, and `npm pack` when the registry holds the
-// version: the tarball `npm publish` would upload is the one to compare.
+// version, and compares the packed tarball with the registry's integrity.
 //
-// The probe cannot tell whether npm's own configuration held a credential, so
-// it never marks the answer anonymous.
+// The probe never marks the answer anonymous: npm's own configuration may hold
+// a credential the probe does not see.
 func probeUnmanagedNPM(run npmDryRun) extproto.MemberProbe {
 	viewEnv := maps.Clone(run.authEnv)
 	token := ""
@@ -186,8 +175,7 @@ func probeUnmanagedNPM(run npmDryRun) extproto.MemberProbe {
 		Registry: unmanagedNPMRegistry(run),
 	}
 
-	// One request per question: npm's own retries would hold a dry run with no
-	// network for minutes.
+	// --fetch-retries 0 sends one request per question.
 	result, err := runNPM(run.npmDir, viewEnv, "view", run.packageName+"@"+run.version, "dist", "--json", "--fetch-retries", "0")
 	if err != nil || result == nil {
 		return subject.Unverified(memberprobe.Redact(fmt.Sprintf("npm could not be run: %v", err), token))
@@ -212,7 +200,7 @@ func probeUnmanagedNPM(run npmDryRun) extproto.MemberProbe {
 		return subject.Unverified(npmFailureReason(code, memberprobe.Redact(summary, token)))
 	}
 	if stdout == "" {
-		// An npm that finds the package without this version prints nothing.
+		// npm prints nothing for a package that exists without this version.
 		return subject.Absent()
 	}
 
@@ -228,9 +216,14 @@ func probeUnmanagedNPM(run npmDryRun) extproto.MemberProbe {
 	case same:
 		return subject.Held(localDigest)
 	default:
-		return subject.Conflict(registryDigest, "the registry already holds this version with another digest")
+		return subject.Conflict(registryDigest, reasonNPMUnmanagedOtherBytes)
 	}
 }
+
+// reasonNPMUnmanagedOtherBytes is the reason of a version the registry holds
+// with other bytes than the packed package, outside a release set.
+const reasonNPMUnmanagedOtherBytes = "the registry already holds this version with other bytes than the packed package; " +
+	"the real publish outside a release set reuses the existing version without comparing the bytes"
 
 // npmFailureReason says why `npm view` could not answer, from npm's error code.
 func npmFailureReason(code, summary string) string {
@@ -278,8 +271,8 @@ func compareNPMIntegrity(integrity, localDigest, localIntegrity string) (same bo
 			}
 		}
 		if registryDigest == localDigest {
-			// Two entries that contradict each other: keep the conflict
-			// without a digest that would say the opposite.
+			// The sha512 and sha256 entries disagree: the conflict carries
+			// no registry digest.
 			registryDigest = ""
 		}
 		return false, registryDigest, true

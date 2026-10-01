@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	extproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/sdk/extension/pinnedarchive"
 )
 
 // PutEcosystem is the ecosystem id of an archive member on the put registry.
@@ -75,7 +76,7 @@ func ProbeArchive(ctx context.Context, archive Archive) extproto.MemberProbe {
 	if archive.Token != "" {
 		request.Header.Set("Authorization", "Bearer "+archive.Token)
 	}
-	response, err := client.Do(request) //nolint:gosec // the endpoint is a validated registry origin and an escaped coordinate
+	response, err := client.Do(request) //nolint:gosec // G704: the endpoint is archiveProbeURL's validated registry origin and escaped coordinate
 	if err != nil {
 		return subject.Unreachable(err)
 	}
@@ -84,8 +85,7 @@ func ProbeArchive(ctx context.Context, archive Archive) extproto.MemberProbe {
 
 	switch response.StatusCode {
 	case http.StatusOK:
-		// The channel parameter also accepts a moving name. An answer for another
-		// version says nothing about this one.
+		// An answer that names another version is unverified.
 		if resolved := response.Header.Get("X-Resolved-Version"); resolved != "" && resolved != archive.Version {
 			return subject.Unverified(fmt.Sprintf("the registry resolved version %s, not %s", Redact(resolved, archive.Token), archive.Version))
 		}
@@ -98,9 +98,8 @@ func ProbeArchive(ctx context.Context, archive Archive) extproto.MemberProbe {
 }
 
 // archiveProbeURL builds the download URL of one archive. It refuses a registry
-// URL that carries a credential, and plain HTTP anywhere but loopback, before
-// any request: a bearer must not travel in the clear or beside a second
-// credential.
+// URL that carries user information, a query or a fragment, and plain HTTP
+// anywhere but loopback.
 func archiveProbeURL(archive Archive) (string, error) {
 	parsed, err := url.Parse(strings.TrimSpace(archive.Registry))
 	if err != nil || parsed.Opaque != "" || parsed.Hostname() == "" {
@@ -135,27 +134,12 @@ func archiveProbeURL(archive Archive) (string, error) {
 }
 
 // advertisedArchiveDigest returns the SHA-256 digest the registry advertises
-// for the archive, in the form a probe carries, or empty when it advertises
-// none. X-Integrity is preferred over an RFC 9530 Digest header.
+// for the archive, as "sha256:" and 64 lowercase hex characters, or empty when
+// it advertises none in a form pinnedarchive.NormalizeIntegrity accepts.
 func advertisedArchiveDigest(header http.Header) string {
-	value := strings.TrimSpace(header.Get("X-Integrity"))
-	if value == "" {
-		for part := range strings.SplitSeq(header.Get("Digest"), ",") {
-			if rest, ok := strings.CutPrefix(strings.ToLower(strings.TrimSpace(part)), "sha-256="); ok {
-				value = rest
-				break
-			}
-		}
-	}
-	value = strings.ToLower(value)
-	for _, prefix := range []string{"sha256:", "sha-256:", "sha256-", "sha-256-"} {
-		if rest, ok := strings.CutPrefix(value, prefix); ok {
-			value = rest
-			break
-		}
-	}
-	if len(value) != 64 || strings.Trim(value, "0123456789abcdef") != "" {
+	digest, err := pinnedarchive.NormalizeIntegrity(pinnedarchive.ReadAdvertisedIntegrity(header))
+	if err != nil {
 		return ""
 	}
-	return "sha256:" + value
+	return "sha256:" + digest
 }

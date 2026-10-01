@@ -438,7 +438,8 @@
             "kind": "acceptance",
             "checks": [
               "managed-npm-probe-is-read-only",
-              "unmanaged-npm-probe-asks-through-npm"
+              "unmanaged-npm-probe-asks-through-npm",
+              "npm-refusal-is-unverified"
             ]
           }
         },

@@ -112,45 +112,61 @@ func assertOneZipRead(t *testing.T, server *recorded.Server, wantAuthorization s
 	}
 }
 
-// The Go module dry run answers the four states from what the registry said,
-// names the member, the registry and the version in every verdict, and asks
-// with one GET. Every 404 is a response the production registry sent.
+// The Go module dry run answers from what the registry said, under the reuse
+// rule of the real publish, names the member, the registry and the version in
+// every verdict, and asks with one GET. Every 404 is a response the production
+// registry sent.
 func TestGoModuleDryRunProbesTheRegistry(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "dry-run-registry-probe", "go-module-probe-is-read-only")
 	cases := []struct {
 		name      string
 		recording string
 		// served is what the registry holds for the version, when it holds it.
-		// "staged" stands for the exact bytes the dry run staged.
+		// "staged" stands for the exact bytes of the staged zip.
 		served    string
 		planned   bool
 		anonymous bool
+		// unstaged removes the module an earlier package staged.
+		unstaged bool
 
 		wantState  string
+		wantLocal  bool
 		wantReason string
 	}{
-		{name: "a version the registry does not serve is absent", recording: "module-version-not-found.404.http", wantState: extproto.MemberProbeAbsent},
-		{name: "a module the registry does not know is absent", recording: "module-not-found.404.http", wantState: extproto.MemberProbeAbsent},
+		{name: "a version the registry does not serve is absent", recording: "module-version-not-found.404.http", wantState: extproto.MemberProbeAbsent, wantLocal: true},
+		{name: "a module the registry does not know is absent", recording: "module-not-found.404.http", wantState: extproto.MemberProbeAbsent, wantLocal: true},
 		{
 			name: "an anonymous 404 is absent and says it was anonymous", recording: "module-version-not-found.404.http",
-			anonymous: true, wantState: extproto.MemberProbeAbsent,
-		},
-		{name: "the same zip is identical", served: "staged", wantState: extproto.MemberProbeIdentical},
-		{
-			name: "the same zip read without a credential is identical", served: "staged",
-			anonymous: true, wantState: extproto.MemberProbeIdentical,
+			anonymous: true, wantState: extproto.MemberProbeAbsent, wantLocal: true,
 		},
 		{
-			name: "another zip is a conflict", served: "another module zip",
-			wantState: extproto.MemberProbeConflict, wantReason: "another digest",
+			name: "outside a release set the same zip is a conflict", served: "staged",
+			wantState: extproto.MemberProbeConflict, wantLocal: true, wantReason: "fails when the registry has publicly released it",
 		},
 		{
-			name: "a planned dry run stages no zip, so a served version is a conflict", served: "staged", planned: true,
-			wantState: extproto.MemberProbeConflict, wantReason: "built no artifact to compare",
+			name: "outside a release set another zip is a conflict", served: "another module zip",
+			wantState: extproto.MemberProbeConflict, wantLocal: true, wantReason: "fails its verification of the served zip",
 		},
 		{
-			name: "a planned dry run reports an absent version", recording: "module-version-not-found.404.http", planned: true,
-			wantState: extproto.MemberProbeAbsent,
+			name: "under a plan the staged zip is identical", served: "staged", planned: true,
+			wantState: extproto.MemberProbeIdentical, wantLocal: true,
+		},
+		{
+			name: "under a plan the staged zip read without a credential is identical", served: "staged", planned: true,
+			anonymous: true, wantState: extproto.MemberProbeIdentical, wantLocal: true,
+		},
+		{
+			name: "under a plan another zip is a conflict", served: "another module zip", planned: true,
+			wantState: extproto.MemberProbeConflict, wantLocal: true, wantReason: "it keeps those bytes when the version is sent again",
+		},
+		{
+			name: "under a plan without a staged zip a served version is a conflict that names the remedy", served: "staged",
+			planned: true, unstaged: true,
+			wantState: extproto.MemberProbeConflict, wantReason: "run package for this project without --dry-run",
+		},
+		{
+			name: "under a plan without a staged zip an absent version is absent", recording: "module-version-not-found.404.http",
+			planned: true, unstaged: true, wantState: extproto.MemberProbeAbsent,
 		},
 	}
 	for _, tc := range cases {
@@ -171,10 +187,17 @@ func TestGoModuleDryRunProbesTheRegistry(t *testing.T) {
 				server = recorded.NewServer(t, servedZip([]byte(tc.served)))
 			}
 			declareGoOrigin(t, ctx.WorkspaceRoot, server.URL)
-			wantLocal := stagedDigest
 			if tc.planned {
 				ctx.Params = managedGoBootstrapParams(t)
-				wantLocal = ""
+			}
+			if tc.unstaged {
+				if err := os.Remove(filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", "mod", "package", "go", "module.json")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			wantLocal := ""
+			if tc.wantLocal {
+				wantLocal = stagedDigest
 			}
 
 			probe := oneGoProbe(t, ctx)
@@ -196,6 +219,34 @@ func TestGoModuleDryRunProbesTheRegistry(t *testing.T) {
 				wantAuthorization = "Bearer " + token
 			}
 			assertOneZipRead(t, server, wantAuthorization)
+		})
+	}
+}
+
+// A staged zip that cannot be read is no artifact to compare: the probe is
+// unverified with the read error, and the registry is asked nothing.
+func TestGoModuleDryRunReportsAnUnreadableStagedZip(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "dry-run-registry-probe", "unreadable-staged-zip-is-unverified")
+	for name, planned := range map[string]bool{"outside a release set": false, "under a plan": true} {
+		t.Run(name, func(t *testing.T) {
+			ctx, _, _, _ := managedGoPublishTestContext(t)
+			if planned {
+				ctx.Params = managedGoBootstrapParams(t)
+			}
+			if err := os.Remove(filepath.Join(ctx.WorkspaceRoot, "module.zip")); err != nil {
+				t.Fatal(err)
+			}
+			server := recorded.NewServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Error("a probe without a readable staged zip asked the registry")
+			}))
+			declareGoOrigin(t, ctx.WorkspaceRoot, server.URL)
+
+			probe := oneGoProbe(t, ctx)
+
+			if probe.State != extproto.MemberProbeUnverified || !strings.Contains(probe.Reason, "the staged module zip cannot be read") ||
+				!strings.Contains(probe.Reason, "module.zip") {
+				t.Fatalf("probe = %+v, want unverified with the read error", probe)
+			}
 		})
 	}
 }
@@ -237,7 +288,7 @@ func TestGoRegistryAnswerOutsideTheProtocolIsUnverified(t *testing.T) {
 	}))
 	subject := memberprobe.Subject{Ecosystem: "go", Coordinate: probeModulePath, Version: probeVersion, Registry: server.URL}
 
-	probe := askGoRegistry(subject, server.URL, probeTestToken)
+	probe := askGoRegistry(subject, server.URL, probeTestToken, true)
 
 	if probe.State != extproto.MemberProbeUnverified || !strings.Contains(probe.Reason, "502 Bad Gateway") {
 		t.Fatalf("probe = %+v, want unverified naming the status", probe)
@@ -286,7 +337,7 @@ func TestUnplannedGoDryRunProbesWithoutAStagedModule(t *testing.T) {
 		assertOneZipRead(t, server, "Bearer test-token")
 	})
 
-	t.Run("a served version cannot be compared", func(t *testing.T) {
+	t.Run("a served version is a conflict", func(t *testing.T) {
 		workspace := t.TempDir()
 		writeGoChannelRecord(t, workspace)
 		server := recorded.NewServer(t, servedZip([]byte("the module the registry serves")))
@@ -294,8 +345,8 @@ func TestUnplannedGoDryRunProbesWithoutAStagedModule(t *testing.T) {
 
 		probe := oneGoProbe(t, &pctx.Context{WorkspaceRoot: workspace, Project: pctx.Project{Name: probeModulePath, Path: "mod"}})
 
-		if probe.State != extproto.MemberProbeConflict || !strings.Contains(probe.Reason, "built no artifact to compare") {
-			t.Fatalf("probe = %+v, want a conflict the dry run could not compare", probe)
+		if probe.State != extproto.MemberProbeConflict || probe.ArtifactDigest != "" || !strings.Contains(probe.Reason, "outside a release set") {
+			t.Fatalf("probe = %+v, want a conflict without a local digest", probe)
 		}
 		assertOneZipRead(t, server, "Bearer test-token")
 	})

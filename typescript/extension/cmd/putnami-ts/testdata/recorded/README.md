@@ -14,6 +14,7 @@ written by `curl -si --http1.1` and served back by
 | --- | --- | --- |
 | `tarball-version-not-found.404.http` | `GET https://npm.putnami.dev/@putnami/runtime/-/runtime-0.0.0-20260101000000-00000000.tgz`, no `Authorization`: a package the registry serves, at a version it does not | 2026-10-01 |
 | `tarball-package-not-found.404.http` | `GET https://npm.putnami.dev/@putnami/no-such-package-probe/-/no-such-package-probe-1.0.0.tgz`, no `Authorization` | 2026-10-01 |
+| `anonymous-request.401.http` | `GET https://npm.putnami.dev/-/whoami`, no `Authorization`: the registry's refusal of an anonymous request that needs a credential | 2026-10-01 |
 
 ## `npm-cli/`: command exchanges
 
@@ -47,8 +48,10 @@ credential.
   package itself. The tests build that answer from the bytes they stage.
 - An `npm view` answer whose integrity equals the staged package is built by the
   test, from the tarball its fake `npm pack` writes.
-- A `401` or a `403` is not recorded: the registry answers an anonymous read of
-  the packages it serves, and a refused credential needs a live bearer.
+- A `401` or a `403` on a tarball path is not recorded: the registry answers an
+  anonymous tarball read with the tarball or a `404`. The `401` recorded above
+  comes from the `/-/whoami` path, the only anonymous `GET` found that it
+  refuses. A refused credential needs a live bearer and is not recorded.
 
 ## Recording a new exchange
 

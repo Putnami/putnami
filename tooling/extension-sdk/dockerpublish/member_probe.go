@@ -36,17 +36,19 @@ type imageProbe struct {
 	ref string
 	// digest is the packaged manifest digest, or empty when package assembled
 	// no image.
-	digest   string
+	digest string
+	// movesTag is true when ref is a version tag the real publish moves to the
+	// packaged image: a held tag at another digest is then a retag.
+	movesTag bool
 	keychain authn.Keychain
 	// transport is the per-call transport of a private publication broker, or
 	// nil for the direct registry path.
 	transport http.RoundTripper
 }
 
-// emitImageProbe asks the registry for one manifest with a HEAD and reports the
-// answer as a member-probe event. It never fails the dry run: a registry that
-// refuses or cannot be reached is reported as unverified, and the orchestrator
-// decides.
+// emitImageProbe asks the registry for one manifest with a HEAD and emits the
+// answer as a member-probe event. A registry that refuses or cannot be reached
+// is unverified. It emits nothing for a repository without a host.
 func emitImageProbe(emit *jsonl.Emitter, probe imageProbe) {
 	coordinate := strings.TrimPrefix(probe.repository, probe.host+"/")
 	if probe.host == "" || coordinate == "" || coordinate == probe.repository {
@@ -71,6 +73,10 @@ func emitImageProbe(emit *jsonl.Emitter, probe imageProbe) {
 	}
 	descriptor, err := probeManifestHead(probe.ref, options...)
 	if err == nil {
+		if probe.movesTag {
+			memberprobe.Emit(emit, subject.HeldTag(descriptor.Digest.String()))
+			return
+		}
 		memberprobe.Emit(emit, subject.Held(descriptor.Digest.String()))
 		return
 	}
@@ -88,8 +94,7 @@ func emitImageProbe(emit *jsonl.Emitter, probe imageProbe) {
 }
 
 // registryErrorCodes lists the distribution error codes of a registry answer,
-// such as MANIFEST_UNKNOWN. The codes are a closed vocabulary; the free-text
-// message beside them is upstream-controlled and is left out.
+// such as MANIFEST_UNKNOWN, without the free-text message beside them.
 func registryErrorCodes(err *transport.Error) string {
 	codes := make([]string, 0, len(err.Errors))
 	for _, diagnostic := range err.Errors {
@@ -113,8 +118,12 @@ func resolvesAnonymous(keychain authn.Keychain, host string) bool {
 
 // probePlannedImageMembers probes the OCI members the release-set plan selects
 // for this project when package assembled no image. The plan supplies the
-// coordinate and the version; no local digest exists to compare, so a version
-// the registry already holds is a conflict.
+// coordinate and the version, and the probe asks for the version tag with no
+// local digest. When the real publish pushes that tag, as for a workload or for
+// an image project outside a private publication broker, a held tag is a retag
+// to the image the publish builds; otherwise a held version is a conflict whose
+// reason names the remedy. The transport and the credential are resolved once
+// for the host.
 func probePlannedImageMembers(ctx *pctx.Context, emit *jsonl.Emitter, configuredRegistry string) {
 	plan, err := releaseset.FromContext(ctx)
 	if err != nil {
@@ -131,22 +140,33 @@ func probePlannedImageMembers(ctx *pctx.Context, emit *jsonl.Emitter, configured
 	if host == "" {
 		return
 	}
+	var members []releaseset.PlannedMember
 	for _, member := range plan.SelectedMembers() {
-		if member.Ecosystem != "oci" || member.ProjectID != ctx.Identity.Project.ID {
+		if member.Ecosystem == "oci" && member.ProjectID == ctx.Identity.Project.ID {
+			members = append(members, member)
+		}
+	}
+	if len(members) == 0 {
+		return
+	}
+	privateTransport, credentialHost, routeErr := privateOCITransportFor(imagePublishTarget{Host: host, Managed: host == managedOCIRegistry})
+	var keychain authn.Keychain
+	if routeErr == nil {
+		token, _ := resolveManagedDockerCredential(credentialHost)
+		keychain = oci.NewRegistryKeychain(host, token)
+	}
+	for _, member := range members {
+		if routeErr != nil {
+			subject := memberprobe.Subject{Ecosystem: "oci", Coordinate: member.Coordinate, Version: member.Version, Registry: host}
+			memberprobe.Emit(emit, subject.Unverified(routeErr.Error()))
 			continue
 		}
 		repository := host + "/" + member.Coordinate
-		subject := memberprobe.Subject{Ecosystem: "oci", Coordinate: member.Coordinate, Version: member.Version, Registry: host}
-		privateTransport, credentialHost, err := privateOCITransportFor(imagePublishTarget{Host: host, Managed: host == managedOCIRegistry})
-		if err != nil {
-			memberprobe.Emit(emit, subject.Unverified(err.Error()))
-			continue
-		}
-		token, _ := resolveManagedDockerCredential(credentialHost)
 		emitImageProbe(emit, imageProbe{
 			host: host, repository: repository, version: member.Version,
 			ref:      fmt.Sprintf("%s:%s", repository, member.Version),
-			keychain: oci.NewRegistryKeychain(host, token), transport: privateTransport,
+			movesTag: ctx.Project.Type != "image" || privateTransport == nil,
+			keychain: keychain, transport: privateTransport,
 		})
 	}
 }

@@ -468,7 +468,7 @@
         "go-registry-token": { "type": "string", "description": "Explicit Go module registry bearer-token override. Also resolved from PUTNAMI_REGISTRY_TOKEN; otherwise requested from @putnami/cloud for the registry host." },
         "go": { "type": "boolean", "default": false, "description": "Publish Go module" },
         "docker": { "type": "boolean", "default": false, "description": "Push Docker image to registry" },
-        "dry-run": { "type": "boolean", "default": false, "description": "Show what would be published without uploading" },
+        "dry-run": { "type": "boolean", "default": false, "description": "Upload nothing; ask each registry whether it already holds the planned version" },
         "remote-build-cache": { "type": "boolean", "default": true, "description": "Back the Go build cache with the run's shared object cache when a cache provider offers one; the local Go cache is used either way. Off keeps the local cache alone." }
       },
       "run": [

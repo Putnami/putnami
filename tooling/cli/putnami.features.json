@@ -2956,7 +2956,11 @@
               "all-absent-passes",
               "identical-is-reported-as-reused",
               "no-plan-still-aggregates",
-              "unreadable-probe-fails"
+              "unreadable-probe-fails",
+              "verdicts-reach-the-machine-output",
+              "conflict-fails-the-run",
+              "retag-is-a-warning",
+              "retag-does-not-hide-a-conflict"
             ]
           }
         },
@@ -2969,7 +2973,8 @@
             "checks": [
               "unprobed-member-is-a-warning",
               "probe-version-must-match-the-plan",
-              "anonymous-absent-is-a-warning"
+              "anonymous-absent-is-a-warning",
+              "unexpected-probe-fails"
             ]
           }
         }
