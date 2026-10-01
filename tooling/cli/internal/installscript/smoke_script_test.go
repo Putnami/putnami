@@ -176,6 +176,7 @@ func runSmokeFrom(t *testing.T, registryURL, installerURL, diagnosticsDir, launc
 	}
 	cmd.Env = append(cmd.Env, "SMOKE_TEST_HTTP_STATUS="+os.Getenv("SMOKE_TEST_HTTP_STATUS"))
 	cmd.Env = append(cmd.Env, "SMOKE_TEST_NPM_AUTH="+os.Getenv("SMOKE_TEST_NPM_AUTH"))
+	cmd.Env = append(cmd.Env, smokeReadyShapeEnv+"="+os.Getenv(smokeReadyShapeEnv))
 	// extra comes last, so it wins over anything above (os/exec keeps the last
 	// value of a duplicated key). It lets a test that runs in parallel set what
 	// the others read from the process environment.
@@ -274,7 +275,7 @@ func fullGoldenPathStub(t *testing.T) []byte {
 // TestSmokeCLIHelperProcess is re-executed through the installed stub binary.
 // It accepts only the argv the public contract requires, authors the minimum
 // complete generated state the smoke asserts, and serves a real HTTP listener
-// after emitting the same typed readiness shape as a published extension.
+// after emitting the readiness record the CLI prints for a published extension.
 func TestSmokeCLIHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_SMOKE_CLI_HELPER") != "1" {
 		return
@@ -330,7 +331,7 @@ func TestSmokeCLIHelperProcess(t *testing.T) {
 			t.Fatal(err)
 		}
 		port := listener.Addr().(*net.TCPAddr).Port
-		_, _ = os.Stdout.WriteString(`{"v":2,"type":"ready","data":{"target":"server","endpoints":[{"scheme":"http","host":"127.0.0.1","port":` + fmt.Sprint(port) + `}]}}` + "\n")
+		_, _ = os.Stdout.WriteString(smokeReadyRecord(port) + "\n")
 		httpStatus := http.StatusOK
 		if configured := os.Getenv("SMOKE_TEST_HTTP_STATUS"); configured != "" {
 			httpStatus, err = strconv.Atoi(configured)
@@ -368,6 +369,21 @@ func TestSmokeCLIHelperProcess(t *testing.T) {
 	default:
 		t.Fatalf("unexpected golden-path argv: %q", args)
 	}
+}
+
+// smokeReadyShapeEnv selects the line the stub prints for a ready listener.
+const smokeReadyShapeEnv = "SMOKE_TEST_READY_SHAPE"
+
+// smokeReadyRecord is the line `putnami serve` prints for a ready listener
+// under PUTNAMI_OUTPUT=jsonl: the extension's typed event inside a task:event
+// record, each object's keys in sorted order, so "port" comes before "type".
+// With SMOKE_TEST_READY_SHAPE=extension it is the extension's own event line,
+// where "type" comes first.
+func smokeReadyRecord(port int) string {
+	if os.Getenv(smokeReadyShapeEnv) == "extension" {
+		return fmt.Sprintf(`{"v":2,"type":"ready","data":{"target":"server","endpoints":[{"scheme":"http","host":"127.0.0.1","port":%d}]}}`, port)
+	}
+	return fmt.Sprintf(`{"protocolVersion":2,"record":"task:event","time":"2026-01-01T00:00:00.000Z","identity":{"key":"/webapp:serve~serve","scope":"project","project":{"id":"/webapp","name":"webapp"},"task":{"name":"serve~serve","command":"serve","step":"serve","kind":"serve-app"},"provider":{"extension":"@putnami/typescript","version":"1.2.3"}},"event":{"durationMs":1,"endpoints":[{"host":"127.0.0.1","port":%d,"scheme":"http"}],"target":"server","time":"2026-01-01T00:00:00.000Z","type":"ready"}}`, port)
 }
 
 func writeGoldenPathFixture(t *testing.T) {
@@ -512,6 +528,33 @@ func TestSmokeRunsExactTypeScriptGoldenPathThroughHTTPAndCleanStop(t *testing.T)
 	// The run leg is opt-in through SMOKE_RUN_COMMAND.
 	if res.contains("?run=") || res.contains("→ run ") {
 		t.Fatalf("the run leg ran without SMOKE_RUN_COMMAND:\n%s", res.output)
+	}
+}
+
+// The smoke reads the port of the ready line whichever key comes first: the
+// CLI's record puts "port" before "type", an extension's own event line puts
+// "type" first.
+func TestSmokeReadsTheReadyPortInEitherKeyOrder(t *testing.T) {
+	requireBash(t)
+	t.Setenv("GO_WANT_SMOKE_CLI_HELPER", "1")
+	for _, shape := range []string{"", "extension"} {
+		t.Setenv(smokeReadyShapeEnv, shape)
+		record := smokeReadyRecord(4242)
+		port, kind := strings.Index(record, `"port":4242`), strings.Index(record, `"type":"ready"`)
+		if port < 0 || kind < 0 || (port < kind) != (shape == "") {
+			t.Fatalf("ready shape %q does not put its keys in the order it stands for: %s", shape, record)
+		}
+		body := fullGoldenPathStub(t)
+		server := newRegistry(t, registryOptions{
+			body:      body,
+			integrity: "sha256:" + sha256Hex(body),
+			resolved:  stubVersion,
+		})
+
+		res := runSmoke(t, server.URL)
+		if res.exitCode != 0 || !res.contains("smoke: GET http://127.0.0.1:") {
+			t.Fatalf("smoke did not read the port of ready shape %q (exit %d):\n%s", shape, res.exitCode, res.output)
+		}
 	}
 }
 

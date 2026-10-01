@@ -603,10 +603,12 @@ server_pid=$!
 # The framework reports the listener's actual OS-assigned port through the
 # typed ready event. Waiting on that event avoids both fixed-port collisions and
 # a check-then-bind race, while the deadline keeps release failures bounded.
+# The CLI writes the keys of a record in sorted order, so "port" comes before
+# "type" on the line: select the ready line first, then read its port.
 ready_port=""
 deadline=$((SECONDS + startup_timeout))
 while [ -z "$ready_port" ]; do
-  ready_port="$(sed -n 's/.*"type":"ready".*"port":\([0-9][0-9]*\).*/\1/p' "$serve_log" | tail -n 1)"
+  ready_port="$(sed -n '/"type":"ready"/s/.*"port":\([0-9][0-9]*\).*/\1/p' "$serve_log" | tail -n 1)"
   if [ -n "$ready_port" ]; then
     break
   fi
