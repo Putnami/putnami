@@ -336,7 +336,7 @@ func TestSmokePS1NamesTheLegsOfTheShellSmoke(t *testing.T) {
 			t.Fatalf("smoke-check-release.ps1 does not fail with %q", text)
 		}
 	}
-	for _, pattern := range []string{`"type":"ready".*"port":`, `"record":"session:end"`, `'Integrity verified'`, `'without integrity verification'`} {
+	for _, pattern := range []string{`'"type":"ready"'`, `'"port":([0-9]+)'`, `"record":"session:end"`, `'Integrity verified'`, `'without integrity verification'`} {
 		if !strings.Contains(src, pattern) {
 			t.Fatalf("smoke-check-release.ps1 does not look for %s", pattern)
 		}

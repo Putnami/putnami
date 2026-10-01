@@ -154,7 +154,7 @@ func runSmokeStubRunCommand() int {
 	return 0
 }
 
-// runSmokeStubServe emits the typed ready event with the port the system
+// runSmokeStubServe emits the ready record with the port the system
 // assigned, serves HTTP, and stops when it receives CTRL_BREAK_EVENT, which Go
 // delivers as os.Interrupt. With SMOKE_TEST_IGNORE_BREAK=1 it keeps serving.
 func runSmokeStubServe() int {
@@ -181,7 +181,7 @@ func runSmokeStubServe() int {
 		_, _ = w.Write([]byte("<!doctype html><title>Welcome to Putnami</title>"))
 	})}
 	go func() { _ = server.Serve(listener) }()
-	fmt.Printf(`{"v":2,"type":"ready","data":{"target":"server","endpoints":[{"scheme":"http","host":"127.0.0.1","port":%d}]}}`+"\n", listener.Addr().(*net.TCPAddr).Port)
+	fmt.Println(smokeReadyRecord(listener.Addr().(*net.TCPAddr).Port))
 	deadline := time.After(5 * time.Minute)
 	for {
 		select {
@@ -349,6 +349,19 @@ func TestWindowsSmokePS1RunsTheGoldenPath(t *testing.T) {
 	// Without SMOKE_RUN_COMMAND there is no run leg.
 	if res.contains("run leg") || smokeRequests(server, "/install-commands.txt") != 0 {
 		t.Fatalf("the smoke ran the run leg without SMOKE_RUN_COMMAND:\n%s", res.output())
+	}
+}
+
+// The smoke reads the port of the ready line when "type" comes before "port",
+// as in an extension's own event line; the golden path above covers the CLI's
+// record, where "port" comes first.
+func TestWindowsSmokePS1ReadsTheReadyPortWhenTypeComesFirst(t *testing.T) {
+	h, _ := newSmokeHost(t, nil, "bun.exe", "git.exe", "sh.exe")
+	h.set(smokeReadyShapeEnv, "extension")
+
+	res := h.smoke(t)
+	if res.exitCode != 0 || !res.contains(smokeOKLine) {
+		t.Fatalf("the smoke failed (exit %d):\n%s", res.exitCode, res.output())
 	}
 }
 

@@ -1052,12 +1052,15 @@ function Invoke-Smoke {
     # typed ready event. Waiting on that event avoids both fixed-port collisions
     # and a check-then-bind race, while the deadline keeps release failures
     # bounded.
+    # The CLI writes the keys of a record in sorted order, so "port" comes
+    # before "type" on the line: select the ready line first, then read its
+    # port.
     $readyPort = ''
     $deadline = [DateTime]::UtcNow.AddSeconds($StartupTimeout)
     while (-not $readyPort) {
         $serveText = Read-SharedText $serveLog
         foreach ($line in (Get-TextLines $serveText)) {
-            if ($line -match '"type":"ready".*"port":([0-9]+)') { $readyPort = $Matches[1] }
+            if (($line -match '"type":"ready"') -and ($line -match '"port":([0-9]+)')) { $readyPort = $Matches[1] }
         }
         if ($readyPort) { break }
         # serve watches by default and stays resident after a failed run so it
