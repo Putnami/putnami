@@ -930,10 +930,15 @@ func boundedRefusal(t *testing.T, output, code string) {
 // error still names why the run failed.
 func failureLines(output string) string {
 	var lines []string
-	for _, line := range strings.Split(output, "\n") {
+	all := strings.Split(output, "\n")
+	for i, line := range all {
 		lower := strings.ToLower(line)
 		if strings.Contains(lower, "error") || strings.Contains(lower, "fail") || strings.Contains(lower, "refus") {
 			lines = append(lines, strings.TrimSpace(line))
+			// A failed task's reason is the indented line under it.
+			if i+1 < len(all) && strings.HasPrefix(all[i+1], "    ") {
+				lines = append(lines, strings.TrimSpace(all[i+1]))
+			}
 		}
 	}
 	joined := strings.Join(lines, " | ")
