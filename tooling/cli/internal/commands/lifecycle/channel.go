@@ -64,7 +64,7 @@ var newChannelClient = func(ctx context.Context, wsRoot string, cfg *wsproto.Con
 	}
 	if provider == nil {
 		detail := fmt.Sprintf("install exactly one extension declaring %q", distribution.ProviderCommandName)
-		if cause := providerext.SkippedProviderCause(discovered.Skipped); cause != "" {
+		if cause := discovered.ProviderCause(distribution.ProviderCommandName); cause != "" {
 			detail += ". " + cause
 		}
 		return nil, fmt.Errorf("%w: %s", releaseset.ErrProviderAbsent, detail)

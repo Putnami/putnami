@@ -197,15 +197,17 @@ func RemoteCacheConfigPath(wsRoot string) string {
 // print a non-empty notice once; per the missing-cloud policy this path must
 // never be silent.
 //
-// skipped carries discovery's unloadable-extension records so a configured
-// cache whose @putnami/cloud was skipped (unparseable manifest, contract too
-// new) degrades with the root cause in the notice instead of a generic
-// "not installed". Nil is fine when the caller has no skip records.
+// discovered carries discovery's unloadable-extension records and the
+// provider capabilities a hosted run removed, so a configured cache whose
+// provider was skipped (unparseable manifest, contract too new) or removed
+// from a path extension degrades with the root cause in the notice
+// (DiscoveryResult.ProviderCause) instead of a generic "not installed". Nil is
+// fine when the caller has no discovery result.
 //
 // The context bounds provider detection and the preparation of the extension
 // runtime the provider command references; provider startup is deferred to the
 // first request that needs it.
-func LoadRemoteCache(ctx context.Context, wsRoot string, exts []*extension.ExtensionDescription, skipped []extension.SkippedExtension, trust store.CacheTrust, options ...RemoteCacheOption) (*RemoteCache, string) {
+func LoadRemoteCache(ctx context.Context, wsRoot string, exts []*extension.ExtensionDescription, discovered *extension.DiscoveryResult, trust store.CacheTrust, options ...RemoteCacheOption) (*RemoteCache, string) {
 	if trust == store.CacheTrustNone {
 		return nil, ""
 	}
@@ -214,7 +216,7 @@ func LoadRemoteCache(ctx context.Context, wsRoot string, exts []*extension.Exten
 		// policy must never degrade into accepting hints on an authoritative run.
 		return nil, "putnami: remote cache trust policy is unresolved; building locally"
 	}
-	provider, notice, err := loadProviderRemoteCache(ctx, wsRoot, exts, skipped, trust)
+	provider, notice, err := loadProviderRemoteCache(ctx, wsRoot, exts, discovered, trust)
 	if err != nil {
 		// A gate failure (e.g. an @putnami/cloud too old to serve this protocol) is
 		// a degradation, not the unconfigured default — surface it rather than

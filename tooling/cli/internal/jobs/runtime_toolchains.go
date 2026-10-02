@@ -21,8 +21,10 @@ import (
 	model "go.putnami.dev/cli/model/extension"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/envkeys"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
+	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -321,6 +323,17 @@ func provisioningMode(provisioning bool) toolchainResolutionMode {
 	return resolveStrict
 }
 
+// markRuntimeToolchainProbes records that the run starts repository code
+// before it resolves a runtime toolchain of ext, unless ext is installed from
+// the artifact store: a toolchain probe runs the candidate and arguments that
+// the manifest of ext chooses, and the manifest of any other extension is
+// repository content.
+func markRuntimeToolchainProbes(workspaceRoot string, ext *model.ExtensionDescription) {
+	if !extension.InStoreRoot(store.ResolveArtifactStoreRoot(workspaceRoot), ext) {
+		runcredential.MarkRepositoryCodeStarted("runtime toolchain probe of " + ext.Name)
+	}
+}
+
 // resolveRuntimeToolchainRefs resolves refs against the workspace lock and
 // records each resolution on ext. mode decides what a required ref the lock
 // does not satisfy becomes.
@@ -331,6 +344,7 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 	if ext == nil || ext.Runtime == nil {
 		return errors.New("resolve runtime toolchains: extension runtime is not declared")
 	}
+	markRuntimeToolchainProbes(workspaceRoot, ext)
 	if err := lockRuntimeToolchains(ctx); err != nil {
 		return err
 	}
@@ -492,6 +506,7 @@ func ReportProvisionedRuntimeToolchains(ctx context.Context, workspaceRoot strin
 			if !pinned || strings.TrimSpace(entry.Version) == "" || strings.TrimSpace(integrity) == "" {
 				continue
 			}
+			markRuntimeToolchainProbes(workspaceRoot, ext)
 			probes = append(probes, pending{extension: ext.Name, ref: ref, requirement: requirement, entry: entry, integrity: integrity})
 		}
 	}

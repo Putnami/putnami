@@ -22,6 +22,12 @@ import (
 type DiscoveryResult struct {
 	Extensions []*ExtensionDescription
 	Skipped    []SkippedExtension
+	// RemovedCapabilities are the provider capabilities a hosted run removed
+	// from extensions that loaded and stay in Extensions
+	// (withoutProviderCapabilities). They are not load failures, so they are
+	// kept apart from Skipped; ProviderCause names them where a provider is
+	// absent.
+	RemovedCapabilities []RemovedCapability
 }
 
 // DiscoverExtensions scans extension paths and builds an extension registry.
@@ -54,13 +60,15 @@ func DiscoverExtensions(workspaceRoot string, cfg *wsproto.Config, projectPaths 
 // explicitly referenced extension is only recorded as skipped when no probe
 // location loaded it.
 //
-// A hosted run (runcredential.Hosted) looks in no node_modules directory. It
-// keeps the extensions installed from the artifact store (InArtifactStore) and
-// the workspace's own path extensions (WorkspacePathExtension), and returns
-// every other one in Skipped. A path extension loses its provider
-// capabilities, each with a skip record that names it: no repository code can
-// receive a credential, and the engine starts a path extension only after
-// custody ended.
+// A hosted run (runcredential.Hosted) looks in no node_modules directory, and
+// reads a workspace config key as a workspace path only when the key is
+// path-shaped (declaredByPath): any other key names an extension, which loads
+// from the artifact store. It keeps the extensions installed from the artifact
+// store (InArtifactStore) and the workspace's own path extensions
+// (WorkspacePathExtension), and returns every other one in Skipped. A path
+// extension loses its provider capabilities, each recorded in
+// RemovedCapabilities: no repository code can receive a credential, and the
+// engine starts a path extension only after custody ended.
 func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, projectPaths []string) (*DiscoveryResult, error) {
 	var extensions []*ExtensionDescription
 	var skipped []SkippedExtension
@@ -145,8 +153,11 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 			recordSkips(refSkips)
 			continue
 		}
-		// Try as a workspace project path
-		if relPath, ok := normalizeWorkspaceExtensionPath(extRef); ok {
+		// Try as a workspace project path. A hosted run reads only a
+		// path-shaped key as a path, so a key that names an extension loads
+		// its build from the artifact store, never a workspace directory of
+		// that name.
+		if relPath, ok := normalizeWorkspaceExtensionPath(extRef); ok && (!hosted || declaredByPath(extRef)) {
 			absPath := filepath.Join(workspaceRoot, relPath)
 			var skip *SkippedExtension
 			ext, skip = tryLoadExtension(absPath, extRef, false)
@@ -208,7 +219,7 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 		}
 	}
 
-	extensions, notHosted := keepHostedExtensions(workspaceRoot, extensions)
+	extensions, notHosted, removed := keepHostedExtensions(workspaceRoot, extensions)
 	recordSkips(notHosted)
 
 	// Propagate RelPath to all job definitions as ExtensionPath
@@ -223,7 +234,7 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 		}
 	}
 
-	return &DiscoveryResult{Extensions: extensions, Skipped: skipped}, nil
+	return &DiscoveryResult{Extensions: extensions, Skipped: skipped, RemovedCapabilities: removed}, nil
 }
 
 // scanProjectExtensions loads the manifest at each workspace project root. A
@@ -285,13 +296,17 @@ func settlePinnedProjects(workspaceRoot string, extensions, pinned []*ExtensionD
 
 // pinnedByName reports whether the workspace config names the extension by
 // its manifest name with a key that is not the project's own path. Such a key
-// is a registry pin, so the project's manifest yields to the pinned build.
+// is a registry pin, so the project's manifest yields to the pinned build. A
+// hosted run reads only a path-shaped key as a path (declaredByPath).
 func pinnedByName(cfg *wsproto.Config, name, projectRelPath string) bool {
 	if cfg == nil {
 		return false
 	}
 	if _, ok := cfg.Extensions.List[name]; !ok {
 		return false
+	}
+	if runcredential.Hosted() && !declaredByPath(name) {
+		return true
 	}
 	if rel, ok := normalizeWorkspaceExtensionPath(name); ok && rel == filepath.Clean(projectRelPath) {
 		return false
@@ -693,8 +708,13 @@ func readPackageNameVersion(dir string) (string, string) {
 // content resolves an extension through the same directory, so an extension's
 // commands and its content come from one installed package.
 func installedPackageDir(workspaceRoot, name string) string {
-	return filepath.Join(workspaceRoot, "node_modules", name)
+	return filepath.Join(workspaceRoot, installedPackagesDirName, name)
 }
+
+// installedPackagesDirName is the name of the directory that the
+// package-manager sources of discovery load extensions from
+// (installedPackageDir).
+const installedPackagesDirName = "node_modules"
 
 // rootPackageDeclarations returns discovery's third source: the extensions the
 // workspace root's package manifest declares in devDependencies. A missing or

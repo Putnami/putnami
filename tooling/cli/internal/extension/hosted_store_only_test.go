@@ -109,65 +109,121 @@ func TestHostedDiscoveryKeepsStoreAndPathExtensions(t *testing.T) {
 	}
 }
 
-// A path extension is one the workspace declares by a path inside it. A hosted
-// run skips, with the reason, an extension loaded from an absolute path, inside
-// the workspace or outside it, a declared path under node_modules, and a
-// declared path that links out of the workspace. A run without the run
-// credential loads every one of them.
+// storeInstalled writes the build of name into the artifact store at
+// storeRoot and links it where the workspace ws installs it, as an install
+// does.
+func storeInstalled(t *testing.T, ws, storeRoot, name string) {
+	t.Helper()
+	stored := filepath.Join(storeRoot, "extensions", strings.ReplaceAll(strings.TrimPrefix(name, "@"), "/", "-")+"@1.0.0")
+	writeExtensionManifest(t, stored, storeOnlyManifest(name))
+	link := layout.StableDir(ws, layout.Extensions, name)
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(stored, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+}
+
+// A path extension is one the workspace declares by a path inside it: a
+// workspace project, or a path-shaped `extensions` key. A hosted run skips,
+// with the reason, an extension loaded from an absolute path, inside the
+// workspace or outside it, a declared path that links out of the workspace,
+// and a declared path inside a node_modules directory, at the root or deeper.
+// A key that names an extension, even one equal to a workspace directory or
+// project path, loads its build from the artifact store. A run without the run
+// credential loads every one of them from the workspace.
 func TestHostedDiscoverySkipsEveryOtherLocalSource(t *testing.T) {
 	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "hosted-run-runs-only-store-and-path-extensions")
-	ws, outside := t.TempDir(), t.TempDir()
-	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
+	ws, outside, storeRoot := t.TempDir(), t.TempDir(), t.TempDir()
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", storeRoot)
 	writeExtensionManifest(t, filepath.Join(ws, "tools", "declared"), storeOnlyManifest("@acme/declared"))
 	writeExtensionManifest(t, filepath.Join(ws, "tools", "absolute"), storeOnlyManifest("@acme/absolute-inside"))
 	writeExtensionManifest(t, filepath.Join(outside, "ext"), storeOnlyManifest("@acme/absolute-outside"))
-	writeExtensionManifest(t, filepath.Join(ws, "node_modules", "nm"), storeOnlyManifest("@acme/node-modules"))
+	writeExtensionManifest(t, installedPackageDir(ws, "nm"), storeOnlyManifest("@acme/node-modules"))
+	writeExtensionManifest(t, installedPackageDir(filepath.Join(ws, "packages", "web"), "nested"), storeOnlyManifest("@acme/nested"))
 	writeExtensionManifest(t, filepath.Join(outside, "escaped"), storeOnlyManifest("@acme/escaped"))
 	if err := os.Symlink(filepath.Join(outside, "escaped"), filepath.Join(ws, "tools", "escape")); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
+	// A directory and a project whose paths equal the extension names that
+	// their keys pin; the store holds both builds.
+	writeExtensionManifest(t, filepath.Join(ws, "@acme", "named"), storeOnlyManifest("@acme/named"))
+	writeExtensionManifest(t, filepath.Join(ws, "@acme", "project"), storeOnlyManifest("@acme/project"))
+	storeInstalled(t, ws, storeRoot, "@acme/named")
+	storeInstalled(t, ws, storeRoot, "@acme/project")
 	cfg := &wsproto.Config{Extensions: wsproto.ExtensionsConfig{List: map[string]string{
 		"/tools/declared":                      "",
 		filepath.Join(ws, "tools", "absolute"): "",
 		filepath.Join(outside, "ext"):          "",
 		"/node_modules/nm":                     "",
+		"./packages/web/node_modules/nested":   "",
 		"/tools/escape":                        "",
+		"@acme/named":                          "1.0.0",
+		"@acme/project":                        "1.0.0",
 	}}}
+	projects := []string{filepath.Join("@acme", "project")}
+	fromWorkspace := func(result *DiscoveryResult, name string) bool {
+		ext := FindExtensionByName(result.Extensions, name)
+		return ext != nil && ext.LocalSource
+	}
 
-	local, err := DiscoverExtensionsDetailed(ws, cfg, nil)
+	local, err := DiscoverExtensionsDetailed(ws, cfg, projects)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(local.Extensions); got != 5 {
-		t.Fatalf("a local run discovered %v, want five extensions", extensionNames(local.Extensions))
+	if got := len(local.Extensions); got != 8 {
+		t.Fatalf("a local run discovered %v, want eight extensions", extensionNames(local.Extensions))
+	}
+	for _, name := range []string{"@acme/named", "@acme/project"} {
+		if !fromWorkspace(local, name) {
+			t.Errorf("a local run loaded %s from the store, want its workspace directory", name)
+		}
 	}
 
 	restore := runcredential.SetForTest("run-bearer")
 	t.Cleanup(restore)
-	hosted, err := DiscoverExtensionsDetailed(ws, cfg, nil)
+	hosted, err := DiscoverExtensionsDetailed(ws, cfg, projects)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := extensionNames(hosted.Extensions); !slices.Equal(got, []string{"@acme/declared"}) {
-		t.Fatalf("a hosted run discovered %v, want only @acme/declared", got)
+	if got := extensionNames(hosted.Extensions); !slices.Equal(got, []string{"@acme/declared", "@acme/named", "@acme/project"}) {
+		t.Fatalf("a hosted run discovered %v, want [@acme/declared @acme/named @acme/project]", got)
 	}
-	var skipped []string
-	for _, skip := range hosted.Skipped {
-		if errors.Is(skip.Reason, errNotFromTheStore) {
-			skipped = append(skipped, skip.Name)
+	for _, name := range []string{"@acme/named", "@acme/project"} {
+		if ext := FindExtensionByName(hosted.Extensions, name); ext == nil || !InArtifactStore(ws, ext) {
+			t.Errorf("a hosted run loaded %s as %+v, want its build from the artifact store", name, ext)
 		}
 	}
-	slices.Sort(skipped)
-	if want := []string{"@acme/absolute-inside", "@acme/absolute-outside", "@acme/escaped", "@acme/node-modules"}; !slices.Equal(skipped, want) {
-		t.Errorf("a hosted run skipped %v as not from the store, want %v", skipped, want)
+	reasons := map[error][]string{}
+	for _, skip := range hosted.Skipped {
+		for _, reason := range []error{errNotFromTheStore, errInstalledPackage} {
+			if errors.Is(skip.Reason, reason) {
+				reasons[reason] = append(reasons[reason], skip.Name)
+			}
+		}
+	}
+	for reason, want := range map[error][]string{
+		errNotFromTheStore:  {"@acme/absolute-inside", "@acme/absolute-outside", "@acme/escaped"},
+		errInstalledPackage: {"@acme/nested", "@acme/node-modules"},
+	} {
+		got := reasons[reason]
+		slices.Sort(got)
+		if !slices.Equal(got, want) {
+			t.Errorf("a hosted run skipped %v with %q, want %v", got, reason, want)
+		}
+	}
+	if strings.Contains(errInstalledPackage.Error(), "declare it by its path") {
+		t.Errorf("the node_modules skip tells the user to declare a path: %v", errInstalledPackage)
 	}
 }
 
 // A path extension serves no provider capability on a hosted run: each
-// reserved provider command it declares is removed, with a skip record that
-// names the capability and the extension, and its other commands and jobs
-// stay. A store extension keeps its providers, and a run without the run
-// credential keeps every command.
+// reserved provider command it declares is removed, with a record that names
+// the capability and the extension, and its other commands and jobs stay. The
+// extension loaded, so no skip record calls it unreadable; the cause of an
+// absent provider names the removal. A store extension keeps its providers,
+// and a run without the run credential keeps every command.
 func TestHostedDiscoveryRemovesTheProviderCapabilitiesOfAPathExtension(t *testing.T) {
 	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "path-extension-serves-no-provider")
 	ws := t.TempDir()
@@ -225,14 +281,15 @@ func TestHostedDiscoveryRemovesTheProviderCapabilitiesOfAPathExtension(t *testin
 			t.Errorf("a hosted run removed the %s command of the path extension", kept)
 		}
 	}
-	reasons := map[string]string{}
 	for _, skip := range hosted.Skipped {
-		if errors.Is(skip.Reason, errPathExtensionProvider) && skip.Name == "@acme/path-providers" {
-			for _, command := range providers {
-				if strings.Contains(skip.Reason.Error(), " "+command+" capability") {
-					reasons[command] = skip.Reason.Error()
-				}
-			}
+		if skip.Name == "@acme/path-providers" {
+			t.Errorf("a hosted run recorded the loaded path extension as skipped: %v", skip.Reason)
+		}
+	}
+	removed := map[string]error{}
+	for _, removal := range hosted.RemovedCapabilities {
+		if removal.Extension == "@acme/path-providers" && filepath.Base(removal.Path) == "providers" {
+			removed[removal.Command] = removal.Reason()
 		}
 	}
 	for _, command := range providers {
@@ -241,12 +298,51 @@ func TestHostedDiscoveryRemovesTheProviderCapabilitiesOfAPathExtension(t *testin
 		if declared || visible || path.Jobs[command] != nil {
 			t.Errorf("a hosted run kept the %s capability of the path extension", command)
 		}
-		if reason := reasons[command]; !strings.Contains(reason, "path extension @acme/path-providers") {
-			t.Errorf("no skip record names the %s capability of @acme/path-providers: %+v", command, hosted.Skipped)
+		if reason := removed[command]; !errors.Is(reason, errPathExtensionProvider) ||
+			!strings.Contains(reason.Error(), "path extension @acme/path-providers does not serve the "+command+" capability") {
+			t.Errorf("no removal record names the %s capability of @acme/path-providers: %+v", command, hosted.RemovedCapabilities)
+		}
+		if cause := hosted.ProviderCause(command); cause != removed[command].Error() {
+			t.Errorf("the cause of an absent %s provider is %q, want the removal %q", command, cause, removed[command])
 		}
 		if provider, err := ResolveReservedProvider(hosted.Extensions, command); err != nil || provider == nil || provider.ExtensionName != "@acme/cloud" {
 			t.Errorf("%s resolves to %+v (err %v), want the store extension @acme/cloud", command, provider, err)
 		}
+	}
+	if len(hosted.RemovedCapabilities) != len(providers) {
+		t.Errorf("a hosted run removed %+v, want only the %d providers of the path extension", hosted.RemovedCapabilities, len(providers))
+	}
+	if len(local.RemovedCapabilities) != 0 {
+		t.Errorf("a local run removed %+v, want nothing", local.RemovedCapabilities)
+	}
+}
+
+// ProviderCause names the removed capabilities of the requested command and
+// the load failures, and nothing for a result without either.
+func TestProviderCause(t *testing.T) {
+	var none *DiscoveryResult
+	if cause := none.ProviderCause("cache-provider"); cause != "" {
+		t.Errorf("a nil result has the cause %q, want none", cause)
+	}
+	result := &DiscoveryResult{
+		RemovedCapabilities: []RemovedCapability{
+			{Extension: "@acme/b", Path: "/ws/b", Command: "cache-provider"},
+			{Extension: "@acme/a", Path: "/ws/a", Command: "cache-provider"},
+			{Extension: "@acme/c", Path: "/ws/c", Command: "runner-provider"},
+		},
+	}
+	cause := result.ProviderCause("cache-provider")
+	a, b := strings.Index(cause, "@acme/a"), strings.Index(cause, "@acme/b")
+	if a < 0 || b < a || strings.Contains(cause, "@acme/c") || strings.Contains(cause, "could not be loaded") {
+		t.Errorf("the cache-provider cause is %q, want @acme/a then @acme/b and no load failure", cause)
+	}
+	result.Skipped = []SkippedExtension{{Name: "@acme/broken", Path: "/ws/broken", Reason: errors.New("bad manifest")}}
+	if cause := result.ProviderCause("runner-provider"); !strings.HasPrefix(cause, result.RemovedCapabilities[2].Reason().Error()+"; ") ||
+		!strings.Contains(cause, "@acme/broken") {
+		t.Errorf("the runner-provider cause is %q, want the removal then the load failure", cause)
+	}
+	if cause := result.ProviderCause("session-reporter"); cause != SkippedProviderCause(result.Skipped) {
+		t.Errorf("the session-reporter cause is %q, want only the load failure", cause)
 	}
 }
 
@@ -256,15 +352,19 @@ func TestHostedDiscoveryRemovesTheProviderCapabilitiesOfAPathExtension(t *testin
 func TestLoadWorkspacePathExtension(t *testing.T) {
 	ws, outside := t.TempDir(), t.TempDir()
 	writeExtensionManifest(t, filepath.Join(ws, "tools", "local"), storeOnlyManifest("@acme/local"))
-	writeExtensionManifest(t, filepath.Join(ws, "node_modules", "nm"), storeOnlyManifest("@acme/nm"))
+	writeExtensionManifest(t, installedPackageDir(ws, "nm"), storeOnlyManifest("@acme/nm"))
+	writeExtensionManifest(t, installedPackageDir(filepath.Join(ws, "tools", "web"), "nested"), storeOnlyManifest("@acme/nested"))
 	writeExtensionManifest(t, filepath.Join(outside, "ext"), storeOnlyManifest("@acme/outside"))
 	for ref, want := range map[string]string{
-		"/tools/local":                 "@acme/local",
-		"./tools/local":                "@acme/local",
-		"/node_modules/nm":             "",
-		"../" + filepath.Base(outside): "",
-		filepath.Join(outside, "ext"):  "",
-		"/tools/missing":               "",
+		"/tools/local":                    "@acme/local",
+		"./tools/local":                   "@acme/local",
+		"tools/local":                     "",
+		"/node_modules/nm":                "",
+		"/tools/web/node_modules/nested":  "",
+		"./tools/web/Node_Modules/nested": "",
+		"../" + filepath.Base(outside):    "",
+		filepath.Join(outside, "ext"):     "",
+		"/tools/missing":                  "",
 	} {
 		got := LoadWorkspacePathExtension(ws, ref)
 		switch {
@@ -278,12 +378,12 @@ func TestLoadWorkspacePathExtension(t *testing.T) {
 	// The installed-package directory is a link to another directory of the
 	// workspace: a path into that directory loads nothing either.
 	linked := t.TempDir()
-	writeExtensionManifest(t, filepath.Join(linked, "pkgs", "nm"), storeOnlyManifest("@acme/nm"))
-	if err := os.Symlink(filepath.Join(linked, "pkgs"), installedPackageDir(linked, "")); err != nil {
+	writeExtensionManifest(t, filepath.Join(linked, "pkgs", "sub", "nm"), storeOnlyManifest("@acme/nm"))
+	if err := os.Symlink(filepath.Join(linked, "pkgs", "sub"), installedPackageDir(linked, "")); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
-	if got := LoadWorkspacePathExtension(linked, "/pkgs/nm"); got != nil {
-		t.Errorf("/pkgs/nm behind the installed-package link: loaded %s, want nothing", got.Name)
+	if got := LoadWorkspacePathExtension(linked, "/pkgs/sub/nm"); got != nil {
+		t.Errorf("/pkgs/sub/nm behind the installed-package link: loaded %s, want nothing", got.Name)
 	}
 }
 

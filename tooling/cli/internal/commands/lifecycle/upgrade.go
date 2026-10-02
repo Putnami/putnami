@@ -72,7 +72,7 @@ var validateUpgradeReleaseSetProvider = func(wsRoot string, cfg *wsproto.Config)
 	}
 	if provider == nil {
 		detail := fmt.Sprintf("install exactly one extension declaring %q", distribution.ProviderCommandName)
-		if cause := providerext.SkippedProviderCause(discovered.Skipped); cause != "" {
+		if cause := discovered.ProviderCause(distribution.ProviderCommandName); cause != "" {
 			detail += ". " + cause
 		}
 		return fmt.Errorf("%w: %s", releaseset.ErrProviderAbsent, detail)

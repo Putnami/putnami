@@ -320,7 +320,7 @@ func requireReleaseSetProvider(discovered *extension.DiscoveryResult, name strin
 	message := fmt.Sprintf(
 		"deploy --env %s requires exactly one installed extension declaring %q: an environment follows a channel, and a channel exists only through a release-set provider",
 		name, distribution.ProviderCommandName)
-	if cause := extension.SkippedProviderCause(discovered.Skipped); cause != "" {
+	if cause := discovered.ProviderCause(distribution.ProviderCommandName); cause != "" {
 		message += ". " + cause
 	}
 	return fmt.Errorf("%w: %s", releaseset.ErrProviderAbsent, message)

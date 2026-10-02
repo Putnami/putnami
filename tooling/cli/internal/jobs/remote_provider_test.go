@@ -508,15 +508,41 @@ func TestLoadRemoteCache_ConfiguredWithoutProviderEmitsNotice(t *testing.T) {
 // fault instead of a silent local-only run.
 func TestLoadRemoteCache_SkippedExtensionCitesRootCause(t *testing.T) {
 	enableProviderRemoteCache(t)
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), nil, []extension.SkippedExtension{
+	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), nil, &extension.DiscoveryResult{Skipped: []extension.SkippedExtension{
 		{Ref: "@acme/cache", Name: "@acme/cache", Reason: errors.New("requires a newer putnami (contract 4 > 3)")},
-	}, store.CacheTrustAny)
+	}}, store.CacheTrustAny)
 	if remote != nil {
 		t.Fatalf("a configured cache with no loadable provider must build locally, got %+v", remote)
 	}
 	for _, want := range []string{"@acme/cache", "requires a newer putnami"} {
 		if !strings.Contains(notice, want) {
 			t.Fatalf("notice %q should cite the skip cause %q", notice, want)
+		}
+	}
+}
+
+// A hosted run that removed the cache provider from a path extension builds
+// locally and names that removal, never an unloadable extension or an install
+// remedy: the path extension loaded. A removal of another capability is not
+// named.
+func TestLoadRemoteCache_RemovedCapabilityNamesThePathExtension(t *testing.T) {
+	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "path-extension-serves-no-provider")
+	enableProviderRemoteCache(t)
+	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), nil, &extension.DiscoveryResult{
+		RemovedCapabilities: []extension.RemovedCapability{
+			{Extension: "@acme/local", Command: cache.ProviderCommandName},
+			{Extension: "@acme/other", Command: "credential-provider"},
+		},
+	}, store.CacheTrustAny)
+	if remote != nil {
+		t.Fatalf("a configured cache whose only provider was removed must build locally, got %+v", remote)
+	}
+	if want := "path extension @acme/local does not serve the " + cache.ProviderCommandName + " capability"; !strings.Contains(notice, want) {
+		t.Errorf("notice %q does not name the removal %q", notice, want)
+	}
+	for _, unwanted := range []string{"@acme/other", "could not be loaded", "putnami upgrade"} {
+		if strings.Contains(notice, unwanted) {
+			t.Errorf("notice %q holds %q", notice, unwanted)
 		}
 	}
 }

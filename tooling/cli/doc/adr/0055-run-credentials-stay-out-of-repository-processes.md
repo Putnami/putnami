@@ -58,17 +58,22 @@ flag, nothing changes.
 - A hosted run runs the extensions installed from the artifact store, which the
   CLI downloaded and verified against the lock, and the workspace's own path
   extensions: a workspace project with a `putnami.extension.json`, or an
-  `extensions` entry that names a path inside the workspace. Discovery looks in
-  no `node_modules` and skips an extension loaded from an absolute path, or
-  whose files resolve outside the workspace or inside its `node_modules`
-  directory, naming the extension and the reason. `putnami extensions install
-  <path>` accepts only a path extension of the workspace.
+  `extensions` entry whose key is a path inside the workspace that starts with
+  `/` or `./`. Any other key names an extension, and discovery loads the
+  build the lock pins from the store, even when a workspace directory or
+  project has that name. Discovery looks in no `node_modules` and skips an
+  extension loaded from an absolute path, or whose files resolve outside the
+  workspace, naming the extension and the reason. It skips an extension whose
+  files lie inside a `node_modules` directory at any depth with a reason of
+  its own. `putnami extensions install <path>` accepts only a path extension
+  of the workspace.
 - A path extension is repository code and serves no provider. Discovery removes
   its `credential-provider`, `cache-provider`, `runner-provider`,
-  `session-reporter`, `log-reporter` and `cloud-release-set` commands, each with
-  a skip record that names the extension and the command, so every provider
-  comes from the store. Its runtime, jobs and hooks start only after custody
-  ends (§4).
+  `session-reporter`, `log-reporter` and `cloud-release-set` commands, so every
+  provider comes from the store. It records each removal apart from the
+  extensions it could not load: the extension loaded, and a run that finds no
+  provider names the removal in its error. Its runtime, workspace probe,
+  toolchain probes, jobs and hooks start only after custody ends (§4).
 - A hosted run reads no registry the workspace declares
   (`registries.put.registry`). The runner's `PUTNAMI_REGISTRY_PUT_URL`, then
   `PUTNAMI_REGISTRY_URL`, or the default registry decides where the pinned CLI
@@ -178,9 +183,12 @@ ends when repository code starts.
 
 - The engine marks the run when it starts a repository process: a hook, a job
   other than a credentialed `workspace-fetch`, a toolchain inside the workspace,
-  an extension runtime outside the store, such as a path extension's, or a
+  an extension runtime outside the store, such as a path extension's, the
+  workspace probe or a runtime toolchain probe of such an extension, or a
   nested CLI that loads the workspace's extensions, such as
-  `putnami cloud release-set`. It marks a runtime before it prepares it. From
+  `putnami cloud release-set`. It marks a runtime before it prepares it, and
+  an extension outside the store before it probes a toolchain that the
+  extension's manifest declares. From
   then on,
   every handoff fails with an error naming the process that asked and the one
   that ran repository code: the job credential descriptor, a cache provider's

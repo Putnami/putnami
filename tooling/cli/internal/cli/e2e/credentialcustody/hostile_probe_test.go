@@ -376,7 +376,7 @@ func engineEnv(wsRoot, home, tmp string, hosted bool) []string {
 		custodyRoleEnv, custodyReportEnv, custodyWorkspaceEnv, custodyCredentialFDEnv,
 		custodyCacheEnv, custodyTargetEnv, custodyArgsEnv, custodyHostsEnv,
 		custodyOrderEnv, custodyLedgerEnv, custodySetupEnv, custodyExecEnv,
-		custodyGateEnv, "HOME", "TMPDIR",
+		custodyGateEnv, custodyProbeLogEnv, "HOME", "TMPDIR",
 	}
 	var env []string
 	for _, entry := range os.Environ() {
