@@ -33,8 +33,11 @@ in the same call.
 5. **A manifest references exactly the blobs the publisher uploads.** The
    references are the members the registry links: `blob_digest`,
    `artifact.blob` and `artifacts.<key>.digest`.
-6. **Every message decodes strictly.** An unknown member, a duplicate member
-   and trailing data are refused on both sides.
+6. **Every message decodes strictly.** An unknown member, a member named in
+   another case than its field, a duplicate member and trailing data are
+   refused on both sides. A manifest payload that names a blob reference
+   member in another case is refused too, so a reader that ignores case and
+   one that does not link the same blobs.
 
 ## Rejected alternatives
 

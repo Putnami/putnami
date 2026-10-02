@@ -71,9 +71,9 @@ A Put registry member is written with
 Its kind is the kind its declared package and publish steps give it
 (`releaseset.KindFor`), whether or not the plan records member attribution: a
 release archive is ecosystem `archive` and kind `archive`, and a config,
-migration or doc member is ecosystem `put`. The node checks the manifest's
-media type and its blob references against that kind before it asks for a
-credential. The member's digest is the SHA-256 of the manifest payload the
+migration or doc member is ecosystem `put`. Before it asks for a credential,
+the node checks the manifest's media type and its blob references against
+that kind, and the size and digest of every blob. The member's digest is the SHA-256 of the manifest payload the
 registry stores, and an archive member also reports the blob digest of each
 platform.
 
@@ -88,10 +88,13 @@ bounded error that names its code; it moves no channel, and the run fails.
 ### 5. A Put registry member releases only from an engine upload
 
 A selected Put registry member releases only when its upload node reported
-it. The release is refused when a `published-member` event for a `put` or
-`archive` member comes from any other node, or when a selected one has no
-upload. A job that publishes such a member itself, outside the outbox, moves
-no channel, so a provider can echo `publication-v1` to any workspace.
+it. When a `published-member` event for a `put` or `archive` member comes
+from any other node, or a selected one has no upload, the engine sends no
+`release`: the release moves no channel and the run fails. The check covers
+only the release. A job that obtains a registry credential some other way and
+moves a channel itself is outside it, so a provider can echo `publication-v1`
+to any workspace only because a publication job receives no registry
+credential under `publication-v1`.
 
 ### 6. A bound request plans without the engine's nodes
 

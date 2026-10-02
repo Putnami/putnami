@@ -185,9 +185,11 @@ or `artifact_digest_mismatch`.
   release-plan contract hashes them. The engine uploads each one with
   [`put-write/v1`](../../../put/README.md), which moves no channel, and its
   evidence digest is the SHA-256 of the stored manifest payload.
-- A provider can echo `publication-v1` to any workspace. When a selected Put
-  registry member has no engine upload, or a job reports one itself, the
-  engine fails the run before `release`, so no channel moves.
+- When a selected Put registry member has no engine upload, or a job reports
+  one itself, the engine fails the run before `release`, so the release moves
+  no channel. A provider can echo `publication-v1` to any workspace because a
+  publication job receives no registry credential under it; the check does
+  not stop a job that obtains one some other way from moving a channel itself.
 - A provider stores one outcome per `planDigest`. A run that lost its answer
   learns the outcome by asking again with the same plan.
 - A second implementation is checked against the schema and fixture corpus in

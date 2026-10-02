@@ -373,7 +373,7 @@ func TestPublicationCarriesPutRegistryMembers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if digest, err := PlanDigest(open.Plan); err != nil || digest != open.Plan.PlanDigest || digest != "sha256:96d3a32cdede07c0b62db190c50b1f51121e8f856adcf7f082a836223f6f88d5" {
+	if digest, err := PlanDigest(open.Plan); err != nil || digest != open.Plan.PlanDigest || digest != "sha256:381297fb31e4bd3a452ba9bb64acf77fdd6b6549264c83e16b79e75901b9849f" {
 		t.Errorf("the put-members open fixture's digest = %s, %v", digest, err)
 	}
 	release, err := ParseReleaseParams(fixturePayload(t, "request-release-put-members.json"))
@@ -395,6 +395,28 @@ func TestPublicationCarriesPutRegistryMembers(t *testing.T) {
 	for _, ecosystem := range []distribution.Ecosystem{"archive", "put"} {
 		if !slices.ContainsFunc(open.Plan.Members, func(member PublicationPlanMember) bool { return member.Ecosystem == ecosystem }) {
 			t.Errorf("the put-members plan selects no %s member", ecosystem)
+		}
+	}
+	// The plan carries no kind; the released member does. Every kind a Put
+	// registry member has is a selected plan member with evidence.
+	planned := map[string]bool{}
+	for _, member := range open.Plan.Members {
+		planned[string(member.Ecosystem)+"\x00"+member.Coordinate] = true
+	}
+	kinds := map[distribution.MemberKind]distribution.Ecosystem{
+		distribution.KindArchive: "archive", distribution.KindConfig: "put",
+		distribution.KindMigration: "put", distribution.KindDoc: "put",
+	}
+	for kind, ecosystem := range kinds {
+		index := slices.IndexFunc(release.Request.ReleaseSet.Members, func(member distribution.ReleaseSetMember) bool { return member.Kind == kind })
+		if index < 0 {
+			t.Errorf("the put-members release carries no %s member", kind)
+			continue
+		}
+		member := release.Request.ReleaseSet.Members[index]
+		key := string(member.Ecosystem) + "\x00" + member.Coordinate
+		if member.Ecosystem != ecosystem || !planned[key] || evidence[key] != member.ArtifactDigest {
+			t.Errorf("the %s member %s %s is not a planned %s member whose evidence digest is its artifact digest", kind, member.Ecosystem, member.Coordinate, ecosystem)
 		}
 	}
 }

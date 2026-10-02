@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -124,6 +126,9 @@ func payloadError(payload []byte) error {
 	if err := noDuplicateMember(payload); err != nil {
 		return fmt.Errorf("manifest payload: %w", err)
 	}
+	if err := exactReferenceNames(payload); err != nil {
+		return fmt.Errorf("manifest payload: %w", err)
+	}
 	canonical, err := json.Marshal(json.RawMessage(payload))
 	if err != nil {
 		return fmt.Errorf("manifest payload: %w", err)
@@ -182,8 +187,12 @@ func duplicateFreeValue(decoder *json.Decoder) error {
 // "digest" of every member of its "artifacts" object. The registry links
 // exactly these blobs to the package, so a publisher uploads exactly these.
 // A reference that is present and not a digest is an error, as is a payload
-// those members cannot be read from.
+// those members cannot be read from, or one that names a reference member in
+// another case (exactReferenceNames).
 func BlobReferences(payload []byte) ([]string, error) {
+	if err := exactReferenceNames(payload); err != nil {
+		return nil, fmt.Errorf("manifest payload: %w", err)
+	}
 	var shape struct {
 		BlobDigest *string `json:"blob_digest"`
 		Artifact   *struct {
@@ -222,6 +231,58 @@ func BlobReferences(payload []byte) ([]string, error) {
 	}
 	slices.Sort(references)
 	return slices.Compact(references), nil
+}
+
+// exactReferenceNames refuses a payload member whose name equals a blob
+// reference member under case folding without being byte-equal to it:
+// "blob_digest", "artifact" and "artifacts" in the payload, "blob" in its
+// "artifact", and "digest" in each member of its "artifacts". A decoder that
+// matches names without regard to case, as encoding/json does, reads such a
+// member as the reference; one that matches exactly does not. Refusing it
+// keeps every reader on the same blobs. A payload that is not an object, or
+// whose reference members are not objects, is left to the caller's decode.
+func exactReferenceNames(payload []byte) error {
+	var top map[string]json.RawMessage
+	if json.Unmarshal(payload, &top) != nil {
+		return nil
+	}
+	if err := refuseFoldedNames("", top, "blob_digest", "artifact", "artifacts"); err != nil {
+		return err
+	}
+	var artifact map[string]json.RawMessage
+	if json.Unmarshal(top["artifact"], &artifact) == nil {
+		if err := refuseFoldedNames("artifact.", artifact, "blob"); err != nil {
+			return err
+		}
+	}
+	var artifacts map[string]json.RawMessage
+	if json.Unmarshal(top["artifacts"], &artifacts) != nil {
+		return nil
+	}
+	for _, platform := range slices.Sorted(maps.Keys(artifacts)) {
+		var member map[string]json.RawMessage
+		if json.Unmarshal(artifacts[platform], &member) != nil {
+			continue
+		}
+		if err := refuseFoldedNames("artifacts."+platform+".", member, "digest"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// refuseFoldedNames refuses a member of members whose name equals one of
+// names under case folding and is not byte-equal to it. prefix names the
+// object in the error.
+func refuseFoldedNames(prefix string, members map[string]json.RawMessage, names ...string) error {
+	for _, member := range slices.Sorted(maps.Keys(members)) {
+		for _, name := range names {
+			if member != name && strings.EqualFold(member, name) {
+				return fmt.Errorf("member %q names %q in another case", prefix+member, name)
+			}
+		}
+	}
+	return nil
 }
 
 // ParseArchivePayload strict-parses and validates an archive manifest
@@ -426,11 +487,14 @@ func validTime(code, field, value string) []diag.Diagnostic {
 }
 
 // strictDecode decodes one JSON value into target: an unknown member, a
-// duplicate member and trailing data are refused. Every message is closed, so
-// a field this build does not know is a protocol change, not an addition to
-// ignore.
+// member named in another case than its field's, a duplicate member and
+// trailing data are refused. Every message is closed, so a field this build
+// does not know is a protocol change, not an addition to ignore.
 func strictDecode(data []byte, target any) error {
 	if err := noDuplicateMember(data); err != nil {
+		return err
+	}
+	if err := exactMembers(data, reflect.TypeOf(target)); err != nil {
 		return err
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -443,4 +507,80 @@ func strictDecode(data []byte, target any) error {
 		return errors.New("unexpected trailing JSON value")
 	}
 	return nil
+}
+
+// rawMessageType is json.RawMessage: an opaque value, such as a manifest
+// payload, whose member names are not a message's fields.
+var rawMessageType = reflect.TypeFor[json.RawMessage]()
+
+// exactMembers refuses an object member that is not the exact json name of a
+// field of kind, through struct, pointer, map and slice types. encoding/json
+// matches a name to a field without regard to case and keeps the last match,
+// so without this check "Digest" would fill the field "digest" and
+// DisallowUnknownFields would not see it. A value whose JSON type does not
+// match kind is left to the decode, which reports it. Members are checked in
+// name order, so the error names the same member on every run.
+func exactMembers(data []byte, kind reflect.Type) error {
+	for kind.Kind() == reflect.Pointer {
+		kind = kind.Elem()
+	}
+	if kind == rawMessageType {
+		return nil
+	}
+	switch kind.Kind() {
+	case reflect.Struct:
+		var members map[string]json.RawMessage
+		if json.Unmarshal(data, &members) != nil {
+			return nil
+		}
+		fields := jsonFieldTypes(kind)
+		for _, name := range slices.Sorted(maps.Keys(members)) {
+			field, ok := fields[name]
+			if !ok {
+				return fmt.Errorf("unknown member %q", name)
+			}
+			if err := exactMembers(members[name], field); err != nil {
+				return err
+			}
+		}
+	case reflect.Map:
+		var members map[string]json.RawMessage
+		if json.Unmarshal(data, &members) != nil {
+			return nil
+		}
+		for _, name := range slices.Sorted(maps.Keys(members)) {
+			if err := exactMembers(members[name], kind.Elem()); err != nil {
+				return err
+			}
+		}
+	case reflect.Slice:
+		var items []json.RawMessage
+		if json.Unmarshal(data, &items) != nil {
+			return nil
+		}
+		for _, item := range items {
+			if err := exactMembers(item, kind.Elem()); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// jsonFieldTypes maps the json name of each exported field of kind to its
+// type.
+func jsonFieldTypes(kind reflect.Type) map[string]reflect.Type {
+	fields := make(map[string]reflect.Type, kind.NumField())
+	for index := range kind.NumField() {
+		field := kind.Field(index)
+		name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+		if !field.IsExported() || name == "-" {
+			continue
+		}
+		if name == "" {
+			name = field.Name
+		}
+		fields[name] = field.Type
+	}
+	return fields
 }

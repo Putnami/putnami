@@ -584,9 +584,11 @@ func (run *ReleaseSetRun) uploadGo(ctx context.Context, project *workspace.Proje
 // uploadPut uploads a Put registry member to putRegistryEndpoint with the
 // provider's publish bearer for that registry: the blobs its manifest
 // references, one at a time, then the manifest, with no channel. Every check
-// that needs no registry runs before the bearer is asked for. The digest is
-// the SHA-256 of the manifest payload the registry stores, which must be the
-// packed manifest's.
+// that needs no registry runs before the bearer is asked for: the member's
+// shape (putpublish.Check), then the size and digest of every blob, streamed
+// from the outbox. Each blob is read and verified again when it is uploaded.
+// The digest is the SHA-256 of the manifest payload the registry stores,
+// which must be the packed manifest's.
 func (run *ReleaseSetRun) uploadPut(ctx context.Context, project *workspace.Project, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember, kind distribution.MemberKind) (string, map[string]string, error) {
 	endpoint, err := putRegistryEndpoint(project)
 	if err != nil {
@@ -613,6 +615,11 @@ func (run *ReleaseSetRun) uploadPut(ctx context.Context, project *workspace.Proj
 	}
 	if _, err := putpublish.Check(member); err != nil {
 		return "", nil, err
+	}
+	for _, blob := range packed.Put.Blobs {
+		if err := outbox.VerifyFile(blob.File()); err != nil {
+			return "", nil, err
+		}
 	}
 	bearer, err := run.publication.PublishBearer(ctx, target)
 	if err != nil {

@@ -77,11 +77,15 @@ valid UTF-8 with no duplicate member.
 
 The registry links a blob to the package only through a published manifest
 that references it: `blob_digest`, `artifact.blob`, or the `digest` of each
-member of `artifacts`. `BlobReferences` reads exactly those. A publisher
-uploads exactly the blobs its manifest references, and checks each receipt
-(`ValidateBlobReceiptFor`) names the uploaded digest and size. The registry
-stores one blob per digest and answers the media type of the first upload of
-those bytes, so a receipt's media type may differ from the upload's.
+member of `artifacts`. `BlobReferences` reads exactly those. A payload that
+names one of those members in another case, such as `BLOB_DIGEST` or
+`artifact.Blob`, is refused: a reader that ignores case, as Go's
+`encoding/json` does, would take it for the reference, and a reader that
+matches names exactly would not. A publisher uploads exactly the blobs its
+manifest references, and checks each receipt (`ValidateBlobReceiptFor`) names
+the uploaded digest and size. The registry stores one blob per digest and
+answers the media type of the first upload of those bytes, so a receipt's
+media type may differ from the upload's.
 
 An archive payload is `{"artifacts":{"<os>-<arch>":{"digest","size"}}}`, 1 to
 32 platforms; two platforms may share a blob. `ArchivePayload.Platforms` maps
@@ -119,8 +123,9 @@ alone.
 `ProtocolVersion` is `1` and is pinned by
 [`conformance_test.go`](conformance_test.go), with the path templates, the
 media types of each kind, the closed field names, the error codes and the
-bounds. Every message decodes strictly: an unknown member, a duplicate member
-and trailing data are refused. Adding a field to any message is a v2 change.
+bounds. Every message decodes strictly: an unknown member, a member named in
+another case than its field (`Digest` for `digest`), a duplicate member and
+trailing data are refused. Adding a field to any message is a v2 change.
 
 ## Schemas and fixtures
 

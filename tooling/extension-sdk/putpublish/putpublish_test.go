@@ -453,6 +453,59 @@ func TestPublishSendsTheBearerAndReadsTheVersionManifest(t *testing.T) {
 	}
 }
 
+// Every call that sends a request checks its registry URL first: a URL that
+// ValidateRegistryURL refuses sends nothing, and a trailing slash is dropped
+// before the path is joined.
+func TestEveryCallValidatesTheRegistryURLBeforeAnyRequest(t *testing.T) {
+	member := members()[distribution.KindDoc]
+	calls := map[string]func(registryURL string) error{
+		"Publish": func(registryURL string) error {
+			_, err := Publish(context.Background(), testClient(t), registryURL, testToken, member)
+			return err
+		},
+		"UploadBlob": func(registryURL string) error {
+			return UploadBlob(context.Background(), testClient(t), registryURL, testToken, member.Coordinate, member.Blobs[0])
+		},
+		"PublishManifest": func(registryURL string) error {
+			_, _, err := PublishManifest(context.Background(), testClient(t), registryURL, testToken, member)
+			return err
+		},
+		"ReadManifest": func(registryURL string) error {
+			_, err := ReadManifest(context.Background(), testClient(t), registryURL, testToken, member.Coordinate, member.Version)
+			return err
+		},
+	}
+	for name, call := range calls {
+		t.Run(name, func(t *testing.T) {
+			registry := newFakeRegistry(t)
+			for _, refused := range []string{
+				strings.Replace(registry.server.URL, "http://", "http://publisher:secret@", 1),
+				registry.server.URL + "?secret",
+				registry.server.URL + "#secret",
+				strings.Replace(registry.server.URL, "http://", "ftp://", 1),
+			} {
+				if err := call(refused); err == nil || strings.Contains(err.Error(), "secret") {
+					t.Errorf("%s(%q) = %v; want a refusal that does not print the URL", name, refused, err)
+				}
+			}
+			if count := registry.requestCount(); count != 0 {
+				t.Fatalf("a refused registry URL sent %d requests", count)
+			}
+		})
+	}
+	registry := newFakeRegistry(t)
+	if _, err := Publish(context.Background(), testClient(t), registry.server.URL+"/", testToken, member); err != nil {
+		t.Fatalf("a registry URL with a trailing slash was refused: %v", err)
+	}
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	for _, request := range registry.requests {
+		if strings.Contains(request, "//") {
+			t.Fatalf("request %q keeps the trailing slash of the registry URL", request)
+		}
+	}
+}
+
 func TestValidateRegistryURL(t *testing.T) {
 	for _, tc := range []struct{ raw, want string }{
 		{"https://put.putnami.dev", "https://put.putnami.dev"},

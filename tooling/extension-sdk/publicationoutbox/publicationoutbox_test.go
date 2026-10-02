@@ -114,9 +114,15 @@ func TestOutboxReaderRefusesATamperedArtifact(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if err := outbox.VerifyFile(member.NPM.Tarball); err != nil {
+				t.Fatalf("intact artifact refused: %v", err)
+			}
 			tamper(t, root)
 			if data, err := outbox.ReadFile(member.NPM.Tarball); err == nil {
 				t.Fatalf("tampered artifact read as %q", data)
+			}
+			if err := outbox.VerifyFile(member.NPM.Tarball); err == nil {
+				t.Fatal("tampered artifact verified")
 			}
 		})
 	}

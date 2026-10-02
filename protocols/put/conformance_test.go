@@ -135,7 +135,7 @@ func TestConformance_SchemaTracksTheGoTypes(t *testing.T) {
 			t.Errorf("definitions/%s properties = %v, want the %T fields %v", definition, names, value, want)
 		}
 	}
-	for _, rule := range []string{"canonical form", "no duplicate object member", "at most 4194304 bytes", "at most 256 bytes", "at most 32 platforms"} {
+	for _, rule := range []string{"canonical form", "no duplicate object member", "at most 4194304 bytes", "at most 256 bytes", "at most 32 platforms", "in another case"} {
 		if !strings.Contains(schema.Description, rule) {
 			t.Errorf("the schema description does not name %q", rule)
 		}
@@ -223,6 +223,7 @@ func TestConformance_CanonicalPayload(t *testing.T) {
 		`{"a":{"b":1,"b":1}}`: `duplicate object member "b"`,
 		"{\"a\":\"\xff\"}":    "not valid UTF-8",
 		`{"a":1}{"b":2}`:      "trailing data",
+		`{"Blob_digest":"x"}`: "in another case",
 		`{"a":`:               "manifest payload",
 	} {
 		diags := ValidatePayload([]byte(payload))
@@ -248,6 +249,7 @@ func TestConformance_BlobReferences(t *testing.T) {
 		`{"artifact":{"blob":"` + two + `","mediaType":"application/gzip","size":3},"bundle":{"name":"x"}}`: {two},
 		`{"artifacts":{"linux-amd64":{"digest":"` + two + `","size":1},"darwin-arm64":{"digest":"` + one + `","size":1},"windows-amd64":{"digest":"` + two + `","size":1}}}`: {one, two},
 		`{"blob_digest":"` + one + `","artifact":{"blob":"` + one + `"},"artifacts":{"a-b":{"digest":"` + three + `"}}}`:                                                     {one, three},
+		`{"blob_digests":"` + one + `","values":{"Blob_Digest":"` + two + `"},"artifact":{"blobs":"` + three + `"}}`:                                                         nil,
 	} {
 		got, err := BlobReferences([]byte(payload))
 		if err != nil || !slices.Equal(got, want) {
@@ -260,6 +262,15 @@ func TestConformance_BlobReferences(t *testing.T) {
 		`{"artifacts":[{"digest":"` + one + `"}]}`,
 		`{"artifacts":{"a-b":{"digest":"` + strings.ToUpper(one) + `"}}}`,
 		`[]`,
+		// A member named in another case is read as the reference by a
+		// decoder that ignores case, and not by one that matches exactly.
+		`{"BLOB_DIGEST":"` + one + `"}`,
+		`{"blob_digest":"` + one + `","Blob_Digest":"` + two + `"}`,
+		`{"Artifact":{"blob":"` + one + `"}}`,
+		`{"artifact":{"Blob":"` + one + `"}}`,
+		`{"ARTIFACTS":{"a-b":{"digest":"` + one + `"}}}`,
+		"{\"artifact\u017f\":{\"a-b\":{\"digest\":\"" + one + "\"}}}",
+		`{"artifacts":{"a-b":{"digest":"` + one + `","Digest":"` + two + `"}}}`,
 	} {
 		if got, err := BlobReferences([]byte(payload)); err == nil {
 			t.Errorf("BlobReferences(%s) = %v, want a refusal", payload, got)

@@ -106,7 +106,7 @@ uploaded. It refuses a release whose artifacts the registries do not store
 A release archive, config, migration or site-content bundle uploads as a
 private, immutable version of the Put registry, and only the release moves its
 channel. When a selected one has no Putnami upload, because its job uploaded it
-itself or packed nothing, the release refuses the run and moves no channel.
+itself or packed nothing, the run fails and the release moves no channel.
 
 A publication job served from a cache packed nothing in this run, so the
 release refuses the run and names the job. The publication tasks of the

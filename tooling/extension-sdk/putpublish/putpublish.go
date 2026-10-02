@@ -215,9 +215,14 @@ func firstMessage(diags []diag.Diagnostic) string {
 }
 
 // UploadBlob reads blob and uploads it to the blob endpoint of coordinate.
+// A registryURL that ValidateRegistryURL refuses is refused before any read.
 // Bytes whose digest or size is not the blob's are refused before they are
 // sent, and a receipt that names other bytes is refused.
 func UploadBlob(ctx context.Context, client *http.Client, registryURL, token, coordinate string, blob Blob) error {
+	registryURL, err := ValidateRegistryURL(registryURL)
+	if err != nil {
+		return err
+	}
 	namespace, pkg, err := put.SplitCoordinate(coordinate)
 	if err != nil {
 		return err
@@ -254,8 +259,13 @@ func UploadBlob(ctx context.Context, client *http.Client, registryURL, token, co
 // PublishManifest publishes member's manifest without a channel and returns
 // the manifest the registry stores. A 409 means the version is already
 // published: the stored manifest is read back, and the version is a reuse only
-// when its media type and payload bytes equal member's.
+// when its media type and payload bytes equal member's. A registryURL that
+// ValidateRegistryURL refuses is refused before any request.
 func PublishManifest(ctx context.Context, client *http.Client, registryURL, token string, member Member) (stored *put.Manifest, reused bool, err error) {
+	registryURL, err = ValidateRegistryURL(registryURL)
+	if err != nil {
+		return nil, false, err
+	}
 	namespace, pkg, err := put.SplitCoordinate(member.Coordinate)
 	if err != nil {
 		return nil, false, err
@@ -297,8 +307,13 @@ func PublishManifest(ctx context.Context, client *http.Client, registryURL, toke
 	return nil, false, fmt.Errorf("publish returned %d", status)
 }
 
-// ReadManifest reads the stored manifest of coordinate at version.
+// ReadManifest reads the stored manifest of coordinate at version. A
+// registryURL that ValidateRegistryURL refuses is refused before any request.
 func ReadManifest(ctx context.Context, client *http.Client, registryURL, token, coordinate, version string) (*put.Manifest, error) {
+	registryURL, err := ValidateRegistryURL(registryURL)
+	if err != nil {
+		return nil, err
+	}
 	namespace, pkg, err := put.SplitCoordinate(coordinate)
 	if err != nil {
 		return nil, err
@@ -320,11 +335,15 @@ func ReadManifest(ctx context.Context, client *http.Client, registryURL, token, 
 	return manifest, nil
 }
 
-// Publish checks member (Check), uploads its blobs, and publishes its
-// manifest. The digest it returns is the SHA-256 of the payload the registry
-// stores. An existing version is a reuse only when it holds the same manifest;
-// anything else is an error.
+// Publish checks registryURL (ValidateRegistryURL) and member (Check),
+// uploads its blobs, and publishes its manifest. The digest it returns is the
+// SHA-256 of the payload the registry stores. An existing version is a reuse
+// only when it holds the same manifest; anything else is an error.
 func Publish(ctx context.Context, client *http.Client, registryURL, token string, member Member) (Published, error) {
+	registryURL, err := ValidateRegistryURL(registryURL)
+	if err != nil {
+		return Published{}, err
+	}
 	platforms, err := Check(member)
 	if err != nil {
 		return Published{}, err
@@ -363,7 +382,7 @@ func send(ctx context.Context, client *http.Client, method, target, contentType,
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	resp, err := client.Do(req) //nolint:gosec // registryURL is validated publish configuration
+	resp, err := client.Do(req) //nolint:gosec // G704: target starts with a registry URL that ValidateRegistryURL accepted in the exported call that sends it
 	if err != nil {
 		return nil, 0, transportError(err)
 	}

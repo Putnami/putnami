@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://putnami.dev/schemas/protocol/put/put-write-v1.json",
   "title": "Putnami Put registry write protocol put-write/v1",
-  "description": "The messages of the immutable Put registry write: a blob receipt, a publish request, a publish response, a stored manifest, and the archive manifest payload. Implementations must also enforce the rules in protocols/put/README.md that this schema cannot express: no duplicate object member and no trailing data; a manifest payload of at most 4194304 bytes of valid UTF-8 in the canonical form Go's encoding/json writes for a json.RawMessage; a version of at most 256 bytes; a publish response whose manifest id and package id equal the version's manifest_id and package_id; and an archive payload of at most 32 platforms.",
+  "description": "The messages of the immutable Put registry write: a blob receipt, a publish request, a publish response, a stored manifest, and the archive manifest payload. Implementations must also enforce the rules in protocols/put/README.md that this schema cannot express: no duplicate object member and no trailing data; no manifest payload member that names blob_digest, artifact or artifacts, the blob of its artifact, or the digest of an artifacts member in another case; a manifest payload of at most 4194304 bytes of valid UTF-8 in the canonical form Go's encoding/json writes for a json.RawMessage; a version of at most 256 bytes; a publish response whose manifest id and package id equal the version's manifest_id and package_id; and an archive payload of at most 32 platforms.",
   "oneOf": [
     {
       "$ref": "#/definitions/blobReceipt"

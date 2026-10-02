@@ -489,6 +489,44 @@ func TestAPutMemberIsCheckedBeforeTheBearerIsAsked(t *testing.T) {
 	}
 }
 
+// A Put blob whose bytes are not the bytes its descriptor names is refused
+// before the bearer is asked for: the engine hashes every blob of the member
+// first, so the registry receives no blob, not even the intact one listed
+// before it.
+func TestATamperedPutBlobGetsNoBearer(t *testing.T) {
+	spectest.Proves(t, "cli/provider-publication", "put-registry-members-upload-in-the-engine", "a-put-member-is-checked-before-the-bearer-is-asked")
+	reg := newPutRegistry(t)
+	h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, reg.server)}})
+	f := putMemberFixtures()[0]
+	outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
+		return []extensionproto.OutboxMember{f.pack(t, w)}
+	})
+	// The second blob keeps its size and changes its bytes.
+	tampered := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tampered, "put"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tampered, "put", "blob-1"), []byte(strings.ToUpper(string(f.blobs[1].data))), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	job := addPutMember(h, f, reg.server.URL, fixtureScript{
+		{"copy-tree", outbox, "$PUTNAMI_PUBLICATION_OUTBOX"},
+		{"copy-tree", tampered, "$PUTNAMI_PUBLICATION_OUTBOX"},
+	})
+	planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
+	results := h.execute(context.Background(), planned, internal, nil)
+
+	if upload := results[h.uploadKey(job)]; upload == nil || upload.Status != "failed" || upload.Error == nil || !strings.Contains(upload.Error.Message, "digest mismatch") {
+		t.Fatalf("upload of a tampered blob: %s", resultMessage(upload))
+	}
+	if requests, _ := reg.recorded(); len(requests) != 0 {
+		t.Fatalf("the registry received %v", requests)
+	}
+	if ops := h.session.recorded(); slices.Contains(ops, "credential") || slices.Contains(ops, "release") {
+		t.Fatalf("ops %v after a tampered blob", ops)
+	}
+}
+
 // The Put registry an upload goes to is the project's registries.put.registry,
 // or the default Put registry, as an HTTPS endpoint (HTTP only on loopback)
 // with no credential, query or fragment. A refusal does not print the

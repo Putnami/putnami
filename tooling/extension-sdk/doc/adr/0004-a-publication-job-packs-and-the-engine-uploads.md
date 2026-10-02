@@ -71,6 +71,10 @@ The engine reads the outbox after the job exits. `publicationoutbox.Read`
 parses the descriptor, and `Outbox.ReadFile` reads each artifact once, refusing
 a size or a digest that differs from the descriptor. The uploader receives the
 bytes that were hashed, so a file changed after the check is never uploaded.
+`Outbox.VerifyFile` applies the same checks while streaming the file through
+the digest, so the engine can refuse every blob of a Put member before it asks
+for the bearer without holding the blobs in memory; the upload still reads
+each blob with `Outbox.ReadFile`.
 `oci.PushLayout` hashes the manifest bytes it uploads and refuses a digest other
 than the expected one before any request.
 
