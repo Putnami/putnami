@@ -178,7 +178,7 @@ func TestAProbeDuringAnUploadFindsNoCredential(t *testing.T) {
 	code, output := runEngine(t, self, fx.wsRoot, t.TempDir(), false,
 		custodyArgsEnv+"=publish\n--all\n--channel\npr-0\n--providers\npublish\n--max-parallel\n4")
 	if code != 0 {
-		t.Fatalf("publish exit=%d, want 0\n%s", code, output)
+		t.Fatalf("publish exit=%d, want 0: %s\n%s", code, failureLines(output), output)
 	}
 
 	members, refused := npm.stored()

@@ -1094,7 +1094,7 @@ func TestReleaseSetE2ELocalAndHostedRunsOpenTheSamePlan(t *testing.T) {
 	for _, hosted := range []bool{false, true} {
 		run := fx.publish(t, hosted, providerSetup{})
 		if run.code != 0 {
-			t.Fatalf("publish (hosted=%t) exit=%d, want 0\n%s", hosted, run.code, run.output)
+			t.Fatalf("publish (hosted=%t) exit=%d, want 0: %s\n%s", hosted, run.code, failureLines(run.output), run.output)
 		}
 		if len(run.initialize) != 1 || run.initialize[0].RunCredential != hosted {
 			t.Errorf("hosted=%t: initialize %+v; want one, carrying the run credential only on the hosted run", hosted, run.initialize)
