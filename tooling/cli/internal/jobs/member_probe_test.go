@@ -3,6 +3,7 @@ package jobs
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
 	"strings"
 	"testing"
 
@@ -476,19 +477,20 @@ func TestDryRunFailsOnAProbeTheStrictReaderRefuses(t *testing.T) {
 		"ecosystem": "npm", "coordinate": "@putnami/runtime", "version": "1.4.0",
 		"registry": testNPMRegistry, "state": extensionproto.MemberProbeAbsent,
 	}
-	for name, mutate := range map[string]func(map[string]any){
-		"unknown state":            func(data map[string]any) { data["state"] = "superseded" },
-		"unknown field":            func(data map[string]any) { data["overwritable"] = true },
-		"conflict without reason":  func(data map[string]any) { data["state"] = extensionproto.MemberProbeConflict },
-		"credential in registry":   func(data map[string]any) { data["registry"] = "https://user:secret@npm.putnami.dev" },
-		"identical without digest": func(data map[string]any) { data["state"] = extensionproto.MemberProbeIdentical },
+	type override struct {
+		key   string
+		value any
+	}
+	for name, change := range map[string]override{
+		"unknown state":            {"state", "superseded"},
+		"unknown field":            {"overwritable", true},
+		"conflict without reason":  {"state", extensionproto.MemberProbeConflict},
+		"credential in registry":   {"registry", "https://user:secret@npm.putnami.dev"},
+		"identical without digest": {"state", extensionproto.MemberProbeIdentical},
 	} {
 		t.Run(name, func(t *testing.T) {
-			data := map[string]any{}
-			for key, value := range valid {
-				data[key] = value
-			}
-			mutate(data)
+			data := maps.Clone(valid)
+			data[change.key] = change.value
 			results := map[string]*JobResult{"a:publish~npm": {
 				Status: "success",
 				Events: []RawJobEvent{rawArtifactEvent(t, "npm", "@putnami/runtime", extensionproto.MemberProbeEventKind, data)},
