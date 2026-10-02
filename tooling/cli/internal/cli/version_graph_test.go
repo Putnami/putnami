@@ -19,6 +19,7 @@ import (
 // records that view before it computes a version. Without a catalog, no edge
 // is read and nothing is recorded.
 func TestVersionRecordsTheDependencyGraphOnlyWithASupportCatalog(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name        string
 		withCatalog bool
@@ -28,6 +29,7 @@ func TestVersionRecordsTheDependencyGraphOnlyWithASupportCatalog(t *testing.T) {
 		{name: "without a catalog", withCatalog: false, want: workspace.RecordedAbsent},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			wsRoot := versionGraphRepo(t, testCase.withCatalog)
 			registered, ok := lookupCommand("version")
 			if !ok {
@@ -52,6 +54,7 @@ func TestVersionRecordsTheDependencyGraphOnlyWithASupportCatalog(t *testing.T) {
 // When the refresh fails, `version get` answers from the recorded view, since it
 // must work offline, and `version tag` refuses to release from it.
 func TestVersionFallsBackToTheRecordedGraphOnlyForGet(t *testing.T) {
+	t.Parallel()
 	wsRoot := versionGraphRepo(t, true)
 	registered, ok := lookupCommand("version")
 	if !ok {

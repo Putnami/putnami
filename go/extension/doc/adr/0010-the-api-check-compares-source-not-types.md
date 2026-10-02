@@ -8,7 +8,7 @@
 `validate` holds the breaking-change marker: for a stable project it compares
 the exported API at the last tag of the version line with the working tree, and
 fails an incompatible change that no commit declares
-([doc/validate.md](../validate.md)). Issue #38 named `apidiff` or `gorelease`
+([doc/validate.md](../validate.md)). The request named `apidiff` or `gorelease`
 as the comparison.
 
 Both tools compare type-checked packages. To type-check the API at a tag, they
