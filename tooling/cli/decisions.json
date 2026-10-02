@@ -32,7 +32,7 @@
     },
     {
       "id": "D-W2",
-      "statement": "release archives stay .tar.gz on every platform, with the Windows binary at compiled/<name>.exe; every extractor in the CLI reads tar.gz only; the one exception is the CLI's own release, whose platform assets may also be raw executables that the CLI's self-update installs as downloaded",
+      "statement": "release archives stay .tar.gz on every platform, with the Windows binary at compiled/<name>.exe; every extractor in the CLI reads tar.gz only; the CLI's own release may also publish raw executables, which self-update installs as is",
       "settled": "2026-10-02",
       "settledBy": "fdumay",
       "reviewOnly": true
