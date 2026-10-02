@@ -31,9 +31,11 @@ For each line, in order:
 | Commit | Before 1.0 | From 1.0 |
 |---|---|---|
 | `!` or a `BREAKING CHANGE:` footer | minor | major |
-| `feat` | minor | minor |
+| `feat` | patch | minor |
 | `fix`, `perf` | patch | patch |
 | anything else | no advance | no advance |
+
+Before 1.0, a minor is the release that may need a migration, and nothing else: a feature that breaks nothing ships in a patch, so a `^0.y.0` range picks it up.
 
 A pre-release is always at least a patch above the last tag, so a docs-only commit still produces a new, ordered version. Versions of one line are totally ordered by their timestamp segment, which is what lets a registry answer "the newest build of this channel" without any Putnami-specific metadata.
 

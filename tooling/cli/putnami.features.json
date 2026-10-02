@@ -1714,7 +1714,7 @@
             "kind": "acceptance",
             "checks": [
               "docs-commit-still-advances-a-patch",
-              "feat-advances-minor-before-one",
+              "feat-advances-patch-before-one-minor-after",
               "breaking-advances-minor-before-one-major-after"
             ]
           }

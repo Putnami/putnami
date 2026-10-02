@@ -505,19 +505,20 @@ func TestGetVersionInfo_TwoTagsOfOneLineAtHeadAreRefused(t *testing.T) {
 func TestGetVersionInfo_AdvanceFollowsTheConventionalCommits(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/version-from-git", "conventional-advance", "docs-commit-still-advances-a-patch")
-	spectest.Proves(t, "cli/version-from-git", "conventional-advance", "feat-advances-minor-before-one")
+	spectest.Proves(t, "cli/version-from-git", "conventional-advance", "feat-advances-patch-before-one-minor-after")
 	for _, testCase := range []struct {
-		name, subject, want string
+		name, last, subject, want string
 	}{
-		{"docs still advances a patch", "docs: rewrite the guide", "0.4.1"},
-		{"fix advances a patch", "fix(ts): stop the leak", "0.4.1"},
-		{"feat advances a minor", "feat(ts): add the thing", "0.5.0"},
-		{"breaking is a minor before 1.0", "feat(ts)!: change the thing", "0.5.0"},
+		{"docs still advances a patch", "0.4.0", "docs: rewrite the guide", "0.4.1"},
+		{"fix advances a patch", "0.4.0", "fix(ts): stop the leak", "0.4.1"},
+		{"feat advances a patch before 1.0", "0.4.0", "feat(ts): add the thing", "0.4.1"},
+		{"feat advances a minor from 1.0", "1.2.0", "feat(ts): add the thing", "1.3.0"},
+		{"breaking is a minor before 1.0", "0.4.0", "feat(ts)!: change the thing", "0.5.0"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			dir := initGitRepo(t)
-			gitDo(t, dir, "tag", "-a", "ts/v0.4.0", "-m", "release")
+			gitDo(t, dir, "tag", "-a", "ts/v"+testCase.last, "-m", "release")
 			writeCommit(t, dir, "typescript/src.ts", testCase.subject)
 
 			info, err := GetVersionInfo(dir, LineSpec{

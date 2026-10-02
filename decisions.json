@@ -32,6 +32,13 @@
       "settled": "2026-09-11",
       "settledBy": "fdumay",
       "reviewOnly": true
+    },
+    {
+      "id": "D-004",
+      "statement": "before 1.0, a feature that breaks nothing ships in a patch, and only a breaking change makes a minor",
+      "settled": "2026-10-02",
+      "settledBy": "fdumay",
+      "reviewOnly": true
     }
   ]
 }

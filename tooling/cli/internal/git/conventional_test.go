@@ -29,9 +29,10 @@ func TestParseConventional(t *testing.T) {
 	}
 }
 
-// BumpFor reduces a range to its strongest advance, and the pre-1.0 reading
-// makes a breaking change a minor: before 1.0 the major number is not yet a
-// compatibility promise.
+// BumpFor reduces a range to its strongest advance. The pre-1.0 reading makes
+// a breaking change a minor and a feature a patch: before 1.0 the major number
+// is not yet a compatibility promise, and a minor is kept for what may need a
+// migration.
 func TestBumpFor(t *testing.T) {
 	t.Parallel()
 	commits := []Commit{
@@ -39,8 +40,11 @@ func TestBumpFor(t *testing.T) {
 		{Subject: "fix: stop"},
 		{Subject: "feat: add"},
 	}
-	if got := BumpFor(commits, true); got != BumpMinor {
-		t.Errorf("BumpFor(feat+fix+docs) = %v, want minor", got)
+	if got := BumpFor(commits, true); got != BumpPatch {
+		t.Errorf("BumpFor(feat+fix+docs, preOne) = %v, want patch before 1.0", got)
+	}
+	if got := BumpFor(commits, false); got != BumpMinor {
+		t.Errorf("BumpFor(feat+fix+docs, post 1.0) = %v, want minor", got)
 	}
 	breaking := append(append([]Commit(nil), commits...), Commit{Subject: "refactor!: move"})
 	if got := BumpFor(breaking, true); got != BumpMinor {

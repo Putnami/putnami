@@ -90,8 +90,10 @@ func isConventionalType(s string) bool {
 }
 
 // BumpFor reduces a set of commits to the strongest advance they justify.
-// preOne selects the pre-1.0 reading of a breaking change, where the major
-// number is not yet a compatibility promise, so breaking is a minor.
+// preOne selects the pre-1.0 reading, where the major number is not yet a
+// compatibility promise: a breaking change is a minor and a feature is a patch,
+// so a minor always means "you may have to migrate" and never only "something
+// is new".
 //
 // Types other than feat, fix and perf advance nothing on their own: a
 // documentation commit does not make a release. A pre-release still floors at a
@@ -110,6 +112,8 @@ func BumpFor(commits []Commit, preOne bool) Bump {
 			level = BumpMinor
 		case breaking:
 			level = BumpMajor
+		case typ == "feat" && preOne:
+			level = BumpPatch
 		case typ == "feat":
 			level = BumpMinor
 		case typ == "fix", typ == "perf":
