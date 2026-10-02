@@ -333,6 +333,22 @@ func runFixtureScript(encoded string, args []string) int {
 			if err := os.WriteFile(ops[2], []byte(os.Getenv(ops[1])), 0o644); err != nil {
 				return fail(step, err)
 			}
+		case "copy-tree": // copy-tree SOURCE TARGET: copies the tree SOURCE into TARGET, both expanded (expandFixture).
+			if err := copyFixtureTree(expandFixture(ops[1], args), expandFixture(ops[2], args)); err != nil {
+				return fail(step, err)
+			}
+		case "write-environ": // write-environ PATH: writes the environment, one variable a line.
+			if err := os.WriteFile(ops[1], []byte(strings.Join(os.Environ(), "\n")), 0o644); err != nil {
+				return fail(step, err)
+			}
+		case "write-mode": // write-mode NAME PATH: writes the permission bits of the path the variable names.
+			info, err := os.Stat(os.Getenv(ops[1]))
+			if err == nil {
+				err = os.WriteFile(ops[2], []byte(fmt.Sprintf("%#o", info.Mode().Perm())), 0o644)
+			}
+			if err != nil {
+				return fail(step, err)
+			}
 		case "write-pid": // write-pid PATH
 			if err := os.WriteFile(ops[1], []byte(strconv.Itoa(os.Getpid())), 0o644); err != nil {
 				return fail(step, err)
@@ -427,6 +443,32 @@ func runFixtureScript(encoded string, args []string) int {
 		}
 	}
 	return 0
+}
+
+// copyFixtureTree copies the directories and regular files under source into
+// target, which may exist.
+func copyFixtureTree(source, target string) error {
+	if source == "" || target == "" {
+		return errors.New("copy-tree needs a source and a target")
+	}
+	return filepath.WalkDir(source, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(source, path)
+		if err != nil {
+			return err
+		}
+		destination := filepath.Join(target, rel)
+		if entry.IsDir() {
+			return os.MkdirAll(destination, 0o700)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(destination, data, 0o600)
+	})
 }
 
 // expandFixture expands text as a shell does: $NAME and ${NAME} from the

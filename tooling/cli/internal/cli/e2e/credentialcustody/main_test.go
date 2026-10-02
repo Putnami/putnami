@@ -10,6 +10,10 @@
 //   - Without --credential-fd, the same run's job and hook environment is the
 //     one it always had: PUTNAMI_CACHE_TOKEN and PUTNAMI_CLOUD_TOKEN pass
 //     through and no offline signal is added.
+//   - On a run that publishes through a publication-v1 credential provider,
+//     the publication job, repository code, finds the publish credential
+//     nowhere: the engine uploads what the job packed with a credential only
+//     it receives.
 //
 // The engine, the hostile hook and the hostile task are all this test binary
 // re-executed in a role (custodyRoleEnv), the same pattern
@@ -63,12 +67,16 @@ const (
 	// custodyArgsEnv, when set, is the engine role's command, one argument per
 	// line, in place of `build --projects app`.
 	custodyArgsEnv = "PUTNAMI_TEST_CUSTODY_ARGS"
+	// custodyHostsEnv is the comma list of hosts the "credential-provider"
+	// role's publish credential serves.
+	custodyHostsEnv = "PUTNAMI_TEST_CUSTODY_HOSTS"
 )
 
 // TestMain runs the tests, or, when this binary was re-executed in a role, that
-// role: the engine that runs `build`, the cache provider, the workspace-fetch,
-// a hook that overwrites the provider's executable, or a hostile hook or task
-// that probes for the credential. A role process exits without running any
+// role: the engine that runs `build`, the cache provider, the credential
+// provider, the workspace-fetch, a hook that overwrites the provider's
+// executable, or a hostile hook, task or publication job that probes for the
+// credential. A role process exits without running any
 // test. As the runtime of the fixture extension, this binary first answers the
 // CLI's runtime-info handshake, which inherits the engine's environment and so
 // its role.
@@ -88,6 +96,10 @@ func TestMain(m *testing.M) {
 		os.Exit(runFetchRole())
 	case "tamper":
 		os.Exit(runTamperRole())
+	case "credential-provider":
+		os.Exit(runCredentialProviderRole())
+	case "publication":
+		os.Exit(runHostilePublicationRole())
 	default:
 		os.Exit(runHostileRole(role))
 	}

@@ -425,7 +425,17 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // internal/credentialprovider, which imports internal/jobs and
 // internal/extension, nor in internal/launch, whose other callers need none of
 // it. It adds no vertical and no engine stage.
-const internalPackageCountCeiling = 66
+//
+// RAISED 66 → 67 (ADR 0057): internal/credentialprovider/providertest is the
+// test-only credential provider that answers the provider's RPC, publication
+// operations included, from a stated configuration. The tests of three packages
+// share it: internal/credentialprovider, internal/jobs, and the custody e2e
+// package, which re-executes its test binary as the provider process. It cannot
+// sit in internal/credentialprovider, whose internal tests the jobs tests cannot
+// import, nor in internal/cli/clitest, which internal/jobs cannot import without
+// a cycle. It is imported by _test.go files only and never by cmd/putnami's
+// graph. It adds no vertical and no engine stage.
+const internalPackageCountCeiling = 67
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

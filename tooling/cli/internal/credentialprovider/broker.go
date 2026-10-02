@@ -60,7 +60,9 @@ type Broker struct {
 	open     Opener
 	now      func() time.Time
 	timeout  time.Duration
-	source   string
+	// releaseTimeout bounds one publication-v1 release (DefaultReleaseTimeout).
+	releaseTimeout time.Duration
+	source         string
 	// runCredential is the hosted run's bearer that New's opener hands to the
 	// provider at initialize; empty without one. A Broker is never formatted.
 	runCredential string
@@ -99,6 +101,11 @@ func WithClock(now func() time.Time) Option { return func(b *Broker) { b.now = n
 // WithOpTimeout replaces DefaultOpTimeout.
 func WithOpTimeout(timeout time.Duration) Option { return func(b *Broker) { b.timeout = timeout } }
 
+// WithReleaseTimeout replaces DefaultReleaseTimeout.
+func WithReleaseTimeout(timeout time.Duration) Option {
+	return func(b *Broker) { b.releaseTimeout = timeout }
+}
+
 // WithSource names where the enabled purposes came from — `--providers`,
 // PUTNAMI_PROVIDERS or the execution request — in every error Bearer returns.
 func WithSource(source string) Option { return func(b *Broker) { b.source = source } }
@@ -119,6 +126,8 @@ func NewBroker(purposes []string, open Opener, options ...Option) *Broker {
 		now:      time.Now,
 		timeout:  DefaultOpTimeout,
 		connect:  make(chan struct{}, 1),
+
+		releaseTimeout: DefaultReleaseTimeout,
 	}
 	for _, purpose := range purposes {
 		if registry.ValidPurpose(purpose) {

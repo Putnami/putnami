@@ -555,10 +555,15 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 
 	// A run that may publish reads its bound commit's ancestry here, before
 	// the first hook runs repository code that could rewrite refs or replace
-	// objects (AncestrySnapshot).
+	// objects (AncestrySnapshot). The snapshot an adapter read at process
+	// start for the same workspace, before its bootstrap or install ran any
+	// repository code, is that read (CaptureAncestry).
 	req.ancestry = nil
 	if readsAncestry(req) {
-		req.ancestry = captureAncestrySnapshot(req.WorkspaceRoot, MaxAncestryCommits)
+		req.ancestry = capturedAncestry(ctx, req.WorkspaceRoot)
+		if req.ancestry == nil {
+			req.ancestry = captureAncestrySnapshot(req.WorkspaceRoot, MaxAncestryCommits)
+		}
 	}
 
 	// Hook verbosity is resolved once, here, from the flags as parsed. The run
@@ -773,12 +778,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		return SessionResult{ExitCode: protocolcli.ExitCodeForError(err), Plan: planned, Projects: selectedProjects}, nil
 	}
 	if releaseSetRun != nil {
-		planned, err = releaseSetRun.AttachPlan(planned)
-		if err != nil {
-			iox.Fprintf(os.Stderr, "putnami: release-set publish: %v\n", err)
-			return SessionResult{ExitCode: ExitError, Plan: planned, Projects: selectedProjects}, nil
-		}
-		planned, req.internalJobs, err = releaseSetRun.AttachBarrier(planned)
+		planned, req.internalJobs, err = attachReleaseSet(req, releaseSetRun, planned)
 		if err != nil {
 			iox.Fprintf(os.Stderr, "putnami: release-set publish: %v\n", err)
 			return SessionResult{ExitCode: ExitError, Plan: planned, Projects: selectedProjects}, nil
@@ -891,12 +891,12 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		newCachedObservationRecovery(req, ws, planningExtensions, cacheManager), req.specGate); gate != nil {
 		finalizers = append(finalizers, gate)
 	}
-	// Advancing a release-set channel is irreversible for this publish attempt.
-	// Keep it after every session gate so a synthetic policy failure is visible
-	// to the coordinator and cannot publish a successful outcome.
-	if releaseSetRun != nil && len(req.internalJobs) == 0 {
-		finalizers = append(finalizers, releaseSetRun.Finalizer(ctx))
+	ctx, finalizers, closeOutboxes, err := releaseSetExecution(ctx, releaseSetRun, finalizers)
+	if err != nil {
+		iox.Fprintf(os.Stderr, "putnami: release-set publish: %v\n", err)
+		return SessionResult{ExitCode: ExitError, Plan: planned, Projects: selectedProjects}, nil
 	}
+	defer closeOutboxes()
 	result := e.execute(ctx, req, ws, selectedProjects, discovered, planned, cacheManager, sink, finalizers...)
 	result.Plan, result.Projects = planned, selectedProjects
 	result = attachWithheldServeSteps(result, req, ws, withheld)
@@ -905,6 +905,45 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		result.ExitCode = archivePublishExitCode(result.ExitCode, unpublishedArchives, fatalUnpublishedArchives)
 	}
 	return result, nil
+}
+
+// releaseSetExecution prepares the release set's part of the execution. It
+// appends the release finalizer after every session gate: advancing a
+// release-set channel is irreversible for this publish attempt, so a synthetic
+// policy failure has to be visible first and cannot publish a successful
+// outcome. A run whose deploy barrier releases the set has no finalizer. It
+// also returns the context that carries the private outboxes of a
+// publication-v1 run's publication jobs, and the function that removes them
+// when the run ends.
+func releaseSetExecution(ctx context.Context, run *jobs.ReleaseSetRun, finalizers []func(map[string]*jobs.JobResult)) (context.Context, []func(map[string]*jobs.JobResult), func(), error) {
+	if release := run.Finalizer(ctx); release != nil {
+		finalizers = append(finalizers, release)
+	}
+	ctx, closeOutboxes, err := run.PublicationContext(ctx)
+	return ctx, finalizers, closeOutboxes, err
+}
+
+// attachReleaseSet adds the release set's nodes to the plan, and returns the
+// plan with the in-process runners of those nodes. A run that publishes
+// through a publication-v1 provider first binds what open sends: its plan
+// tuple and the ancestry snapshot the run read before any repository code ran.
+func attachReleaseSet(req *Request, run *jobs.ReleaseSetRun, planned []*jobs.ScheduledJob) ([]*jobs.ScheduledJob, map[string]jobs.InternalJobRunner, error) {
+	planned, err := run.AttachPlan(planned)
+	if err != nil {
+		return planned, nil, err
+	}
+	var ancestry jobs.AncestryReader
+	if req.ancestry != nil {
+		ancestry = req.ancestry
+	}
+	var barrier []string
+	if req.Portable != nil && req.Portable.Request.Invocation.Publication != nil {
+		barrier = req.Portable.Request.Invocation.Publication.Barrier
+	}
+	if err := run.BindPublication(ancestry, barrier); err != nil {
+		return planned, nil, err
+	}
+	return run.AttachBarrier(planned)
 }
 
 // buildReleaseSetOptions reads the publication-shaping parameters this run was

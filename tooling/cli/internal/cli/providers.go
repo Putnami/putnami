@@ -158,7 +158,9 @@ func installCredentialProviders(providers []string, source, wsRoot string, cfg *
 	}
 	restore := broker.InstallRead()
 	restoreJob := broker.InstallJobRead()
+	restorePublication := broker.InstallPublication()
 	return func() {
+		restorePublication()
 		restoreJob()
 		restore()
 		_ = broker.Close()

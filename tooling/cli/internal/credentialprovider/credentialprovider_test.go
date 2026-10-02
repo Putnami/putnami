@@ -603,14 +603,14 @@ func initializeOverPipes(t *testing.T, config fakeConfig, runCredential string) 
 	}
 }
 
-// Without a run credential the initialize line is byte for byte the one the
-// engine sent before run credentials existed. With one, the line carries it
-// and is the protocol's valid run-credential fixture.
+// Without a run credential the initialize line has no runCredential field.
+// With one, the line carries it and is the protocol's valid run-credential
+// fixture. Both offer credential-v1 and publication-v1.
 func TestInitializeCarriesTheRunCredentialOnlyWhenHeld(t *testing.T) {
 	t.Parallel()
 	for runCredential, want := range map[string]string{
-		"":                           `{"protocolVersion":1,"id":1,"op":"initialize","payload":{"protocolVersion":1,"capabilities":["credential-v1"]}}`,
-		"prc_fixture-run-credential": `{"protocolVersion":1,"id":1,"op":"initialize","payload":{"protocolVersion":1,"capabilities":["credential-v1"],"runCredential":"prc_fixture-run-credential"}}`,
+		"":                           `{"protocolVersion":1,"id":1,"op":"initialize","payload":{"protocolVersion":1,"capabilities":["credential-v1","publication-v1"]}}`,
+		"prc_fixture-run-credential": `{"protocolVersion":1,"id":1,"op":"initialize","payload":{"protocolVersion":1,"capabilities":["credential-v1","publication-v1"],"runCredential":"prc_fixture-run-credential"}}`,
 	} {
 		line, err := initializeOverPipes(t, fakeConfig{}, runCredential)
 		if err != nil || line != want {

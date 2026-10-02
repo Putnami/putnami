@@ -2874,7 +2874,7 @@
       "id": "cli/provider-publication",
       "type": "feature",
       "name": "Publication through providers",
-      "outcome": "A user who publishes, locally or on a hosted runner, gets a run whose ancestry and publish credential are fixed before any repository code runs, while a run or a bound request that only gates starts no publication",
+      "outcome": "A user who publishes, locally or on a hosted runner, gets a run whose ancestry and publish credential are fixed before any repository code runs, whose uploads and channel release run in the engine through one provider session, and whose repository processes hold no publish credential, while a run or a bound request that only gates starts no publication",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -2890,7 +2890,8 @@
               "a-shallow-clone-is-named",
               "a-history-above-the-limit-contains-nothing",
               "a-gate-only-run-reads-no-ancestry",
-              "the-publish-purpose-starts-its-provider-before-the-first-hook"
+              "the-publish-purpose-starts-its-provider-before-the-first-hook",
+              "the-snapshot-precedes-the-install"
             ]
           }
         },
@@ -2904,6 +2905,39 @@
               "a-publishing-request-without-the-block-is-refused-before-any-provider",
               "a-request-without-the-block-enables-no-publish-purpose",
               "a-gate-only-request-plans-no-publish-job"
+            ]
+          }
+        },
+        {
+          "id": "open-credential-release-through-one-provider",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-session-offers-publication-v1-and-the-echo-decides",
+              "resolve-runs-through-the-session",
+              "open-follows-every-barrier-leaf-once",
+              "a-second-plan-is-refused-in-one-session",
+              "a-head-that-is-not-forward-is-refused-at-open",
+              "an-uncertain-release-is-resolved-by-plan-digest",
+              "a-refused-release-moves-no-channel",
+              "without-the-echo-the-legacy-path-runs"
+            ]
+          }
+        },
+        {
+          "id": "uploads-run-in-the-engine",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-publication-job-holds-no-credential",
+              "a-hostile-publication-job-finds-no-credential",
+              "each-packed-member-is-uploaded-by-the-engine",
+              "a-tampered-artifact-is-refused-by-digest",
+              "a-member-the-plan-does-not-select-is-refused"
             ]
           }
         }

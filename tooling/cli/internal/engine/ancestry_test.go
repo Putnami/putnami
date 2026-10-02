@@ -69,13 +69,66 @@ func assertAncestry(t *testing.T, snapshot *AncestrySnapshot, revision string, i
 // The fixture roots are no workspaces, so the run stops after its first stage.
 func runQuietly(t *testing.T, req Request) SessionResult {
 	t.Helper()
+	return runQuietlyIn(t, context.Background(), req)
+}
+
+// runQuietlyIn is runQuietly in ctx.
+func runQuietlyIn(t *testing.T, ctx context.Context, req Request) SessionResult {
+	t.Helper()
 	var result SessionResult
 	_ = captureStderr(t, func() {
 		_ = captureStdout(t, func() {
-			result, _ = New().Run(context.Background(), req, nil)
+			result, _ = New().Run(ctx, req, nil)
 		})
 	})
 	return result
+}
+
+// An adapter reads the ancestry at process start, before its first-use
+// bootstrap or an install runs repository code, and the run reuses that
+// snapshot. Here the install grafts an orphan under HEAD and moves HEAD
+// between the capture and the run: the run still answers for the commit the
+// process started on, in the order git lists its history.
+func TestAncestryIsCapturedBeforeTheInstallRunsRepositoryCode(t *testing.T) {
+	spectest.Proves(t, "cli/provider-publication", "ancestry-is-read-before-repository-code", "the-snapshot-precedes-the-install")
+	t.Setenv(git.SourceRevisionEnv, "")
+	root, first, head, orphan := ancestryRepo(t)
+	ctx := CaptureAncestry(context.Background(), root, []string{"build", "publish"}, nil)
+
+	runCLISelectionGit(t, root, "replace", "--graft", "HEAD", orphan)
+	runCLISelectionGit(t, root, "commit", "-q", "--allow-empty", "-m", "installed")
+	installed := gitLine(t, root, "rev-parse", "HEAD")
+
+	result := runQuietlyIn(t, ctx, Request{WorkspaceRoot: root, Config: &wsproto.Config{}, Commands: []string{"build", "publish"}})
+	assertAncestry(t, result.ancestry, head, []string{head, first}, []string{orphan, installed})
+	if result.ancestry != capturedAncestry(ctx, root) {
+		t.Fatal("the run read its own snapshot instead of the one taken at process start")
+	}
+	for commit, want := range map[string]int{head: 0, first: 1} {
+		if position, held := result.ancestry.Position(commit); !held || position != want {
+			t.Errorf("position of %s = %d (%v), want %d", commit, position, held, want)
+		}
+	}
+	if _, held := result.ancestry.Position(orphan); held {
+		t.Error("the snapshot positions a commit the bound commit does not reach")
+	}
+
+	if capturedAncestry(ctx, t.TempDir()) != nil {
+		t.Fatal("a snapshot of one workspace answers for another")
+	}
+	if capturedAncestry(context.Background(), root) != nil {
+		t.Fatal("a context without a capture carries a snapshot")
+	}
+	gate := []string{"lint", "test", "build"}
+	if capturedAncestry(CaptureAncestry(context.Background(), root, gate, nil), root) != nil {
+		t.Fatal("a gate-only invocation read the ancestry")
+	}
+	bound := &runner.ExecutionRequest{Invocation: runner.InvocationBlock{
+		Commands: gate, Publication: &runner.PublicationBlock{Barrier: []string{"test"}},
+	}}
+	if capturedAncestry(CaptureAncestry(context.Background(), root, gate, bound), root) == nil {
+		t.Fatal("a bound request carrying invocation.publication read no ancestry")
+	}
 }
 
 // A before hook is repository code: here it grafts an orphan under HEAD and

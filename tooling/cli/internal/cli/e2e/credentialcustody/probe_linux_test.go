@@ -296,14 +296,3 @@ func readableRegion(line string) (start uint64, size int, ok bool) {
 	}
 	return lo, int(hi - lo), true
 }
-
-// collectFound returns the secrets in foundSet in the stable secretNames order.
-func collectFound(foundSet map[string]bool) []string {
-	var found []string
-	for _, s := range secretNames {
-		if foundSet[s] {
-			found = append(found, s)
-		}
-	}
-	return found
-}

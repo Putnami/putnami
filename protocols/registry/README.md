@@ -207,7 +207,21 @@ flag enables nothing and every path below stays on `registry-token/v1`.
 archive download, `AuthorizeRegistryRequest` in
 `tooling/cli/internal/extension`, which uses the `read` purpose. A host outside
 the credential's `hosts`, an absent provider, or `--providers` off keeps the
-request on the host-keyed seam, unchanged.
+request on the host-keyed seam, unchanged. The release set's upload nodes use
+the `publish` purpose, in a session that negotiated `publication-v1` only.
+
+**`publication-v1` producer** — none ships in this repository. `@putnami/cloud`
+is the intended producer, in a separate repository.
+`tooling/cli/internal/credentialprovider/providertest` is an in-process
+producer for tests: it keeps the heads, the plan and the released sets in
+memory.
+
+**`publication-v1` consumer** — the CLI engine. Its session
+(`tooling/cli/internal/credentialprovider`) offers the capability and sends the
+three ops. The release set (`tooling/cli/internal/jobs`) resolves through it,
+opens after the barrier, uploads every packed npm, Go module and OCI member in
+the engine with the `publish` credential, and releases. A session without the
+echo leaves the release set on its release-set provider process, unchanged.
 
 **`registry-token/v1` producer** — `putnami cloud registry-token`, implemented by `@putnami/cloud`
 in a separate repository. This repository ships no producer, which is exactly
@@ -232,7 +246,10 @@ cloudless-compatible fallback.
 | `tooling/extension-sdk/dockerpublish` | Docker registry login and push; managed OCI publication requests an exact workspace/package/action lease |
 
 Every one of them degrades to explicit or native credentials (`.npmrc`, the
-platform keychain, an explicit token) when the seam yields nothing.
+platform keychain, an explicit token) when the seam yields nothing. When
+`PUTNAMI_PUBLICATION_OUTBOX` is set, the npm, Go module and managed OCI paths
+pack a managed member into the outbox and ask the seam for nothing: the engine
+uploads it.
 
 ## The retired publish-provider marker
 

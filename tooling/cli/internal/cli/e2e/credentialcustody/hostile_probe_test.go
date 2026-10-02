@@ -80,20 +80,34 @@ func scanBytes(data []byte) []string {
 	return found
 }
 
+// collectFound returns the secrets in foundSet in the stable secretNames order.
+func collectFound(foundSet map[string]bool) []string {
+	var found []string
+	for _, s := range secretNames {
+		if foundSet[s] {
+			found = append(found, s)
+		}
+	}
+	return found
+}
+
 // searchProbes are the probe names that must find no secret on a hosted run,
 // for the current OS. envValuesProbe is asserted separately (it records values,
-// not a search). The Linux-only probes are named by platformSearchProbes.
+// not a search). The descriptor probe runs on Unix (descriptorSearchProbes),
+// the Linux-only probes are named by platformSearchProbes.
 func searchProbes() []string {
 	probes := []string{"env-self", "files-home", "files-workspace", "files-tmpdir", "files-systemtmp"}
+	probes = append(probes, descriptorSearchProbes()...)
 	return append(probes, platformSearchProbes()...)
 }
 
 const envValuesProbe = "env-values"
 
 // runHostileRole is one hostile process — the build's before-hook or its build
-// task. It probes for the credential everywhere a repository process can reach
-// and appends every finding to its report. It always exits 0: the engine must
-// see the hook and task succeed so the build completes and both reports exist.
+// task, or a publication job. It probes for the credential everywhere a
+// repository process can reach and appends every finding to its report. It
+// always exits 0: the engine must see the hook and task succeed so the build
+// completes and both reports exist.
 func runHostileRole(role string) int {
 	report := os.Getenv(custodyReportEnv)
 	wsRoot := os.Getenv(workspaceRootEnv)
@@ -106,6 +120,7 @@ func runHostileRole(role string) int {
 		probeFiles(role, "tmpdir", os.Getenv("TMPDIR")),
 		probeFiles(role, "systemtmp", os.TempDir()),
 	}
+	findings = append(findings, descriptorProbes(role)...)
 	findings = append(findings, platformProbes(role)...)
 
 	if err := writeFindings(report, findings); err != nil {
@@ -124,13 +139,15 @@ func probeEnvSelf(role string) finding {
 }
 
 // probeEnvValues records the values a repository process reads for the two
-// framework tokens and the offline signal, so the flag-off scenario can assert
-// they pass through and no offline signal is added.
+// framework tokens, the offline signal and the publication outbox, so the
+// flag-off scenario can assert they pass through and no offline signal is
+// added, and the publication scenario that the job packs into an outbox.
 func probeEnvValues(role string) finding {
 	return finding{Role: role, Probe: envValuesProbe, Checked: true, Env: map[string]string{
 		"cache":   os.Getenv(runcredential.CacheTokenEnv),
 		"cloud":   os.Getenv(runcredential.CloudTokenEnv),
 		"offline": os.Getenv(extensionproto.OfflineDependenciesEnv),
+		"outbox":  os.Getenv(extensionproto.PublicationOutboxEnv),
 	}}
 }
 
@@ -357,7 +374,7 @@ func engineEnv(wsRoot, home, tmp string, hosted bool) []string {
 		runcredential.CacheTokenEnv, runcredential.CloudTokenEnv,
 		extensionproto.OfflineDependenciesEnv,
 		custodyRoleEnv, custodyReportEnv, custodyWorkspaceEnv, custodyCredentialFDEnv,
-		custodyCacheEnv, custodyTargetEnv, custodyArgsEnv,
+		custodyCacheEnv, custodyTargetEnv, custodyArgsEnv, custodyHostsEnv,
 		"HOME", "TMPDIR",
 	}
 	var env []string

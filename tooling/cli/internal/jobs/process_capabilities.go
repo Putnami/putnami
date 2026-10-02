@@ -634,6 +634,13 @@ func scopeProcessCapabilities(ctx context.Context, env []string, job *ScheduledJ
 	env = removeEnvKey(env, InternalReleaseSetProviderCapabilityEnv)
 	env = removeEnvKey(env, runtimeproto.ReleaseSetPublishedImagesFileEnv)
 	env = removeEnvKey(env, runtimeproto.ReleaseSetMembersFileEnv)
+	// The outbox is engine control data too: only a publication job of a
+	// publication-v1 run receives one, and it then receives no credential and
+	// no registry route, whatever the process captured.
+	env = removeEnvKey(env, extensionproto.PublicationOutboxEnv)
+	if outbox := publicationOutboxFor(ctx, job); outbox != "" {
+		return publicationOutboxEnv(env, outbox)
+	}
 	capabilities := processCapabilitiesFromContext(ctx)
 	if capabilities == nil {
 		return env

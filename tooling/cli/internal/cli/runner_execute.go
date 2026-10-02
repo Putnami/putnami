@@ -54,6 +54,10 @@ func (a *App) runBoundRequest(ctx context.Context, wsRoot string, cfg *wsproto.C
 		iox.Fprintf(os.Stderr, "putnami: bound execution request: %v\n", err)
 		return ExitUsage
 	}
+	// A request that may publish reads its bound commit's ancestry now, before
+	// the bootstrap or an install runs repository code that could rewrite
+	// refs; the engine run reuses that snapshot (engine.CaptureAncestry).
+	ctx = engine.CaptureAncestry(ctx, wsRoot, request.Invocation.Commands, &request)
 	if request.Invocation.Cwd != "." {
 		if err := os.Chdir(filepath.Join(wsRoot, filepath.FromSlash(request.Invocation.Cwd))); err != nil {
 			iox.Fprintf(os.Stderr, "putnami: bound execution request cwd: %v\n", err)
