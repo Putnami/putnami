@@ -22,7 +22,7 @@
     },
     {
       "id": "open-credential-release-through-one-provider",
-      "text": "The engine uses publication-v1 only when the credential provider echoes it; otherwise the release-set path is unchanged. With it, the provider resolves channels, one open sends plan, heads and ancestry after the barrier, and release sends artifacts, heads, ancestry and evidence. The provider refuses a second plan and a non-ancestor head. Open and release retry once on a transport error; release is idempotent by plan digest. A refusal names its code and moves no channel. Local and hosted runs open one plan."
+      "text": "The engine uses publication-v1 only when the provider echoes it; otherwise nothing changes. With it, the provider resolves channels, one open sends plan, heads and ancestry after the barrier, and release sends artifacts, heads, ancestry and evidence. The provider refuses a second plan and a non-ancestor head. Open and release retry once after a timeout on a live session; release is idempotent by plan digest. A refusal names its code and moves no channel. Local and hosted runs open one plan."
     },
     {
       "id": "uploads-run-in-the-engine",

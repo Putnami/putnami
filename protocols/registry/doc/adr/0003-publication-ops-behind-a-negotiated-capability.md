@@ -93,9 +93,11 @@ key. It stores the outcome with the set ref the request derives
 and the same set ref gets the stored outcome. One with another set ref gets
 `plan_mismatch`.
 
-The engine sends `release` again once, after a transport error or a timeout,
-and in no other case. An answer, a refusal included, is final. When the second
-attempt also fails, the engine fails closed and names the `planDigest`, so an
+The engine sends `open` or `release` again once, after the op timed out while
+the session was still live, and in no other case. A session that ends, a broken
+pipe included, cannot carry a second attempt: the run fails. An answer, a
+refusal included, is final. When the second attempt also times out, or the
+session ends, the engine fails closed and names the `planDigest`, so an
 operator can ask the provider for the stored outcome.
 
 `already-current` is a success outcome. A compare-and-swap miss is the
@@ -116,6 +118,10 @@ The engine asserts the statement; the provider records it with the release and
 does not verify it against the repository. The provider refuses with
 `not_forward` at `open`, and again at `release` for the heads its
 compare-and-swap matches.
+
+A head whose release recorded no source revision is stated without
+`headSourceRevision` and with `ancestor` false. The forward rule treats it as
+a channel without a head; the compare-and-swap still matches it.
 
 ### Bounds
 
@@ -174,9 +180,12 @@ or `artifact_digest_mismatch`.
 
 - No repository process holds a `publish` bearer under `publication-v1`. The
   engine holds it and uploads.
-- Release, template and agent-content archives are not plan members. The job
-  that uploads them belongs to the provider extension and keeps its own
-  credential; these ops do not cover it.
+- Release, template and agent-content archives are plan members, as the
+  release-plan contract hashes them, but no engine uploader exists for them
+  yet. The engine refuses a plan that selects one before `open`, so no channel
+  moves and no credential is issued. Until an archive uploader lands, a
+  provider must not echo `publication-v1` to a workspace that publishes
+  archives.
 - A provider stores one outcome per `planDigest`. A run that lost its answer
   learns the outcome by asking again with the same plan.
 - A second implementation is checked against the schema and fixture corpus in

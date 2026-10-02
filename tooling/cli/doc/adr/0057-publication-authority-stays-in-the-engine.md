@@ -62,7 +62,8 @@ uploads nothing. The upload nodes count as publication jobs for the release.
 
 The release carries the plan digest, the heads it moves from, the ancestry
 stated at `open`, and the evidence. `open` and `release` are sent again once,
-after a transport error or a timeout, and in no other case. A refusal is a
+after the op timed out while the session was still live, and in no other
+case; a session that ends fails the run. A refusal is a
 bounded error that names its code; it moves no channel, and the run fails.
 
 ## Rejected alternatives
