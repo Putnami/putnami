@@ -14,7 +14,7 @@
   "requirements": [
     {
       "id": "ancestry-is-read-before-repository-code",
-      "text": "A run naming publish or deploy, or a bound request with invocation.publication, reads its bound commit's ancestry into memory at process start, before the first-use bootstrap, an install or the first hook: PUTNAMI_SOURCE_REVISION, else HEAD, ignoring replace refs, grafts and the commit-graph, so later writes change no answer. The engine run reuses that snapshot. It names a shallow clone; above 1,000,000 commits it holds a named error and no commit. Other runs read none. With publish enabled, the credential provider starts before the first hook, locally as on a hosted run."
+      "text": "A run naming publish or deploy, or a bound request with invocation.publication, reads the ancestry of its bound commit (PUTNAMI_SOURCE_REVISION, else HEAD) at process start, before the bootstrap, an install or a hook, ignoring replace refs, grafts and the commit-graph; the run reuses it. It names a shallow clone and holds an error above 1,000,000 commits. Other runs read none. With publish enabled, the credential provider starts before the first hook, locally as on a hosted run."
     },
     {
       "id": "gate-only-launches-no-publication",
@@ -22,11 +22,11 @@
     },
     {
       "id": "open-credential-release-through-one-provider",
-      "text": "The engine offers publication-v1 at initialize and uses it only when the credential provider echoes it; without the echo the existing release-set path runs unchanged. With it, the provider resolves the channels and no release-set provider process starts. One open node waits for the bound request's barrier commands, or, locally, for every task that neither publishes nor depends on one, and sends the plan digest, the channel heads and the ancestry snapshot. The provider refuses a second plan in one session and a head that is not an ancestor of the bound commit. Release sends the published artifacts, the heads it moves from, the ancestry and the evidence. Open and release are retried once, on a transport error only, and a release is idempotent by plan digest. A refusal is a bounded error that names its code, and moves no channel. A local run and a hosted run of one commit open the same plan and release the same set."
+      "text": "The engine uses publication-v1 only when the credential provider echoes it; otherwise the release-set path is unchanged. With it, the provider resolves channels, one open sends plan, heads and ancestry after the barrier, and release sends artifacts, heads, ancestry and evidence. The provider refuses a second plan and a non-ancestor head. Open and release retry once on a transport error; release is idempotent by plan digest. A refusal names its code and moves no channel. Local and hosted runs open one plan."
     },
     {
       "id": "uploads-run-in-the-engine",
-      "text": "Under publication-v1 each publication job receives a private outbox, PUTNAMI_PUBLICATION_OUTBOX with mode 0700, and no registry or cloud credential, credential descriptor or registry route. One upload node per publication job runs in the engine after the job and the open. It hashes every outbox file again, refuses a member the plan does not select, or a version or project the plan does not assign, asks the provider for the publish credential of the member's registry, and uploads the npm tarball, Go module zip or OCI layout in process. It records published-image.json for an OCI member and reports one published-member event per upload. A job that wrote no descriptor packed nothing, and its node uploads nothing. A publication job whose result was reused instead of executed packed nothing in the run, and the release refuses."
+      "text": "Under publication-v1 a publication job gets a private 0700 outbox and no credential, credential descriptor or registry route. An engine upload node re-hashes the outbox, refuses a member, version or project the plan does not assign, asks the publish credential of the member's registry and uploads the npm tarball, Go zip or OCI layout itself, with published-image.json and one published-member event per upload. No descriptor means nothing packed. A reused publication job packed nothing; the release refuses."
     }
   ],
   "decisions": [
