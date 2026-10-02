@@ -1,427 +1,250 @@
 ---
 name: audit
-description: Scan projects for quality issues — create, update, and close GitHub issues; update scorecards. --prune removes dead weight per domain in one umbrella issue and one batch PR
+description: Audit selected Putnami projects for correctness, security, operations, testing, performance, design, and developer-experience findings; reconcile GitHub issues and refresh scorecards; or, with --prune, remove dead weight per scope. Use only when the user explicitly invokes $audit or asks to run the repository audit workflow.
 ---
 
 # Audit
 
-Scan projects for quality findings. Each finding becomes a GitHub issue with structured labels. Existing issues are updated or closed when findings change. Scorecards are refreshed at the end.
+Scan Putnami projects for quality findings. Each finding becomes a GitHub issue with structured labels. Existing issues are updated or closed when findings change. Scorecards are refreshed at the end (when enabled).
 
 ## Portable host contract
 
-This is the canonical workflow for both Claude Code and Codex. Treat `/name`
-references below as logical skill invocations: use `/name` on Claude Code and
-`$name` on Codex. Use host-native tools with the stated capability rather than
-requiring the literal Claude tool name. Deterministic helpers live under this
-skill's `scripts/` directory.
+This is the canonical workflow for both Claude Code and Codex: invoke it with `/audit` on Claude Code or `$audit` on Codex. The `@putnami/intelligence` extension ships it; `putnami install` materializes it when the workspace lists `extension:@putnami/intelligence` in `agentArtifacts`. Helper scripts live under `.agents/skills/audit/scripts/` on both hosts; run them from the workspace root through `bash`. When the `putnami` MCP tools appear deferred on Claude Code, load them in one ToolSearch call before discovery. Run semantic audit judgment on the strongest available model.
+
+The audit unit is a Putnami **scope**: a directory whose `putnami.json` declares projects (`putnami scopes list`). Repository settings live in the workspace manifest under `options["@putnami/intelligence"].audit`; `bash .agents/skills/audit/scripts/config.sh` resolves them:
+
+| Key | Meaning | Default |
+|---|---|---|
+| `priority` | Property groups in fix-queue order for every scope | `security, operations, testing, design, performance, developer-experience` |
+| `scopes.<scope>.priority` | That scope's own order | the workspace `priority` |
+| `labelPrefix` | Issue label of a scope is `<labelPrefix><scope>` | `scope/` |
+| `scorecards` | Maintain one scorecard task per scope plus a workspace rollup | `false` |
+| `profile` | Path of the repository profile, from the workspace root | `.AI/audit/profile.md` |
+| `checks` | Path of a repository bash script, from the workspace root; `mechanical.sh` runs it with the project path and its JSON lines join `mechanical.sh` output | none |
+
+Before resolving scope, load the repository profile: `bash .agents/skills/audit/scripts/config.sh profile` prints its path, and exits 1 when no profile is set and the default file is absent. It exits 2 when a configured profile is missing or `jq` is not installed: stop and report, never scan without the profile the workspace names. The profile contains repository-specific architecture, rubric, label, and operational guidance and extends this portable workflow without modifying it. It may add properties to a group, sharpen a property's bar for that repository, or map project tags to role labels.
+
+Judge each project against its own repository architecture and constraints. Repository-specific boundaries, providers, infrastructure, and incident-derived rules belong in the profile; when no profile exists, apply the portable property definitions below without inventing local conventions.
 
 ## Arguments
 
 | Flag | Scope |
 |------|-------|
-| `--all` | Full workspace audit (all domains, all groups) |
-| `--domain <name>` | One domain (e.g. `go`, `typescript`) |
-| `--project <name>` | One project (e.g. `go.putnami.dev/database`) |
+| `--all` | Full workspace audit (all scopes, all groups) |
+| `--scope <path>` | One scope from `putnami scopes list` |
+| `--project <name>` | One exact Putnami project id |
 | `--group <group>` | One property group across all projects |
-| `--impacted` | Only projects with changes vs. main (default when no flag) |
+| `--impacted` | Only projects with changes vs. `main` (default when no flag) |
 | `--reconcile` | Verify open issues only — close resolved ones with commit/PR attribution |
 | `--scorecard-only` | Skip scanning; only refresh scorecards from existing open issues |
 | `--skip-scorecard` | Scan and create/update issues, but do not refresh scorecards |
 | `--no-cache` | Ignore attestations — re-scan (project, group) pairs even when their content is unchanged |
 | `--dry-run` | Print findings without creating/updating issues |
-| `--prune` | Remove weight instead of filing findings: dead code, duplicates, dual versions, palliatives, historical references, justifying comments, test scaffolding, hidden config, stale docs. One umbrella issue and one batch PR per domain. See [Prune mode](#prune-mode). |
+| `--prune` | Remove weight instead of filing findings: dead code, duplicates, dual versions, palliatives, historical references, justifying comments, test scaffolding, hidden config, stale docs. One umbrella issue and one batch proposal per scope. See [Prune mode](#prune-mode). |
 | `--typology <t>` | Prune only: restrict to one typology (`dead`, `duplicate`, `multi-version`, `palliative`, `historical-ref`, `comment`, `test-scaffold`, `config-surface`, `doc`) |
-| `--apply` | Prune only: apply the safe removals and push the batch branch. Without it, prune scans and updates the umbrella issue only. |
+| `--apply` | Prune only: apply the safe removals and push the batch branch. Without it, prune scans, triages and updates the umbrella issue only. |
 
-Flags combine: `--group security --domain go` audits security in Go projects only.
+Flags combine: `--group security --scope identity` audits security in the identity scope only.
 
 **Prune mode** (`--prune`): none of the issue-per-finding lifecycle below applies. No fingerprints, no attestations, no scorecards. Jump to [Prune mode](#prune-mode).
 
-**Reconcile mode** (`--reconcile`): Instead of scanning for new findings, only checks whether existing open issues are still valid. Resolved issues are closed with a comment attributing the fixing commit or PR. Combines with `--domain`, `--project`, `--group` to filter which issues to check. `--dry-run` prints what would be closed without acting.
+**Reconcile mode** (`--reconcile`): Instead of scanning for new findings, only checks whether existing open issues are still valid. Resolved issues are closed with a comment attributing the fixing commit or PR. Combines with `--scope`, `--project`, `--group` to filter. `--dry-run` prints what would be closed without acting.
 
-**Scorecard-only mode** (`--scorecard-only`): Skip scanning entirely; run `bash .agents/skills/audit/scripts/scorecard.sh` (add `--domain <d>` to refresh a single domain) and exit. Scorecards are deterministic artifacts rendered from open issues — no model judgment involved. `fleet.sh` runs the script directly as its post-pass, and `/fix-loop` runs it when its backlog loop ends.
+**Scorecard-only mode** (`--scorecard-only`): Skip scanning entirely; run `bash .agents/skills/audit/scripts/scorecard.sh` (add `--scope <s>` to refresh a single scope) and exit. Scorecards are deterministic artifacts rendered from open issues.
 
-**Skip-scorecard** (`--skip-scorecard`): Run the full scan and issue lifecycle, but leave the scorecard refresh to someone else. Intended for parallel shards (see [Parallel runs](#parallel-runs)): the fleet's post-pass runs `scorecard.sh` once after all shards exit.
+**Skip-scorecard** (`--skip-scorecard`): Run the full scan and issue lifecycle, but leave the scorecard refresh to someone else. Intended for parallel shards: the fleet's post-pass runs `scorecard.sh` once after all shards exit.
+
+## Bootstrap (first run in this repo)
+
+The audit taxonomy is not part of the default label set. On the **first** mutating run (or when `gh label list` is missing them), create the labels once. Under `--dry-run`, report missing labels but do not create them.
+
+```bash
+# groups
+for g in security operations testing performance design developer-experience; do
+  gh label create "group/$g" --color 5319e7 --force >/dev/null 2>&1 || true
+done
+# severities (impact only)
+gh label create "severity/critical" --color b60205 --force; gh label create "severity/high" --color d93f0b --force
+gh label create "severity/medium"  --color fbca04 --force; gh label create "severity/low"  --color c2e0c6 --force
+# priorities (fix-queue ordering, separate from severity)
+for p in p1 p2 p3; do gh label create "priority/$p" --color 5319e7 --force; done
+# lifecycle + provenance (status/* are shared with $fix and $fix-loop)
+for s in audit-finding confirmed in-progress needs-review; do gh label create "status/$s" --color 0e8a16 --force; done
+gh label create "source/audit" --color ededed --force
+# roles + languages
+for r in workload lib cli site infra; do gh label create "role/$r" --color bfdadc --force; done
+for l in go ts python; do gh label create "lang/$l" --color c5def5 --force; done
+# per-scope labels + area/all for workspace-wide meta-issues
+for label in $(bash .agents/skills/audit/scripts/config.sh scopes | jq -r '.label') area/all; do
+  gh label create "$label" --color 1d76db --force; done
+```
+
+**Attestations** (`.agents/skills/audit/scripts/attest.sh`) cache "this (project, group) was scanned at content hash X" under `.putnami/audit/attestations/` — Putnami CLI state, gitignored, per-machine. No provisioning needed; they populate as waves run and let unchanged projects be skipped.
+
+**Scorecards** are tasks of the bound tasks provider, one per scope plus one workspace rollup. They are off until the workspace sets `"scorecards": true`; until then the audit runs the full scan/issue lifecycle and skips the scorecard refresh with a note. Once on, `scorecard.sh` finds or opens each scorecard through `putnami tasks create` with the idempotency key `scorecard:<scope label>` (`scorecard:workspace` for the rollup), so no file records task numbers. The provider matches a key per account: a CI identity and a person each keep their own scorecards, so run scorecards from one identity.
 
 ## Steps
 
 ### 1. Resolve scope
 
-1. List the domains and their projects with `bash .agents/skills/audit/scripts/domains.sh` (`list` for names, `paths <domain>` for one domain's project paths). A domain is a top-level directory whose `putnami.json` declares the scope schema (`https://putnami.dev/schemas/putnami-scope.json`); its projects are that scope's `includes`. Every domain uses one **group priority order**: security, testing, design, performance, developer-experience, operations.
-2. Determine which (domain, project, group) triples to audit based on arguments.
+1. Run `bash .agents/skills/audit/scripts/config.sh scopes` for every scope's projects, short names, label and priority order. Generated projects (tag `generated` or `generated-client`) are not listed and not audited. A failure stops the audit: never guess scopes.
+2. Determine which (scope, project, group) triples to audit from the arguments. `bash .agents/skills/audit/scripts/config.sh scope-of <project-id>` names a project's scope; a project outside every scope is reported, not audited.
 3. For `--impacted`: run `git diff --name-only main...HEAD` and match changed paths to projects.
 4. Build a todo list of work items.
-5. **Preflight — fail loud, never degrade silently.** If any TypeScript project is in scope, verify dependencies are installed (e.g. `node_modules` exists under the scoped projects); if missing, run `./putnamiw deps install`, and if that fails STOP and report — do not silently fall back to structural-only analysis (the 2026-06 TS wave did, and the degradation was invisible). If a property depends on tool output (coverage, `bun audit`), probe the tool once before scanning; if unavailable, either stop or note the caveat explicitly in every affected issue body and the wave narrative.
+5. **Preflight — fail loud, never degrade silently.** If scoped projects need dependencies, run `putnami deps install` when they are absent; if that fails STOP and report rather than silently falling back to structural-only analysis. If a property depends on optional tool output (coverage or a dependency-vulnerability scan), probe the repository-declared Putnami command once before scanning; if unavailable, either stop or note the caveat explicitly in every affected issue body and the wave narrative.
 
-> **Branch**: if `--reconcile` is set, skip steps 2-4 and jump to [Reconcile mode](#reconcile-mode) below.
+> **Branch**: if `--reconcile` is set, skip steps 2-4 and jump to [Reconcile mode](#reconcile-mode).
 >
-> **Branch**: if `--scorecard-only` is set, skip steps 2-4 and jump directly to [step 5 (Update scorecards)](#5-update-scorecards).
+> **Branch**: if `--scorecard-only` is set, skip steps 2-4 and jump to [step 5](#5-update-scorecards).
 
 ### 2. For each project in scope
 
-Get project metadata (path, type, tags, dependencies) from the putnami MCP `describe_project` tool when available; fall back to `./putnamiw projects describe <project> --output=jsonl`.
+Run `putnami projects describe <project> --output=jsonl` (or `putnami describe_project`) to get metadata (path, tags, dependencies).
 
-**Resolve issue labels from project metadata** — map project tags and domain to labels:
+**Resolve issue labels from project metadata:**
 
 | Source | → Labels |
 | --- | --- |
-| project tag `go` | `lang/go` |
-| project tag `ts` | `lang/ts` |
-| project tag `python` | `lang/python` |
-| project tag `extension` | `role/extension` |
-| project tag `web` | `role/site` |
-| project tag `sample` or `e2e` | `role/sample` |
-| project tag `protocol` | `role/framework` |
-| domain `tooling` (no other role tag) | `role/tooling` |
-| domain `go`/`typescript`/`python`/`protocols` (no extension/sample tag) | `role/framework` |
-| domain `sites` (no other role tag) | `role/site` |
+| tag `go` | `lang/go` |
+| tag `ts` | `lang/ts` |
+| tag `python` | `lang/python` |
+| path `.../workloads/...` | `role/workload` |
+| path `.../libs/...` | `role/lib` |
+| tag `cli` | `role/cli` |
+| tag `web` | `role/site` |
+| tag `infra` | `role/infra` |
+| always | the scope label (`config.sh label <scope>`) |
 
-Store these as `<project-labels>` — they will be added to every issue created for this project.
+Store these as `<project-labels>` — added to every issue for this project.
 
 **Attestation gate — skip unchanged work.** Audit judgments are cacheable outputs keyed by content, exactly like putnami task results. Compute the project's content hash once:
 
 ```bash
-hash=$(.agents/skills/audit/scripts/attest.sh hash <project-path>)   # git tree hash; "-dirty" suffix if uncommitted changes
+hash=$(bash .agents/skills/audit/scripts/attest.sh hash <project-path>)   # git tree hash, folded with DIRECT deps; "-dirty" suffix if uncommitted (or describe unavailable)
 ```
 
-Before scanning each group in step 3, check the ledger:
+Before scanning each group in step 3, check the ledger (`<project-short>` is the project's short name from step 4b):
 
 ```bash
-.agents/skills/audit/scripts/attest.sh check <project-short> <group> "$hash" && skip
+bash .agents/skills/audit/scripts/attest.sh check <project-short> <group> "$hash" && skip
 ```
 
 Exit 0 means this (project, group) was already scanned at exactly this content — skip it. Nothing new can be found and nothing can have been fixed, since the code is byte-identical. `--no-cache` bypasses the check. After completing a group's scan (findings filed, resolved issues closed), record it:
 
 ```bash
-.agents/skills/audit/scripts/attest.sh record <project-short> <group> "$hash"
+bash .agents/skills/audit/scripts/attest.sh record <project-short> <group> "$hash"
 ```
+
+The hash also folds each **direct dependency**'s tree object and the **rubric hash** (`SKILL.md` + `mechanical.sh` + `config.sh` + the repository profile and checks script when set), so a dep change, a rubric edit or a profile edit invalidates attestations implicitly — no manual `--no-cache`. If `putnami projects describe` is unavailable the dep set is unknown, so the hash is marked `-dirty` and the project re-scans rather than skip on a partial hash.
+
+**Shared Intelligence tier.** When the root Putnami manifest enables `options["@putnami/cloud"].intelligence`, ephemeral web sessions and CI reuse each other's verifications through `putnami cloud audit-attest` (keyed by repo + project + group + input hash + rubric hash). After a local miss `check` consults Intelligence and seeds the local ledger on a hit; `record` mirrors best-effort. This remains a pure, fail-open optimization — unavailable Intelligence degrades to local-only and never fails an audit. `fleet.sh` batch-prefetches the ledger in one ordered request before dispatch (also skipped under `--no-cache`).
 
 The helper refuses to record `-dirty` hashes, so a dirty working tree is always re-scanned. Report skipped pairs in the summary — a silent skip reads as coverage.
 
-### 3. For each property group (in group priority order)
+### 3. For each property group (in scope priority order)
 
-Scan the project for findings in each property. Use grep patterns, file reads, test output analysis, and structural code analysis appropriate to the project type (Go vs TypeScript).
+Scan for findings in each property. **Read the code, understand intent, trace data flow** — do not just grep. Putnami projects can run real production traffic and infrastructure; a pattern match is not evidence. When a property says "check", read the relevant code and evaluate whether it meets the bar. Ground findings in the repository profile, constraints, commit history, and runbooks. When hosted Intelligence tools are configured, prefer their context, impact, related, search, and symbol tools for structural orientation; grep stays for literal patterns.
 
-**Audit depth**: do not just grep for patterns. Read the code, understand intent, trace data flow. A framework for experienced developers using AI must hold itself to a higher standard than pattern-matching can verify. When a property says "check", it means: read the relevant code, understand what it does, and evaluate whether it meets the bar.
-
-**Mechanical properties are script-run, not model-run.** Run `.agents/skills/audit/scripts/mechanical.sh <project-path>` once per project. It deterministically emits JSONL findings for `complexity-file-size`, `complexity-nesting`, `complexity-dependencies` (import fan-out), raw-print `observability-logging` occurrences, and `design-errors` diagnostic codes passed to `diag.Errorf`/`Warningf` as string literals instead of namespaced `ErrorCode*` constants. Do not re-derive these by reading code — triage the script's output instead (e.g. a CLI output writer printing to stdout is not a logging violation; drop it) and take what survives through step 4 like any other finding. Your reading time goes to the semantic properties a script cannot check.
+**Mechanical properties are script-run, not model-run.** Run `bash .agents/skills/audit/scripts/mechanical.sh <project-path>` once per project. It deterministically emits JSONL findings for `complexity-file-size`, `complexity-nesting`, `complexity-dependencies` (import fan-out), and raw-print `ops-logging` occurrences, then runs the repository checks script when the workspace sets `checks`; those lines carry the property ids the profile defines. Do not re-derive these by reading code — triage the script's output instead (e.g. a CLI output writer printing to stdout is not a logging violation; drop it) and take what survives through step 4 like any other finding.
 
 #### Property groups and what to check
 
 ---
 
+**security** (`sec-authz-enforcement`, `sec-token-identity`, `sec-secrets`, `sec-injection`, `sec-validation`, `sec-error-exposure`, `sec-defaults`, `sec-boundary-leak`, `sec-serialization`):
+
+Treat authentication as a generic subdomain: its language is clients, principals, scopes, grants, tokens, and audiences. Repository-specific domain boundaries and identity infrastructure belong in the repository profile, when present.
+
+- `sec-authz-enforcement` — On Go `api.Endpoint(...)`, `.Secure(scope)` is runtime enforcement and the single source of truth for HTTP permission scopes (TS: `.secure(...)`). Check that every route touching sensitive data declares its scope there, that handlers don't re-implement the same JWT scope check, and that default auth-exclude paths are narrow (`/_/health`, not `/_/` — which would publish `/_/openapi.json`). Routes that fail open: severity critical.
+- `sec-token-identity` — Token and workload-identity handling: precedence, verification, introspection, issuer/audience matching, exchange allowlists, and tenancy binding. Identity flows fail closed and callers request only the audience and scope they need. A missing allowlist entry or over-broad audience: severity high.
+- `sec-secrets` — Check for hardcoded secrets, keys, and tokens in source or configuration. Secret-bearing values use the repository's protected configuration path, never committed files or undocumented plain-environment fallbacks.
+- `sec-injection` — SQL/shell/template concatenation. Postgres access must use parameterized queries (`$1` placeholders / query builder), never string-built SQL. Any raw interpolation of request data into a query: severity critical.
+- `sec-validation` — Public and infra-facing API handlers must validate input at the boundary (schema on bodies, typed path/query params). Do not put required inputs in DELETE request bodies — use path/query params (proxies drop DELETE bodies).
+- `sec-error-exposure` — Responses must not leak internals: stack traces, file paths, SQL text, or DB column names in user-facing errors. Go `errors.Error` `Stack()` must not serialize to HTTP; TS `HttpException` must not expose the `cause` chain in the body.
+- `sec-defaults` — Secure-by-default: request-size limits, timeouts, `X-Content-Type-Options: nosniff`, cookie `HttpOnly/Secure/SameSite` on the web surfaces. Insecure default that users must opt out of: severity high.
+- `sec-boundary-leak` — DDD boundary integrity: generic subdomains must not embed product-domain literals or rules, and one domain must not import another domain's internals. Cross-domain concept leak in a generic subdomain: severity high.
+- `sec-serialization` — Unsafe deserialization: `json.Unmarshal` into `interface{}` for untrusted input, `JSON.parse` without schema, prototype-pollution vectors.
+
+---
+
+**operations** (`ops-deploy-idempotency`, `ops-provisioning-order`, `ops-config-resolution`, `ops-cold-start`, `ops-retry-backoff`, `ops-graceful`, `ops-migration`, `ops-health`, `ops-logging`, `ops-errors`, `ops-metrics`, `ops-tracing`):
+
+Operational reliability is defined by how a project deploys, provisions, resolves configuration, and observes itself: observable by construction, idempotent, and recoverable. Apply repository-specific platform conventions from the repository profile.
+
+- `ops-deploy-idempotency` — Deploy/release paths must be safe to re-run, serialize conflicting work, wait for prerequisites, and recover cleanly after partial failure. A release step that collides on concurrent deploy or strands intermediate writes: severity high.
+- `ops-provisioning-order` — Resource lifecycles must declare dependencies and provision in order. Check ad-hoc chains that assume prior state and conflated provisioning/serving identities.
+- `ops-config-resolution` — Configuration, secrets, and managed-resource values must compose through the repository's declared resolution seams without hidden environment side channels, duplicate providers, or blank-default regressions.
+- `ops-cold-start` — Startup paths must tolerate cold or temporarily unavailable peers with bounded retry/backoff instead of one eager request that makes the service fail to boot.
+- `ops-retry-backoff` — Cross-service I/O needs a timeout and bounded retry with backoff where retry is safe. Missing timeout on any cross-service I/O: severity high.
+- `ops-graceful` — Signal handling and cleanup: `SIGTERM`/context-cancel drains in-flight work, closes pools/handles, bounded shutdown timeout. Jobs must exit non-zero on failure so the deployer sees it.
+- `ops-migration` — Schema changes ship a feature-owned `migration.Source` (embedded SQL under `<feature>/internal/migrations/`) surfaced via `MigrationContributor`; no central migration list edits. Check ordering/idempotency and that composer plugins aggregate sub-plugin sources.
+- `ops-health` — Health, liveness, readiness, and version endpoints use the project's standard platform support. Readiness reflects real serving capability, not a static success response.
+- `ops-logging` — Use the project's structured logger rather than raw printing. Log calls carry level, structured fields, and the relevant request/tenant/trace context.
+- `ops-errors` — Errors preserve cause and add actionable context at boundaries. An operational failure must be diagnosable from logs alone.
+- `ops-metrics` — User-facing operations emit signals: HTTP latency/count/error-rate, DB query duration, pool utilization. Missing metrics on a serving path: severity medium.
+- `ops-tracing` — Trace context propagates through middleware and DB calls; `tenant_id`/`workspace_id` are first-class span attributes on every request (architecture §5).
+
+---
+
 **testing** (`test-coverage`, `test-contracts`, `test-concurrency`, `test-edge-cases`, `test-integration`, `test-regression`, `test-determinism`):
 
-Framework users depend on every public API behaving as documented. Tests are the executable specification.
-
-- `test-coverage` — Run `./putnamiw test <project> --output=jsonl --no-cache` and parse coverage. Flag exported functions/methods with 0% coverage. For framework packages, every exported symbol must have at least one test exercising its primary use case. Coverage below 60% on a framework package is severity high.
-
-- `test-contracts` — **Every exported type, function, and interface must have dedicated tests that verify the contract, not the implementation.** Check that:
-  - Public API signatures have tests covering normal inputs, edge inputs, and error returns
-  - Type contracts are tested (e.g., if a function returns `Result<T>`, test both success and failure paths)
-  - Go: exported functions in non-`_test.go` files have corresponding test functions
-  - TS: exported symbols in barrel `index.ts` files have matching test files
-  - Breaking a public contract without a test catching it is severity critical
-
-- `test-concurrency` — **Go only**: check that packages with `sync.Mutex`/`sync.RWMutex`/channels have concurrent test scenarios. Look for:
-  - Tests that spawn multiple goroutines accessing shared state
-  - Use of `-race` flag in test configuration (should be enabled by default in CI)
-  - Packages with mutex-protected state but no concurrent test: severity high
-  - **TS**: check for async race conditions — concurrent promise resolution, shared mutable state across async boundaries
-
-- `test-edge-cases` — Look for missing error path tests, nil/undefined input tests, empty collection tests, boundary values (0, -1, max int, empty string). Framework code must handle degenerate inputs gracefully. Check that error constructors and error wrapping paths are tested.
-
-- `test-integration` — Verify cross-module integration tests exist. For frameworks: if module A depends on module B, there should be a test that exercises A through B's interface (not mocking B). Check `go/samples/` and `typescript/samples/` for integration-level coverage.
-
-- `test-regression` — Check recent bug-fix commits (`git log --grep="fix"`) for corresponding test additions. A bug fix without a regression test is severity medium.
-
-- `test-determinism` — Check for test flakiness signals: time-dependent assertions (`Date.now()`, `time.Now()` in assertions), uncontrolled randomness, port binding, file system race conditions. Tests must produce identical results on every run.
+- `test-coverage` — Run `putnami test <project> --output=jsonl --no-cache` and parse coverage. Flag exported Reader/Writer methods and handlers with 0% coverage. Coverage below 60% on a lib carrying domain logic: severity high.
+- `test-contracts` — Every feature `Reader`/`Writer` interface and every API endpoint has tests covering normal, edge, and error paths — testing the contract, not the implementation. Breaking a published contract (API scope, DTO, registry protocol) without a test catching it: severity critical.
+- `test-concurrency` — Go: packages with `sync.Mutex`/channels or deploy-concurrency guards need concurrent test scenarios and `-race`. TS: async races over shared mutable state. Concurrency-guard code with no concurrent test: severity high.
+- `test-edge-cases` — Missing error-path, nil/empty, and boundary tests. Error constructors and wrapping paths must be exercised.
+- `test-integration` — Real-dependency integration where it matters: DB-backed repositories tested against Postgres (not mocked), storage against a real/emulated bucket, deploy planner against fixture manifests. A repository with only mocked tests: severity medium.
+- `test-regression` — Recent fix commits (`git log --grep=fix`) should each add a regression test. Repeated deploy/config/provider regressions must be pinned. A bug fix without a regression test: severity medium.
+- `test-determinism` — No time/randomness/port/filesystem races in assertions. Cache/content-addressing tests must be byte-deterministic.
 
 ---
 
-**security** (`security-injection`, `security-validation`, `security-auth`, `security-secrets`, `security-timeout`, `security-error-exposure`, `security-defaults`, `security-dependencies`, `security-serialization`):
+**performance** (`perf-algorithmic`, `perf-allocation`, `perf-io`, `perf-n-plus-1`, `perf-caching`, `perf-regex`, `perf-startup`, `perf-hot-path`):
 
-Principle 4: "Security is foundational, not a layer." The framework must be secure by default, not by opt-in.
-
-- `security-injection` — Grep for string concatenation/interpolation in SQL queries, shell commands, template rendering. Check that query builders use parameterized queries exclusively. In Go `database/` package: verify all queries use `$1` placeholders. In TS `database/`: verify query builder prevents raw SQL injection.
-
-- `security-validation` — Check API handlers for input validation at system boundaries. Every endpoint that accepts user input must validate before processing. Check for:
-  - Schema validation on request bodies (using runtime schema system)
-  - Type coercion that could be exploited (string→number, array→string)
-  - Missing validation on path parameters, query parameters, headers
-  - Go: check `http.Handler` implementations for input parsing without validation
-
-- `security-auth` — Verify authentication/authorization middleware coverage. Check that:
-  - Routes handling sensitive data have security middleware applied
-  - Token validation is not reimplemented per-handler (should use framework middleware)
-  - Default deny: routes without explicit auth config should fail closed
-
-- `security-secrets` — Grep for hardcoded secrets, API keys, passwords, tokens in source. Check `.env` files are gitignored. Check config loading doesn't have fallback defaults for secrets.
-
-- `security-timeout` — Verify all I/O operations have bounded timeouts:
-  - HTTP servers: read/write timeouts configured (Go `ServerConfig` defaults: verify they're applied)
-  - HTTP clients: request timeouts, connection timeouts
-  - DB queries: statement timeouts, connection pool limits
-  - Missing timeout on any I/O operation: severity high
-
-- `security-error-exposure` — Check error responses don't leak internals:
-  - Stack traces in production HTTP responses
-  - Internal file paths in error messages
-  - Database column names or query text in user-facing errors
-  - Go: check that `errors.Error` with `Stack()` doesn't serialize stack to HTTP response
-  - TS: check `HttpException` doesn't include `cause` chain in response body
-
-- `security-defaults` — **Does the framework default to secure?** Check:
-  - HTTP server: are request size limits enforced by default? (Go: MaxBodySize 1MiB — good. Verify TS equivalent)
-  - CORS: if no CORS middleware is configured, do cross-origin requests fail? (Browsers enforce, but check preflight handling)
-  - Content-Type: are responses served with correct Content-Type? Is `X-Content-Type-Options: nosniff` set?
-  - CSP: for `@putnami/web` (SSR), is a Content-Security-Policy header set by default?
-  - Session cookies: are they HttpOnly, Secure, SameSite by default?
-  - If the framework provides insecure defaults that users must override: severity high
-
-- `security-dependencies` — **TS only**: check `package.json` dependencies for known vulnerabilities. Run `bun audit` or check advisory databases for direct dependencies. Go framework is stdlib-only (no check needed). For TS packages with runtime dependencies, each dependency is an attack surface. Flag packages with deep transitive dependency trees.
-
-- `security-serialization` — Check for unsafe deserialization:
-  - `JSON.parse` on untrusted input without schema validation
-  - Prototype pollution vectors (object spread from user input, `Object.assign` with user data)
-  - Go: check `json.Unmarshal` targets are typed (not `interface{}` for user input)
-  - Template injection in SSR rendering
+- `perf-algorithmic` — O(n²)+ over collections of unknown size (route matching, manifest/blob lists, project graphs).
+- `perf-allocation` — Allocations in hot loops / per-request: `fmt.Sprintf` on hot paths, per-request `JSON` marshal without need, slice growth without pre-alloc.
+- `perf-io` — Synchronous/sequential I/O that should be parallel or batched; buffering an unbounded blob or request body in memory instead of streaming or redirecting it.
+- `perf-n-plus-1` — DB queries inside loops (`Query`/`QueryRow` in `for`, `repository.find()` in iteration).
+- `perf-caching` — Repeated expensive work uncached: config parse per request (use the per-pod resolve cache), schema compile per validation, missing remote-cache reuse.
+- `perf-regex` — `regexp.Compile`/`new RegExp` inside per-request functions; compile once at package level.
+- `perf-startup` — Import/initialization side effects, eager loading of optional features, and expensive work before readiness increase startup and scale-out latency.
+- `perf-hot-path` — Per-request middleware/DI overhead: re-resolving singletons per request, closures capturing large objects, `context.Context` recreated per middleware.
 
 ---
 
-**performance** (`perf-algorithmic`, `perf-allocation`, `perf-io`, `perf-n-plus-1`, `perf-caching`, `perf-regex`, `perf-startup`, `perf-bundle`, `perf-hot-path`):
+**design** (`design-feature-decomposition`, `design-exposition`, `design-reader-writer`, `design-thin-workload`, `design-route-registration`, `design-provider-ownership`, `design-api-contract`, `design-domain-boundary`, `design-retired-roots`, `design-types`, `design-errors`, `design-stability`, `complexity-file-size`, `complexity-function-size`, `complexity-nesting`, `complexity-dependencies`):
 
-Principle 2: "Performance is a constraint, not an optimization." Framework overhead must be bounded and measurable.
+The repository's declared architecture and profile are the contract. New code follows them; existing code migrates when touched — flag violations in **new or modified** code, not untouched legacy. When no local architecture is declared, apply the portable Putnami conventions below without inventing retired paths or ownership rules.
 
-- `perf-algorithmic` — Look for O(n²) or worse in code that processes collections of unknown size. Nested loops over arrays/slices, repeated linear searches where a map lookup would suffice. Check router path matching for linear vs trie-based lookup.
-
-- `perf-allocation` — Check for allocations in hot loops:
-  - `new Map/Set/Object/RegExp` inside loops or frequently-called functions
-  - `JSON.parse`/`JSON.stringify` in request handlers (per-request allocation)
-  - String concatenation in loops (use builder/buffer)
-  - Go: check for `fmt.Sprintf` in hot paths (use `strings.Builder`), slice growth without pre-allocation
-
-- `perf-io` — Check for synchronous I/O in async paths, sequential I/O that could be parallelized, missing batching of small operations. Look for `fs.readFileSync` in TS server code, blocking reads in Go handlers.
-
-- `perf-n-plus-1` — Grep for database queries inside loops. Check repository patterns for methods that load related entities one-at-a-time. In Go `database/`: check for `Query`/`QueryRow` calls inside `for` loops. In TS `database/`: check for `repository.find()` inside iteration.
-
-- `perf-caching` — Look for repeated expensive computations without caching. Check:
-  - Config parsing on every request (should parse once)
-  - Schema compilation on every validation (should compile once)
-  - Template compilation on every render (should cache compiled templates)
-  - Route resolution without caching (trie lookup is O(path length), acceptable)
-
-- `perf-regex` — Check for `new RegExp()` or `regexp.Compile()` inside functions called per-request. Regex should be compiled once at module/package level. Shared compiled regex is safe for concurrent use in both Go and TS.
-
-- `perf-startup` — **Framework cold-start performance**:
-  - Check for import-time side effects (code that runs on `import`/`init()` before the app is ready)
-  - Check for eager loading of optional features (should be lazy)
-  - Go: check `init()` functions for expensive operations (file I/O, network calls)
-  - TS: check top-level await, synchronous file reads at import time
-  - For a framework, startup latency directly impacts developer experience and serverless cold starts
-
-- `perf-bundle` — **TS web-facing packages only** (`@putnami/web`, `@putnami/ui`):
-  - Check for barrel re-exports that prevent tree-shaking
-  - Check for server-only code imported into client bundles
-  - Check for large runtime dependencies that could be avoided
-  - Verify `package.json` has proper `browser`/`default` conditional exports to separate server/client code
-
-- `perf-hot-path` — **Per-request overhead in HTTP frameworks**:
-  - Check middleware chain for unnecessary allocations per request
-  - Check router lookup for per-request map/slice creation
-  - Go: verify `context.Context` is passed through, not recreated per middleware
-  - TS: verify middleware doesn't create closures capturing large objects per request
-  - Check that DI resolution in request handlers uses cached instances (not re-resolving singletons per request)
+- `design-feature-decomposition` — Libraries decompose by **vertical feature**, not horizontal layer. Flag top-level `handlers/`/`service/`/`repository/`/`types`/shared `migrations/` that mix concepts (architecture §2 anti-pattern) in new/changed libs.
+- `design-exposition` — Controlled exposition: Go concretes live under `<feature>/internal/`; TS privacy via `package.json#exports`. A workload importing `@putnami/<lib>/src/...` or an unexported subpath, or an accidentally-exported internal: severity high.
+- `design-reader-writer` — Each feature publishes `<Feature>Reader` (side-effect-free) and `<Feature>Writer`; read-only middleware never sees a Writer.
+- `design-thin-workload` — Workloads compose feature plugins and own only boundary concerns (middleware order telemetry→auth→tenancy→handlers, `/healthz`, OpenAPI). Handlers depend on Reader/Writer interfaces, never concrete `*Service`. Provider/business behavior in a workload: severity medium.
+- `design-route-registration` — One route-registration path per workload. Straddling `go.putnami.dev/api` endpoints and per-feature `RegisterRoutes`/ad-hoc HTTP mounts lets OpenAPI drift from production routing: severity high.
+- `design-provider-ownership` — External integrations are packaged by provider ownership first: one provider feature owns its callbacks, tokens, persistence, and migrations. Introduce a shared broker/interface only when a real second provider exists.
+- `design-api-contract` — Prefer interoperable HTTP contracts: identifiers in path/query not DELETE bodies; expose OpenAPI intentionally with narrow auth-exclude. Consumers get facts + leased tokens, never raw credentials.
+- `design-domain-boundary` — DDD boundaries: generic subdomains (auth/IAM) stay agnostic of core-domain concepts; a domain never depends "upward" or sideways into another domain's internals; integrate via published contracts (`go.putnami.dev/protocol/*`). (Also flagged under `sec-boundary-leak` when it's a security surface.)
+- `design-retired-roots` — Do not add files under roots declared retired by the repository profile or constraints. When no retired roots are declared, do not infer them.
+- `design-types` — Go: `interface{}`/`any` in public APIs where a typed interface fits. TS: unjustified `as any`/`@ts-ignore`/`@ts-expect-error` (each needs a comment), missing explicit return types, unbounded generics. Config-schema structs must stay in the owning workload package (moving one out empties its generated schema).
+- `design-errors` — Structured, actionable errors: Go `errors.Error` with defined code constants (not bare `fmt.Errorf`); messages that name the offending input and the remedy. "invalid input" with no context: severity medium.
+- `design-stability` — Observable identities (package names, image names, service hosts, artifacts, and protocol shapes) must not change silently. A rename that misses a live override or consumer is an unannounced break: severity high.
+- `complexity-file-size` — Flag files > 500 lines (Go) / 400 (TS).
+- `complexity-function-size` — Functions > 50 lines or cyclomatic complexity > 10.
+- `complexity-nesting` — Nesting depth > 4.
+- `complexity-dependencies` — Files importing > 8 internal packages (god-file fan-out) or packages imported by > 10 files (fan-in — consider splitting).
 
 ---
 
-**design** (`design-api-surface`, `design-coupling`, `design-patterns`, `design-abstractions`, `design-types`, `design-errors`, `design-stability`, `design-extensibility`, `design-consistency`, `complexity-file-size`, `complexity-function-size`, `complexity-nesting`, `complexity-dependencies`):
+**developer-experience** (`dx-doc-coverage`, `dx-adjacent-docs`, `dx-runbook`, `dx-cli-output`, `dx-errors-actionable`, `dx-config-schema`, `language`):
 
-Principles 3 + 5: "Deterministic and reviewable behavior" + "Data ownership is non-negotiable." A framework's API is a contract with its users.
+Automation is a first-class user; operators run these services in production.
 
-- `design-api-surface` — **Every exported symbol must be intentional.** Check:
-  - Barrel `index.ts` files: is every re-export a deliberate public API?
-  - Go: are exported types/functions in internal packages accidentally public?
-  - Look for symbols exported only because they're used by tests (should use `_test` package in Go, `/testing` subpath export in TS)
-  - Compare exports count across similar modules (e.g., all Go framework modules should have comparable surface area)
-
-- `design-coupling` — Check for circular dependencies and excessive peer imports:
-  - Run import graph analysis: count how many internal packages each file imports
-  - Flag fan-out > 5 internal imports in a single file
-  - Check for import cycles (A→B→A) which indicate design issues
-  - Framework modules should depend downward (application→runtime→utils), never upward
-
-- `design-patterns` — **Verify pattern consistency across the framework**:
-  - Do all plugin implementations follow the same lifecycle interface? (Go: Generator/Warmer/Starter/Stopper; TS: generate/warmup/start/stop)
-  - Do all repository implementations follow the same interface shape?
-  - Do error handling patterns match? (Go: `errors.Wrap`; TS: `cause` chaining)
-  - Is constructor naming consistent? (Go: `New<Type>`; TS: factory functions or classes)
-  - Inconsistent patterns between similar modules: severity medium
-
-- `design-abstractions` — Check for over/under-abstraction:
-  - Interfaces with single implementations (Go: premature interface extraction)
-  - Abstract base classes in TS (prefer composition via plugin system)
-  - Leaky abstractions: implementation details visible through the public API
-  - Check that abstractions earn their complexity: does the indirection serve a real use case?
-
-- `design-types` — **Type quality (TS) / Type safety (Go)**:
-  - TS: grep for `as any`, `@ts-ignore`, `@ts-expect-error` — each one must be justified with a comment explaining why the escape is necessary and what invariant the developer must maintain manually
-  - TS: check that exported function return types are explicit (not inferred to complex anonymous types)
-  - TS: verify generics have meaningful bounds (not `<T>` with no constraint where `<T extends SomeBase>` would be more correct)
-  - Go: check for `interface{}` / `any` in public APIs where a typed interface would be more appropriate
-  - Phantom types (`__brand`, `__type`) must have doc comments explaining the branding purpose
-  - Unjustified type escape in framework code: severity high
-
-- `design-errors` — **Error types must be typed, documented, and actionable**:
-  - Go: verify error returns use the structured `errors.Error` type, not bare `fmt.Errorf`. Diagnostic codes passed as string literals to `diag.Errorf`/`Warningf` (rather than namespaced `ErrorCode*` constants) are now flagged mechanically by `mechanical.sh` — triage those from its output; reserve reading time for whether the codes/messages are actionable
-  - TS: verify `HttpException` subclasses cover all failure modes. Check that error factories include enough context for an AI agent to understand what went wrong and how to fix it
-  - Check error messages: can a developer (or AI) reading only the error message understand what happened, which input caused it, and what to do? If not: severity medium
-  - Errors that say "invalid input" without saying which input or what's wrong: severity high
-
-- `design-stability` — **Backward compatibility for public APIs**:
-  - Check recent commits for removed or renamed exports (breaking changes)
-  - Verify `@internal` / `@experimental` annotations on unstable APIs
-  - Check that deprecated APIs have migration guidance in doc comments
-  - Framework packages must not break public API without a major version bump
-  - Go: check for removed exported functions/types in recent diffs
-  - TS: check for removed entries in `package.json` `exports` map
-  - Unannounced breaking change: severity critical
-
-- `design-extensibility` — **Can users extend framework behavior without forking?**:
-  - Check that plugins can add middleware, routes, DI bindings without modifying framework code
-  - Check that key behaviors are interface-based (Go) or configurable (TS), not hardcoded
-  - Look for `switch` statements on type that should be replaced with interface dispatch
-  - Check that event systems allow user-defined event types
-  - Sealed/final patterns where extension is expected: severity medium
-
-- `design-consistency` — **Cross-module API consistency**:
-  - Compare naming conventions across Go framework modules (e.g., `NewXxxPlugin` everywhere?)
-  - Compare config struct patterns (do all use the same config-loading mechanism?)
-  - Compare error handling patterns across modules
-  - Check that similar operations have similar signatures (e.g., all `Start()` methods return `error`)
-  - Inconsistency between modules that serve the same architectural role: severity medium
-
-- `complexity-file-size` — Flag files exceeding 500 lines (Go) or 400 lines (TS). Framework files above this threshold likely have mixed concerns.
-
-- `complexity-function-size` — Flag functions exceeding 50 lines or with cyclomatic complexity above 10. Framework functions must be readable; long functions with many branches are hard for both humans and AI to reason about.
-
-- `complexity-nesting` — Flag nesting depth > 4 levels. Deep nesting signals missing early returns, missing extraction, or an overly complex algorithm.
-
-- `complexity-dependencies` — Count imports per file. Flag files importing > 8 internal packages (fan-out too high, likely a god-file). Flag packages imported by > 10 files (fan-in too high, consider if it should be split).
-
----
-
-**operations** (`observability-logging`, `observability-errors`, `observability-metrics`, `observability-tracing`, `prod-versioning`, `prod-config`, `prod-graceful`, `prod-migration`, `prod-health`):
-
-Principle 1: "Observable by construction." Runtime behavior must be visible by default, not opt-in.
-
-- `observability-logging` — Check for raw `console.log`/`fmt.Println` vs structured logging. Framework code must use the structured logger (`@putnami/utils` logger / `go.putnami.dev/logger`). Check that log calls include:
-  - Log level appropriate to the message (not everything at INFO)
-  - Structured fields (not string interpolation for key data)
-  - Request context (trace ID, request ID) when inside a request handler
-
-- `observability-errors` — Verify errors propagate context through the chain:
-  - Go: `errors.Wrap(err, code)` preserves cause chain. Check for bare `return err` without wrapping (loses context about where the error was caught)
-  - TS: `new Error(msg, { cause: err })` preserves chain. Check for `catch (e) { throw new Error(msg) }` that drops the cause
-  - Framework errors must be diagnosable from the error alone, without needing to reproduce
-
-- `observability-metrics` — Check for operations without measurable signals:
-  - HTTP handler execution time, request count, error rate
-  - DB query duration, connection pool utilization
-  - DI container resolution time (for debugging startup issues)
-  - Go: check for `emit.metric()` calls in framework operations
-  - Missing metrics on a user-facing operation: severity medium
-
-- `observability-tracing` — Check trace context propagation:
-  - HTTP middleware should create/propagate trace spans
-  - DB queries should be traced with the query (sanitized) as span name
-  - Go: check `context.Context` carries trace data through the call chain
-  - TS: check async context propagation in DI scope resolution
-
-- `prod-versioning` — Check version management consistency. Verify `.gen/version.json` files are present and up-to-date. Check that version is exposed at runtime (health endpoint, startup log).
-
-- `prod-config` — Look for hardcoded config values that should come from environment/config:
-  - Port numbers, hostnames, timeouts in source code (should be in config structs)
-  - Feature flags as boolean constants (should be runtime-configurable)
-  - Environment-specific logic (`if (env === 'production')`) that should be config-driven
-
-- `prod-graceful` — Check signal handling and resource cleanup:
-  - Go: verify `os.Signal` handling with graceful shutdown (context cancellation, drain connections)
-  - TS: verify `process.on('SIGTERM')` or equivalent lifecycle hooks
-  - Check that DB connections, file handles, and goroutines are cleaned up on shutdown
-  - Check shutdown timeout configuration (don't hang forever, don't kill immediately)
-
-- `prod-migration` — Check for schema changes without migrations:
-  - New table definitions or column additions should have corresponding migration files
-  - Check migration ordering and idempotency
-  - Data ownership principle: schema changes must be versioned and reversible
-
-- `prod-health` — Verify health/readiness endpoints in applications:
-  - Health endpoint should check downstream dependencies (DB, external services)
-  - Readiness endpoint should reflect actual serving capability
-  - Both should return structured responses (not just 200 OK)
-
----
-
-**developer-experience** (`dx-api-docs`, `dx-examples`, `dx-getting-started`, `dx-migration`, `dx-site`, `dx-errors-actionable`, `dx-discoverability`, `dx-predictability`, `dx-cli-output`, `language`):
-
-Principle 6: "Automation is a first-class user." The framework must be usable by both humans and AI agents. Documentation is not prose — it's executable specification.
-
-- `dx-api-docs` — **Per-export documentation coverage.** Check that every exported function, type, and interface has a doc comment (Go: godoc; TS: JSDoc). The comment must describe:
-  - What the function does (not how — that's the implementation)
-  - Parameters and return value semantics
-  - Error conditions and what they mean
-  - `@internal` / `@experimental` for unstable APIs
-  - Count: `exported symbols without doc comment / total exported symbols`. Ratio > 10% undocumented on a framework package: severity high
-
-- `dx-examples` — Verify code examples exist and are current:
-  - `doc/` folder contains runnable examples for key APIs
-  - `go/samples/` and `typescript/samples/` projects exercise the framework end-to-end
-  - Check that example imports match current `package.json` exports
-  - Check that example code compiles (run build on sample projects)
-  - Stale example that doesn't compile: severity high
-
-- `dx-getting-started` — **Zero-to-working path.** Check that:
-  - Each framework package has a `doc/` with at minimum a getting-started guide
-  - The guide shows a complete, minimal working example (not fragments)
-  - The example can be copy-pasted and run without modification
-  - For AI agents: the getting-started guide should be sufficient to build a working app without reading source code
-
-- `dx-migration` — Check for breaking changes without migration guidance:
-  - Recent commits that modify exports, config shapes, or behavior
-  - If breaking: is there a migration section in the doc, or a changelog entry?
-  - Deprecated APIs should have `@deprecated Use X instead` with a concrete replacement
-
-- `dx-site` — Verify `sites/putnami.dev/doc/` coverage for the project's features. Cross-reference exported APIs with documentation sections. New features without corresponding site docs: severity medium.
-
-- `dx-errors-actionable` — **Can an AI agent self-correct from error messages alone?** Read error messages in the codebase and evaluate:
-  - Does the error say what was expected vs what was received?
-  - Does it identify which input/parameter caused the failure?
-  - Does it suggest what to do? (e.g., "did you forget to call .use(plugin)?" or "register the provider before resolving")
-  - Go: check `errors.New`/`errors.Newf` messages for context completeness
-  - TS: check `throw new Error(msg)` and `HttpException` messages
-  - Error that says "invalid" or "failed" without context: severity medium
-
-- `dx-discoverability` — **Can an AI agent understand a module from its types alone?** Check:
-  - Are types self-documenting? (e.g., `ServerConfig` fields have doc comments, not just `Port int`)
-  - Are there type aliases that explain domain concepts? (e.g., `type Handler = (ctx: Context) => Response`)
-  - Is the type graph navigable? (following types from the entry point should reveal the full API)
-  - Do barrel exports organize symbols logically? (grouped by feature, not alphabetically)
-  - Check `index.ts` / exported package symbols: can you understand the module's capabilities from the export list?
-
-- `dx-predictability` — **API consistency for pattern matching.** Check:
-  - Do similar modules have similar APIs? (e.g., Go `http.NewServerPlugin` and `database.NewPlugin` — same lifecycle pattern?)
-  - Are options passed the same way? (config struct vs functional options vs method chaining — pick one per language)
-  - Can a developer who learned one module predict the API of another?
-  - Cross-module inconsistencies: severity low (but compound effect is high)
-
-- `dx-cli-output` — **Machine-readable output for all operations.** Check:
-  - CLI commands support `--output=jsonl` for structured output
-  - Error output includes file, line, column for diagnostic tools
-  - Progress reporting uses structured events, not free-form text
-  - Missing structured output on a user-facing CLI command: severity medium
-
-- `language` — **Every GitHub artifact, code comment, and doc is in English** (`.agents/constraints.md`). This property is script-run and workspace-wide, not per project. Run it once per audit run whenever the developer-experience group is in scope, and skip it for `--scorecard-only`:
+- `dx-doc-coverage` — Exported Go/TS symbols carry doc comments (godoc/JSDoc) describing behavior, params, and error conditions. `@internal`/`@experimental` on unstable APIs.
+- `dx-adjacent-docs` — User-facing changes update adjacent docs in the same owning domain (constraints rule). A new CLI verb, config field, or endpoint without doc update: severity medium.
+- `dx-runbook` — Operational surfaces such as deploys, break-glass access, secret rotation, and cutovers have a current runbook in the repository's documented location. Incident procedures that live only in tribal knowledge: severity medium.
+- `dx-cli-output` — CLI commands support `--output=jsonl`; errors include file/line/column for diagnostic tools; progress uses structured events. Do not name an extension command flag after a putnami builtin (it silently shadows).
+- `dx-errors-actionable` — Can an operator/AI self-correct from the error alone? It should say what was expected vs received, which input failed, and what to do (e.g. "identity is not entitled — add SA to the token-exchange allowlist").
+- `dx-config-schema` — Config structs generate a truthful schema (`putnami describe`). Flag config that won't round-trip or that relocated out of its workload package and emptied its schema block.
+- `language` — Every GitHub artifact, code comment, and doc is in English. This property is script-run and workspace-wide, not per project. It applies when the shared detector `.agents/skills/check/scripts/english-only.sh` exists (the `@putnami/contributor` extension installs it); without it, report the property as not checked. Run it once per audit run whenever the developer-experience group is in scope, and skip it for `--scorecard-only`:
   ```bash
   bash .agents/skills/check/scripts/english-only.sh files          # tracked files
   bash .agents/skills/check/scripts/english-only.sh tasks          # open, in-progress and blocked tasks, through `putnami tasks find`
@@ -429,21 +252,20 @@ Principle 6: "Automation is a first-class user." The framework must be usable by
   bash .agents/skills/audit/scripts/english-only-proposals.sh      # open and draft proposals into origin's default branch, through `putnami proposals find`
   ```
   The proposals contract finds a proposal by its exact base and head, so `english-only-proposals.sh` takes the heads from origin's remote-tracking branches (hence the fetch) and scans each proposal's title and body with the detector's `text` mode. A proposal into another base is scanned only with `--base <branch>`. It asks about the 200 most recently committed heads (`--heads <n>` changes the bound, and the summary counts the heads left out); a head whose find answers `unavailable` is skipped, named on stderr and counted, and the scan goes on. Without an offender, an unavailable head makes the scan exit 2: the scan is incomplete, not clean. Every exit status means the same for all three scans: exit 0 is clean, exit 1 lists the offenders on stdout, and exit 2 is a tool failure — stop and report it, never read it as clean. The detector already skips test files, `testdata/` and `fixtures/`, allowlisted proper nouns, and its own tracking issue. Triage what remains: a foreign word quoted as an example inside an issue about language is a legitimate drop.
-  File every surviving offender in **one** issue, never one per offender, with fingerprint `audit-fp: workspace/language/english-only` and title `[workspace] Non-English text in GitHub artifacts, code comments, or docs`. Route it as in 4b: when it is open, replace its Evidence with the current listing; when none exists or the last one closed as completed, create it with `--label "group/developer-experience" --label "prop/language" --label "area/all" --label "severity/medium" --label "priority/p2" --label "type/task" --label "status/audit-finding" --label "source/audit"`. `area/all` keeps it out of the domain scorecards; `status/audit-finding` puts it in the `/fix` queue. If the label is missing, create it first with `gh label create prop/language --force --description "Non-English text in a GitHub artifact, code comment, or doc"`. When all three scans are clean and the issue is open, close it as resolved (4e).
+  File every surviving offender in **one** issue, never one per offender, with fingerprint `audit-fp: workspace/language/english-only` and title `[workspace] Non-English text in GitHub artifacts, code comments, or docs`. Route it as in 4b: when it is open, replace its Evidence with the current listing; when none exists or the last one closed as completed, create it with `--label "group/developer-experience" --label "prop/language" --label "area/all" --label "severity/medium" --label "priority/p2" --label "status/audit-finding" --label "source/audit"`, plus the issue type the profile names. It is always `priority/p2`: it spans every scope, so no scope's priority order applies. `area/all` keeps it out of the scope scorecards. If the label is missing, create it first with `gh label create prop/language --force --description "Non-English text in a GitHub artifact, code comment, or doc"`. When all three scans are clean and the issue is open, close it as resolved (4e).
 
 ### 4. For each finding
 
 #### 4a. Assign severity
 
-Base severity from the finding's nature:
-- **critical**: Security vulnerability, data loss risk, production blocker
-- **high**: Significant gap, reliability risk
-- **medium**: Quality improvement, fix when touching the area
-- **low**: Cosmetic, minor, nice to have
+- **critical**: security vuln, data loss, production blocker (fails-open auth, credential leak, non-idempotent destructive deploy)
+- **high**: significant reliability/security gap
+- **medium**: quality improvement, fix when touching the area
+- **low**: cosmetic, minor
 
-Severity describes **impact only** — never inflate it for scheduling reasons. (The old severity-boost rule conflated the two axes and let boosted mediums skip triage; it is gone.)
+Severity describes **impact only** — never inflate it for scheduling reasons. (An older severity-boost rule conflated impact with priority and let boosted mediums skip triage; it is gone.)
 
-Assign **priority** as a separate axis, from the position of the finding's group in the group priority order (step 1): positions 1-2 → `priority/p1`, positions 3-4 → `priority/p2`, positions 5-6 → `priority/p3`. Priority orders the fix queue; severity states impact. `/fix` sorts by severity first, then priority.
+Assign **priority** as a separate axis, from the position of the finding's group in the scope's priority order (`config.sh priority <scope>`): positions 1-2 → `priority/p1`, positions 3-4 → `priority/p2`, positions 5-6 → `priority/p3`. Priority orders the fix queue; severity states impact.
 
 #### 4b. Fingerprint, duplicates, and waivers
 
@@ -453,20 +275,16 @@ Every finding gets a deterministic fingerprint, stamped into the issue body on i
 audit-fp: <project-short>/<property>/<slug>
 ```
 
-`<slug>` identifies the primary subject — the exported symbol under scrutiny, or the file basename without extension (e.g. `audit-fp: go-http/security-timeout/client`). Derive it from the finding's *location*, never its prose, so re-discoveries in later waves produce the identical fingerprint.
+`<slug>` identifies the primary subject — the exported symbol under scrutiny, or the file basename without extension (for example `audit-fp: payments/api/sec-token-identity/authorize`). Derive it from the finding's *location*, never its prose, so re-discoveries in later waves produce the identical fingerprint.
 
-**`<project-short>` naming convention** (used consistently in fingerprints, issue titles, and searches):
+**`<project-short>` convention** — read it from `config.sh scopes` (`.shorts`) or `config.sh short <project-id>`; never derive it by hand. It is `<scope>/<leaf>`, where `<leaf>` is the final path segment, or `<scope>/<path under the scope>` when two audited projects of the scope share a leaf. Use it consistently in fingerprints, issue titles, and searches:
 
-| Project name pattern | Short name |
+| Project | Short name |
 | --- | --- |
-| `@putnami/<name>` | `<name>` (e.g. `@putnami/database` → `database`) |
-| `go.putnami.dev/protocol/<name>` | `go-protocol-<name>` (e.g. `go.putnami.dev/protocol/cache` → `go-protocol-cache`) |
-| `go.putnami.dev/examples/<name>` | `go-examples-<name>` |
-| `go.putnami.dev/<name>` | `go-<name>` (e.g. `go.putnami.dev/events` → `go-events`) |
-| `@example/<name>` (TS samples) | `example-<name>` |
-| `putnami.dev` | `putnami.dev` |
-
-Match the most specific pattern first. Short names never contain `/` — nested name segments flatten to `-` so the fingerprint always has exactly three `/`-separated parts. (Issues filed before 2026-07-28 for `protocol/*` and `examples/*` projects may carry malformed slashed shorts like `go-protocol/cache`; when deduping those projects, search both forms.)
+| `/payments/libs/core` | `payments/core` |
+| `/payments/workloads/api` | `payments/api` |
+| `/web/apps/console` | `web/console` |
+| `/web/libs/cli` and `/web/workloads/cli` | `web/libs/cli`, `web/workloads/cli` |
 
 Search **all states** — closed issues are the system's memory of rejections:
 
@@ -474,7 +292,7 @@ Search **all states** — closed issues are the system's memory of rejections:
 gh issue list --search "\"audit-fp: <fp>\"" --state all --json number,title,state,stateReason,labels --limit 20
 ```
 
-Fallback for pre-fingerprint issues (no hit above): `gh issue list --label "prop/<property>" --search "<project-short-name>" --state all --json number,title,state,stateReason,body --limit 50`, matching on same property label + project in title + similar file reference in body.
+Fallback for pre-fingerprint issues (no hit above): `gh issue list --label "prop/<property>" --search "<project-short>" --state all --json number,title,state,stateReason,body --limit 50`, matching on same `prop/` label + project in title + similar file reference.
 
 Route by what you find:
 
@@ -484,7 +302,7 @@ Route by what you find:
 
 #### 4c. Adversarial check before filing
 
-A false finding is not cheap — it costs a full `/fix` session downstream and erodes trust in the backlog. Before creating any **new** issue, re-read the evidence as a skeptic trying to refute it: does the code actually reach this path? Is the "missing" guard provided by a caller, middleware, or framework default? Does an existing test already pin this behavior? For `critical` and `high` findings, trace the concrete failure path end to end and put the trace in the Evidence section. Findings that don't survive the skeptic pass are dropped, not filed at lower severity.
+A false finding is not cheap — it costs a full `$fix` session downstream and erodes trust in the backlog. Before creating any **new** issue, re-read the evidence as a skeptic trying to refute it: does the code actually reach this path? Is the "missing" guard provided by a caller, middleware, or framework default? Does an existing test already pin this behavior? For `critical` and `high` findings, trace the concrete failure path end to end and put the trace in the Evidence section. Findings that don't survive the skeptic pass are dropped, not filed at lower severity.
 
 #### 4d. Create or update issue
 
@@ -493,20 +311,16 @@ A false finding is not cheap — it costs a full `/fix` session downstream and e
 gh issue create \
   --title "[<project-short>] <description>" \
   --label "group/<group>" --label "prop/<property>" \
-  --label "scope/<domain>" --label "severity/<severity>" \
+  --label "<scope-label>" --label "severity/<severity>" \
   --label "priority/<p1|p2|p3>" \
-  --label "type/<type>" \
   --label "status/audit-finding" --label "source/audit" \
-  --label "<project-labels>" \
+  <one --label per entry in <project-labels>> \
   --body "<body>"
 ```
 
-**Issue type** — set based on the finding's group:
+**Issue type by group**: follow the repository profile and existing issue taxonomy. If neither defines a type policy, use `bug` for demonstrated defects and do not invent new taxonomy labels.
 
-- `group/security` → `type/bug`
-- all other groups → `type/task`
-
-**Auto-confirm rule**: if severity is `critical` or `high`, also add `status/confirmed` (remove `status/audit-finding`).
+**Auto-confirm rule**: if severity is `critical` or `high`, swap `status/audit-finding` for `status/confirmed` so `$fix` or an explicit `$fix-loop --label status/confirmed` can pick it up.
 
 Issue body template:
 ```markdown
@@ -516,8 +330,8 @@ Issue body template:
 
 ## Location
 
-- **Project**: `<package-name>` (`<path>`)
-- **File(s)**: `<file>:<line>` (repeat as needed)
+- **Project**: `<name>` (`<path>`)
+- **File(s)**: `<file>:<line>`
 
 ## Evidence
 
@@ -525,142 +339,143 @@ Issue body template:
 
 ## Severity Rationale
 
-<why this severity level>
+<why this impact level — the concrete failure and who it hits>
 
 ## Suggested Fix
 
 <concrete suggestion>
 
 ---
-_Property: `<property-id>` | Group: `<group>` | Domain: `<domain>`_
-_Audit date: `<YYYY-MM-DD>`_
+_Property: `<property-id>` | Group: `<group>` | Scope: `<scope>`_
+_Audit: `<YYYY-MM-DD>`_
 
 audit-fp: <project-short>/<property>/<slug>
 ```
 
 #### 4e. Auto-close resolved findings
 
-For existing open issues matching this project + property: if the finding no longer reproduces (code was fixed), close the issue with a comment noting it was resolved.
+For existing open issues on this project + property that no longer reproduce, close with a comment noting the resolution (and the fixing commit/PR if identifiable).
 
 ### 5. Update scorecards
 
-> **Branch**: if `--skip-scorecard` is set, stop here and proceed directly to step 6. Scorecards will be refreshed by the fleet's post-pass or a later `--scorecard-only` run — see [Parallel runs](#parallel-runs).
+> **Branch**: if `--skip-scorecard` is set, stop here and go to step 6. Scorecards will be refreshed by the fleet's post-pass or a later `--scorecard-only` run.
 
 Scorecard bodies are deterministic artifacts — never hand-write them:
 
-```bash
-bash .agents/skills/audit/scripts/scorecard.sh                # all domains + workspace rollup
-bash .agents/skills/audit/scripts/scorecard.sh --domain go    # one domain (workspace rollup still refreshed)
-```
-
-The script rebuilds each domain scorecard (project × group matrix, by-group table, grades) and the workspace rollup from the current open issues. It finds each scorecard by its exact title among open issues (`[scorecard] <Domain> Health` per domain, for example `[scorecard] TypeScript Health`, and `[scorecard] Workspace Health` for the rollup) and creates it when none is open. `--dry-run` prints the bodies and edits nothing. Because it is a plain script, anything may run it: `/fix-loop`'s final step, `fleet.sh`'s post-pass, a cron — the dashboard never goes stale waiting for the next wave.
-
-Then post the **wave narrative as a comment** on each in-scope domain scorecard issue — never in the body, which the script owns and regenerates:
+Write the **wave narrative** to a file, then pass it to the script:
 
 ```bash
-gh issue comment <scorecard-number> --body "<wave narrative>"
+bash .agents/skills/audit/scripts/scorecard.sh --narrative-file <file>                  # all scopes + workspace rollup
+bash .agents/skills/audit/scripts/scorecard.sh --scope identity --narrative-file <file> # one scope (rollup still refreshed)
 ```
 
-The narrative records what was scanned, environment caveats (e.g. degraded tooling), notable findings, and what was **verified clean** — those clean attestations plus the comment trail are the wave-over-wave history the body cannot hold.
+The script rebuilds each scope scorecard (project × group matrix, by-group table, grades, and the narrative as its "Last wave" section) and the workspace rollup from the open tasks carrying each scope label, through `putnami tasks find`, `create` and `update`. With scorecards off it prints a note and changes nothing.
+
+The narrative records what was scanned, environment caveats (e.g. degraded tooling), notable findings, and what was **verified clean**. Each run replaces the previous one; attestations keep the per-pair history.
 
 ### 6. Prevention — graduate recurring finding classes
 
-Count this wave's new findings per property. Any property that fired on **3+ projects** is a lint rule waiting to exist; `/fix` whacking instances one at a time is the expensive alternative. Draft a single graduation issue and put the draft in the wave summary, but **ask the user before filing** — constraints.md forbids unprompted tooling/process issues. In unattended runs, leave the draft in the summary for the next interactive session instead of filing. Once approved, file (or update, if one is already open):
+Count this wave's new findings per property. Any property that fired on **3+ projects** is a lint rule waiting to exist; fixing instances one at a time is the expensive alternative. File (or update, if one is already open) a single graduation issue. When the repository profile or constraints require the user's approval before a tooling or process issue is filed, put the draft in the wave summary instead, and file it only once approved:
 
 ```bash
 gh issue create \
   --title "[workspace] Graduate <property> recurrences into a deterministic guard" \
-  --label "type/task" --label "prop/<property>" --label "area/all" \
+  --label "prop/<property>" --label "area/all" \
   --label "source/audit" --label "status/audit-finding" --label "severity/medium" \
   --body "<the instances found this wave + the proposed lint rule / mechanical.sh check / framework guard>"
 ```
 
-`area/all` keeps these meta-issues out of the domain scorecards. This is principle 6 — automation as first-class user — applied to the audit itself: kill the class, not the instance.
+`area/all` keeps these meta-issues out of the per-scope scorecards (`scorecard.sh` queries each scope label). Kill the class, not the instance.
 
 ### 7. Print summary
 
 ```
-Audit complete: <N domains>, <N projects>, <N groups>
+Audit complete: <N scopes>, <N projects>, <N groups>
 
-  Created: N new issues
-  Updated: N existing issues
-  Closed:  N resolved issues
-  Waived:  N (standing wontfix — not re-filed)
-  Skipped: N (project, group) pairs unchanged since last attestation
+  Created:   N new issues
+  Updated:   N existing issues
+  Closed:    N resolved issues
+  Waived:    N (standing wontfix — not re-filed)
+  Skipped:   N (project, group) pairs unchanged since last attestation
   Unchanged: N
 
-Scorecards updated: workspace + <N> domains
+Scorecards: updated <N> | off
 ```
 
 ## Reconcile mode
 
-`--reconcile` verifies existing open issues instead of scanning for new findings:
+Triggered by `--reconcile`. Do not scan for new findings. For each open `source/audit` issue in scope (`gh issue list --label source/audit --state open ...`, plus any `--scope`/`--group`/`--project` filter), locate the finding from its `audit-fp:` line and Location section, re-read the referenced file(s), and decide if it still reproduces. If resolved, close it:
 
-1. List candidates: `gh issue list --label "source/audit" --state open --json number,title,body,labels --limit 200`, narrowed by `--domain` / `--project` / `--group` label filters when given.
-2. For each issue, locate the finding from the `audit-fp:` line and the Location section, then check whether it still reproduces at HEAD.
-3. **Resolved** → attribute the fix (`git log --oneline -- <file>` to find the commit/PR), comment `Resolved by <sha or PR link>`, then `gh issue close <number> --reason completed`.
-4. **Still valid** → leave open; refresh the Evidence section if the code moved.
-5. Finish with the scorecard refresh (step 5) unless `--skip-scorecard`.
+```bash
+gh issue close <number> --comment "Resolved as of <sha> (<commit subject or PR>). Finding no longer reproduces at <file>:<line>."
+```
 
-`--dry-run` prints what would be closed without acting.
-
+`--dry-run` prints the close list without acting. Finish with a summary of checked / closed / still-open counts.
 
 ## Prune mode
 
-`/audit --prune --domain <d>` removes weight. It answers one question per candidate: what breaks if this goes away? When the answer is "nothing", it goes away. The regular property rubric finds work to add; prune finds work to delete. The two never run together.
+`$audit --prune --scope <s>` removes weight. It answers one question per candidate: what breaks if this goes away? When the answer is "nothing", it goes away. The regular property rubric finds work to add; prune finds work to delete. The two never run together.
 
-The repository must be explainable, not merely green. Putnami's consumers are this repository and the checkouts listed in `PUTNAMI_CONSUMER_REPOS`. A symbol, package, flag or page that none of them uses has no reason to exist.
+The repository must be explainable, not merely green. Its consumers are this repository and the checkouts listed in `PUTNAMI_CONSUMER_REPOS` (colon-separated; an empty value when no other repository consumes this one). A symbol, package, flag or page that none of them uses has no reason to exist.
 
 ### Typologies
 
 | Typology | Candidate | Truth to restore | Verdict |
 | --- | --- | --- | --- |
-| `dead` | package or export with zero importer across this repository and the consumer checkouts | delete; unexport when only its own package uses it | auto, except methods (may satisfy an interface) and sample-only importers |
+| `dead` | package or export with zero importer across this repository and the consumer checkouts | delete; unexport when only its own package uses it | auto, except methods (may satisfy an interface), sample-only importers and test-only references |
 | `duplicate` | the same function defined in two or more projects | one copy, in the lowest module that both can import | owner names the surviving copy |
 | `multi-version` | legacy / v1-v2 / compat / fallback branches | the newer path, alone | owner names the survivor |
 | `palliative` | a guard explained by an incident; a test pinning a commit or a stamped version | fix the root cause or delete the guard; a test proves a contract, never history | owner, except pinned repository state (auto) |
 | `historical-ref` | a comment, doc or ADR citing an issue, PR or commit | the rule, stated in the present tense, or nothing | auto |
 | `comment` | a comment that justifies the code instead of describing it; a lint escape (`//nolint`, `as any`, `@ts-ignore`, `biome-ignore`); a file over 30 % comment lines | a comment states the contract; a lint escape means the code or the rule changes | justification comments auto; escapes and density need the owner |
 | `test-scaffold` | test-only packages, fakes, mocks, harnesses; a project with test lines above twice its source | tests through the public contract, on the real component | owner |
-| `config-surface` | a `PUTNAMI_*` variable read in code and documented nowhere | a documented config key, or deletion | owner |
+| `config-surface` | a `PUTNAMI_*` variable read in code and documented nowhere (the scan knows only this prefix) | a documented config key, or deletion | owner |
 | `doc` | an ADR that is superseded, rejected or never adopted; a page linking to a path that no longer exists | ADRs describe the released product, one per settled decision; dangling links go | dangling links auto; ADRs need the owner |
 
-Module granularity and god files (`release_set.go`, `result-v2.ts`) are reported as observations in the umbrella issue, never as prune PRs: splitting is design work, and the module graph is what `--impacted` and the monorepo sell.
+Module granularity and god files are reported as observations in the umbrella issue, never as prune proposals: splitting is design work.
 
-### Models
+### Workers
 
-Judgment and edits run on different tiers, on both hosts. Tier equivalence is settled in `.agents/constraints.md`: Fable 5.1 ↔ `gpt-6-astra`, Opus 5.5 ↔ `gpt-6-sol`, Sonnet 5 ↔ `gpt-6-luna`.
+Judgment and edits run on different tiers. This extension ships both workers with the skill: `prune-triage` (read-only, strongest tier, high effort) and `prune-apply` (edits, light tier, medium effort), under `.claude/agents/` and `.codex/agents/`. On Codex, the repository registers them in `.codex/config.toml`.
 
-| Step | Claude Code | Codex | Why |
-| --- | --- | --- | --- |
-| Index, scan, gates | script / CLI | script / CLI | no model |
-| P3 triage of every `auto: false` row, and of `auto: true` rows in `dead`, `duplicate`, `multi-version`, `palliative`, `test-scaffold` | `prune-triage`: Fable 5.1, high | `prune-triage`: `gpt-6-astra`, high | a wrong deletion breaks a consumer repository, where this repository's gate cannot see it |
-| P5 edits, one call per typology | `prune-apply`: Sonnet 5, medium | `prune-apply`: `gpt-6-luna`, medium | every row is prescribed; the `--projects` gate is the proof |
-| Orchestration: slicing, umbrella issue, commits, the one `--impacted` gate | this skill's session (Opus 5.5) | the session model (`gpt-6-astra`) | git and GitHub state stay in one place |
+| Step | Who | Why |
+| --- | --- | --- |
+| Index, scan, gates | script / CLI | no model |
+| P3 triage of every `auto: false` row, and of the `auto: true` rows of `dead` and `palliative` | `prune-triage` | a wrong deletion breaks a consumer repository, where this repository's gate cannot see it |
+| P5 edits, one call per typology | `prune-apply` | every row is prescribed; the `--projects` gate is the proof |
+| Orchestration: slicing, umbrella issue, commits, the one `--impacted` gate | this skill's session | git and GitHub state stay in one place |
 
-The workers are hand-authored with the skill: `.claude/agents/prune-triage.md`, `.claude/agents/prune-apply.md`, `.codex/agents/prune-*.toml` (registered in `.codex/config.toml`). Hand each worker a slice, never a domain: at most 150 candidate rows per `prune-triage` call and one typology per `prune-apply` call, and run one orchestrator session per (domain, typology) on the large domains (`tooling`, `typescript`).
+Hand each worker a slice, never a scope: at most 150 candidate rows per `prune-triage` call and one typology per `prune-apply` call, and run one orchestrator session per (scope, typology) on large scopes.
 
 ### Steps
 
-**P1. Index.** Run `prune.sh repos` and read the HEAD dates. A consumer checkout older than 7 days is fetched first (`git -C <repo> pull --ff-only`); a missing checkout stops the run (set `PUTNAMI_CONSUMER_REPOS`). Then `prune.sh index` once per session: 40 s over every repository, symbol and import tables under `.putnami/audit/prune/`.
+**P1. Index.** Run `bash .agents/skills/audit/scripts/prune.sh repos` and read the HEAD dates. A consumer checkout older than 7 days is fetched first (`git -C <repo> pull --ff-only`); a missing checkout stops the run (set `PUTNAMI_CONSUMER_REPOS`). Then `prune.sh index` once per session: symbol and import tables under `.putnami/audit/prune/`. The workspace's own packages are the Go module paths and scoped npm names it tracks, so the index needs no configuration.
 
-**P2. Scan.** For each domain in scope, `prune.sh scan all $(bash .agents/skills/audit/scripts/domains.sh paths <domain>) > .putnami/audit/prune/<domain>.jsonl` (`--typology` narrows). The script emits candidates, not findings: every `auto: false` row needs a reading, and `auto: true` rows still get the skeptic pass in P3.
+**P2. Scan.** For each scope in scope, list its projects and scan them:
 
-**P3. Triage.** Delegate to `prune-triage` in slices of at most 150 rows: `auto: true` rows of `historical-ref`, `comment` justifications, `doc` dangling links and `config-surface` duplicates skip triage and go straight to P5, where `prune-apply` runs the skeptic pass itself. Every other row is triaged. The worker returns one JSONL line per row with one of three outcomes:
+```bash
+bash .agents/skills/audit/scripts/prune.sh scan all \
+  $(bash .agents/skills/audit/scripts/config.sh scopes | jq -r --arg s "<scope>" 'select(.scope == $s) | .projects[]') \
+  > .putnami/audit/prune/<scope>.jsonl
+```
+
+`--typology` narrows the first argument. The script emits candidates, not findings: every `auto: false` row needs a reading, and every `auto: true` row still gets a skeptic pass: in P3 for `dead` and `palliative`, in P5 for the rest.
+
+**P3. Triage.** Delegate to `prune-triage` in slices of at most 150 rows: `auto: true` rows of `historical-ref`, `comment` (justifications) and `doc` (dangling links) skip triage and go straight to P5, where `prune-apply` runs the skeptic pass itself. Every other row is triaged. The worker returns one JSONL line per row with one of three outcomes:
 - **apply** — the evidence is complete. A `dead` export with zero references in every consumer repository, a comment that explains history, a link to nothing. These are applied in P5 without asking.
 - **verdict** — the removal is right but the choice is the owner's: which copy survives, which branch of a dual path, whether an ADR still describes the product. These become rows in the umbrella issue.
 - **drop** — a false positive. Name why in one line (interface implementation, extension binary consumed by manifest, symbol reached by reflection or by a JSON key). Dropped rows are listed at the bottom of the umbrella issue so the next wave does not re-read them.
 
-Triage rules per typology: a Go method with no caller by name is checked against the interfaces of its package before deletion. An export used only by samples or templates counts as unused: samples follow the framework, not the reverse. For `duplicate`, the surviving copy is the one in the lowest module both consumers already import; if no such module exists, the finding stays a verdict. For `multi-version`, the newer path survives by default; the row says which files carry the old one. For `comment`, keep the one sentence that states the contract and delete the rest; a lint escape becomes either a code change or a rule change in `biome.json` or `.golangci.yml`, never a longer comment. For `palliative`, the row names the incident, states whether the root cause is still reachable, and estimates the fix in files; the owner picks fix, delete or keep.
+Triage rules per typology live in the `prune-triage` worker. An export used only by samples or templates counts as unused: samples follow the code they demonstrate, not the reverse.
 
-**P4. One umbrella issue per domain.** Title `[prune] <domain>`, labels `type/task`, `scope/<d>`, `source/audit`, `status/confirmed`, `<project-labels>`. The body is regenerated on every batch with `gh issue edit --body`, never appended: a counts table (applied / verdict / dropped per typology, LoC delta so far), then one verdict table per typology with a checkbox per row (`- [ ] path — one-line choice`), then the observations (modules, god files), then the dropped list. The owner ticks a row to approve it and writes the choice on the same line when there are two. The issue is the decision surface; the PR is the delivery surface. No per-finding issue, ever.
+**P4. One umbrella issue per scope.** Title `[prune] <scope>`, labels: the scope label (`config.sh label <scope>`), `source/audit`, `status/confirmed`, `<project-labels>`, plus the issue type the profile names for maintenance work. The body is regenerated on every batch with `gh issue edit --body`, never appended: a counts table (applied / verdict / dropped per typology, LoC delta so far), then one verdict table per typology with a checkbox per row (`- [ ] path — one-line choice`), then the observations (modules, god files), then the dropped list. The owner ticks a row to approve it and writes the choice on the same line when there are two. The issue is the decision surface; the proposal is the delivery surface. No per-finding issue, ever. Under `--dry-run`, print the body instead of creating or editing the issue, then go to P6.
 
-**P5. One batch branch per domain.** Branch `prune/<domain>` from `origin/main`, draft PR opened at the first commit and kept open while batches land. One commit per typology, in the order `dead`, `multi-version`, `duplicate`, `palliative`, `test-scaffold`, `comment`, `historical-ref`, `config-surface`, `doc`: deletions first, so later typologies do not touch files that are about to go. Domains run in parallel; typologies within a domain run in sequence, because they touch the same files.
+**P5. One batch branch per scope.** Only with `--apply`; without it, go to P6 once the umbrella issue is current. Branch `prune/<scope>` from `origin/main`, a draft proposal opened at the first commit and kept open while batches land. One commit per typology, in the order `dead`, `multi-version`, `duplicate`, `palliative`, `test-scaffold`, `comment`, `historical-ref`, `config-surface`, `doc`: deletions first, so later typologies do not touch files that are about to go. Scopes run in parallel; typologies within a scope run in sequence, because they touch the same files.
 
-Each commit message names what it deletes, in English (D-002, D-003). The type is `refactor`, a Conventional Commit type, because a prune keeps behavior; a typology that drops a published export uses `refactor(<domain>)!`:
+Each commit message names what it deletes, in English. The type is `refactor`, a Conventional Commit type, because a prune keeps behavior; a typology that drops a published export uses `refactor(<scope>)!`:
 
 ```
-refactor(<domain>): prune <typology> — <N> removals
+refactor(<scope>): prune <typology> — <N> removals
 
 Deletes: <package or file list, or "exports: A, B, C in pkg">
 Keeps: <the surviving copy or path, when a verdict chose one>
@@ -669,56 +484,27 @@ Verdicts: #<umbrella> rows <ids>
 
 Edits are delegated to `prune-apply`, one call per typology, with the `apply` rows and the ticked verdict rows as its input. The worker edits and runs the `--projects` gate; the orchestrator reads its `Deletes:` block into the commit message, verifies the gate record it names, and commits. Rows the worker escalates go back to the umbrella issue as verdicts.
 
-Gate cadence, the expensive part, is what makes batches cheaper than PRs:
-- after each commit: `./putnamiw lint,test,build --projects <changed projects>`; a red here is fixed in the same commit, never carried;
-- before ready-for-review, once: `./putnamiw lint,test,build,validate --impacted --enforce-coverage`; a load flake is re-run alone with `--retry-failed`, never waited out with a timeout;
-- no `/fix` finalizer, no per-finding session.
+Gate cadence, the expensive part, is what makes batches cheaper than one proposal per finding:
+- after each commit: `putnami lint,test,build --projects <changed projects>` (`./putnamiw` when the workspace has one); a red here is fixed in the same commit, never carried;
+- before ready-for-review, once: `putnami lint,test,build,validate --impacted --enforce-coverage`; a load flake is re-run alone with `--retry-failed`, never waited out with a timeout;
+- no per-finding session.
 
-At the start of every batch, re-read the umbrella issue: ticked verdict rows join the next commit of their typology. The PR is marked ready when every typology has had its pass and no verdict row is left open, or when the owner says ship. The PR body lists the deletions per typology with the LoC delta from `git diff --shortstat origin/main...`, links the umbrella issue, and closes it on merge.
+At the start of every batch, re-read the umbrella issue: ticked verdict rows join the next commit of their typology. The proposal is marked ready when every typology has had its pass and no verdict row is left open, or when the owner says ship. Its body lists the deletions per typology with the LoC delta from `git diff --shortstat origin/main...`, links the umbrella issue, and closes it on merge.
 
-**P6. Summary.** Print, per domain: candidates, applied, verdict (open / ticked), dropped, LoC delta, PR URL, umbrella issue URL. A prune typology that fired in three or more domains is a rule waiting to exist: draft it for `.agents/constraints.md` or a lint rule in the summary, and ask before filing (step 6 above applies).
+**P6. Summary.** Print, per scope: candidates, applied, verdict (open / ticked), dropped, LoC delta, proposal URL, umbrella issue URL. A prune typology that fired in three or more scopes is a rule waiting to exist: draft it for the repository constraints or a lint rule in the summary, and follow step 6 for filing.
 
 ## Parallel runs
 
-A full workspace audit can be split across multiple backgrounded Claude Code or
-Codex sessions, one per `(domain, group)` slice. The orchestrator script lives
-at `.agents/skills/audit/scripts/fleet.sh` and computes its slice matrix from
-the domains that `domains.sh` reads from the workspace's top-level scopes.
+A full workspace audit may split independent `(scope, group)` slices across bounded subagents when collaboration tools are available. On Claude Code, `bash .agents/skills/audit/scripts/fleet.sh` runs them as background `claude -p` sessions and performs the scorecard post-pass.
 
-### How slicing works
+- A scope with **≤4 projects** runs as one combined shard (`$audit --scope <s> --skip-scorecard`).
+- A scope with **>4 projects** is split per group (`$audit --scope <s> --group <g> --skip-scorecard`) in priority order.
+- Never exceed the session's available collaboration slots; keep one slot for the root orchestrator.
 
-The matrix is computed from each domain's project count:
+Shards use `--skip-scorecard` because the scorecards are the shared write surface. The root orchestrator runs `scorecard.sh` once after every shard exits. Each (project, group) pair belongs to exactly one shard and gets its own attestation file.
 
-- A domain with **≤6 projects** runs as **one combined shard** (`/audit --domain <d> --skip-scorecard`) — all groups for that domain in a single agent.
-- A domain with **>6 projects** is **split per group** (`/audit --domain <d> --group <g> --skip-scorecard`) — one agent per group, launched in group priority order.
+### When to use which
 
-For today's scopes that yields 26 slices: `python` (5 projects) and `sites` (2) as single shards; `go` (38), `protocols` (39), `tooling` (11) and `typescript` (35) each split into 6 group shards. `fleet.sh --dry-run` prints the current matrix with each domain's project count.
-
-### Why `--skip-scorecard`
-
-Scorecards (the `[scorecard] … Health` issues) are the only shared write surface across shards. Letting each shard refresh them would race. Shards skip the refresh; the orchestrator runs `scorecard.sh` once after all shards exit — a plain script, no model session needed. Attestation writes never race: each (project, group) pair belongs to exactly one shard and gets its own file under `.putnami/audit/attestations/`.
-
-### Dispatch
-
-```bash
-.agents/skills/audit/scripts/fleet.sh --host claude # Claude Code fleet
-.agents/skills/audit/scripts/fleet.sh --host codex  # GPT-6 Astra fleet
-.agents/skills/audit/scripts/fleet.sh --dry-run     # print the matrix only
-.agents/skills/audit/scripts/fleet.sh --domain go   # only the 6 go slices
-.agents/skills/audit/scripts/fleet.sh --group security
-.agents/skills/audit/scripts/fleet.sh --max-parallel 6
-.agents/skills/audit/scripts/fleet.sh --no-cache
-.agents/skills/audit/scripts/fleet.sh --skip-scorecard-pass
-```
-
-Each shard uses the selected host CLI and writes stdout and stderr under
-`.audit-runs/<timestamp>/`. Codex shards explicitly request
-`gpt-6-astra` at xhigh effort and fail preflight when the installed CLI does
-not expose that model. The final `summary.txt` lists per-slice exit status and
-points to any failed shard's log.
-
-### When to run the parallel mode vs the single-process `/audit`
-
-- **`/audit --impacted`** — fast, default for routine work; only re-audits projects touched on the current branch.
-- **`/audit --domain <d>`** — one domain end-to-end in a single session; use when you want to read the audit live.
-- **`fleet.sh`** — full workspace refresh, or any time the matrix would take > ~30 minutes serially. Attestations make re-runs cheap: shards skip every (project, group) pair whose content hasn't changed since its last scan, so a routine fleet run re-reads the drift, not the world. Reserve `--no-cache` for rubric changes (new properties, changed thresholds) where old attestations no longer mean "clean".
+- **`$audit --impacted`** — fast, default for routine work; only re-audits touched projects.
+- **`$audit --scope <s>`** — one scope end-to-end, live in the session.
+- **Parallel shards** — full-workspace refresh; attestations keep re-runs bounded to changed inputs. Reserve `--no-cache` for intentional full hygiene waves.

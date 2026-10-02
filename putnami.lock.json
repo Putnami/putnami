@@ -38,6 +38,14 @@
       },
       "manifestHash": "c42448072f686fd52222c7904651b4f48423dd9f20cf7b358dbf6db6f12306f2",
       "source": "https://put.putnami.dev/putnami/cloud/download?channel=0.0.0-20261001113948-7b0d372db"
+    },
+    "@putnami/intelligence": {
+      "version": "0.0.0-20261002155126-05f5df1b2",
+      "integrities": {
+        "darwin/arm64": "905c4b151735c5fdbcd0445790b212b30e0a71cd2d8d0738d84e7407c46f34b1"
+      },
+      "manifestHash": "f2bdad9498ea77bab5a6ae9744b064c191f0942146af8839d11ed3971b098034",
+      "source": "https://put.putnami.dev/putnami/intelligence/download?channel=0.0.0-20261002155126-05f5df1b2"
     }
   },
   "templates": {}

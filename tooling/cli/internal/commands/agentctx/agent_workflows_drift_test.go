@@ -17,11 +17,11 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
-// handAuthoredAgentTrees are the paths under the host trees this repository
-// writes by hand. The audit skill and its prune-* workers are the one exception
-// to "the host trees are generated" (.agents/constraints.md, "Agent
-// Workflows").
-var handAuthoredAgentTrees = []string{
+// publishedAgentTrees are the paths under the host trees that a published
+// extension's agent content owns: the audit skill and its prune-* workers come
+// from @putnami/intelligence, which no local source builds (.agents/constraints.md,
+// "Agent Workflows").
+var publishedAgentTrees = []string{
 	".agents/skills/audit/",
 	".claude/skills/audit/",
 	".claude/agents/prune-",
@@ -87,7 +87,7 @@ func TestLocalAgentContentMatchesCommittedRoot(t *testing.T) {
 				return err
 			}
 			rel = filepath.ToSlash(rel)
-			for _, prefix := range handAuthoredAgentTrees {
+			for _, prefix := range publishedAgentTrees {
 				if strings.HasPrefix(rel, prefix) {
 					return nil
 				}
