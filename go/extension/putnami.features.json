@@ -165,6 +165,24 @@
           }
         },
         {
+          "id": "api-compatibility-marker",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-incompatible-change-without-a-marker-fails-naming-package-and-symbol",
+              "a-breaking-marker-since-the-tag-allows-the-change",
+              "a-preview-or-experimental-project-is-not-checked",
+              "a-line-without-a-reachable-tag-passes",
+              "an-addition-is-compatible",
+              "renamed-parameters-are-compatible"
+            ]
+          }
+        },
+        {
           "id": "managed-toolchain",
           "stage": "coded",
           "evidenceKinds": [

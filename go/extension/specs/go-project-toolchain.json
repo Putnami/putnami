@@ -112,6 +112,10 @@
       "text": "Linting several projects in one invocation produces the diagnostics a solo run produces, attributes each to the longest matching project root, and never groups projects from distinct go.work roots together."
     },
     {
+      "id": "api-compatibility-marker",
+      "text": "Validate holds the breaking-change marker for every Go project the root support catalog lists as stable or does not list: an incompatible change to the exported API since the last tag of the project's line fails, naming the package and the symbol, unless a commit since that tag that touches the project declares it with \"!\" or a BREAKING CHANGE: footer. Additions and renamed parameters are compatible; a preview or experimental project, and a line with no reachable tag, are not checked."
+    },
+    {
       "id": "image-input-producers",
       "text": "Image packaging materializes the project's declared build producers before assembly, including when the image is selected through an upstream package dependency; it does not enter Go compiler steps for an image project."
     },

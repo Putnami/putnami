@@ -19,6 +19,7 @@ require (
 	go.putnami.dev/protocol/job v0.0.0
 	go.putnami.dev/protocol/registry v0.0.0
 	go.putnami.dev/protocol/runtime v0.0.0
+	go.putnami.dev/protocol/support v0.0.0
 	go.putnami.dev/protocol/workspace v0.0.0
 	golang.org/x/mod v0.36.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -80,5 +81,7 @@ replace go.putnami.dev/protocol/storage => ../../protocols/storage
 replace go.putnami.dev/protocol/extension => ../../protocols/extension
 
 replace go.putnami.dev/protocol/workspace => ../../protocols/workspace
+
+replace go.putnami.dev/protocol/support => ../../protocols/support
 
 replace go.putnami.dev/protocol/architecture => ../../protocols/architecture
