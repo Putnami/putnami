@@ -1173,7 +1173,7 @@
       "declares": {}
     },
     "validate-api": {
-      "description": "API compatibility check of one Go project against its version line's last reachable tag: the exported functions, types, methods, fields, interface methods, variables and constants of every importable package, read from source with go/parser and no type-checking. A preview or experimental project is skipped. UNCACHEABLE on purpose: the verdict reads the line's git tags, the files at the last one, and the messages of the commits since, and no file-pattern key covers git history, so a key would serve a stale verdict after a new tag or a new commit. The check starts no tool other than git.",
+      "description": "API compatibility check of one Go project against its version line's last reachable tag: the exported functions, types, methods, fields, interface methods, variables and constants of every importable package, read from source with go/parser and no type-checking. When the workspace has a support catalog, only a project it lists as stable is checked; a preview, experimental or unlisted project is skipped. UNCACHEABLE on purpose: the verdict reads the line's git tags, the files at the last one, and the messages of the commits since, and no file-pattern key covers git history, so a key would serve a stale verdict after a new tag or a new commit. The check starts no tool other than git.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["validate-api"],

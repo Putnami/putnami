@@ -42,10 +42,11 @@ func SupportSubjectOf(project *Project) (supportproto.SubjectKind, string) {
 // touch a project the root support catalog lists as stable?
 //
 // When a catalog exists, it is the authority: a commit counts as stable only
-// when a file it changes belongs to a project the catalog lists as `stable`. A
-// preview or experimental project promises no compatibility, and neither does a
-// project the catalog does not list or a file no project owns, so a commit that
-// touches only those advances a patch at most.
+// when a file it changes belongs to a project the catalog lists as `stable`, or
+// to an unlisted project a stable one depends on, since that code ships inside
+// the stable product. A preview or experimental project promises no
+// compatibility, and neither does any other unlisted project or a file no
+// project owns, so a commit that touches only those advances a patch at most.
 //
 // A workspace with no catalog returns a nil test, which reads every commit as
 // stable. An unreadable or invalid catalog is an error: reading it as absent
@@ -65,33 +66,67 @@ func StableChangeTest(ws *Workspace) (git.StableTest, error) {
 	if catalog == nil || diag.HasErrors(findings) {
 		return nil, fmt.Errorf("%s is invalid: %s", supportproto.CatalogFilename, diag.ErrorText(findings))
 	}
-	stable := make(map[supportSubject]bool, len(catalog.Entries))
-	for _, entry := range catalog.Entries {
-		if entry.Status == supportproto.StatusStable {
-			stable[supportSubject{kind: entry.Kind, id: entry.ID}] = true
-		}
-	}
+	promised := promisedProjects(ws, catalog)
 	// A path's owners are the same for every commit, and each lookup rebuilds
 	// the owner index, so a path is looked up once per test. The test is
 	// therefore not safe for concurrent use.
 	ownedByStable := make(map[string]bool)
 	return func(files []string) bool {
 		for _, file := range files {
-			promised, seen := ownedByStable[file]
+			owned, seen := ownedByStable[file]
 			if !seen {
 				for _, owner := range ProjectOwnersForPath(ws, file) {
-					kind, id := SupportSubjectOf(owner)
-					if stable[supportSubject{kind: kind, id: id}] {
-						promised = true
+					if promised[owner.ID] {
+						owned = true
 						break
 					}
 				}
-				ownedByStable[file] = promised
+				ownedByStable[file] = owned
 			}
-			if promised {
+			if owned {
 				return true
 			}
 		}
 		return false
 	}, nil
+}
+
+// promisedProjects are the IDs of the projects whose changes may move a line
+// past a patch: those the catalog lists as stable, and every project the catalog
+// does not list that one of them depends on, directly or through other unlisted
+// projects. A listed dependency keeps its own status.
+func promisedProjects(ws *Workspace, catalog *supportproto.Catalog) map[string]bool {
+	status := make(map[supportSubject]supportproto.Status, len(catalog.Entries))
+	for _, entry := range catalog.Entries {
+		status[supportSubject{kind: entry.Kind, id: entry.ID}] = entry.Status
+	}
+	statusOf := func(project *Project) (supportproto.Status, bool) {
+		kind, id := SupportSubjectOf(project)
+		value, listed := status[supportSubject{kind: kind, id: id}]
+		return value, listed
+	}
+	promised := make(map[string]bool)
+	var queue []*Project
+	for _, project := range ws.Projects {
+		if value, _ := statusOf(project); value == supportproto.StatusStable {
+			promised[project.ID] = true
+			queue = append(queue, project)
+		}
+	}
+	for len(queue) > 0 {
+		project := queue[0]
+		queue = queue[1:]
+		for _, name := range project.Dependencies {
+			dependency := ws.ProjectByName(name)
+			if dependency == nil || promised[dependency.ID] {
+				continue
+			}
+			if _, listed := statusOf(dependency); listed {
+				continue
+			}
+			promised[dependency.ID] = true
+			queue = append(queue, dependency)
+		}
+	}
+	return promised
 }

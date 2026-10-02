@@ -51,8 +51,8 @@ feature shipped in a minor would stop every automatic upgrade for nothing to
 migrate; `putnami version` proposes a patch for it.
 
 The table holds for the projects `putnami.support.json` lists as `stable`. A
-`preview` or `experimental` project, or one the catalog does not list, promises
-no compatibility, so its changes, breaking ones included, ship in a patch; a
+`preview` or `experimental` project, or one the catalog does not list and no
+stable project depends on, promises no compatibility, so its changes, breaking ones included, ship in a patch; a
 breaking one still names its migration in the release notes.
 
 ## Release checklist

@@ -21,6 +21,7 @@ func TestVersionTagBumpFollowsTheSupportCatalog(t *testing.T) {
 		name, last, subject string
 		files               []string
 		noCatalog           bool
+		webDependsOnKit     bool
 		want                string
 	}{
 		{name: "breaking in an experimental project is a patch", last: "0.4.0",
@@ -39,6 +40,8 @@ func TestVersionTagBumpFollowsTheSupportCatalog(t *testing.T) {
 			subject: "feat(lab)!: drop the flag", files: []string{"typescript/lab/src.ts", "typescript/NOTES.md"}, want: "ts/v0.4.1"},
 		{name: "a project the catalog does not list promises nothing", last: "0.4.0",
 			subject: "feat(kit)!: drop the flag", files: []string{"typescript/kit/src.ts"}, want: "ts/v0.4.1"},
+		{name: "an unlisted project a stable one depends on counts as stable", last: "0.4.0", webDependsOnKit: true,
+			subject: "feat(kit)!: drop the flag", files: []string{"typescript/kit/src.ts"}, want: "ts/v0.5.0"},
 		{name: "a stable file outside the line does not count", last: "0.4.0",
 			subject: "feat!: drop the flag", files: []string{"typescript/lab/src.ts", "tooling/cli/main.go"}, want: "ts/v0.4.1"},
 		{name: "without a catalog every commit is stable", last: "0.4.0", noCatalog: true,
@@ -46,6 +49,12 @@ func TestVersionTagBumpFollowsTheSupportCatalog(t *testing.T) {
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			dir := supportCatalogRepo(t, !testCase.noCatalog)
+			if testCase.webDependsOnKit {
+				writeRepoFile(t, dir, "typescript/web/"+wsproto.ConfigFilename,
+					`{"name": "@putnami/web", "dependencies": ["@putnami/kit"]}`)
+				gitInRepo(t, dir, "add", "-A")
+				gitInRepo(t, dir, "commit", "-m", "chore: web uses kit")
+			}
 			gitInRepo(t, dir, "tag", "-a", "ts/v"+testCase.last, "-m", "release")
 			for _, file := range testCase.files {
 				writeRepoFile(t, dir, file, "export const changed = true\n")

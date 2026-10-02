@@ -27,6 +27,11 @@ When a catalog exists, it is the authority: only what it lists as stable is
 checked, and a skipped project says why in an information line. A workspace
 without a catalog has made no statement, so every project is checked.
 
+The version bump also counts an unlisted project that a stable project depends
+on as stable, because its code ships inside the stable product. This check does
+not: it guards the API a project publishes, and an unlisted project publishes
+none. A breaking change there still needs its marker for the bump.
+
 A project is looked up as a `protocol` subject when it carries the `protocol`
 tag, and as a `package` subject otherwise, under its project name. The tags
 are the project's own `tags` in `putnami.json`, else the tags of its scopes; an

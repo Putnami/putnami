@@ -42,7 +42,7 @@
     },
     {
       "id": "D-005",
-      "statement": "with a support catalog, only a commit that touches a project the catalog lists as stable advances its version line past a patch; unlisted projects and unowned files promise nothing",
+      "statement": "with a support catalog, only a commit that touches a project the catalog lists as stable, or an unlisted project a stable one depends on, advances its version line past a patch",
       "settled": "2026-10-02",
       "settledBy": "fdumay",
       "reviewOnly": true
