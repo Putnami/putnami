@@ -156,6 +156,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/sdd-extension",
+          "producerProject": "/protocols/put"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/sdd-extension",
           "producerProject": "/protocols/registry"
         },
         {

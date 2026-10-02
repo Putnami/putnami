@@ -18,7 +18,8 @@
 // managed npm rules (ManagedNPMRegistry) and an OCI member names its registry
 // host; the engine refuses one that the project's registries declaration
 // contradicts, and sends a bearer only to a host the provider's credential
-// serves.
+// serves. A put or archive member names no registry: the engine uploads it to
+// the project's Put registry.
 
 package extension
 
@@ -76,12 +77,20 @@ const (
 	MaxOutboxGoModBytes = 16 << 20
 	// MaxOutboxGoInfoBytes bounds a Go module .info file.
 	MaxOutboxGoInfoBytes = 64 << 10
+	// MaxOutboxPutManifestBytes bounds the manifest payload of a put block.
+	MaxOutboxPutManifestBytes = 4 << 20
+	// MaxOutboxPutBlobBytes bounds one blob of a put block.
+	MaxOutboxPutBlobBytes = 512 << 20
+	// MaxOutboxPutBlobs bounds the blobs of one put block.
+	MaxOutboxPutBlobs = 32
+	// MaxOutboxMediaTypeBytes bounds a media type of a put block.
+	MaxOutboxMediaTypeBytes = 255
 )
 
 // maxOutboxDepth bounds the container nesting of a descriptor: the root
-// object is 0, the members array 1, a member 2, its ecosystem block 3, and an
-// artifact file or the tags array 4.
-const maxOutboxDepth = 4
+// object is 0, the members array 1, a member 2, its ecosystem block 3, an
+// artifact file, the tags array or the blobs array 4, and a blob 5.
+const maxOutboxDepth = 5
 
 // The ecosystems an outbox member may belong to. Each names the one block the
 // member carries.
@@ -89,6 +98,12 @@ const (
 	OutboxEcosystemNPM = "npm"
 	OutboxEcosystemGo  = "go"
 	OutboxEcosystemOCI = "oci"
+	// OutboxEcosystemPut is a member of the Put registry that is not a release
+	// archive: a config, a migration or a doc member. It carries the put block.
+	OutboxEcosystemPut = "put"
+	// OutboxEcosystemArchive is a release archive on the Put registry. It
+	// carries the put block.
+	OutboxEcosystemArchive = "archive"
 )
 
 // PublicationOutbox is the descriptor a publication job writes at the root of
@@ -103,13 +118,15 @@ type PublicationOutbox struct {
 }
 
 // OutboxMember is one managed release-set member and the artifacts that
-// publish it. Exactly one of NPM, Go and OCI is set, the one Ecosystem names.
+// publish it. Exactly one block is set: NPM, Go or OCI for the ecosystem of
+// that name, Put for OutboxEcosystemPut and OutboxEcosystemArchive.
 type OutboxMember struct {
-	// Ecosystem is OutboxEcosystemNPM, OutboxEcosystemGo or OutboxEcosystemOCI.
+	// Ecosystem is OutboxEcosystemNPM, OutboxEcosystemGo, OutboxEcosystemOCI,
+	// OutboxEcosystemPut or OutboxEcosystemArchive.
 	Ecosystem string `json:"ecosystem"`
 	// Coordinate is the member's coordinate in the release-set plan: the npm
-	// package name, the complete Go module path, or the OCI repository path
-	// without its registry host.
+	// package name, the complete Go module path, the OCI repository path
+	// without its registry host, or the Put "<namespace>/<package>".
 	Coordinate string `json:"coordinate"`
 	// Version is the member's planned version.
 	Version string `json:"version"`
@@ -121,6 +138,8 @@ type OutboxMember struct {
 	Go *OutboxGo `json:"go,omitempty"`
 	// OCI is the image layout of an OCI member.
 	OCI *OutboxOCI `json:"oci,omitempty"`
+	// Put is the immutable version of a put or archive member.
+	Put *OutboxPut `json:"put,omitempty"`
 }
 
 // OutboxFile is one regular file inside the outbox.
@@ -174,6 +193,43 @@ type OutboxOCI struct {
 	Tags []string `json:"tags,omitempty"`
 }
 
+// OutboxPut is one immutable version on the Put registry, in the Put write
+// protocol (go.putnami.dev/protocol/put): the blobs it references, uploaded
+// first, and the manifest the version publishes.
+type OutboxPut struct {
+	// MediaType is the media type the manifest is published with.
+	MediaType string `json:"mediaType"`
+	// Manifest is the manifest payload: one JSON object, in the canonical form
+	// the registry stores, at most MaxOutboxPutManifestBytes.
+	Manifest OutboxFile `json:"manifest"`
+	// Blobs are the blobs the manifest references, at most MaxOutboxPutBlobs,
+	// each digest once. Absent or empty uploads none.
+	Blobs []OutboxPutBlob `json:"blobs,omitempty"`
+}
+
+// OutboxPutBlob is one blob of a put block: a regular file inside the outbox
+// and the media type it is uploaded with.
+type OutboxPutBlob struct {
+	// Path is relative to the outbox root, in the form ValidOutboxPath accepts.
+	Path string `json:"path"`
+	// Digest is "sha256:" and the 64 lowercase hex characters of the file's
+	// SHA-256.
+	Digest string `json:"digest"`
+	// Size is the file's length in bytes, at least 1.
+	Size int64 `json:"size"`
+	// MediaType is the Content-Type the blob upload carries.
+	MediaType string `json:"mediaType"`
+}
+
+// File is the outbox file the blob names.
+func (b OutboxPutBlob) File() OutboxFile {
+	return OutboxFile{Path: b.Path, Digest: b.Digest, Size: b.Size}
+}
+
+// outboxMediaTypePattern is the lowercase "type/subtype" form of a media type
+// in a put block, without parameters.
+var outboxMediaTypePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$`)
+
 // ociTagPattern is the OCI distribution tag grammar.
 var ociTagPattern = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$`)
 
@@ -205,9 +261,10 @@ func ParsePublicationOutbox(data []byte) (*PublicationOutbox, []diag.Diagnostic)
 
 // ValidatePublicationOutbox checks every rule a descriptor answers to beyond
 // its JSON shape: the version, the member bound, each member's identity and
-// single ecosystem block, an npm member's registry, artifact paths, digests
-// and sizes, and that no two members share an identity and no two artifacts
-// share or nest a path.
+// single ecosystem block, an npm member's registry, a put block's media types
+// and blob bound, artifact paths, digests and sizes, and that no two members
+// share an identity, no two blobs of a put block share a digest and no two
+// artifacts share or nest a path.
 func ValidatePublicationOutbox(outbox *PublicationOutbox) []diag.Diagnostic {
 	if outbox == nil {
 		return []diag.Diagnostic{diag.Errorf(outboxDiagnostic, "", "publication outbox is nil")}
@@ -244,13 +301,13 @@ func ValidatePublicationOutbox(outbox *PublicationOutbox) []diag.Diagnostic {
 			identities[identity] = index
 		}
 		blocks := 0
-		for _, present := range []bool{member.NPM != nil, member.Go != nil, member.OCI != nil} {
+		for _, present := range []bool{member.NPM != nil, member.Go != nil, member.OCI != nil, member.Put != nil} {
 			if present {
 				blocks++
 			}
 		}
 		if blocks != 1 {
-			add(field, "member carries %d ecosystem blocks, want exactly the %q block", blocks, member.Ecosystem)
+			add(field, "member carries %d ecosystem blocks, want exactly the %q block", blocks, outboxBlockName(member.Ecosystem))
 		}
 		switch member.Ecosystem {
 		case OutboxEcosystemNPM:
@@ -275,9 +332,15 @@ func ValidatePublicationOutbox(outbox *PublicationOutbox) []diag.Diagnostic {
 				continue
 			}
 			paths = checkOutboxOCI(add, paths, field+".oci", member.Coordinate, *member.OCI)
+		case OutboxEcosystemPut, OutboxEcosystemArchive:
+			if member.Put == nil {
+				add(field+".put", "a member of ecosystem %q requires the put block", member.Ecosystem)
+				continue
+			}
+			paths = checkOutboxPut(add, paths, field+".put", *member.Put)
 		default:
-			add(field+".ecosystem", "ecosystem %q is not %q, %q or %q",
-				member.Ecosystem, OutboxEcosystemNPM, OutboxEcosystemGo, OutboxEcosystemOCI)
+			add(field+".ecosystem", "ecosystem %q is not %q, %q, %q, %q or %q", member.Ecosystem,
+				OutboxEcosystemNPM, OutboxEcosystemGo, OutboxEcosystemOCI, OutboxEcosystemPut, OutboxEcosystemArchive)
 		}
 	}
 	for i := range paths {
@@ -288,6 +351,14 @@ func ValidatePublicationOutbox(outbox *PublicationOutbox) []diag.Diagnostic {
 		}
 	}
 	return diags
+}
+
+// outboxBlockName is the name of the one block a member of ecosystem carries.
+func outboxBlockName(ecosystem string) string {
+	if ecosystem == OutboxEcosystemArchive {
+		return OutboxEcosystemPut
+	}
+	return ecosystem
 }
 
 // outboxPathOwner pairs an artifact path with the field that names it.
@@ -379,6 +450,37 @@ func checkOutboxOCI(add func(string, string, ...any), paths []outboxPathOwner, f
 		seen[tag] = true
 	}
 	return paths
+}
+
+// checkOutboxPut checks a put block: its media types, its manifest file, and
+// its blob files, bound and unique digests. Which media types a member kind
+// publishes and which blobs its manifest references are rules of the Put
+// write protocol, checked where the member is uploaded.
+func checkOutboxPut(add func(string, string, ...any), paths []outboxPathOwner, field string, block OutboxPut) []outboxPathOwner {
+	checkOutboxMediaType(add, field+".mediaType", block.MediaType)
+	paths = checkOutboxFile(add, paths, field+".manifest", block.Manifest, MaxOutboxPutManifestBytes)
+	if len(block.Blobs) > MaxOutboxPutBlobs {
+		add(field+".blobs", "%d blobs exceed the bound of %d", len(block.Blobs), MaxOutboxPutBlobs)
+		return paths
+	}
+	digests := map[string]int{}
+	for index, blob := range block.Blobs {
+		blobField := fmt.Sprintf("%s.blobs[%d]", field, index)
+		paths = checkOutboxFile(add, paths, blobField, blob.File(), MaxOutboxPutBlobBytes)
+		checkOutboxMediaType(add, blobField+".mediaType", blob.MediaType)
+		if previous, repeated := digests[blob.Digest]; repeated {
+			add(blobField+".digest", "digest %q repeats %s.blobs[%d]", blob.Digest, field, previous)
+		} else {
+			digests[blob.Digest] = index
+		}
+	}
+	return paths
+}
+
+func checkOutboxMediaType(add func(string, string, ...any), field, mediaType string) {
+	if len(mediaType) > MaxOutboxMediaTypeBytes || !outboxMediaTypePattern.MatchString(mediaType) {
+		add(field, "media type %q must be a lowercase type/subtype of at most %d bytes", mediaType, MaxOutboxMediaTypeBytes)
+	}
 }
 
 // validOutboxIdentity accepts a non-empty bounded value of printable,

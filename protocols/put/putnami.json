@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/protocol/put",
+  "visibility": "public",
+  "tags": ["go", "protocol"],
+  "extensions": ["/go/extension"],
+  "publish": ["go"],
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "test": {
+      "filePatterns": ["fixtures/**", "schemas/**"]
+    },
+    "publish": {
+      "archives": false
+    }
+  },
+  "featureAuthority": {
+    "none": "A registry write contract is plumbing behind the publish command of @putnami/cli."
+  }
+}

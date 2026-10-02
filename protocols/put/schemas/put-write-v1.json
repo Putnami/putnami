@@ -1,0 +1,236 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/protocol/put/put-write-v1.json",
+  "title": "Putnami Put registry write protocol put-write/v1",
+  "description": "The messages of the immutable Put registry write: a blob receipt, a publish request, a publish response, a stored manifest, and the archive manifest payload. Implementations must also enforce the rules in protocols/put/README.md that this schema cannot express: no duplicate object member and no trailing data; a manifest payload of at most 4194304 bytes of valid UTF-8 in the canonical form Go's encoding/json writes for a json.RawMessage; a version of at most 256 bytes; a publish response whose manifest id and package id equal the version's manifest_id and package_id; and an archive payload of at most 32 platforms.",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/blobReceipt"
+    },
+    {
+      "$ref": "#/definitions/publishRequest"
+    },
+    {
+      "$ref": "#/definitions/publishResponse"
+    },
+    {
+      "$ref": "#/definitions/manifest"
+    },
+    {
+      "$ref": "#/definitions/archivePayload"
+    }
+  ],
+  "definitions": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "mediaType": {
+      "type": "string",
+      "maxLength": 255,
+      "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\s/\\u0000](?:[^/\\u0000\\r\\n]*[^\\s/\\u0000])?$",
+      "not": {
+        "enum": [
+          ".",
+          ".."
+        ]
+      }
+    },
+    "coordinate": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,254}/[a-z0-9][a-z0-9._-]{0,254}$"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1
+    },
+    "payload": {
+      "type": "object",
+      "description": "The manifest payload: one JSON object in canonical form."
+    },
+    "blobReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "digest",
+        "size",
+        "media_type",
+        "created_at"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "digest": {
+          "$ref": "#/definitions/digest"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "media_type": {
+          "$ref": "#/definitions/mediaType"
+        },
+        "created_at": {
+          "$ref": "#/definitions/time"
+        }
+      }
+    },
+    "publishRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "media_type",
+        "payload"
+      ],
+      "description": "No channel, visibility or source_ref: the version is published private and no channel moves.",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/version"
+        },
+        "media_type": {
+          "$ref": "#/definitions/mediaType"
+        },
+        "payload": {
+          "$ref": "#/definitions/payload"
+        }
+      }
+    },
+    "publishResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package",
+        "version",
+        "manifest",
+        "channel"
+      ],
+      "properties": {
+        "package": {
+          "$ref": "#/definitions/coordinate"
+        },
+        "version": {
+          "$ref": "#/definitions/publishedVersion"
+        },
+        "manifest": {
+          "$ref": "#/definitions/manifest"
+        },
+        "channel": {
+          "const": null
+        }
+      }
+    },
+    "publishedVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "package_id",
+        "version",
+        "manifest_id",
+        "state",
+        "visibility",
+        "created_at"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "package_id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "version": {
+          "$ref": "#/definitions/version"
+        },
+        "manifest_id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "state": {
+          "const": "published"
+        },
+        "visibility": {
+          "const": "private"
+        },
+        "created_at": {
+          "$ref": "#/definitions/time"
+        }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "package_id",
+        "media_type",
+        "payload",
+        "created_at"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "package_id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "media_type": {
+          "$ref": "#/definitions/mediaType"
+        },
+        "payload": {
+          "$ref": "#/definitions/payload"
+        },
+        "created_at": {
+          "$ref": "#/definitions/time"
+        }
+      }
+    },
+    "archivePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifacts"
+      ],
+      "properties": {
+        "artifacts": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 32,
+          "propertyNames": {
+            "pattern": "^[a-z0-9]+-[a-z0-9]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/definitions/archiveArtifact"
+          }
+        }
+      }
+    },
+    "archiveArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "digest",
+        "size"
+      ],
+      "properties": {
+        "digest": {
+          "$ref": "#/definitions/digest"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

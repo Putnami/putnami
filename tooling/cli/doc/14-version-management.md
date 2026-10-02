@@ -206,6 +206,8 @@ It streams the platform binary and advertises `X-Resolved-Version` plus a SHA-25
 
 The CLI and the extensions are ordinary members of the release set, in the `archive` and `put` ecosystems: `publish --channel <c>` carries them into the snapshot with every other member, and the release writes the put registry's channel projection in the same transaction that advances the channel. There is no separate recipe to run afterwards.
 
+When the credential provider negotiates `publication-v1`, the publish job holds no registry credential and uploads nothing. It packs each archive into its outbox, and the engine uploads it with [`put-write/v1`](../../../protocols/put/README.md); the member's digest is the SHA-256 of the manifest the registry stores. The release is refused when a selected `archive` or `put` member has no engine upload, so a job that still uploads one itself moves no channel ([ADR 0057](adr/0057-publication-authority-stays-in-the-engine.md)).
+
 If a project builds release archives but **no** publish step uploads them (e.g. `@putnami/cloud` is not installed or failed to load), `publish` fails instead of silently shipping nothing — the gap that once stranded merged CLI fixes off the `publish → upgrade` path.
 
 ### Pre-release version shape

@@ -65,6 +65,7 @@ replace (
 	go.putnami.dev/protocol/migration => ../../protocols/migration
 	go.putnami.dev/protocol/oci => ../../protocols/oci
 	go.putnami.dev/protocol/platform => ../../protocols/platform
+	go.putnami.dev/protocol/put => ../../protocols/put
 	go.putnami.dev/protocol/registry => ../../protocols/registry
 	go.putnami.dev/protocol/runtime => ../../protocols/runtime
 	go.putnami.dev/protocol/storage => ../../protocols/storage

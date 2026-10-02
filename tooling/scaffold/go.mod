@@ -30,6 +30,8 @@ replace (
 
 replace go.putnami.dev/protocol/oci => ../../protocols/oci
 
+replace go.putnami.dev/protocol/put => ../../protocols/put
+
 replace go.putnami.dev/protocol/registry => ../../protocols/registry
 
 replace go.putnami.dev/protocol/extension => ../../protocols/extension

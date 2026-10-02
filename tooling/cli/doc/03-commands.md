@@ -143,7 +143,7 @@ Members are keyed by `(ecosystem, coordinate)`, not by project: one project yiel
 
 The channels are resolved exactly once and never again. The run's `data.releaseSet` outcome carries the exact `{id, digest}` and the head each channel now points at, with its generation. A compare-and-swap conflict on **any** channel writes nothing on any of them: the publication fails naming every head whose observed ref differs from the expectation, and re-running the publish plans against the current heads. A plan that selects nothing still releases: the provider answers `already-current` and the outcome names the unchanged heads.
 
-A credential provider that negotiates `publication-v1` takes the release-set provider's place: it resolves and releases over its session, and the engine uploads every npm, Go module and OCI member; see [`--providers`](#credential-provider---providers).
+A credential provider that negotiates `publication-v1` takes the release-set provider's place: it resolves and releases over its session, and the engine uploads every npm, Go module, OCI and Put registry member; see [`--providers`](#credential-provider---providers).
 
 Without a release-set provider, `putnami publish --all` still publishes every member to the registries the workspace declares, with git-derived versions. `--channel` is refused, and `distribution` and `envs` in `putnami.ci.json` fail `putnami ci validate`.
 
@@ -1269,11 +1269,19 @@ publish runs through that one session
    shared with another run, packed nothing in this run, so the release refuses
    the run and names the job.
 4. The engine hashes every packed file again, refuses a member the plan does
-   not assign to that job, and uploads each npm, Go module and OCI member
-   itself with the `publish` credential. Each upload node reports one
-   `published-member` event in the session.
+   not assign to that job, and uploads each npm, Go module, OCI and Put
+   registry member itself with the `publish` credential. Each upload node
+   reports one `published-member` event in the session.
 5. The engine releases the set over the same session. A refusal names its code
    and moves no channel.
+
+A Put registry member is a release archive (ecosystem `archive`) or a config,
+migration or site-content member (ecosystem `put`). The engine uploads its
+blobs and its manifest to the project's `registries.put.registry`, else the
+default Put registry, with [`put-write/v1`](../../../protocols/put/README.md),
+which moves no channel. Its digest is the SHA-256 of the manifest payload the
+registry stores. The engine refuses the release when a selected Put registry
+member has no engine upload, or when a job reports one itself.
 
 The plan names the commit, its members and the channel heads, and nothing of
 the run that opens it, so a local run and a hosted run of one commit open the

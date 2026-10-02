@@ -8,7 +8,8 @@
     "A run whose credential provider negotiates publication-v1 resolves, opens, uploads and releases through that one session, and no repository process holds a publish credential"
   ],
   "nonGoals": [
-    "Uploading a member of an ecosystem other than npm, Go modules and OCI images under publication-v1; such a plan is refused before it opens"
+    "Uploading under publication-v1 a member of an ecosystem other than npm, Go modules, OCI images and the Put registry, or a Put registry member of a kind put-write/v1 does not publish; such a plan is refused before it opens",
+    "Running a migration's data acceptance or moving a site-content channel at upload; the provider's release does both"
   ],
   "requirements": [
     {
@@ -25,7 +26,11 @@
     },
     {
       "id": "uploads-run-in-the-engine",
-      "text": "Under publication-v1 a publication job gets a private 0700 outbox and no credential, credential descriptor or registry route. An engine upload node re-hashes the outbox, refuses a member, version or project the plan does not assign, asks the publish credential of the member's registry and uploads the npm tarball, Go zip or OCI layout itself, with published-image.json and one published-member event per upload. No descriptor means nothing packed. A reused publication job packed nothing; the release refuses."
+      "text": "Under publication-v1 a publication job gets a private 0700 outbox and no credential, credential descriptor or registry route. An engine upload node re-hashes the outbox, refuses a member, version or project the plan does not assign, asks the publish credential of the member's registry and uploads each packed artifact itself, with published-image.json and one published-member event per upload. No descriptor means nothing packed. A reused publication job packed nothing; the release refuses."
+    },
+    {
+      "id": "put-registry-members-upload-in-the-engine",
+      "text": "Under publication-v1 the engine uploads a put or archive member (config, migration, doc or release archive) to the project's registries.put registry, else the default, with put-write/v1. It checks the manifest media type, canonical payload and blob references before asking the publish credential, uploads the blobs, then publishes a private version with no channel. Its digest is the SHA-256 of the stored payload; an archive adds platforms. A put or archive member no upload node published fails the release."
     },
     {
       "id": "bound-requests-publish-through-the-provider",

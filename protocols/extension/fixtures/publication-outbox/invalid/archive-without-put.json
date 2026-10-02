@@ -1,0 +1,16 @@
+{
+  "protocolVersion": 1,
+  "members": [
+    {
+      "ecosystem": "archive",
+      "coordinate": "acme/widget",
+      "version": "1.2.3",
+      "project": "/tooling/widget",
+      "oci": {
+        "layout": "oci/widget",
+        "repository": "oci.acme.dev/acme/widget",
+        "digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    }
+  ]
+}

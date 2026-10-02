@@ -203,6 +203,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli",
+          "producerProject": "/protocols/put"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli",
           "producerProject": "/protocols/qualify"
         },
         {
@@ -359,6 +364,11 @@
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/platform"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/put"
         },
         {
           "kind": "project-dependency",

@@ -1,0 +1,91 @@
+{
+  "protocolVersion": 1,
+  "members": [
+    {
+      "ecosystem": "archive",
+      "coordinate": "acme/widget",
+      "version": "1.2.3",
+      "project": "/tooling/widget",
+      "put": {
+        "mediaType": "application/vnd.putnami.archive+json",
+        "manifest": {
+          "path": "put/widget/manifest.json",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "size": 210
+        },
+        "blobs": [
+          {
+            "path": "put/widget/widget-darwin-arm64.tar.gz",
+            "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "size": 4096,
+            "mediaType": "application/gzip"
+          },
+          {
+            "path": "put/widget/widget-linux-amd64.tar.gz",
+            "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+            "size": 4100,
+            "mediaType": "application/gzip"
+          }
+        ]
+      }
+    },
+    {
+      "ecosystem": "put",
+      "coordinate": "acme/api-config",
+      "version": "1.2.3",
+      "project": "/go/api",
+      "put": {
+        "mediaType": "application/vnd.putnami.config.authored-member+json",
+        "manifest": {
+          "path": "put/api-config/manifest.json",
+          "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "size": 512
+        }
+      }
+    },
+    {
+      "ecosystem": "put",
+      "coordinate": "acme/api-migrations",
+      "version": "1.2.3",
+      "project": "/go/api",
+      "put": {
+        "mediaType": "application/vnd.putnami.data.migration.v2+json",
+        "manifest": {
+          "path": "put/api-migrations/manifest.json",
+          "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "size": 640
+        },
+        "blobs": [
+          {
+            "path": "put/api-migrations/bundle.tar",
+            "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+            "size": 10240,
+            "mediaType": "application/vnd.putnami.migration-bundle.v1.tar"
+          }
+        ]
+      }
+    },
+    {
+      "ecosystem": "put",
+      "coordinate": "cloud/doc-contents-platform",
+      "version": "0a1b2c3d4e5f",
+      "project": "/docs/putnami.dev",
+      "put": {
+        "mediaType": "application/vnd.putnami.sitecontent.bundle+json",
+        "manifest": {
+          "path": "put/doc-contents-platform/manifest.json",
+          "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "size": 900
+        },
+        "blobs": [
+          {
+            "path": "put/doc-contents-platform/bundle.tar.gz",
+            "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+            "size": 20480,
+            "mediaType": "application/gzip"
+          }
+        ]
+      }
+    }
+  ]
+}

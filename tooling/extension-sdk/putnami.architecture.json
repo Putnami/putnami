@@ -119,6 +119,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/extension-sdk",
+          "producerProject": "/protocols/put"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/extension-sdk",
           "producerProject": "/protocols/registry"
         },
         {

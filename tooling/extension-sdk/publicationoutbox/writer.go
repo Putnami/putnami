@@ -294,6 +294,12 @@ func memberFiles(member extproto.OutboxMember) []extproto.OutboxFile {
 	if member.Go != nil {
 		files = append(files, member.Go.Zip, member.Go.Mod, member.Go.Info)
 	}
+	if member.Put != nil {
+		files = append(files, member.Put.Manifest)
+		for _, blob := range member.Put.Blobs {
+			files = append(files, blob.File())
+		}
+	}
 	return files
 }
 

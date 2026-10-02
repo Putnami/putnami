@@ -2538,6 +2538,9 @@ func (run *ReleaseSetRun) commit(ctx context.Context, results map[string]*JobRes
 	if err := run.ensureNoReusedPublication(results); err != nil {
 		return releaseSetFailure(err)
 	}
+	if err := run.ensureEngineUploadedPutMembers(results); err != nil {
+		return releaseSetFailure(err)
+	}
 	finalSet, err := reconcilePublishedReleaseSet(run.plan, results)
 	if err != nil {
 		return releaseSetFailure(err)

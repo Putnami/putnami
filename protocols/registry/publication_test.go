@@ -363,6 +363,42 @@ func TestOpenPlanDigestMatchesTheReleasePlanContract(t *testing.T) {
 	}
 }
 
+// A plan may select Put registry members: a release archive and a config,
+// migration or doc member. The engine uploads them like any other member, so
+// open names them in the plan and release names the digest of each in its
+// evidence.
+func TestPublicationCarriesPutRegistryMembers(t *testing.T) {
+	t.Parallel()
+	open, err := ParseOpenParams(fixturePayload(t, "request-open-put-members.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if digest, err := PlanDigest(open.Plan); err != nil || digest != open.Plan.PlanDigest || digest != "sha256:96d3a32cdede07c0b62db190c50b1f51121e8f856adcf7f082a836223f6f88d5" {
+		t.Errorf("the put-members open fixture's digest = %s, %v", digest, err)
+	}
+	release, err := ParseReleaseParams(fixturePayload(t, "request-release-put-members.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if release.PlanDigest != open.Plan.PlanDigest {
+		t.Fatalf("the release names plan %s; open named %s", release.PlanDigest, open.Plan.PlanDigest)
+	}
+	evidence := map[string]string{}
+	for _, member := range release.Evidence.Members {
+		evidence[member.Ecosystem+"\x00"+member.Coordinate] = member.Digest
+	}
+	for _, member := range open.Plan.Members {
+		if evidence[string(member.Ecosystem)+"\x00"+member.Coordinate] == "" {
+			t.Errorf("the release evidence names no digest for %s %s", member.Ecosystem, member.Coordinate)
+		}
+	}
+	for _, ecosystem := range []distribution.Ecosystem{"archive", "put"} {
+		if !slices.ContainsFunc(open.Plan.Members, func(member PublicationPlanMember) bool { return member.Ecosystem == ecosystem }) {
+			t.Errorf("the put-members plan selects no %s member", ecosystem)
+		}
+	}
+}
+
 func TestPublicationLinesNeverFormatTheirPayload(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{"request-open.json", "request-release.json"} {

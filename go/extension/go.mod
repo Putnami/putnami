@@ -57,6 +57,7 @@ replace (
 	go.putnami.dev/protocol/distribution => ../../protocols/distribution
 	go.putnami.dev/protocol/gomod => ../../protocols/gomod
 	go.putnami.dev/protocol/infra => ../../protocols/infra
+	go.putnami.dev/protocol/put => ../../protocols/put
 	go.putnami.dev/sdk/extension => ../../tooling/extension-sdk
 )
 

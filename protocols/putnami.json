@@ -29,6 +29,7 @@
     "migration",
     "oci",
     "platform",
+    "put",
     "qualify",
     "registry",
     "runner",

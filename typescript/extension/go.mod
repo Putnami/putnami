@@ -56,6 +56,8 @@ replace go.putnami.dev/protocol/job => ../../protocols/job
 
 replace go.putnami.dev/protocol/oci => ../../protocols/oci
 
+replace go.putnami.dev/protocol/put => ../../protocols/put
+
 replace go.putnami.dev/protocol/registry => ../../protocols/registry
 
 replace go.putnami.dev/protocol/runtime => ../../protocols/runtime

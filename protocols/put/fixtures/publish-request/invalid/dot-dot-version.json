@@ -1,0 +1,1 @@
+{"version":"..","media_type":"application/vnd.putnami.archive+json","payload":{"artifacts":{"darwin-arm64":{"digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111","size":4096},"linux-amd64":{"digest":"sha256:2222222222222222222222222222222222222222222222222222222222222222","size":4100}}}}

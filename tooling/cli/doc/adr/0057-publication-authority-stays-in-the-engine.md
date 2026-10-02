@@ -52,16 +52,30 @@ the job and for `open`. It reads the outbox, hashes every file again, and
 refuses the outbox before any upload when a member is not the one the plan
 assigns that job: another member, a member the plan does not select, another
 version or another project. A member's registry is the registry its npm block
-names, the `registries.go.origin` of its project, or the host of its OCI
-repository. The node refuses an npm registry other than the one
+names, the `registries.go.origin` of its project, the host of its OCI
+repository, or, for a Put registry member, the `registries.put.registry` of its
+project, else the default Put registry. The node refuses an npm registry other
+than the one
 `registries.npm.publish` names, compared after the managed npm rules normalize
 both, and an OCI host other than the one `registries.oci.publish` names, as a
 repository prefix or as a URL. It then asks the session for the `publish`
 credential of each member's registry, applies the host rule, and uploads the
-npm tarball, the Go module zip or the OCI layout in its own process. It writes
-`published-image.json` for an OCI member and reports one `published-member`
-event per upload. A job that wrote no descriptor packed nothing, so its node
-uploads nothing. The upload nodes count as publication jobs for the release.
+npm tarball, the Go module zip, the OCI layout, or the blobs and manifest of a
+Put registry member in its own process. It writes `published-image.json` for
+an OCI member and reports one `published-member` event per upload. A job that
+wrote no descriptor packed nothing, so its node uploads nothing. The upload
+nodes count as publication jobs for the release.
+
+A Put registry member is written with
+[`put-write/v1`](../../../../protocols/put/README.md), which moves no channel.
+Its kind is the kind its declared package and publish steps give it
+(`releaseset.KindFor`), whether or not the plan records member attribution: a
+release archive is ecosystem `archive` and kind `archive`, and a config,
+migration or doc member is ecosystem `put`. The node checks the manifest's
+media type and its blob references against that kind before it asks for a
+credential. The member's digest is the SHA-256 of the manifest payload the
+registry stores, and an archive member also reports the blob digest of each
+platform.
 
 ### 4. One release, final on an answer
 
@@ -71,7 +85,15 @@ after the op timed out while the session was still live, and in no other
 case; a session that ends fails the run. A refusal is a
 bounded error that names its code; it moves no channel, and the run fails.
 
-### 5. A bound request plans without the engine's nodes
+### 5. A Put registry member releases only from an engine upload
+
+A selected Put registry member releases only when its upload node reported
+it. The release is refused when a `published-member` event for a `put` or
+`archive` member comes from any other node, or when a selected one has no
+upload. A job that publishes such a member itself, outside the outbox, moves
+no channel, so a provider can echo `publication-v1` to any workspace.
+
+### 6. A bound request plans without the engine's nodes
 
 The `open` and upload nodes run engine code only, and they exist only when
 the provider echoes `publication-v1`, which a submitter does not know. A
@@ -96,8 +118,11 @@ scheduler read the whole graph.
 ## Consequences
 
 - No repository process of a `publication-v1` run holds a `publish` bearer.
-- A selected member outside npm, Go modules and OCI images fails the plan
-  before `open`, because the engine has no upload for it.
+- A selected member outside npm, Go modules, OCI images and the Put registry,
+  or a Put registry member of a kind `put-write/v1` does not publish, fails
+  the plan before `open`, because the engine has no upload for it.
+- A migration uploads like any Put registry member. Its data acceptance, and
+  the channel move of a site-content bundle, run at the provider's `release`.
 - A bound request with `invocation.publication` publishes through
   `publication-v1` as a local run does, from the plan its submitter computed
   without the capability, and opens the plan digest a local run of the same
@@ -107,7 +132,8 @@ scheduler read the whole graph.
   remote cache hit, or a coalesced result) packed nothing into this run's
   outbox, and a `published-member` event its result replays names an upload
   this run did not make. The release refuses such a run and names the job.
-- The engine now carries the npm, Go module and OCI upload clients of the SDK.
+- The engine carries the npm, Go module, OCI and Put upload clients of the
+  SDK.
 - `.gen/version.json` keeps no image fields under the outbox: no reader in the
   same run needs them, and a same-session deploy takes its image from the
   released set.
