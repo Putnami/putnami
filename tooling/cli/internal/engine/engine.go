@@ -849,7 +849,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// expected one before anything is scheduled. It sits after the preflight so
 	// a blocked run transfers nothing, and before the release-set handoff so no
 	// publication capability is ever armed for a request that leaves.
-	if result, handled := e.portableSeam(ctx, req, ws, discovered, planned); handled {
+	if result, handled := e.portableSeam(ctx, req, ws, discovered, planned, releaseSetRun); handled {
 		result.Projects = selectedProjects
 		return result, nil
 	}

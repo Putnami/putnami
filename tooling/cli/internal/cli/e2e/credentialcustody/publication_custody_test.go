@@ -264,25 +264,46 @@ func packPublicationMember() error {
 // member through a publication-v1 credential provider. Its local extension
 // declares the npm ecosystem, the credential provider, and a publish command
 // whose one task is a hostile publication job; the workspace's after-publish
-// hook is a hostile hook. Every report and log lies outside every probed root.
+// hook is a hostile hook. With a gate, the publish command has a second step,
+// a hostile probe that runs while the engine uploads (runUploadProbeRole).
+// Every report and log lies outside every probed root.
 type publicationFixture struct {
 	wsRoot      string
 	jobReport   string
 	hookReport  string
+	probeReport string
 	providerLog string
 }
 
 // writePublicationFixture builds the fixture. self is the absolute path of
 // this test binary, which the provider, the publication job and the hook run;
-// endpoint is the npm registry the project publishes to.
-func writePublicationFixture(t *testing.T, self, endpoint string) publicationFixture {
+// endpoint is the npm registry the project publishes to; gate, when not
+// empty, is the uploadGate URL the probe step waits on.
+func writePublicationFixture(t *testing.T, self, endpoint, gate string) publicationFixture {
 	t.Helper()
 	reports := t.TempDir()
 	fx := publicationFixture{
 		wsRoot:      t.TempDir(),
 		jobReport:   filepath.Join(reports, "publication.jsonl"),
 		hookReport:  filepath.Join(reports, "hook.jsonl"),
+		probeReport: filepath.Join(reports, "upload-probe.jsonl"),
 		providerLog: filepath.Join(reports, "provider.log"),
+	}
+	// The probe step declares no dependsOn: it waits for the package command,
+	// as the publication job does, and only the release waits for it.
+	probeStep, probeTask := "", ""
+	if gate != "" {
+		probeStep = `, { "id": "probe", "task": "upload-probe" }`
+		probeTask = fmt.Sprintf(`
+    "upload-probe": {
+      "kind": "command",
+      "command": %s,
+      "cache": false,
+      "timeoutMs": %d,
+      "env": { %s: "upload-probe", %s: %s, %s: %s }
+    },`, jsonString(self), 2*custodyGateTimeout.Milliseconds(),
+			jsonString(custodyRoleEnv), jsonString(custodyReportEnv), jsonString(fx.probeReport),
+			jsonString(custodyGateEnv), jsonString(gate))
 	}
 	target, err := url.Parse(endpoint)
 	if err != nil {
@@ -322,11 +343,11 @@ func writePublicationFixture(t *testing.T, self, endpoint string) publicationFix
   ],
   "commands": {
     "package": { "run": [{ "id": "artifact", "task": "noop" }] },
-    "publish": { "dependsOn": ["package"], "run": [{ "id": "artifact", "task": "publication" }] },
+    "publish": { "dependsOn": ["package"], "run": [{ "id": "artifact", "task": "publication" }%s] },
     %s: { "description": "Serve credentials.", "run": [{ "id": "serve", "task": "credential-provider" }] }
   },
   "tasks": {
-    "noop": { "kind": "command", "command": "/bin/sh", "args": ["-c", "exit 0"], "cwd": "{workspaceRoot}", "cache": false },
+    "noop": { "kind": "command", "command": "/bin/sh", "args": ["-c", "exit 0"], "cwd": "{workspaceRoot}", "cache": false },%s
     "publication": {
       "kind": "command",
       "command": %s,
@@ -342,7 +363,7 @@ func writePublicationFixture(t *testing.T, self, endpoint string) publicationFix
     }
   }
 }`,
-		protocolcli.CurrentContract, jsonString(registry.CredentialProviderCommand),
+		protocolcli.CurrentContract, probeStep, jsonString(registry.CredentialProviderCommand), probeTask,
 		jsonString(self), jsonString(custodyRoleEnv), jsonString(custodyReportEnv), jsonString(fx.jobReport),
 		jsonString(self), jsonString(custodyRoleEnv), jsonString(custodyReportEnv), jsonString(fx.providerLog),
 		jsonString(custodyHostsEnv), jsonString(target.Host)))
@@ -470,7 +491,7 @@ func TestHostilePublicationJobFindsNoPublishCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 	npm := newCustodyNPMRegistry(t)
-	fx := writePublicationFixture(t, self, npm.server.URL)
+	fx := writePublicationFixture(t, self, npm.server.URL, "")
 	code, output := runEngine(t, self, fx.wsRoot, t.TempDir(), false,
 		custodyArgsEnv+"=publish\n--all\n--channel\npr-0\n--providers\npublish")
 	if code != 0 {

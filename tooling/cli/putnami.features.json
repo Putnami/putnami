@@ -2904,6 +2904,7 @@
             "checks": [
               "a-publishing-request-without-the-block-is-refused-before-any-provider",
               "a-request-without-the-block-enables-no-publish-purpose",
+              "a-request-without-the-block-starts-no-publish-provider",
               "a-gate-only-request-plans-no-publish-job"
             ]
           }
@@ -2941,7 +2942,20 @@
               "a-tampered-artifact-is-refused-by-digest",
               "a-member-the-plan-does-not-select-is-refused",
               "a-reused-publication-job-fails-the-release",
-              "real-extension-jobs-pack-and-the-engine-uploads"
+              "real-extension-jobs-pack-and-the-engine-uploads",
+              "a-probe-during-an-upload-finds-no-credential"
+            ]
+          }
+        },
+        {
+          "id": "bound-requests-publish-through-the-provider",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-expected-plan-is-the-legacy-plan",
+              "a-bound-request-opens-uploads-and-releases-the-local-plan"
             ]
           }
         }

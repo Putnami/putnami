@@ -85,14 +85,18 @@ const (
 	// custodyExecEnv names the program the "exec-probe" role runs once it has
 	// probed: a real extension binary.
 	custodyExecEnv = "PUTNAMI_TEST_CUSTODY_EXEC"
+	// custodyGateEnv is the URL of the uploadGate the "upload-probe" role
+	// waits on before it probes, and tells once it has reported.
+	custodyGateEnv = "PUTNAMI_TEST_CUSTODY_GATE"
 )
 
 // TestMain runs the tests, or, when this binary was re-executed in a role, that
 // role: the engine that runs `build`, the cache provider, the credential
 // provider, the workspace-fetch, a hook that overwrites the provider's
 // executable, a hostile hook, task or publication job that probes for the
-// credential, a package step that stages a member, the bun a real extension
-// packs with, or a probe that then runs a real extension binary. A role
+// credential, a probe that runs while the engine uploads, a package step that
+// stages a member, the bun a real extension packs with, or a probe that then
+// runs a real extension binary. A role
 // process exits without running any test. As the runtime of a fixture
 // extension, this binary first answers the CLI's runtime-info handshake, which
 // inherits the engine's environment and so its role.
@@ -116,6 +120,8 @@ func TestMain(m *testing.M) {
 		os.Exit(runCredentialProviderRole())
 	case "publication":
 		os.Exit(runHostilePublicationRole())
+	case "upload-probe":
+		os.Exit(runUploadProbeRole())
 	case "stage":
 		os.Exit(runStageRole())
 	case "bun":

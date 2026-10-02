@@ -8,8 +8,7 @@
     "A run whose credential provider negotiates publication-v1 resolves, opens, uploads and releases through that one session, and no repository process holds a publish credential"
   ],
   "nonGoals": [
-    "Uploading a member of an ecosystem other than npm, Go modules and OCI images under publication-v1; such a plan is refused before it opens",
-    "Publishing a bound request through publication-v1; its expected plan names no open or upload node, so the executing engine refuses the plan it builds"
+    "Uploading a member of an ecosystem other than npm, Go modules and OCI images under publication-v1; such a plan is refused before it opens"
   ],
   "requirements": [
     {
@@ -27,6 +26,10 @@
     {
       "id": "uploads-run-in-the-engine",
       "text": "Under publication-v1 a publication job gets a private 0700 outbox and no credential, credential descriptor or registry route. An engine upload node re-hashes the outbox, refuses a member, version or project the plan does not assign, asks the publish credential of the member's registry and uploads the npm tarball, Go zip or OCI layout itself, with published-image.json and one published-member event per upload. No descriptor means nothing packed. A reused publication job packed nothing; the release refuses."
+    },
+    {
+      "id": "bound-requests-publish-through-the-provider",
+      "text": "A bound request with invocation.publication publishes through publication-v1 when the credential provider echoes it, as a local run does: open waits for its barrier commands, and the provider receives the plan digest a local run of the commit opens. Its expected plan names no open or upload node, which run engine code only: the executing engine compares it with its graph without them, an edge to an upload moved to its publication job, so one submitted plan validates either path."
     }
   ],
   "decisions": [

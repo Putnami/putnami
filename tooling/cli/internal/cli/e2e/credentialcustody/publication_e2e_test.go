@@ -862,6 +862,16 @@ func publishedMemberEvents(t *testing.T, wsRoot string) []sessionMemberEvent {
 func assertProbesFoundNothing(t *testing.T, role, report string) {
 	t.Helper()
 	findings := readFindings(t, report)
+	assertNoProbeFoundTheBearer(t, role, findings)
+	if values := findings[envValuesProbe]; values.Env["outbox"] == "" {
+		t.Errorf("%s: the publication job had no outbox", role)
+	}
+}
+
+// assertNoProbeFoundTheBearer fails t when a search probe of findings did not
+// run or found the publish credential.
+func assertNoProbeFoundTheBearer(t *testing.T, role string, findings map[string]finding) {
+	t.Helper()
 	rootExempt := runtime.GOOS == "linux" && os.Geteuid() == 0
 	for _, probe := range searchProbes() {
 		f, ok := findings[probe]
@@ -877,9 +887,6 @@ func assertProbesFoundNothing(t *testing.T, role, report string) {
 			}
 			t.Errorf("%s: probe %q found the publish credential (detail %q)", role, probe, f.Detail)
 		}
-	}
-	if values := findings[envValuesProbe]; values.Env["outbox"] == "" {
-		t.Errorf("%s: the publication job had no outbox", role)
 	}
 }
 

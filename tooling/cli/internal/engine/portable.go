@@ -78,6 +78,11 @@ const remoteDeadline = 4 * time.Hour
 // production preflight so a blocked run is blocked before any transfer, and
 // it returns (result, true) exactly when the run must not execute here.
 //
+// The executing side compares the expected plan with the graph without the
+// nodes a publication-v1 provider adds (jobs.ReleaseSetRun.WithoutPublicationNodes),
+// so the submitter plans the same graph whether or not the provider echoes
+// the capability. The publication and admission checks read the whole graph.
+//
 // Between the unsupported-shape refusal and the request projection sits the
 // input admission (ADR 0037): on the plan's declared inputs it binds every
 // required git-ignored file into the request, reports the ignored files a
@@ -85,9 +90,9 @@ const remoteDeadline = 4 * time.Hour
 // env-keyed task before anything is captured. The executing side re-derives
 // the same decision on the materialized tree and refuses a divergence exactly
 // as it refuses a divergent plan.
-func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.Workspace, discovered *internalextension.DiscoveryResult, planned []*jobs.ScheduledJob) (SessionResult, bool) {
+func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.Workspace, discovered *internalextension.DiscoveryResult, planned []*jobs.ScheduledJob, releaseSetRun *jobs.ReleaseSetRun) (SessionResult, bool) {
 	if req.Portable != nil {
-		if err := validateExpectedPlan(req.Portable.Request.Plan, planned); err != nil {
+		if err := validateExpectedPlan(req.Portable.Request.Plan, releaseSetRun.WithoutPublicationNodes(planned)); err != nil {
 			iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
 			return SessionResult{ExitCode: ExitError, Plan: planned}, true
 		}

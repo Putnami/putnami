@@ -66,6 +66,16 @@ after the op timed out while the session was still live, and in no other
 case; a session that ends fails the run. A refusal is a
 bounded error that names its code; it moves no channel, and the run fails.
 
+### 5. A bound request plans without the engine's nodes
+
+The `open` and upload nodes run engine code only, and they exist only when
+the provider echoes `publication-v1`, which a submitter does not know. A
+bound request's expected plan names neither. The executing engine compares
+that plan with its graph without them: an edge to an upload node becomes an
+edge to the publication job it uploads for, and an edge to `open` is
+dropped. The publication barrier check, the input admission and the
+scheduler read the whole graph.
+
 ## Rejected alternatives
 
 - **Hand the publication job a short-lived bearer.** Every process the job
@@ -83,9 +93,11 @@ bounded error that names its code; it moves no channel, and the run fails.
 - No repository process of a `publication-v1` run holds a `publish` bearer.
 - A selected member outside npm, Go modules and OCI images fails the plan
   before `open`, because the engine has no upload for it.
-- A bound request's expected plan names no `open` or upload node, so an
-  executing engine refuses a bound request that publishes through
-  `publication-v1`. Publishing one needs the submitter to plan those nodes.
+- A bound request with `invocation.publication` publishes through
+  `publication-v1` as a local run does, from the plan its submitter computed
+  without the capability, and opens the plan digest a local run of the same
+  commit opens. An expected plan that names an `open` or upload node is
+  refused, whichever path the provider selects.
 - A publication job whose result was reused instead of executed (a local or
   remote cache hit, or a coalesced result) packed nothing into this run's
   outbox, and a `published-member` event its result replays names an upload

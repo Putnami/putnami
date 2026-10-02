@@ -47,6 +47,12 @@ func TestMain(m *testing.M) {
 		fmt.Println("1.2.3")
 		os.Exit(0)
 	}
+	// The publication job of the bound publication fixture is a child of this
+	// binary that inherits the release-set provider's variable, so its role is
+	// read first (bound_publication_provider_test.go).
+	if os.Getenv(boundPublicationPackEnv) != "" {
+		os.Exit(packBoundPublicationMember())
+	}
 	// The release-set coordinator resolves its provider by running
 	// os.Executable() with the reserved argv, so a child of THIS binary is the
 	// provider a fixture session talks to (release_set_session_test.go).
