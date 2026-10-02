@@ -22,6 +22,12 @@ import (
 type DiscoveryResult struct {
 	Extensions []*ExtensionDescription
 	Skipped    []SkippedExtension
+	// RemovedCapabilities are the provider capabilities a hosted run removed
+	// from extensions that loaded and stay in Extensions
+	// (withoutProviderCapabilities). They are not load failures, so they are
+	// kept apart from Skipped; ProviderCause names them where a provider is
+	// absent.
+	RemovedCapabilities []RemovedCapability
 }
 
 // DiscoverExtensions scans extension paths and builds an extension registry.
@@ -54,11 +60,16 @@ func DiscoverExtensions(workspaceRoot string, cfg *wsproto.Config, projectPaths 
 // explicitly referenced extension is only recorded as skipped when no probe
 // location loaded it.
 //
-// A hosted run (runcredential.Hosted) looks in no node_modules directory and
-// keeps only the extensions installed from the artifact store
-// (InArtifactStore): every other one is returned in Skipped. No repository
-// code then runs as an extension before the fetch, and none can receive a
-// credential.
+// A hosted run (runcredential.Hosted) looks in no node_modules directory, and
+// reads a workspace config key as a workspace path only when the key is
+// path-shaped (declaredByPath): any other key names an extension, which loads
+// from the artifact store, and a workspace project of that name never loads in
+// place of a pinned build that is not installed (settlePinnedProjects). It keeps the extensions installed from the artifact
+// store (InArtifactStore) and the workspace's own path extensions
+// (WorkspacePathExtension), and returns every other one in Skipped. A path
+// extension loses its provider capabilities, each recorded in
+// RemovedCapabilities: no repository code can receive a credential, and the
+// engine starts a path extension only after custody ended.
 func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, projectPaths []string) (*DiscoveryResult, error) {
 	var extensions []*ExtensionDescription
 	var skipped []SkippedExtension
@@ -143,8 +154,11 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 			recordSkips(refSkips)
 			continue
 		}
-		// Try as a workspace project path
-		if relPath, ok := normalizeWorkspaceExtensionPath(extRef); ok {
+		// Try as a workspace project path. A hosted run reads only a
+		// path-shaped key as a path, so a key that names an extension loads
+		// its build from the artifact store, never a workspace directory of
+		// that name.
+		if relPath, ok := normalizeWorkspaceExtensionPath(extRef); ok && (!hosted || declaredByPath(extRef)) {
 			absPath := filepath.Join(workspaceRoot, relPath)
 			var skip *SkippedExtension
 			ext, skip = tryLoadExtension(absPath, extRef, false)
@@ -181,7 +195,8 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 	}
 
 	// 3. A project manifest set aside for a pin that loaded nothing.
-	extensions = settlePinnedProjects(workspaceRoot, extensions, pinnedLocal, seen)
+	extensions, unsettled := settlePinnedProjects(workspaceRoot, extensions, pinnedLocal, seen, hosted)
+	recordSkips(unsettled)
 
 	// 4. Scan root package.json devDependencies for extension packages.
 	// Quick-check: only attempt full manifest load for packages that
@@ -206,8 +221,8 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 		}
 	}
 
-	extensions, notFromTheStore := keepStoreInstalled(workspaceRoot, extensions)
-	recordSkips(notFromTheStore)
+	extensions, notHosted, removed := keepHostedExtensions(workspaceRoot, extensions)
+	recordSkips(notHosted)
 
 	// Propagate RelPath to all job definitions as ExtensionPath
 	for _, ext := range extensions {
@@ -221,7 +236,7 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 		}
 	}
 
-	return &DiscoveryResult{Extensions: extensions, Skipped: skipped}, nil
+	return &DiscoveryResult{Extensions: extensions, Skipped: skipped, RemovedCapabilities: removed}, nil
 }
 
 // scanProjectExtensions loads the manifest at each workspace project root. A
@@ -257,9 +272,11 @@ func scanProjectExtensions(workspaceRoot string, cfg *wsproto.Config, projectPat
 // settlePinnedProjects resolves each project manifest scanProjectExtensions
 // set aside. When the pinned build loaded, that build and its jobs record the
 // project it replaces, so a project that names that project's path keeps
-// running the extension; otherwise the project manifest loads, with a warning that the pin
-// is not installed.
-func settlePinnedProjects(workspaceRoot string, extensions, pinned []*ExtensionDescription, seen map[string]bool) []*ExtensionDescription {
+// running the extension. Otherwise the project manifest loads, with a warning
+// that the pin is not installed; on a hosted run it does not, and the project
+// is returned in skipped, with errPinnedBuildMissing.
+func settlePinnedProjects(workspaceRoot string, extensions, pinned []*ExtensionDescription, seen map[string]bool, hosted bool) ([]*ExtensionDescription, []SkippedExtension) {
+	var skipped []SkippedExtension
 	for _, local := range pinned {
 		if seen[local.Name] {
 			if ext := FindExtensionByName(extensions, local.Name); ext != nil && !ext.LocalSource {
@@ -272,24 +289,35 @@ func settlePinnedProjects(workspaceRoot string, extensions, pinned []*ExtensionD
 			}
 			continue
 		}
+		if hosted {
+			skipped = append(skipped, SkippedExtension{
+				Ref: local.Name, Name: local.Name, Path: local.Path, Version: local.Version,
+				Reason: fmt.Errorf("the workspace config pins %s, and its build is not installed: %w", local.Name, errPinnedBuildMissing),
+			})
+			continue
+		}
 		warnOnce("pin-unloaded:"+workspaceRoot+":"+local.Name,
 			"workspace config pins an extension whose build is not installed; using the workspace project's manifest instead — run putnami install",
 			"extension", local.Name, "project", filepath.ToSlash(local.RelPath))
 		seen[local.Name] = true
 		extensions = append(extensions, local)
 	}
-	return extensions
+	return extensions, skipped
 }
 
 // pinnedByName reports whether the workspace config names the extension by
 // its manifest name with a key that is not the project's own path. Such a key
-// is a registry pin, so the project's manifest yields to the pinned build.
+// is a registry pin, so the project's manifest yields to the pinned build. A
+// hosted run reads only a path-shaped key as a path (declaredByPath).
 func pinnedByName(cfg *wsproto.Config, name, projectRelPath string) bool {
 	if cfg == nil {
 		return false
 	}
 	if _, ok := cfg.Extensions.List[name]; !ok {
 		return false
+	}
+	if runcredential.Hosted() && !declaredByPath(name) {
+		return true
 	}
 	if rel, ok := normalizeWorkspaceExtensionPath(name); ok && rel == filepath.Clean(projectRelPath) {
 		return false
@@ -691,8 +719,13 @@ func readPackageNameVersion(dir string) (string, string) {
 // content resolves an extension through the same directory, so an extension's
 // commands and its content come from one installed package.
 func installedPackageDir(workspaceRoot, name string) string {
-	return filepath.Join(workspaceRoot, "node_modules", name)
+	return filepath.Join(workspaceRoot, installedPackagesDirName, name)
 }
+
+// installedPackagesDirName is the name of the directory that the
+// package-manager sources of discovery load extensions from
+// (installedPackageDir).
+const installedPackagesDirName = "node_modules"
 
 // rootPackageDeclarations returns discovery's third source: the extensions the
 // workspace root's package manifest declares in devDependencies. A missing or

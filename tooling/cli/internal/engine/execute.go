@@ -318,7 +318,7 @@ func (e *Engine) executeSession(
 	if cache != nil && !runcredential.Hosted() {
 		setupStart := time.Now()
 		var cacheNotice string
-		remote, cacheNotice = jobs.LoadRemoteCache(ctx, wsRoot, extensions, discovered.Skipped, store.CacheTrust(req.Global.CacheTrust), remoteCacheOptions()...)
+		remote, cacheNotice = jobs.LoadRemoteCache(ctx, wsRoot, extensions, discovered, store.CacheTrust(req.Global.CacheTrust), remoteCacheOptions()...)
 		// Per the missing-cloud policy, a configured-but-unusable remote cache must
 		// never degrade to local-only silently — surface the one-line notice.
 		if cacheNotice != "" {

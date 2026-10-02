@@ -100,7 +100,7 @@ func newProviderRemoteCache(wsRoot string, launch cacheprovider.LaunchSpec, mode
 // to sit beside it: compatibility is established by the extension contract
 // version at discovery and by provider-RPC negotiation at the initialize
 // handshake, neither of which needs to know which vendor ships the provider.
-func loadProviderRemoteCache(ctx context.Context, wsRoot string, exts []*extension.ExtensionDescription, skipped []extension.SkippedExtension, trust store.CacheTrust) (*RemoteCache, string, error) {
+func loadProviderRemoteCache(ctx context.Context, wsRoot string, exts []*extension.ExtensionDescription, discovered *extension.DiscoveryResult, trust store.CacheTrust) (*RemoteCache, string, error) {
 	cfg, err := loadRemoteCacheConfig(wsRoot)
 	if err != nil {
 		return nil, fmt.Sprintf("putnami: remote cache config unavailable (%v); building locally", err), nil
@@ -120,7 +120,7 @@ func loadProviderRemoteCache(ctx context.Context, wsRoot string, exts []*extensi
 		// silently. When discovery SKIPPED an extension, cite that
 		// instead: an unloadable manifest is a fixable fault, not an absence.
 		notice := fmt.Sprintf("putnami: remote cache is configured but no installed extension declares the %q command; building locally.", cache.ProviderCommandName)
-		if cause := extension.SkippedProviderCause(skipped); cause != "" {
+		if cause := discovered.ProviderCause(cache.ProviderCommandName); cause != "" {
 			notice += " " + cause
 		}
 		return nil, notice, nil

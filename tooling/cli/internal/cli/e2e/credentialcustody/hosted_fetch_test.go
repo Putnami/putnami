@@ -59,7 +59,7 @@ func writeCloudPathFixture(t *testing.T) (wsRoot, marker string) {
 // never runs. Without the marker the same command runs the path extension.
 func TestACLIInsideAHostedFetchLoadsNoExtension(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "hosted-run-runs-only-store-installed-extensions")
+	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "hosted-run-runs-only-store-and-path-extensions")
 	clitest.RequireShell(t)
 	self, err := os.Executable()
 	if err != nil {

@@ -39,6 +39,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	runtimeproto "go.putnami.dev/protocol/runtime"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 )
@@ -88,22 +89,28 @@ const (
 	// custodyGateEnv is the URL of the uploadGate the "upload-probe" role
 	// waits on before it probes, and tells once it has reported.
 	custodyGateEnv = "PUTNAMI_TEST_CUSTODY_GATE"
+	// custodyProbeLogEnv names the log the workspace probe of a path
+	// fixture's path extension appends to (runPathProbeRole).
+	custodyProbeLogEnv = "PUTNAMI_TEST_CUSTODY_PROBE_LOG"
 )
 
 // TestMain runs the tests, or, when this binary was re-executed in a role, that
 // role: the engine that runs `build`, the cache provider, the credential
-// provider, the workspace-fetch, a hook that overwrites the provider's
-// executable, a hostile hook, task or publication job that probes for the
-// credential, a probe that runs while the engine uploads, a package step that
-// stages a member, the bun a real extension packs with, or a probe that then
-// runs a real extension binary. A role
-// process exits without running any test. As the runtime of a fixture
-// extension, this binary first answers the CLI's runtime-info handshake, which
-// inherits the engine's environment and so its role.
+// provider, the workspace-fetch of a store or a path extension, a hook that
+// overwrites the provider's executable, a hostile hook, task or publication
+// job that probes for the credential, a probe that runs while the engine
+// uploads, a package step that stages a member, the bun a real extension packs
+// with, or a probe that then runs a real extension binary. A role process
+// exits without running any test. As the runtime of a fixture
+// extension, this binary first answers the CLI's runtime-info handshake and
+// workspace probe, which inherit the engine's environment and so its role.
 func TestMain(m *testing.M) {
 	if len(os.Args) == 3 && os.Args[1] == "__putnami" && os.Args[2] == "runtime-info" {
 		fmt.Println(fixtureRuntimeInfo())
 		os.Exit(0)
+	}
+	if wsproto.IsProbeInvocation(os.Args[1:]) {
+		os.Exit(runPathProbeRole())
 	}
 	switch role := os.Getenv(custodyRoleEnv); role {
 	case "":
@@ -114,6 +121,8 @@ func TestMain(m *testing.M) {
 		os.Exit(runCacheProviderRole())
 	case "fetch":
 		os.Exit(runFetchRole())
+	case "path-fetch":
+		os.Exit(runPathFetchRole())
 	case "tamper":
 		os.Exit(runTamperRole())
 	case "credential-provider":

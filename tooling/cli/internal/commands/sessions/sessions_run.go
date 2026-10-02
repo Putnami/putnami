@@ -127,7 +127,7 @@ func resolveRunnerProvider(ctx context.Context, wsRoot string, cfg *wsproto.Conf
 	}
 	if provider == nil {
 		detail := fmt.Sprintf("install exactly one extension declaring %q to resume a remote attempt", runner.ProviderCommandName)
-		if cause := providerext.SkippedProviderCause(discovered.Skipped); cause != "" {
+		if cause := discovered.ProviderCause(runner.ProviderCommandName); cause != "" {
 			detail += ". " + cause
 		}
 		return runnerprovider.Resume{}, cmderr.Classify(errors.New(detail), cmderr.ErrNotFound)

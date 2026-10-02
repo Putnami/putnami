@@ -118,7 +118,7 @@ func startHostedRemoteCache(ctx context.Context, req *Request) (*jobs.RemoteCach
 		return nil, nil
 	}
 	setupStart := time.Now()
-	remote, notice := jobs.LoadRemoteCache(ctx, req.WorkspaceRoot, discovered.Extensions, discovered.Skipped,
+	remote, notice := jobs.LoadRemoteCache(ctx, req.WorkspaceRoot, discovered.Extensions, discovered,
 		trust, remoteCacheOptions()...)
 	if notice != "" {
 		iox.Fprintln(os.Stderr, notice)
@@ -150,7 +150,7 @@ func hostedRunRemoteCache(ctx context.Context, req *Request, ws *workspace.Works
 	if req.hostedRemote != nil {
 		return req.hostedRemote, nil
 	}
-	remote, _ := jobs.LoadRemoteCache(ctx, req.WorkspaceRoot, discovered.Extensions, discovered.Skipped,
+	remote, _ := jobs.LoadRemoteCache(ctx, req.WorkspaceRoot, discovered.Extensions, discovered,
 		store.CacheTrust(req.Global.CacheTrust), remoteCacheOptions()...)
 	if err := remote.StartProvider(ctx, ws, cache); err != nil {
 		remote.Close()

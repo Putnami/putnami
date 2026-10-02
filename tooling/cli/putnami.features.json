@@ -2688,7 +2688,8 @@
             "checks": [
               "fetch-completes-before-install",
               "only-fetch-gets-the-job-credential",
-              "every-other-job-runs-offline"
+              "every-other-job-runs-offline",
+              "path-extension-fetch-runs-after-custody"
             ]
           }
         },
@@ -2700,7 +2701,8 @@
             "kind": "acceptance",
             "checks": [
               "hostile-hook-and-test-find-nothing",
-              "hosted-run-runs-only-store-installed-extensions",
+              "hosted-run-runs-only-store-and-path-extensions",
+              "path-extension-serves-no-provider",
               "hosted-run-ignores-the-workspace-registry",
               "hosted-run-probes-no-workspace-toolchain",
               "no-credential-after-repository-code"

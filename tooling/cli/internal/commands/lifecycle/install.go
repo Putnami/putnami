@@ -103,11 +103,13 @@ var runDeferredInstallHooks = extensions.RunExtensionInstallHooksTo
 
 // installExtensions is Install's extensions phase: it installs the extension
 // artifacts and runs their onInstall hooks. A hosted install
-// (runcredential.Hosted) runs every workspace-fetch, then
-// env.BeforeRepositoryCode, between the two (ADR 0055): the fetch receives the
-// run credential, and a hosted run hands its credential to no process that
-// starts after repository code, which an onInstall hook is. The workspace
-// installers then run without a second fetch (LifecycleEnv.fetched).
+// (runcredential.Hosted) runs the fetch steps between the two
+// (LifecycleEnv.fetchBeforeRepositoryCode, ADR 0055): the store extensions'
+// workspace-fetch, env.BeforeRepositoryCode, then the path extensions'
+// workspace-fetch. The first two hand out the run credential, and a hosted run
+// hands its credential to no process that starts after repository code, which
+// a path extension's fetch and an onInstall hook are. The workspace installers
+// then run without a second fetch (LifecycleEnv.fetched).
 func installExtensions(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, phase *installPhaseIO) error {
 	if phase.env.Display.Verbose || phase.env.Display.Debug {
 		iox.Fprintln(phase.env.out(), "\n  Installing extensions...")

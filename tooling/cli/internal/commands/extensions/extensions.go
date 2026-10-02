@@ -274,8 +274,14 @@ func resolveLocalExtensionRef(wsRoot, ref string) (*extension.ExtensionDescripti
 	if !isLocalExtensionRef(ref) {
 		return nil, nil
 	}
+	// A hosted run loads a local ref only as one of the workspace's own path
+	// extensions, from the workspace and never from the working directory.
 	if runcredential.Hosted() {
-		return nil, fmt.Errorf("local extension %s: a hosted run (--credential-fd) runs only extensions installed from the artifact store", ref)
+		if ext := extension.LoadWorkspacePathExtension(wsRoot, ref); ext != nil {
+			return ext, nil
+		}
+		return nil, fmt.Errorf("local extension %s: a hosted run (--credential-fd) runs only extensions installed from the artifact store "+
+			"and the workspace's own path extensions, declared by a path inside the workspace", ref)
 	}
 
 	for _, dir := range localExtensionCandidateDirs(wsRoot, ref) {

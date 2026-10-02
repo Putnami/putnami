@@ -976,7 +976,7 @@ func PrepareReleaseSet(
 		}
 		message := fmt.Sprintf("publish --impacted --channel requires exactly one installed extension declaring %q; use publish --all for the cloudless full-release path",
 			distribution.ProviderCommandName)
-		if cause := extension.SkippedProviderCause(discovered.Skipped); cause != "" {
+		if cause := discovered.ProviderCause(distribution.ProviderCommandName); cause != "" {
 			message += ". " + cause
 		}
 		return nil, fmt.Errorf("%w: %s", releaseset.ErrProviderAbsent, message)

@@ -141,8 +141,8 @@ artifact GC. `.putnami/bin/putnami` is an absolute symlink to it.
 - `./putnamiw` is the only supported entrypoint here. A runner that invokes a
   checkout's `./putnamiw` when one exists works; one that invokes a CLI directly
   is refused with an actionable message.
-- This workspace cannot run hosted: its extensions are local sources, and a
-  hosted runner starts the CLI directly
+- This workspace cannot run hosted: it builds its own CLI, which only
+  `./putnamiw` starts, and a hosted runner starts the CLI directly
   ([ADR 0055](0055-run-credentials-stay-out-of-repository-processes.md)).
 - Agent hosts must start the MCP server as `./putnamiw mcp`. `.codex/config.toml`
   does. `.mcp.json` keeps `"command": "putnami"`, because the `@putnami/cloud`

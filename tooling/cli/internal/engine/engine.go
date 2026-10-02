@@ -622,6 +622,10 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	if code != ExitSuccess {
 		return SessionResult{ExitCode: code}, nil
 	}
+	// The dependency fetch of a hosted install sees only the extensions
+	// installed from the artifact store: no path extension starts beside the
+	// job credential.
+	discovered = jobs.CredentialedFetchView(ctx, req.WorkspaceRoot, discovered)
 	extensions := discovered.Extensions
 
 	// Phase 1b: the command-scoped half of the single parse-and-validation pass.
@@ -654,7 +658,10 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// The toolchain report after the run reads the extensions synchronized
 	// here (Request.synchronizedExtensions), including after a failed
 	// synchronization.
-	planningExtensions := req.planExtensions(discovered)
+	//
+	// The path-extension fetch of a hosted install plans only the extensions
+	// the dependency fetch left out.
+	planningExtensions := jobs.PathExtensionFetchPlan(ctx, req.WorkspaceRoot, req.planExtensions(discovered))
 	req.preparation, req.synchronizedExtensions = &jobs.PreparationReport{}, planningExtensions
 	if err := jobs.SynchronizeExtensionRuntimesForCommands(
 		ctx, ws, planningExtensions, req.Commands, req.preparation,
