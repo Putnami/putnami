@@ -922,7 +922,25 @@ func boundedRefusal(t *testing.T, output, code string) {
 			return
 		}
 	}
-	t.Errorf("the output does not name the refusal %s:\n%s", code, output)
+	t.Errorf("the output does not name the refusal %s: %s\n%s", code, failureLines(output), output)
+}
+
+// failureLines joins, on one line of at most 1 KiB, the lines of output that
+// report a failure, so a report that keeps only the first line of a test
+// error still names why the run failed.
+func failureLines(output string) string {
+	var lines []string
+	for _, line := range strings.Split(output, "\n") {
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "error") || strings.Contains(lower, "fail") || strings.Contains(lower, "refus") {
+			lines = append(lines, strings.TrimSpace(line))
+		}
+	}
+	joined := strings.Join(lines, " | ")
+	if len(joined) > 1024 {
+		joined = joined[:1024]
+	}
+	return joined
 }
 
 // A publish run through the real TypeScript and Go extensions and a
@@ -944,7 +962,7 @@ func TestReleaseSetE2EPublicationV1UploadsInProcessAndReleasesForwardOnly(t *tes
 		forwardRef := setRef(t, forward)
 		run := fx.publish(t, false, providerSetup{Heads: map[string]distribution.ReleaseSet{e2eChannel: forward}})
 		if run.code != 0 {
-			t.Fatalf("publish exit=%d, want 0\n%s", run.code, run.output)
+			t.Fatalf("publish exit=%d, want 0: %s\n%s", run.code, failureLines(run.output), run.output)
 		}
 
 		// One open, after every package step, then the publish credential,
