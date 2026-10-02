@@ -85,11 +85,11 @@ addition. Re-read them from the test's log output at any time.
 
 | Quantity | Value |
 | --- | --- |
-| Candidate files scanned | 5659 |
-| Release series | 0.2.0 (from `putnami.workspace.json`) |
+| Candidate files scanned | 8285 |
+| Release series | 0.3.0 (from `tooling/CHANGELOG.md`) |
 | Builder archive matrix | `darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64` |
-| Publishable artifacts | 85 across `archives=13 docker=4 go=56 npm=12 template-archives=7` |
-| Publish order | protocols → go-framework → typescript-framework → language-extensions → cli → templates |
+| Publishable artifacts | 98 across `archives=18 docker=4 go=62 npm=14 template-archives=7` |
+| Publish order | protocols → extension-sdk → go-framework → typescript-framework → language-extensions → cli → contributor-extensions → templates |
 | Public-cut scrub findings | 0 unresolved beyond the reviewed baseline |
 
 The `docker` channel carries four artifacts — the documentation site, the
