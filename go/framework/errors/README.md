@@ -59,7 +59,7 @@ return errors.User(errors.CodeBadRequest, "email is required")
 ### Newf — formatted message with stack
 
 ```go
-return errors.Newf(CodeMigration, "migration %q failed at step %d", name, step)
+return errors.Newf(CodeDatasource, "datasource %q is not declared", name)
 ```
 
 ## Error Codes
@@ -70,8 +70,9 @@ Every package defines its own codes as `errors.Code` constants:
 const (
     CodeConnection  errors.Code = "db.connection"
     CodeQuery       errors.Code = "db.query"
-    CodeMigration   errors.Code = "db.migration"
     CodeTransaction errors.Code = "db.transaction"
+    CodeDatasource  errors.Code = "db.datasource"
+    CodeBinding     errors.Code = "db.binding"
 )
 ```
 
