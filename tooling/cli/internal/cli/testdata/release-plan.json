@@ -1,7 +1,7 @@
 {
   "protocolVersion": 1,
   "release": {
-    "series": "0.2.0",
+    "series": "0.3.0",
     "license": "FSL-1.1-MIT",
     "futureLicense": "MIT",
     "targets": [
