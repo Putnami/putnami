@@ -84,8 +84,8 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  24,
-		funcs:  162,
-		why: "RAISED 157→162 (ADR 0057): a run that may publish reads its ancestry at process start, " +
+		funcs:  163,
+		why: "RAISED 157→163 (ADR 0057): a run that may publish reads its ancestry at process start, " +
 			"before the first-use bootstrap or an install runs repository code, and Engine.Run reuses " +
 			"that read. ancestry.go holds CaptureAncestry, the one entry adapters call, capturedAncestry, " +
 			"which hands Engine.Run the snapshot only for the same workspace, mayPublish, the predicate " +
