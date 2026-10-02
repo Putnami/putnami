@@ -231,7 +231,7 @@ Each framework package defines its own error codes:
 |---------|-------|
 | `inject` | `inject.not_registered`, `inject.circular_dependency`, `inject.scope_violation`, `inject.container_closed`, `inject.duplicate_provider`, `inject.requirement_not_met`, `inject.type_mismatch`, `inject.factory_failed` |
 | `app` | `app.already_running`, `app.configure`, `app.register`, `app.start`, `app.stop`, `app.invoke`, `app.runner` |
-| `sql` | `db.connection`, `db.query`, `db.migration`, `db.transaction` |
+| `database` | `db.connection`, `db.query`, `db.transaction`, `db.datasource`, `db.binding` |
 | `http` | `http.listen`, `http.body`, `http.scope`, `http.no_server`, `http.ambiguous_server` |
 | `config` | `config.source`, `config.path`, `config.mapping` |
 

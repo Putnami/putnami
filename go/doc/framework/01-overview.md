@@ -4,7 +4,7 @@ The Putnami Go framework follows the same Putnami architecture in idiomatic Go. 
 
 ## Installation
 
-All Go packages use the `go.putnami.dev` import domain. Its `go-import` meta tags name the module proxy at `https://go.putnami.dev`, which serves anonymous reads, so the default `GOPROXY` resolves every package through `proxy.golang.org` without credentials.
+All Go packages use the `go.putnami.dev` import domain. Its `go-import` meta tags name the module proxy at `https://go.putnami.dev`, which serves anonymous reads, so the default `GOPROXY` resolves every package without credentials.
 
 The quickest start is a Putnami project: `putnami projects create api --template go-server` pins the newest framework version your Go module proxies serve. To add a package to another module:
 

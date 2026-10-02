@@ -62,9 +62,10 @@ The generic `Repository[T]` provides typed CRUD operations for a database table:
 
 ### Defining a repository
 
-Every repository method selects `*`, so the scan function receives every column
-of the table, in the order the table declares them. Scan one destination per
-column. The examples on this page use this table:
+The finder methods (`FindByID`, `FindAll`, `FindWhere` and the others) select
+`*`, so the scan function receives every column of the table, in the order the
+table declares them. Scan one destination per column, and make a raw `Query` or
+`QueryOne` return the same columns. The examples on this page use this table:
 
 ```sql
 CREATE TABLE users (
@@ -172,7 +173,10 @@ func (r *UserRepository) Create(ctx context.Context, user User) error {
 ```go
 err := database.WithTx(ctx, pool, func(ctx context.Context) error {
     // All queries within this function use the same transaction
-    _, err := pool.Exec(ctx, "INSERT INTO users (id, name) VALUES ($1, $2)", id, name)
+    _, err := pool.Exec(ctx,
+        "INSERT INTO users (id, name, email, age) VALUES ($1, $2, $3, $4)",
+        id, name, email, age,
+    )
     if err != nil {
         return err // triggers rollback
     }
@@ -252,7 +256,9 @@ database.WithTx(ctx, pool, func(ctx context.Context) error {
 You can also check for an active transaction:
 
 ```go
-tx := database.TxFromContext(ctx, pool) // the WithTx transaction on this pool
+// The WithTx transaction on this pool; nil inside a unit of work alone.
+// database.InUnitOfWork(ctx) reports a request-scoped unit of work.
+tx := database.TxFromContext(ctx, pool)
 if tx != nil {
     // inside a transaction
 }
@@ -261,8 +267,9 @@ if tx != nil {
 ## Query builder
 
 A lightweight builder for common SQL patterns. `Build` quotes the table and the
-columns you name, never a condition. Number the placeholders of each `Where`, `Set` or `Having` call from
-`$1`: the builder shifts them past the arguments earlier calls added.
+columns you name, never a condition. Number the placeholders of each `Where`,
+`Set` or `Having` call from `$1`: the builder shifts them past the arguments
+earlier calls added.
 
 ### SELECT
 
@@ -286,12 +293,12 @@ query, args := database.Select("users").
 
 ```go
 query, args := database.Insert("users").
-    Columns("id", "name", "email").
-    Values("user-123", "Jane", "jane@example.com").
+    Columns("id", "name", "email", "age").
+    Values("user-123", "Jane", "jane@example.com", 34).
     Returning("id", "created_at").
     Build()
 
-// query: INSERT INTO "users" ("id", "name", "email") VALUES ($1, $2, $3) RETURNING "id", "created_at"
+// query: INSERT INTO "users" ("id", "name", "email", "age") VALUES ($1, $2, $3, $4) RETURNING "id", "created_at"
 ```
 
 ### UPDATE
@@ -299,11 +306,11 @@ query, args := database.Insert("users").
 ```go
 query, args := database.Update("users").
     Set("name = $1", "Jane Doe").
-    Set("updated_at = $1", time.Now()).
+    Set("age = $1", 35).
     Where("id = $1", "user-123").
     Build()
 
-// query: UPDATE "users" SET name = $1, updated_at = $2 WHERE id = $3
+// query: UPDATE "users" SET name = $1, age = $2 WHERE id = $3
 ```
 
 ### DELETE
@@ -368,8 +375,10 @@ import (
 
 a := app.New("my-service")
 a.Module.Use(database.NewPlugin(database.PluginConfig{
-    DSN:      "postgres://localhost/mydb",
-    MaxConns: 10,
+    Pool: database.PoolConfig{
+        DSN:      "postgres://localhost/mydb",
+        MaxConns: 10,
+    },
 }))
 ```
 

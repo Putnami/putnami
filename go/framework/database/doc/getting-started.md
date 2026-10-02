@@ -297,7 +297,7 @@ func (r *UserRepo) Create(ctx context.Context, name, email string) (User, error)
 
 ## Query Builder
 
-The `QueryBuilder` constructs parameterized SQL queries with a fluent API. It handles positional parameter rewriting automatically -- each `.Where()` or `.Set()` call uses `$1`-based numbering locally, and the builder renumbers them in the final query.
+The `QueryBuilder` constructs parameterized SQL queries with a fluent API. `Build` quotes the table and the columns you name, never a condition. It handles positional parameter rewriting automatically -- each `.Where()` or `.Set()` call uses `$1`-based numbering locally, and the builder renumbers them in the final query.
 
 ### SELECT
 
@@ -310,7 +310,7 @@ q, args := database.Select("users").
     Limit(10).
     Offset(20).
     Build()
-// q    = "SELECT id, name, email FROM users WHERE age > $1 AND active = $2 ORDER BY name ASC LIMIT 10 OFFSET 20"
+// q    = `SELECT "id", "name", "email" FROM "users" WHERE age > $1 AND active = $2 ORDER BY "name" ASC LIMIT 10 OFFSET 20`
 // args = [18, true]
 ```
 
@@ -325,7 +325,7 @@ q, args := database.Select("orders").
     GroupBy("status").
     Having("COUNT(*) > 5").
     Build()
-// q    = "SELECT status, COUNT(*) as count FROM orders WHERE created_at > $1 GROUP BY status HAVING COUNT(*) > 5"
+// q    = `SELECT "status", COUNT(*) as count FROM "orders" WHERE created_at > $1 GROUP BY "status" HAVING COUNT(*) > 5`
 // args = ["2024-01-01"]
 ```
 
@@ -338,7 +338,7 @@ q, args := database.Insert("users").
     Values("Alice", "alice@example.com").
     Returning("id", "created_at").
     Build()
-// q    = "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, created_at"
+// q    = `INSERT INTO "users" ("name", "email") VALUES ($1, $2) RETURNING "id", "created_at"`
 // args = ["Alice", "alice@example.com"]
 
 // Multiple rows
@@ -347,7 +347,7 @@ q, args := database.Insert("users").
     Values("Alice", "alice@example.com").
     Values("Bob", "bob@example.com").
     Build()
-// q    = "INSERT INTO users (name, email) VALUES ($1, $2), ($3, $4)"
+// q    = `INSERT INTO "users" ("name", "email") VALUES ($1, $2), ($3, $4)`
 // args = ["Alice", "alice@example.com", "Bob", "bob@example.com"]
 ```
 
@@ -360,7 +360,7 @@ q, args := database.Update("users").
     Where("id = $1", 42).
     Returning("*").
     Build()
-// q    = "UPDATE users SET name = $1, age = $2 WHERE id = $3 RETURNING *"
+// q    = `UPDATE "users" SET name = $1, age = $2 WHERE id = $3 RETURNING *`
 // args = ["Alice", 30, 42]
 ```
 
@@ -371,7 +371,7 @@ q, args := database.Delete("users").
     Where("active = $1", false).
     Returning("id").
     Build()
-// q    = "DELETE FROM users WHERE active = $1 RETURNING id"
+// q    = `DELETE FROM "users" WHERE active = $1 RETURNING "id"`
 // args = [false]
 ```
 
