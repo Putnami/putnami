@@ -187,6 +187,8 @@ type MemberProbe struct {
 	RegistryDigest string `json:"registryDigest,omitempty"`
 	// Reason says why the state is MemberProbeConflict or
 	// MemberProbeUnverified. It is required for both and carries no credential.
+	// On MemberProbeIdentical it is optional and says what the local artifact
+	// is, when the dry run compared one an earlier package staged.
 	Reason string `json:"reason,omitempty"`
 	// Anonymous is true when the registry answered a request that carried no
 	// credential. A registry answers an anonymous request for a private member
@@ -201,7 +203,7 @@ const MemberProbeEventKind = "member-probe"
 
 // The states of a MemberProbe. The set is closed: ValidateMemberProbe rejects
 // any other state. A consumer fails a dry run on MemberProbeConflict and
-// MemberProbeUnverified, and warns on MemberProbeRetag.
+// MemberProbeUnverified, and warns on MemberProbeTagMove.
 const (
 	// MemberProbeAbsent means the registry does not hold the version: the real
 	// publish uploads it.
@@ -219,12 +221,17 @@ const (
 	// error, a timeout, a refused credential, a server error or a malformed
 	// answer. The outcome of the real publish is unknown.
 	MemberProbeUnverified = "unverified"
-	// MemberProbeRetag means the registry holds the version tag at other
+	// MemberProbeTagMove means the registry holds the version tag at other
 	// content and the real publish moves the tag to the local artifact.
 	// RegistryDigest names the content the tag points at; ArtifactDigest, when
-	// the dry run built an artifact, differs from it.
-	MemberProbeRetag = "retag"
+	// the dry run built an artifact, differs from it. Only an OCI probe
+	// (Ecosystem "oci") emits it: no other registry has a tag to move.
+	MemberProbeTagMove = "tag-move"
 )
+
+// memberProbeTagMoveEcosystem is the one ecosystem whose probe may report
+// MemberProbeTagMove.
+const memberProbeTagMoveEcosystem = "oci"
 
 // NamedManifest pairs a parsed manifest with the extension name it was loaded
 // under, so resolution diagnostics can name the manifest at fault.
@@ -661,9 +668,9 @@ func validateProbeRegistry(registry string) []diag.Diagnostic {
 }
 
 // validateProbeState checks the evidence each state requires: absent carries
-// no registry digest, identical carries two equal digests, retag carries a
-// registry digest that differs from the artifact digest, and conflict and
-// unverified carry a reason.
+// no registry digest, identical carries two equal digests, tag-move comes from
+// an OCI probe and carries a registry digest that differs from the artifact
+// digest, and conflict and unverified carry a reason.
 func validateProbeState(p *MemberProbe) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	switch p.State {
@@ -677,7 +684,11 @@ func validateProbeState(p *MemberProbe) []diag.Diagnostic {
 			diags = append(diags, diag.Errorf("invalid-member-probe", "registryDigest",
 				"state %s requires an artifactDigest and an equal registryDigest", p.State))
 		}
-	case MemberProbeRetag:
+	case MemberProbeTagMove:
+		if p.Ecosystem != memberProbeTagMoveEcosystem {
+			diags = append(diags, diag.Errorf("invalid-member-probe", "ecosystem",
+				"state %s is only valid for ecosystem %s, not %q", p.State, memberProbeTagMoveEcosystem, p.Ecosystem))
+		}
 		if p.RegistryDigest == "" || p.ArtifactDigest == p.RegistryDigest {
 			diags = append(diags, diag.Errorf("invalid-member-probe", "registryDigest",
 				"state %s requires a registryDigest that differs from the artifactDigest", p.State))
@@ -686,7 +697,7 @@ func validateProbeState(p *MemberProbe) []diag.Diagnostic {
 	default:
 		return []diag.Diagnostic{diag.Errorf("invalid-member-probe", "state",
 			"state %q must be one of: %s, %s, %s, %s, %s", p.State,
-			MemberProbeAbsent, MemberProbeIdentical, MemberProbeConflict, MemberProbeUnverified, MemberProbeRetag)}
+			MemberProbeAbsent, MemberProbeIdentical, MemberProbeConflict, MemberProbeUnverified, MemberProbeTagMove)}
 	}
 	if (p.State == MemberProbeConflict || p.State == MemberProbeUnverified) && strings.TrimSpace(p.Reason) == "" {
 		diags = append(diags, diag.Errorf("invalid-member-probe", "reason",

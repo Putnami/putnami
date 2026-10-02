@@ -85,7 +85,7 @@
     },
     {
       "id": "dry-run-member-probe",
-      "text": "A dry-run publication asks its registry, with GET or HEAD only, whether it already holds the member at the version the real publish would write, and emits one member-probe event per member: absent, identical when the registry digest equals the local artifact, retag when the real publish moves a version tag held at other content, conflict when it cannot reuse the held version, unverified when the registry cannot answer. An answer obtained without a credential is marked anonymous. The orchestrator decides."
+      "text": "A dry-run publication asks its registry, with GET or HEAD only, whether it holds the member at the version the real publish would write, and emits one member-probe event per member: absent, identical when the registry digest equals the local artifact, naming a staged one, tag-move when the managed OCI registry holds the version tag at other content, conflict when the publish cannot reuse the held version, unverified when the registry cannot answer. An anonymous answer is marked. The orchestrator decides."
     },
     {
       "id": "agent-content-packaging",

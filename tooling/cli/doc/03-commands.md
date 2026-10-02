@@ -66,16 +66,16 @@ When every job has ended, the CLI prints one report on standard error:
 putnami: publish --dry-run registry checks
   conflict    npm @acme/widget@2.0.0 at https://registry.npmjs.org: the registry already holds this version with another digest; the real publish cannot overwrite it
   unverified  go example.com/mod@v2.0.0 at https://go.example.com: the registry could not be reached: connection refused
-  reused      oci acme/api@2.0.0 at registry.example.com: the registry holds the same digest sha256:…, so the publish reuses it
+  reused      oci acme/api@2.0.0 at registry.example.com: the registry holds the same digest sha256:…, so the publish reuses it (compared with the image the last `package` staged; re-run `package` if the source changed since)
   absent      3 member(s) are not in their registry: the publish uploads them
-  warning: publish will move tag 2.0.0 of acme/worker on registry.example.com from sha256:… to sha256:…
+  warning: publish will move tag 2.0.0 of acme/worker on oci.putnami.dev from sha256:… to sha256:…
 ```
 
 | State | Meaning | Dry run |
 |-------|---------|---------|
 | `absent` | The registry does not hold the version. | Passes. |
-| `identical` (printed `reused`) | The registry holds the version with the same content digest. The publish reuses it. | Passes. |
-| `retag` (printed as a warning) | The registry holds an image's version tag at another digest. The publish moves the tag to the image it builds. | Passes. |
+| `identical` (printed `reused`) | The registry holds the version with the same content digest. The publish reuses it. When the compared artifact is one the last `package` staged, the line names it. | Passes. |
+| `tag-move` (printed as a warning) | The managed registry `oci.putnami.dev` holds an image's version tag at another digest. The publish moves the tag to the image it builds. On any other registry the same answer is a `conflict`, because that registry may refuse the move. | Passes. |
 | `conflict` | The registry holds the version and the real publish cannot reuse it: the digest differs, the dry run has no artifact to compare, or the registry may have released the version, which the publisher refuses. The reason says which. | Fails. |
 | `unverified` | The registry gave no usable answer: no network, a timeout, a 401 or 403, a server error. | Fails. |
 
@@ -94,9 +94,9 @@ error diagnostic per such member. A dry run without network access fails as
 
 The report also prints warnings, which do not fail the run:
 
-- `publish will move tag …`: a `retag`, with the registry digest and the local
-  one, or `the image this publish builds` when the dry run has no image. A
-  registry with immutable tags refuses the move, which a read cannot see.
+- `publish will move tag …`: a `tag-move` on `oci.putnami.dev`, with the
+  registry digest and the local one, or `the image this publish builds` when
+  the dry run has no image.
 - `not probed`: under a release-set plan, a selected member whose publisher
   reported no check, with the publisher and the publish step, or with the
   statement that the publish route is unknown.

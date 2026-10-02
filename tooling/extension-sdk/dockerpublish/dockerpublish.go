@@ -164,12 +164,12 @@ func Publish(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 			emit.Info("  - " + ref)
 		}
 		emitPublishedDocker(emit, qualifiedImage, version, runtime.PublishRecord{DryRun: true})
-		// The probe asks for the version tag, the one tag this publisher writes
-		// and moves, and compares it with the packaged manifest digest. An empty
+		// The probe asks for the version tag, the one tag this publisher writes on
+		// every route, and compares it with the packaged manifest digest. An empty
 		// registry is asked nothing.
 		emitImageProbe(emit, imageProbe{
 			host: regHost, repository: qualifiedImage, version: version, ref: versionRef,
-			digest: contentDigest, movesTag: true, keychain: keychain, transport: route.transport,
+			digest: contentDigest, versionTag: true, keychain: keychain, transport: route.transport,
 		})
 		return "OK", map[string]any{"dryRun": true, "imageName": imageName, "refs": allRefs, "contentTag": contentTag}, nil
 	}

@@ -149,11 +149,12 @@ func TestGoModuleDryRunProbesTheRegistry(t *testing.T) {
 		},
 		{
 			name: "under a plan the staged zip is identical", served: "staged", planned: true,
-			wantState: extproto.MemberProbeIdentical, wantLocal: true,
+			wantState: extproto.MemberProbeIdentical, wantLocal: true, wantReason: "compared with the module zip the last `package` staged",
 		},
 		{
 			name: "under a plan the staged zip read without a credential is identical", served: "staged", planned: true,
 			anonymous: true, wantState: extproto.MemberProbeIdentical, wantLocal: true,
+			wantReason: "compared with the module zip the last `package` staged",
 		},
 		{
 			name: "under a plan another zip is a conflict", served: "another module zip", planned: true,
@@ -220,6 +221,46 @@ func TestGoModuleDryRunProbesTheRegistry(t *testing.T) {
 			}
 			assertOneZipRead(t, server, wantAuthorization)
 		})
+	}
+}
+
+// The zip a dry run compares is the one an earlier package staged. While it is
+// the zip the registry serves, the version is reused and the verdict names the
+// staged zip, because it may predate the source; once package stages other
+// bytes, the same served version is a conflict.
+func TestGoModuleDryRunComparesTheStagedZip(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "dry-run-registry-probe", "identical-names-the-staged-zip")
+	ctx, zipBytes, _, stagedDigest := managedGoPublishTestContext(t)
+	ctx.Params = managedGoBootstrapParams(t)
+	server := recorded.NewServer(t, servedZip(zipBytes))
+	declareGoOrigin(t, ctx.WorkspaceRoot, server.URL)
+
+	probe := oneGoProbe(t, ctx)
+	if probe.State != extproto.MemberProbeIdentical || probe.ArtifactDigest != stagedDigest ||
+		probe.Reason != memberprobe.StagedReason("module zip") {
+		t.Fatalf("probe = %+v, want identical at %s, naming the staged module zip", probe, stagedDigest)
+	}
+
+	restaged := []byte("go module zip bytes a later package staged")
+	if err := os.WriteFile(filepath.Join(ctx.WorkspaceRoot, "module.zip"), restaged, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	restagedDigest, err := sha256OfFile(filepath.Join(ctx.WorkspaceRoot, "module.zip"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe = oneGoProbe(t, ctx)
+	if probe.State != extproto.MemberProbeConflict || probe.ArtifactDigest != restagedDigest ||
+		probe.RegistryDigest != stagedDigest || probe.Reason != reasonGoOtherDigest {
+		t.Fatalf("probe = %+v, want a conflict of the restaged zip %s against the served %s", probe, restagedDigest, stagedDigest)
+	}
+	for _, request := range server.Requests() {
+		if request.Method != http.MethodGet || request.URL.Path != probeZipPath {
+			t.Fatalf("the dry run sent %s %s, want only the GET of the module zip", request.Method, request.URL.Path)
+		}
+	}
+	if requests := server.Requests(); len(requests) != 2 {
+		t.Fatalf("the two dry runs sent %d registry requests, want one each", len(requests))
 	}
 }
 

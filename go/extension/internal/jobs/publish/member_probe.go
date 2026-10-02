@@ -32,6 +32,10 @@ const reasonGoReleased = "the registry already serves this version; a Go publish
 const reasonGoOtherDigest = "the registry already holds this version with another zip digest; it keeps those bytes " +
 	"when the version is sent again, so the real publish fails its verification of the served zip"
 
+// stagedGoZipArtifact names the local artifact a Go probe compares: the module
+// zip an earlier package staged.
+const stagedGoZipArtifact = "module zip"
+
 // probeGoModule asks the registry whether it already serves modulePath at
 // version and emits the answer as one member-probe event.
 //
@@ -62,6 +66,8 @@ func probeGoModule(params pctx.Params, emit *jsonl.Emitter, route goPublishRoute
 			return
 		}
 		subject.ArtifactDigest = digest
+		// The zip comes from an earlier package, so an identical verdict says so.
+		subject.Staged = stagedGoZipArtifact
 	}
 	memberprobe.Emit(emit, askGoRegistry(subject, route.endpoint, token, planned))
 }

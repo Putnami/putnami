@@ -18,7 +18,7 @@
   "requirements": [
     {
       "id": "one-pass-verdict",
-      "text": "An executing publish --dry-run reads every member-probe event of its jobs through the strict protocol reader, with or without a release-set plan. It prints one report: each conflict and unverified probe with its member, registry, version and reason, each identical member as reused, each retag as a warning naming the tag and both digests, and a count of absent members. The run fails once, naming every conflict, unverified and refused probe, each also as an error diagnostic. Absent, identical and retag pass."
+      "text": "An executing publish --dry-run reads every member-probe event through the strict protocol reader, with or without a release-set plan. It prints one report: each conflict and unverified probe with its member, registry, version and reason, each identical member as reused with its reason, each tag-move as a warning naming the tag and both digests, and a count of absent members. The run fails once, naming every conflict, unverified and refused probe, each also as an error diagnostic. Other states pass."
     },
     {
       "id": "plan-coverage",

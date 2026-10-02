@@ -6,7 +6,7 @@
 // publisher's own sources yield, which for a managed host is the host-only
 // registry-token seam the real publish asks, and is anonymous when none
 // resolves. The orchestrator fails the dry run on a conflict or an unverified
-// answer, and warns on a retag.
+// answer, and warns on a tag move.
 //
 // The package owns what the four registry kinds share: the verdict rules, the
 // wording of a reason, the credential-free form of an endpoint and the emit
@@ -66,6 +66,11 @@ type Subject struct {
 	// ArtifactDigest is the digest of the local artifact the real publish would
 	// upload, or empty when the dry run built none.
 	ArtifactDigest string
+	// Staged names the local artifact, such as "module zip" or "image", when it
+	// is one an earlier package staged rather than one the dry run built. An
+	// identical verdict then says what it compared, because that artifact may
+	// predate the source. Empty otherwise.
+	Staged string
 	// Anonymous is true when the request carried no credential.
 	Anonymous bool
 }
@@ -81,6 +86,23 @@ func (s Subject) probe(state string) extproto.MemberProbe {
 		ArtifactDigest: s.ArtifactDigest,
 		Anonymous:      s.Anonymous,
 	}
+}
+
+// identical is the verdict for a registry that holds the version with the local
+// artifact's digest. It names a staged artifact.
+func (s Subject) identical(registryDigest string) extproto.MemberProbe {
+	probe := s.probe(extproto.MemberProbeIdentical)
+	probe.RegistryDigest = registryDigest
+	if s.Staged != "" {
+		probe.Reason = StagedReason(s.Staged)
+	}
+	return probe
+}
+
+// StagedReason is the reason an identical verdict carries when it compared an
+// artifact an earlier package staged. artifact names it, such as "module zip".
+func StagedReason(artifact string) string {
+	return "compared with the " + artifact + " the last `package` staged; re-run `package` if the source changed since"
 }
 
 // Absent is the verdict for a registry that does not hold the version.
@@ -106,29 +128,26 @@ func (s Subject) HeldWith(registryDigest, otherDigest string) extproto.MemberPro
 	case registryDigest == "":
 		return s.Unverified("the registry holds this version but advertised no digest to compare")
 	case registryDigest == s.ArtifactDigest:
-		probe := s.probe(extproto.MemberProbeIdentical)
-		probe.RegistryDigest = registryDigest
-		return probe
+		return s.identical(registryDigest)
 	default:
 		return s.Conflict(registryDigest, otherDigest)
 	}
 }
 
-// HeldTag is the verdict for a registry that holds the version tag at
+// HeldTag is the verdict for an OCI registry that holds the version tag at
 // registryDigest, for a publisher whose real publish moves the tag to the local
-// artifact. It is identical when the digests are equal, retag when they differ
-// or when the dry run built no artifact, and unverified when the registry
-// advertised no digest.
+// artifact on that registry. It is identical when the digests are equal,
+// tag-move when they differ or when the dry run built no artifact, and
+// unverified when the registry advertised no digest. A registry that may refuse
+// to move a tag takes HeldWith instead.
 func (s Subject) HeldTag(registryDigest string) extproto.MemberProbe {
 	switch {
 	case registryDigest == "":
 		return s.Unverified("the registry holds this version tag but advertised no digest to compare")
 	case registryDigest == s.ArtifactDigest:
-		probe := s.probe(extproto.MemberProbeIdentical)
-		probe.RegistryDigest = registryDigest
-		return probe
+		return s.identical(registryDigest)
 	default:
-		probe := s.probe(extproto.MemberProbeRetag)
+		probe := s.probe(extproto.MemberProbeTagMove)
 		probe.RegistryDigest = registryDigest
 		return probe
 	}

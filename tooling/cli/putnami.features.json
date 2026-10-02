@@ -2959,8 +2959,8 @@
               "unreadable-probe-fails",
               "verdicts-reach-the-machine-output",
               "conflict-fails-the-run",
-              "retag-is-a-warning",
-              "retag-does-not-hide-a-conflict"
+              "tag-move-is-a-warning",
+              "tag-move-does-not-hide-a-conflict"
             ]
           }
         },

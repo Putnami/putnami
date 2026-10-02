@@ -42,31 +42,39 @@ through the registry client and the keychain of a real push, and emits one
 |-------|------|
 | `absent` | The registry answers 404. |
 | `identical` | The registry holds the manifest digest package assembled. The real publish reuses it. |
-| `retag` | The registry holds the version tag at another digest, and the real publish moves the tag. |
-| `conflict` | The registry holds another digest at a reference the real publish does not move, or package assembled no image to compare it with. |
+| `tag-move` | The managed registry `oci.putnami.dev` holds the version tag at another digest, and the real publish moves the tag. |
+| `conflict` | The registry holds another digest at a reference the real publish cannot move, or package assembled no image to compare it with. |
 | `unverified` | The registry cannot be reached, refuses the request, or answers outside the protocol. |
 
 A workload image is asked at its version tag, an image project at its digest.
 The probe compares with the manifest in the project's package directory. A
 dry-run package that assembles no image leaves the manifest of the last real
 `package` in place, so the comparison uses that image; its digest is checked,
-its version is not. A version tag held at another digest is a `retag`: the real
-publish moves the tag to the packaged image, and the orchestrator prints a
-warning that names both digests instead of failing the run. A registry with
-immutable tags refuses that move, which a read cannot see.
+its version is not. An `identical` verdict says so: its reason reads "compared
+with the image the last `package` staged; re-run `package` if the source
+changed since".
 
-When the project holds no manifest and the invocation carries a release-set
+A version tag held at another digest is a `tag-move` on `oci.putnami.dev`
+alone, where a manifest PUT moves the tag: the real publish moves it to the
+packaged image, and the orchestrator prints a warning that names both digests
+instead of failing the run. On any other registry it is a `conflict`: the dry
+run cannot tell whether that registry lets the publish move the tag, and a
+registry with immutable tags, for example, refuses it.
+
+When a workload holds no manifest and the invocation carries a release-set
 plan, the plan's selected OCI members of the project supply the coordinate and
-the version, and the probe asks for the version tag. When the real publish
-pushes that tag, as for a workload or for an image project outside a private
-publication broker, a held tag is a `retag` without a local digest. Any other
-held version is a `conflict` that names the remedy: run `putnami package` for
-the project without `--dry-run`, then the dry run again. The probe resolves the
-credential once for the host, through the host-only seam the real push asks;
-the cloud decides what the credential grants. The event marks an answer
-obtained without a credential as anonymous. The task succeeds whatever the
-answer; the orchestrator fails the dry run on `conflict` and `unverified`. A
-`member-probe` event is never publication evidence.
+the version, and the probe asks for the version tag. A held tag is a
+`tag-move` without a local digest on `oci.putnami.dev`, and on any other
+registry a `conflict` that names the remedy: run `putnami package` for the
+project without `--dry-run`, then the dry run again. An image project without
+a manifest is not probed: its publish writes the content tag or the digest
+package computes, never the plan's version tag, so the orchestrator lists its
+member as not probed. The probe resolves the credential once for the host,
+through the host-only seam the real push asks; the cloud decides what the
+credential grants. The event marks an answer obtained without a credential as
+anonymous. The task succeeds whatever the answer; the orchestrator fails the
+dry run on `conflict` and `unverified`. A `member-probe` event is never
+publication evidence.
 
 The `dry-run-member-probe` requirement covers this contract, and the probe of
 a put archive (`memberprobe.ProbeArchive`).

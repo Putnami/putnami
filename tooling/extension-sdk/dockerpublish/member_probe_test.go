@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -15,8 +16,10 @@ import (
 
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/memberprobe"
+	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/registrycred"
 )
 
@@ -27,6 +30,52 @@ func stubManifestHead(t *testing.T, err error) {
 	original := probeManifestHead
 	probeManifestHead = func(string, ...crane.Option) (*v1.Descriptor, error) { return nil, err }
 	t.Cleanup(func() { probeManifestHead = original })
+}
+
+// stubbedHeldDigest is the digest stubManifestDigest answers with.
+const stubbedHeldDigest = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+
+// stubManifestDigest makes the probe's manifest HEAD answer that the registry
+// holds every asked ref at stubbedHeldDigest, and records the refs asked. It
+// stands in for the managed registry, whose real answer needs its production
+// token endpoint.
+func stubManifestDigest(t *testing.T) *[]string {
+	t.Helper()
+	hash, err := v1.NewHash(stubbedHeldDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var asked []string
+	original := probeManifestHead
+	probeManifestHead = func(ref string, _ ...crane.Option) (*v1.Descriptor, error) {
+		asked = append(asked, ref)
+		return &v1.Descriptor{Digest: hash}, nil
+	}
+	t.Cleanup(func() { probeManifestHead = original })
+	return &asked
+}
+
+// restageImage writes the Docker manifest an earlier package would leave for
+// another image, and returns that image's digest. A dry run reads only the
+// manifest, so the layout is not rewritten.
+func restageImage(t *testing.T, ctx *pctx.Context) string {
+	t.Helper()
+	path := filepath.Join(pkgmeta.PackageOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, "docker"), "manifest.json")
+	manifest, err := pkgmeta.ReadDockerManifest(ctx.WorkspaceRoot, ctx.Project.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	image, err := random.Image(64, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := image.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest.Digest = digest.String()
+	writeJSONFile(t, path, manifest)
+	return manifest.Digest
 }
 
 // dryRunProbes runs one dry-run publication and returns the probes it emitted,
@@ -130,20 +179,23 @@ func TestDryRunProbesTheVersionTag(t *testing.T) {
 		before := len(fixture.registry.recordedCalls())
 		probe := oneProbe(t, dryRunProbes(t, dryRun(fixture)))
 		assertMember(t, fixture, probe)
-		if probe.State != extproto.MemberProbeIdentical || probe.RegistryDigest != fixture.digest {
-			t.Fatalf("probe = %+v, want identical at %s", probe, fixture.digest)
+		if probe.State != extproto.MemberProbeIdentical || probe.RegistryDigest != fixture.digest ||
+			probe.Reason != memberprobe.StagedReason("image") {
+			t.Fatalf("probe = %+v, want identical at %s, naming the staged image", probe, fixture.digest)
 		}
 		assertReadOnly(t, fixture.registry.recordedCalls()[before:])
 	})
 
-	t.Run("another digest is a retag", func(t *testing.T) {
+	// Only the managed registry is known to move a tag on a manifest PUT. This
+	// registry may refuse it, so a tag held at other content is a conflict.
+	t.Run("another digest is a conflict", func(t *testing.T) {
 		fixture := newDockerPublishFixture(t)
 		held := pushOtherImage(t, fixture.host+"/"+fixture.repository+":"+fixture.version)
 		before := len(fixture.registry.recordedCalls())
 		probe := oneProbe(t, dryRunProbes(t, dryRun(fixture)))
 		assertMember(t, fixture, probe)
-		if probe.State != extproto.MemberProbeRetag || probe.RegistryDigest != held {
-			t.Fatalf("probe = %+v, want a retag from the held digest %s: the real publish moves the tag", probe, held)
+		if probe.State != extproto.MemberProbeConflict || probe.RegistryDigest != held || probe.Reason != reasonOCITagHeld {
+			t.Fatalf("probe = %+v, want a conflict from the held digest %s that says the move may be refused", probe, held)
 		}
 		assertReadOnly(t, fixture.registry.recordedCalls()[before:])
 	})
@@ -215,8 +267,8 @@ func TestDryRunProbesTheVersionTag(t *testing.T) {
 }
 
 // When package assembled no image, the dry run asks about the coordinate and
-// version the release-set plan names. A workload's held version tag is a retag
-// with no local digest: the real publish moves the tag to the image it builds.
+// version the release-set plan names. On a registry other than the managed one,
+// a held version tag is a conflict with no local digest that names the remedy.
 func TestDryRunProbesThePlannedMemberWithoutAnAssembledImage(t *testing.T) {
 	fixture := newDockerPublishFixture(t)
 	ctx := fixture.ctx
@@ -241,10 +293,115 @@ func TestDryRunProbesThePlannedMemberWithoutAnAssembledImage(t *testing.T) {
 	held := pushOtherImage(t, fixture.host+"/team/app:4.0.0")
 	before := len(fixture.registry.recordedCalls())
 	probe = oneProbe(t, dryRunProbes(t, dryRun))
-	if probe.State != extproto.MemberProbeRetag || probe.RegistryDigest != held || probe.ArtifactDigest != "" {
-		t.Fatalf("probe = %+v, want a retag from the held digest %s with no local digest", probe, held)
+	if probe.State != extproto.MemberProbeConflict || probe.RegistryDigest != held || probe.ArtifactDigest != "" ||
+		probe.Reason != memberprobe.ReasonNoArtifact {
+		t.Fatalf("probe = %+v, want a conflict from the held digest %s with no local digest and the remedy", probe, held)
 	}
 	assertReadOnly(t, fixture.registry.recordedCalls()[before:])
+}
+
+// A version tag held at other content is a tag move on the managed registry
+// alone, where a manifest PUT moves the tag, with or without a staged image.
+// The same answer from any other registry is a conflict.
+func TestDryRunMovesATagOnlyOnTheManagedRegistry(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "dry-run-member-probe", "tag-move-only-on-the-managed-registry")
+	const held = stubbedHeldDigest
+	t.Setenv(privateOCIRegistryURLEnv, "")
+	managed := `{"oci":{"publish":"` + managedOCIRegistry + `/putnami"}}`
+
+	t.Run("a staged image", func(t *testing.T) {
+		fixture := newDockerPublishFixture(t)
+		fixture.ctx.Params["registries"] = json.RawMessage(managed)
+		stubResolveToken(t, privateOCITestToken)
+		asked := stubManifestDigest(t)
+		probe := oneProbe(t, dryRunProbes(t, func() (string, map[string]any, error) {
+			return Publish(fixture.ctx, jsonl.New(), []string{"--dry-run"})
+		}))
+		if probe.State != extproto.MemberProbeTagMove || probe.Registry != managedOCIRegistry ||
+			probe.RegistryDigest != held || probe.ArtifactDigest != fixture.digest || probe.Reason != "" {
+			t.Fatalf("probe = %+v, want a tag move on %s from %s to %s", probe, managedOCIRegistry, held, fixture.digest)
+		}
+		if len(*asked) != 1 || !strings.HasSuffix((*asked)[0], ":"+fixture.version) {
+			t.Fatalf("the dry run asked %v, want the version tag %s", *asked, fixture.version)
+		}
+	})
+
+	t.Run("no staged image", func(t *testing.T) {
+		fixture := newDockerPublishFixture(t)
+		ctx := fixture.ctx
+		ctx.WorkspaceRoot = t.TempDir()
+		plan := imageReleasePlan(ctx)
+		plan.Members[0].Coordinate = "putnami/team/app"
+		bindImageReleasePlan(t, ctx, plan)
+		ctx.Params["registries"] = json.RawMessage(managed)
+		stubResolveToken(t, privateOCITestToken)
+		stubManifestDigest(t)
+		probe := oneProbe(t, dryRunProbes(t, func() (string, map[string]any, error) {
+			return Publish(ctx, jsonl.New(), []string{"--dry-run"})
+		}))
+		if probe.State != extproto.MemberProbeTagMove || probe.RegistryDigest != held || probe.ArtifactDigest != "" {
+			t.Fatalf("probe = %+v, want a tag move from %s to the image the publish builds", probe, held)
+		}
+	})
+
+	t.Run("another registry", func(t *testing.T) {
+		fixture := newDockerPublishFixture(t)
+		stubManifestDigest(t)
+		probe := oneProbe(t, dryRunProbes(t, func() (string, map[string]any, error) {
+			return Publish(fixture.ctx, jsonl.New(), []string{"--dry-run"})
+		}))
+		if probe.State != extproto.MemberProbeConflict || probe.Reason != reasonOCITagHeld {
+			t.Fatalf("probe = %+v, want a conflict on %s that says the move may be refused", probe, fixture.host)
+		}
+	})
+}
+
+// The image a dry run compares is the one an earlier package staged. The same
+// image is reused, and the report names it as staged; an image staged again
+// with other bytes is a conflict against the version the registry holds.
+func TestDryRunComparesTheStagedImage(t *testing.T) {
+	fixture := newDockerPublishFixture(t)
+	if status, data, err := Publish(fixture.ctx, jsonl.New(), nil); err != nil || status != "OK" {
+		t.Fatalf("publish = (%q, %+v, %v), want OK", status, data, err)
+	}
+	dryRun := func() (string, map[string]any, error) {
+		return Publish(fixture.ctx, jsonl.New(), []string{"--dry-run"})
+	}
+
+	probe := oneProbe(t, dryRunProbes(t, dryRun))
+	if probe.State != extproto.MemberProbeIdentical || probe.ArtifactDigest != fixture.digest ||
+		probe.Reason != memberprobe.StagedReason("image") {
+		t.Fatalf("probe = %+v, want identical at %s, naming the staged image", probe, fixture.digest)
+	}
+
+	restaged := restageImage(t, fixture.ctx)
+	before := len(fixture.registry.recordedCalls())
+	probe = oneProbe(t, dryRunProbes(t, dryRun))
+	if probe.State != extproto.MemberProbeConflict || probe.ArtifactDigest != restaged ||
+		probe.RegistryDigest != fixture.digest || probe.Reason != reasonOCITagHeld {
+		t.Fatalf("probe = %+v, want a conflict of the restaged %s against the held %s", probe, restaged, fixture.digest)
+	}
+	assertReadOnly(t, fixture.registry.recordedCalls()[before:])
+}
+
+// An image project's publish writes the content tag or the digest package
+// computes, never the plan's version tag. Without a staged image there is
+// nothing to ask about, so the dry run sends no request and emits no probe; the
+// orchestrator lists the member as not probed.
+func TestDryRunDoesNotProbeAnImageProjectWithoutAStagedImage(t *testing.T) {
+	ctx, _ := newManagedImagePublishFixture(t)
+	bindImageReleasePlan(t, ctx, imageReleasePlan(ctx))
+	ctx.Params["registries"] = json.RawMessage(`{"oci":{"publish":"registry.example.test/team"}}`)
+	asked := stubManifestDigest(t)
+
+	if probes := dryRunProbes(t, func() (string, map[string]any, error) {
+		return Publish(ctx, jsonl.New(), []string{"--dry-run"})
+	}); len(probes) != 0 {
+		t.Fatalf("probes = %+v, want none for an image project without a staged image", probes)
+	}
+	if len(*asked) != 0 {
+		t.Fatalf("the dry run asked the registry about %v", *asked)
+	}
 }
 
 // The planned members of one project share a host, so their probes share one
@@ -311,4 +468,53 @@ func TestDryRunProbesAnImageProjectByDigest(t *testing.T) {
 	if heads := manifestHeads(calls); len(heads) != 1 || !strings.HasSuffix(heads[0], "/manifests/"+manifest.Digest) {
 		t.Fatalf("the dry run sent manifest HEADs %v, want one, by digest", heads)
 	}
+	if probe.Reason != memberprobe.StagedReason("image") {
+		t.Fatalf("reason = %q, want the note that names the staged image", probe.Reason)
+	}
+}
+
+// Under a private publication broker the image project's dry run asks the
+// broker, with the run's credential, about the digest; the probe still names
+// the managed registry and the logical coordinate.
+func TestDryRunProbesAnImageProjectThroughTheBroker(t *testing.T) {
+	broker := newPrivateOCITestBroker(t, "")
+	t.Setenv(privateOCIRegistryURLEnv, broker.server.URL+"/oci")
+	ctx, manifest := newManagedImagePublishFixture(t)
+	stubResolveToken(t, privateOCITestToken)
+	publish := func(dryRun bool) func() (string, map[string]any, error) {
+		return func() (string, map[string]any, error) {
+			return publishImmutableImageProject(ctx, jsonl.New(), dryRun, "", manifest)
+		}
+	}
+	assertDigestHead := func(t *testing.T, calls []privateOCITestCall) {
+		t.Helper()
+		assertReadOnly(t, calls)
+		for _, call := range calls {
+			if !strings.HasPrefix(call.Path, "/oci/v2/") ||
+				call.Path != "/oci/v2/" && call.Authorization != "Bearer "+privateOCITestToken {
+				t.Fatalf("broker request %s %s (%q), want /oci/v2 with the run credential", call.Method, call.Path, call.Authorization)
+			}
+		}
+		if heads := manifestHeads(calls); len(heads) != 1 || !strings.HasSuffix(heads[0], "/manifests/"+manifest.Digest) {
+			t.Fatalf("the dry run sent manifest HEADs %v, want one, by digest", heads)
+		}
+	}
+
+	probe := oneProbe(t, dryRunProbes(t, publish(true)))
+	if probe.State != extproto.MemberProbeAbsent || probe.Registry != managedOCIRegistry ||
+		probe.Coordinate != "team/"+manifest.Image || probe.ArtifactDigest != manifest.Digest || probe.Anonymous {
+		t.Fatalf("probe = %+v, want the image absent on %s with the run credential", probe, managedOCIRegistry)
+	}
+	assertDigestHead(t, broker.recordedCalls())
+
+	if status, data, err := publish(false)(); err != nil || status != "OK" {
+		t.Fatalf("publish = (%q, %+v, %v), want OK", status, data, err)
+	}
+	before := len(broker.recordedCalls())
+	probe = oneProbe(t, dryRunProbes(t, publish(true)))
+	if probe.State != extproto.MemberProbeIdentical || probe.RegistryDigest != manifest.Digest ||
+		probe.Reason != memberprobe.StagedReason("image") {
+		t.Fatalf("probe = %+v, want identical at %s, naming the staged image", probe, manifest.Digest)
+	}
+	assertDigestHead(t, broker.recordedCalls()[before:])
 }

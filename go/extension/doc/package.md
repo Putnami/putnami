@@ -264,7 +264,9 @@ HTTP client as a real publication, and emits one `member-probe` event:
 
 A dry-run `package` stages no zip. Under a plan the module and version come from
 the plan, and the dry run compares with the zip a real `package` staged
-earlier for that module and version. With none, the conflict says so: run
+earlier for that module and version. An `identical` verdict says so: its
+reason reads "compared with the module zip the last `package` staged; re-run
+`package` if the source changed since". With none, the conflict says so: run
 `putnami package` for the project without `--dry-run`, then the dry run again.
 Without a plan the module and version come from the staged module, or from the
 `go` channel record when the dry-run package staged none.

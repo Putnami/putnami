@@ -202,27 +202,29 @@ func TestPublishedMemberIsStrict(t *testing.T) {
 
 // TestMemberProbeIsStrict pins the dry-run probe's parse and validation
 // contract: an unknown field or state is a rejection, absent, identical and
-// retag carry the digest evidence they claim, conflict and unverified carry a
-// reason, and the registry endpoint carries no credential. A conflict may carry
-// equal digests: the publisher's reuse rule, not the digests, decides it.
+// tag-move carry the digest evidence they claim, only an OCI probe reports a
+// tag-move, conflict and unverified carry a reason, and the registry endpoint
+// carries no credential. A conflict may carry equal digests: the publisher's
+// reuse rule, not the digests, decides it.
 func TestMemberProbeIsStrict(t *testing.T) {
 	const local = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 	const remote = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
 	base := `"ecosystem":"npm","coordinate":"@acme/widget","version":"1.2.3","registry":"https://registry.example.test"`
+	ociBase := `"ecosystem":"oci","coordinate":"acme/api","version":"1.2.3","registry":"registry.example.test"`
 
 	for name, raw := range map[string]string{
-		"absent":            `{` + base + `,"state":"absent"}`,
-		"absent anonymous":  `{` + base + `,"state":"absent","artifactDigest":"` + local + `","anonymous":true}`,
-		"identical":         `{` + base + `,"state":"identical","artifactDigest":"` + local + `","registryDigest":"` + local + `"}`,
+		"absent":           `{` + base + `,"state":"absent"}`,
+		"absent anonymous": `{` + base + `,"state":"absent","artifactDigest":"` + local + `","anonymous":true}`,
+		"identical":        `{` + base + `,"state":"identical","artifactDigest":"` + local + `","registryDigest":"` + local + `"}`,
+		"identical with a note": `{` + base + `,"state":"identical","artifactDigest":"` + local + `","registryDigest":"` + local +
+			`","reason":"compared with the tarball the last package staged"}`,
 		"conflict":          `{` + base + `,"state":"conflict","artifactDigest":"` + local + `","registryDigest":"` + remote + `","reason":"digests differ"}`,
 		"conflict no local": `{` + base + `,"state":"conflict","reason":"the dry run built no artifact to compare"}`,
 		"conflict with equal digests": `{` + base + `,"state":"conflict","artifactDigest":"` + local + `","registryDigest":"` + local +
 			`","reason":"the publisher refuses an existing version"}`,
-		"unverified": `{` + base + `,"state":"unverified","reason":"connection refused"}`,
-		"retag": `{"ecosystem":"oci","coordinate":"acme/api","version":"1.2.3","registry":"registry.example.test",` +
-			`"state":"retag","artifactDigest":"` + local + `","registryDigest":"` + remote + `"}`,
-		"retag no local": `{"ecosystem":"oci","coordinate":"acme/api","version":"1.2.3","registry":"registry.example.test",` +
-			`"state":"retag","registryDigest":"` + remote + `"}`,
+		"unverified":        `{` + base + `,"state":"unverified","reason":"connection refused"}`,
+		"tag-move":          `{` + ociBase + `,"state":"tag-move","artifactDigest":"` + local + `","registryDigest":"` + remote + `"}`,
+		"tag-move no local": `{` + ociBase + `,"state":"tag-move","registryDigest":"` + remote + `"}`,
 		"bare host": `{"ecosystem":"oci","coordinate":"acme/api","version":"1.2.3","registry":"registry.example.test:5000",` +
 			`"state":"absent"}`,
 		"one platform": `{` + base + `,"state":"absent","platform":"linux/arm64"}`,
@@ -269,9 +271,12 @@ func TestMemberProbeIsStrict(t *testing.T) {
 		"identical with other digest": {
 			`{` + base + `,"state":"identical","artifactDigest":"` + local + `","registryDigest":"` + remote + `"}`, "registryDigest",
 		},
-		"retag without registry digest": {`{` + base + `,"state":"retag","artifactDigest":"` + local + `"}`, "registryDigest"},
-		"retag with equal digests": {
-			`{` + base + `,"state":"retag","artifactDigest":"` + local + `","registryDigest":"` + local + `"}`, "registryDigest",
+		"tag-move without registry digest": {`{` + ociBase + `,"state":"tag-move","artifactDigest":"` + local + `"}`, "registryDigest"},
+		"tag-move with equal digests": {
+			`{` + ociBase + `,"state":"tag-move","artifactDigest":"` + local + `","registryDigest":"` + local + `"}`, "registryDigest",
+		},
+		"tag-move from npm": {
+			`{` + base + `,"state":"tag-move","artifactDigest":"` + local + `","registryDigest":"` + remote + `"}`, "ecosystem",
 		},
 		"conflict without reason":   {`{` + base + `,"state":"conflict","registryDigest":"` + remote + `"}`, "reason"},
 		"unverified without reason": {`{` + base + `,"state":"unverified","reason":"  "}`, "reason"},
@@ -296,35 +301,6 @@ func TestMemberProbeIsStrict(t *testing.T) {
 	}
 }
 
-// ecosystemInvalidFixtureCodes maps each ecosystem counter-example to the exact
-// diagnostic codes it must produce, in order. This module has no central
-// fixture→code table, so the profile corpus carries its own: a new
-// counter-example is one fixture file and one line here.
-var ecosystemInvalidFixtureCodes = map[string][]string{
-	// THE ID IS AN IDENTIFIER — it becomes a registry path segment and a
-	// workspace `registries` key, so it cannot carry case or underscores.
-	"ecosystem-bad-id.json": {"invalid-ecosystem-profile"},
-	// SELF-CONTAINED — a pattern that does not compile would fail at plan time,
-	// on every project of the ecosystem at once.
-	"ecosystem-bad-pattern.json": {"invalid-ecosystem-profile"},
-	// SELF-CONTAINED — a publish job that does not exist validates here and
-	// fails at release time, the one path with no recovery.
-	"ecosystem-publish-missing.json": {"invalid-ecosystem-profile"},
-	// ONE OWNER — two declarations in one file are the same divergence risk as
-	// two extensions, reported before resolution ever sees the manifest.
-	"ecosystem-duplicate-id.json": {"duplicate-ecosystem-profile"},
-	// ONE OWNER — `uses` names ecosystems SOMEONE ELSE owns; using one's own is
-	// a second declaration spelled as a reference.
-	"ecosystem-uses-own.json": {"ecosystem-use-of-own-profile"},
-	// CLOSED VOCABULARY — `channel` says which projection the distribution
-	// backend implements, so a third value asks for behavior nobody has.
-	"ecosystem-bad-channel.json": {"invalid-ecosystem-profile"},
-}
-
-// TestEcosystemFixturesReportStableCodes pins each counter-example to its own
-// rule through the entry point consumers call. Exact-match rather than
-// contains: a fixture that started failing for a second, unrelated reason would
-// stop certifying the rule it was written for.
 // An artifact event's payload is every field but the envelope, so the strict
 // parsers meet exactly what the publisher emitted. The event is not modified.
 func TestArtifactEventPayloadDropsTheEnvelope(t *testing.T) {
@@ -362,6 +338,35 @@ func TestArtifactEventPayloadDropsTheEnvelope(t *testing.T) {
 	}
 }
 
+// ecosystemInvalidFixtureCodes maps each ecosystem counter-example to the exact
+// diagnostic codes it must produce, in order. This module has no central
+// fixture→code table, so the profile corpus carries its own: a new
+// counter-example is one fixture file and one line here.
+var ecosystemInvalidFixtureCodes = map[string][]string{
+	// THE ID IS AN IDENTIFIER — it becomes a registry path segment and a
+	// workspace `registries` key, so it cannot carry case or underscores.
+	"ecosystem-bad-id.json": {"invalid-ecosystem-profile"},
+	// SELF-CONTAINED — a pattern that does not compile would fail at plan time,
+	// on every project of the ecosystem at once.
+	"ecosystem-bad-pattern.json": {"invalid-ecosystem-profile"},
+	// SELF-CONTAINED — a publish job that does not exist validates here and
+	// fails at release time, the one path with no recovery.
+	"ecosystem-publish-missing.json": {"invalid-ecosystem-profile"},
+	// ONE OWNER — two declarations in one file are the same divergence risk as
+	// two extensions, reported before resolution ever sees the manifest.
+	"ecosystem-duplicate-id.json": {"duplicate-ecosystem-profile"},
+	// ONE OWNER — `uses` names ecosystems SOMEONE ELSE owns; using one's own is
+	// a second declaration spelled as a reference.
+	"ecosystem-uses-own.json": {"ecosystem-use-of-own-profile"},
+	// CLOSED VOCABULARY — `channel` says which projection the distribution
+	// backend implements, so a third value asks for behavior nobody has.
+	"ecosystem-bad-channel.json": {"invalid-ecosystem-profile"},
+}
+
+// TestEcosystemFixturesReportStableCodes pins each counter-example to its own
+// rule through the entry point consumers call. Exact-match rather than
+// contains: a fixture that started failing for a second, unrelated reason would
+// stop certifying the rule it was written for.
 func TestEcosystemFixturesReportStableCodes(t *testing.T) {
 	for name, codes := range ecosystemInvalidFixtureCodes {
 		t.Run(name, func(t *testing.T) {

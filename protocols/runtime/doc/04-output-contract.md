@@ -81,9 +81,9 @@ Verb-specific outcomes also travel as **typed payloads** so consumers can aggreg
 - A publisher that runs under `--dry-run` reports, with a kind `member-probe`
   artifact event per member, whether the registry already holds the member at
   the version it would publish: `ecosystem`, `coordinate`, `version`,
-  `registry`, and a `state` of `absent`, `identical`, `retag`, `conflict` or
+  `registry`, and a `state` of `absent`, `identical`, `tag-move`, `conflict` or
   `unverified`. The orchestrator fails the dry run on `conflict` and
-  `unverified`, and warns on `retag`. The event is never publication evidence.
+  `unverified`, and warns on `tag-move`. The event is never publication evidence.
 
 **Parsing a typed payload out of an artifact event.** `ParseRawEvent` merges
 every top-level runtime-event field into `Data`, so the map a consumer receives

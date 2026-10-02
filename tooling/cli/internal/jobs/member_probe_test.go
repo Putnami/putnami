@@ -9,6 +9,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
+	"go.putnami.dev/sdk/extension/memberprobe"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
 
@@ -52,7 +53,7 @@ func probeOf(ecosystem, coordinate, version, registry, state string) extensionpr
 		probe.ArtifactDigest, probe.RegistryDigest = digestFor('a'), digestFor('a')
 	case extensionproto.MemberProbeUnverified:
 		probe.Reason = "the registry could not be reached: connection refused"
-	case extensionproto.MemberProbeRetag:
+	case extensionproto.MemberProbeTagMove:
 		probe.ArtifactDigest, probe.RegistryDigest = digestFor('a'), digestFor('b')
 	}
 	return probe
@@ -195,12 +196,16 @@ func TestDryRunPassesWhenEveryMemberIsAbsent(t *testing.T) {
 }
 
 // A member the registry holds with the same digest is not a conflict: the run
-// passes and the report says the publish reuses it.
+// passes and the report says the publish reuses it. When the probe compared an
+// artifact an earlier package staged, the line says so and names it.
 func TestDryRunReportsAnIdenticalMemberAsReused(t *testing.T) {
 	spectest.Proves(t, "cli/publish-dry-run-probe", "one-pass-verdict", "identical-is-reported-as-reused")
+	staged := probeOf("go", "go.putnami.dev/sdk/extension", "v1.4.0", testGoRegistry, extensionproto.MemberProbeIdentical)
+	staged.Reason = memberprobe.StagedReason("module zip")
 	results := dryRunResults(t,
 		probeOf("npm", "@putnami/runtime", "1.4.0", testNPMRegistry, extensionproto.MemberProbeIdentical),
-		probeOf("go", "go.putnami.dev/sdk/extension", "v1.4.0", testGoRegistry, extensionproto.MemberProbeAbsent),
+		staged,
+		probeOf("oci", "putnami/api", "1.4.0", testOCIRegistry, extensionproto.MemberProbeAbsent),
 	)
 
 	report, failure := finalizeDryRun(t, nil, results)
@@ -208,8 +213,16 @@ func TestDryRunReportsAnIdenticalMemberAsReused(t *testing.T) {
 	if failure != "" {
 		t.Fatalf("an identical member failed the dry run: %s", failure)
 	}
-	if !strings.Contains(report, "reused      npm @putnami/runtime@1.4.0 at https://npm.putnami.dev") || !strings.Contains(report, digestFor('a')) {
-		t.Fatalf("report does not say the member is reused, with its digest:\n%s", report)
+	built := "reused      npm @putnami/runtime@1.4.0 at https://npm.putnami.dev: the registry holds the same digest " +
+		digestFor('a') + ", so the publish reuses it\n"
+	if !strings.Contains(report, built) {
+		t.Fatalf("report does not say the member is reused, with its digest and no note:\n%s", report)
+	}
+	noted := "reused      go go.putnami.dev/sdk/extension@v1.4.0 at https://go.putnami.dev: the registry holds the same digest " +
+		digestFor('a') + ", so the publish reuses it " +
+		"(compared with the module zip the last `package` staged; re-run `package` if the source changed since)\n"
+	if !strings.Contains(report, noted) {
+		t.Fatalf("report does not name the staged module zip of the reused member:\n%s", report)
 	}
 }
 
@@ -218,9 +231,9 @@ func TestDryRunReportsAnIdenticalMemberAsReused(t *testing.T) {
 // member, the registry and both digests, or the image the publish builds when
 // the dry run has no local digest, and quiet keeps it.
 func TestDryRunWarnsAboutAMovedTag(t *testing.T) {
-	spectest.Proves(t, "cli/publish-dry-run-probe", "one-pass-verdict", "retag-is-a-warning")
-	moved := probeOf("oci", "putnami/api", "1.4.0", testOCIRegistry, extensionproto.MemberProbeRetag)
-	unbuilt := probeOf("oci", "putnami/worker", "1.4.0", testOCIRegistry, extensionproto.MemberProbeRetag)
+	spectest.Proves(t, "cli/publish-dry-run-probe", "one-pass-verdict", "tag-move-is-a-warning")
+	moved := probeOf("oci", "putnami/api", "1.4.0", testOCIRegistry, extensionproto.MemberProbeTagMove)
+	unbuilt := probeOf("oci", "putnami/worker", "1.4.0", testOCIRegistry, extensionproto.MemberProbeTagMove)
 	unbuilt.ArtifactDigest = ""
 	results := dryRunResults(t, moved, unbuilt)
 	var out bytes.Buffer
@@ -243,9 +256,9 @@ func TestDryRunWarnsAboutAMovedTag(t *testing.T) {
 // A moved tag does not hide a conflict elsewhere: the run fails on the
 // conflict alone, and the moved tag stays a warning.
 func TestDryRunFailsOnAConflictBesideAMovedTag(t *testing.T) {
-	spectest.Proves(t, "cli/publish-dry-run-probe", "one-pass-verdict", "retag-does-not-hide-a-conflict")
+	spectest.Proves(t, "cli/publish-dry-run-probe", "one-pass-verdict", "tag-move-does-not-hide-a-conflict")
 	results := dryRunResults(t,
-		probeOf("oci", "putnami/api", "1.4.0", testOCIRegistry, extensionproto.MemberProbeRetag),
+		probeOf("oci", "putnami/api", "1.4.0", testOCIRegistry, extensionproto.MemberProbeTagMove),
 		probeOf("go", "go.putnami.dev/sdk/extension", "v1.4.0", testGoRegistry, extensionproto.MemberProbeConflict),
 	)
 

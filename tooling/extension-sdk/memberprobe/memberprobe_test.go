@@ -29,6 +29,13 @@ func testSubject() Subject {
 	}
 }
 
+func ociSubject() Subject {
+	return Subject{
+		Ecosystem: "oci", Coordinate: "acme/api", Version: "1.4.0",
+		Registry: "registry.example.test", ArtifactDigest: localDigest,
+	}
+}
+
 // The verdict of a held version is decided in one place for every registry
 // kind: equal digests are a reuse, anything the dry run cannot prove equal is
 // not.
@@ -75,33 +82,67 @@ func TestHeldWithStatesThePublishersReason(t *testing.T) {
 	}
 }
 
-// A version tag held at other content is a retag, not a conflict: the real
-// publish moves the tag. Without a local artifact it is still a retag, to the
-// image the publish builds.
+// A version tag held at other content is a tag move, not a conflict, for a
+// registry where the real publish moves the tag. Without a local artifact it is
+// still a tag move, to the image the publish builds.
 func TestHeldTagVerdict(t *testing.T) {
-	spectest.Proves(t, "tooling/extension-authoring", "dry-run-member-probe", "held-tag-is-a-retag")
+	spectest.Proves(t, "tooling/extension-authoring", "dry-run-member-probe", "held-tag-is-a-tag-move")
 	for name, tc := range map[string]struct {
 		local, registry string
 		wantState       string
 	}{
 		"equal digests are identical":        {localDigest, localDigest, extproto.MemberProbeIdentical},
-		"different digests are a retag":      {localDigest, otherDigest, extproto.MemberProbeRetag},
-		"no local artifact is a retag":       {"", otherDigest, extproto.MemberProbeRetag},
+		"different digests are a tag move":   {localDigest, otherDigest, extproto.MemberProbeTagMove},
+		"no local artifact is a tag move":    {"", otherDigest, extproto.MemberProbeTagMove},
 		"no advertised digest is unverified": {localDigest, "", extproto.MemberProbeUnverified},
 		"nothing to compare is unverified":   {"", "", extproto.MemberProbeUnverified},
 	} {
 		t.Run(name, func(t *testing.T) {
-			subject := testSubject()
+			subject := ociSubject()
 			subject.ArtifactDigest = tc.local
 			probe := subject.HeldTag(tc.registry)
 			if probe.State != tc.wantState {
 				t.Fatalf("HeldTag(%q) = %+v, want %s", tc.registry, probe, tc.wantState)
 			}
-			if probe.State == extproto.MemberProbeRetag && (probe.RegistryDigest != tc.registry || probe.Reason != "") {
+			if probe.State == extproto.MemberProbeTagMove && (probe.RegistryDigest != tc.registry || probe.Reason != "") {
 				t.Fatalf("HeldTag(%q) = %+v, want the registry digest and no reason", tc.registry, probe)
 			}
 			if diagnostics := extproto.ValidateMemberProbe(&probe); len(diagnostics) != 0 {
 				t.Fatalf("verdict %+v is not a valid member-probe: %v", probe, diagnostics)
+			}
+		})
+	}
+}
+
+// An identical verdict on an artifact an earlier package staged says so and
+// names the artifact, because that artifact may predate the source. Only the
+// identical verdict carries the note: a conflict keeps the publisher's reason.
+func TestIdenticalNamesAStagedArtifact(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "dry-run-member-probe", "identical-names-a-staged-artifact")
+	const wantZip = "compared with the module zip the last `package` staged; re-run `package` if the source changed since"
+	staged := testSubject()
+	staged.Staged = "module zip"
+	if got := StagedReason("module zip"); got != wantZip {
+		t.Fatalf("StagedReason() = %q, want %q", got, wantZip)
+	}
+	image := ociSubject()
+	image.Staged = "image"
+	for name, tc := range map[string]struct {
+		probe      extproto.MemberProbe
+		wantState  string
+		wantReason string
+	}{
+		"held staged zip":          {staged.HeldWith(localDigest, "other"), extproto.MemberProbeIdentical, wantZip},
+		"held staged image tag":    {image.HeldTag(localDigest), extproto.MemberProbeIdentical, StagedReason("image")},
+		"other digest keeps cause": {staged.HeldWith(otherDigest, "other"), extproto.MemberProbeConflict, "other"},
+		"built artifact no note":   {testSubject().Held(localDigest), extproto.MemberProbeIdentical, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if tc.probe.State != tc.wantState || tc.probe.Reason != tc.wantReason {
+				t.Fatalf("probe = %+v, want %s with reason %q", tc.probe, tc.wantState, tc.wantReason)
+			}
+			if diagnostics := extproto.ValidateMemberProbe(&tc.probe); len(diagnostics) != 0 {
+				t.Fatalf("verdict %+v is not a valid member-probe: %v", tc.probe, diagnostics)
 			}
 		})
 	}
@@ -219,12 +260,18 @@ func TestEmitRoundTripsThroughTheStrictReader(t *testing.T) {
 	subject.Registry = "https://user:hunter2@registry.example.test/npm/?token=hunter2"
 	subject.Platform = "linux/arm64"
 	subject.Anonymous = true
+	staged := subject
+	staged.Staged = "module zip"
+	oci := ociSubject()
+	oci.Registry = "user:hunter2@registry.example.test?token=hunter2"
+	ociTagMove := oci.HeldTag(otherDigest)
 	for name, probe := range map[string]extproto.MemberProbe{
 		"absent":     subject.Absent(),
 		"identical":  subject.Held(localDigest),
 		"conflict":   subject.Held(otherDigest),
 		"unverified": subject.Unreachable(errors.New("no route to host")),
-		"retag":      subject.HeldTag(otherDigest),
+		"tag-move":   ociTagMove,
+		"staged":     staged.Held(localDigest),
 	} {
 		for _, version := range []int{1, 2} {
 			t.Run(fmt.Sprintf("%s v%d", name, version), func(t *testing.T) {
@@ -246,8 +293,12 @@ func TestEmitRoundTripsThroughTheStrictReader(t *testing.T) {
 				if *decoded != probe {
 					t.Fatalf("decoded = %+v, want the emitted probe %+v", *decoded, probe)
 				}
-				if decoded.Registry != "https://registry.example.test/npm" {
-					t.Fatalf("registry = %q, want the credential-free endpoint", decoded.Registry)
+				wantRegistry := "https://registry.example.test/npm"
+				if probe.Ecosystem == "oci" {
+					wantRegistry = "registry.example.test"
+				}
+				if decoded.Registry != wantRegistry {
+					t.Fatalf("registry = %q, want the credential-free endpoint %q", decoded.Registry, wantRegistry)
 				}
 			})
 		}

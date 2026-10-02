@@ -308,7 +308,9 @@
             "checks": [
               "put-archive-probe-is-read-only",
               "oci-probe-is-read-only",
-              "held-tag-is-a-retag"
+              "held-tag-is-a-tag-move",
+              "identical-names-a-staged-artifact",
+              "tag-move-only-on-the-managed-registry"
             ]
           }
         },

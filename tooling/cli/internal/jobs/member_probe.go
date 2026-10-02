@@ -78,9 +78,9 @@ type memberProbeSummary struct {
 	// reused are the identical probes: the real publish reuses what the
 	// registry holds.
 	reused []*extproto.MemberProbe
-	// retagged are the retag probes: the real publish moves a version tag to
+	// tagMoves are the tag-move probes: the real publish moves a version tag to
 	// other content. Each one is a warning.
-	retagged []*extproto.MemberProbe
+	tagMoves []*extproto.MemberProbe
 	// absent counts the probes whose registry does not hold the version, and
 	// anonymousAbsent those of them answered without a credential.
 	absent, anonymousAbsent int
@@ -159,8 +159,8 @@ func summarizeMemberProbes(run *ReleaseSetRun, results map[string]*JobResult) me
 			}
 		case extproto.MemberProbeIdentical:
 			summary.reused = append(summary.reused, probe)
-		case extproto.MemberProbeRetag:
-			summary.retagged = append(summary.retagged, probe)
+		case extproto.MemberProbeTagMove:
+			summary.tagMoves = append(summary.tagMoves, probe)
 		default:
 			// MemberProbeConflict and MemberProbeUnverified.
 			summary.blocking = append(summary.blocking, probe)
@@ -277,14 +277,20 @@ func (summary memberProbeSummary) print(out io.Writer, quiet bool) {
 	}
 	if !quiet {
 		for _, probe := range summary.reused {
-			lines = append(lines, fmt.Sprintf("  %-10s  %s: the registry holds the same digest %s, so the publish reuses it",
-				"reused", memberProbeLabel(probe), probe.RegistryDigest))
+			// The reason of an identical probe names the staged artifact it
+			// compared, which may predate the source.
+			note := ""
+			if probe.Reason != "" {
+				note = " (" + probe.Reason + ")"
+			}
+			lines = append(lines, fmt.Sprintf("  %-10s  %s: the registry holds the same digest %s, so the publish reuses it%s",
+				"reused", memberProbeLabel(probe), probe.RegistryDigest, note))
 		}
 		if summary.absent > 0 {
 			lines = append(lines, fmt.Sprintf("  %-10s  %d member(s) are not in their registry: the publish uploads them", "absent", summary.absent))
 		}
 	}
-	for _, probe := range summary.retagged {
+	for _, probe := range summary.tagMoves {
 		target := probe.ArtifactDigest
 		if target == "" {
 			target = "the image this publish builds"

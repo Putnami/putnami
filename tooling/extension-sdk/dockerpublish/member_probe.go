@@ -12,6 +12,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 
+	extproto "go.putnami.dev/protocol/extension"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/memberprobe"
@@ -22,6 +23,15 @@ import (
 // probeManifestHead is the manifest HEAD a dry run asks the registry with. It
 // is the only request a dry-run image publication sends.
 var probeManifestHead = crane.Head
+
+// reasonOCITagHeld is the reason of a version tag held at other content on a
+// registry other than the managed one, where a manifest PUT may not move it.
+const reasonOCITagHeld = "the registry holds this version tag at other content, and the dry run cannot tell " +
+	"whether this registry lets the publish move it (for example, a registry with immutable tags refuses it)"
+
+// stagedImage names the local artifact of an image probe: the image an earlier
+// package staged in the Docker manifest. A dry-run package writes no manifest.
+const stagedImage = "image"
 
 // imageProbe is one question a dry-run image publication asks its registry:
 // does ref already exist, and at which digest.
@@ -37,10 +47,11 @@ type imageProbe struct {
 	// digest is the packaged manifest digest, or empty when package assembled
 	// no image.
 	digest string
-	// movesTag is true when ref is a version tag the real publish moves to the
-	// packaged image: a held tag at another digest is then a retag.
-	movesTag bool
-	keychain authn.Keychain
+	// versionTag is true when ref is the version tag the real publish writes.
+	// On the managed registry, whose manifest PUT moves a tag, a held tag at
+	// another digest is then a tag move; on any other registry it is a conflict.
+	versionTag bool
+	keychain   authn.Keychain
 	// transport is the per-call transport of a private publication broker, or
 	// nil for the direct registry path.
 	transport http.RoundTripper
@@ -63,6 +74,7 @@ func emitImageProbe(emit *jsonl.Emitter, probe imageProbe) {
 	}
 	if isImmutableDigest(probe.digest) {
 		subject.ArtifactDigest = probe.digest
+		subject.Staged = stagedImage
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), memberprobe.Timeout)
@@ -73,11 +85,7 @@ func emitImageProbe(emit *jsonl.Emitter, probe imageProbe) {
 	}
 	descriptor, err := probeManifestHead(probe.ref, options...)
 	if err == nil {
-		if probe.movesTag {
-			memberprobe.Emit(emit, subject.HeldTag(descriptor.Digest.String()))
-			return
-		}
-		memberprobe.Emit(emit, subject.Held(descriptor.Digest.String()))
+		memberprobe.Emit(emit, heldImage(subject, probe, descriptor.Digest.String()))
 		return
 	}
 	var registryErr *transport.Error
@@ -90,6 +98,21 @@ func emitImageProbe(emit *jsonl.Emitter, probe imageProbe) {
 		memberprobe.Emit(emit, subject.Refused(http.StatusUnauthorized, ""))
 	default:
 		memberprobe.Emit(emit, subject.Unreachable(err))
+	}
+}
+
+// heldImage is the verdict for a registry that holds ref at registryDigest. A
+// version tag is a tag move only on the managed registry, whose manifest PUT
+// moves a tag. Any other registry may refuse the move, so a tag held at other
+// content there is a conflict.
+func heldImage(subject memberprobe.Subject, probe imageProbe, registryDigest string) extproto.MemberProbe {
+	switch {
+	case !probe.versionTag:
+		return subject.Held(registryDigest)
+	case probe.host == managedOCIRegistry:
+		return subject.HeldTag(registryDigest)
+	default:
+		return subject.HeldWith(registryDigest, reasonOCITagHeld)
 	}
 }
 
@@ -117,14 +140,16 @@ func resolvesAnonymous(keychain authn.Keychain, host string) bool {
 }
 
 // probePlannedImageMembers probes the OCI members the release-set plan selects
-// for this project when package assembled no image. The plan supplies the
-// coordinate and the version, and the probe asks for the version tag with no
-// local digest. When the real publish pushes that tag, as for a workload or for
-// an image project outside a private publication broker, a held tag is a retag
-// to the image the publish builds; otherwise a held version is a conflict whose
-// reason names the remedy. The transport and the credential are resolved once
-// for the host.
+// for a workload when package assembled no image. The plan supplies the
+// coordinate and the version, and the probe asks for the version tag, which the
+// real publish writes, with no local digest (see heldImage). An image project
+// is not probed: its publish writes the content tag or the digest package
+// computes, never the plan's version tag, so the report lists it as not probed.
+// The transport and the credential are resolved once for the host.
 func probePlannedImageMembers(ctx *pctx.Context, emit *jsonl.Emitter, configuredRegistry string) {
+	if ctx.Project.Type == "image" {
+		return
+	}
 	plan, err := releaseset.FromContext(ctx)
 	if err != nil {
 		emit.Warn("Dry run: the release-set plan could not be read, so the registry was not asked: " + err.Error())
@@ -134,9 +159,6 @@ func probePlannedImageMembers(ctx *pctx.Context, emit *jsonl.Emitter, configured
 		return
 	}
 	host := oci.RegistryHost(configuredRegistry)
-	if host == "" && ctx.Project.Type == "image" {
-		host = managedOCIRegistry
-	}
 	if host == "" {
 		return
 	}
@@ -164,9 +186,8 @@ func probePlannedImageMembers(ctx *pctx.Context, emit *jsonl.Emitter, configured
 		repository := host + "/" + member.Coordinate
 		emitImageProbe(emit, imageProbe{
 			host: host, repository: repository, version: member.Version,
-			ref:      fmt.Sprintf("%s:%s", repository, member.Version),
-			movesTag: ctx.Project.Type != "image" || privateTransport == nil,
-			keychain: keychain, transport: privateTransport,
+			ref:        fmt.Sprintf("%s:%s", repository, member.Version),
+			versionTag: true, keychain: keychain, transport: privateTransport,
 		})
 	}
 }
