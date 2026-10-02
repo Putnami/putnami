@@ -50,7 +50,9 @@ const (
 func runCredentialProviderRole() int {
 	var hosts []string
 	if value := os.Getenv(custodyHostsEnv); value != "" {
-		hosts = strings.Split(value, ",")
+		// The protocol wants the hosts sorted and unique; fixture hosts carry
+		// random ports, so the order they are listed in is not.
+		hosts = slices.Compact(slices.Sorted(slices.Values(strings.Split(value, ","))))
 	}
 	setup, err := readProviderSetup(os.Getenv(custodySetupEnv))
 	if err != nil {
