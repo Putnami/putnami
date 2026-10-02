@@ -52,7 +52,7 @@ upload task per publication task. They run engine code only, and whether they
 exist depends on a capability the submitter cannot know. The expected plan
 therefore never names them. A submitter leaves them out, and the edges of the
 remaining tasks name the publication task an upload task follows instead of
-the upload task. The executing engine compares the plan without them, so one
+the upload task, and an edge to the open task is dropped. The executing engine compares the plan without them, so one
 expected plan validates a run with or without the capability, and a plan that
 names them is refused.
 
