@@ -42,7 +42,7 @@ func descriptorProbes(role string) []finding {
 		if err != nil || fd == 1 || fd == 2 {
 			continue
 		}
-		data, kind := readDescriptor(fd)
+		data, kind := readOpenDescriptor(fd)
 		kinds[kind]++
 		read += len(data)
 		for _, s := range scanBytes(data) {
@@ -67,11 +67,11 @@ func descriptorNames() ([]string, error) {
 	return dir.Readdirnames(-1)
 }
 
-// readDescriptor reads what descriptor fd holds and names its kind: "file",
+// readOpenDescriptor reads what descriptor fd holds and names its kind: "file",
 // "stream" for a pipe or a socket, "other" for a descriptor it does not read,
 // such as a directory or a device, and "closed" for one that closed after it
 // was listed, such as the descriptor that listed them.
-func readDescriptor(fd int) ([]byte, string) {
+func readOpenDescriptor(fd int) ([]byte, string) {
 	var stat unix.Stat_t
 	if err := unix.Fstat(fd, &stat); err != nil {
 		return nil, "closed"
