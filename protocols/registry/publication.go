@@ -240,14 +240,23 @@ type PublicationEvidence struct {
 // command and step that published it. The provider treats it as an
 // assertion and verifies the artifact itself.
 type PublicationMemberEvidence struct {
-	Project    string `json:"project"`
-	Ecosystem  string `json:"ecosystem"`
+	// Project is the workspace path of the project the plan assigns the
+	// member to, without its leading slash.
+	Project string `json:"project"`
+	// Ecosystem is the member's ecosystem, as in the plan.
+	Ecosystem string `json:"ecosystem"`
+	// Coordinate is the member's coordinate in its ecosystem, as in the plan.
 	Coordinate string `json:"coordinate"`
-	Version    string `json:"version"`
-	Digest     string `json:"digest"`
-	Publisher  string `json:"publisher"`
-	Command    string `json:"command"`
-	Step       string `json:"step"`
+	// Version is the version the member was published at.
+	Version string `json:"version"`
+	// Digest is the digest of the artifact the engine uploaded for the member.
+	Digest string `json:"digest"`
+	// Publisher is the package publisher the member's package metadata names.
+	Publisher string `json:"publisher"`
+	// Command is the extension command that published the member.
+	Command string `json:"command"`
+	// Step is the step of Command that published the member.
+	Step string `json:"step"`
 }
 
 // PlanDigest returns sha256:<lowercase hex> of the JSON encoding of plan with
