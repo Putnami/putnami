@@ -44,7 +44,19 @@ The executing engine also refuses the block over a plan with no task that has
 registry or cloud effects. At execution, the block is present exactly when the
 plan publishes.
 
-### 3. Canonical form
+### 3. The expected plan names no engine-derived publication task
+
+When the credential provider negotiates `publication-v1` (registry ADR 0003),
+the executing engine adds tasks of its own: one `putnami:publish~open` and one
+upload task per publication task. They run engine code only, and whether they
+exist depends on a capability the submitter cannot know. The expected plan
+therefore never names them. A submitter leaves them out, and the edges of the
+remaining tasks name the publication task an upload task follows instead of
+the upload task. The executing engine compares the plan without them, so one
+expected plan validates a run with or without the capability, and a plan that
+names them is refused.
+
+### 4. Canonical form
 
 Both members are optional and omitted when empty; an explicit empty list is
 non-canonical. A request without them keeps its canonical bytes and its

@@ -125,7 +125,7 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 	}
 	// What the admission did NOT bind is said out loud before submission.
 	admission.ReportUnbound(os.Stderr)
-	request, err := portableRequest(req, ws, discovered, planned, admission.Bound)
+	request, err := portableRequest(req, ws, discovered, releaseSetRun.WithoutPublicationNodes(planned), admission.Bound)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: --where remote: %v\n", err)
 		return SessionResult{ExitCode: ExitError, Plan: planned}, true
