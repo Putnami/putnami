@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -99,7 +98,8 @@ func npmCommand(goos string, args []string) (string, error) {
 //
 // When the engine names a publication outbox, a release-set member is packed
 // into it and nothing else happens: no credential, no broker route, no upload
-// and no published-member event (packManagedNPMIntoOutbox). Unmanaged
+// and no published-member event (packManagedNPMIntoOutbox). The member names
+// the managed registry resolved here, and the engine uploads there. Unmanaged
 // publication ignores the outbox.
 func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	if ctx.Project.Name == "" {
@@ -134,7 +134,7 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 		// registry's server-owned policy. A future public release needs a separate,
 		// explicit server attestation; sparse/full state cannot make it public.
 		access = ""
-		registry, err = validateManagedNPMRegistry(orDefaultNPMRegistry(registry))
+		registry, err = extproto.ManagedNPMRegistry(orDefaultNPMRegistry(registry))
 		if err != nil {
 			return "FAILED", nil, err
 		}
@@ -235,7 +235,7 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 			emit.Diagnostic("error", err.Error(), "", 0)
 			return "FAILED", nil, err
 		}
-		return packManagedNPMIntoOutbox(emit, wsRoot, projectPath, npmDir, pkgData, packageName, version, project)
+		return packManagedNPMIntoOutbox(emit, wsRoot, projectPath, npmDir, pkgData, packageName, version, project, registry)
 	}
 
 	// Ask Cloud for the publication credential. The dry run above asks the same
@@ -339,29 +339,6 @@ func orDefaultNPMRegistry(registry string) string {
 	return registry
 }
 
-func validateManagedNPMRegistry(raw string) (string, error) {
-	raw = strings.TrimSpace(raw)
-	u, err := url.Parse(raw)
-	if err != nil || u.Opaque != "" || u.Host == "" || u.Hostname() == "" {
-		return "", fmt.Errorf("managed npm registry must be an absolute HTTP(S) URL without credentials")
-	}
-	if u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return "", fmt.Errorf("managed npm registry must be an absolute HTTP(S) URL without credentials, query, or fragment")
-	}
-	scheme := strings.ToLower(u.Scheme)
-	if scheme != "https" {
-		hostname := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
-		ip := net.ParseIP(hostname)
-		loopback := hostname == "localhost" || strings.HasSuffix(hostname, ".localhost") || (ip != nil && ip.IsLoopback())
-		if scheme != "http" || !loopback {
-			return "", fmt.Errorf("managed npm registry must use HTTPS (HTTP is allowed only for loopback)")
-		}
-	}
-	u.Scheme = scheme
-	u.Path = strings.TrimRight(u.Path, "/")
-	return u.String(), nil
-}
-
 func npmPublishReleaseSetMember(ctx *pctx.Context) (releaseset.PlannedMember, bool, error) {
 	plan, err := releaseset.FromContext(ctx)
 	if err != nil || plan == nil {
@@ -407,10 +384,12 @@ const (
 // packManagedNPMIntoOutbox packs a managed release-set member into the
 // publication outbox and commits the descriptor. It packs with
 // packNPMArtifact, as the upload path does, and writes the tarball and
-// manifest, the staged package.json bytes the caller validated. It resolves no
-// credential, sends no request, and emits no published or published-member
-// event: the engine uploads the bytes it verifies and reports the member.
-func packManagedNPMIntoOutbox(emit *jsonl.Emitter, wsRoot, projectPath, npmDir string, manifest []byte, packageName, version, project string) (string, map[string]any, error) {
+// manifest, the staged package.json bytes the caller validated. The member
+// names registry, the managed registry the caller resolved, which is the
+// registry the upload path publishes to. It resolves no credential, sends no
+// request, and emits no published or published-member event: the engine
+// uploads the bytes it verifies and reports the member.
+func packManagedNPMIntoOutbox(emit *jsonl.Emitter, wsRoot, projectPath, npmDir string, manifest []byte, packageName, version, project, registry string) (string, map[string]any, error) {
 	fail := func(err error) error {
 		emit.Diagnostic("error", err.Error(), "", 0)
 		return err
@@ -445,7 +424,7 @@ func packManagedNPMIntoOutbox(emit *jsonl.Emitter, wsRoot, projectPath, npmDir s
 	if err == nil {
 		err = writer.Add(extproto.OutboxMember{
 			Ecosystem: extproto.OutboxEcosystemNPM, Coordinate: packageName, Version: version, Project: project,
-			NPM: &extproto.OutboxNPM{Tarball: tarball, Manifest: manifestFile},
+			NPM: &extproto.OutboxNPM{Registry: registry, Tarball: tarball, Manifest: manifestFile},
 		})
 	}
 	if err == nil {

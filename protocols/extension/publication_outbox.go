@@ -12,9 +12,13 @@
 // obtains itself.
 //
 // The descriptor is written by repository-controlled code, so it carries no
-// registry endpoint and no credential, and the parser accepts one exact shape:
-// a bounded document, no unknown, duplicate or null member at any depth, and
-// every path relative to the outbox root.
+// credential, and the parser accepts one exact shape: a bounded document, no
+// unknown, duplicate or null member at any depth, and every path relative to
+// the outbox root. An npm member names the registry the job resolved with the
+// managed npm rules (ManagedNPMRegistry) and an OCI member names its registry
+// host; the engine refuses one that the project's registries declaration
+// contradicts, and sends a bearer only to a host the provider's credential
+// serves.
 
 package extension
 
@@ -24,6 +28,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -128,8 +134,14 @@ type OutboxFile struct {
 	Size int64 `json:"size"`
 }
 
-// OutboxNPM is what the managed npm PUT carries for one version.
+// OutboxNPM is what the managed npm PUT carries for one version, and where it
+// goes.
 type OutboxNPM struct {
+	// Registry is the registry the job publishes the version to, resolved and
+	// validated as a managed npm publication without an outbox does
+	// (ManagedNPMRegistry): the job's registry parameter, else the project's
+	// registries.npm.publish, else https://registry.npmjs.org.
+	Registry string `json:"registry"`
 	// Tarball is the packed archive the PUT attaches and the registry serves.
 	Tarball OutboxFile `json:"tarball"`
 	// Manifest is the version document of the PUT: the staged package.json
@@ -193,8 +205,9 @@ func ParsePublicationOutbox(data []byte) (*PublicationOutbox, []diag.Diagnostic)
 
 // ValidatePublicationOutbox checks every rule a descriptor answers to beyond
 // its JSON shape: the version, the member bound, each member's identity and
-// single ecosystem block, artifact paths, digests and sizes, and that no two
-// members share an identity and no two artifacts share or nest a path.
+// single ecosystem block, an npm member's registry, artifact paths, digests
+// and sizes, and that no two members share an identity and no two artifacts
+// share or nest a path.
 func ValidatePublicationOutbox(outbox *PublicationOutbox) []diag.Diagnostic {
 	if outbox == nil {
 		return []diag.Diagnostic{diag.Errorf(outboxDiagnostic, "", "publication outbox is nil")}
@@ -245,6 +258,7 @@ func ValidatePublicationOutbox(outbox *PublicationOutbox) []diag.Diagnostic {
 				add(field+".npm", "an npm member requires the npm block")
 				continue
 			}
+			checkOutboxNPMRegistry(add, field+".npm.registry", member.NPM.Registry)
 			paths = checkOutboxFile(add, paths, field+".npm.tarball", member.NPM.Tarball, MaxOutboxNPMTarballBytes)
 			paths = checkOutboxFile(add, paths, field+".npm.manifest", member.NPM.Manifest, MaxOutboxNPMManifestBytes)
 		case OutboxEcosystemGo:
@@ -295,6 +309,47 @@ func checkOutboxFile(add func(string, string, ...any), paths []outboxPathOwner, 
 		add(field+".size", "size %d is outside 1..%d", file.Size, limit)
 	}
 	return paths
+}
+
+// checkOutboxNPMRegistry reports a registry that ManagedNPMRegistry refuses,
+// without repeating it: a refused registry may carry a credential.
+func checkOutboxNPMRegistry(add func(string, string, ...any), field, registry string) {
+	if registry == "" {
+		add(field, "registry is required")
+		return
+	}
+	if _, err := ManagedNPMRegistry(registry); err != nil {
+		add(field, "%v", err)
+	}
+}
+
+// ManagedNPMRegistry validates the registry a managed npm publication uploads
+// to and returns it normalized. The registry is an absolute https URL, or an
+// http URL whose host is loopback (localhost, a name under .localhost, or a
+// loopback IP), with no userinfo, query or fragment. Surrounding spaces are
+// ignored, the scheme is lowercased and trailing slashes leave the path. No
+// error repeats raw, which may carry a credential.
+func ManagedNPMRegistry(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	u, err := url.Parse(raw)
+	if err != nil || u.Opaque != "" || u.Host == "" || u.Hostname() == "" {
+		return "", errors.New("managed npm registry must be an absolute HTTP(S) URL without credentials")
+	}
+	if u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return "", errors.New("managed npm registry must be an absolute HTTP(S) URL without credentials, query, or fragment")
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "https" {
+		hostname := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
+		ip := net.ParseIP(hostname)
+		loopback := hostname == "localhost" || strings.HasSuffix(hostname, ".localhost") || (ip != nil && ip.IsLoopback())
+		if scheme != "http" || !loopback {
+			return "", errors.New("managed npm registry must use HTTPS (HTTP is allowed only for loopback)")
+		}
+	}
+	u.Scheme = scheme
+	u.Path = strings.TrimRight(u.Path, "/")
+	return u.String(), nil
 }
 
 func checkOutboxOCI(add func(string, string, ...any), paths []outboxPathOwner, field, coordinate string, image OutboxOCI) []outboxPathOwner {

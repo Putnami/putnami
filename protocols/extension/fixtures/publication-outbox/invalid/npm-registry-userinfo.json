@@ -2,12 +2,12 @@
   "protocolVersion": 1,
   "members": [
     {
-      "ecosystem": "pypi",
+      "ecosystem": "npm",
       "coordinate": "@acme/web",
       "version": "1.2.3-r42",
       "project": "/typescript/web",
       "npm": {
-        "registry": "https://npm.acme.dev",
+        "registry": "https://publisher:secret@npm.acme.dev",
         "tarball": {
           "path": "npm/web/web-1.2.3-r42.tgz",
           "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

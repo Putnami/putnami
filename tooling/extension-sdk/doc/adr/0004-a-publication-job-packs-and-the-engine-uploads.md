@@ -37,17 +37,25 @@ and `schemas/publication-outbox.json`:
 - an OCI image names its layout directory, its repository and its expected
   manifest digest, which addresses its content.
 
-An npm member carries no access level and no dist-tag, and npm and Go members
-carry no registry endpoint. Repository code chooses neither visibility, nor
-channel, nor destination. An OCI member names its repository, and the engine
-checks that host against the registry its bearer is for.
+An npm member carries no access level and no dist-tag, so repository code
+chooses neither visibility nor channel. It names the registry the job resolved
+(`--registry`, else `registries.npm.publish`, else npm's own registry), which
+the managed npm rules accept: HTTPS, or HTTP to a loopback host, with no
+credential, query or fragment. The engine refuses it when the project's
+`registries.npm.publish` names another registry. A Go member carries no
+registry endpoint: the engine reads `registries.go.origin`. An OCI member names
+its repository, and the engine checks that host against
+`registries.oci.publish` and against the registry its bearer is for.
 
 ### 3. Paths stay inside the outbox
 
 A path is relative, clean and slash-separated, with no `..` segment, no
 absolute form, and never `outbox.json`. The reader walks each path from the
 outbox root and refuses a symbolic link at any step. An OCI layout holds only
-regular files and directories.
+regular files and directories. The writer, the reader and `oci.PushLayout` open
+each file without following a symbolic link and without waiting on a FIFO, then
+require the regular file the walk found, so an entry replaced after the walk
+fails the read instead of blocking the upload.
 
 ### 4. The engine uploads the bytes it verified
 
@@ -77,8 +85,11 @@ the zip and go.mod back, and OCI asks for the manifest by digest.
 
 - **Give the job a short-lived bearer.** It is still a bearer in repository
   code, and the registry still receives whatever bytes the job chooses.
-- **Let the descriptor name registry endpoints, access or dist-tags.** The
-  repository would choose where and how its artifacts are published.
+- **Let the descriptor name access, dist-tags, or a registry the workspace
+  does not declare.** The repository would choose how its artifacts are
+  published, or send them somewhere its workspace contradicts. An npm member
+  names its registry only so the engine uploads where the job resolved it, and
+  the bearer still reaches only a registry the provider's credential serves.
 - **Trust the descriptor's digests without reading the files.** A file can
   change between the job's write and the upload.
 

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://putnami.dev/schemas/putnami-publication-outbox.json",
   "title": "Putnami publication outbox descriptor",
-  "description": "The outbox.json a publication job writes at the root of the directory PUTNAMI_PUBLICATION_OUTBOX names. Implementations must also enforce the rules documented in protocols/extension/README.md that this schema cannot express: a document of at most 262144 bytes of valid UTF-8; no null, no duplicate member and no trailing data; container nesting of at most 4 levels; exactly the ecosystem block the member's ecosystem names; no two members with the same ecosystem and coordinate; no two artifact paths that are equal or nest; an OCI repository whose path after the registry host is the coordinate; and coordinate, version, project and repository values of at most 512 bytes with no space or control character.",
+  "description": "The outbox.json a publication job writes at the root of the directory PUTNAMI_PUBLICATION_OUTBOX names. Implementations must also enforce the rules documented in protocols/extension/README.md that this schema cannot express: a document of at most 262144 bytes of valid UTF-8; no null, no duplicate member and no trailing data; container nesting of at most 4 levels; exactly the ecosystem block the member's ecosystem names; no two members with the same ecosystem and coordinate; no two artifact paths that are equal or nest; an npm registry that is an absolute https URL, or an http URL to a loopback host, with no userinfo, query or fragment; an OCI repository whose path after the registry host is the coordinate; and coordinate, version, project and repository values of at most 512 bytes with no space or control character.",
   "type": "object",
   "additionalProperties": false,
   "required": ["protocolVersion", "members"],
@@ -73,8 +73,14 @@
     "npm": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["tarball", "manifest"],
+      "required": ["registry", "tarball", "manifest"],
       "properties": {
+        "registry": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The registry the job publishes the version to, resolved as a managed npm publication without an outbox does.",
+          "pattern": "^\\s*[Hh][Tt][Tt][Pp][Ss]?://"
+        },
         "tarball": {
           "allOf": [{ "$ref": "#/definitions/file" }, { "properties": { "size": { "maximum": 268435456 } } }]
         },

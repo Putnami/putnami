@@ -210,10 +210,13 @@ When the engine names a publication outbox in `PUTNAMI_PUBLICATION_OUTBOX`, a
 managed publication packs instead of uploading. It runs the same local
 `bun pm pack`, copies the tarball and the staged `package.json` into the outbox,
 and writes `outbox.json`, which names the package, the planned version, the
-owning project and the digest and size of each file. The job asks for no
-credential, consults no broker, sends no registry request and reports no
-published member: the engine uploads the bytes it verifies and reports the
-member. Unmanaged publication ignores the outbox and runs `npm` as described
+owning project, the digest and size of each file, and the managed registry
+the job resolved, as described below. The job asks for no credential, consults
+no broker, sends no registry request and reports no published member: the
+engine uploads the bytes it verifies to that registry and reports the member.
+The engine refuses the member when the project's `registries.npm.publish`
+names another registry, so a `--registry` that contradicts the declaration
+fails instead of publishing. Unmanaged publication ignores the outbox and runs `npm` as described
 below. A dry run packs nothing.
 
 The staged npm tree is mode-canonical before packing: directories and ordinary

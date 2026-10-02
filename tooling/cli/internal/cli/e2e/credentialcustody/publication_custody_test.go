@@ -234,6 +234,10 @@ func packPublicationMember() error {
 	if err := json.Unmarshal(stamp, &version); err != nil {
 		return err
 	}
+	registry, err := declaredNPMRegistry()
+	if err != nil {
+		return err
+	}
 	writer, err := publicationoutbox.WriterFromEnv()
 	if err != nil {
 		return err
@@ -253,7 +257,7 @@ func packPublicationMember() error {
 	if err := writer.Add(extensionproto.OutboxMember{
 		Ecosystem: extensionproto.OutboxEcosystemNPM, Coordinate: publicationCoordinate,
 		Version: version.Version, Project: publicationProject,
-		NPM: &extensionproto.OutboxNPM{Tarball: tarball, Manifest: manifestFile},
+		NPM: &extensionproto.OutboxNPM{Registry: registry, Tarball: tarball, Manifest: manifestFile},
 	}); err != nil {
 		return err
 	}
@@ -540,4 +544,25 @@ func TestHostilePublicationJobFindsNoPublishCredential(t *testing.T) {
 	if values.Env["outbox"] == "" || values.Env["cloud"] != "" {
 		t.Errorf("the publication job read outbox %q and a cloud token %q; want an outbox and no token", values.Env["outbox"], values.Env["cloud"])
 	}
+}
+
+// declaredNPMRegistry is the registries.npm.publish value of the fixture
+// workspace, one level above the job's project: the registry a managed npm job
+// resolves and records in its outbox member.
+func declaredNPMRegistry() (string, error) {
+	config, err := os.ReadFile(filepath.Join(os.Getenv("PUTNAMI_PROJECT_ROOT"), "..", wsproto.WorkspaceConfigFilename))
+	if err != nil {
+		return "", err
+	}
+	var declared struct {
+		Registries struct {
+			NPM struct {
+				Publish string `json:"publish"`
+			} `json:"npm"`
+		} `json:"registries"`
+	}
+	if err := json.Unmarshal(config, &declared); err != nil {
+		return "", err
+	}
+	return declared.Registries.NPM.Publish, nil
 }

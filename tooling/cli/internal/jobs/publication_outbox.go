@@ -399,17 +399,17 @@ func (run *ReleaseSetRun) uploadPacked(ctx context.Context, publish *ScheduledJo
 	return "", fmt.Errorf("ecosystem %q has no upload", packed.Ecosystem)
 }
 
+// uploadNPM uploads the member to the registry it names
+// (memberRegistryEndpoint) with the provider's publish bearer for that
+// registry.
 func (run *ReleaseSetRun) uploadNPM(ctx context.Context, project *workspace.Project, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember) (string, error) {
-	endpoint, err := declaredRegistryEndpoint(project, packed.Ecosystem, "publish")
+	endpoint, err := memberRegistryEndpoint(project, packed)
 	if err != nil {
 		return "", err
 	}
-	if endpoint == "" {
-		return "", fmt.Errorf("no %s publish endpoint is declared: set registries.%s.publish", packed.Ecosystem, packed.Ecosystem)
-	}
 	target, err := url.Parse(endpoint)
-	if err != nil || target.Host == "" {
-		return "", fmt.Errorf("registries.%s.publish %q is not an absolute URL", packed.Ecosystem, endpoint)
+	if err != nil {
+		return "", err
 	}
 	tarball, err := outbox.ReadFile(packed.NPM.Tarball)
 	if err != nil {
@@ -432,6 +432,62 @@ func (run *ReleaseSetRun) uploadNPM(ctx context.Context, project *workspace.Proj
 		return "", err
 	}
 	return npmpublish.Digest(tarball), nil
+}
+
+// maxPrintedRegistry bounds a registry URL or host an upload error names.
+const maxPrintedRegistry = 256
+
+// printableRegistry is endpoint cut to maxPrintedRegistry bytes.
+func printableRegistry(endpoint string) string {
+	if len(endpoint) <= maxPrintedRegistry {
+		return endpoint
+	}
+	return endpoint[:maxPrintedRegistry] + "..."
+}
+
+// memberRegistryEndpoint is the registry the npm member names, normalized by
+// the managed rules (extproto.ManagedNPMRegistry). When the project declares
+// registries.npm.publish, the member must name that same registry
+// (registryURLIdentity): the engine uploads nowhere the declaration
+// contradicts. Neither URL carries a credential, a query or a fragment, so the
+// refusal names both, cut to maxPrintedRegistry.
+func memberRegistryEndpoint(project *workspace.Project, packed extproto.OutboxMember) (string, error) {
+	endpoint, err := extproto.ManagedNPMRegistry(packed.NPM.Registry)
+	if err != nil {
+		return "", err
+	}
+	declared, err := declaredRegistryEndpoint(project, packed.Ecosystem, "publish")
+	if err != nil {
+		return "", err
+	}
+	if declared == "" {
+		return endpoint, nil
+	}
+	want, err := extproto.ManagedNPMRegistry(declared)
+	if err != nil {
+		return "", fmt.Errorf("registries.%s.publish: %w", packed.Ecosystem, err)
+	}
+	if registryURLIdentity(endpoint) != registryURLIdentity(want) {
+		return "", fmt.Errorf("the publication job packed %s for the registry %q; registries.%s.publish names %q",
+			packed.Coordinate, printableRegistry(endpoint), packed.Ecosystem, printableRegistry(want))
+	}
+	return endpoint, nil
+}
+
+// registryURLIdentity is what names the registry at a managed npm registry
+// URL: its scheme, its host lowercased, its port unless it is the scheme's
+// default, and its escaped path. Two URLs with the same identity name the same
+// registry.
+func registryURLIdentity(endpoint string) string {
+	target, err := url.Parse(endpoint)
+	if err != nil {
+		return endpoint
+	}
+	port := target.Port()
+	if (target.Scheme == "https" && port == "443") || (target.Scheme == "http" && port == "80") {
+		port = ""
+	}
+	return strings.Join([]string{target.Scheme, strings.ToLower(target.Hostname()), port, target.EscapedPath()}, "\x00")
 }
 
 func (run *ReleaseSetRun) uploadGo(ctx context.Context, project *workspace.Project, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember) (string, error) {
@@ -495,12 +551,12 @@ func (run *ReleaseSetRun) uploadOCI(ctx context.Context, publish *ScheduledJob, 
 		return "", fmt.Errorf("OCI repository %q: %w", packed.OCI.Repository, err)
 	}
 	host := repository.RegistryStr()
-	declared, err := declaredRegistryEndpoint(publish.Project, packed.Ecosystem, "publish")
+	declaredHost, err := declaredOCIRegistryHost(publish.Project, packed.Ecosystem)
 	if err != nil {
 		return "", err
 	}
-	if declaredHost, _, _ := strings.Cut(declared, "/"); declared != "" && !strings.EqualFold(declaredHost, host) {
-		return "", fmt.Errorf("the publication job packed an image for %s; registries.%s.publish names %s", host, packed.Ecosystem, declaredHost)
+	if declaredHost != "" && !strings.EqualFold(declaredHost, host) {
+		return "", fmt.Errorf("the publication job packed an image for %s; registries.%s.publish names %s", host, packed.Ecosystem, printableRegistry(declaredHost))
 	}
 	candidate, err := pkgmeta.ReadDockerManifest(run.root, publish.Project.Path)
 	if err != nil {
@@ -540,6 +596,33 @@ func (run *ReleaseSetRun) uploadOCI(ctx context.Context, publish *ScheduledJob, 
 		return "", fmt.Errorf("record the published image: %w", err)
 	}
 	return pushed.Digest, nil
+}
+
+// declaredOCIRegistryHost is the registry host the project's
+// registries.<ecosystem>.publish entry names, "" when it declares none. The
+// entry is a repository prefix such as "ghcr.io/team" or a URL such as
+// "https://ghcr.io/team"; both name the host "ghcr.io", normalized as an image
+// repository's host is (name.NewRegistry), so "docker.io" names
+// "index.docker.io". An entry that names no valid host is refused without
+// being printed, since it may carry a credential.
+func declaredOCIRegistryHost(project *workspace.Project, ecosystem string) (string, error) {
+	declared, err := declaredRegistryEndpoint(project, ecosystem, "publish")
+	if err != nil || declared == "" {
+		return "", err
+	}
+	host, _, _ := strings.Cut(declared, "/")
+	if strings.Contains(declared, "://") {
+		target, err := url.Parse(declared)
+		if err != nil || target.User != nil {
+			return "", fmt.Errorf("registries.%s.publish is not a registry URL without credentials", ecosystem)
+		}
+		host = target.Host
+	}
+	registry, err := name.NewRegistry(host, name.StrictValidation)
+	if err != nil {
+		return "", fmt.Errorf("registries.%s.publish names no registry host", ecosystem)
+	}
+	return registry.RegistryStr(), nil
 }
 
 // declaredRegistryEndpoint reads field of the project's registries entry for

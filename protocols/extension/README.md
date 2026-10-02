@@ -215,14 +215,18 @@ Members that a route does not manage publish themselves and are not listed.
 | `members` | At most 64 (`MaxPublicationOutboxMembers`). An empty list states that the job packed none. |
 | `members[].ecosystem` | `npm`, `go` or `oci`. The member carries exactly the block of that name. |
 | `members[].coordinate`, `.version`, `.project` | The release-set member's coordinate and version, and the project the plan assigns it to. |
+| `npm.registry` | The registry the job publishes to, resolved as a managed npm publication without an outbox does: the job's `registry` parameter, else `registries.npm.publish`, else `https://registry.npmjs.org` (`ManagedNPMRegistry`). |
 | `npm.tarball`, `npm.manifest` | The packed archive (at most 256 MiB) and the staged `package.json` the PUT carries. |
 | `go.zip`, `go.mod`, `go.info` | The module zip (at most 500 MiB), its `go.mod`, and its `.info` document. |
 | `oci.layout`, `oci.repository`, `oci.digest`, `oci.tags` | The OCI image layout directory, the repository as registry host plus coordinate, the expected manifest digest, and up to 16 tags. |
 
 Each file is `{path, digest, size}`: a path relative to the outbox root, the
 `sha256:` digest of its bytes, and its size, at least 1 byte and within the
-ecosystem's cap. An npm member carries no access level and no dist-tag, and no
-member carries a registry endpoint for npm or Go: the engine resolves them.
+ecosystem's cap. An npm member carries no access level and no dist-tag. Its
+registry is an absolute `https` URL, or `http` to a loopback host, with no
+userinfo, query or fragment; the engine uploads there and refuses a registry
+other than the project's `registries.npm.publish` when the project declares
+one. A Go member carries no registry endpoint: the engine resolves it.
 
 `ParsePublicationOutbox` is strict: the document is at most 256 KiB of UTF-8
 (`MaxPublicationOutboxBytes`), with no unknown, duplicate, case-folded or null
@@ -332,11 +336,12 @@ only the dependent command. Re-package an authored extension, or run
   and ecosystem-profile errors.
 - Publication outbox: [`schemas/publication-outbox.json`](schemas/publication-outbox.json),
   held against the Go types by `TestOutboxSchemaTracksTheGoTypes`, with
-  [`fixtures/publication-outbox/valid/`](fixtures/publication-outbox/valid) — 3
+  [`fixtures/publication-outbox/valid/`](fixtures/publication-outbox/valid) — 4
   descriptors — and
   [`fixtures/publication-outbox/invalid/`](fixtures/publication-outbox/invalid) —
-  34 counter-examples covering unknown, duplicate and null members, escaping and
-  overlapping paths, digests, caps, and repository and tag rules.
+  39 counter-examples covering unknown, duplicate and null members, escaping and
+  overlapping paths, digests, caps, npm registry rules, and repository and tag
+  rules.
 - Golden: [`testdata/task_digests.golden.json`](testdata/task_digests.golden.json)
   pins task-contract digests, so a change to how a contract hashes is visible as
   a golden diff rather than as a silent cache-key shift.

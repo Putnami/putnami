@@ -75,6 +75,10 @@ func packBoundPublication() error {
 	if err := json.Unmarshal(stamp, &version); err != nil {
 		return err
 	}
+	registry, err := declaredNPMRegistry()
+	if err != nil {
+		return err
+	}
 	writer, err := publicationoutbox.WriterFromEnv()
 	if err != nil {
 		return err
@@ -97,7 +101,7 @@ func packBoundPublication() error {
 	if err := writer.Add(extensionproto.OutboxMember{
 		Ecosystem: extensionproto.OutboxEcosystemNPM, Coordinate: boundPublicationCoordinate,
 		Version: version.Version, Project: boundPublicationProject,
-		NPM: &extensionproto.OutboxNPM{Tarball: tarball, Manifest: manifestFile},
+		NPM: &extensionproto.OutboxNPM{Registry: registry, Tarball: tarball, Manifest: manifestFile},
 	}); err != nil {
 		return err
 	}
@@ -388,4 +392,25 @@ func TestBoundRequestPublishesThroughThePublicationProvider(t *testing.T) {
 	}
 	keys := planKeys(t, result.Plan)
 	assertPlanned(t, keys, boundPublicationOpenKey, "/app:publish~artifact~upload")
+}
+
+// declaredNPMRegistry is the registries.npm.publish value of the fixture
+// workspace, one level above the job's project: the registry a managed npm job
+// resolves and records in its outbox member.
+func declaredNPMRegistry() (string, error) {
+	config, err := os.ReadFile(filepath.Join(os.Getenv("PUTNAMI_PROJECT_ROOT"), "..", wsproto.WorkspaceConfigFilename))
+	if err != nil {
+		return "", err
+	}
+	var declared struct {
+		Registries struct {
+			NPM struct {
+				Publish string `json:"publish"`
+			} `json:"npm"`
+		} `json:"registries"`
+	}
+	if err := json.Unmarshal(config, &declared); err != nil {
+		return "", err
+	}
+	return declared.Registries.NPM.Publish, nil
 }

@@ -133,6 +133,10 @@ func TestManagedNPMPublishWritesTheOutboxAndUploadsNothing(t *testing.T) {
 		member.Version != "1.2.3-r42" || member.Project != "/project" || member.NPM == nil || member.Go != nil || member.OCI != nil {
 		t.Fatalf("outbox member = %+v, want the planned npm member", member)
 	}
+	declared, err := npmRegistriesFrom(ctx.Params)
+	if err != nil || member.NPM.Registry != declared.Publish {
+		t.Fatalf("outbox npm registry = %q, want the declared %q (%v)", member.NPM.Registry, declared.Publish, err)
+	}
 	tarball, err := outbox.ReadFile(member.NPM.Tarball)
 	if err != nil || string(tarball) != outboxTarballBytes {
 		t.Fatalf("outbox tarball = (%q, %v), want the packed bytes", tarball, err)
@@ -150,6 +154,47 @@ func TestManagedNPMPublishWritesTheOutboxAndUploadsNothing(t *testing.T) {
 	}
 	if string(manifest) != string(staged) {
 		t.Fatalf("outbox manifest = %s, want the staged package.json %s", manifest, staged)
+	}
+}
+
+// The npm member names the managed registry the job resolved, normalized as the
+// managed rules require: --registry over registries.npm.publish over npm's own
+// registry. The engine uploads there and nowhere else.
+func TestManagedNPMOutboxNamesTheResolvedRegistry(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "managed-publication-packs-only", "the-managed-route-packs-into-the-outbox-and-uploads-nothing")
+	for name, tc := range map[string]struct {
+		registry   string
+		registries string
+		want       string
+	}{
+		"the declared registry":   {registries: `{"npm":{"publish":"HTTPS://npm.acme.dev/team/"}}`, want: "https://npm.acme.dev/team"},
+		"the --registry override": {registry: "https://override.acme.dev/", registries: `{"npm":{"publish":"https://npm.acme.dev"}}`, want: "https://override.acme.dev"},
+		"npm's own registry":      {want: defaultNPMRegistry},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx, _, outboxRoot, requests := managedOutboxNPMContext(t)
+			stubOutboxNPMPack(t)
+			delete(ctx.Params, "registries")
+			if tc.registries != "" {
+				withRegistries(t, ctx, tc.registries)
+			}
+			if tc.registry != "" {
+				ctx.Params["registry"] = json.RawMessage(fmt.Sprintf("%q", tc.registry))
+			}
+			if status, _, err := runPublishNpm(ctx, jsonl.New(), nil); err != nil || status != "OK" {
+				t.Fatalf("runPublishNpm() = (%q, %v), want a packed OK", status, err)
+			}
+			if got := requests.Load(); got != 0 {
+				t.Fatalf("registry requests = %d, want none", got)
+			}
+			outbox, err := publicationoutbox.Read(outboxRoot)
+			if err != nil {
+				t.Fatalf("read the outbox: %v", err)
+			}
+			if got := outbox.Descriptor.Members[0].NPM.Registry; got != tc.want {
+				t.Fatalf("outbox npm registry = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 

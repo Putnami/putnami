@@ -167,6 +167,80 @@ func TestOutboxDescriptorRefusesInvalidArtifactsAndIdentities(t *testing.T) {
 	}
 }
 
+// An npm member names its registry, which follows the managed npm rules: an
+// absolute https URL, or http to a loopback host, with no userinfo, query or
+// fragment. A refusal never repeats the registry.
+func TestOutboxDescriptorRefusesAnNPMRegistryTheManagedRulesRefuse(t *testing.T) {
+	for name, want := range map[string]string{
+		"npm-registry-missing.json":   "registry is required",
+		"npm-registry-cleartext.json": "HTTP is allowed only for loopback",
+		"npm-registry-userinfo.json":  "without credentials, query, or fragment",
+		"npm-registry-query.json":     "without credentials, query, or fragment",
+		"npm-registry-relative.json":  "absolute HTTP(S) URL",
+	} {
+		t.Run(name, func(t *testing.T) {
+			outbox, diags := ParsePublicationOutbox(readOutboxFixture(t, "invalid", name))
+			if outbox != nil {
+				t.Fatalf("descriptor accepted, want a refusal naming %q", want)
+			}
+			got := outboxRefusal(diags)
+			if !strings.Contains(got, "members[0].npm.registry: ") || !strings.Contains(got, want) {
+				t.Fatalf("refusal = %q, want members[0].npm.registry to name %q", got, want)
+			}
+			if strings.Contains(got, "secret") {
+				t.Fatalf("refusal = %q repeats the registry's credential", got)
+			}
+		})
+	}
+	outbox, diags := ParsePublicationOutbox(readOutboxFixture(t, "valid", "npm-loopback-registry.json"))
+	if outbox == nil || outbox.Members[0].NPM.Registry != "http://127.0.0.1:4873/npm/" {
+		t.Fatalf("a loopback http registry was refused or rewritten: %+v %s", outbox, outboxRefusal(diags))
+	}
+}
+
+func TestManagedNPMRegistryNormalizesWhatItAccepts(t *testing.T) {
+	for _, accepted := range []struct{ raw, want string }{
+		{"https://registry.npmjs.org", "https://registry.npmjs.org"},
+		{"\tHTTPS://npm.example.test/scoped/\n", "https://npm.example.test/scoped"},
+		{"https://npm.example.test:8443/a//", "https://npm.example.test:8443/a"},
+		{"http://localhost:4873/", "http://localhost:4873"},
+		{"http://localhost./npm", "http://localhost./npm"},
+		{"http://registry.localhost", "http://registry.localhost"},
+		{"http://127.0.0.1:1/npm", "http://127.0.0.1:1/npm"},
+		{"http://[::1]:4873", "http://[::1]:4873"},
+		{"https://npm.example.test/@scope%2Fname/", "https://npm.example.test/@scope/name"},
+	} {
+		got, err := ManagedNPMRegistry(accepted.raw)
+		if err != nil || got != accepted.want {
+			t.Errorf("ManagedNPMRegistry(%q) = %q, %v; want %q", accepted.raw, got, err, accepted.want)
+		}
+		if again, err := ManagedNPMRegistry(got); err != nil || again != got {
+			t.Errorf("ManagedNPMRegistry(%q) = %q, %v; a normalized registry must stay as it is", got, again, err)
+		}
+	}
+	for _, raw := range []string{
+		"",
+		"npm.example.test",
+		"/npm",
+		"https:npm.example.test",
+		"https://",
+		"ftp://npm.example.test",
+		"http://npm.example.test",
+		"http://0.0.0.0:4873",
+		"http://localhost.example.test",
+		"https://publisher:secret@npm.example.test",
+		"https://publisher@npm.example.test",
+		"https://npm.example.test/?token=secret",
+		"https://npm.example.test/#secret",
+	} {
+		if got, err := ManagedNPMRegistry(raw); err == nil {
+			t.Errorf("ManagedNPMRegistry(%q) = %q, want a refusal", raw, got)
+		} else if strings.Contains(err.Error(), "secret") || strings.Contains(err.Error(), "publisher") {
+			t.Errorf("ManagedNPMRegistry(%q) error %q repeats the registry", raw, err)
+		}
+	}
+}
+
 // Every fixture in the corpus is asserted by a test above: a new
 // counter-example cannot be added without a stated reason for refusal.
 func TestOutboxFixtureCorpusIsCovered(t *testing.T) {
@@ -201,7 +275,7 @@ func TestOutboxDescriptorAcceptsEveryEcosystem(t *testing.T) {
 		t.Fatalf("members = %d, want 3", len(outbox.Members))
 	}
 	npm, goModule, image := outbox.Members[0], outbox.Members[1], outbox.Members[2]
-	if npm.NPM == nil || npm.NPM.Tarball.Path != "npm/web/web-1.2.3-r42.tgz" || npm.NPM.Manifest.Size != 312 {
+	if npm.NPM == nil || npm.NPM.Registry != "https://npm.acme.dev" || npm.NPM.Tarball.Path != "npm/web/web-1.2.3-r42.tgz" || npm.NPM.Manifest.Size != 312 {
 		t.Fatalf("npm member = %+v", npm)
 	}
 	if goModule.Go == nil || goModule.Go.Info.Path != "go/api/v1.4.0.info" || goModule.Project != "/go/api" {

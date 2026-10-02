@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	extproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/sdk/extension/internal/regularfile"
 )
 
 // Outbox is a publication outbox whose descriptor has been read and
@@ -29,7 +30,7 @@ func Read(root string) (*Outbox, error) {
 	if !info.IsDir() {
 		return nil, fmt.Errorf("publication outbox %s is not a directory", root)
 	}
-	file, err := openRegular(filepath.Join(root, extproto.PublicationOutboxDescriptor))
+	file, err := regularfile.Open(filepath.Join(root, extproto.PublicationOutboxDescriptor))
 	if err != nil {
 		return nil, fmt.Errorf("read publication outbox: %w", err)
 	}
@@ -53,8 +54,9 @@ func (o *Outbox) Root() string { return o.root }
 
 // ReadFile returns the bytes of the artifact file names, read once. It refuses
 // a path that leaves the outbox or crosses a symbolic link, a file that is not
-// regular, and bytes whose size or digest differ from file's. The returned
-// bytes are the bytes hashed, so a caller uploads exactly what was verified.
+// regular, and bytes whose size or digest differ from file's. A file replaced
+// by a FIFO is refused without waiting for a writer. The returned bytes are
+// the bytes hashed, so a caller uploads exactly what was verified.
 func (o *Outbox) ReadFile(file extproto.OutboxFile) ([]byte, error) {
 	full, err := extproto.ResolveOutboxPath(o.root, file.Path)
 	if err != nil {
@@ -63,7 +65,7 @@ func (o *Outbox) ReadFile(file extproto.OutboxFile) ([]byte, error) {
 	if file.Size < 1 {
 		return nil, fmt.Errorf("outbox file %q has no size", file.Path)
 	}
-	in, err := openRegular(full)
+	in, err := regularfile.Open(full)
 	if err != nil {
 		return nil, fmt.Errorf("outbox file %q: %w", file.Path, err)
 	}

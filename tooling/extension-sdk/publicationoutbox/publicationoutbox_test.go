@@ -32,7 +32,7 @@ func writeNPMOutbox(t *testing.T) (string, extproto.OutboxMember) {
 	}
 	member := extproto.OutboxMember{
 		Ecosystem: extproto.OutboxEcosystemNPM, Coordinate: "@acme/web", Version: "1.2.3", Project: "/typescript/web",
-		NPM: &extproto.OutboxNPM{Tarball: tarball, Manifest: manifest},
+		NPM: &extproto.OutboxNPM{Registry: "https://npm.acme.dev", Tarball: tarball, Manifest: manifest},
 	}
 	if err := writer.Add(member); err != nil {
 		t.Fatal(err)
@@ -129,14 +129,23 @@ func writeOver(t *testing.T, path, content string) {
 	}
 }
 
+// npmDescriptor is a descriptor of one npm member that names registry and
+// whose tarball is at tarball.
+func npmDescriptor(registry, tarball string) string {
+	return `{"protocolVersion":1,"members":[{"ecosystem":"npm","coordinate":"a","version":"1","project":"/p","npm":{` +
+		`"registry":"` + registry + `",` +
+		`"tarball":{"path":"` + tarball + `","digest":"sha256:` + strings.Repeat("a", 64) + `","size":1},` +
+		`"manifest":{"path":"package.json","digest":"sha256:` + strings.Repeat("b", 64) + `","size":1}}}]}`
+}
+
 func TestOutboxReaderRefusesAnInvalidDescriptor(t *testing.T) {
 	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "the-descriptor-is-strict-and-bounded")
 	for name, content := range map[string]string{
-		"unknown member": `{"protocolVersion":1,"members":[],"registry":"https://evil.example"}`,
-		"oversized":      `{"protocolVersion":1,"members":[]}` + strings.Repeat(" ", extproto.MaxPublicationOutboxBytes),
-		"escaping path": `{"protocolVersion":1,"members":[{"ecosystem":"npm","coordinate":"a","version":"1","project":"/p","npm":{` +
-			`"tarball":{"path":"../a.tgz","digest":"sha256:` + strings.Repeat("a", 64) + `","size":1},` +
-			`"manifest":{"path":"package.json","digest":"sha256:` + strings.Repeat("b", 64) + `","size":1}}}]}`,
+		"unknown member":            `{"protocolVersion":1,"members":[],"registry":"https://evil.example"}`,
+		"oversized":                 `{"protocolVersion":1,"members":[]}` + strings.Repeat(" ", extproto.MaxPublicationOutboxBytes),
+		"escaping path":             npmDescriptor("https://npm.acme.dev", "../a.tgz"),
+		"credentialed npm registry": npmDescriptor("https://publisher:secret@npm.acme.dev", "a.tgz"),
+		"cleartext npm registry":    npmDescriptor("http://npm.acme.dev", "a.tgz"),
 	} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
@@ -170,7 +179,7 @@ func TestOutboxWriterRefusesUnwrittenAndOverlappingArtifacts(t *testing.T) {
 	forged.Digest = "sha256:" + strings.Repeat("a", 64)
 	member := extproto.OutboxMember{
 		Ecosystem: extproto.OutboxEcosystemNPM, Coordinate: "web", Version: "1.0.0", Project: "/web",
-		NPM: &extproto.OutboxNPM{Tarball: forged, Manifest: tarball},
+		NPM: &extproto.OutboxNPM{Registry: "https://npm.acme.dev", Tarball: forged, Manifest: tarball},
 	}
 	if err := writer.Add(member); err == nil {
 		t.Fatal("added a member whose digest the writer did not compute")

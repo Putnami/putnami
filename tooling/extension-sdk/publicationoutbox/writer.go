@@ -23,6 +23,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	extproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/sdk/extension/internal/regularfile"
 )
 
 // Writer stages one job's artifacts in an outbox directory and writes the
@@ -84,7 +85,7 @@ func (w *Writer) WriteFile(rel string, data []byte) (extproto.OutboxFile, error)
 // CopyFile copies the regular file at src to a new file at rel and returns its
 // descriptor entry. A src that is a symbolic link is refused.
 func (w *Writer) CopyFile(rel, src string) (extproto.OutboxFile, error) {
-	in, err := openRegular(src)
+	in, err := regularfile.Open(src)
 	if err != nil {
 		return extproto.OutboxFile{}, err
 	}
@@ -121,7 +122,7 @@ func (w *Writer) CopyLayout(rel, src string) error {
 		if entry.IsDir() {
 			return os.Mkdir(destination, 0o700)
 		}
-		in, err := openRegular(entryPath)
+		in, err := regularfile.Open(entryPath)
 		if err != nil {
 			return err
 		}
@@ -294,28 +295,6 @@ func memberFiles(member extproto.OutboxMember) []extproto.OutboxFile {
 		files = append(files, member.Go.Zip, member.Go.Mod, member.Go.Info)
 	}
 	return files
-}
-
-// openRegular opens path for reading, refusing anything but a regular file and
-// a file replaced between the check and the open.
-func openRegular(name string) (*os.File, error) {
-	before, err := os.Lstat(name)
-	if err != nil {
-		return nil, err
-	}
-	if !before.Mode().IsRegular() {
-		return nil, fmt.Errorf("%s is not a regular file", name)
-	}
-	file, err := os.Open(name)
-	if err != nil {
-		return nil, err
-	}
-	after, err := file.Stat()
-	if err != nil || !os.SameFile(before, after) {
-		_ = file.Close()
-		return nil, fmt.Errorf("%s changed while it was opened", name)
-	}
-	return file, nil
 }
 
 // checkTree refuses a directory that is a symbolic link or holds an entry that

@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
@@ -52,9 +51,11 @@ var (
 //
 // Before any request it refuses a layout that holds a symbolic link or another
 // non-regular entry, a layout that does not index target.Digest, and a manifest
-// whose bytes do not hash to target.Digest. The manifest bytes it hashes are the
-// bytes it uploads. When the registry already holds the digest, nothing is
-// uploaded and Reused is set.
+// whose bytes do not hash to target.Digest. Every file it reads is opened
+// without following a symbolic link or waiting on a FIFO, so an entry replaced
+// after that check fails the push instead of blocking it. The manifest bytes it
+// hashes are the bytes it uploads. When the registry already holds the digest,
+// nothing is uploaded and Reused is set.
 //
 // bearer is sent only to the registry host of target.Repository. No request
 // goes through an ambient proxy unless options supplies a transport, and no
@@ -96,11 +97,7 @@ func pushLayout(ctx context.Context, layoutDir string, target LayoutTarget, bear
 	if err := checkLayoutTree(layoutDir); err != nil {
 		return PushedLayout{}, err
 	}
-	index, err := layout.ImageIndexFromPath(layoutDir)
-	if err != nil {
-		return PushedLayout{}, fmt.Errorf("read OCI layout: %w", err)
-	}
-	img, err := index.Image(want)
+	img, err := layoutImage(layoutDir, want)
 	if err != nil {
 		return PushedLayout{}, fmt.Errorf("OCI layout does not hold manifest %s: %w", want, err)
 	}

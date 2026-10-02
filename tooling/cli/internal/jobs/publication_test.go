@@ -338,7 +338,9 @@ func stageOutbox(t *testing.T, write func(*publicationoutbox.Writer) []extension
 	return dir
 }
 
-func npmOutboxMember(t *testing.T, writer *publicationoutbox.Writer, project, name, version string) extensionproto.OutboxMember {
+// npmOutboxMember writes the tarball and manifest of name@version into writer
+// and returns the member that names them, packed for registry.
+func npmOutboxMember(t *testing.T, writer *publicationoutbox.Writer, registry, project, name, version string) extensionproto.OutboxMember {
 	t.Helper()
 	tarball, err := writer.WriteFile("npm/"+strings.ReplaceAll(name, "/", "_")+".tgz", []byte("tarball of "+name+"@"+version))
 	if err != nil {
@@ -350,7 +352,7 @@ func npmOutboxMember(t *testing.T, writer *publicationoutbox.Writer, project, na
 	}
 	return extensionproto.OutboxMember{
 		Ecosystem: extensionproto.OutboxEcosystemNPM, Coordinate: name, Version: version, Project: project,
-		NPM: &extensionproto.OutboxNPM{Tarball: tarball, Manifest: manifest},
+		NPM: &extensionproto.OutboxNPM{Registry: registry, Tarball: tarball, Manifest: manifest},
 	}
 }
 
@@ -539,7 +541,7 @@ func TestSessionOpenIsSentOnceAfterEveryBarrierLeaf(t *testing.T) {
 			npm := newNPMRegistry(t)
 			h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, npm.server)}})
 			outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
-				return []extensionproto.OutboxMember{npmOutboxMember(t, w, "/web", "@putnami/web", "1.2.3")}
+				return []extensionproto.OutboxMember{npmOutboxMember(t, w, npm.server.URL, "/web", "@putnami/web", "1.2.3")}
 			})
 			h.addMember("npm", "@putnami/web", "1.2.3", "web", map[string]string{"npm": registriesEntry("publish", npm.server.URL)},
 				fixtureScript{{"copy-tree", outbox, "$PUTNAMI_PUBLICATION_OUTBOX"}})
@@ -592,6 +594,74 @@ func TestSessionOpenIsSentOnceAfterEveryBarrierLeaf(t *testing.T) {
 	}
 }
 
+// The legacy handoff and the publication session state one plan digest for a
+// selection, whatever order the planner met its members in: the plan holds
+// them in canonical order, both sides keep that order, and both refuse a plan
+// out of it.
+func TestHandoffAndSessionStateOnePlanDigestInAnyMemberOrder(t *testing.T) {
+	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "open-follows-every-barrier-leaf-once")
+	member := func(ecosystem, coordinate, version string, fingerprint byte) releaseset.PlannedMember {
+		return releaseset.PlannedMember{
+			Ecosystem: distribution.Ecosystem(ecosystem), Coordinate: coordinate, Version: version,
+			Dependencies: []distribution.ReleaseSetDependency{}, SourceRevision: testRevision,
+			SelectionFingerprint: digestFor(fingerprint), Selected: true, ProjectID: "/" + coordinate,
+		}
+	}
+	// Every ecosystem, and coordinates that prefix one another or differ in
+	// one byte after a shared prefix.
+	met := []releaseset.PlannedMember{
+		member("oci", "team/app", "1.2.3", '1'),
+		member("npm", "@putnami/web-ui", "1.2.3", '2'),
+		member("go", "example.test/mod/v2", "v2.0.0", '3'),
+		member("npm", "@putnami/web", "1.2.3", '4'),
+		member("go", "example.test/mod", "v1.2.3", '5'),
+		member("npm", "@putnami/web.js", "1.2.3", '6'),
+	}
+	runOver := func(members []releaseset.PlannedMember) *ReleaseSetRun {
+		return &ReleaseSetRun{plan: &releaseset.Plan{
+			ProtocolVersion: distribution.ProtocolVersion, Namespace: "putnami", Channels: []string{"canary"},
+			Heads: map[string]*distribution.ChannelHead{"canary": nil}, Members: members,
+		}, sourceRevision: testRevision}
+	}
+	canonical := func(a, b releaseset.PlannedMember) int {
+		return strings.Compare(releaseset.MemberKey(a.Ecosystem, a.Coordinate), releaseset.MemberKey(b.Ecosystem, b.Coordinate))
+	}
+	digest := ""
+	for _, order := range [][]int{{0, 1, 2, 3, 4, 5}, {5, 4, 3, 2, 1, 0}, {3, 0, 5, 1, 4, 2}} {
+		members := make([]releaseset.PlannedMember, 0, len(order))
+		for _, index := range order {
+			members = append(members, met[index])
+		}
+		slices.SortFunc(members, canonical)
+		run := runOver(members)
+		handoff, err := run.capabilityPlan()
+		if err != nil {
+			t.Fatalf("order %v: handoff: %v", order, err)
+		}
+		session, err := run.publicationPlan()
+		if err != nil {
+			t.Fatalf("order %v: session plan: %v", order, err)
+		}
+		if handoff.PlanDigest != session.PlanDigest {
+			t.Fatalf("order %v: the handoff states %s, the session %s", order, handoff.PlanDigest, session.PlanDigest)
+		}
+		if digest != "" && session.PlanDigest != digest {
+			t.Fatalf("order %v: plan digest %s, another order %s", order, session.PlanDigest, digest)
+		}
+		digest = session.PlanDigest
+	}
+
+	reversed := slices.Clone(met)
+	slices.SortFunc(reversed, func(a, b releaseset.PlannedMember) int { return canonical(b, a) })
+	run := runOver(reversed)
+	if _, err := run.capabilityPlan(); err == nil {
+		t.Fatal("the handoff stated a plan out of canonical order")
+	}
+	if _, err := run.publicationPlan(); err == nil {
+		t.Fatal("the session stated a plan out of canonical order")
+	}
+}
+
 // A publication job of a publication-v1 run receives a private outbox and no
 // credential: not the captured cloud token, not the job credential
 // descriptor, not a registry route, and not the publish bearer the engine
@@ -606,7 +676,7 @@ func TestPublishJobReceivesNoCredentialUnderPublicationV1(t *testing.T) {
 	npm := newNPMRegistry(t)
 	h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, npm.server)}})
 	outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
-		return []extensionproto.OutboxMember{npmOutboxMember(t, w, "/web", "@putnami/web", "1.2.3")}
+		return []extensionproto.OutboxMember{npmOutboxMember(t, w, npm.server.URL, "/web", "@putnami/web", "1.2.3")}
 	})
 	environ := filepath.Join(h.root, "publication-environ")
 	mode := filepath.Join(h.root, "publication-outbox-mode")
@@ -702,7 +772,7 @@ func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
 	h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: slices.Compact(hosts)})
 
 	npmOutbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
-		return []extensionproto.OutboxMember{npmOutboxMember(t, w, "/web", "@putnami/web", "1.2.3")}
+		return []extensionproto.OutboxMember{npmOutboxMember(t, w, npm.server.URL, "/web", "@putnami/web", "1.2.3")}
 	})
 	zip := []byte("module zip of example.test/mod@v1.2.3")
 	goMod := []byte("module example.test/mod\n")
@@ -724,42 +794,12 @@ func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
 			Go: &extensionproto.OutboxGo{Zip: zipFile, Mod: modFile, Info: infoFile},
 		}}
 	})
-	image, err := random.Image(256, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	layout := filepath.Join(t.TempDir(), "layout")
-	imageDigest, err := oci.WriteLayout(layout, image)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ociOutbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
-		if err := w.CopyLayout("oci/layout", layout); err != nil {
-			t.Fatal(err)
-		}
-		return []extensionproto.OutboxMember{{
-			Ecosystem: extensionproto.OutboxEcosystemOCI, Coordinate: "team/app", Version: "1.2.3", Project: "/app",
-			OCI: &extensionproto.OutboxOCI{Layout: "oci/layout", Repository: ociHost + "/team/app", Digest: imageDigest, Tags: []string{"1.2.3"}},
-		}}
-	})
 	copyOutbox := func(dir string) fixtureScript {
 		return fixtureScript{{"copy-tree", dir, "$PUTNAMI_PUBLICATION_OUTBOX"}}
 	}
 	npmJob := h.addMember("npm", "@putnami/web", "1.2.3", "web", map[string]string{"npm": registriesEntry("publish", npm.server.URL)}, copyOutbox(npmOutbox))
 	goJob := h.addMember("go", "example.test/mod", "v1.2.3", "mod", map[string]string{"go": registriesEntry("origin", gomod.server.URL)}, copyOutbox(goOutbox))
-	ociJob := h.addMember("oci", "team/app", "1.2.3", "app", map[string]string{"oci": registriesEntry("publish", ociHost)}, copyOutbox(ociOutbox))
-	candidate := pkgmeta.DockerManifest{Image: ociHost + "/team/app", Version: "1.2.3", ContentHash: "content-hash", Digest: imageDigest, Layout: "layout"}
-	encoded, err := json.Marshal(candidate)
-	if err != nil {
-		t.Fatal(err)
-	}
-	candidatePath := filepath.Join(pkgmeta.PackageOutputDir(h.root, "app", "docker"), "manifest.json")
-	if err := os.MkdirAll(filepath.Dir(candidatePath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(candidatePath, encoded, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	ociJob, imageDigest := addOCIMember(t, h, ociHost, ociHost)
 
 	planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
 	results := h.execute(context.Background(), planned, internal, nil)
@@ -809,6 +849,222 @@ func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
 	}
 }
 
+// addOCIMember adds the project app, whose publication job packs a random
+// image as ociHost/team/app at 1.2.3 and whose package step built it, under
+// registries.oci.publish declared. It returns the publication job and the
+// image's manifest digest.
+func addOCIMember(t *testing.T, h *publicationHarness, ociHost, declared string) (*ScheduledJob, string) {
+	t.Helper()
+	image, err := random.Image(256, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout := filepath.Join(t.TempDir(), "layout")
+	imageDigest, err := oci.WriteLayout(layout, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
+		if err := w.CopyLayout("oci/layout", layout); err != nil {
+			t.Fatal(err)
+		}
+		return []extensionproto.OutboxMember{{
+			Ecosystem: extensionproto.OutboxEcosystemOCI, Coordinate: "team/app", Version: "1.2.3", Project: "/app",
+			OCI: &extensionproto.OutboxOCI{Layout: "oci/layout", Repository: ociHost + "/team/app", Digest: imageDigest, Tags: []string{"1.2.3"}},
+		}}
+	})
+	job := h.addMember("oci", "team/app", "1.2.3", "app", map[string]string{"oci": registriesEntry("publish", declared)},
+		fixtureScript{{"copy-tree", outbox, "$PUTNAMI_PUBLICATION_OUTBOX"}})
+	candidate := pkgmeta.DockerManifest{Image: ociHost + "/team/app", Version: "1.2.3", ContentHash: "content-hash", Digest: imageDigest, Layout: "layout"}
+	encoded, err := json.Marshal(candidate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidatePath := filepath.Join(pkgmeta.PackageOutputDir(h.root, "app", "docker"), "manifest.json")
+	if err := os.MkdirAll(filepath.Dir(candidatePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(candidatePath, encoded, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return job, imageDigest
+}
+
+// The engine uploads an npm member to the registry the member names. A
+// project that declares registries.npm.publish must declare that registry,
+// written in any form the managed rules normalize alike; a project that
+// declares another is refused, naming both, before any credential is asked or
+// any byte reaches either registry.
+func TestNPMUploadGoesToTheRegistryTheMemberNames(t *testing.T) {
+	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "each-packed-member-is-uploaded-by-the-engine")
+	for name, tc := range map[string]struct {
+		// declared is the registries.npm.publish entry, "" for none, given
+		// the registry the member names and another one.
+		declared func(packed, other string) string
+		refused  bool
+	}{
+		"no declaration":                     {declared: func(string, string) string { return "" }},
+		"a declaration of the same registry": {declared: func(packed, _ string) string { return "HTTP" + strings.TrimPrefix(packed, "http") + "/" }},
+		"a declaration of another registry":  {declared: func(_, other string) string { return other }, refused: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			npm, other := newNPMRegistry(t), newNPMRegistry(t)
+			hosts := []string{serverHost(t, npm.server), serverHost(t, other.server)}
+			slices.Sort(hosts)
+			h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: hosts})
+			outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
+				return []extensionproto.OutboxMember{npmOutboxMember(t, w, npm.server.URL, "/web", "@putnami/web", "1.2.3")}
+			})
+			var registries map[string]string
+			if declared := tc.declared(npm.server.URL, other.server.URL); declared != "" {
+				registries = map[string]string{"npm": registriesEntry("publish", declared)}
+			}
+			job := h.addMember("npm", "@putnami/web", "1.2.3", "web", registries, fixtureScript{{"copy-tree", outbox, "$PUTNAMI_PUBLICATION_OUTBOX"}})
+			planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
+			results := h.execute(context.Background(), planned, internal, nil)
+
+			upload := results[h.uploadKey(job)]
+			tarball, requests := npm.stored("@putnami/web", "1.2.3")
+			if _, otherRequests := other.stored("@putnami/web", "1.2.3"); otherRequests != 0 {
+				t.Fatalf("the registry the member does not name received %d requests", otherRequests)
+			}
+			if !tc.refused {
+				if upload == nil || upload.Status != "success" || string(tarball) != "tarball of @putnami/web@1.2.3" {
+					t.Fatalf("upload: %s; stored %q", resultMessage(upload), tarball)
+				}
+				return
+			}
+			if upload == nil || upload.Status != "failed" || upload.Error == nil ||
+				!strings.Contains(upload.Error.Message, npm.server.URL) || !strings.Contains(upload.Error.Message, other.server.URL) {
+				t.Fatalf("upload under a contradicting declaration: %s", resultMessage(upload))
+			}
+			if requests != 0 || slices.Contains(h.session.recorded(), "credential") {
+				t.Fatalf("a contradicting declaration sent %d requests; ops %v", requests, h.session.recorded())
+			}
+		})
+	}
+}
+
+// memberRegistryEndpoint accepts a declaration that names the member's
+// registry in another spelling, refuses one that names another registry with a
+// bounded error naming both, and never prints a declaration that carries a
+// credential.
+func TestMemberRegistryEndpointComparesTheNormalizedRegistry(t *testing.T) {
+	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "each-packed-member-is-uploaded-by-the-engine")
+	long := "https://npm.acme.dev/" + strings.Repeat("a", 4096)
+	for name, tc := range map[string]struct {
+		packed, declared, want, refusal string
+	}{
+		"no declaration":       {packed: "https://npm.acme.dev/team", want: "https://npm.acme.dev/team"},
+		"the default port":     {packed: "https://npm.acme.dev/team", declared: "https://NPM.acme.dev:443/team/", want: "https://npm.acme.dev/team"},
+		"a loopback port":      {packed: "http://127.0.0.1:4873", declared: "HTTP://127.0.0.1:4873/", want: "http://127.0.0.1:4873"},
+		"another path":         {packed: "https://npm.acme.dev/team", declared: "https://npm.acme.dev/other", refusal: `names "https://npm.acme.dev/other"`},
+		"another path case":    {packed: "https://npm.acme.dev/team", declared: "https://npm.acme.dev/Team", refusal: "registries.npm.publish names"},
+		"another port":         {packed: "https://npm.acme.dev", declared: "https://npm.acme.dev:8443", refusal: "registries.npm.publish names"},
+		"another scheme":       {packed: "http://localhost:4873", declared: "https://localhost:4873", refusal: "registries.npm.publish names"},
+		"another host":         {packed: "https://npm.acme.dev", declared: "https://registry.npmjs.org", refusal: `the registry "https://npm.acme.dev"`},
+		"a credentialed entry": {packed: "https://npm.acme.dev", declared: "https://publisher:secret@npm.acme.dev", refusal: "registries.npm.publish: managed npm registry"},
+		"a cleartext entry":    {packed: "https://npm.acme.dev", declared: "http://npm.acme.dev", refusal: "HTTP is allowed only for loopback"},
+		"a long entry":         {packed: "https://npm.acme.dev", declared: long, refusal: "registries.npm.publish names"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			project := &workspace.Project{Registries: map[string]json.RawMessage{}}
+			if tc.declared != "" {
+				project.Registries["npm"] = json.RawMessage(registriesEntry("publish", tc.declared))
+			}
+			got, err := memberRegistryEndpoint(project, extensionproto.OutboxMember{
+				Ecosystem: extensionproto.OutboxEcosystemNPM, Coordinate: "@acme/web", NPM: &extensionproto.OutboxNPM{Registry: tc.packed},
+			})
+			if tc.refusal == "" {
+				if err != nil || got != tc.want {
+					t.Fatalf("memberRegistryEndpoint = %q, %v; want %q", got, err, tc.want)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.refusal) {
+				t.Fatalf("memberRegistryEndpoint = %q, %v; want a refusal naming %q", got, err, tc.refusal)
+			}
+			if strings.Contains(err.Error(), "secret") || len(err.Error()) > 1024 {
+				t.Fatalf("refusal is not bounded or names a credential: %d bytes", len(err.Error()))
+			}
+		})
+	}
+}
+
+// The declared OCI registry names its host as a repository prefix or as a
+// URL. Either form naming the image's host lets the engine push; either form
+// naming another host, or a URL carrying a credential, is refused before any
+// credential is asked.
+func TestOCIUploadReadsTheDeclaredHostInEitherForm(t *testing.T) {
+	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "each-packed-member-is-uploaded-by-the-engine")
+	for name, tc := range map[string]struct {
+		declared func(host string) string
+		refusal  string
+	}{
+		"a repository prefix":          {declared: func(host string) string { return host + "/team" }},
+		"a URL":                        {declared: func(host string) string { return "http://" + host + "/team" }},
+		"a prefix naming another host": {declared: func(string) string { return "other.example/team" }, refusal: "registries.oci.publish names other.example"},
+		"a URL naming another host":    {declared: func(string) string { return "https://other.example/team" }, refusal: "registries.oci.publish names other.example"},
+		"a URL carrying a credential":  {declared: func(host string) string { return "https://publisher:secret@" + host }, refusal: "without credentials"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(registry.New())
+			t.Cleanup(server.Close)
+			host := serverHost(t, server)
+			h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{host}})
+			job, imageDigest := addOCIMember(t, h, host, tc.declared(host))
+			planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
+			results := h.execute(context.Background(), planned, internal, nil)
+
+			upload := results[h.uploadKey(job)]
+			if tc.refusal == "" {
+				events := uploadEvents(t, upload)
+				if upload == nil || upload.Status != "success" || len(events) != 1 || events[0].ArtifactDigest != imageDigest {
+					t.Fatalf("upload: %s; events %+v", resultMessage(upload), events)
+				}
+				return
+			}
+			if upload == nil || upload.Status != "failed" || upload.Error == nil ||
+				!strings.Contains(upload.Error.Message, tc.refusal) || strings.Contains(upload.Error.Message, "secret") {
+				t.Fatalf("upload under a contradicting declaration: %s", resultMessage(upload))
+			}
+			if slices.Contains(h.session.recorded(), "credential") {
+				t.Fatalf("ops %v after a contradicting declaration", h.session.recorded())
+			}
+		})
+	}
+}
+
+// declaredOCIRegistryHost reads the host of either form, normalized as an
+// image repository's host, and refuses an entry naming no host without
+// printing it.
+func TestDeclaredOCIRegistryHost(t *testing.T) {
+	for declared, want := range map[string]string{
+		"":                           "",
+		"ghcr.io":                    "ghcr.io",
+		"ghcr.io/team/":              "ghcr.io",
+		"https://ghcr.io":            "ghcr.io",
+		"https://ghcr.io/team":       "ghcr.io",
+		"localhost:5000/team":        "localhost:5000",
+		"http://localhost:5000/team": "localhost:5000",
+		"docker.io/library":          "index.docker.io",
+	} {
+		project := &workspace.Project{Registries: map[string]json.RawMessage{}}
+		if declared != "" {
+			project.Registries["oci"] = json.RawMessage(registriesEntry("publish", declared))
+		}
+		if got, err := declaredOCIRegistryHost(project, "oci"); err != nil || got != want {
+			t.Errorf("declaredOCIRegistryHost(%q) = %q, %v; want %q", declared, got, err, want)
+		}
+	}
+	for _, declared := range []string{"publisher:secret@ghcr.io/team", "https://publisher:secret@ghcr.io", "https:///team", "https://ghcr.io:bad/secret"} {
+		project := &workspace.Project{Registries: map[string]json.RawMessage{"oci": json.RawMessage(registriesEntry("publish", declared))}}
+		if got, err := declaredOCIRegistryHost(project, "oci"); err == nil || strings.Contains(err.Error(), "secret") {
+			t.Errorf("declaredOCIRegistryHost(%q) = %q, %v; want a refusal that does not print it", declared, got, err)
+		}
+	}
+}
+
 // An artifact changed after the descriptor named its digest is refused before
 // any credential is asked or any byte reaches the registry.
 func TestTamperedOutboxArtifactIsRefusedByDigest(t *testing.T) {
@@ -816,7 +1072,7 @@ func TestTamperedOutboxArtifactIsRefusedByDigest(t *testing.T) {
 	npm := newNPMRegistry(t)
 	h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, npm.server)}})
 	outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
-		return []extensionproto.OutboxMember{npmOutboxMember(t, w, "/web", "@putnami/web", "1.2.3")}
+		return []extensionproto.OutboxMember{npmOutboxMember(t, w, npm.server.URL, "/web", "@putnami/web", "1.2.3")}
 	})
 	tampered := t.TempDir()
 	original, err := os.ReadFile(filepath.Join(outbox, "npm", "@putnami_web.tgz"))
@@ -861,8 +1117,8 @@ func TestPackedMembersAreCheckedAgainstThePlan(t *testing.T) {
 		h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, npm.server)}})
 		outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
 			return []extensionproto.OutboxMember{
-				npmOutboxMember(t, w, "/web", "@putnami/other", "1.2.3"),
-				npmOutboxMember(t, w, "/web", "@putnami/web", "1.2.3"),
+				npmOutboxMember(t, w, npm.server.URL, "/web", "@putnami/other", "1.2.3"),
+				npmOutboxMember(t, w, npm.server.URL, "/web", "@putnami/web", "1.2.3"),
 			}
 		})
 		job := h.addMember("npm", "@putnami/web", "1.2.3", "web", map[string]string{"npm": registriesEntry("publish", npm.server.URL)},
@@ -907,7 +1163,7 @@ func TestNotForwardHeadIsRefusedAtOpen(t *testing.T) {
 	npm := newNPMRegistry(t)
 	h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, npm.server)}})
 	outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
-		return []extensionproto.OutboxMember{npmOutboxMember(t, w, "/web", "@putnami/web", "1.2.3")}
+		return []extensionproto.OutboxMember{npmOutboxMember(t, w, npm.server.URL, "/web", "@putnami/web", "1.2.3")}
 	})
 	job := h.addMember("npm", "@putnami/web", "1.2.3", "web", map[string]string{"npm": registriesEntry("publish", npm.server.URL)},
 		fixtureScript{{"copy-tree", outbox, "$PUTNAMI_PUBLICATION_OUTBOX"}})
@@ -954,7 +1210,7 @@ func TestReleaseNamingAMemberWithNoArtifactIsRefusedWithABoundedError(t *testing
 		Stored: func(string, string, string) (string, bool) { return "", false },
 	})
 	outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
-		return []extensionproto.OutboxMember{npmOutboxMember(t, w, "/web", "@putnami/web", "1.2.3")}
+		return []extensionproto.OutboxMember{npmOutboxMember(t, w, npm.server.URL, "/web", "@putnami/web", "1.2.3")}
 	})
 	h.addMember("npm", "@putnami/web", "1.2.3", "web", map[string]string{"npm": registriesEntry("publish", npm.server.URL)},
 		fixtureScript{{"copy-tree", outbox, "$PUTNAMI_PUBLICATION_OUTBOX"}})

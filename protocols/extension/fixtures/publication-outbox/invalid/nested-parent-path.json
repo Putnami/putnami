@@ -7,6 +7,7 @@
       "version": "1.2.3-r42",
       "project": "/typescript/web",
       "npm": {
+        "registry": "https://npm.acme.dev",
         "tarball": {
           "path": "npm/../../web.tgz",
           "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

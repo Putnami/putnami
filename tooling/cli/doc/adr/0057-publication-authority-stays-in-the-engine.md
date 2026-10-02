@@ -51,7 +51,12 @@ descriptor or a registry route. One upload node per publication job waits for
 the job and for `open`. It reads the outbox, hashes every file again, and
 refuses the outbox before any upload when a member is not the one the plan
 assigns that job: another member, a member the plan does not select, another
-version or another project. It then asks the session for the `publish`
+version or another project. A member's registry is the registry its npm block
+names, the `registries.go.origin` of its project, or the host of its OCI
+repository. The node refuses an npm registry other than the one
+`registries.npm.publish` names, compared after the managed npm rules normalize
+both, and an OCI host other than the one `registries.oci.publish` names, as a
+repository prefix or as a URL. It then asks the session for the `publish`
 credential of each member's registry, applies the host rule, and uploads the
 npm tarball, the Go module zip or the OCI layout in its own process. It writes
 `published-image.json` for an OCI member and reports one `published-member`
