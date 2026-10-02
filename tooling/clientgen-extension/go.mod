@@ -24,6 +24,7 @@ require (
 	go.putnami.dev/protocol/cli v0.0.0 // indirect
 	go.putnami.dev/protocol/config v0.0.0 // indirect
 	go.putnami.dev/protocol/database v0.0.0 // indirect
+	go.putnami.dev/protocol/distribution v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
 	go.putnami.dev/protocol/http-routes v0.0.0 // indirect
 	go.putnami.dev/protocol/identity v0.0.0 // indirect
