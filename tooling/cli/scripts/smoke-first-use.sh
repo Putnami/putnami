@@ -92,6 +92,14 @@ fail() {
   exit 1
 }
 
+# Go writes its module cache read-only, so a plain rm -rf cannot empty the home
+# the legs used. A tree left behind is reported, never turned into a failure:
+# the verdict is the legs', not the cleanup's.
+remove_tree() {
+  chmod -R u+w "$1" 2>/dev/null || true
+  rm -rf "$1" 2>/dev/null || echo "smoke: could not remove $1" >&2
+}
+
 case "$startup_timeout" in
   '' | *[!0-9]*) fail "SMOKE_STARTUP_TIMEOUT must be a non-negative integer, got '${startup_timeout}'" ;;
 esac
@@ -145,7 +153,7 @@ if [ -z "$inside" ]; then
     if [ -n "$image_id" ]; then
       docker rmi -f "$image_id" >/dev/null 2>&1 || true
     fi
-    rm -rf "$outer_workdir"
+    remove_tree "$outer_workdir"
     exit "$status"
   }
   trap outer_cleanup EXIT
@@ -236,7 +244,7 @@ cleanup() {
   trap - EXIT
   stop_group || true
   cd / 2>/dev/null || true
-  rm -rf "$workdir"
+  remove_tree "$workdir"
   exit "$status"
 }
 trap cleanup EXIT
