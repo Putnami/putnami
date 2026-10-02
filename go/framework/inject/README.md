@@ -192,7 +192,7 @@ defer forked.Close()
 The container validates at startup:
 - **Missing dependencies** — tokens referenced but not registered
 - **Circular dependencies** — DFS-based cycle detection
-- **Scope violations** — singleton depending on scoped without proxy
+- **Scope violations** — singleton depending on scoped; resolve the scoped value from the request context instead
 
 ## Support and contract
 

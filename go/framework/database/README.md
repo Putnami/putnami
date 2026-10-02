@@ -144,7 +144,7 @@ query, args := database.Select("users").
     Limit(10).
     Offset(20).
     Build()
-// SELECT id, name, email FROM users WHERE age > $1 AND active = $2 ORDER BY name ASC LIMIT 10 OFFSET 20
+// SELECT "id", "name", "email" FROM "users" WHERE age > $1 AND active = $2 ORDER BY "name" ASC LIMIT 10 OFFSET 20
 
 // INSERT
 query, args := database.Insert("users").
