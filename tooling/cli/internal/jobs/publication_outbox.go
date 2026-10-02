@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -19,6 +20,7 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 	distribution "go.putnami.dev/protocol/distribution"
 	extproto "go.putnami.dev/protocol/extension"
+	put "go.putnami.dev/protocol/put"
 	runner "go.putnami.dev/protocol/runner"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/sdk/extension/envkeys"
@@ -27,6 +29,7 @@ import (
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/publicationoutbox"
+	"go.putnami.dev/sdk/extension/putpublish"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
@@ -146,12 +149,8 @@ func (run *ReleaseSetRun) attachPublication(planned []*ScheduledJob) ([]*Schedul
 		return nil, nil, errors.New("attach the publication: the plan was not bound before planning ended")
 	}
 	for _, member := range run.plan.SelectedMembers() {
-		switch string(member.Ecosystem) {
-		case extproto.OutboxEcosystemNPM, extproto.OutboxEcosystemGo, extproto.OutboxEcosystemOCI:
-		default:
-			return nil, nil, fmt.Errorf("selected member %s: publication-v1 uploads %s, %s and %s members only",
-				printableReleaseKey(releaseset.MemberKey(member.Ecosystem, member.Coordinate)),
-				extproto.OutboxEcosystemNPM, extproto.OutboxEcosystemGo, extproto.OutboxEcosystemOCI)
+		if err := admitPublicationMember(member, run.publicationKind(member)); err != nil {
+			return nil, nil, err
 		}
 	}
 	byKey := jobsByPlanKey(planned)
@@ -214,6 +213,37 @@ func (run *ReleaseSetRun) attachPublication(planned []*ScheduledJob) ([]*Schedul
 		return nil, nil, fmt.Errorf("attach the publication: %w", err)
 	}
 	return planned, runners, nil
+}
+
+// publicationKind is the kind the engine uploads member as: the kind its
+// declared package and publish steps give it (releaseset.KindFor), which is
+// the kind a plan with member attribution records. It does not depend on
+// that opt-in.
+func (run *ReleaseSetRun) publicationKind(member releaseset.PlannedMember) distribution.MemberKind {
+	route := run.routes[releaseset.MemberKey(member.Ecosystem, member.Coordinate)]
+	return releaseset.KindFor(member.Ecosystem, route.packageStep, route.publishStep)
+}
+
+// admitPublicationMember refuses, before open, a selected member the engine
+// has no upload for: an ecosystem outside npm, go, oci, put and archive, or a
+// Put registry member of a kind put-write/v1 does not publish. A release
+// archive is the archive kind of the archive ecosystem; a config, migration
+// or doc member belongs to the put ecosystem.
+func admitPublicationMember(member releaseset.PlannedMember, kind distribution.MemberKind) error {
+	key := printableReleaseKey(releaseset.MemberKey(member.Ecosystem, member.Coordinate))
+	switch ecosystem := string(member.Ecosystem); ecosystem {
+	case extproto.OutboxEcosystemNPM, extproto.OutboxEcosystemGo, extproto.OutboxEcosystemOCI:
+		return nil
+	case extproto.OutboxEcosystemPut, extproto.OutboxEcosystemArchive:
+		_, published := put.ProfileFor(kind)
+		if published && (ecosystem == extproto.OutboxEcosystemArchive) == (kind == distribution.KindArchive) {
+			return nil
+		}
+		return fmt.Errorf("selected member %s: publication-v1 uploads no %s member of kind %q", key, ecosystem, kind)
+	}
+	return fmt.Errorf("selected member %s: publication-v1 uploads %s, %s, %s, %s and %s members only", key,
+		extproto.OutboxEcosystemNPM, extproto.OutboxEcosystemGo, extproto.OutboxEcosystemOCI,
+		extproto.OutboxEcosystemPut, extproto.OutboxEcosystemArchive)
 }
 
 // openDependencies is what open waits for. With a bound barrier, it is every
@@ -345,12 +375,13 @@ func (run *ReleaseSetRun) uploadOutbox(ctx context.Context, publish *ScheduledJo
 	}
 	published := make([]*extproto.PublishedMember, 0, len(outbox.Descriptor.Members))
 	for _, packed := range outbox.Descriptor.Members {
-		digest, err := run.uploadPacked(ctx, publish, outbox, packed)
+		digest, platforms, err := run.uploadPacked(ctx, publish, outbox, packed, run.publicationKind(planned))
 		if err != nil {
 			return nil, err
 		}
 		published = append(published, &extproto.PublishedMember{
 			Ecosystem: packed.Ecosystem, Coordinate: packed.Coordinate, Version: packed.Version, ArtifactDigest: digest,
+			Platforms: platforms,
 		})
 	}
 	return published, nil
@@ -385,18 +416,26 @@ func (run *ReleaseSetRun) checkPacked(packed extproto.OutboxMember, planned rele
 	return nil
 }
 
-// uploadPacked uploads one checked member and returns its artifact digest:
-// the npm tarball's, the Go module zip's, or the OCI manifest's.
-func (run *ReleaseSetRun) uploadPacked(ctx context.Context, publish *ScheduledJob, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember) (string, error) {
+// uploadPacked uploads one checked member of the planned kind and returns its
+// artifact digest: the npm tarball's, the Go module zip's, the OCI
+// manifest's, or the stored Put manifest payload's, with the platforms of an
+// archive.
+func (run *ReleaseSetRun) uploadPacked(ctx context.Context, publish *ScheduledJob, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember, kind distribution.MemberKind) (string, map[string]string, error) {
+	var digest string
+	var err error
 	switch packed.Ecosystem {
 	case extproto.OutboxEcosystemNPM:
-		return run.uploadNPM(ctx, publish.Project, outbox, packed)
+		digest, err = run.uploadNPM(ctx, publish.Project, outbox, packed)
 	case extproto.OutboxEcosystemGo:
-		return run.uploadGo(ctx, publish.Project, outbox, packed)
+		digest, err = run.uploadGo(ctx, publish.Project, outbox, packed)
 	case extproto.OutboxEcosystemOCI:
-		return run.uploadOCI(ctx, publish, outbox, packed)
+		digest, err = run.uploadOCI(ctx, publish, outbox, packed)
+	case extproto.OutboxEcosystemPut, extproto.OutboxEcosystemArchive:
+		return run.uploadPut(ctx, publish.Project, outbox, packed, kind)
+	default:
+		err = fmt.Errorf("ecosystem %q has no upload", packed.Ecosystem)
 	}
-	return "", fmt.Errorf("ecosystem %q has no upload", packed.Ecosystem)
+	return digest, nil, err
 }
 
 // uploadNPM uploads the member to the registry it names
@@ -542,6 +581,79 @@ func (run *ReleaseSetRun) uploadGo(ctx context.Context, project *workspace.Proje
 	return digest, nil
 }
 
+// uploadPut uploads a Put registry member to putRegistryEndpoint with the
+// provider's publish bearer for that registry: the blobs its manifest
+// references, one at a time, then the manifest, with no channel. Every check
+// that needs no registry runs before the bearer is asked for: the member's
+// shape (putpublish.Check), then the size and digest of every blob, streamed
+// from the outbox. Each blob is read and verified again when it is uploaded.
+// The digest is the SHA-256 of the manifest payload the registry stores,
+// which must be the packed manifest's.
+func (run *ReleaseSetRun) uploadPut(ctx context.Context, project *workspace.Project, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember, kind distribution.MemberKind) (string, map[string]string, error) {
+	endpoint, err := putRegistryEndpoint(project)
+	if err != nil {
+		return "", nil, err
+	}
+	target, err := url.Parse(endpoint)
+	if err != nil {
+		return "", nil, err
+	}
+	manifest, err := outbox.ReadFile(packed.Put.Manifest)
+	if err != nil {
+		return "", nil, err
+	}
+	member := putpublish.Member{
+		Kind: kind, Coordinate: packed.Coordinate, Version: packed.Version,
+		MediaType: packed.Put.MediaType, Manifest: manifest,
+	}
+	for _, blob := range packed.Put.Blobs {
+		file := blob.File()
+		member.Blobs = append(member.Blobs, putpublish.Blob{
+			MediaType: blob.MediaType, Digest: blob.Digest, Size: blob.Size,
+			Read: func() ([]byte, error) { return outbox.ReadFile(file) },
+		})
+	}
+	if _, err := putpublish.Check(member); err != nil {
+		return "", nil, err
+	}
+	for _, blob := range packed.Put.Blobs {
+		if err := outbox.VerifyFile(blob.File()); err != nil {
+			return "", nil, err
+		}
+	}
+	bearer, err := run.publication.PublishBearer(ctx, target)
+	if err != nil {
+		return "", nil, err
+	}
+	client, err := putpublish.NewHTTPClient()
+	if err != nil {
+		return "", nil, err
+	}
+	published, err := putpublish.Publish(ctx, client, endpoint, bearer, member)
+	if err != nil {
+		return "", nil, err
+	}
+	if published.Digest != packed.Put.Manifest.Digest {
+		return "", nil, fmt.Errorf("the registry stored manifest %s, not the packed %s", published.Digest, packed.Put.Manifest.Digest)
+	}
+	return published.Digest, published.Platforms, nil
+}
+
+// putRegistryEndpoint is the Put registry the project's registries.put entry
+// names in its registry field, or the default Put registry, as an upload
+// endpoint (putpublish.ValidateRegistryURL). A release archive and a config,
+// migration or doc member are served from that one registry.
+func putRegistryEndpoint(project *workspace.Project) (string, error) {
+	declared, err := declaredRegistryEndpoint(project, extension.PutRegistryEcosystem, "registry")
+	if err != nil {
+		return "", err
+	}
+	if declared == "" {
+		declared = extension.DefaultPutRegistryURL
+	}
+	return putpublish.ValidateRegistryURL(declared)
+}
+
 // uploadOCI pushes the packed layout, then records the published image beside
 // the publication job's output, where a same-run consumer reads it
 // (pkgmeta.PublishedImageManifestPath).
@@ -657,17 +769,74 @@ func declaredRegistryEndpoint(project *workspace.Project, ecosystem, field strin
 // with the artifact envelope a publication job's own event carries: the
 // ecosystem as its id and the coordinate as its name.
 func publishedMemberRawEvent(member *extproto.PublishedMember) RawJobEvent {
-	return RawJobEvent{
-		Version: runtimeproto.MaxKnownProtocolVersion,
-		Type:    EventTypeArtifact,
-		Data: map[string]any{
-			"id":             member.Ecosystem,
-			"name":           member.Coordinate,
-			"kind":           extproto.PublishedMemberEventKind,
-			"ecosystem":      member.Ecosystem,
-			"coordinate":     member.Coordinate,
-			"version":        member.Version,
-			"artifactDigest": member.ArtifactDigest,
-		},
+	data := map[string]any{
+		"id":             member.Ecosystem,
+		"name":           member.Coordinate,
+		"kind":           extproto.PublishedMemberEventKind,
+		"ecosystem":      member.Ecosystem,
+		"coordinate":     member.Coordinate,
+		"version":        member.Version,
+		"artifactDigest": member.ArtifactDigest,
 	}
+	if len(member.Platforms) > 0 {
+		platforms := make(map[string]any, len(member.Platforms))
+		for platform, digest := range member.Platforms {
+			platforms[platform] = digest
+		}
+		data["platforms"] = platforms
+	}
+	return RawJobEvent{Version: runtimeproto.MaxKnownProtocolVersion, Type: EventTypeArtifact, Data: data}
+}
+
+// ensureEngineUploadedPutMembers refuses a publication-v1 release in which a
+// put or archive member was not uploaded by an engine upload node: a
+// published-member event from any other node, or a selected member no upload
+// node published. A publication job holds no publish credential and packs a
+// Put registry member into its outbox; an event it reports for one names
+// bytes the engine never uploaded.
+func (run *ReleaseSetRun) ensureEngineUploadedPutMembers(results map[string]*JobResult) error {
+	if !run.Publication() {
+		return nil
+	}
+	uploaded := map[string]bool{}
+	var foreign []string
+	for resultKey, result := range results {
+		if result == nil {
+			continue
+		}
+		for _, event := range result.Events {
+			kind, _ := event.Data["kind"].(string)
+			ecosystem, _ := event.Data["ecosystem"].(string)
+			if event.Type != EventTypeArtifact || kind != extproto.PublishedMemberEventKind ||
+				(ecosystem != extproto.OutboxEcosystemPut && ecosystem != extproto.OutboxEcosystemArchive) {
+				continue
+			}
+			coordinate, _ := event.Data["coordinate"].(string)
+			key := releaseset.MemberKey(distribution.Ecosystem(ecosystem), coordinate)
+			if publishJob, upload := run.uploads[resultKey]; upload && run.publishJobKeys[publishJob] == key {
+				uploaded[key] = true
+				continue
+			}
+			foreign = append(foreign, fmt.Sprintf("%s by %s", printableReleaseKey(key), resultKey))
+		}
+	}
+	if len(foreign) > 0 {
+		sort.Strings(foreign)
+		return fmt.Errorf("release-set publication refused: %d put or archive member(s) were reported by a job the engine did not upload for: %s",
+			len(foreign), strings.Join(foreign, "; "))
+	}
+	var missing []string
+	for _, member := range run.plan.SelectedMembers() {
+		ecosystem := string(member.Ecosystem)
+		key := releaseset.MemberKey(member.Ecosystem, member.Coordinate)
+		if (ecosystem == extproto.OutboxEcosystemPut || ecosystem == extproto.OutboxEcosystemArchive) && !uploaded[key] {
+			missing = append(missing, printableReleaseKey(key))
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		return fmt.Errorf("release-set publication refused: the engine uploaded no artifact for %d selected put or archive member(s): %s",
+			len(missing), strings.Join(missing, "; "))
+	}
+	return nil
 }

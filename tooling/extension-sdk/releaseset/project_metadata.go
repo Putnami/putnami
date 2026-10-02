@@ -124,18 +124,20 @@ type MemberDeclaration struct {
 // kind vocabulary: a publisher that adds a step adds its token here, and a step
 // this table does not know classifies nothing rather than guessing.
 var kindByStep = map[string]distribution.MemberKind{
-	"npm":                     distribution.KindLibrary,
-	"go":                      distribution.KindLibrary,
-	"docker":                  distribution.KindImage,
-	"oci":                     distribution.KindImage,
-	"image":                   distribution.KindImage,
-	"archives":                distribution.KindArchive,
-	"cloud-publish-archives":  distribution.KindArchive,
-	"cloud-publish-config":    distribution.KindConfig,
-	"cloud-config-member":     distribution.KindConfig,
-	"cloud-publish-migration": distribution.KindMigration,
-	"site-content":            distribution.KindDoc,
-	"cloud-publish-content":   distribution.KindDoc,
+	"npm":                        distribution.KindLibrary,
+	"go":                         distribution.KindLibrary,
+	"docker":                     distribution.KindImage,
+	"oci":                        distribution.KindImage,
+	"image":                      distribution.KindImage,
+	"archives":                   distribution.KindArchive,
+	"cloud-publish-archives":     distribution.KindArchive,
+	"cloud-publish-config":       distribution.KindConfig,
+	"cloud-config-member":        distribution.KindConfig,
+	"cloud-publish-migration":    distribution.KindMigration,
+	"site-content":               distribution.KindDoc,
+	"cloud-site-content":         distribution.KindDoc,
+	"cloud-publish-content":      distribution.KindDoc,
+	"cloud-publish-site-content": distribution.KindDoc,
 }
 
 // kindByEcosystem is the fallback for an ecosystem whose profile admits exactly

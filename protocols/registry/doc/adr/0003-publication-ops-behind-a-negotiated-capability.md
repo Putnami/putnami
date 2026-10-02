@@ -180,12 +180,16 @@ or `artifact_digest_mismatch`.
 
 - No repository process holds a `publish` bearer under `publication-v1`. The
   engine holds it and uploads.
-- Release, template and agent-content archives are plan members, as the
-  release-plan contract hashes them, but no engine uploader exists for them
-  yet. The engine refuses a plan that selects one before `open`, so no channel
-  moves and no credential is issued. Until an archive uploader lands, a
-  provider must not echo `publication-v1` to a workspace that publishes
-  archives.
+- Put registry members (release, template and agent-content archives, config
+  members, migrations and site-content bundles) are plan members, as the
+  release-plan contract hashes them. The engine uploads each one with
+  [`put-write/v1`](../../../put/README.md), which moves no channel, and its
+  evidence digest is the SHA-256 of the stored manifest payload.
+- When a selected Put registry member has no engine upload, or a job reports
+  one itself, the engine fails the run before `release`, so the release moves
+  no channel. A provider can echo `publication-v1` to any workspace because a
+  publication job receives no registry credential under it; the check does
+  not stop a job that obtains one some other way from moving a channel itself.
 - A provider stores one outcome per `planDigest`. A run that lost its answer
   learns the outcome by asking again with the same plan.
 - A second implementation is checked against the schema and fixture corpus in

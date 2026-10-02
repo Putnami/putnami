@@ -213,12 +213,14 @@ Members that a route does not manage publish themselves and are not listed.
 |---|---|
 | `protocolVersion` | `1` (`PublicationOutboxVersion`). |
 | `members` | At most 64 (`MaxPublicationOutboxMembers`). An empty list states that the job packed none. |
-| `members[].ecosystem` | `npm`, `go` or `oci`. The member carries exactly the block of that name. |
+| `members[].ecosystem` | `npm`, `go`, `oci`, `put` or `archive`. An `npm`, `go` or `oci` member carries exactly the block of that name; a `put` or `archive` member carries exactly the `put` block. |
 | `members[].coordinate`, `.version`, `.project` | The release-set member's coordinate and version, and the project the plan assigns it to. |
 | `npm.registry` | The registry the job publishes to, resolved as a managed npm publication without an outbox does: the job's `registry` parameter, else `registries.npm.publish`, else `https://registry.npmjs.org` (`ManagedNPMRegistry`). |
 | `npm.tarball`, `npm.manifest` | The packed archive (at most 256 MiB) and the staged `package.json` the PUT carries. |
 | `go.zip`, `go.mod`, `go.info` | The module zip (at most 500 MiB), its `go.mod`, and its `.info` document. |
 | `oci.layout`, `oci.repository`, `oci.digest`, `oci.tags` | The OCI image layout directory, the repository as registry host plus coordinate, the expected manifest digest, and up to 16 tags. |
+| `put.mediaType`, `put.manifest` | The media type the version's manifest is published with, and the manifest payload file (at most 4 MiB). |
+| `put.blobs[]` | Up to 32 blobs the manifest references, each `{path, digest, size, mediaType}`, at most 512 MiB, each digest once. |
 
 Each file is `{path, digest, size}`: a path relative to the outbox root, the
 `sha256:` digest of its bytes, and its size, at least 1 byte and within the
@@ -226,7 +228,13 @@ ecosystem's cap. An npm member carries no access level and no dist-tag. Its
 registry is an absolute `https` URL, or `http` to a loopback host, with no
 userinfo, query or fragment; the engine uploads there and refuses a registry
 other than the project's `registries.npm.publish` when the project declares
-one. A Go member carries no registry endpoint: the engine resolves it.
+one. A Go member carries no registry endpoint: the engine resolves it. A `put`
+or `archive` member names no registry either: the engine uploads it to the
+project's `registries.put.registry`, else the default Put registry, with the
+[Put write protocol](../put/README.md). A media type is lowercase
+`type/subtype` with no parameter. Which media types a member kind publishes,
+and which blobs its manifest references, are rules of that protocol, which the
+engine checks before it asks for a bearer.
 
 `ParsePublicationOutbox` is strict: the document is at most 256 KiB of UTF-8
 (`MaxPublicationOutboxBytes`), with no unknown, duplicate, case-folded or null
@@ -336,12 +344,12 @@ only the dependent command. Re-package an authored extension, or run
   and ecosystem-profile errors.
 - Publication outbox: [`schemas/publication-outbox.json`](schemas/publication-outbox.json),
   held against the Go types by `TestOutboxSchemaTracksTheGoTypes`, with
-  [`fixtures/publication-outbox/valid/`](fixtures/publication-outbox/valid) — 4
+  [`fixtures/publication-outbox/valid/`](fixtures/publication-outbox/valid) — 5
   descriptors — and
   [`fixtures/publication-outbox/invalid/`](fixtures/publication-outbox/invalid) —
-  39 counter-examples covering unknown, duplicate and null members, escaping and
-  overlapping paths, digests, caps, npm registry rules, and repository and tag
-  rules.
+  48 counter-examples covering unknown, duplicate and null members, escaping and
+  overlapping paths, digests, caps, npm registry rules, repository and tag
+  rules, and put block media types, blobs and bounds.
 - Golden: [`testdata/task_digests.golden.json`](testdata/task_digests.golden.json)
   pins task-contract digests, so a change to how a contract hashes is visible as
   a golden diff rather than as a silent cache-key shift.

@@ -31,8 +31,8 @@ for the SDK library.
 - Digest-pinned archive installs (`pinnedarchive`): download, SHA-256 verification against the pin, link-free `.tar.gz`/`.zip` extraction, and an atomic publish under a `filelock` lock
 - The Putnami home and its toolchain directories (`putnamihome`), resolved as the CLI resolves them
 - Reproducible, link-free `.tar.gz` packaging without a `cp` or `tar` process (`treearchive`)
-- Publication outbox (`publicationoutbox`): a job writes its packed artifacts and `outbox.json` under `PUTNAMI_PUBLICATION_OUTBOX`; the engine reads each artifact once and refuses a size or digest the descriptor does not state ([ADR 0004](doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md))
-- Registry uploaders that take the bearer as an argument and send it only to the registry they were given: the managed npm PUT (`npmpublish`), the gomod-write upload (`gomodpublish`), and `oci.PushLayout`; each reuses a version already published at the same digest
+- Publication outbox (`publicationoutbox`): a job writes its packed artifacts and `outbox.json` under `PUTNAMI_PUBLICATION_OUTBOX`; the engine refuses a size or digest the descriptor does not state, and uploads the bytes it hashed (`Outbox.ReadFile`); `Outbox.VerifyFile` streams the same check without holding the file in memory ([ADR 0004](doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md))
+- Registry uploaders that take the bearer as an argument and send it only to the registry they were given: the managed npm PUT (`npmpublish`), the gomod-write upload (`gomodpublish`), the put-write upload of archive, config, migration and doc members (`putpublish`), and `oci.PushLayout`; each reuses a version already published at the same digest
 - Spec-verification fragment merge (`specreport`): the shared adapter half of the executable-spec gate — bounded fragment reads, project attribution, strict-wire validation, and the reserved `putnami-feature-verification` report artifact
 
 ## Lifecycle primitives

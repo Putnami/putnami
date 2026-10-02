@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://putnami.dev/schemas/putnami-publication-outbox.json",
   "title": "Putnami publication outbox descriptor",
-  "description": "The outbox.json a publication job writes at the root of the directory PUTNAMI_PUBLICATION_OUTBOX names. Implementations must also enforce the rules documented in protocols/extension/README.md that this schema cannot express: a document of at most 262144 bytes of valid UTF-8; no null, no duplicate member and no trailing data; container nesting of at most 4 levels; exactly the ecosystem block the member's ecosystem names; no two members with the same ecosystem and coordinate; no two artifact paths that are equal or nest; an npm registry that is an absolute https URL, or an http URL to a loopback host, with no userinfo, query or fragment; an OCI repository whose path after the registry host is the coordinate; and coordinate, version, project and repository values of at most 512 bytes with no space or control character.",
+  "description": "The outbox.json a publication job writes at the root of the directory PUTNAMI_PUBLICATION_OUTBOX names. Implementations must also enforce the rules documented in protocols/extension/README.md that this schema cannot express: a document of at most 262144 bytes of valid UTF-8; no null, no duplicate member and no trailing data; container nesting of at most 5 levels; exactly the ecosystem block the member's ecosystem names, the put block for the put and archive ecosystems; no two members with the same ecosystem and coordinate; no two artifact paths that are equal or nest; an npm registry that is an absolute https URL, or an http URL to a loopback host, with no userinfo, query or fragment; an OCI repository whose path after the registry host is the coordinate; no two blobs of a put block with the same digest; media types of at most 255 bytes; and coordinate, version, project and repository values of at most 512 bytes with no space or control character.",
   "type": "object",
   "additionalProperties": false,
   "required": ["protocolVersion", "members"],
@@ -20,26 +20,31 @@
       "additionalProperties": false,
       "required": ["ecosystem", "coordinate", "version", "project"],
       "properties": {
-        "ecosystem": { "enum": ["npm", "go", "oci"] },
+        "ecosystem": { "enum": ["npm", "go", "oci", "put", "archive"] },
         "coordinate": { "$ref": "#/definitions/identity" },
         "version": { "$ref": "#/definitions/identity" },
         "project": { "$ref": "#/definitions/identity" },
         "npm": { "$ref": "#/definitions/npm" },
         "go": { "$ref": "#/definitions/go" },
-        "oci": { "$ref": "#/definitions/oci" }
+        "oci": { "$ref": "#/definitions/oci" },
+        "put": { "$ref": "#/definitions/put" }
       },
       "allOf": [
         {
           "if": { "properties": { "ecosystem": { "const": "npm" } } },
-          "then": { "required": ["npm"], "not": { "anyOf": [{ "required": ["go"] }, { "required": ["oci"] }] } }
+          "then": { "required": ["npm"], "not": { "anyOf": [{ "required": ["go"] }, { "required": ["oci"] }, { "required": ["put"] }] } }
         },
         {
           "if": { "properties": { "ecosystem": { "const": "go" } } },
-          "then": { "required": ["go"], "not": { "anyOf": [{ "required": ["npm"] }, { "required": ["oci"] }] } }
+          "then": { "required": ["go"], "not": { "anyOf": [{ "required": ["npm"] }, { "required": ["oci"] }, { "required": ["put"] }] } }
         },
         {
           "if": { "properties": { "ecosystem": { "const": "oci" } } },
-          "then": { "required": ["oci"], "not": { "anyOf": [{ "required": ["npm"] }, { "required": ["go"] }] } }
+          "then": { "required": ["oci"], "not": { "anyOf": [{ "required": ["npm"] }, { "required": ["go"] }, { "required": ["put"] }] } }
+        },
+        {
+          "if": { "properties": { "ecosystem": { "enum": ["put", "archive"] } } },
+          "then": { "required": ["put"], "not": { "anyOf": [{ "required": ["npm"] }, { "required": ["go"] }, { "required": ["oci"] }] } }
         }
       ]
     },
@@ -119,6 +124,39 @@
           "uniqueItems": true,
           "items": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$" }
         }
+      }
+    },
+    "mediaType": {
+      "type": "string",
+      "maxLength": 255,
+      "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$"
+    },
+    "put": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mediaType", "manifest"],
+      "description": "One immutable version on the Put registry, in the Put write protocol (protocols/put): the media type its manifest is published with, the manifest payload, and the blobs the manifest references.",
+      "properties": {
+        "mediaType": { "$ref": "#/definitions/mediaType" },
+        "manifest": {
+          "allOf": [{ "$ref": "#/definitions/file" }, { "properties": { "size": { "maximum": 4194304 } } }]
+        },
+        "blobs": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "$ref": "#/definitions/putBlob" }
+        }
+      }
+    },
+    "putBlob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest", "size", "mediaType"],
+      "properties": {
+        "path": { "$ref": "#/definitions/path" },
+        "digest": { "$ref": "#/definitions/digest" },
+        "size": { "type": "integer", "minimum": 1, "maximum": 536870912 },
+        "mediaType": { "$ref": "#/definitions/mediaType" }
       }
     }
   }

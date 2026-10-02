@@ -1,8 +1,8 @@
 # Repository adoption matrix
 
-This repository maps **93 of its 130 projects** to **10 architecture domains**.
+This repository maps **94 of its 131 projects** to **10 architecture domains**.
 The other **37 are excluded on purpose**: 28 samples, 7 templates and 2 template
-proofs. Every one of the 130 appears in a table below, mapped or excluded, with a
+proofs. Every one of the 131 appears in a table below, mapped or excluded, with a
 reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
@@ -27,7 +27,7 @@ an unmapped project is simply invisible to it. This file is that second half.
 
 | Domain | Owner | Projects | Manifest |
 |---|---|---|---|
-| `protocols` | `protocols` | 39 | `protocols/putnami.architecture.json` |
+| `protocols` | `protocols` | 40 | `protocols/putnami.architecture.json` |
 | `go-framework` | `framework` | 24 | `go/framework/putnami.architecture.json` |
 | `typescript-framework` | `framework` | 14 | `typescript/framework/putnami.architecture.json` |
 | `extension-providers` | `extension-providers` | 8 | `go/extension/putnami.architecture.json` |
@@ -49,7 +49,7 @@ from the directory.
 Each section states the domain's **membership test** first. A project belongs
 because it passes that test, not because of where its directory sits.
 
-### `protocols` — 39 projects
+### `protocols` — 40 projects
 
 **Membership test:** the project decides what one wire document *means*. It owns
 that document's strict parser, its validator, and its canonical writer, and no
@@ -85,6 +85,7 @@ other project in the repository may reinterpret it.
 | `/protocols/migration` | `go.putnami.dev/protocol/migration` | The schema-migration contract. |
 | `/protocols/oci` | `go.putnami.dev/protocol/oci` | Putnami's extensions over the OCI distribution spec. |
 | `/protocols/platform` | `go.putnami.dev/protocol/platform` | The platform-target vocabulary. |
+| `/protocols/put` | `go.putnami.dev/protocol/put` | The Put registry immutable write protocol. |
 | `/protocols/qualify` | `go.putnami.dev/protocol/qualify` | Workload qualification: the smoke contract derived from a workload's contracts, and the verdict of running it. |
 | `/protocols/registry` | `go.putnami.dev/protocol/registry` | The credential seam between publishers and the cloud. |
 | `/protocols/runner` | `go.putnami.dev/protocol/runner` | The credential-free runner wire: source manifest, execution request, provider RPC and session bundle. |

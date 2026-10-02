@@ -28,6 +28,7 @@ replace (
 	go.putnami.dev/protocol/infra => ../../protocols/infra
 	go.putnami.dev/protocol/job => ../../protocols/job
 	go.putnami.dev/protocol/oci => ../../protocols/oci
+	go.putnami.dev/protocol/put => ../../protocols/put
 	go.putnami.dev/protocol/registry => ../../protocols/registry
 	go.putnami.dev/protocol/runtime => ../../protocols/runtime
 	go.putnami.dev/protocol/storage => ../../protocols/storage

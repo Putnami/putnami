@@ -114,9 +114,15 @@ func TestOutboxReaderRefusesATamperedArtifact(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if err := outbox.VerifyFile(member.NPM.Tarball); err != nil {
+				t.Fatalf("intact artifact refused: %v", err)
+			}
 			tamper(t, root)
 			if data, err := outbox.ReadFile(member.NPM.Tarball); err == nil {
 				t.Fatalf("tampered artifact read as %q", data)
+			}
+			if err := outbox.VerifyFile(member.NPM.Tarball); err == nil {
+				t.Fatal("tampered artifact verified")
 			}
 		})
 	}
@@ -199,6 +205,52 @@ func TestOutboxWriterRefusesUnwrittenAndOverlappingArtifacts(t *testing.T) {
 	}
 	if _, err := NewWriter("relative/outbox"); err == nil {
 		t.Fatal("opened a writer on a relative path")
+	}
+}
+
+func TestOutboxWriterPacksAPutMember(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "the-engine-uploads-only-bytes-whose-digest-it-verified")
+	root := filepath.Join(t.TempDir(), "outbox")
+	writer, err := NewWriter(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := writer.WriteFile("put/orders/bundle.tar", []byte("bundle bytes"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := writer.WriteFile("put/orders/manifest.json", []byte(`{"blob_digest":"`+bundle.Digest+`"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	blob := extproto.OutboxPutBlob{Path: bundle.Path, Digest: bundle.Digest, Size: bundle.Size, MediaType: "application/vnd.putnami.migration-bundle.v1.tar"}
+	member := extproto.OutboxMember{
+		Ecosystem: extproto.OutboxEcosystemPut, Coordinate: "acme/orders-db", Version: "0007", Project: "/data/orders",
+		Put: &extproto.OutboxPut{MediaType: "application/vnd.putnami.data.migration.v2+json", Manifest: manifest, Blobs: []extproto.OutboxPutBlob{blob}},
+	}
+	forged := member
+	forgedBlob := blob
+	forgedBlob.Size++
+	forged.Put = &extproto.OutboxPut{MediaType: member.Put.MediaType, Manifest: manifest, Blobs: []extproto.OutboxPutBlob{forgedBlob}}
+	if err := writer.Add(forged); err == nil {
+		t.Fatal("added a put member whose blob size the writer did not compute")
+	}
+	if err := writer.Add(member); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	outbox, err := Read(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	packed := outbox.Descriptor.Members[0].Put
+	if data, err := outbox.ReadFile(packed.Blobs[0].File()); err != nil || string(data) != "bundle bytes" {
+		t.Fatalf("blob = %q, %v", data, err)
+	}
+	if data, err := outbox.ReadFile(packed.Manifest); err != nil || !strings.Contains(string(data), bundle.Digest) {
+		t.Fatalf("manifest = %q, %v", data, err)
 	}
 }
 

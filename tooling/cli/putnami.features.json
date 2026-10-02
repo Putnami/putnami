@@ -2951,6 +2951,20 @@
           }
         },
         {
+          "id": "put-registry-members-upload-in-the-engine",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "put-registry-members-are-uploaded-by-the-engine",
+              "a-put-member-is-checked-before-the-bearer-is-asked",
+              "a-put-member-the-engine-did-not-upload-fails-the-release",
+              "every-put-registry-kind-uploads-with-no-bearer-in-the-repository"
+            ]
+          }
+        },
+        {
           "id": "bound-requests-publish-through-the-provider",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

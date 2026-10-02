@@ -40,6 +40,37 @@
         "tooling/extension-sdk/memberprobe/archive_test.go"
       ],
       "reason": "Builds the HTTP client a registry probe sends its read-only requests with: no ambient proxy and no redirect followed. The caller supplies the registry endpoint and speaks that registry's protocol."
+    },
+    {
+      "runtime": "putnami-extension-sdk",
+      "status": "pending-provider-contract",
+      "adapter": "tooling/extension-sdk/putpublish/putpublish.go",
+      "callsites": [
+        {
+          "path": "tooling/extension-sdk/putpublish/putpublish.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "62efef67fbf5b532305665e19efd5c700447e0433ff224f9b01bbce87c3bd505"
+        },
+        {
+          "path": "tooling/extension-sdk/putpublish/putpublish.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "7b2423e487c586830cc21d05bf3571789a87650a454ab395e5b32de8147dda70"
+        }
+      ],
+      "owner": "putnami-extension-sdk",
+      "tests": [
+        "tooling/extension-sdk/putpublish/putpublish_test.go",
+        "tooling/extension-sdk/uploaders_test.go"
+      ],
+      "reason": "Uploads the blobs and publishes the manifest of a Put registry member, and reads a stored manifest back after a conflict, with the bearer it is given sent to that registry only: no ambient proxy and no redirect followed. First-party Putnami service; the wire contract lives in protocols/put (put-write/v1) and no provider declares a client for it yet.",
+      "operations": [
+        "put.blob-upload",
+        "put.manifest-read",
+        "put.publish"
+      ],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
     }
   ]
 }

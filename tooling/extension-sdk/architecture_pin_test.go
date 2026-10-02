@@ -72,6 +72,7 @@ func authoredExtensionSDKDomain() *arch.Builder {
 				arch.Bind("/tooling/extension-sdk", "/protocols/infra"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/job"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/oci"),
+				arch.Bind("/tooling/extension-sdk", "/protocols/put"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/registry"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/runtime"),
 				arch.Bind("/tooling/extension-sdk", "/protocols/storage"),

@@ -148,6 +148,8 @@ func TestKindForClassifiesDeclaredStepsAndFallsBackToTheEcosystem(t *testing.T) 
 		{"cloud archives", "archive", "archives", "cloud-publish-archives", distribution.KindArchive},
 		{"template archive", "archive", "template", "cloud-publish-archives", distribution.KindArchive},
 		{"site content", "put", "site-content", "site-content", distribution.KindDoc},
+		{"cloud site content", "put", "cloud-site-content", "cloud-publish-site-content", distribution.KindDoc},
+		{"cloud site content with an unknown publish step", "put", "cloud-site-content", "bespoke", distribution.KindDoc},
 		{"unknown step in a generic ecosystem", "put", "bespoke", "bespoke", ""},
 		{"nothing declared", "", "", "", ""},
 	}

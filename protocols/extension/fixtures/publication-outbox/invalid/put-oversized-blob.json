@@ -1,0 +1,27 @@
+{
+  "protocolVersion": 1,
+  "members": [
+    {
+      "ecosystem": "archive",
+      "coordinate": "acme/api-config",
+      "version": "1.2.3",
+      "project": "/go/api",
+      "put": {
+        "mediaType": "application/vnd.putnami.archive+json",
+        "manifest": {
+          "path": "put/manifest.json",
+          "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "size": 512
+        },
+        "blobs": [
+          {
+            "path": "put/blob-1",
+            "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "size": 536870913,
+            "mediaType": "application/gzip"
+          }
+        ]
+      }
+    }
+  ]
+}

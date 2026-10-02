@@ -25,6 +25,7 @@ require (
 	go.putnami.dev/protocol/infra v0.0.0
 	go.putnami.dev/protocol/job v0.0.0
 	go.putnami.dev/protocol/platform v0.0.0-00010101000000-000000000000
+	go.putnami.dev/protocol/put v0.0.0
 	go.putnami.dev/protocol/qualify v0.0.0-00010101000000-000000000000
 	go.putnami.dev/protocol/registry v0.0.0
 	go.putnami.dev/protocol/runner v0.0.0
@@ -74,6 +75,7 @@ replace (
 	go.putnami.dev/protocol/infra => ../../protocols/infra
 	go.putnami.dev/protocol/job => ../../protocols/job
 	go.putnami.dev/protocol/platform => ../../protocols/platform
+	go.putnami.dev/protocol/put => ../../protocols/put
 	go.putnami.dev/protocol/qualify => ../../protocols/qualify
 	go.putnami.dev/protocol/runner => ../../protocols/runner
 	go.putnami.dev/protocol/runtime => ../../protocols/runtime

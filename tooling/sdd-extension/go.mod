@@ -33,6 +33,7 @@ replace (
 	go.putnami.dev/protocol/features => ../../protocols/features
 	go.putnami.dev/protocol/gomod => ../../protocols/gomod
 	go.putnami.dev/protocol/job => ../../protocols/job
+	go.putnami.dev/protocol/put => ../../protocols/put
 	go.putnami.dev/protocol/runtime => ../../protocols/runtime
 	go.putnami.dev/protocol/support => ../../protocols/support
 	go.putnami.dev/protocol/workspace => ../../protocols/workspace

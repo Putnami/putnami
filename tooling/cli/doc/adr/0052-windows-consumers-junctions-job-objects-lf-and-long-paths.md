@@ -155,7 +155,7 @@ every sign-in and sign-out.
   monitor stays on the four macOS and Linux targets.
 
 The other decisions, D-W1 (target), D-W2 (`.tar.gz` archives with
-`compiled/<name>.exe`), D-W3 (hooks through `sh -c` from Git for Windows), D-W5
+`compiled/<name>.exe`, the CLI's own raw executables excepted), D-W3 (hooks through `sh -c` from Git for Windows), D-W5
 (OS-class cache-key field on Windows only), D-W10 (`LockFileEx` locks) and D-W11
 (the proof host), need no further reason here.
 

@@ -291,6 +291,69 @@ func TestOutboxDescriptorAcceptsEveryEcosystem(t *testing.T) {
 	}
 }
 
+// A put or archive member carries one put block: the manifest payload, its
+// media type, and the blobs it references, each a regular outbox file.
+func TestOutboxDescriptorAcceptsPutAndArchiveMembers(t *testing.T) {
+	outbox, diags := ParsePublicationOutbox(readOutboxFixture(t, "valid", "put-members.json"))
+	if outbox == nil {
+		t.Fatalf("valid descriptor refused: %s", outboxRefusal(diags))
+	}
+	if len(outbox.Members) != 4 {
+		t.Fatalf("members = %d, want 4", len(outbox.Members))
+	}
+	archive, config, migration, doc := outbox.Members[0], outbox.Members[1], outbox.Members[2], outbox.Members[3]
+	if archive.Ecosystem != OutboxEcosystemArchive || archive.Put == nil || len(archive.Put.Blobs) != 2 ||
+		archive.Put.Blobs[1].File() != (OutboxFile{Path: "put/widget/widget-linux-amd64.tar.gz", Digest: "sha256:" + strings.Repeat("2", 64), Size: 4100}) {
+		t.Fatalf("archive member = %+v", archive)
+	}
+	if config.Ecosystem != OutboxEcosystemPut || config.Put == nil || len(config.Put.Blobs) != 0 || config.Put.Manifest.Size != 512 {
+		t.Fatalf("config member = %+v", config)
+	}
+	if migration.Put == nil || migration.Put.Blobs[0].MediaType != "application/vnd.putnami.migration-bundle.v1.tar" {
+		t.Fatalf("migration member = %+v", migration)
+	}
+	if doc.Put == nil || doc.Put.MediaType != "application/vnd.putnami.sitecontent.bundle+json" {
+		t.Fatalf("doc member = %+v", doc)
+	}
+
+	for name, want := range map[string]string{
+		"put-without-block.json":             `a member of ecosystem "put" requires the put block`,
+		"archive-without-put.json":           `a member of ecosystem "archive" requires the put block`,
+		"put-uppercase-media-type.json":      "must be a lowercase type/subtype",
+		"put-blob-without-media-type.json":   "blobs[0].mediaType: media type \"\" must be",
+		"put-repeated-blob.json":             "repeats members[0].put.blobs[0]",
+		"put-oversized-manifest.json":        fmt.Sprintf("outside 1..%d", MaxOutboxPutManifestBytes),
+		"put-oversized-blob.json":            fmt.Sprintf("outside 1..%d", MaxOutboxPutBlobBytes),
+		"put-unknown-blob-member.json":       `unknown member "platform"`,
+		"put-blob-shares-manifest-path.json": "overlaps",
+	} {
+		t.Run(name, func(t *testing.T) {
+			outbox, diags := ParsePublicationOutbox(readOutboxFixture(t, "invalid", name))
+			if outbox != nil {
+				t.Fatalf("descriptor accepted, want a refusal naming %q", want)
+			}
+			if got := outboxRefusal(diags); !strings.Contains(got, want) {
+				t.Fatalf("refusal = %q, want it to name %q", got, want)
+			}
+		})
+	}
+
+	block := OutboxPut{MediaType: "application/vnd.putnami.archive+json", Manifest: OutboxFile{Path: "m.json", Digest: "sha256:" + strings.Repeat("a", 64), Size: 2}}
+	for index := 0; index <= MaxOutboxPutBlobs; index++ {
+		block.Blobs = append(block.Blobs, OutboxPutBlob{Path: fmt.Sprintf("b%d", index), Digest: fmt.Sprintf("sha256:%064x", index), Size: 1, MediaType: "application/gzip"})
+	}
+	many := &PublicationOutbox{ProtocolVersion: PublicationOutboxVersion, Members: []OutboxMember{{
+		Ecosystem: OutboxEcosystemArchive, Coordinate: "acme/widget", Version: "1.2.3", Project: "/w", Put: &block,
+	}}}
+	if got := outboxRefusal(ValidatePublicationOutbox(many)); !strings.Contains(got, fmt.Sprintf("exceed the bound of %d", MaxOutboxPutBlobs)) {
+		t.Fatalf("too many blobs refusal = %q", got)
+	}
+	block.Blobs = block.Blobs[:MaxOutboxPutBlobs]
+	if diags := ValidatePublicationOutbox(many); len(diags) != 0 {
+		t.Fatalf("a put block at the blob bound was refused: %s", outboxRefusal(diags))
+	}
+}
+
 func TestOutboxDescriptorIsBounded(t *testing.T) {
 	oversized := `{"protocolVersion":1,"members":[],"pad":"` + strings.Repeat("x", MaxPublicationOutboxBytes) + `"}`
 	if _, diags := ParsePublicationOutbox([]byte(oversized)); !strings.Contains(outboxRefusal(diags), "exceeds") {
@@ -302,7 +365,7 @@ func TestOutboxDescriptorIsBounded(t *testing.T) {
 	if _, diags := ParsePublicationOutbox([]byte("{\"protocolVersion\":1,\"members\":[],\"x\":\"\xff\"}")); !strings.Contains(outboxRefusal(diags), "UTF-8") {
 		t.Fatalf("invalid UTF-8 refusal = %q", outboxRefusal(diags))
 	}
-	deep := `{"protocolVersion":1,"members":[{"ecosystem":"oci","coordinate":"a/b","version":"1","project":"p","oci":{"tags":[["x"]]}}]}`
+	deep := `{"protocolVersion":1,"members":[{"ecosystem":"oci","coordinate":"a/b","version":"1","project":"p","oci":{"tags":[[["x"]]]}}]}`
 	if _, diags := ParsePublicationOutbox([]byte(deep)); !strings.Contains(outboxRefusal(diags), "nesting exceeds") {
 		t.Fatalf("deep descriptor refusal = %q", outboxRefusal(diags))
 	}
@@ -364,6 +427,7 @@ func TestOutboxSchemaTracksTheGoTypes(t *testing.T) {
 	assertFieldParity(t, "PublicationOutbox", names(schema.Properties), goTypeJSONFields(t, PublicationOutbox{}))
 	for definition, value := range map[string]any{
 		"member": OutboxMember{}, "file": OutboxFile{}, "npm": OutboxNPM{}, "go": OutboxGo{}, "oci": OutboxOCI{},
+		"put": OutboxPut{}, "putBlob": OutboxPutBlob{},
 	} {
 		def, ok := schema.Definitions[definition]
 		if !ok {

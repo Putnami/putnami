@@ -16,6 +16,7 @@ require (
 	go.putnami.dev/protocol/infra v0.0.0
 	go.putnami.dev/protocol/job v0.0.0
 	go.putnami.dev/protocol/oci v0.0.0
+	go.putnami.dev/protocol/put v0.0.0
 	go.putnami.dev/protocol/registry v0.0.0
 	go.putnami.dev/protocol/runtime v0.0.0
 	go.putnami.dev/protocol/workspace v0.0.0
@@ -53,6 +54,7 @@ replace (
 	go.putnami.dev/protocol/infra => ../../protocols/infra
 	go.putnami.dev/protocol/job => ../../protocols/job
 	go.putnami.dev/protocol/oci => ../../protocols/oci
+	go.putnami.dev/protocol/put => ../../protocols/put
 	go.putnami.dev/protocol/registry => ../../protocols/registry
 	go.putnami.dev/protocol/runtime => ../../protocols/runtime
 	go.putnami.dev/protocol/storage => ../../protocols/storage

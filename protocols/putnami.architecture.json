@@ -32,6 +32,7 @@
     "/protocols/migration",
     "/protocols/oci",
     "/protocols/platform",
+    "/protocols/put",
     "/protocols/qualify",
     "/protocols/registry",
     "/protocols/runner",

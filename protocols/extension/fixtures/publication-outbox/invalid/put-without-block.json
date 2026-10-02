@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "members": [
+    {
+      "ecosystem": "put",
+      "coordinate": "acme/api-config",
+      "version": "1.2.3",
+      "project": "/go/api"
+    }
+  ]
+}

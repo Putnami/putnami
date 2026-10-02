@@ -13,10 +13,13 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/v1/random"
 
+	distribution "go.putnami.dev/protocol/distribution"
 	"go.putnami.dev/protocol/features/spectest"
+	put "go.putnami.dev/protocol/put"
 	"go.putnami.dev/sdk/extension/gomodpublish"
 	"go.putnami.dev/sdk/extension/npmpublish"
 	"go.putnami.dev/sdk/extension/oci"
+	"go.putnami.dev/sdk/extension/putpublish"
 )
 
 // testBearer holds characters a URL escapes, so an echo of its query escaping
@@ -31,7 +34,9 @@ func echoBody(r *http.Request) string {
 }
 
 // hostileRegistry answers every upload with an error body that echoes the
-// bearer. A gomod blob upload succeeds with the bearer as its digest.
+// bearer. A gomod or Put blob upload succeeds with the bearer in its digest, a
+// Put publish answers 409, and a Put manifest read answers the bearer in an
+// unknown member.
 func hostileRegistry(t *testing.T) *httptest.Server {
 	t.Helper()
 	var server *httptest.Server
@@ -46,6 +51,16 @@ func hostileRegistry(t *testing.T) *httptest.Server {
 		case strings.HasSuffix(r.URL.Path, "/-/blobs/upload"):
 			w.WriteHeader(http.StatusCreated)
 			_, _ = fmt.Fprintf(w, `{"digest":%q}`, "sha256:"+strings.Repeat("e", 64)+testBearer)
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/blobs"):
+			w.WriteHeader(http.StatusCreated)
+			_, _ = fmt.Fprintf(w, `{"id":%q,"digest":%q,"size":3,"media_type":"application/gzip","created_at":"2026-10-02T10:00:00Z"}`,
+				testBearer, "sha256:"+strings.Repeat("e", 64)+testBearer)
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/publish"):
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(echoBody(r)))
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/manifest"):
+			_, _ = fmt.Fprintf(w, `{"id":"m","package_id":"p","media_type":%q,"payload":{"echo":%q},"created_at":"2026-10-02T10:00:00Z","echo":%q}`,
+				put.MigrationManifestMediaType, testBearer, echoBody(r))
 		default:
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
@@ -86,6 +101,16 @@ func writeLayout(t *testing.T) (string, string) {
 		t.Fatal(err)
 	}
 	return dir, digest
+}
+
+// putMember is a migration member: a manifest and the bundle it references.
+func putMember() putpublish.Member {
+	bundle := []byte("migration bundle")
+	return putpublish.Member{
+		Kind: distribution.KindMigration, Coordinate: "acme/orders-db", Version: "0007",
+		MediaType: put.MigrationManifestMediaType, Manifest: []byte(fmt.Sprintf(`{"blob_digest":%q}`, put.Digest(bundle))),
+		Blobs: []putpublish.Blob{putpublish.BytesBlob(put.MigrationBundleBlobMediaType, bundle)},
+	}
 }
 
 // uploads runs every uploader against registry with testBearer and returns the
@@ -145,6 +170,19 @@ func uploads(t *testing.T, registry string) map[string]string {
 		err := run(reporter)
 		results[name] = text(err) + "\n" + strings.Join(reporter.lines, "\n")
 	}
+
+	putClient, err := putpublish.NewHTTPClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	member := putMember()
+	results["put blob"] = text(putpublish.UploadBlob(ctx, putClient, registry, testBearer, member.Coordinate, member.Blobs[0]))
+	_, _, manifestErr := putpublish.PublishManifest(ctx, putClient, registry, testBearer, member)
+	results["put manifest"] = text(manifestErr)
+	_, readErr := putpublish.ReadManifest(ctx, putClient, registry, testBearer, member.Coordinate, member.Version)
+	results["put read"] = text(readErr)
+	_, putErr := putpublish.Publish(ctx, putClient, registry, testBearer, member)
+	results["put publish"] = text(putErr)
 
 	dir, digest := writeLayout(t)
 	host := strings.TrimPrefix(strings.TrimPrefix(registry, "http://"), "https://")

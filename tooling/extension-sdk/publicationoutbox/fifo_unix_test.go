@@ -60,6 +60,13 @@ func TestOutboxReaderRefusesAFIFOWithoutBlocking(t *testing.T) {
 	if err == nil {
 		t.Fatal("a FIFO member file was read")
 	}
+	returned, err = returnsPromptly(func() error { return outbox.VerifyFile(member.NPM.Tarball) })
+	if !returned {
+		t.Fatal("verifying a FIFO member file waited for a writer")
+	}
+	if err == nil {
+		t.Fatal("a FIFO member file was verified")
+	}
 
 	// Swap the member file between the regular file and a FIFO while the
 	// reader reads it. Every read returns, and every read that succeeds

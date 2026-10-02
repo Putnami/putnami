@@ -175,6 +175,7 @@ validator built before this contract rejects it: upgrade the validator first.
 | [`cache`](https://github.com/putnami/putnami/tree/main/protocols/cache) | The remote build cache wire: negotiate, store/commit, batched writes, Action Cache and CAS shapes, capabilities, presigned transfers — plus the provider RPC. |
 | [`oci`](https://github.com/putnami/putnami/tree/main/protocols/oci) | Optional registry fast paths layered on the OCI distribution spec, always degrading to the standard API elsewhere. |
 | [`gomod`](https://github.com/putnami/putnami/tree/main/protocols/gomod) | Authenticated private Go module uploads with channel routing a plain VCS tag cannot express. |
+| [`put`](https://github.com/putnami/putnami/tree/main/protocols/put) | Release archives, config members, migrations and site-content bundles uploaded to the Put registry as immutable versions; only a release moves a channel. |
 | [`registry`](https://github.com/putnami/putnami/tree/main/protocols/registry) | Publisher authentication without the framework owning a host list, a recipe model, or a stored credential. Absence of a credential is a supported answer. |
 | [`sitecontent`](https://github.com/putnami/putnami/tree/main/protocols/sitecontent) | Content produced in one repository, mounted into a site in another as one content-addressed, self-verifying bundle. *This page's neighbours arrive that way.* |
 
