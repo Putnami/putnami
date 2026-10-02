@@ -91,7 +91,10 @@ func stageNPMPackage(ctx *pctx.Context, _ *jsonl.Emitter, _ []string) (string, m
 	if err := pkgmeta.WriteChannelRecord(dir, pkgmeta.ChannelRecord{Version: member.Version, Channels: []string{"npm"}}); err != nil {
 		return "FAILED", nil, err
 	}
-	return stagedProject(ctx)
+	if err := logStaged(ctx); err != nil {
+		return "FAILED", nil, err
+	}
+	return "OK", nil, nil
 }
 
 // stageGoModule stages the project's Go module at its planned version: the
@@ -132,7 +135,10 @@ func stageGoModule(ctx *pctx.Context, _ *jsonl.Emitter, _ []string) (string, map
 	if err := pkgmeta.WriteChannelRecord(dir, pkgmeta.ChannelRecord{Version: member.Version, Channels: []string{"go"}}); err != nil {
 		return "FAILED", nil, err
 	}
-	return stagedProject(ctx)
+	if err := logStaged(ctx); err != nil {
+		return "FAILED", nil, err
+	}
+	return "OK", nil, nil
 }
 
 // plannedMember is the member of the job's release-set plan that ecosystem
@@ -152,11 +158,9 @@ func plannedMember(ctx *pctx.Context, ecosystem distribution.Ecosystem, coordina
 	return member, nil
 }
 
-func stagedProject(ctx *pctx.Context) (string, map[string]any, error) {
-	if err := appendLog(os.Getenv(custodyOrderEnv), "staged "+ctx.Project.Path); err != nil {
-		return "FAILED", nil, err
-	}
-	return "OK", nil, nil
+// logStaged records in the custody order log that the job staged its project.
+func logStaged(ctx *pctx.Context) error {
+	return appendLog(os.Getenv(custodyOrderEnv), "staged "+ctx.Project.Path)
 }
 
 // goModulePath is the module path the module line of goMod declares.
