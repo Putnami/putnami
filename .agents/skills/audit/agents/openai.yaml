@@ -1,4 +1,7 @@
 interface:
   display_name: "Audit"
-  short_description: "Audit projects and maintain GitHub findings"
-  default_prompt: "Use $audit to scan the requested Putnami scope and maintain findings."
+  short_description: "Audit Putnami projects and manage findings"
+  default_prompt: "Use $audit to audit selected Putnami projects and manage evidence-backed findings."
+
+policy:
+  allow_implicit_invocation: false
