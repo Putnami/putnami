@@ -61,12 +61,11 @@ func TestSessionCapHook(t *testing.T) {
 // "bash english-only.sh <mode> ... # <comment>".
 var englishOnlyUsageLine = regexp.MustCompile(`(?m)^#\s+bash english-only\.sh (\w+)\b.*#\s*(.*)$`)
 
-// englishOnlyCall is one invocation of the shared detector in a hand-authored
-// skill file.
+// englishOnlyCall is one invocation of the shared detector in a skill file.
 var englishOnlyCall = regexp.MustCompile(`english-only\.sh (\w+)`)
 
-// The hand-authored audit's language rule keeps covering what it covered —
-// tracked files, tasks and change proposals — through the collaboration
+// The audit's language rule, from the @putnami/intelligence agent content,
+// covers tracked files, tasks and change proposals through the collaboration
 // contracts: it calls only the shared detector's current modes, never a
 // deprecated alias, and scans proposals with its own script over
 // `putnami proposals find`, which runs here against the real CLI and the

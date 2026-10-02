@@ -4,7 +4,7 @@
 # Prune mode removes weight instead of filing quality findings. This script
 # emits *candidates*; the model triages them and the owner gives verdicts on
 # the ones that need a decision. Everything here is grep-level and cheap, so it
-# runs once per domain in seconds and never burns model context on counting.
+# runs once per scope in seconds and never burns model context on counting.
 #
 # Consumers live in this repository and in the repositories that depend on
 # it. A symbol or package with no importer in any of them is dead. Set
@@ -45,6 +45,10 @@
 # complete: zero consumers, a dangling reference, a comment). Everything else
 # goes to the umbrella issue's verdict table.
 #
+# The workspace's own packages are the Go module paths of its tracked go.mod
+# files and the scoped npm names of its tracked package.json files; imports are
+# counted against those prefixes, so the script carries no repository name.
+#
 # Generated code (.gen/, *.d.ts, dist/, files whose first line carries a
 # "Code generated ... DO NOT EDIT" or "Auto-generated" marker), node_modules,
 # vendor and testdata are excluded. Only git-tracked files are scanned.
@@ -53,6 +57,8 @@
 # is a doc decision.
 set -euo pipefail
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SELF="$HERE/$(basename "${BASH_SOURCE[0]}")"
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 IDX="$ROOT/.putnami/audit/prune"
@@ -66,7 +72,7 @@ require_repos() {
   fi
 }
 
-usage() { sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,57p' "$SELF" | sed 's/^# \{0,1\}//'; exit 2; }
 
 emit() { # typology file lines-json subject value auto message
   jq -nc --arg typology "$1" --arg file "$2" --argjson lines "$3" --arg subject "$4" \
@@ -79,7 +85,7 @@ lines_json() { head -10 | jq -cnR '[inputs | tonumber]'; }
 drop_generated() {
   local files gen
   files="$(cat)"; [ -n "$files" ] || return 0
-  gen="$(printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 awk 'FNR == 1 { if ($0 ~ /Code generated .* DO NOT EDIT|^\/\/ Auto-generated/) print FILENAME; nextfile }' 2>/dev/null || true)"
+  gen="$(printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 -r awk 'FNR == 1 { if ($0 ~ /Code generated .* DO NOT EDIT|^\/\/ Auto-generated/) print FILENAME; nextfile }' 2>/dev/null || true)"
   if [ -n "$gen" ]; then printf '%s\n' "$files" | grep -vxF -f <(printf '%s\n' "$gen") || true
   else printf '%s\n' "$files"; fi
 }
@@ -104,7 +110,7 @@ RG_COMMON=(-g '!node_modules' -g '!vendor' -g '!dist' -g '!testdata' -g '!.gen' 
 # ---------------------------------------------------------------------------
 cmd_repos() {
   require_repos
-  echo "putnami  $ROOT  $(git log -1 --format='%h %cs')"
+  echo "workspace $ROOT  $(git log -1 --format='%h %cs')"
   local IFS=:
   for r in $REPOS; do
     if [ -d "$r/.git" ] || [ -f "$r/.git" ]; then
@@ -115,8 +121,26 @@ cmd_repos() {
   done
 }
 
+# Module prefixes the workspace publishes (config.sh modules): Go module
+# prefixes and npm scopes, one per line.
+go_hosts() { bash "$HERE/config.sh" modules | grep -v '^@' || true; }
+package_scopes() { bash "$HERE/config.sh" modules | grep '^@' || true; }
+# import_pattern prints the ripgrep pattern of an import of a workspace
+# package, or nothing when the workspace publishes no module.
+import_pattern() {
+  local alts=() h
+  while read -r h; do [ -n "$h" ] && alts+=("$(printf '%s' "$h" | sed 's/\./\\./g')/[A-Za-z0-9/_.~-]+"); done < <(go_hosts)
+  while read -r h; do [ -n "$h" ] && alts+=("$(printf '%s' "$h" | sed 's/\./\\./g')/[a-z0-9._~-]+"); done < <(package_scopes)
+  [ "${#alts[@]}" -gt 0 ] || return 0
+  local IFS='|'; printf '(%s)' "${alts[*]}"
+}
+
 cmd_index() {
   require_repos
+  # A step that finds nothing is a result: grep and rg exit 1 on no match.
+  # indexed-at is written last, so an index that stopped early is refused.
+  set +o pipefail
+  rm -f "$IDX/indexed-at"
   local repos=("$ROOT"); local IFS=:
   for r in $REPOS; do [ -d "$r" ] && repos+=("$r"); done
   unset IFS
@@ -125,14 +149,14 @@ cmd_index() {
   # 1. Exported definitions in this repository (Go exported, TS exported).
   #    defs.tsv: symbol <TAB> file <TAB> package-dir
   {
-    tracked src tooling go typescript protocols python \
+    tracked src . \
       | grep -E '\.go$' | tr '\n' '\0' \
-      | xargs -0 rg -H -N -o --no-heading \
+      | xargs -0 -r rg -H -N -o --no-heading \
           '^(func(\s*\([^)]*\))?\s+|type\s+|var\s+|const\s+)([A-Z][A-Za-z0-9_]*)' -r '$3' 2>/dev/null \
       | awk -F: '{print $2 "\t" $1 "\t" ($1 ~ /\// ? substr($1, 1, match($1, /\/[^\/]*$/)-1) : ".")}'
-    tracked src tooling go typescript protocols python \
+    tracked src . \
       | grep -E '\.tsx?$' | tr '\n' '\0' \
-      | xargs -0 rg -H -N -o --no-heading \
+      | xargs -0 -r rg -H -N -o --no-heading \
           '^export\s+(async\s+)?(function|const|class|interface|type|enum|let)\s+([A-Za-z_][A-Za-z0-9_]*)' -r '$3' 2>/dev/null \
       | awk -F: '{print $2 "\t" $1 "\t" ($1 ~ /\// ? substr($1, 1, match($1, /\/[^\/]*$/)-1) : ".")}'
   } | sort -u > "$IDX/defs.tsv"
@@ -154,9 +178,11 @@ cmd_index() {
   echo "index: $(wc -l < "$IDX/refs.tsv" | tr -d ' ') (symbol, file) reference rows" >&2
 
   # 3. Package imports across every repository. imports.tsv: package file
+  local pattern; pattern="$(import_pattern)"
+  [ -n "$pattern" ] || pattern='$^'
   for r in "${repos[@]}"; do
     (cd "$r" && rg -H -N -o --no-heading "${RG_COMMON[@]}" -g '*.go' -g '*.ts' -g '*.tsx' -g '*.json' \
-        '(go\.putnami\.dev/[a-z0-9/_.-]+|@putnami/[a-z0-9-]+)' . 2>/dev/null \
+        "$pattern" . 2>/dev/null \
       | awk -v repo="$r" '{ i = index($0, ":"); f = substr($0, 1, i-1); sub(/^\.\//, "", f); print substr($0, i+1) "\t" repo "/" f }')
   done | sort -u > "$IDX/imports.tsv"
   echo "index: $(wc -l < "$IDX/imports.tsv" | tr -d ' ') package import rows" >&2
@@ -167,7 +193,7 @@ cmd_index() {
   #    parent of doc/) and the qualifier is the package prefix of `pkg.Symbol`.
   #    Only code-form citations count (`Symbol` or pkg.Symbol), never prose.
   git ls-files -- '*AI.md' '*README.md' '*/doc/*.md' '*/doc/**/*.md' | grep -vE 'node_modules|CHANGELOG|/adr/' | tr '\n' '\0' \
-    | xargs -0 rg -H -o -N --no-heading '(`|\b[a-z][a-z0-9]*\.)[A-Z][A-Za-z0-9_]+\b' 2>/dev/null \
+    | xargs -0 -r rg -H -o -N --no-heading '(`|\b[a-z][a-z0-9]*\.)[A-Z][A-Za-z0-9_]+\b' 2>/dev/null \
     | awk -v names="$IDX/names.txt" 'BEGIN { while ((getline n < names) > 0) want[n]=1 }
         { i = index($0, ":"); f = substr($0, 1, i-1); s = substr($0, i+1); q = ""; sub(/^`/, "", s)
           if ((j = index(s, ".")) > 0) { q = substr(s, 1, j-1); s = substr(s, j+1) }
@@ -179,7 +205,7 @@ cmd_index() {
   date -u +%FT%TZ > "$IDX/indexed-at"
 }
 
-need_index() { [ -s "$IDX/refs.tsv" ] && [ -f "$IDX/documented.tsv" ] || { echo "prune: run \`prune.sh index\` first" >&2; exit 2; }; }
+need_index() { [ -f "$IDX/indexed-at" ] || { echo "prune: run \`prune.sh index\` first" >&2; exit 2; }; }
 
 # ---------------------------------------------------------------------------
 # scans
@@ -204,20 +230,22 @@ report_package() { # file name dir extra-awk-match
 scan_dead() { # path...
   need_index
   local paths=("$@")
-  # Packages: Go module paths and @putnami names owned by the scanned paths.
+  # Packages: Go module paths and scoped npm names owned by the scanned paths.
+  local scopes; scopes="$(package_scopes)"
   for p in "${paths[@]}"; do
-    git ls-files -- "$p" | grep -E '(^|/)go\.mod$' | while read -r gm; do
-      local mod dir n
+    git ls-files -- "$p" | grep -E '(^|/)go\.mod$' | grep -vE '(^|/)(testdata|fixtures)/' | while read -r gm; do
+      local mod dir n srcs
       mod="$(awk '/^module /{print $2; exit}' "$gm")"; dir="$(dirname "$gm")"
       # An extension or CLI binary is consumed through its manifest, not imported.
-      if git ls-files -- "$dir" | grep -E '\.go$' | grep -vE '_test\.go$' | tr '\n' '\0' | xargs -0 grep -lqs '^package main' 2>/dev/null; then continue; fi
+      srcs="$(git ls-files -- "$dir" | grep -E '\.go$' | grep -vE '_test\.go$')"
+      if [ -n "$srcs" ] && printf '%s\n' "$srcs" | tr '\n' '\0' | xargs -0 -r grep -lqs '^package main' 2>/dev/null; then continue; fi
       report_package "$gm" "$mod" "$dir" 'index($1, m "/") == 1'
 
     done
     git ls-files -- "$p" | grep -E '(^|/)package\.json$' | grep -vE 'node_modules|testdata|fixtures' | while read -r pj; do
       local name dir n
       name="$(jq -r '.name // empty' "$pj")"; dir="$(dirname "$pj")"
-      case "$name" in @putnami/*) ;; *) continue ;; esac
+      [ -n "$name" ] && printf '%s\n' "$scopes" | grep -qxF "${name%%/*}" || continue
       report_package "$pj" "$name" "$dir" '0'
 
     done
@@ -280,7 +308,7 @@ scan_dead() { # path...
 scan_duplicate() {
   local files
   files="$(tracked src "$@")"; [ -n "$files" ] || return 0
-  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 rg -H -N -o --no-heading \
+  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 -r rg -H -N -o --no-heading \
       '^(func\s+|export\s+(async\s+)?function\s+)([a-zA-Z][A-Za-z0-9_]{5,})\s*[(<]' -r '$3' 2>/dev/null \
     | awk -F: '{ f=$1; s=$2; split(f, seg, "/"); p=seg[1] "/" seg[2] "/" seg[3]
                  key=s; if (index(seen[key], p "|")==0) { seen[key]=seen[key] p "|"; cnt[key]++ }
@@ -296,7 +324,7 @@ scan_duplicate() {
 scan_multi_version() {
   local files
   files="$(tracked src "$@")"; [ -n "$files" ] || return 0
-  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 rg -H -n --no-heading -i \
+  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 -r rg -H -n --no-heading -i \
       '\b(legacy|compat(ibility)?|fallback|deprecated|putnamirc|v1|v2|olderthan|migratefrom|upgradefrom)\b|Legacy[A-Z]|[a-z](V1|V2|Legacy|Compat|Fallback)\b' 2>/dev/null \
     | awk -F: '{ c[$1]++; if (!( $1 in first)) first[$1]=$2 } END { for (f in c) print c[f] "\t" f "\t" first[f] }' \
     | sort -rn | while IFS=$'\t' read -r n f ln; do
@@ -308,7 +336,7 @@ scan_palliative() {
   local src tst
   src="$(tracked src "$@")"; tst="$(tracked test "$@")"
   if [ -n "$src" ]; then
-    printf '%s\n' "$src" | tr '\n' '\0' | xargs -0 rg -H -n --no-heading -i \
+    printf '%s\n' "$src" | tr '\n' '\0' | xargs -0 -r rg -H -n --no-heading -i \
         '^\s*(//|\*|#).*\b(workaround|guard(s)? against|would otherwise|otherwise the|used to |historically|regressed|regression|poison|stale|hijack|race(d)? with|until (issue|PR|#))' 2>/dev/null \
       | awk -F: '{ c[$1]++; if (!($1 in first)) first[$1]=$2 } END { for (f in c) print c[f] "\t" f "\t" first[f] }' \
       | sort -rn | while IFS=$'\t' read -r n f ln; do
@@ -316,7 +344,7 @@ scan_palliative() {
         done
   fi
   if [ -n "$tst" ]; then
-    printf '%s\n' "$tst" | tr '\n' '\0' | xargs -0 rg -H -n --no-heading \
+    printf '%s\n' "$tst" | tr '\n' '\0' | xargs -0 -r rg -H -n --no-heading \
         '"[0-9a-f]{9,40}"|"[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,}"|sha256:[0-9a-f]{12,}' 2>/dev/null \
       | awk -F: '{ c[$1]++; if (!($1 in first)) first[$1]=$2 } END { for (f in c) print c[f] "\t" f "\t" first[f] }' \
       | sort -rn | while IFS=$'\t' read -r n f ln; do
@@ -329,12 +357,12 @@ scan_historical_ref() {
   local files
   files="$(git ls-files -- "$@" | grep -E '\.(go|ts|tsx|md|json|yaml|yml|sh)$' | grep -vE '(^|/)(node_modules|vendor|dist|\.gen)/|CHANGELOG\.md$|\.d\.ts$' || true)"
   [ -n "$files" ] || return 0
-  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 rg -H -n --no-heading \
+  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 -r rg -H -n --no-heading \
       '(^|\s|\()#[0-9]{3,4}\b|\b(PR|pull request|issue) #?[0-9]{3,4}\b|\b[0-9a-f]{9}\b' 2>/dev/null \
     | grep -vE '^[^:]+:[0-9]+:\s*(-|\*|[0-9]+\.)?\s*\[#?[0-9]+\]' \
     | awk -F: '{ c[$1]++; if (!($1 in first)) first[$1]=$2 } END { for (f in c) print c[f] "\t" f "\t" first[f] }' \
     | sort -rn | while IFS=$'\t' read -r n f ln; do
-        emit historical-ref "$f" "[$ln]" "$(basename "$f")" "$n" true "$n references to an issue, PR or commit: after the history squash they point nowhere; state the rule or delete the sentence"
+        emit historical-ref "$f" "[$ln]" "$(basename "$f")" "$n" true "$n references to an issue, PR or commit: history belongs in the version control log; state the rule or delete the sentence"
       done
 }
 
@@ -342,14 +370,14 @@ scan_comment() {
   local files
   files="$(tracked src "$@")"; [ -n "$files" ] || return 0
   # lint escapes
-  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 rg -H -n --no-heading \
+  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 -r rg -H -n --no-heading \
       '//nolint|@ts-ignore|@ts-expect-error|\bas any\b|biome-ignore|eslint-disable' 2>/dev/null \
     | awk -F: '{ c[$1]++; if (!($1 in first)) first[$1]=$2 } END { for (f in c) print c[f] "\t" f "\t" first[f] }' \
     | sort -rn | while IFS=$'\t' read -r n f ln; do
         emit comment "$f" "[$ln]" "$(basename "$f")" "$n" false "$n lint escapes: change the code or change the rule, never annotate the wart"
       done
   # justifying comments
-  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 rg -H -n --no-heading -i \
+  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 -r rg -H -n --no-heading -i \
       '^\s*(//|\*|#)\s.*\b(because the|so that the|this (keeps|guard|check) |would otherwise|otherwise the|we (must|need to|have to)|do not remove|don.t remove|keep this|needed (because|since)|required (because|since))\b' 2>/dev/null \
     | awk -F: '{ c[$1]++; if (!($1 in first)) first[$1]=$2 } END { for (f in c) print c[f] "\t" f "\t" first[f] }' \
     | sort -rn | while IFS=$'\t' read -r n f ln; do
@@ -374,7 +402,7 @@ scan_test_scaffold() {
       done
   # helper / fake / mock files
   printf '%s\n' "$all" | grep -iE '(testutil|testenv|testsupport|testkit|fake|mock|stub|harness|fixture)[^/]*\.(go|ts|tsx)$' | while read -r f; do
-    emit test-scaffold "$f" '[]' "$(basename "$f")" "$(wc -l < "$f" | tr -d ' ')" false "test double or harness: prefer the real component or the framework's own test support"
+    emit test-scaffold "$f" '[]' "$(basename "$f")" "$(wc -l < "$f" | tr -d ' ')" false "test double or harness: prefer the real component or the repository's own test support"
   done
   # test/source ratio per project directory (first three path segments)
   printf '%s\n' "$all" | while read -r f; do
@@ -390,8 +418,8 @@ scan_test_scaffold() {
 scan_config_surface() {
   local files docs
   files="$(tracked src "$@")"; [ -n "$files" ] || return 0
-  docs="$(git ls-files -- '*.md' | grep -vE 'node_modules|CHANGELOG' | tr '\n' '\0' | xargs -0 rg -o -N --no-filename 'PUTNAMI_[A-Z0-9_]+' 2>/dev/null | sort -u || true)"
-  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 rg -H -n -o --no-heading 'PUTNAMI_[A-Z0-9_]+' 2>/dev/null \
+  docs="$(git ls-files -- '*.md' | grep -vE 'node_modules|CHANGELOG' | tr '\n' '\0' | xargs -0 -r rg -o -N --no-filename 'PUTNAMI_[A-Z0-9_]+' 2>/dev/null | sort -u || true)"
+  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 -r rg -H -n -o --no-heading 'PUTNAMI_[A-Z0-9_]+' 2>/dev/null \
     | awk -F: '{ v=$3; if (!(v in first)) { first[v]=$1 ":" $2 }; c[v]++ } END { for (v in c) print c[v] "\t" v "\t" first[v] }' \
     | sort -rn | while IFS=$'\t' read -r n v loc; do
         f="${loc%%:*}"; ln="${loc##*:}"

@@ -16,10 +16,12 @@
     "/tooling/sdd-extension",
     "/tooling/contributor",
     "/tooling/github-collaboration",
-    "@putnami/cloud"
+    "@putnami/cloud",
+    "@putnami/intelligence"
   ],
   "agentArtifacts": [
-    "extension:@putnami/contributor"
+    "extension:@putnami/contributor",
+    "extension:@putnami/intelligence"
   ],
   "includes": [
     "go",
@@ -167,14 +169,25 @@
     "@putnami/typescript": {
       "fix": true
     },
+    "@putnami/intelligence": {
+      "audit": {
+        "priority": [
+          "security",
+          "testing",
+          "design",
+          "performance",
+          "developer-experience",
+          "operations"
+        ],
+        "profile": ".agents/audit/profile.md",
+        "checks": ".agents/audit/checks.sh"
+      }
+    },
     "@putnami/cloud": {
       "workspace": {
         "workspace_id": "a3839d53-5b31-48d4-8924-fb29df25c743"
       },
       "intelligence": {
-        "audit": {
-          "enabled": false
-        },
         "enabled": true,
         "workspace": "dev"
       },
