@@ -102,16 +102,22 @@ func withoutGitTrace(env []string) []string {
 }
 
 // Commit is one commit of a line's history: what conventional-commit parsing
-// reads, plus the SHA a changelog bullet cites.
+// reads, the SHA a changelog bullet cites, and the files the bump attributes to
+// projects.
 type Commit struct {
 	SHA     string
 	Subject string
 	Body    string
+	// Files are the repository-relative paths the commit changes, limited to
+	// the pathspecs it was read under. A rename lists both of its paths, so a
+	// file moved out of a project still counts as a change to that project.
+	Files []string
 }
 
 // commitRecordSeparator is ASCII RS. A commit body is arbitrary text, newlines
 // included, so records are separated by a byte no message carries and fields by
-// NUL for the same reason.
+// NUL for the same reason. It opens each record because the file names
+// --name-only prints follow the formatted message.
 const commitRecordSeparator = "\x1e"
 
 // CommitsSince returns the commits between fromCommit (exclusive) and HEAD that
@@ -127,7 +133,10 @@ func CommitsSince(repoRoot, fromCommit string, pathspecs []string) ([]Commit, er
 		}
 		revision = resolved + "..HEAD"
 	}
-	args := []string{"log", "--format=%H%x00%s%x00%b" + commitRecordSeparator, "--no-show-signature", revision}
+	// core.quotePath=false keeps a non-ASCII path as its bytes, so it can match
+	// a project directory.
+	args := []string{"-c", "core.quotePath=false", "log", "--format=" + commitRecordSeparator + "%H%x00%s%x00%b%x00",
+		"--name-only", "--no-renames", "--no-show-signature", revision}
 	if len(pathspecs) > 0 {
 		args = append(args, "--")
 		args = append(args, pathspecs...)
@@ -142,14 +151,15 @@ func CommitsSince(repoRoot, fromCommit string, pathspecs []string) ([]Commit, er
 		if strings.TrimSpace(record) == "" {
 			continue
 		}
-		fields := strings.SplitN(record, "\x00", 3)
-		if len(fields) != 3 {
+		fields := strings.SplitN(record, "\x00", 4)
+		if len(fields) != 4 {
 			continue
 		}
 		commits = append(commits, Commit{
 			SHA:     strings.TrimSpace(fields[0]),
 			Subject: strings.TrimSpace(fields[1]),
 			Body:    strings.TrimRight(fields[2], "\n"),
+			Files:   splitLines(fields[3]),
 		})
 	}
 	return commits, nil

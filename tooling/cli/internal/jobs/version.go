@@ -141,12 +141,18 @@ func BuildRunVersions(ws *workspace.Workspace, snapshot *putnamigit.VersionInfo)
 	}
 	versions = make(RunVersions, len(ws.Lines)+1)
 	var lineErrs []error
+	// An unusable support catalog degrades the bump to the stable reading,
+	// the larger one, instead of failing a build that releases nothing.
+	stable, catalogErr := workspace.StableChangeTest(ws)
+	if catalogErr != nil {
+		lineErrs = append(lineErrs, fmt.Errorf("every version line reads each commit as stable: %w", catalogErr))
+	}
 	for _, line := range runVersionLines(ws) {
 		pattern, ok := ws.Lines[line]
 		if !ok {
 			pattern = wsproto.LineTagPattern(line, nil)
 		}
-		spec := putnamigit.LineSpec{ScopePath: line, TagPattern: pattern}
+		spec := putnamigit.LineSpec{ScopePath: line, TagPattern: pattern, Stable: stable}
 		if line != "" {
 			spec.Pathspecs = []string{line}
 		}

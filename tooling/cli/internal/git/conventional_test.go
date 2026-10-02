@@ -40,24 +40,51 @@ func TestBumpFor(t *testing.T) {
 		{Subject: "fix: stop"},
 		{Subject: "feat: add"},
 	}
-	if got := BumpFor(commits, true); got != BumpPatch {
+	if got := BumpFor(commits, true, nil); got != BumpPatch {
 		t.Errorf("BumpFor(feat+fix+docs, preOne) = %v, want patch before 1.0", got)
 	}
-	if got := BumpFor(commits, false); got != BumpMinor {
+	if got := BumpFor(commits, false, nil); got != BumpMinor {
 		t.Errorf("BumpFor(feat+fix+docs, post 1.0) = %v, want minor", got)
 	}
 	breaking := append(append([]Commit(nil), commits...), Commit{Subject: "refactor!: move"})
-	if got := BumpFor(breaking, true); got != BumpMinor {
+	if got := BumpFor(breaking, true, nil); got != BumpMinor {
 		t.Errorf("BumpFor(breaking, preOne) = %v, want minor before 1.0", got)
 	}
-	if got := BumpFor(breaking, false); got != BumpMajor {
+	if got := BumpFor(breaking, false, nil); got != BumpMajor {
 		t.Errorf("BumpFor(breaking, post 1.0) = %v, want major", got)
 	}
-	if got := BumpFor([]Commit{{Subject: "docs: rewrite"}, {Subject: "chore: tidy"}}, true); got != BumpNone {
+	if got := BumpFor([]Commit{{Subject: "docs: rewrite"}, {Subject: "chore: tidy"}}, true, nil); got != BumpNone {
 		t.Errorf("BumpFor(docs+chore) = %v, want none", got)
 	}
-	if got := BumpFor(nil, true); got != BumpNone {
+	if got := BumpFor(nil, true, nil); got != BumpNone {
 		t.Errorf("BumpFor(nothing) = %v, want none", got)
+	}
+}
+
+// A commit the stability test reads as touching no stable project advances a
+// patch at most, and the test is asked only where it can lower the answer.
+func TestBumpForCapsACommitThatTouchesNoStableProject(t *testing.T) {
+	t.Parallel()
+	asked := 0
+	unstable := func(files []string) bool {
+		asked++
+		return len(files) == 1 && files[0] == "stable/a.go"
+	}
+	if got := BumpFor([]Commit{{Subject: "feat!: drop", Files: []string{"lab/a.go"}}}, true, unstable); got != BumpPatch {
+		t.Errorf("BumpFor(breaking, unstable) = %v, want patch", got)
+	}
+	if got := BumpFor([]Commit{{Subject: "feat: add", Files: []string{"lab/a.go"}}}, false, unstable); got != BumpPatch {
+		t.Errorf("BumpFor(feat post 1.0, unstable) = %v, want patch", got)
+	}
+	if got := BumpFor([]Commit{{Subject: "feat!: drop", Files: []string{"stable/a.go"}}}, false, unstable); got != BumpMajor {
+		t.Errorf("BumpFor(breaking post 1.0, stable) = %v, want major", got)
+	}
+	asked = 0
+	if got := BumpFor([]Commit{{Subject: "fix: stop"}, {Subject: "docs: rewrite"}}, false, unstable); got != BumpPatch {
+		t.Errorf("BumpFor(fix+docs) = %v, want patch", got)
+	}
+	if asked != 0 {
+		t.Errorf("the stability test was asked %d times for a range it cannot lower", asked)
 	}
 }
 

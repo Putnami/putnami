@@ -28,14 +28,18 @@ For each line, in order:
 
 `<next>` starts from the line's last reachable tag and advances by the **conventional commits** that touch a project of the line, attributed by the files each commit changed:
 
-| Commit | Before 1.0 | From 1.0 |
-|---|---|---|
-| `!` or a `BREAKING CHANGE:` footer | minor | major |
-| `feat` | patch | minor |
-| `fix`, `perf` | patch | patch |
-| anything else | no advance | no advance |
+| Commit | Stable, before 1.0 | Stable, from 1.0 | Only preview or experimental |
+|---|---|---|---|
+| `!` or a `BREAKING CHANGE:` footer | minor | major | patch |
+| `feat` | patch | minor | patch |
+| `fix`, `perf` | patch | patch | patch |
+| anything else | no advance | no advance | no advance |
 
 Before 1.0, a minor is the release that may need a migration, and nothing else: a feature that breaks nothing ships in a patch, so a `^0.y.0` range picks it up.
+
+The bump reads the support status that the root [`putnami.support.json`](../../../protocols/support/README.md) gives the projects a commit touches. A commit counts as stable unless every file it changes belongs to a project the catalog lists as `preview` or `experimental`: those promise no compatibility, so their changes never move the line past a patch. A file that no project owns, and a project the catalog does not list, count as stable. A workspace with no catalog reads every commit as stable. `version get` and `version tag` refuse a catalog they cannot parse; a build stamps its pre-release versions with the stable reading and reports the catalog error.
+
+A breaking change outside the stable projects still needs its migration in the release notes.
 
 A pre-release is always at least a patch above the last tag, so a docs-only commit still produces a new, ordered version. Versions of one line are totally ordered by their timestamp segment, which is what lets a registry answer "the newest build of this channel" without any Putnami-specific metadata.
 

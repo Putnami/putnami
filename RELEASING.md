@@ -50,6 +50,11 @@ without reading anything. npm and Cargo read `^0.3.0` as `>=0.3.0 <0.4.0`, so a
 feature shipped in a minor would stop every automatic upgrade for nothing to
 migrate; `putnami version` proposes a patch for it.
 
+The table holds for the projects `putnami.support.json` lists as `stable`. A
+`preview` or `experimental` project promises no compatibility, so its changes,
+breaking ones included, ship in a patch; a breaking one still names its
+migration in the release notes.
+
 ## Release checklist
 
 Every item names the evidence that satisfies it. An item that cannot be

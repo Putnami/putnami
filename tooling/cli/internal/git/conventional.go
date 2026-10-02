@@ -89,17 +89,26 @@ func isConventionalType(s string) bool {
 	return true
 }
 
+// StableTest reports whether a commit, by the files it changes, touches a
+// project the support catalog lists as stable. Only such a commit may advance a
+// line past a patch: a preview or experimental project promises no
+// compatibility, so neither its features nor its breaking changes move the
+// line's minor or major. A nil StableTest reads every commit as stable, which is
+// the reading of a workspace with no support catalog.
+type StableTest func(files []string) bool
+
 // BumpFor reduces a set of commits to the strongest advance they justify.
 // preOne selects the pre-1.0 reading, where the major number is not yet a
 // compatibility promise: a breaking change is a minor and a feature is a patch,
 // so a minor always means "you may have to migrate" and never only "something
-// is new".
+// is new". A commit that stable reports as touching no stable project advances
+// a patch at most.
 //
 // Types other than feat, fix and perf advance nothing on their own: a
 // documentation commit does not make a release. A pre-release still floors at a
 // patch, but that floor belongs to NextVersion, not here — an explicit
 // `version tag` on a docs-only range must be able to see BumpNone and say so.
-func BumpFor(commits []Commit, preOne bool) Bump {
+func BumpFor(commits []Commit, preOne bool, stable StableTest) Bump {
 	strongest := BumpNone
 	for _, commit := range commits {
 		typ, breaking, ok := ParseConventional(commit.Subject, commit.Body)
@@ -117,6 +126,11 @@ func BumpFor(commits []Commit, preOne bool) Bump {
 		case typ == "feat":
 			level = BumpMinor
 		case typ == "fix", typ == "perf":
+			level = BumpPatch
+		}
+		// The stability test runs only where it can lower the answer, so a
+		// range of fixes reads no catalog attribution at all.
+		if level > BumpPatch && stable != nil && !stable(commit.Files) {
 			level = BumpPatch
 		}
 		if level > strongest {
