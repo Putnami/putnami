@@ -117,9 +117,10 @@ packages, Go modules, OCI images and put archives.
    version as a `conflict`. Under a plan it reuses a version whose zip has the
    staged digest, so equal digests are `identical` and another digest is a
    `conflict`. On `oci.putnami.dev`, where a manifest PUT moves a tag, an OCI
-   version tag held at another digest is a `tag-move`: the real publish moves the tag, and the report prints
-   `publish will move tag <version> of <coordinate> on <registry> from
-   <registry digest> to <local digest>`, or `to the image this publish builds`
+   version tag held at another digest is a `tag-move`: the real publish moves
+   the tag, and the report prints `publish will move tag <version> of
+   <coordinate> on <registry> from <registry digest> to <local digest>`, or
+   `to the image this publish builds`
    without a local digest. The run does not fail on it. On any other registry
    the same answer is a `conflict`: the dry run cannot tell whether that
    registry lets the publish move the tag. The unmanaged npm

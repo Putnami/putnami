@@ -43,7 +43,7 @@ through the registry client and the keychain of a real push, and emits one
 | `absent` | The registry answers 404. |
 | `identical` | The registry holds the manifest digest package assembled. The real publish reuses it. |
 | `tag-move` | The managed registry `oci.putnami.dev` holds the version tag at another digest, and the real publish moves the tag. |
-| `conflict` | The registry holds another digest at a reference the real publish cannot move, or package assembled no image to compare it with. |
+| `conflict` | The registry holds another digest at a reference the real publish cannot move, or, on a registry other than `oci.putnami.dev`, package assembled no image to compare it with. |
 | `unverified` | The registry cannot be reached, refuses the request, or answers outside the protocol. |
 
 A workload image is asked at its version tag, an image project at its digest.

@@ -518,3 +518,34 @@ func TestDryRunProbesAnImageProjectThroughTheBroker(t *testing.T) {
 	}
 	assertDigestHead(t, broker.recordedCalls()[before:])
 }
+
+// The managed registry is matched by its exact host. A port, another case, a
+// lookalike or any other host is not the managed registry, and an image
+// project's digest reference is never a tag, so each of them is a conflict.
+func TestHeldImageMatchesTheManagedHostExactly(t *testing.T) {
+	const local = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	const held = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+	cases := []struct {
+		name       string
+		host       string
+		versionTag bool
+		state      string
+		reason     string
+	}{
+		{"the managed host", managedOCIRegistry, true, extproto.MemberProbeTagMove, ""},
+		{"an explicit port", managedOCIRegistry + ":443", true, extproto.MemberProbeConflict, reasonOCITagHeld},
+		{"another case", strings.ToUpper(managedOCIRegistry), true, extproto.MemberProbeConflict, reasonOCITagHeld},
+		{"a lookalike", managedOCIRegistry + ".example.com", true, extproto.MemberProbeConflict, reasonOCITagHeld},
+		{"another host", "ghcr.io", true, extproto.MemberProbeConflict, reasonOCITagHeld},
+		{"a digest reference", managedOCIRegistry, false, extproto.MemberProbeConflict, memberprobe.ReasonOtherDigest},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			subject := memberprobe.Subject{Ecosystem: "oci", Coordinate: "putnami/app", Version: "1.0.0", Registry: tc.host, ArtifactDigest: local}
+			probe := heldImage(subject, imageProbe{host: tc.host, versionTag: tc.versionTag}, held)
+			if probe.State != tc.state || probe.Reason != tc.reason || probe.RegistryDigest != held {
+				t.Fatalf("probe = %+v, want state %q with reason %q", probe, tc.state, tc.reason)
+			}
+		})
+	}
+}
