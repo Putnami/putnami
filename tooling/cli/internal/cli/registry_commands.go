@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	ciproto "go.putnami.dev/protocol/ci"
+	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/commands/cachecmd"
 	"go.putnami.dev/tooling/cli/internal/commands/ci"
@@ -512,6 +515,11 @@ func cmdVersion(env *CommandEnv) error {
 	if err := env.requireWorkspace(); err != nil {
 		return err
 	}
+	if env.Sub == "get" || env.Sub == "" || env.Sub == "tag" {
+		if err := synchronizeVersionGraph(env); err != nil {
+			return err
+		}
+	}
 	switch env.Sub {
 	case "get", "":
 		return versioncmd.VersionGet(env.WsRoot, env.Args, env.OutputFormat)
@@ -524,6 +532,23 @@ func cmdVersion(env *CommandEnv) error {
 	default:
 		return usageErrorf("unknown subcommand: version %s\n  Available: get, tag, list, use", env.Sub)
 	}
+}
+
+// synchronizeVersionGraph refreshes the recorded dependency graph before a
+// version is computed from a support catalog. The catalog promotes an unlisted
+// project a stable one depends on, and a Go dependency edge exists only in the
+// recorded provider view, so a version read from a missing or outdated view
+// would differ between a fresh clone and a machine that ran a build. A
+// workspace without a catalog never reads an edge and is not refreshed.
+func synchronizeVersionGraph(env *CommandEnv) error {
+	if _, err := os.Stat(filepath.Join(env.WsRoot, supportproto.CatalogFilename)); err != nil {
+		return nil
+	}
+	if err := synchronizeWorkspaceGraph(env.Ctx, env.WsRoot, env.Cfg); err != nil {
+		return cmderr.InvalidConfigf("version: %s reads the dependency graph, which could not be refreshed: %v",
+			supportproto.CatalogFilename, err)
+	}
+	return nil
 }
 
 // cliBinDir resolves the directory holding the installed putnami CLI binaries:

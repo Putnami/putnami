@@ -197,6 +197,15 @@ func prepareMCPWorkspaceView(ctx context.Context, wsRoot string, cfg *wsproto.Co
 	if workspace.RecordedIndexView(wsRoot, time.Now()).Usable() {
 		return nil
 	}
+	return synchronizeWorkspaceGraph(ctx, wsRoot, cfg)
+}
+
+// synchronizeWorkspaceGraph brings the recorded provider graph up to date with
+// the tree: it asks only the providers whose inputs changed since the recorded
+// probe, and none when nothing changed. It runs no lifecycle hooks, dependency
+// installers or Cloud setup, and fails closed when it cannot record a usable
+// view.
+func synchronizeWorkspaceGraph(ctx context.Context, wsRoot string, cfg *wsproto.Config) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
