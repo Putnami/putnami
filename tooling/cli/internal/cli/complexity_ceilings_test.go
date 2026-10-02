@@ -84,8 +84,12 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  23,
-		funcs:  148,
-		why: "RAISED 146→148 (a missing extension before the repository refusal): " +
+		funcs:  149,
+		why: "RAISED 148→149 (a publish dry run asks each registry, ADR 0056): publishFinalizers " +
+			"orders the probe report of an executing dry-run publish before the release-set commit, " +
+			"so the commit sees a blocking verdict, and is the seam a test uses to tell an executing " +
+			"dry run from a preview. run loses its inline release-set branch; files stay at 23. " +
+			"RAISED 146→148 (a missing extension before the repository refusal): " +
 			"reportRepositoryRefusal reports a selected command whose extension is not installed " +
 			"with the missing-extension guard's own message instead of the refusal, because that " +
 			"install is the first remedy; discoverDeclaredExtensions resolves the extensions for " +

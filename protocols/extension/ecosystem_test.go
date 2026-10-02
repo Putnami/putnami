@@ -200,6 +200,144 @@ func TestPublishedMemberIsStrict(t *testing.T) {
 	}
 }
 
+// TestMemberProbeIsStrict pins the dry-run probe's parse and validation
+// contract: an unknown field or state is a rejection, absent, identical and
+// tag-move carry the digest evidence they claim, only an OCI probe reports a
+// tag-move, conflict and unverified carry a reason, and the registry endpoint
+// carries no credential. A conflict may carry equal digests: the publisher's
+// reuse rule, not the digests, decides it.
+func TestMemberProbeIsStrict(t *testing.T) {
+	const local = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+	const remote = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	base := `"ecosystem":"npm","coordinate":"@acme/widget","version":"1.2.3","registry":"https://registry.example.test"`
+	ociBase := `"ecosystem":"oci","coordinate":"acme/api","version":"1.2.3","registry":"registry.example.test"`
+
+	for name, raw := range map[string]string{
+		"absent":           `{` + base + `,"state":"absent"}`,
+		"absent anonymous": `{` + base + `,"state":"absent","artifactDigest":"` + local + `","anonymous":true}`,
+		"identical":        `{` + base + `,"state":"identical","artifactDigest":"` + local + `","registryDigest":"` + local + `"}`,
+		"identical with a note": `{` + base + `,"state":"identical","artifactDigest":"` + local + `","registryDigest":"` + local +
+			`","reason":"compared with the tarball the last package staged"}`,
+		"conflict":          `{` + base + `,"state":"conflict","artifactDigest":"` + local + `","registryDigest":"` + remote + `","reason":"digests differ"}`,
+		"conflict no local": `{` + base + `,"state":"conflict","reason":"the dry run built no artifact to compare"}`,
+		"conflict with equal digests": `{` + base + `,"state":"conflict","artifactDigest":"` + local + `","registryDigest":"` + local +
+			`","reason":"the publisher refuses an existing version"}`,
+		"unverified":        `{` + base + `,"state":"unverified","reason":"connection refused"}`,
+		"tag-move":          `{` + ociBase + `,"state":"tag-move","artifactDigest":"` + local + `","registryDigest":"` + remote + `"}`,
+		"tag-move no local": `{` + ociBase + `,"state":"tag-move","registryDigest":"` + remote + `"}`,
+		"bare host": `{"ecosystem":"oci","coordinate":"acme/api","version":"1.2.3","registry":"registry.example.test:5000",` +
+			`"state":"absent"}`,
+		"one platform": `{` + base + `,"state":"absent","platform":"linux/arm64"}`,
+	} {
+		t.Run("valid "+name, func(t *testing.T) {
+			probe, diags := ParseMemberProbe([]byte(raw))
+			if len(diags) != 0 {
+				t.Fatalf("parse: %v", diags)
+			}
+			if diags := ValidateMemberProbe(probe); len(diags) != 0 {
+				t.Fatalf("valid probe reported %v", diags)
+			}
+		})
+	}
+
+	if _, diags := ParseMemberProbe([]byte(`{` + base + `,"state":"absent","tag":"latest"}`)); !hasCode(diags, "invalid-member-probe") {
+		t.Fatalf("an unknown field was accepted: %v", diags)
+	}
+
+	for name, tc := range map[string]struct {
+		raw   string
+		field string
+	}{
+		"bad ecosystem": {`{"ecosystem":"NPM","coordinate":"c","version":"1","registry":"r","state":"absent"}`, "ecosystem"},
+		"no coordinate": {`{"ecosystem":"npm","coordinate":"","version":"1","registry":"r","state":"absent"}`, "coordinate"},
+		"no version":    {`{"ecosystem":"npm","coordinate":"c","version":"","registry":"r","state":"absent"}`, "version"},
+		"no registry":   {`{"ecosystem":"npm","coordinate":"c","version":"1","state":"absent"}`, "registry"},
+		"registry user info": {
+			`{"ecosystem":"npm","coordinate":"c","version":"1","registry":"https://user:secret@r.test","state":"absent"}`, "registry",
+		},
+		"registry query": {
+			`{"ecosystem":"npm","coordinate":"c","version":"1","registry":"https://r.test/?token=secret","state":"absent"}`, "registry",
+		},
+		"bare host user info": {
+			`{"ecosystem":"oci","coordinate":"c","version":"1","registry":"user:secret@r.test","state":"absent"}`, "registry",
+		},
+		"bad platform":              {`{` + base + `,"state":"absent","platform":"linux"}`, "platform"},
+		"unknown state":             {`{` + base + `,"state":"present"}`, "state"},
+		"no state":                  {`{` + base + `}`, "state"},
+		"short digest":              {`{` + base + `,"state":"absent","artifactDigest":"sha256:abc"}`, "artifactDigest"},
+		"short registry digest":     {`{` + base + `,"state":"unverified","reason":"r","registryDigest":"deadbeef"}`, "registryDigest"},
+		"absent with a held digest": {`{` + base + `,"state":"absent","registryDigest":"` + remote + `"}`, "registryDigest"},
+		"identical without digests": {`{` + base + `,"state":"identical"}`, "registryDigest"},
+		"identical with other digest": {
+			`{` + base + `,"state":"identical","artifactDigest":"` + local + `","registryDigest":"` + remote + `"}`, "registryDigest",
+		},
+		"tag-move without registry digest": {`{` + ociBase + `,"state":"tag-move","artifactDigest":"` + local + `"}`, "registryDigest"},
+		"tag-move with equal digests": {
+			`{` + ociBase + `,"state":"tag-move","artifactDigest":"` + local + `","registryDigest":"` + local + `"}`, "registryDigest",
+		},
+		"tag-move from npm": {
+			`{` + base + `,"state":"tag-move","artifactDigest":"` + local + `","registryDigest":"` + remote + `"}`, "ecosystem",
+		},
+		"conflict without reason":   {`{` + base + `,"state":"conflict","registryDigest":"` + remote + `"}`, "reason"},
+		"unverified without reason": {`{` + base + `,"state":"unverified","reason":"  "}`, "reason"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			parsed, diags := ParseMemberProbe([]byte(tc.raw))
+			if len(diags) != 0 {
+				t.Fatalf("parse: %v", diags)
+			}
+			diags = ValidateMemberProbe(parsed)
+			if len(diags) != 1 || diags[0].Code != "invalid-member-probe" || diags[0].Field != tc.field {
+				t.Fatalf("diagnostics = %v, want one invalid-member-probe on %q", diags, tc.field)
+			}
+			if strings.Contains(diags[0].Message, "secret") {
+				t.Fatalf("diagnostic %q repeats the credential it rejects", diags[0].Message)
+			}
+		})
+	}
+
+	if !hasCode(ValidateMemberProbe(nil), "invalid-member-probe") {
+		t.Fatal("a nil probe must be reported, not panic")
+	}
+}
+
+// An artifact event's payload is every field but the envelope, so the strict
+// parsers meet exactly what the publisher emitted. The event is not modified.
+func TestArtifactEventPayloadDropsTheEnvelope(t *testing.T) {
+	event := map[string]any{
+		"v": 2, "type": "artifact", "time": "2026-10-01T00:00:00Z", "level": "info", "message": "m",
+		"id": "npm", "name": "@acme/widget", "kind": MemberProbeEventKind, "path": "",
+		"ecosystem": "npm", "coordinate": "@acme/widget", "version": "1.4.0",
+		"registry": "https://registry.example.test", "state": MemberProbeAbsent,
+	}
+
+	encoded, err := ArtifactEventPayload(event)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{
+		"ecosystem": "npm", "coordinate": "@acme/widget", "version": "1.4.0",
+		"registry": "https://registry.example.test", "state": MemberProbeAbsent,
+	}
+	if !reflect.DeepEqual(payload, want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+	if len(event) != 14 {
+		t.Fatalf("the event lost fields: %v", event)
+	}
+	if probe, diagnostics := ParseMemberProbe(encoded); probe == nil || len(diagnostics) != 0 {
+		t.Fatalf("the payload does not pass the strict parser: %v", diagnostics)
+	}
+	if _, err := ArtifactEventPayload(map[string]any{"bad": func() {}}); err == nil {
+		t.Fatal("a payload that does not encode was accepted")
+	}
+}
+
 // ecosystemInvalidFixtureCodes maps each ecosystem counter-example to the exact
 // diagnostic codes it must produce, in order. This module has no central
 // fixture→code table, so the profile corpus carries its own: a new

@@ -45,13 +45,13 @@
           "path": "go/extension/internal/jobs/publish/gomodule.go",
           "transport": "http",
           "symbol": "http.NewRequest",
-          "fingerprint": "137870532acab130a8ada89b3fae645290f49eee160dda0ad84fb688a927e1a5"
+          "fingerprint": "3e64d9e9ba9241f0cf10cc093ec5cfd49d42987637893fcfdf75bcac9c38cef2"
         },
         {
           "path": "go/extension/internal/jobs/publish/gomodule.go",
           "transport": "http",
           "symbol": "http.NewRequest",
-          "fingerprint": "4bb73cfd353f221b562f68ad5851344dea5d11ab64213eaaa048a9690a813bec"
+          "fingerprint": "ab9da0308137a55a9eb7a763026c3aa72dfaf400af27ea428f2ee12719ecf747"
         },
         {
           "path": "go/extension/internal/jobs/publish/gomodule.go",
@@ -68,9 +68,10 @@
       ],
       "owner": "@putnami/go",
       "tests": [
+        "go/extension/internal/jobs/publish/member_probe_test.go",
         "go/extension/internal/jobs/publish/publish_test.go"
       ],
-      "reason": "Uploads a module zip and its metadata to a Go module registry over the module proxy protocol."
+      "reason": "Uploads a module zip and its metadata to a Go module registry over the module proxy protocol. A dry-run publish sends one GET of the module zip to ask whether the registry already serves the version."
     }
   ]
 }

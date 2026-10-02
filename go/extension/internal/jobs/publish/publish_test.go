@@ -22,6 +22,7 @@ import (
 	gomod "go.putnami.dev/protocol/gomod"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/recorded"
 	"go.putnami.dev/sdk/extension/registrycred"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
@@ -49,15 +50,10 @@ func TestGoModule_MissingConfig(t *testing.T) {
 }
 
 func TestGoModule_DryRun(t *testing.T) {
-	// An explicit token avoids the cloud seam shell-out (which runs before the
-	// dry-run short-circuit).
+	// An explicit token keeps the probe's credential lookup off the cloud seam.
 	t.Setenv("PUTNAMI_REGISTRY_TOKEN", "test-token")
-	var registryCalls int
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		registryCalls++
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer server.Close()
+	server := recorded.NewServer(t, nil, recorded.HTTP(t,
+		filepath.Join("testdata", "recorded", "go-registry", "module-version-not-found.404.http")))
 
 	dir := t.TempDir()
 	projectPath := "mod"
@@ -69,8 +65,13 @@ func TestGoModule_DryRun(t *testing.T) {
 		[]byte(`{"version":"1.0.0","channels":["go"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// The probe hashes the staged zip, so it exists.
+	zipPath := filepath.Join(dir, "x.zip")
+	if err := os.WriteFile(zipPath, []byte("staged module zip"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(pkgDir, "go", "module.json"),
-		[]byte(`{"modulePath":"go.putnami.dev/mod","version":"1.0.0","zipPath":"/tmp/x.zip","modPath":"/tmp/go.mod"}`), 0o644); err != nil {
+		fmt.Appendf(nil, `{"modulePath":"go.putnami.dev/mod","version":"1.0.0","zipPath":%q,"modPath":"/tmp/go.mod"}`, zipPath), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,8 +107,11 @@ func TestGoModule_DryRun(t *testing.T) {
 			t.Errorf("dry-run package claimed digest verification: %+v", event)
 		}
 	}
-	if registryCalls != 0 {
-		t.Fatalf("dry run made %d registry calls, including a possible release", registryCalls)
+	// The dry run asks the registry once whether it serves the version, and
+	// sends nothing that could release it.
+	requests := server.Requests()
+	if len(requests) != 1 || requests[0].Method != http.MethodGet || requests[0].URL.Path != "/go.putnami.dev/mod/@v/1.0.0.zip" {
+		t.Fatalf("dry run sent %d registry requests, want one GET of the module zip: %+v", len(requests), requests)
 	}
 }
 
@@ -286,12 +290,8 @@ func TestGoRegistryHTTPClientDisablesProxyAndRedirects(t *testing.T) {
 
 func TestManagedGoModuleDryRunUsesPlanWithoutPackageArtifacts(t *testing.T) {
 	t.Setenv("PUTNAMI_REGISTRY_TOKEN", "test-token")
-	var registryCalls int
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		registryCalls++
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer server.Close()
+	server := recorded.NewServer(t, nil, recorded.HTTP(t,
+		filepath.Join("testdata", "recorded", "go-registry", "module-version-not-found.404.http")))
 
 	workspace := t.TempDir()
 	projectRoot := filepath.Join(workspace, "mod")
@@ -337,8 +337,10 @@ func TestManagedGoModuleDryRunUsesPlanWithoutPackageArtifacts(t *testing.T) {
 	if packages != 1 {
 		t.Fatalf("managed dry run emitted %d Go package events, want 1: %s", packages, output)
 	}
-	if registryCalls != 0 {
-		t.Fatalf("managed dry run made %d registry calls", registryCalls)
+	// The one request is the probe: a read of the planned version's zip.
+	requests := server.Requests()
+	if len(requests) != 1 || requests[0].Method != http.MethodGet || requests[0].URL.Path != "/go.putnami.dev/mod/@v/v1.2.3-canary.1.zip" {
+		t.Fatalf("managed dry run sent %d registry requests, want one GET of the planned zip: %+v", len(requests), requests)
 	}
 	if _, statErr := os.Stat(filepath.Join(workspace, ".putnami", "out", "mod", "package", "go", "module.json")); !os.IsNotExist(statErr) {
 		t.Fatalf("managed dry run unexpectedly required or created module.json: %v", statErr)

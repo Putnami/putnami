@@ -199,6 +199,22 @@
           }
         },
         {
+          "id": "dry-run-registry-probe",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-module-probe-is-read-only",
+              "unplanned-dry-run-probes-without-a-staged-module",
+              "unreadable-staged-zip-is-unverified",
+              "identical-names-the-staged-zip"
+            ]
+          }
+        },
+        {
           "id": "merged-config-survives-a-cache-hit",
           "stage": "coded",
           "evidenceKinds": [

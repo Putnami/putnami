@@ -1,0 +1,12 @@
+HTTP/1.1 403 Forbidden
+content-type: application/json
+x-request-id: c0d889e3f104d25866a76eeb1a0a24d8/15035679457980621366
+Content-Length: 63
+date: Thu, 17 Sep 2026 10:24:31 GMT
+server: Google Frontend
+x-cloud-trace-context: c0d889e3f104d25866a76eeb1a0a24d8/15035679457980621366
+traceparent: 00-c0d889e3f104d25866a76eeb1a0a24d8-d0a976cdf992a236-00
+via: 1.1 google
+Alt-Svc: h3=":443"; ma=2592000
+
+{"error":"token was issued for a different registry protocol"}

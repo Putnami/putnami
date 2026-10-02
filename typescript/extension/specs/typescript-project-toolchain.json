@@ -120,6 +120,10 @@
       "text": "Every npm publication, new or reused, reports one published member with its verified digest and writes no dist-tag."
     },
     {
+      "id": "dry-run-registry-probe",
+      "text": "A dry-run npm publication asks the registry, without writing, whether it already holds the staged package at its version, and emits one member-probe event: absent, identical when the registry copy equals the tarball the real publish would upload, conflict when it differs or cannot be compared, unverified when the registry cannot answer. A release-set member sends one GET of the tarball, with a bearer only when one resolved, and runs no npm process. Any other publication asks through npm view and npm pack."
+    },
+    {
       "id": "upgrade-table-shows-source-revision",
       "text": "The upgrade table shows, for every resolved version, the source revision carried by its suffix."
     },

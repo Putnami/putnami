@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "ECONNREFUSED",
+    "summary": "FetchError: request to http://127.0.0.1:9/lodash failed, reason: connect ECONNREFUSED 127.0.0.1:9",
+    "detail": "\nIf you are behind a proxy, please make sure that the\n'proxy' config is set properly.  See: 'npm help config'"
+  }
+}

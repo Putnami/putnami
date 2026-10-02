@@ -9,6 +9,7 @@
     "typescript/typescript-project-toolchain#committed-client-drift",
     "typescript/typescript-project-toolchain#declared-assets-must-exist",
     "typescript/typescript-project-toolchain#deterministic-content-identity",
+    "typescript/typescript-project-toolchain#dry-run-registry-probe",
     "typescript/typescript-project-toolchain#environment-independent-library-output",
     "typescript/typescript-project-toolchain#hook-order-determinism",
     "typescript/typescript-project-toolchain#lint-covers-the-project",

@@ -102,6 +102,8 @@
     "cli/native-session-reporting#engine-lifecycle",
     "cli/portable-runner#immutable-source",
     "cli/portable-runner#optional-placement",
+    "cli/publish-dry-run-probe#one-pass-verdict",
+    "cli/publish-dry-run-probe#plan-coverage",
     "cli/runtime-toolchain-pinning#exact-lock-resolution",
     "cli/runtime-toolchain-pinning#identity-keys-results",
     "cli/runtime-toolchain-pinning#minimal-child-environment",

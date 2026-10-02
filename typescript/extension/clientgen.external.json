@@ -49,9 +49,10 @@
       ],
       "owner": "@putnami/typescript",
       "tests": [
+        "typescript/extension/cmd/putnami-ts/publish_probe_test.go",
         "typescript/extension/cmd/putnami-ts/publish_test.go"
       ],
-      "reason": "Publishes a package tarball and reads back its published metadata."
+      "reason": "Publishes a package tarball and reads back its published metadata. A dry-run publish sends one GET of the version's tarball to ask whether the registry already holds the package."
     }
   ]
 }

@@ -871,12 +871,8 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		newCachedObservationRecovery(req, ws, planningExtensions, cacheManager), req.specGate); gate != nil {
 		finalizers = append(finalizers, gate)
 	}
-	// Advancing a release-set channel is irreversible for this publish attempt.
-	// Keep it after every session gate so a synthetic policy failure is visible
-	// to the coordinator and cannot publish a successful outcome.
-	if releaseSetRun != nil && len(req.internalJobs) == 0 {
-		finalizers = append(finalizers, releaseSetRun.Finalizer(ctx))
-	}
+	// The publish finalizers come after every session gate (publishFinalizers).
+	finalizers = append(finalizers, publishFinalizers(ctx, req, releaseSetRun)...)
 	result := e.execute(ctx, req, ws, selectedProjects, discovered, planned, cacheManager, sink, finalizers...)
 	result.Plan, result.Projects = planned, selectedProjects
 	result = attachWithheldServeSteps(result, req, ws, withheld)
@@ -885,6 +881,28 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		result.ExitCode = archivePublishExitCode(result.ExitCode, unpublishedArchives, fatalUnpublishedArchives)
 	}
 	return result, nil
+}
+
+// publishFinalizers returns the finalizers a publish session ends with, in
+// order.
+//
+// The first reads the registry probes of a dry-run publish once, after every
+// job, and is nil for any other run. The dry-run parameter the jobs receive
+// selects it, as it selects the release-set mode: a preview executes no job and
+// runs no finalizer.
+//
+// The release-set coordinator comes last. It sees the synthetic failure of a
+// session gate or of the probe report, and publishes no successful outcome
+// after one.
+func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *jobs.ReleaseSetRun) []func(map[string]*jobs.JobResult) {
+	dryRun, _ := req.CommandParams["dry-run"].(bool)
+	finalizers := []func(map[string]*jobs.JobResult){jobs.MemberProbeReport{
+		Run: releaseSetRun, Commands: req.Commands, DryRun: dryRun, Quiet: req.Global.Quiet, Out: os.Stderr,
+	}.Finalizer()}
+	if releaseSetRun != nil && len(req.internalJobs) == 0 {
+		finalizers = append(finalizers, releaseSetRun.Finalizer(ctx))
+	}
+	return finalizers
 }
 
 // buildReleaseSetOptions reads the publication-shaping parameters this run was
