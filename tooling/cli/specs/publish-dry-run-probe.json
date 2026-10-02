@@ -1,0 +1,31 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/publish-dry-run-probe",
+  "outcomes": [
+    "A user learns from one publish --dry-run which planned members a registry would refuse, before any member is written",
+    "Every conflict of a release shows in one pass, each naming the member, the registry and the version",
+    "A dry run that could not ask a registry fails with the reason instead of passing",
+    "A member a registry already holds with the same content is reported as reused, not as a conflict"
+  ],
+  "nonGoals": [
+    "Knowing a registry protocol: each publisher asks its own registry, and the CLI only aggregates the records they emit",
+    "Writing to a registry, or requiring a credential for a public member",
+    "Asking for a read-only credential: a probe asks the host-only seam the real publish asks, and the cloud decides what the credential grants",
+    "Proving that a private member is absent from an answer obtained without a credential",
+    "Probing during a plan-only preview: --plan and a plan-only --dry-run execute no job"
+  ],
+  "requirements": [
+    {
+      "id": "one-pass-verdict",
+      "text": "An executing publish --dry-run reads every member-probe event through the strict protocol reader, with or without a release-set plan. It prints one report: each conflict and unverified probe with its member, registry, version and reason, each identical member as reused with its reason, each tag-move as a warning naming the tag and both digests, and a count of absent members. The run fails once, naming every conflict, unverified and refused probe, each also as an error diagnostic. Other states pass."
+    },
+    {
+      "id": "plan-coverage",
+      "text": "With a release-set plan, each selected member no probe speaks about is reported as not probed, with its publisher and publish step or as a member whose route is unknown: a warning, never silent. A probe for a member the plan does not select, or whose version differs from the planned version, is rejected and fails the run. An absent answer obtained without a credential produces one warning, because a registry answers such a request for a private member as for a missing one."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0056-a-publish-dry-run-asks-each-registry.md"
+  ]
+}

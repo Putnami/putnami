@@ -9,6 +9,7 @@
     "tooling/extension-authoring#cache-eviction-policy",
     "tooling/extension-authoring#checkout-independent-generation-paths",
     "tooling/extension-authoring#credential-confinement",
+    "tooling/extension-authoring#dry-run-member-probe",
     "tooling/extension-authoring#ecosystem-profiles",
     "tooling/extension-authoring#event-stream-conformance",
     "tooling/extension-authoring#host-identity-scrub",

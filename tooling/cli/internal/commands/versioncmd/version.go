@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/pinnedarchive"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -376,10 +377,10 @@ func fetchRelease(ctx context.Context, client *http.Client, baseURL string, chan
 		return "", "", "", fmt.Errorf("no version resolved")
 	}
 
-	// The resolver may advertise the binary's SHA-256 either via X-Integrity
-	// or the standard RFC 9530 Digest header. We accept either; downstream
-	// verification fails closed if neither is present.
-	integrity = extension.ReadAdvertisedIntegrity(resp.Header)
+	// The resolver advertises the binary's SHA-256 in X-Integrity or in the
+	// sha-256 entry of the legacy Digest header (RFC 3230). Downstream
+	// verification fails closed when neither is present.
+	integrity = pinnedarchive.ReadAdvertisedIntegrity(resp.Header)
 
 	// The download endpoint streams the binary directly — return the URL
 	// so downloadBinary can re-fetch it.

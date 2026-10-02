@@ -59,7 +59,7 @@ return errors.User(errors.CodeBadRequest, "email is required")
 ### Newf — formatted message with stack
 
 ```go
-return errors.Newf(CodeMigration, "migration %q failed at step %d", name, step)
+return errors.Newf(CodeDatasource, "datasource %q is not declared", name)
 ```
 
 ## Error Codes
@@ -70,8 +70,9 @@ Every package defines its own codes as `errors.Code` constants:
 const (
     CodeConnection  errors.Code = "db.connection"
     CodeQuery       errors.Code = "db.query"
-    CodeMigration   errors.Code = "db.migration"
     CodeTransaction errors.Code = "db.transaction"
+    CodeDatasource  errors.Code = "db.datasource"
+    CodeBinding     errors.Code = "db.binding"
 )
 ```
 
@@ -82,7 +83,7 @@ const (
 | `errors` | `unknown`, `internal`, `unavailable`, `canceled`, `timeout`, `not_found`, `not_implemented`, `validation`, `invalid_argument`, `unauthorized`, `forbidden`, `conflict`, `precondition_failed`, `already_exists`, `connection`, `rate_limit` |
 | `inject` | `inject.not_registered`, `inject.circular_dependency`, `inject.scope_violation`, `inject.container_closed`, `inject.duplicate_provider`, `inject.requirement_not_met`, `inject.validation`, `inject.type_mismatch`, `inject.factory_failed`, `inject.illegal_state` |
 | `app` | `app.already_running`, `app.configure`, `app.register`, `app.start`, `app.stop`, `app.invoke`, `app.runner` |
-| `sql` | `db.connection`, `db.query`, `db.migration`, `db.transaction` |
+| `database` | `db.connection`, `db.query`, `db.transaction`, `db.datasource`, `db.binding` |
 | `http` | `http.listen`, `http.body`, `http.scope`, `http.no_server`, `http.ambiguous_server` |
 | `grpc` | `grpc.listen`, `grpc.scope`, `grpc.panic` |
 | `storage` | `storage.read`, `storage.write`, `storage.delete`, `storage.list`, `storage.not_found`, `storage.request`, `storage.failed` |

@@ -891,7 +891,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		newCachedObservationRecovery(req, ws, planningExtensions, cacheManager), req.specGate); gate != nil {
 		finalizers = append(finalizers, gate)
 	}
-	ctx, finalizers, closeOutboxes, err := releaseSetExecution(ctx, releaseSetRun, finalizers)
+	ctx, finalizers, closeOutboxes, err := releaseSetExecution(ctx, req, releaseSetRun, finalizers)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: release-set publish: %v\n", err)
 		return SessionResult{ExitCode: ExitError, Plan: planned, Projects: selectedProjects}, nil
@@ -908,17 +908,12 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 }
 
 // releaseSetExecution prepares the release set's part of the execution. It
-// appends the release finalizer after every session gate: advancing a
-// release-set channel is irreversible for this publish attempt, so a synthetic
-// policy failure has to be visible first and cannot publish a successful
-// outcome. A run whose deploy barrier releases the set has no finalizer. It
-// also returns the context that carries the private outboxes of a
+// appends the publish finalizers after every session gate (publishFinalizers),
+// and returns the context that carries the private outboxes of a
 // publication-v1 run's publication jobs, and the function that removes them
 // when the run ends.
-func releaseSetExecution(ctx context.Context, run *jobs.ReleaseSetRun, finalizers []func(map[string]*jobs.JobResult)) (context.Context, []func(map[string]*jobs.JobResult), func(), error) {
-	if release := run.Finalizer(ctx); release != nil {
-		finalizers = append(finalizers, release)
-	}
+func releaseSetExecution(ctx context.Context, req *Request, run *jobs.ReleaseSetRun, finalizers []func(map[string]*jobs.JobResult)) (context.Context, []func(map[string]*jobs.JobResult), func(), error) {
+	finalizers = append(finalizers, publishFinalizers(ctx, req, run)...)
 	ctx, closeOutboxes, err := run.PublicationContext(ctx)
 	return ctx, finalizers, closeOutboxes, err
 }
@@ -944,6 +939,29 @@ func attachReleaseSet(req *Request, run *jobs.ReleaseSetRun, planned []*jobs.Sch
 		return planned, nil, err
 	}
 	return run.AttachBarrier(planned)
+}
+
+// publishFinalizers returns the finalizers a publish session ends with, in
+// order.
+//
+// The first reads the registry probes of a dry-run publish once, after every
+// job, and is nil for any other run. The dry-run parameter the jobs receive
+// selects it, as it selects the release-set mode: a preview executes no job and
+// runs no finalizer.
+//
+// The release-set coordinator comes last. It sees the synthetic failure of a
+// session gate or of the probe report, and publishes no successful outcome
+// after one. A run whose deploy barrier releases the set has no release
+// finalizer.
+func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *jobs.ReleaseSetRun) []func(map[string]*jobs.JobResult) {
+	dryRun, _ := req.CommandParams["dry-run"].(bool)
+	finalizers := []func(map[string]*jobs.JobResult){jobs.MemberProbeReport{
+		Run: releaseSetRun, Commands: req.Commands, DryRun: dryRun, Quiet: req.Global.Quiet, Out: os.Stderr,
+	}.Finalizer()}
+	if release := releaseSetRun.Finalizer(ctx); release != nil {
+		finalizers = append(finalizers, release)
+	}
+	return finalizers
 }
 
 // buildReleaseSetOptions reads the publication-shaping parameters this run was

@@ -78,6 +78,12 @@ Verb-specific outcomes also travel as **typed payloads** so consumers can aggreg
   `artifactDigest`, and optional per-platform digests. The release-set
   coordinator reconciles those events against its plan to build the snapshot it
   releases.
+- A publisher that runs under `--dry-run` reports, with a kind `member-probe`
+  artifact event per member, whether the registry already holds the member at
+  the version it would publish: `ecosystem`, `coordinate`, `version`,
+  `registry`, and a `state` of `absent`, `identical`, `tag-move`, `conflict` or
+  `unverified`. The orchestrator fails the dry run on `conflict` and
+  `unverified`, and warns on `tag-move`. The event is never publication evidence.
 
 **Parsing a typed payload out of an artifact event.** `ParseRawEvent` merges
 every top-level runtime-event field into `Data`, so the map a consumer receives
@@ -107,6 +113,8 @@ Common artifact kinds:
 - `coverage` — Coverage data file
 - `published-member` — One published release-set member: its ecosystem,
   coordinate, version, and verified artifact digest
+- `member-probe` — One registry answer of a dry-run publish: whether the
+  registry already holds a member at the version the publish would write
 
 ### Traces (future)
 

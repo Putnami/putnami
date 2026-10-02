@@ -23,6 +23,36 @@
         "typescript/extension/cmd/putnami-ts/deps_upgrade_test.go"
       ],
       "reason": "Reads package metadata to resolve the version an upgrade pins."
+    },
+    {
+      "authority": "npm registry API (github.com/npm/registry/blob/master/docs/REGISTRY-API.md)",
+      "adapter": "typescript/extension/cmd/putnami-ts/publish.go",
+      "callsites": [
+        {
+          "path": "typescript/extension/cmd/putnami-ts/publish.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "afc43fc8c958252028a3bdaec97b497a46c9c82ffa469bdca3c32d5675dfc400"
+        },
+        {
+          "path": "typescript/extension/cmd/putnami-ts/publish.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "0d3a08ffb0dfc742bcc7f28328ffb9d6e0544fe7b054baf0bfbd237a16ba113d"
+        },
+        {
+          "path": "typescript/extension/cmd/putnami-ts/publish.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "f7953373f3a529e96655647c28529b58fe771d972645031704a731fc88637e6f"
+        }
+      ],
+      "owner": "@putnami/typescript",
+      "tests": [
+        "typescript/extension/cmd/putnami-ts/publish_probe_test.go",
+        "typescript/extension/cmd/putnami-ts/publish_test.go"
+      ],
+      "reason": "Publishes a package tarball and reads back its published metadata. A dry-run publish sends one GET of the version's tarball to ask whether the registry already holds the package."
     }
   ]
 }

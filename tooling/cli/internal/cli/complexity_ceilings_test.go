@@ -84,8 +84,8 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  24,
-		funcs:  163,
-		why: "RAISED 157→163 (ADR 0057): a run that may publish reads its ancestry at process start, " +
+		funcs:  164,
+		why: "RAISED 158→164 (ADR 0057): a run that may publish reads its ancestry at process start, " +
 			"before the first-use bootstrap or an install runs repository code, and Engine.Run reuses " +
 			"that read. ancestry.go holds CaptureAncestry, the one entry adapters call, capturedAncestry, " +
 			"which hands Engine.Run the snapshot only for the same workspace, mayPublish, the predicate " +
@@ -94,7 +94,7 @@ var complexityCeilings = []complexityCeiling{
 			"barrier nodes attach, and releaseSetExecution, which appends the release finalizer and gives " +
 			"each publication job its private outbox; both keep Engine.run inside its statement budget. " +
 			"The upload and session logic lives in internal/jobs, not here. " +
-			"RAISED 23/148→24/157 (cli/provider-publication): a run that may publish reads its " +
+			"RAISED 23/149→24/158 (cli/provider-publication): a run that may publish reads its " +
 			"bound commit's ancestry before the first hook, because repository code can rewrite refs, " +
 			"replace refs and grafts afterwards. ancestry.go holds AncestrySnapshot (five nil-safe " +
 			"readers), captureAncestrySnapshot and readsAncestry; only Engine.Run sees the point before " +
@@ -102,6 +102,10 @@ var complexityCeilings = []complexityCeiling{
 			"bound request without invocation.publication on its keying plan, before the release-set " +
 			"preparation can start a provider; only this unit holds that plan, and keyingPlan keeps " +
 			"Engine.run inside its statement budget. No flag, no mode. " +
+			"RAISED 148→149 (a publish dry run asks each registry, ADR 0056): publishFinalizers " +
+			"orders the probe report of an executing dry-run publish before the release-set commit, " +
+			"so the commit sees a blocking verdict, and is the seam a test uses to tell an executing " +
+			"dry run from a preview. run loses its inline release-set branch; files stay at 23. " +
 			"RAISED 146→148 (a missing extension before the repository refusal): " +
 			"reportRepositoryRefusal reports a selected command whose extension is not installed " +
 			"with the missing-extension guard's own message instead of the refusal, because that " +

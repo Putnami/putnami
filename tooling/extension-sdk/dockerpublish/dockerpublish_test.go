@@ -2,6 +2,7 @@ package dockerpublish
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/registry"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
@@ -283,6 +285,8 @@ func TestPublishImageProjectUsesGenericDockerRegistryEnvironment(t *testing.T) {
 		Version: "c-" + hash, ContentHash: hash, Digest: digest, Layout: "oci", Platform: "linux/amd64",
 	})
 	t.Setenv("DOCKER_REGISTRY", "registry.example.com/team")
+	stubResolveToken(t, "")
+	stubManifestHead(t, &transport.Error{StatusCode: http.StatusNotFound})
 	ctx := &pctx.Context{WorkspaceRoot: root, Project: pctx.Project{
 		Name: "delivery/images/ci-runner", Path: projectPath, Type: "image",
 	}}
@@ -310,6 +314,8 @@ func TestPublishImageProjectPreservesNestedGenericRegistryPrecedence(t *testing.
 		Version: "c-" + hash, ContentHash: hash, Digest: digest, Layout: "oci", Platform: "linux/amd64",
 	})
 	t.Setenv("DOCKER_REGISTRY", "registry.example.com/environment")
+	stubResolveToken(t, "")
+	stubManifestHead(t, &transport.Error{StatusCode: http.StatusNotFound})
 	ctx := &pctx.Context{
 		WorkspaceRoot: root,
 		Project:       pctx.Project{Name: "delivery/images/ci-runner", Path: projectPath, Type: "image"},

@@ -1,14 +1,15 @@
 import { Favicon, HeaderLink, layout, Meta, Outlet, Style, useLoaderData } from '@putnami/web';
 import { Box, Container, ThemeProvider } from '@putnami/ui';
-import { Footer } from '../components/footer';
 import { PageMeta } from '../components/page-meta';
 import type { NavItem } from '../lib/docs/navigation';
 import { putnamiTheme, SITE_MAX_WIDTH } from '../theme';
+import { Footer } from '../components/footer';
 import NavbarIsland from './navbar.island';
+import ReleaseVersionIsland from './release-version.island';
 import SearchIsland from './search.island';
 
 export default layout().render(() => {
-  const { navItems, version } = useLoaderData<{ navItems: NavItem[]; version?: string }>() || {};
+  const { navItems } = useLoaderData<{ navItems: NavItem[] }>() || {};
 
   return (
     <ThemeProvider theme={putnamiTheme}>
@@ -51,6 +52,11 @@ export default layout().render(() => {
 putnami-island,
 putnami-island-root {
   display: block;
+}
+/* The release version is a run of text inside the footer line. */
+putnami-island[data-island='release-version'],
+putnami-island[data-island='release-version'] > putnami-island-root {
+  display: inline;
 }`,
       })}
 
@@ -60,7 +66,7 @@ putnami-island-root {
         <Container maxWidth={SITE_MAX_WIDTH}>
           <Outlet />
         </Container>
-        <Footer version={version} />
+        <Footer release={<ReleaseVersionIsland />} />
       </Box>
     </ThemeProvider>
   );

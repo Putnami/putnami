@@ -37,8 +37,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
+	"strings"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 )
@@ -135,6 +137,101 @@ type PublishedMember struct {
 // PublishedMemberEventKind is the runtime-event kind a publish job emits a
 // PublishedMember under.
 const PublishedMemberEventKind = "published-member"
+
+// ArtifactEventEnvelope lists the fields an artifact runtime event carries
+// beside its payload when its JSON line is read as one flat object: the event
+// envelope and the artifact's id, name, kind and path.
+var ArtifactEventEnvelope = []string{"v", "type", "time", "level", "message", "id", "name", "kind", "path"}
+
+// ArtifactEventPayload returns the JSON of the payload of a flattened artifact
+// event: every field except the ArtifactEventEnvelope ones. A reader passes it
+// to ParsePublishedMember or ParseMemberProbe, which reject an unknown field.
+func ArtifactEventPayload(event map[string]any) ([]byte, error) {
+	payload := make(map[string]any, len(event))
+	for key, value := range event {
+		payload[key] = value
+	}
+	for _, key := range ArtifactEventEnvelope {
+		delete(payload, key)
+	}
+	return json.Marshal(payload)
+}
+
+// MemberProbe is what a publish job emits under a dry run, once per member it
+// would publish: the answer of the target registry to "do you already hold this
+// version?", and whether the real publish can write or reuse what it holds. A
+// probe is obtained with read-only requests and is never publication evidence.
+type MemberProbe struct {
+	// Ecosystem is the id of the profile this member belongs to.
+	Ecosystem string `json:"ecosystem"`
+	// Coordinate is the member's package name in that ecosystem.
+	Coordinate string `json:"coordinate"`
+	// Version is the version the real publish would write.
+	Version string `json:"version"`
+	// Platform is the "os/arch" of the artifact the probe asked about, for a
+	// member published as one artifact per platform. Such a member emits one
+	// probe per platform. Absent for a single artifact.
+	Platform string `json:"platform,omitempty"`
+	// Registry is the endpoint the probe asked. It carries no credential: no
+	// URL user information and no query string.
+	Registry string `json:"registry"`
+	// State is the verdict, one of the MemberProbe* states.
+	State string `json:"state"`
+	// ArtifactDigest is the content identity of the local artifact the real
+	// publish would upload, as "sha256:" followed by 64 lowercase hex
+	// characters. Absent when the dry run built no artifact.
+	ArtifactDigest string `json:"artifactDigest,omitempty"`
+	// RegistryDigest is the content identity of what the registry already
+	// holds at this version, in the same form. Absent when the registry holds
+	// nothing or advertised no digest.
+	RegistryDigest string `json:"registryDigest,omitempty"`
+	// Reason says why the state is MemberProbeConflict or
+	// MemberProbeUnverified. It is required for both and carries no credential.
+	// On MemberProbeIdentical it is optional and says what the local artifact
+	// is, when the dry run compared one an earlier package staged.
+	Reason string `json:"reason,omitempty"`
+	// Anonymous is true when the registry answered a request that carried no
+	// credential. A registry answers an anonymous request for a private member
+	// that exists exactly as it answers for one that does not, so an anonymous
+	// MemberProbeAbsent is weaker than an authenticated one.
+	Anonymous bool `json:"anonymous,omitempty"`
+}
+
+// MemberProbeEventKind is the runtime-event kind a publish job emits a
+// MemberProbe under.
+const MemberProbeEventKind = "member-probe"
+
+// The states of a MemberProbe. The set is closed: ValidateMemberProbe rejects
+// any other state. A consumer fails a dry run on MemberProbeConflict and
+// MemberProbeUnverified, and warns on MemberProbeTagMove.
+const (
+	// MemberProbeAbsent means the registry does not hold the version: the real
+	// publish uploads it.
+	MemberProbeAbsent = "absent"
+	// MemberProbeIdentical means the registry holds the version with the digest
+	// of the local artifact: the real publish reuses it.
+	MemberProbeIdentical = "identical"
+	// MemberProbeConflict means the registry holds the version and the real
+	// publish cannot reuse it: the digest differs from the local artifact, the
+	// dry run has no local artifact to compare, or the publisher may refuse the
+	// held version whatever its bytes. Reason says which, and what the real
+	// publish does.
+	MemberProbeConflict = "conflict"
+	// MemberProbeUnverified means the registry could not answer: a network
+	// error, a timeout, a refused credential, a server error or a malformed
+	// answer. The outcome of the real publish is unknown.
+	MemberProbeUnverified = "unverified"
+	// MemberProbeTagMove means the registry holds the version tag at other
+	// content and the real publish moves the tag to the local artifact.
+	// RegistryDigest names the content the tag points at; ArtifactDigest, when
+	// the dry run built an artifact, differs from it. Only an OCI probe
+	// (Ecosystem "oci") emits it: no other registry has a tag to move.
+	MemberProbeTagMove = "tag-move"
+)
+
+// memberProbeTagMoveEcosystem is the one ecosystem whose probe may report
+// MemberProbeTagMove.
+const memberProbeTagMoveEcosystem = "oci"
 
 // NamedManifest pairs a parsed manifest with the extension name it was loaded
 // under, so resolution diagnostics can name the manifest at fault.
@@ -486,6 +583,125 @@ func ValidatePublishedMember(m *PublishedMember) []diag.Diagnostic {
 			diags = append(diags, diag.Errorf("invalid-published-member", field,
 				"platform digest %q must be sha256: followed by 64 lowercase hex characters", m.Platforms[platform]))
 		}
+	}
+	return diags
+}
+
+// ParseMemberProbe decodes a member-probe event strictly: an unknown field is a
+// rejection.
+func ParseMemberProbe(data []byte) (*MemberProbe, []diag.Diagnostic) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+
+	var probe MemberProbe
+	if err := dec.Decode(&probe); err != nil {
+		return nil, []diag.Diagnostic{
+			diag.Errorf("invalid-member-probe", "", "failed to parse member probe: %v", err),
+		}
+	}
+	return &probe, nil
+}
+
+// ValidateMemberProbe checks a member-probe event's own invariants: the closed
+// state vocabulary, the digest evidence and the reason each state requires, and
+// that the registry endpoint carries no credential. Like
+// ValidatePublishedMember it does not consult a ProfileRegistry.
+func ValidateMemberProbe(p *MemberProbe) []diag.Diagnostic {
+	if p == nil {
+		return []diag.Diagnostic{diag.Errorf("invalid-member-probe", "", "member probe is nil")}
+	}
+	var diags []diag.Diagnostic
+	if !ecosystemID.MatchString(p.Ecosystem) {
+		diags = append(diags, diag.Errorf("invalid-member-probe", "ecosystem",
+			"ecosystem %q must match %s", p.Ecosystem, EcosystemIDPattern))
+	}
+	if p.Coordinate == "" {
+		diags = append(diags, diag.Errorf("invalid-member-probe", "coordinate", "coordinate is required"))
+	}
+	if p.Version == "" {
+		diags = append(diags, diag.Errorf("invalid-member-probe", "version", "version is required"))
+	}
+	if p.Platform != "" && !platformPattern.MatchString(p.Platform) {
+		diags = append(diags, diag.Errorf("invalid-member-probe", "platform",
+			"platform %q must be os/arch", p.Platform))
+	}
+	diags = append(diags, validateProbeRegistry(p.Registry)...)
+	for field, digest := range map[string]string{
+		"artifactDigest": p.ArtifactDigest,
+		"registryDigest": p.RegistryDigest,
+	} {
+		if digest != "" && !digestPattern.MatchString(digest) {
+			diags = append(diags, diag.Errorf("invalid-member-probe", field,
+				"%s %q must be sha256: followed by 64 lowercase hex characters", field, digest))
+		}
+	}
+	diags = append(diags, validateProbeState(p)...)
+
+	// The diagnostics are sorted by field.
+	sort.SliceStable(diags, func(i, j int) bool { return diags[i].Field < diags[j].Field })
+	return diags
+}
+
+// validateProbeRegistry checks that the endpoint a probe names is present and
+// carries no URL user information and no query string.
+func validateProbeRegistry(registry string) []diag.Diagnostic {
+	if registry == "" {
+		return []diag.Diagnostic{diag.Errorf("invalid-member-probe", "registry", "registry is required")}
+	}
+	if !strings.Contains(registry, "://") {
+		// A bare host or host/path, the form an OCI registry is named by.
+		if strings.ContainsAny(registry, "@?") {
+			return []diag.Diagnostic{diag.Errorf("invalid-member-probe", "registry",
+				"registry must not carry user information or a query string")}
+		}
+		return nil
+	}
+	parsed, err := url.Parse(registry)
+	if err != nil {
+		return []diag.Diagnostic{diag.Errorf("invalid-member-probe", "registry", "registry is not a valid URL")}
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery {
+		return []diag.Diagnostic{diag.Errorf("invalid-member-probe", "registry",
+			"registry must not carry user information or a query string")}
+	}
+	return nil
+}
+
+// validateProbeState checks the evidence each state requires: absent carries
+// no registry digest, identical carries two equal digests, tag-move comes from
+// an OCI probe and carries a registry digest that differs from the artifact
+// digest, and conflict and unverified carry a reason.
+func validateProbeState(p *MemberProbe) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	switch p.State {
+	case MemberProbeAbsent:
+		if p.RegistryDigest != "" {
+			diags = append(diags, diag.Errorf("invalid-member-probe", "registryDigest",
+				"state %s must not carry a registryDigest: the registry holds nothing", p.State))
+		}
+	case MemberProbeIdentical:
+		if p.ArtifactDigest == "" || p.ArtifactDigest != p.RegistryDigest {
+			diags = append(diags, diag.Errorf("invalid-member-probe", "registryDigest",
+				"state %s requires an artifactDigest and an equal registryDigest", p.State))
+		}
+	case MemberProbeTagMove:
+		if p.Ecosystem != memberProbeTagMoveEcosystem {
+			diags = append(diags, diag.Errorf("invalid-member-probe", "ecosystem",
+				"state %s is only valid for ecosystem %s, not %q", p.State, memberProbeTagMoveEcosystem, p.Ecosystem))
+		}
+		if p.RegistryDigest == "" || p.ArtifactDigest == p.RegistryDigest {
+			diags = append(diags, diag.Errorf("invalid-member-probe", "registryDigest",
+				"state %s requires a registryDigest that differs from the artifactDigest", p.State))
+		}
+	case MemberProbeConflict, MemberProbeUnverified:
+	default:
+		return []diag.Diagnostic{diag.Errorf("invalid-member-probe", "state",
+			"state %q must be one of: %s, %s, %s, %s, %s", p.State,
+			MemberProbeAbsent, MemberProbeIdentical, MemberProbeConflict, MemberProbeUnverified, MemberProbeTagMove)}
+	}
+	if (p.State == MemberProbeConflict || p.State == MemberProbeUnverified) && strings.TrimSpace(p.Reason) == "" {
+		diags = append(diags, diag.Errorf("invalid-member-probe", "reason",
+			"state %s requires a reason", p.State))
 	}
 	return diags
 }

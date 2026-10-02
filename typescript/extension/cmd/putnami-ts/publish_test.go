@@ -18,6 +18,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/recorded"
 )
 
 func TestBuildNPMPublishArgs(t *testing.T) {
@@ -97,6 +98,10 @@ func TestRunPublishNpm_SkipsNoProject(t *testing.T) {
 }
 
 func TestRunPublishNpm_DryRun(t *testing.T) {
+	// The dry run asks npm whether the registry holds the version, and runs no
+	// command that writes: the fake fails the test on anything but a read.
+	cli := &npmCLI{view: recordedNPMCommand(t, "view-version-not-found")}
+	cli.install(t)
 	ctx, dir := makeTestCtx(t)
 	ctx.Params = pctx.Params{
 		"npm":     json.RawMessage(`true`),
@@ -127,11 +132,16 @@ func TestRunPublishNpm_DryRun(t *testing.T) {
 }
 
 func TestRunPublishNpm_ManagedDryRunDoesNotClaimPublication(t *testing.T) {
+	// The dry run asks the host-only credential seam once, which yields nothing
+	// here, sends one anonymous read, and succeeds without publication evidence.
+	_, tokenHosts := managedProbeSeams(t, "", nil)
+	registry := recorded.NewServer(t, nil, recordedNPMResponse(t, "tarball-version-not-found.404.http"))
 	ctx, dir := makeTestCtx(t)
 	ctx.Params = pctx.Params{
 		"dry-run":        json.RawMessage(`true`),
 		"releaseSetPlan": oneMemberNPMPlan(t, "@test/pkg"),
 	}
+	withRegistries(t, ctx, fmt.Sprintf(`{"npm":{"publish":%q}}`, registry.URL+"/npm"))
 	stageNPMFixture(t, dir)
 
 	var status string
@@ -142,9 +152,13 @@ func TestRunPublishNpm_ManagedDryRunDoesNotClaimPublication(t *testing.T) {
 		t.Fatalf("status = %q, want OK", status)
 	}
 	for _, event := range events {
-		if event["kind"] == "published" {
+		if event["kind"] == "published" || event["kind"] == extproto.PublishedMemberEventKind {
 			t.Fatalf("dry run emitted publication proof: %#v", event)
 		}
+	}
+	assertOneTarballRead(t, registry, "")
+	if len(*tokenHosts) != 1 {
+		t.Fatalf("credential seam asked %d times (%v), want once", len(*tokenHosts), *tokenHosts)
 	}
 }
 

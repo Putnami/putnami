@@ -298,6 +298,23 @@
           }
         },
         {
+          "id": "dry-run-member-probe",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "put-archive-probe-is-read-only",
+              "oci-probe-is-read-only",
+              "held-tag-is-a-tag-move",
+              "identical-names-a-staged-artifact",
+              "tag-move-only-on-the-managed-registry"
+            ]
+          }
+        },
+        {
           "id": "agent-content-packaging",
           "stage": "coded",
           "evidenceKinds": [

@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/pinnedarchive"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -39,7 +40,7 @@ func (inst *Installer) download(ctx context.Context, name, constraint string, sp
 	defer resp.Body.Close()
 
 	resolvedVersion := artifactResolvedVersion(resp.Header.Get("X-Resolved-Version"), constraint)
-	advertisedIntegrity := ReadAdvertisedIntegrity(resp.Header)
+	advertisedIntegrity := pinnedarchive.ReadAdvertisedIntegrity(resp.Header)
 
 	// Write to temp file
 	tmpFile, err := os.CreateTemp("", spec.ArchivePattern)
@@ -68,7 +69,7 @@ func (inst *Installer) ResolveArtifact(ctx context.Context, name, constraint str
 	return &InstallResult{
 		Name:      name,
 		Version:   artifactResolvedVersion(resp.Header.Get("X-Resolved-Version"), constraint),
-		Integrity: ReadAdvertisedIntegrity(resp.Header),
+		Integrity: pinnedarchive.ReadAdvertisedIntegrity(resp.Header),
 		Source:    source,
 	}, nil
 }
@@ -117,11 +118,11 @@ func (inst *Installer) ResolveArtifactIntegrity(ctx context.Context, name, versi
 		return "", fmt.Errorf("registry resolved %s, not %s", got, version)
 	}
 
-	advertised := ReadAdvertisedIntegrity(resp.Header)
+	advertised := pinnedarchive.ReadAdvertisedIntegrity(resp.Header)
 	if advertised == "" {
 		return "", fmt.Errorf("registry advertised no integrity for %s/%s", spec.OS, spec.Arch)
 	}
-	digest, err := NormalizeIntegrity(advertised)
+	digest, err := pinnedarchive.NormalizeIntegrity(advertised)
 	if err != nil {
 		return "", fmt.Errorf("invalid advertised integrity for %s/%s: %w", spec.OS, spec.Arch, err)
 	}

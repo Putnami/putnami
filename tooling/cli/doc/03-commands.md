@@ -43,12 +43,73 @@ All commands share the same project selection and execution flags. They run sequ
 
 `putnami publish` pushes packaged artifacts to registries (`sideEffects: "registry"`); a project's declared `publish` channels auto-activate the matching steps, so `--npm`/`--go`/`--docker` flags are rarely needed.
 
-`putnami publish --all --dry-run` is special-cased: instead of the plan-only preview `--dry-run` means everywhere else, the publish jobs **execute in their own declared dry-run mode** — each publisher prints the artifact set it would push (registry, name, version, tags) and the run ends with the aggregated `Artifacts: … (dry run)` summary, with zero registry side effects. Two guarantees make that safe:
+`putnami publish --all --dry-run` is special-cased: instead of the plan-only preview `--dry-run` means everywhere else, the publish jobs **execute in their own declared dry-run mode** — each publisher prints the artifact set it would push (registry, name, version, tags) and the run ends with the aggregated `Artifacts: … (dry run)` summary. A dry run writes nothing to a registry. It reads: each publisher asks its registry whether it already holds the member at the planned version (see [Registry checks](#registry-checks)). Two guarantees make that safe:
 
 - A task whose traits declare side effects but whose manifest does **not** declare a `dry-run` flag is excluded from the plan (loudly, with its dependents) — an extension that cannot interpret the param can never publish for real under `--dry-run`.
 - The synthesized `dry-run` param is part of cache and run-marker keys, so a dry-run publish never satisfies a lookup a real publish would have written.
 
 Side-effect-free dependencies (`package~*`) still run — dry-run output is computed from real local artifacts, and the cache makes them cheap. `--plan` remains the pure DAG preview. Only the exact single-command form opts in: a mixed list such as `putnami build,publish --dry-run` keeps preview semantics.
+
+#### Registry checks
+
+A registry refuses to overwrite a published version. A dry-run publish
+therefore asks each target registry, with GET or HEAD requests only, whether it
+already holds each member at the version the publish would write. Each request
+carries the credential the real publish asks for: the host-only credential
+seam carries the registry host and nothing else, so the cloud decides what the
+credential grants. A public member needs no credential: when none resolves,
+the request is anonymous.
+
+When every job has ended, the CLI prints one report on standard error:
+
+```text
+putnami: publish --dry-run registry checks
+  conflict    npm @acme/widget@2.0.0 at https://registry.npmjs.org: the registry already holds this version with another digest; the real publish cannot overwrite it
+  unverified  go example.com/mod@v2.0.0 at https://go.example.com: the registry could not be reached: connection refused
+  reused      oci acme/api@2.0.0 at registry.example.com: the registry holds the same digest sha256:…, so the publish reuses it (compared with the image the last `package` staged; re-run `package` if the source changed since)
+  absent      3 member(s) are not in their registry: the publish uploads them
+  warning: publish will move tag 2.0.0 of acme/worker on oci.putnami.dev from sha256:… to sha256:…
+```
+
+| State | Meaning | Dry run |
+|-------|---------|---------|
+| `absent` | The registry does not hold the version. | Passes. |
+| `identical` (printed `reused`) | The registry holds the version with the same content digest. The publish reuses it. When the compared artifact is one the last `package` staged, the line names it. | Passes. |
+| `tag-move` (printed as a warning) | The managed registry `oci.putnami.dev` holds an image's version tag at another digest. The publish moves the tag to the image it builds. On any other registry the same answer is a `conflict`, because that registry may refuse the move. | Passes. |
+| `conflict` | The registry holds the version and the real publish cannot reuse it: the digest differs, the dry run has no artifact to compare, or the registry may have released the version, which the publisher refuses. The reason says which. | Fails. |
+| `unverified` | The registry gave no usable answer: no network, a timeout, a 401 or 403, a server error. | Fails. |
+
+A dry-run `package` builds no artifact for some publishers. Under a release-set
+plan such a publisher compares with the artifact the last real `package` left;
+with none, the conflict names the remedy: run `putnami package` for the project
+without `--dry-run`, then the dry run again.
+
+The run exits non-zero when any check is `conflict` or `unverified`, and when
+a probe under a release-set plan speaks about a member the plan does not select
+or at another version than the planned one. The failure names every such
+member, its registry and its version, so one dry run shows every conflict of
+the release. With `--output=json`, the failed row of the run also carries one
+error diagnostic per such member. A dry run without network access fails as
+`unverified`: it never passes without an answer.
+
+The report also prints warnings, which do not fail the run:
+
+- `publish will move tag …`: a `tag-move` on `oci.putnami.dev`, with the
+  registry digest and the local one, or `the image this publish builds` when
+  the dry run has no image.
+- `not probed`: under a release-set plan, a selected member whose publisher
+  reported no check, with the publisher and the publish step, or with the
+  statement that the publish route is unknown.
+- An `absent` answer obtained without a credential. A registry answers such a
+  request for a private member as it does for a missing one. Sign in and run
+  the dry run again to confirm.
+- No publish step reported a check, for a publish without a plan.
+
+A dry run without a credential reads anonymously. A private registry that
+refuses the read fails the dry run as `unverified`.
+
+`--quiet` keeps the failures and the warnings. The design is recorded in
+[ADR 0056](adr/0056-a-publish-dry-run-asks-each-registry.md).
 
 ### Publish to a release-set channel
 

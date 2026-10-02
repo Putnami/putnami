@@ -1,10 +1,13 @@
+import type { ReactNode } from 'react';
 import { Link } from '@putnami/web';
 import { styled } from '@putnami/ui';
 
-export const Footer = ({ version }: { version?: string }) => (
+// `release` is the island that shows the latest Putnami version (see
+// app/release-version.island.tsx); the footer itself stays server-rendered.
+export const Footer = ({ release }: { release?: ReactNode }) => (
   <StyledFooter as='footer'>
     <FooterLicense>
-      {version ? <span>v{version} — </span> : null}
+      {release}
       Licensed under{' '}
       <Link to='/LICENSE.md' target='_blank' rel='noopener noreferrer'>
         FSL-1.1-MIT

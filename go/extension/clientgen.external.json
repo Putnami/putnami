@@ -30,6 +30,48 @@
         "go/extension/internal/jobs/depsupgrade/netrc_test.go"
       ],
       "reason": "Resolves a release channel to one version per module from the module origin that putnami upgrade targets. The wire contract belongs to the Go module proxy protocol, so no Putnami provider declaration can generate this client."
+    },
+    {
+      "authority": "Go module proxy protocol (go.dev/ref/mod#goproxy-protocol) and the Putnami module registry publish routes it extends",
+      "adapter": "go/extension/internal/jobs/publish/gomodule.go",
+      "callsites": [
+        {
+          "path": "go/extension/internal/jobs/publish/gomodule.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "762221363d2a1fd655077a0e9116272e8f6c312946afb3251d1a073796a5624f"
+        },
+        {
+          "path": "go/extension/internal/jobs/publish/gomodule.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "3e64d9e9ba9241f0cf10cc093ec5cfd49d42987637893fcfdf75bcac9c38cef2"
+        },
+        {
+          "path": "go/extension/internal/jobs/publish/gomodule.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "ab9da0308137a55a9eb7a763026c3aa72dfaf400af27ea428f2ee12719ecf747"
+        },
+        {
+          "path": "go/extension/internal/jobs/publish/gomodule.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "d0bb1d6ac8ca1449c372fe33ff7d952ed9108260e257d32b74667cee271af50f"
+        },
+        {
+          "path": "go/extension/internal/jobs/publish/gomodule.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "f0217eadb0138236fbd7dfd5704e562757b30cc41ffb224383ce0ec43d708144"
+        }
+      ],
+      "owner": "@putnami/go",
+      "tests": [
+        "go/extension/internal/jobs/publish/member_probe_test.go",
+        "go/extension/internal/jobs/publish/publish_test.go"
+      ],
+      "reason": "Uploads a module zip and its metadata to a Go module registry over the module proxy protocol. A dry-run publish sends one GET of the module zip to ask whether the registry already serves the version."
     }
   ]
 }

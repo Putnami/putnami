@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"maps"
 	"os"
@@ -2786,22 +2785,13 @@ func reconcilePublishedReleaseSet(plan *releaseset.Plan, results map[string]*Job
 	return finalSet, nil
 }
 
-// publishedMemberEnvelopeKeys are the runtime-event fields the JSONL reader
-// flattens into every event's data map (ParseRawEvent), plus the `kind` that
-// routes this one. They are the envelope, not the member.
-var publishedMemberEnvelopeKeys = []string{"id", "kind", "level", "message", "name", "path", "time", "type"}
-
 // parsePublishedMemberEvent reads one published-member event through the
 // protocol's own strict reader. Everything left after the envelope belongs to
 // the protocol, which rejects an unknown field — a publish job that emitted a
 // field this build does not know would otherwise have its member silently
 // truncated into the release set.
 func parsePublishedMemberEvent(data map[string]any) (*extproto.PublishedMember, error) {
-	payload := maps.Clone(data)
-	for _, key := range publishedMemberEnvelopeKeys {
-		delete(payload, key)
-	}
-	encoded, err := json.Marshal(payload)
+	encoded, err := extproto.ArtifactEventPayload(data)
 	if err != nil {
 		return nil, err
 	}

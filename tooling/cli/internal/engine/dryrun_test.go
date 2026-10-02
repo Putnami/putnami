@@ -1,13 +1,21 @@
 package engine
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	runtimeproto "go.putnami.dev/protocol/runtime"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -144,5 +152,86 @@ func TestDropUndryableSideEffectJobs_InertOutsideExecutingDryRun(t *testing.T) {
 	aliasDryRun.PlanExtension = &PlanExtensionSelection{Name: "@putnami/test", Command: "deploy"}
 	if kept := dropUndryableSideEffectJobs(aliasDryRun, []*jobs.ScheduledJob{undeclared}); len(kept) != 1 {
 		t.Fatal("an alias dry-run must not be filtered: the alias gates the param on its own flag surface")
+	}
+}
+
+// TestPublishFinalizers_ProbeReportOnlyUnderAnExecutingDryRunPublish pins when
+// a publish session reads its registry probes: only when its jobs receive the
+// dry-run parameter. A preview executes no job, and a real publish emits no
+// probe. Without a release-set plan the release-set commit is absent, so the
+// probe report is the session's only publish finalizer.
+func TestPublishFinalizers_ProbeReportOnlyUnderAnExecutingDryRunPublish(t *testing.T) {
+	t.Parallel()
+	dryRun := executingDryRunRequest()
+	dryRun.Commands = []string{"publish"}
+	preview := &Request{Commands: []string{"publish"}}
+	preview.Global.DryRun = true
+	for name, test := range map[string]struct {
+		req    *Request
+		probes bool
+	}{
+		"executing dry-run publish": {req: dryRun, probes: true},
+		"dry-run preview":           {req: preview},
+		"real publish":              {req: &Request{Commands: []string{"publish"}}},
+	} {
+		finalizers := publishFinalizers(context.Background(), test.req, nil)
+		if len(finalizers) != 1 || (finalizers[0] != nil) != test.probes {
+			t.Errorf("%s: publishFinalizers = %d finalizer(s), probe report present = %v, want %v",
+				name, len(finalizers), len(finalizers) == 1 && finalizers[0] != nil, test.probes)
+		}
+	}
+}
+
+// TestExecute_DryRunPublishFailsOnAConflictProbe drives one conflict probe from
+// a publish job's output through the run: the job succeeds, the probe report
+// fails the run with a non-zero exit, and the session's machine output carries
+// the verdict as an error diagnostic of the failed member-probe row.
+func TestExecute_DryRunPublishFailsOnAConflictProbe(t *testing.T) {
+	spectest.Proves(t, "cli/publish-dry-run-probe", "one-pass-verdict", "conflict-fails-the-run")
+	var stream bytes.Buffer
+	emitter := runtimeproto.NewEmitterForVersion(&stream, runtimeproto.MaxKnownProtocolVersion)
+	probe := map[string]any{
+		"ecosystem": "go", "coordinate": "go.putnami.dev/mod", "version": "v1.2.3",
+		"registry": "https://go.putnami.dev", "state": extensionproto.MemberProbeConflict,
+		"reason": "the registry already holds this version with another zip digest",
+	}
+	if err := emitter.ArtifactData("go", "go.putnami.dev/mod", extensionproto.MemberProbeEventKind, "", probe); err != nil {
+		t.Fatal(err)
+	}
+	f := newExecuteFixture(t)
+	f.planned[0].JobDef.Name = "publish"
+	f.planned[0].JobDef.Command = fixtureproc.Write(t, filepath.Join(t.TempDir(), "publish"), fixtureproc.Program{Stdout: stream.String()})
+	f.req = executingDryRunRequest()
+	f.req.WorkspaceRoot, f.req.Config, f.req.Commands = f.wsRoot, f.cfg, []string{"publish"}
+	f.req.Global.Output = "jsonl"
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var code int
+	out := captureStdout(t, func() {
+		code = f.engine.execute(ctx, f.req, f.ws, []*workspace.Project{f.project},
+			&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{f.ext}}, f.planned, nil, nil,
+			publishFinalizers(ctx, f.req, nil)...).ExitCode
+	})
+
+	if code != ExitError {
+		t.Fatalf("exit code = %d, want %d: a conflict probe fails the dry run\noutput:\n%s", code, ExitError, out)
+	}
+	var failure *protocolcli.TaskRecord
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		var record protocolcli.SessionStreamRecord
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			t.Fatal(err)
+		}
+		if record.Record == protocolcli.RecordTaskEnd && record.Task != nil && record.Task.Status == "failed" {
+			failure = record.Task
+		}
+	}
+	if failure == nil || failure.Error == nil || !strings.Contains(failure.Error.Message, "conflict go go.putnami.dev/mod@v1.2.3 at https://go.putnami.dev") {
+		t.Fatalf("failed task = %+v, want the member-probe row naming the conflict\noutput:\n%s", failure, out)
+	}
+	if len(failure.Diagnostics) != 1 || failure.Diagnostics[0].Code != jobs.MemberProbeConflictCode ||
+		!strings.Contains(failure.Diagnostics[0].Message, "another zip digest") {
+		t.Fatalf("diagnostics = %+v, want one conflict diagnostic with the reason", failure.Diagnostics)
 	}
 }

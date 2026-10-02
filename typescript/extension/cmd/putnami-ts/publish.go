@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -218,6 +219,13 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 			// Preserve the legacy/full event contract outside managed release sets.
 			emitPublished(emit, "npm", packageName, version, true)
 		}
+		// The probe sends reads only. A missing credential sends them
+		// anonymously.
+		probeNPMPackage(emit, npmDryRun{
+			managed: managedReleaseSet, wsRoot: wsRoot, projectPath: projectPath, npmDir: npmDir,
+			packageName: packageName, version: version, registry: registry,
+			endpoint: publishEndpoint, credentialHost: credentialHost, authEnv: npmAuthEnv,
+		})
 		return "OK", map[string]any{"dryRun": true, "version": version}, nil
 	}
 
@@ -230,7 +238,8 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 		return packManagedNPMIntoOutbox(emit, wsRoot, projectPath, npmDir, pkgData, packageName, version, project)
 	}
 
-	// Ask Cloud only after dry-run has returned without requesting credentials.
+	// Ask Cloud for the publication credential. The dry run above asks the same
+	// host-only seam and sends reads only with its answer.
 	// The seam carries the registry HOST and nothing else: the cloud owns what
 	// authority the credential grants, so no package coordinate or action name
 	// crosses it. A managed host with no credential fails closed; only the
@@ -671,6 +680,24 @@ func probeManagedNPMArtifact(registry, token, packageName, version, wantDigest s
 		return false, err
 	}
 	return npmpublish.Probe(context.Background(), client, registry, token, packageName, version, wantDigest, wantSize)
+}
+
+// getManagedNPMTarball sends a GET of the tarball of packageName at version to
+// registry, with the bearer when token is set. A send error is a *url.Error; a
+// coordinate or request error is not.
+func getManagedNPMTarball(client *http.Client, registry, token, packageName, version string) (*http.Response, error) {
+	tarballURL, err := npmpublish.TarballURL(registry, packageName, version)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodGet, tarballURL, nil)
+	if err != nil {
+		return nil, errors.New("the managed npm tarball request could not be built")
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	return client.Do(req) //nolint:gosec // tarball URL is constructed from the validated registry origin and staged coordinate
 }
 
 func sha256File(path string) (string, error) {

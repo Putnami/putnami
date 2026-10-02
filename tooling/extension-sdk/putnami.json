@@ -17,7 +17,7 @@
   },
   "options": {
     "test": {
-      "filePatterns": ["registrycred/testdata/recorded/**", "recorded/testdata/**"]
+      "filePatterns": ["registrycred/testdata/recorded/**", "recorded/testdata/**", "memberprobe/testdata/recorded/**"]
     },
     "publish": {
       "archives": false

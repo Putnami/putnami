@@ -80,10 +80,13 @@ Without that registration, core discovery is limited to local files,
 
 ```go
 // Explicit sources (auto-discovery is skipped)
-cfg, _ := config.Load(ServerConfig,
+cfg, err := config.Load(ServerConfig,
     config.NewYAMLFileSource("custom.yaml", 50),
     config.NewMapSource("defaults", 10, map[string]any{"server": map[string]any{"host": "0.0.0.0"}}),
 )
+if err != nil {
+    log.Fatal(err)
+}
 
 // CONFIG_DATA for containerized deployments
 // CONFIG_DATA='server:\n  port: 9090' ./myapp

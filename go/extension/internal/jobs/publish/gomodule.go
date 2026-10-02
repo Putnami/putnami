@@ -3,6 +3,7 @@ package publish
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 	"go.putnami.dev/sdk/extension/privatebroker"
 	"go.putnami.dev/sdk/extension/publicationoutbox"
 	"go.putnami.dev/sdk/extension/registrycred"
+	"golang.org/x/mod/module"
 )
 
 const maxGoRegistryResponseBytes = gomodpublish.MaxResponseBytes
@@ -120,12 +122,9 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 	projectPath := ctx.Project.Path
 
 	if dryRun && planned != nil {
-		// Managed publication uses the dry-run stream to authorize the exact
-		// npm/Go member tuple before it grants write credentials. The package
-		// command intentionally creates no Go artifacts during a dry run, so use
-		// the already-validated release-set member instead of requiring
-		// module.json that cannot exist. This event is planning evidence only: it
-		// is never a kind=published proof and carries no verified digest.
+		// A dry-run package stages no Go artifact, so the module and version are
+		// the release-set member's. The package event is kind=package and
+		// carries no verified digest.
 		modulePath := planned.Member.Coordinate
 		version := planned.Member.Version
 		emit.Summary(fmt.Sprintf("Dry run: would publish %s@%s to %s", modulePath, version, registryURL))
@@ -133,6 +132,7 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 			"registry": "go", "version": version, "dryRun": true,
 			"digestVerified": false,
 		})
+		probeGoModule(ctx.Params, emit, route, registryURL, modulePath, version, stagedGoZip(wsRoot, projectPath, modulePath, version), true)
 		return "OK", map[string]any{"dryRun": true, "modulePath": modulePath, "version": version}, nil
 	}
 
@@ -146,7 +146,7 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		return "SKIP", nil, nil
 	}
 
-	moduleMeta, err := pkgmeta.ReadGoModuleMetadata(wsRoot, projectPath)
+	moduleMeta, err := stagedGoModule(channels, wsRoot, projectPath, dryRun)
 	if err != nil {
 		emit.Diagnostic("error", "Go module metadata not found: "+err.Error(), "", 0)
 		return "FAILED", nil, fmt.Errorf("read go module metadata: %w", err)
@@ -184,6 +184,7 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 			"registry": "go", "version": version, "dryRun": true,
 			"digestVerified": false,
 		})
+		probeGoModule(ctx.Params, emit, route, registryURL, modulePath, version, moduleMeta.ZipPath, planned != nil)
 		return "OK", map[string]any{"dryRun": true, "modulePath": modulePath, "version": version}, nil
 	}
 
@@ -429,6 +430,28 @@ func publishVersion(client *http.Client, emit *jsonl.Emitter, registryURL, token
 // hashes the exact bytes served to consumers.
 func verifyPublishedZip(client *http.Client, registryURL, token, modulePath, version, wantDigest string) error {
 	return gomodpublish.VerifyZip(context.Background(), client, registryURL, token, modulePath, version, wantDigest)
+}
+
+// getGoModuleZip sends a GET of the standard Go proxy zip of modulePath at
+// version to registryURL, with the bearer when token is set. A send error is
+// a *url.Error; an escape or request error is not.
+func getGoModuleZip(client *http.Client, registryURL, token, modulePath, version string) (*http.Response, error) {
+	escapedPath, err := module.EscapePath(modulePath)
+	if err != nil {
+		return nil, fmt.Errorf("escape module path: %w", err)
+	}
+	escapedVersion, err := module.EscapeVersion(version)
+	if err != nil {
+		return nil, fmt.Errorf("escape module version: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodGet, registryURL+"/"+escapedPath+"/@v/"+escapedVersion+".zip", nil)
+	if err != nil {
+		return nil, errors.New("the module zip request could not be built")
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	return client.Do(req) //nolint:gosec // registryURL is explicit publish configuration
 }
 
 // verifyPublishedMod compares the standard Go proxy .mod projection byte for

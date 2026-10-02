@@ -84,6 +84,10 @@
       "text": "Verified uploads and reuse emit a member at the full repository path, excluding only the registry host. Native images require an exact selected plan coordinate, project and version; standalone images retain their content version. Private image publication writes only the digest; workload Docker publication may tag its version. Channels belong to the release. The workspace registry determines the target. Publication makes one manifest existence check, with no extra push or digest lookup."
     },
     {
+      "id": "dry-run-member-probe",
+      "text": "A dry-run publication asks its registry, with GET or HEAD only, whether it holds the member at the version the real publish would write, and emits one member-probe event per member: absent, identical when the registry digest equals the local artifact, naming a staged one, tag-move when the managed OCI registry holds the version tag at other content, conflict when the publish cannot reuse the held version, unverified when the registry cannot answer. An anonymous answer is marked. The orchestrator decides."
+    },
+    {
       "id": "agent-content-packaging",
       "text": "An extension's agent content is built by the same agent-artifact builder as a standalone artifact, under the extension's own name and version and its declared content policy. Packaging a content-only extension writes the built tree and the packaged contribution form, stamps the lowest CLI contract that covers the manifest, refuses what it cannot certify, and returns only a reproducible, platform-independent archive this CLI's own loader reads; the manifest builder stamps the same contract."
     },

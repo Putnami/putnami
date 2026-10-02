@@ -207,6 +207,42 @@ func TestRewriteParams(t *testing.T) {
 	}
 }
 
+// The query builder examples of go/doc/framework/07-persistence.md, with the
+// output their comments show.
+func TestPersistenceGuideBuilderExamples(t *testing.T) {
+	q, args := Select("users").
+		Columns("id", "name", "email").
+		Where("age > $1", 18).
+		Where("active = $1", true).
+		OrderBy("name ASC").
+		Limit(10).
+		Offset(20).
+		Build()
+	expect(t, q, `SELECT "id", "name", "email" FROM "users" WHERE age > $1 AND active = $2 ORDER BY "name" ASC LIMIT 10 OFFSET 20`)
+	expectArgs(t, args, 18, true)
+
+	q, _ = Insert("users").
+		Columns("id", "name", "email", "age").
+		Values("user-123", "Jane", "jane@example.com", 34).
+		Returning("id", "created_at").
+		Build()
+	expect(t, q, `INSERT INTO "users" ("id", "name", "email", "age") VALUES ($1, $2, $3, $4) RETURNING "id", "created_at"`)
+
+	q, args = Update("users").
+		Set("name = $1", "Jane Doe").
+		Set("age = $1", 35).
+		Where("id = $1", "user-123").
+		Build()
+	expect(t, q, `UPDATE "users" SET name = $1, age = $2 WHERE id = $3`)
+	expectArgs(t, args, "Jane Doe", 35, "user-123")
+
+	q, _ = Delete("users").
+		Where("active = $1", false).
+		Returning("id").
+		Build()
+	expect(t, q, `DELETE FROM "users" WHERE active = $1 RETURNING "id"`)
+}
+
 // --- PoolConfig defaults ---
 
 func TestPoolConfigDefaults(t *testing.T) {

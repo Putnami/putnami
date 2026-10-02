@@ -4,21 +4,13 @@ The Putnami Go framework follows the same Putnami architecture in idiomatic Go. 
 
 ## Installation
 
-All Go packages use the `go.putnami.dev` import domain. Its `go-import` meta tags name the module proxy at `https://go.putnami.dev`. The public module proxy, `proxy.golang.org`, holds some published versions.
+All Go packages use the `go.putnami.dev` import domain. Its `go-import` meta tags name the module proxy at `https://go.putnami.dev`, which serves anonymous reads, so the default `GOPROXY` resolves every package without credentials.
 
-The quickest start is a Putnami project: `putnami projects create api --template go-server` pins the newest framework version your Go module proxies serve. To add a package to another module, name the version:
+The quickest start is a Putnami project: `putnami projects create api --template go-server` pins the newest framework version your Go module proxies serve. To add a package to another module:
 
 ```bash
-go get go.putnami.dev/app@<version>
-go get go.putnami.dev/http@<version>
-go get go.putnami.dev/inject@<version>
+go get go.putnami.dev/app go.putnami.dev/http go.putnami.dev/inject
 ```
-
-Today `go.putnami.dev` does not serve anonymous reads, so a reader without access to it gets only what `proxy.golang.org` holds:
-
-- `go get` without a version fails for these modules, because the version list of `proxy.golang.org` names a version it no longer serves.
-- At the version `https://proxy.golang.org/go.putnami.dev/app/@latest` names, `inject`, `config` and `logger` resolve, but `app` and `http` do not. They import `go.putnami.dev/protocol/diagnostic`, which `proxy.golang.org` does not hold at that version.
-- A `go-server` project requires `app` and `http`, so it does not build without access to `go.putnami.dev`.
 
 ## Package overview
 
@@ -34,7 +26,7 @@ Today `go.putnami.dev` does not serve anonymous reads, so a reader without acces
 | [`security`](/docs/frameworks/go/security) | Declarative authorization middleware (roles, scopes, custom guards) |
 | [`grpc`](/docs/frameworks/go/grpc) | gRPC server with Connect protocol gateway and DI-scoped requests |
 | [`openapi`](/docs/frameworks/go/openapi) | OpenAPI 3.0.3 spec generation from Go struct types |
-| [`sql`](/docs/frameworks/go/persistence) | PostgreSQL via pgx — connection pool, repository pattern, migrations, query builder |
+| [`database`](/docs/frameworks/go/persistence) | PostgreSQL via pgx — connection pool, repository pattern, migrations, query builder |
 | [`cache`](/docs/frameworks/go/caching) | Layered caching (memory + disk) with TTL and FIFO eviction |
 | [`telemetry`](/docs/frameworks/go/telemetry) | OpenTelemetry integration for distributed tracing and metrics |
 | [`events`](/docs/frameworks/go/events) | Typed event system with topics, handlers, retry, and dead-letter queues |
@@ -50,6 +42,7 @@ package main
 
 import (
     "context"
+    "log"
 
     "go.putnami.dev/app"
     "go.putnami.dev/config"
@@ -62,7 +55,10 @@ type AppConfig struct {
 }
 
 func main() {
-    cfg, _ := config.Load(config.Config[AppConfig]("app"))
+    cfg, err := config.Load(config.Config[AppConfig]("app"))
+    if err != nil {
+        log.Fatal(err)
+    }
     db := connectDB(cfg.DSN)
     users := NewUserService(db)
 
@@ -107,7 +103,7 @@ The framework is organized into four layers:
 ```
 Foundation:      errors, logger, config, schema
 DI:              inject (optional, standalone)
-Application:     app → http, grpc, sql, events, storage, cache, client
+Application:     app → http, grpc, database, events, storage, cache, client
 Cross-cutting:   security, telemetry, openapi
 ```
 
@@ -115,7 +111,7 @@ Every component is a **plugin** that participates in the application lifecycle. 
 
 ## Design principles
 
-- **Stdlib only** — no external runtime dependencies (except pgx for PostgreSQL and gRPC)
+- **Few external dependencies** — the standard library, plus pgx (`database`), gRPC and protobuf (`grpc`), OpenTelemetry (`telemetry`) and `gopkg.in/yaml.v3` (`config`)
 - **Optional DI** — wire services explicitly or use constructor-based DI; both compose naturally
 - **Generics** — type-safe topics, repositories, caches, and tokens via Go 1.18+ generics
 - **Context-driven** — transactions, scopes, loggers, and traces all flow through `context.Context`
@@ -134,6 +130,7 @@ Every component is a **plugin** that participates in the application lifecycle. 
 | Client builder | `ClientBuilder.for(Client)` | `client.NewBuilder()` |
 | Circuit breaker | Custom implementation | `client.CircuitBreaker` |
 | Config | `Config('name', schema)` | `config.Config[T]("name")` |
+| Transactions | `runInTransaction(fn)`, or a request flagged by `withTransaction()` that begins at its first write | `database.WithTx(ctx, pool, fn)`, or `PluginConfig.UnitOfWork`, which begins at a request's first query on each pool |
 | Validation | Schema DSL | Struct tags |
 | Application | `application().use(plugin)` | `app.New("name").Module.Use(plugin)` |
 

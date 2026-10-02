@@ -1,0 +1,2 @@
+@putnami-probe-test:registry=undefined
+registry=https://registry.npmjs.org/

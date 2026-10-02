@@ -1,0 +1,29 @@
+npm ERR! code ECONNREFUSED
+npm ERR! syscall connect
+npm ERR! errno ECONNREFUSED
+npm ERR! FetchError: request to http://127.0.0.1:9/lodash failed, reason: connect ECONNREFUSED 127.0.0.1:9
+npm ERR!     at ClientRequest.<anonymous> (/Users/person/n/lib/node_modules/npm/node_modules/minipass-fetch/lib/index.js:130:14)
+npm ERR!     at ClientRequest.emit (node:events:508:28)
+npm ERR!     at emitErrorEvent (node:_http_client:108:11)
+npm ERR!     at _destroy (node:_http_client:963:9)
+npm ERR!     at onSocketNT (node:_http_client:983:5)
+npm ERR!     at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+npm ERR!  FetchError: request to http://127.0.0.1:9/lodash failed, reason: connect ECONNREFUSED 127.0.0.1:9
+npm ERR!     at ClientRequest.<anonymous> (/Users/person/n/lib/node_modules/npm/node_modules/minipass-fetch/lib/index.js:130:14)
+npm ERR!     at ClientRequest.emit (node:events:508:28)
+npm ERR!     at emitErrorEvent (node:_http_client:108:11)
+npm ERR!     at _destroy (node:_http_client:963:9)
+npm ERR!     at onSocketNT (node:_http_client:983:5)
+npm ERR!     at process.processTicksAndRejections (node:internal/process/task_queues:91:21) {
+npm ERR!   code: 'ECONNREFUSED',
+npm ERR!   errno: 'ECONNREFUSED',
+npm ERR!   syscall: 'connect',
+npm ERR!   address: '127.0.0.1',
+npm ERR!   port: 9,
+npm ERR!   type: 'system'
+npm ERR! }
+npm ERR! 
+npm ERR! If you are behind a proxy, please make sure that the
+npm ERR! 'proxy' config is set properly.  See: 'npm help config'
+
+npm ERR! A complete log of this run can be found in: /Users/person/.npm/_logs/2026-10-01T19_48_20_830Z-debug-0.log

@@ -756,7 +756,7 @@
         "dry-run": {
           "type": "boolean",
           "default": false,
-          "description": "Show what would be published without uploading"
+          "description": "Upload nothing; ask each registry whether it already holds the planned version"
         }
       },
       "run": [

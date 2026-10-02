@@ -44,7 +44,7 @@ func newCircularDependencyError(chain []Token) *errors.Error {
 // newScopeViolationError creates an error for when a singleton depends on a scoped provider.
 func newScopeViolationError(singleton, scoped Token) *errors.Error {
 	return errors.New(CodeScopeViolation,
-		"singleton "+TokenName(singleton)+" cannot depend on scoped "+TokenName(scoped)+" (use a scope proxy)",
+		"singleton "+TokenName(singleton)+" cannot depend on scoped "+TokenName(scoped)+" (resolve it from the request context where it is used)",
 		errors.String("singleton", TokenName(singleton)),
 		errors.String("scoped", TokenName(scoped)),
 	)

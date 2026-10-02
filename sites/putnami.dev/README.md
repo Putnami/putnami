@@ -136,6 +136,7 @@ evidence, never authority — emitting one cannot create a cross-domain permissi
 | `/install.ps1?run=<command>` | The same script with `<command>` set in its one `$RunCommandDefault = ''` line (`src/plugins/installer-run.plugin.ts`); a `run` value that is not one `^[a-z][a-z0-9-]{0,63}$` is a 400 |
 | `/dl/:artifact` | Binary resolver redirect (302) using query params (`version`, `target`, `platform`) |
 | `/llms.txt`, `/doc-markdown` | Agent-facing documentation index and raw markdown |
+| `/release.json` | The Putnami version the CLI's `latest` channel points at, shown in the footer |
 | `/privacy` | What the site measures, how visitors are counted, and how to object |
 | `/analytics/analytics.<hash>.js` | Browser tracker bundle, a build output of `@putnami/analytics` |
 | `/_putnami/analytics/events` | Tracker ingest (`POST`, CSRF-exempt, rate-limited) |
@@ -226,6 +227,8 @@ emitted artifact agree, so it cannot drift.
 | `/llms.txt` | PATCH | reject | — |
 | `/sitemap.xml` | GET | allow | `exact /sitemap.xml` |
 | `/doc-markdown` | GET | allow | `exact /doc-markdown` |
+| `/release.json` | GET | allow | `exact /release.json` |
+| `/release.json` | POST | reject | — |
 | `/dl/putnami` | GET | allow | `template /dl/{artifact}` |
 | `/dl` | GET | reject | — |
 | `/robots.txt` | GET | allow | `exact /robots.txt` |

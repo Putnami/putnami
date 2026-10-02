@@ -36,7 +36,8 @@
         "git:../../typescript/extension/bin/**",
         "git:../../python/extension/bin/**",
         "git:../../protocols/transaction/**",
-        "../../protocols/infra/fixtures/equivalence/secrets.golden.json"
+        "../../protocols/infra/fixtures/equivalence/secrets.golden.json",
+        "internal/jobs/publish/testdata/recorded/**"
       ]
     }
   }

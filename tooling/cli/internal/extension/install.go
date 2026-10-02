@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/pinnedarchive"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
@@ -656,7 +657,7 @@ func verifyArchiveIntegrity(lockEntry *lockfile.LockEntry, spec ArtifactSpec, na
 		// platform-independent anchor: preserve the historical strict behavior.
 		return false, integrityMismatch(spec, name, version, "expected", lockEntry.Integrity, integrity)
 	case advertisedIntegrity != "":
-		expected, nerr := NormalizeIntegrity(advertisedIntegrity)
+		expected, nerr := pinnedarchive.NormalizeIntegrity(advertisedIntegrity)
 		if nerr != nil {
 			return false, fmt.Errorf("invalid advertised integrity for %s@%s: %w", name, version, nerr)
 		}

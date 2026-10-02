@@ -249,12 +249,50 @@ download`.
 Go publication is currently private under every release-set selection. A
 plan coordinates immutable versions and digests; it is not
 an authority for visibility. The publisher never asks for `promote`, never
-calls the `/release` operation, never performs an anonymous read, and the closed
+calls the `/release` operation, never performs an anonymous read when it
+publishes, and the closed
 `gomod-write/v1` PUT has no repository-controlled visibility field. A future
 public release requires a separate explicit server-owned attestation contract;
 a command, channel, manifest or release-set plan cannot forge it. The command
 coordinator releases the private channel only after every selected artifact
 has verified successfully.
+
+`putnami publish --go --dry-run` uploads nothing and asks the registry one
+question: does it already serve this module at this version. The publisher
+sends one GET of the proxy zip (`/<module>/@v/<version>.zip`) through the same
+HTTP client as a real publication, and emits one `member-probe` event:
+
+| State | When |
+|-------|------|
+| `absent` | The registry answers 404 or 410. |
+| `identical` | Under a release-set plan, the served zip has the SHA-256 of the zip an earlier `package` staged for the planned module and version. The real publish reuses it. |
+| `conflict` | Without a plan, the registry serves the version: a Go publish outside a release set fails when the registry has publicly released it, and a read cannot tell a released version from a private one. Under a plan, the served zip differs from the staged one, or no zip is staged for that version. |
+| `unverified` | The staged zip cannot be read, or the registry cannot be reached, refuses the request, or answers outside the protocol. |
+
+A dry-run `package` stages no zip. Under a plan the module and version come from
+the plan, and the dry run compares with the zip a real `package` staged
+earlier for that module and version. An `identical` verdict says so: its
+reason reads "compared with the module zip the last `package` staged; re-run
+`package` if the source changed since". With none, the conflict says so: run
+`putnami package` for the project without `--dry-run`, then the dry run again.
+Without a plan the module and version come from the staged module, or from the
+`go` channel record when the dry-run package staged none.
+
+A served zip with another digest is a `conflict` with or without a plan. The
+registry answers a publish of a version it has publicly released with 409, and
+a publish of a private version with 201 while it keeps the bytes it holds. The
+real publish verifies the zip the registry serves after either answer, so it
+fails on other bytes.
+
+The request carries the credential the real publish asks for: an explicit token
+first, then the host-only credential seam. The seam carries the registry host
+and nothing else, so the cloud decides what the credential grants; the probe
+sends reads only with it. A public module needs no credential: when none
+resolves, the request is anonymous and the event says so. A private registry
+that refuses an anonymous read fails the dry run as `unverified`. The task
+succeeds whatever the answer; the CLI fails the run on `conflict` and
+`unverified`
+(see [Publish and `--dry-run`](../../../tooling/cli/doc/03-commands.md#registry-checks)).
 
 On a linked developer checkout, the publisher obtains its write credential only
 after reading the staged module coordinate. It asks `@putnami/cloud` for a
