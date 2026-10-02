@@ -2922,7 +2922,9 @@
               "a-head-that-is-not-forward-is-refused-at-open",
               "an-uncertain-release-is-resolved-by-plan-digest",
               "a-refused-release-moves-no-channel",
-              "without-the-echo-the-legacy-path-runs"
+              "without-the-echo-the-legacy-path-runs",
+              "real-extensions-open-once-and-release-forward-only",
+              "a-local-and-a-hosted-run-open-the-same-plan"
             ]
           }
         },
@@ -2937,7 +2939,9 @@
               "a-hostile-publication-job-finds-no-credential",
               "each-packed-member-is-uploaded-by-the-engine",
               "a-tampered-artifact-is-refused-by-digest",
-              "a-member-the-plan-does-not-select-is-refused"
+              "a-member-the-plan-does-not-select-is-refused",
+              "a-reused-publication-job-fails-the-release",
+              "real-extension-jobs-pack-and-the-engine-uploads"
             ]
           }
         }

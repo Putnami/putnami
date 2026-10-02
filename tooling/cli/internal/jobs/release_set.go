@@ -2536,6 +2536,9 @@ func (run *ReleaseSetRun) commit(ctx context.Context, results map[string]*JobRes
 	if err := run.ensureNoSkippedPublication(results); err != nil {
 		return releaseSetFailure(err)
 	}
+	if err := run.ensureNoReusedPublication(results); err != nil {
+		return releaseSetFailure(err)
+	}
 	finalSet, err := reconcilePublishedReleaseSet(run.plan, results)
 	if err != nil {
 		return releaseSetFailure(err)
@@ -2661,6 +2664,32 @@ func (run *ReleaseSetRun) ensureNoSkippedPublication(results map[string]*JobResu
 	sort.Strings(skipped)
 	return fmt.Errorf("release-set publication refused: %d selected publish job(s) were skipped and published nothing: %s",
 		len(skipped), strings.Join(skipped, "; "))
+}
+
+// ensureNoReusedPublication refuses to release under publication-v1 when a
+// selected publication job's result was reused instead of executed: a local
+// or remote cache hit, or a coalesced result. Such a job ran no process with
+// this run's outbox, so it packed nothing into it, and any published-member
+// event its result replays names an upload this run did not make. Without
+// publication-v1 the check is not made.
+func (run *ReleaseSetRun) ensureNoReusedPublication(results map[string]*JobResult) error {
+	if !run.Publication() {
+		return nil
+	}
+	var reused []string
+	for jobKey, memberKey := range run.publishJobKeys {
+		result := results[jobKey]
+		if result == nil || !result.ReuseKind().Reused() {
+			continue
+		}
+		reused = append(reused, fmt.Sprintf("%s for %s (%s)", jobKey, printableReleaseKey(memberKey), result.ReuseKind()))
+	}
+	if len(reused) == 0 {
+		return nil
+	}
+	sort.Strings(reused)
+	return fmt.Errorf("release-set publication refused: %d selected publication job(s) were reused instead of executed and packed nothing in this run: %s",
+		len(reused), strings.Join(reused, "; "))
 }
 
 func ensureNoReleaseSetOutcome(results map[string]*JobResult) error {

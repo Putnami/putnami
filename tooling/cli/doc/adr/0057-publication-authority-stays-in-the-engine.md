@@ -85,6 +85,10 @@ bounded error that names its code; it moves no channel, and the run fails.
 - A bound request's expected plan names no `open` or upload node, so an
   executing engine refuses a bound request that publishes through
   `publication-v1`. Publishing one needs the submitter to plan those nodes.
+- A publication job whose result was reused instead of executed (a local or
+  remote cache hit, or a coalesced result) packed nothing into this run's
+  outbox, and a `published-member` event its result replays names an upload
+  this run did not make. The release refuses such a run and names the job.
 - The engine now carries the npm, Go module and OCI upload clients of the SDK.
 - `.gen/version.json` keeps no image fields under the outbox: no reader in the
   same run needs them, and a same-session deploy takes its image from the

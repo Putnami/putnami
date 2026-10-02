@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -34,6 +35,7 @@ import (
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/credentialprovider/providertest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/store"
 )
 
 // publicationBearer is the publish credential the test provider issues.
@@ -174,6 +176,11 @@ type publicationHarness struct {
 	jobs      []*ScheduledJob
 	publish   map[string]*ScheduledJob
 	run       *ReleaseSetRun
+	// cache serves and stores reusable results when set; without it every
+	// job executes.
+	cache *store.CacheManager
+	// renderer records what the last execute rendered.
+	renderer *mockRenderer
 }
 
 func newPublicationHarness(t *testing.T, config providertest.Config) *publicationHarness {
@@ -286,11 +293,12 @@ func (h *publicationHarness) execute(ctx context.Context, planned []*ScheduledJo
 		h.t.Fatalf("publication context: %v", err)
 	}
 	defer closeOutboxes()
+	h.renderer = &mockRenderer{}
 	result := RunPlan(ctx, RunRequest{
 		Workspace: workspace.NewWorkspace(h.root, &wsproto.Config{Name: "putnami"}, h.projects),
 		Plan:      planned, InternalJobs: internal, ProcessCapabilityAuthorization: authorization,
-		Config:   SchedulerConfig{MaxParallel: 4, NoCache: true, ContinueOnError: true},
-		Renderer: &mockRenderer{},
+		Config:   SchedulerConfig{MaxParallel: 4, NoCache: h.cache == nil, ContinueOnError: true},
+		Renderer: h.renderer, Cache: h.cache,
 	})
 	if finalize := h.run.Finalizer(ctx); finalize != nil {
 		finalize(result.Results)
@@ -773,6 +781,10 @@ func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
 		events := uploadEvents(t, results[h.uploadKey(job)])
 		if len(events) != 1 || events[0].ArtifactDigest != want[events[0].Ecosystem+"\x00"+events[0].Coordinate] {
 			t.Fatalf("upload of %s reported %+v", job.Key(), events)
+		}
+		rendered := uploadEvents(t, &JobResult{Events: h.renderer.eventsOfType(h.uploadKey(job), EventTypeArtifact)})
+		if len(rendered) != 1 || !reflect.DeepEqual(rendered[0], events[0]) {
+			t.Fatalf("upload of %s rendered %+v; want its published member %+v", job.Key(), rendered, events[0])
 		}
 	}
 	head, moved := h.provider.Head("putnami", "canary")

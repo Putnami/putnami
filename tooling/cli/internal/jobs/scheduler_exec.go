@@ -118,6 +118,11 @@ func (s *Scheduler) executeJobGroup(
 				Error:  &JobError{Message: "framework-owned job returned no result"},
 			}
 		}
+		// The renderers see a framework-owned node's events under its own
+		// identity, as they see an executed task's.
+		for _, event := range result.Events {
+			s.renderer.JobEvent(internalJob, event)
+		}
 		result.TaskWall = time.Since(started)
 		return []jobDone{{job: internalJob, result: result}}
 	}

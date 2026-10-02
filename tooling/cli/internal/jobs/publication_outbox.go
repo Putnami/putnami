@@ -570,12 +570,16 @@ func declaredRegistryEndpoint(project *workspace.Project, ecosystem, field strin
 }
 
 // publishedMemberRawEvent is the published-member event an upload node
-// reports, in the shape the reconciliation reads (parsePublishedMemberEvent).
+// reports, in the shape the reconciliation reads (parsePublishedMemberEvent),
+// with the artifact envelope a publication job's own event carries: the
+// ecosystem as its id and the coordinate as its name.
 func publishedMemberRawEvent(member *extproto.PublishedMember) RawJobEvent {
 	return RawJobEvent{
 		Version: runtimeproto.MaxKnownProtocolVersion,
 		Type:    EventTypeArtifact,
 		Data: map[string]any{
+			"id":             member.Ecosystem,
+			"name":           member.Coordinate,
 			"kind":           extproto.PublishedMemberEventKind,
 			"ecosystem":      member.Ecosystem,
 			"coordinate":     member.Coordinate,

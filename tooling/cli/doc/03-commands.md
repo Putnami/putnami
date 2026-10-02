@@ -1204,12 +1204,19 @@ publish runs through that one session
    its barrier commands.
 3. Each publication job packs its members into a private outbox that
    `PUTNAMI_PUBLICATION_OUTBOX` names, and receives no registry or cloud
-   credential.
+   credential. A publication job whose result is reused from a cache, or
+   shared with another run, packed nothing in this run, so the release refuses
+   the run and names the job.
 4. The engine hashes every packed file again, refuses a member the plan does
    not assign to that job, and uploads each npm, Go module and OCI member
-   itself with the `publish` credential.
+   itself with the `publish` credential. Each upload node reports one
+   `published-member` event in the session.
 5. The engine releases the set over the same session. A refusal names its code
    and moves no channel.
+
+The plan names the commit, its members and the channel heads, and nothing of
+the run that opens it, so a local run and a hosted run of one commit open the
+same plan and release the same set.
 
 Without the echo, the release set publishes through its release-set provider,
 unchanged.

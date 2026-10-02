@@ -249,9 +249,10 @@ A release-set publish through a credential provider that negotiates
 `publication-v1` states that ancestry when it opens its plan: for each channel
 it advances, the head's source revision and whether the snapshot holds it. The
 provider refuses a head the snapshot does not hold (`not_forward`), so a
-channel moves only to a descendant of its head. A snapshot that is missing,
-failed, shallow or bound to another commit fails the publish before any job
-runs.
+channel moves only to a descendant of its head, and nothing is uploaded. A
+snapshot that is missing, failed, shallow or bound to another commit fails the
+publish before any job runs. The ancestry depends only on the commit, so a
+local run and a hosted run of one commit state the same ancestry.
 
 ### Channel semantics
 

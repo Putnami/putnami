@@ -1,9 +1,12 @@
 package credentialcustody
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,6 +19,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	distribution "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	registry "go.putnami.dev/protocol/registry"
@@ -36,18 +40,36 @@ const (
 
 // runCredentialProviderRole is the credential provider of a publication
 // fixture: an in-process provider (providertest) served on its standard
-// streams. It negotiates publication-v1, answers every channel as empty, and
-// issues custodyBearer as the publish credential for the hosts custodyHostsEnv
-// names. When its session ends it appends every request it read to its log,
-// one line each: the op, then the purpose of a credential request, then the
-// code of a refusal.
+// streams. It negotiates publication-v1 and issues custodyBearer as the
+// publish credential for the hosts custodyHostsEnv names. Its channels are
+// empty unless custodySetupEnv names a providerSetup. With custodyOrderEnv or
+// custodyLedgerEnv set, it records each request as it reads it
+// (providerWireTap). When its session ends it appends every request it read
+// to its log, one line each: the op, then the purpose of a credential
+// request, then the code of a refusal.
 func runCredentialProviderRole() int {
 	var hosts []string
 	if value := os.Getenv(custodyHostsEnv); value != "" {
 		hosts = strings.Split(value, ",")
 	}
-	provider := providertest.New(providertest.Config{Bearer: custodyBearer, Hosts: hosts})
-	provider.Serve(os.Stdin, os.Stdout)
+	setup, err := readProviderSetup(os.Getenv(custodySetupEnv))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "custody credential provider: %v\n", err)
+		return 1
+	}
+	config := providertest.Config{Bearer: custodyBearer, Hosts: hosts}
+	if setup.StoresNothing {
+		config.Stored = func(string, string, string) (string, bool) { return "", false }
+	}
+	provider := providertest.New(config)
+	for _, channel := range slices.Sorted(maps.Keys(setup.Heads)) {
+		if _, err := provider.SetHead(setup.Namespace, channel, setup.Heads[channel]); err != nil {
+			fmt.Fprintf(os.Stderr, "custody credential provider: %v\n", err)
+			return 1
+		}
+	}
+	tap := &providerWireTap{source: os.Stdin, order: os.Getenv(custodyOrderEnv), ledger: os.Getenv(custodyLedgerEnv)}
+	provider.Serve(tap, os.Stdout)
 	log := os.Getenv(custodyReportEnv)
 	for _, call := range provider.Calls() {
 		line := strings.TrimSpace(strings.Join([]string{string(call.Op), call.Purpose, call.Code}, " "))
@@ -55,7 +77,133 @@ func runCredentialProviderRole() int {
 			return 1
 		}
 	}
+	if tap.ledger == "" {
+		return 0
+	}
+	end := ledgerEntry{Op: "end", Heads: map[string]string{}, Releases: provider.Releases(), Calls: provider.Calls()}
+	for _, channel := range setup.Channels {
+		if ref, ok := provider.Head(setup.Namespace, channel); ok {
+			end.Heads[channel] = ref.ID
+		}
+	}
+	if err := appendLedger(tap.ledger, end); err != nil {
+		return 1
+	}
 	return 0
+}
+
+// providerSetup is what the "credential-provider" role starts from: the
+// namespace and channels its ledger reports, the head each channel has before
+// the session, and whether every member's registry answers that it stores no
+// artifact.
+type providerSetup struct {
+	Namespace     string                             `json:"namespace"`
+	Channels      []string                           `json:"channels"`
+	Heads         map[string]distribution.ReleaseSet `json:"heads,omitempty"`
+	StoresNothing bool                               `json:"storesNothing,omitempty"`
+}
+
+// readProviderSetup reads the setup at path; an empty path is the zero setup.
+func readProviderSetup(path string) (providerSetup, error) {
+	var setup providerSetup
+	if path == "" {
+		return setup, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return setup, err
+	}
+	return setup, json.Unmarshal(data, &setup)
+}
+
+// ledgerEntry is one line of the provider ledger: an open or release payload
+// as the engine sent it, whether an initialize carried the run credential,
+// or, with op "end", the provider's state when the session ended.
+type ledgerEntry struct {
+	Op            string              `json:"op"`
+	Payload       json.RawMessage     `json:"payload,omitempty"`
+	RunCredential bool                `json:"runCredential,omitempty"`
+	Heads         map[string]string   `json:"heads,omitempty"`
+	Releases      int                 `json:"releases,omitempty"`
+	Calls         []providertest.Call `json:"calls,omitempty"`
+}
+
+func appendLedger(path string, entry ledgerEntry) error {
+	line, err := json.Marshal(entry)
+	if err != nil {
+		return err
+	}
+	return appendLog(path, string(line))
+}
+
+// providerWireTap passes the engine's requests to the provider unchanged and
+// records each one when it is read, before the provider answers it: its op,
+// with the purpose of a credential request, to the order log; the payload of
+// an open or a release, and whether an initialize carried custodyBearer as
+// its run credential, to the ledger. The run credential itself is never
+// recorded.
+type providerWireTap struct {
+	source        io.Reader
+	order, ledger string
+	pending       []byte
+}
+
+func (tap *providerWireTap) Read(p []byte) (int, error) {
+	n, err := tap.source.Read(p)
+	tap.pending = append(tap.pending, p[:n]...)
+	for {
+		end := bytes.IndexByte(tap.pending, '\n')
+		if end < 0 {
+			break
+		}
+		line := bytes.Clone(tap.pending[:end])
+		tap.pending = tap.pending[end+1:]
+		if recordErr := tap.record(line); recordErr != nil {
+			fmt.Fprintf(os.Stderr, "custody credential provider: record a request: %v\n", recordErr)
+		}
+	}
+	return n, err
+}
+
+func (tap *providerWireTap) record(line []byte) error {
+	var request struct {
+		Op      registry.CredentialOp `json:"op"`
+		Payload json.RawMessage       `json:"payload"`
+	}
+	if err := json.Unmarshal(line, &request); err != nil {
+		return err
+	}
+	step := string(request.Op)
+	var entry *ledgerEntry
+	switch request.Op {
+	case registry.CredentialOpCredential:
+		var params struct {
+			Purpose string `json:"purpose"`
+		}
+		if err := json.Unmarshal(request.Payload, &params); err != nil {
+			return err
+		}
+		step += " " + params.Purpose
+	case registry.CredentialOpInitialize:
+		var params struct {
+			RunCredential string `json:"runCredential"`
+		}
+		if err := json.Unmarshal(request.Payload, &params); err != nil {
+			return err
+		}
+		entry = &ledgerEntry{Op: step, RunCredential: params.RunCredential == custodyBearer}
+	case registry.CredentialOpOpen, registry.CredentialOpRelease:
+		entry = &ledgerEntry{Op: step, Payload: request.Payload}
+	}
+	if tap.order != "" {
+		if err := appendLog(tap.order, step); err != nil {
+			return err
+		}
+	}
+	if entry != nil && tap.ledger != "" {
+		return appendLedger(tap.ledger, *entry)
+	}
+	return nil
 }
 
 // runHostilePublicationRole is the publication job of a publication fixture:
