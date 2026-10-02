@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/hometest"
@@ -79,10 +78,11 @@ func TestInstall_AHostedInstallWritesNoLock(t *testing.T) {
 }
 
 // A hosted install runs every workspace-fetch before any onInstall hook and
-// any installer, then BeforeRepositoryCode, then the hooks, then the
-// installers, and it fetches once: the fetch receives the run credential, and
-// no process started after repository code does. A fetch that fails runs no
-// hook and no installer. An install without the run credential fetches
+// any installer: the store extensions' fetch, BeforeRepositoryCode, then the
+// path extensions' fetch; then the hooks, then the installers. It fetches in
+// each step once: the store extensions' fetch receives the run credential,
+// and no process started after repository code does. A fetch that fails runs
+// no hook and no installer. An install without the run credential fetches
 // nothing and runs its hooks with the extensions.
 func TestInstall_AHostedInstallFetchesBeforeAnyHookOrInstaller(t *testing.T) {
 	hometest.Temp(t)
@@ -93,7 +93,7 @@ func TestInstall_AHostedInstallFetchesBeforeAnyHookOrInstaller(t *testing.T) {
 	pinExplicitToolchains = func(context.Context, string) (bool, error) { return false, nil }
 	fillImplicitToolchainPins = func(context.Context, string) (bool, error) { return false, nil }
 	const hooksRan = "onInstall hooks"
-	fetch, install := extensionproto.WorkspaceFetchCommand, "workspace-install"
+	install := "workspace-install"
 
 	for name, c := range map[string]struct {
 		bearer  string
@@ -101,8 +101,8 @@ func TestInstall_AHostedInstallFetchesBeforeAnyHookOrInstaller(t *testing.T) {
 		want    []string
 		wantErr bool
 	}{
-		"a hosted install":          {bearer: "run-bearer", fetch: WorkspaceJobOK, want: []string{fetch, beforeRepositoryCode, hooksRan, install}},
-		"a hosted fetch that fails": {bearer: "run-bearer", fetch: WorkspaceJobFailed, want: []string{fetch}, wantErr: true},
+		"a hosted install":          {bearer: "run-bearer", fetch: WorkspaceJobOK, want: []string{storeFetch, beforeRepositoryCode, pathFetch, hooksRan, install}},
+		"a hosted fetch that fails": {bearer: "run-bearer", fetch: WorkspaceJobFailed, want: []string{storeFetch}, wantErr: true},
 		"a local install":           {want: []string{install}},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -118,9 +118,10 @@ func TestInstall_AHostedInstallFetchesBeforeAnyHookOrInstaller(t *testing.T) {
 				return nil
 			}
 			var out strings.Builder
-			env := LifecycleEnv{Out: &out, RunJob: func(_ context.Context, req WorkspaceJobRequest) (WorkspaceJobResult, error) {
-				ran = append(ran, req.Job)
-				if req.Job == fetch {
+			env := LifecycleEnv{Out: &out, RunJob: func(ctx context.Context, req WorkspaceJobRequest) (WorkspaceJobResult, error) {
+				job := recordedJob(ctx, req)
+				ran = append(ran, job)
+				if job == storeFetch {
 					return WorkspaceJobResult{Outcome: c.fetch}, nil
 				}
 				return WorkspaceJobResult{Outcome: WorkspaceJobOK}, nil

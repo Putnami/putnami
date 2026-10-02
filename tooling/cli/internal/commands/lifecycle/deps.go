@@ -148,15 +148,16 @@ type LifecycleEnv struct {
 	// would leave the worktree without its remote-cache configuration.
 	NoCache bool
 	// BeforeRepositoryCode runs on a hosted run (runcredential.Hosted) once
-	// every workspace-fetch has run, before the first repository code of the
-	// command: an extension onInstall hook or a workspace installer. The
-	// first-use bootstrap starts the hosted run's remote cache provider there,
-	// because no process that starts after repository code receives the run
-	// credential. Nil does nothing. An error fails the command before any
-	// repository code runs.
+	// the workspace-fetch of every extension installed from the artifact store
+	// has run, before the first repository code of the command: a path
+	// extension's workspace-fetch, an extension onInstall hook or a workspace
+	// installer. The first-use bootstrap starts the hosted run's remote cache
+	// provider there, because no process that starts after repository code
+	// receives the run credential. Nil does nothing. An error fails the command
+	// before any repository code runs.
 	BeforeRepositoryCode func(context.Context) error
-	// fetched records that Install already ran the hosted fetch and
-	// BeforeRepositoryCode, so DepsInstall runs neither again.
+	// fetched records that Install already ran the hosted fetch steps and
+	// BeforeRepositoryCode, so DepsInstall runs none of them again.
 	fetched bool
 	// channel is the release channel `putnami init` resolves on when it is not
 	// latest; every other command leaves it empty. The workspace installers
@@ -184,31 +185,44 @@ func (e LifecycleEnv) out() io.Writer {
 }
 
 // fetchBeforeRepositoryCode is the first step of a hosted run's workspace
-// installation (runcredential.Hosted): it runs every workspace-fetch to
-// completion, in the scope of the installers that follow, then
-// BeforeRepositoryCode. The fetch receives the run credential, and a hosted
-// run hands its credential to no process that starts after repository code.
-// It does nothing without a run credential, or when Install already ran it.
+// installation (runcredential.Hosted), in the scope of the installers that
+// follow. It runs, each to completion:
+//
+//  1. the workspace-fetch of every extension installed from the artifact
+//     store, which receives the job credential (jobs.WithDependencyFetch);
+//  2. BeforeRepositoryCode, which hands the run credential to the remote cache
+//     provider;
+//  3. the workspace-fetch of every path extension, which is repository code
+//     and receives nothing (jobs.WithPathExtensionFetch).
+//
+// A hosted run hands its credential to no process that starts after
+// repository code, so the path extensions' fetch runs last. It does nothing
+// without a run credential, or when Install already ran it.
 func (e LifecycleEnv) fetchBeforeRepositoryCode(ctx context.Context, wsRoot string, cfg *wsproto.Config, filterTag, excludeTag string) error {
 	if !runcredential.Hosted() || e.fetched {
 		return nil
 	}
-	if err := depsFetch(ctx, wsRoot, cfg, filterTag, excludeTag, e); err != nil {
+	// Only the jobs of this run receive the job credential of a hosted run;
+	// every one of them must.
+	if err := depsFetch(jobs.WithDependencyFetch(ctx), wsRoot, cfg, filterTag, excludeTag, e); err != nil {
 		return err
 	}
-	if e.BeforeRepositoryCode == nil {
-		return nil
+	if e.BeforeRepositoryCode != nil {
+		if err := e.BeforeRepositoryCode(ctx); err != nil {
+			return err
+		}
 	}
-	return e.BeforeRepositoryCode(ctx)
+	return depsFetch(jobs.WithPathExtensionFetch(ctx), wsRoot, cfg, filterTag, excludeTag, e)
 }
 
 // DepsInstall runs the "workspace-install" task from all extensions that
 // provide it, effectively installing project dependencies.
 // filterTag/excludeTag scope which extensions run (by matching project tags).
 //
-// A hosted run (runcredential.Hosted) first runs depsFetch to completion, then
-// env.BeforeRepositoryCode (LifecycleEnv.fetchBeforeRepositoryCode): the fetch
-// downloads the dependencies, and the installers then run offline.
+// A hosted run (runcredential.Hosted) first runs the store extensions' fetch,
+// env.BeforeRepositoryCode, then the path extensions' fetch, each to
+// completion (LifecycleEnv.fetchBeforeRepositoryCode): the fetch downloads the
+// dependencies, and the installers then run offline.
 func DepsInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config, filterTag, excludeTag string, env LifecycleEnv) error {
 	if err := env.fetchBeforeRepositoryCode(ctx, wsRoot, cfg, filterTag, excludeTag); err != nil {
 		return err
@@ -241,14 +255,13 @@ func DepsInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config, filter
 }
 
 // depsFetch runs extensionproto.WorkspaceFetchCommand from every extension
-// that provides it, with the scope of the install that follows. A workspace
-// whose extensions provide no fetch, or whose fetch matches no project, has
-// nothing to download, and the install runs as it would. A failed fetch fails
-// the install before any installer runs.
+// that provides it and that the step ctx marks plans, with the scope of the
+// install that follows. A workspace whose extensions provide no fetch, or
+// whose fetch matches no project, has nothing to download, and the install
+// runs as it would. A failed fetch fails the install before any installer
+// runs.
 func depsFetch(ctx context.Context, wsRoot string, cfg *wsproto.Config, filterTag, excludeTag string, env LifecycleEnv) error {
-	// Only the jobs of this run receive the job credential of a hosted run
-	// (jobs.WithDependencyFetch); every one of them must.
-	result, err := runWorkspaceJob(jobs.WithDependencyFetch(ctx), env, WorkspaceJobRequest{
+	result, err := runWorkspaceJob(ctx, env, WorkspaceJobRequest{
 		WorkspaceRoot: wsRoot,
 		Config:        cfg,
 		Job:           extensionproto.WorkspaceFetchCommand,

@@ -54,11 +54,13 @@ func DiscoverExtensions(workspaceRoot string, cfg *wsproto.Config, projectPaths 
 // explicitly referenced extension is only recorded as skipped when no probe
 // location loaded it.
 //
-// A hosted run (runcredential.Hosted) looks in no node_modules directory and
-// keeps only the extensions installed from the artifact store
-// (InArtifactStore): every other one is returned in Skipped. No repository
-// code then runs as an extension before the fetch, and none can receive a
-// credential.
+// A hosted run (runcredential.Hosted) looks in no node_modules directory. It
+// keeps the extensions installed from the artifact store (InArtifactStore) and
+// the workspace's own path extensions (WorkspacePathExtension), and returns
+// every other one in Skipped. A path extension loses its provider
+// capabilities, each with a skip record that names it: no repository code can
+// receive a credential, and the engine starts a path extension only after
+// custody ended.
 func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, projectPaths []string) (*DiscoveryResult, error) {
 	var extensions []*ExtensionDescription
 	var skipped []SkippedExtension
@@ -206,8 +208,8 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 		}
 	}
 
-	extensions, notFromTheStore := keepStoreInstalled(workspaceRoot, extensions)
-	recordSkips(notFromTheStore)
+	extensions, notHosted := keepHostedExtensions(workspaceRoot, extensions)
+	recordSkips(notHosted)
 
 	// Propagate RelPath to all job definitions as ExtensionPath
 	for _, ext := range extensions {

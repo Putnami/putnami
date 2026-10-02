@@ -13,6 +13,8 @@ Extensions are discovered from these sources, in order:
 
 Each name is registered once, by the first source that loads it. Use `putnami extensions list` to see all discovered extensions with their provided jobs.
 
+A hosted run ([`--credential-fd`](03-commands.md#run-credential---credential-fd)) loads only the extensions installed from the artifact store and the workspace's path extensions: a workspace project, or an `extensions` entry that names a path inside the workspace. A path extension serves no provider there, and its jobs and hooks start after the run credential's last handoff.
+
 ### Consuming the published build of an extension you develop
 
 A workspace can hold the source of an extension and still run its published build. List the extension by name with a version in `extensions`:

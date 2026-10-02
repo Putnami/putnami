@@ -277,7 +277,7 @@ func TestAuthorizeRegistryRequestReportsTheMissingCredential(t *testing.T) {
 // goes out anonymous, and a refusal fails with ErrHostedRegistryCredential,
 // which says to install a user-scope credential-provider.
 func TestHostedDownloadNeverAsksTheRegistryTokenSeam(t *testing.T) {
-	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "hosted-run-runs-only-store-installed-extensions")
+	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "hosted-run-runs-only-store-and-path-extensions")
 	restore := runcredential.SetForTest("run-bearer")
 	t.Cleanup(restore)
 	seam := 0

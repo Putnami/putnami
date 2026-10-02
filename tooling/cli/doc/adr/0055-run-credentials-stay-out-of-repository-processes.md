@@ -5,7 +5,8 @@
   too ([ADR 0057](0057-publication-authority-stays-in-the-engine.md)).
 - **Scope**: `@putnami/cli` (`internal/runcredential`, `internal/launch`,
   `internal/credentialprovider`, `internal/cacheprovider`, `internal/jobs`,
-  `internal/commands/lifecycle`), `go.putnami.dev/sdk/extension`
+  `internal/commands/lifecycle`, `internal/extension`, `internal/engine`),
+  `go.putnami.dev/sdk/extension`
   (`procguard`, `registrycred`), `go.putnami.dev/protocol/{registry,cache,extension,runner}`,
   `@putnami/typescript` and `@putnami/go` extensions (`workspace-fetch`)
 
@@ -54,11 +55,20 @@ flag, nothing changes.
 
 ### 2. Every credentialed download ends before repository code starts
 
-- A hosted run runs only extensions installed from the artifact store, which the
-  CLI downloaded and verified against the lock. Discovery looks in no
-  `node_modules` and skips a workspace project, a path extension, and anything
-  whose files resolve inside the workspace, naming the extension and the reason.
-  `putnami extensions install <path>` refuses a local path.
+- A hosted run runs the extensions installed from the artifact store, which the
+  CLI downloaded and verified against the lock, and the workspace's own path
+  extensions: a workspace project with a `putnami.extension.json`, or an
+  `extensions` entry that names a path inside the workspace. Discovery looks in
+  no `node_modules` and skips an extension loaded from an absolute path, or
+  whose files resolve outside the workspace or inside its `node_modules`
+  directory, naming the extension and the reason. `putnami extensions install
+  <path>` accepts only a path extension of the workspace.
+- A path extension is repository code and serves no provider. Discovery removes
+  its `credential-provider`, `cache-provider`, `runner-provider`,
+  `session-reporter`, `log-reporter` and `cloud-release-set` commands, each with
+  a skip record that names the extension and the command, so every provider
+  comes from the store. Its runtime, jobs and hooks start only after custody
+  ends (§4).
 - A hosted run reads no registry the workspace declares
   (`registries.put.registry`). The runner's `PUTNAMI_REGISTRY_PUT_URL`, then
   `PUTNAMI_REGISTRY_URL`, or the default registry decides where the pinned CLI
@@ -70,13 +80,18 @@ flag, nothing changes.
 - `putnami install` runs every extension's `workspace-fetch` to completion,
   then `workspace-install`. A hosted run ignores the install state under
   `.putnami`: a repository could commit one that skips the fetch.
-- `workspace-fetch` downloads dependencies and runs none of their code. It is
-  the only job that receives the read credential, on an inherited descriptor
-  named by `PUTNAMI_JOB_CREDENTIAL_FD`, and only in that first install step. A
-  `workspace-fetch` selected by a plan or an alias is an ordinary job.
-- In that step of a hosted install, any job other than a store-installed
-  extension's `workspace-fetch` run by the extension's own runtime fails before
-  it starts, and no job runs an extension's `preBuild` hook.
+- `workspace-fetch` downloads dependencies and runs none of their code. A
+  store extension's `workspace-fetch` is the only job that receives the read
+  credential, on an inherited descriptor named by `PUTNAMI_JOB_CREDENTIAL_FD`,
+  and only in that first install step, the dependency fetch. A path
+  extension's `workspace-fetch` runs after custody ends, offline and without a
+  credential. A `workspace-fetch` selected by a plan or an alias is an ordinary
+  job.
+- The dependency fetch of a hosted install sees only the store extensions: it
+  prepares no path extension's runtime and plans none of its jobs. Any job
+  other than a store-installed extension's `workspace-fetch` run by the
+  extension's own runtime fails before it starts, and no job runs an
+  extension's `preBuild` hook.
 - A fetch job reads the descriptor once, closes it before it starts any process,
   and makes itself non-dumpable. A job handed a descriptor, even an empty one,
   starts no credential child such as `putnami cloud registry-token`.
@@ -163,8 +178,10 @@ ends when repository code starts.
 
 - The engine marks the run when it starts a repository process: a hook, a job
   other than a credentialed `workspace-fetch`, a toolchain inside the workspace,
-  an extension runtime outside the store, or a nested CLI that loads the
-  workspace's extensions, such as `putnami cloud release-set`. From then on,
+  an extension runtime outside the store, such as a path extension's, or a
+  nested CLI that loads the workspace's extensions, such as
+  `putnami cloud release-set`. It marks a runtime before it prepares it. From
+  then on,
   every handoff fails with an error naming the process that asked and the one
   that ran repository code: the job credential descriptor, a cache provider's
   `authenticate`, and `initialize.runCredential`. A holder keeps what it has.
@@ -173,12 +190,14 @@ ends when repository code starts.
   (`registrycred`, `releaseset`, `dbtestenv`), and fails on an unclassified one.
   A second test reads every package outside the CLI that the CLI imports and
   fails on an unlisted helper that starts a process.
-- On a hosted run the order is fixed: every `workspace-fetch`; the remote cache
-  provider starts and authenticates; the extensions' `onInstall` hooks and the
-  installers; the `before` hooks and the tasks. The install that `putnami build`
-  runs first follows it, and the build reuses that provider. Every executable
-  that receives the credential is bytes the store held before any repository
-  process of the invocation ran.
+- On a hosted run the order is fixed: every store extension's
+  `workspace-fetch`; the remote cache provider starts and authenticates; every
+  path extension's `workspace-fetch`, offline; the extensions' `onInstall`
+  hooks and the installers; the `before` hooks and the tasks. The install that
+  `putnami build` runs first follows it, and the build reuses that provider.
+  Every executable that receives the credential is bytes the store held before
+  any repository process of the invocation ran, and no path extension's runtime
+  starts before the last handoff.
 - A cache provider or credential-provider must be one native executable that
   loads nothing from the store after it starts. On a hosted run the CLI starts
   either only as its extension's native runtime (`{extensionRuntime}`) and
@@ -207,8 +226,12 @@ ends when repository code starts.
   the user's home, the workspace, or the memory of the engine and its providers.
 - A hosted runner starts the CLI binary directly. `./putnamiw` is a
   repository-controlled script that would hold the descriptor first, so a
-  workspace that builds its own CLI, or whose extensions are local sources,
-  cannot run hosted; it must pin them from a registry.
+  workspace that builds its own CLI cannot run hosted; it must pin the CLI from
+  a registry. A workspace's path extensions run hosted, after custody ends, and
+  serve no provider: a workspace whose cache provider or credential-provider is
+  a local source must pin that extension from a registry to run hosted with it.
+- A hosted install runs the fetch command twice: once for the store
+  extensions, once for the path extensions after the cache provider starts.
 - A pinned CLI below the custody level is never `exec`ed by a hosted relaunch:
   the run fails with exit 2, naming the pinned version and `putnami pin
   <version>`. A check that cannot run fails with exit 1. Each hosted relaunch

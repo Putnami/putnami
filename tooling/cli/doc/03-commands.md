@@ -1375,12 +1375,24 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
   running the workspace's extensions beside the credential. Move the
   extension's pin with `putnami upgrade`, run without the flag, and commit
   the lock.
-- **Only store-installed extensions run.** With the flag, the CLI runs only
-  extensions it installed from the artifact store, and reads no registry that
-  the workspace declares: `PUTNAMI_REGISTRY_PUT_URL`, `PUTNAMI_REGISTRY_URL`
-  or the default registry decides. A workspace project that declares an
-  extension, a path extension and a `node_modules` extension are skipped with
-  a reason, and `putnami extensions install <path>` fails.
+- **Store extensions and the workspace's path extensions run.** With the
+  flag, the CLI runs the extensions it installed from the artifact store and
+  the workspace's own path extensions: a workspace project with a
+  `putnami.extension.json`, or an `extensions` entry that names a path inside
+  the workspace, such as `/tools/my-extension`. It skips any other extension
+  with a reason: one from `node_modules`, from an absolute path, or from a
+  path that resolves outside the workspace or inside its `node_modules`
+  directory. `putnami extensions install <path>` accepts only a path
+  extension of the workspace. The CLI reads no registry that the workspace
+  declares: `PUTNAMI_REGISTRY_PUT_URL`, `PUTNAMI_REGISTRY_URL` or the default
+  registry decides.
+- **A path extension serves no provider.** With the flag, the CLI skips the
+  `credential-provider`, `cache-provider`, `runner-provider`,
+  `session-reporter`, `log-reporter` and `cloud-release-set` commands of a
+  path extension, each with a reason that names the extension and the
+  command. Every provider comes from a store extension. The path extension's
+  other commands, jobs and hooks run after the credential's last handoff, as
+  the next items describe.
 - **The committed files stay as they are.** With the flag, `putnami install`
   writes no `putnami.lock.json`, `bun.lock`, `.npmrc`, `go.work`, `go.mod`,
   manifest or assistant content (`AGENTS.md`, `.mcp.json`, agent workflows).
@@ -1393,16 +1405,19 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
   installs one. The runner provides the pinned Go and bun on its `PATH`, in
   `GOROOT`, or in the Putnami home.
 - **No process starts with the credential after repository code.** Once a
-  hook or a task has started, the CLI gives the credential to no new process:
-  a cache provider or credential provider that would start later fails the
-  run with an error that names both. With the flag, every dependency fetch
-  runs first, then the remote cache provider starts, then the install hooks,
-  the installers, the `before` hooks and the tasks. Only the dependency fetch
-  of the install receives the job credential: a `workspace-fetch` that a
-  plan or an alias selects runs offline, like any other task. A
-  `workspace-fetch` task that is not its extension's own runtime
-  (`{extensionRuntime}`) fails a hosted install before it starts. No job of
-  the dependency fetch runs an extension's `preBuild` hook.
+  hook, a task or a path extension's runtime has started, the CLI gives the
+  credential to no new process: a fetch job, a cache provider or a credential
+  provider that would receive it later fails the run with an error that
+  names both. With the flag, the store extensions' dependency fetch runs
+  first, then the remote cache provider starts, then the path extensions'
+  `workspace-fetch`, then the install hooks, the installers, the `before`
+  hooks and the tasks. Only the store extensions' dependency fetch receives
+  the job credential. It starts no path extension's runtime. A path
+  extension's `workspace-fetch`, and a `workspace-fetch` that a plan or an
+  alias selects, run offline, like any other task. In the store extensions'
+  dependency fetch, a `workspace-fetch` task that is not its extension's own
+  runtime (`{extensionRuntime}`) fails a hosted install before it starts, and
+  no job runs an extension's `preBuild` hook.
 - **A credential holder is a native executable.** With the flag, a cache
   provider or a credential-provider starts only as its extension's native
   runtime: its task command is `{extensionRuntime}`, and the runtime

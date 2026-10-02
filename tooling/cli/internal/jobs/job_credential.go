@@ -14,6 +14,7 @@ import (
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	registryproto "go.putnami.dev/protocol/registry"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -69,6 +70,77 @@ func dependencyFetch(ctx context.Context) bool {
 	return marked
 }
 
+// pathExtensionFetchKey marks the context of a hosted install's path-extension
+// fetch (WithPathExtensionFetch).
+type pathExtensionFetchKey struct{}
+
+// WithPathExtensionFetch marks ctx as the path-extension fetch of a hosted
+// install: the run of the workspace-fetch of every extension that is not
+// installed from the artifact store, the workspace's own path extensions. The
+// install starts it after the dependency fetch (WithDependencyFetch) and the
+// start of the remote cache provider, and before its hooks and installers. Its
+// jobs receive no credential and run offline, like every job outside the
+// dependency fetch.
+func WithPathExtensionFetch(ctx context.Context) context.Context {
+	return context.WithValue(ctx, pathExtensionFetchKey{}, true)
+}
+
+// pathExtensionFetch reports whether ctx is marked by WithPathExtensionFetch.
+func pathExtensionFetch(ctx context.Context) bool {
+	marked, _ := ctx.Value(pathExtensionFetchKey{}).(bool)
+	return marked
+}
+
+// HostedFetchStep names the step of a hosted install's dependency fetch that
+// ctx belongs to: "dependency fetch" (WithDependencyFetch), "path-extension
+// fetch" (WithPathExtensionFetch), or "" for any other run.
+func HostedFetchStep(ctx context.Context) string {
+	switch {
+	case dependencyFetch(ctx):
+		return "dependency fetch"
+	case pathExtensionFetch(ctx):
+		return "path-extension fetch"
+	}
+	return ""
+}
+
+// CredentialedFetchView returns discovered as the dependency fetch of a hosted
+// install (WithDependencyFetch) sees it: with only the extensions installed
+// from the artifact store (extension.InArtifactStore). The run then prepares
+// no runtime, probes no workspace adapter and plans no job of a path extension
+// while it hands out the job credential. Any other run gets discovered.
+func CredentialedFetchView(ctx context.Context, workspaceRoot string, discovered *extension.DiscoveryResult) *extension.DiscoveryResult {
+	if discovered == nil || !dependencyFetch(ctx) {
+		return discovered
+	}
+	view := *discovered
+	view.Extensions = make([]*extension.ExtensionDescription, 0, len(discovered.Extensions))
+	for _, ext := range discovered.Extensions {
+		if extension.InArtifactStore(workspaceRoot, ext) {
+			view.Extensions = append(view.Extensions, ext)
+		}
+	}
+	return &view
+}
+
+// PathExtensionFetchPlan returns the extensions the path-extension fetch of a
+// hosted install (WithPathExtensionFetch) plans: every one not installed from
+// the artifact store, whose workspace-fetch the dependency fetch did not run.
+// The run still discovers every extension, so the workspace probe binds every
+// adapter. Any other run plans extensions.
+func PathExtensionFetchPlan(ctx context.Context, workspaceRoot string, extensions []*extension.ExtensionDescription) []*extension.ExtensionDescription {
+	if !pathExtensionFetch(ctx) {
+		return extensions
+	}
+	plan := make([]*extension.ExtensionDescription, 0, len(extensions))
+	for _, ext := range extensions {
+		if !extension.InArtifactStore(workspaceRoot, ext) {
+			plan = append(plan, ext)
+		}
+	}
+	return plan
+}
+
 // fetchesDependencies reports whether job belongs to
 // extensionproto.WorkspaceFetchCommand, the one command a hosted run lets
 // download the workspace's dependencies.
@@ -80,8 +152,8 @@ func fetchesDependencies(job *ScheduledJob) bool {
 // receivesJobCredential reports whether job receives the read credential on a
 // hosted run: a fetch job whose command is its extension's own runtime,
 // extensionRuntime, and whose extension is not a local source. A fetch that
-// any other program runs receives nothing. A hosted run discovers no local
-// extension (extension.InArtifactStore); the check here holds without it.
+// any other program runs receives nothing. The dependency fetch plans no path
+// extension (CredentialedFetchView); the check here holds without it.
 func receivesJobCredential(job *ScheduledJob, extensionRuntime string) bool {
 	return fetchesDependencies(job) && extensionRuntime != "" &&
 		job.Extension != nil && !job.Extension.LocalSource &&
