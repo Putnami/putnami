@@ -5,10 +5,8 @@ Structured logging for the Putnami Go framework. The `go.putnami.dev/logger` mod
 ## Installation
 
 ```bash
-go get go.putnami.dev/logger@<version>
+go get go.putnami.dev/logger
 ```
-
-Name the version: without one, `go get` fails today for a reader without access to `go.putnami.dev`. Use the version your module requires for `go.putnami.dev/app`, or the one `https://proxy.golang.org/go.putnami.dev/logger/@latest` names.
 
 ## Creating a Logger
 

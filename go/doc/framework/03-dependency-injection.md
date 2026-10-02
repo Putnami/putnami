@@ -382,7 +382,7 @@ The container validates the entire dependency graph during `Start()`:
 
 - **Missing dependencies** — all declared deps must be registered
 - **Circular dependencies** — detected via DFS-based graph analysis
-- **Scope violations** — singleton depending on scoped (use scope proxies)
+- **Scope violations** — singleton depending on scoped (see [Scoped access from a singleton](#scoped-access-from-a-singleton))
 - **Requirement validation** — mounted modules' requirements must be satisfied
 
 ```go
@@ -399,7 +399,7 @@ err := cc.Start()
 |------|-------------|
 | `inject.not_registered` | Token not found in container or parents |
 | `inject.circular_dependency` | Circular dependency detected |
-| `inject.scope_violation` | Singleton depends on scoped without proxy |
+| `inject.scope_violation` | Singleton depends on scoped |
 | `inject.container_closed` | Operation on a closed container |
 | `inject.duplicate_provider` | Token already registered |
 | `inject.requirement_not_met` | Module requirement not satisfied |

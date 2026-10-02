@@ -62,22 +62,41 @@ The generic `Repository[T]` provides typed CRUD operations for a database table:
 
 ### Defining a repository
 
+Every repository method selects `*`, so the scan function receives every column
+of the table, in the order the table declares them. Scan one destination per
+column. The examples on this page use this table:
+
+```sql
+CREATE TABLE users (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    email      TEXT NOT NULL,
+    age        INT NOT NULL,
+    active     BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
 ```go
 import (
+    "time"
+
     "github.com/jackc/pgx/v5"
     "go.putnami.dev/database"
 )
 
 type User struct {
-    ID    string
-    Name  string
-    Email string
-    Age   int
+    ID        string
+    Name      string
+    Email     string
+    Age       int
+    Active    bool
+    CreatedAt time.Time
 }
 
 func scanUser(row pgx.Row) (User, error) {
     var u User
-    err := row.Scan(&u.ID, &u.Name, &u.Email, &u.Age)
+    err := row.Scan(&u.ID, &u.Name, &u.Email, &u.Age, &u.Active, &u.CreatedAt)
     return u, err
 }
 
@@ -138,8 +157,7 @@ func (r *UserRepository) FindActive(ctx context.Context) ([]User, error) {
 }
 
 func (r *UserRepository) Create(ctx context.Context, user User) error {
-    q := r.Pool().Querier(ctx)
-    _, err := q.Exec(ctx,
+    _, err := r.Pool().Exec(ctx,
         "INSERT INTO users (id, name, email, age) VALUES ($1, $2, $3, $4)",
         user.ID, user.Name, user.Email, user.Age,
     )
@@ -182,9 +200,42 @@ err := database.WithTx(ctx, pool, func(ctx context.Context) error {
 Nested reuse applies only to the same pool. A transaction from another pool is
 not silently reused; multi-datasource work has no two-phase-commit guarantee.
 
+### Request-scoped unit of work
+
+Set `UnitOfWork` on the plugin to make every HTTP request transactional without
+calling `WithTx`:
+
+```go
+a.Use(database.NewPlugin(database.PluginConfig{
+    Datasource: "default",
+    UnitOfWork: true,
+}))
+```
+
+Within a request, the first query on a pool begins that pool's transaction, and
+later queries on the same pool join it. A request that sends no query opens no
+transaction. The request boundary commits or rolls back by outcome, as the
+[HTTP guide](/docs/frameworks/go/http) lists. To roll back a request that still
+returns a success response, mark its unit of work:
+
+```go
+uow, err := inject.Resolve[*database.UnitOfWork](ctx, inject.TokenOf[*database.UnitOfWork]())
+if err != nil {
+    return err
+}
+uow.SetRollbackOnly()
+```
+
+A `WithTx` inside the request joins the unit's transaction and leaves the commit
+to the boundary. A unit that spans several pools commits them one after the
+other, not atomically. `UnitOfWorkTimeout` bounds each commit and rollback.
+
 ### Transaction context
 
-The pool's `Querier` method automatically detects transactions from the context:
+`Exec`, `Query` and `QueryRow` on the pool, and every repository method, join
+the active `WithTx` transaction or the request's unit of work. The pool's
+`Querier` method detects only a `WithTx` transaction: inside a unit of work, it
+returns the pool and its queries autocommit.
 
 ```go
 // Outside a transaction: uses pool connection
@@ -201,7 +252,7 @@ database.WithTx(ctx, pool, func(ctx context.Context) error {
 You can also check for an active transaction:
 
 ```go
-tx := database.TxFromContext(ctx)
+tx := database.TxFromContext(ctx, pool) // the WithTx transaction on this pool
 if tx != nil {
     // inside a transaction
 }
@@ -209,7 +260,9 @@ if tx != nil {
 
 ## Query builder
 
-A lightweight builder for common SQL patterns:
+A lightweight builder for common SQL patterns. `Build` quotes the table and the
+columns you name, never a condition. Number the placeholders of each `Where`, `Set` or `Having` call from
+`$1`: the builder shifts them past the arguments earlier calls added.
 
 ### SELECT
 
@@ -219,13 +272,13 @@ import "go.putnami.dev/database"
 query, args := database.Select("users").
     Columns("id", "name", "email").
     Where("age > $1", 18).
-    Where("active = $2", true).
+    Where("active = $1", true).
     OrderBy("name ASC").
     Limit(10).
     Offset(20).
     Build()
 
-// query: "SELECT id, name, email FROM users WHERE age > $1 AND active = $2 ORDER BY name ASC LIMIT 10 OFFSET 20"
+// query: SELECT "id", "name", "email" FROM "users" WHERE age > $1 AND active = $2 ORDER BY "name" ASC LIMIT 10 OFFSET 20
 // args: [18, true]
 ```
 
@@ -237,6 +290,8 @@ query, args := database.Insert("users").
     Values("user-123", "Jane", "jane@example.com").
     Returning("id", "created_at").
     Build()
+
+// query: INSERT INTO "users" ("id", "name", "email") VALUES ($1, $2, $3) RETURNING "id", "created_at"
 ```
 
 ### UPDATE
@@ -244,9 +299,11 @@ query, args := database.Insert("users").
 ```go
 query, args := database.Update("users").
     Set("name = $1", "Jane Doe").
-    Set("updated_at = $2", time.Now()).
-    Where("id = $3", "user-123").
+    Set("updated_at = $1", time.Now()).
+    Where("id = $1", "user-123").
     Build()
+
+// query: UPDATE "users" SET name = $1, updated_at = $2 WHERE id = $3
 ```
 
 ### DELETE
@@ -256,6 +313,8 @@ query, args := database.Delete("users").
     Where("active = $1", false).
     Returning("id").
     Build()
+
+// query: DELETE FROM "users" WHERE active = $1 RETURNING "id"
 ```
 
 ## Migrations

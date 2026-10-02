@@ -147,7 +147,10 @@ high := config.NewMapSource("high", 90, map[string]any{
     "server": map[string]any{"host": "high-priority"},
 })
 
-cfg, _ := config.Load(ServerConfig, low, high)
+cfg, err := config.Load(ServerConfig, low, high)
+if err != nil {
+    log.Fatal(err)
+}
 // cfg.Host == "high-priority"
 ```
 
@@ -169,7 +172,10 @@ source := config.NewMapSource("app", 50, map[string]any{
     },
 })
 
-cfg, _ := config.Load(APIServer, source)
+cfg, err := config.Load(APIServer, source)
+if err != nil {
+    log.Fatal(err)
+}
 // cfg.Host == "api.example.com"
 ```
 

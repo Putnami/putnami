@@ -103,7 +103,11 @@ func buildTaskFeature(server *http.ServerPlugin, broker events.Transport) *app.M
 func main() {
 	// Configuration: loaded from environment with sensible defaults.
 	serverCfg := config.Config[http.ServerConfig]("server")
-	cfg, _ := config.Load(serverCfg, config.NewEnvSource("TASK"))
+	cfg, err := config.Load(serverCfg, config.NewEnvSource("TASK"))
+	if err != nil {
+		logger.New("main", logger.LevelError).Error("configuration failed", err)
+		os.Exit(1)
+	}
 
 	// Infrastructure: event broker for async messaging.
 	broker := events.NewMemoryBroker()

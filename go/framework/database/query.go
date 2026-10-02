@@ -102,10 +102,10 @@ func (q *QueryBuilder) Values(vals ...any) *QueryBuilder {
 	return q
 }
 
-// Set adds a SET clause for UPDATE. The expression should use positional params ($N).
-// Args are appended to the query's argument list.
+// Set adds a SET clause for UPDATE. Positional parameters ($1, $2, ...) are
+// rewritten to account for previously added arguments, like Where.
 //
-//	q.Set("name = $1", "Alice").Set("age = $2", 30)
+//	q.Set("name = $1", "Alice").Set("age = $1", 30)
 func (q *QueryBuilder) Set(expr string, args ...any) *QueryBuilder {
 	// Rewrite positional params to account for existing args
 	offset := len(q.args)

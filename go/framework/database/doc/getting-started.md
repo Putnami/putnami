@@ -164,7 +164,7 @@ type Querier interface {
 }
 ```
 
-Use `pool.Querier(ctx)` to get the appropriate querier for the current context -- it returns the active transaction if one exists, or the pool otherwise.
+Use `pool.Querier(ctx)` to get the appropriate querier for the current context -- it returns the active `WithTx` transaction on this pool if one exists, or the pool otherwise. It does not join a request-scoped unit of work; `pool.Exec`, `pool.Query` and `pool.QueryRow` do.
 
 ## Repositories
 
@@ -722,4 +722,4 @@ if err != nil {
 
 7. **Configure pool sizing for your workload.** The defaults (10 max, 2 min) work for small services. For high-throughput services, increase `MaxConns` and monitor with `pool.Stats()`.
 
-8. **Use `pool.Querier(ctx)` in shared code.** This returns the active transaction if one exists, or the pool otherwise, making your code transparent to transaction boundaries.
+8. **Query through the pool in shared code.** `pool.Exec`, `pool.Query` and `pool.QueryRow` join the active `WithTx` transaction or the request's unit of work, making your code transparent to transaction boundaries. `pool.Querier(ctx)` sees only a `WithTx` transaction.
