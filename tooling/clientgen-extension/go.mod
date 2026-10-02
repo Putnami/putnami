@@ -24,6 +24,7 @@ require (
 	go.putnami.dev/protocol/cli v0.0.0 // indirect
 	go.putnami.dev/protocol/config v0.0.0 // indirect
 	go.putnami.dev/protocol/database v0.0.0 // indirect
+	go.putnami.dev/protocol/distribution v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
 	go.putnami.dev/protocol/http-routes v0.0.0 // indirect
 	go.putnami.dev/protocol/identity v0.0.0 // indirect
@@ -56,6 +57,7 @@ replace (
 	go.putnami.dev/protocol/events => ../../protocols/events
 	go.putnami.dev/protocol/extension => ../../protocols/extension
 	go.putnami.dev/protocol/features => ../../protocols/features
+	go.putnami.dev/protocol/gomod => ../../protocols/gomod
 	go.putnami.dev/protocol/http-routes => ../../protocols/http-routes
 	go.putnami.dev/protocol/identity => ../../protocols/identity
 	go.putnami.dev/protocol/infra => ../../protocols/infra

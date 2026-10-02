@@ -116,6 +116,13 @@ dry-run. This exception does not grant a manifest job or hook the bearer and
 does not reintroduce it into the parent process environment. Token-only local
 publish/upgrade jobs outside this reserved child keep their ambient compatibility.
 
+When the credential provider negotiates `publication-v1`, the coordinator
+starts no nested CLI. The provider resolves, opens and releases over its own
+session, each publication job packs into an outbox with no registry or cloud
+credential, and the engine uploads with the `publish` credential the provider
+issues
+([CLI ADR 0057](../../../tooling/cli/doc/adr/0057-publication-authority-stays-in-the-engine.md)).
+
 The trusted runner must separately set `PUTNAMI_CLOUD_CAPABILITY_AFTER` to a
 comma-separated command list. The production release runner uses
 `lint,test,build,validate,validate-workspace`. This is runner-image control

@@ -76,11 +76,47 @@ creates an **immutable** channel named after the tag in the portable encoding
 every later move, so a tag names one snapshot forever. A dirty tree is refused,
 and `--scope <line>` names the line when HEAD carries several tags.
 
+## Keep the publish credential out of your jobs
+
+When your credential provider supports `publication-v1`, turn on its `publish`
+purpose and the whole publication runs through that provider:
+
+```bash
+putnami publish --impacted --channel canary --providers publish
+```
+
+1. Putnami resolves the channels through the provider and plans the set.
+2. Your tests and builds run. When every task that does not publish has
+   succeeded, Putnami opens the plan with the provider, once.
+3. Each publication job packs its members into a private outbox. It receives no
+   registry credential, so no script or tool it starts can read one or upload.
+4. Putnami hashes every packed file again, checks each member against the
+   plan, and uploads the npm tarball, the Go module zip or the OCI image itself,
+   with the publish credential the provider issues after the open.
+5. Putnami releases the set over the same session: the opened plan, the heads it
+   moves from, and the digests it uploaded.
+
+Channels only move forward. Opening the plan states, for each channel, the
+commit its head was published from and whether that commit is an ancestor of
+yours. The provider refuses a head that is not (`not_forward`), and nothing is
+uploaded. It refuses a release whose artifacts the registries do not store
+(`artifact_missing`). Each refusal names its code and moves no channel.
+
+A publication job served from a cache packed nothing in this run, so the
+release refuses the run and names the job. The publication tasks of the
+TypeScript and Go extensions never cache their result; a publication task you
+declare yourself must not cache either.
+
+The plan names the commit, its members and the channel heads, and nothing of
+the machine that runs it, so a run on your machine and a hosted run of the same
+commit open the same plan and release the same set.
+
 ## Treat failure as no publication
 
 Sparse release-set publication fails closed when any of these is not proven:
 
-- one release-set provider is available;
+- one release-set provider, or a credential provider that supports
+  `publication-v1`, is available;
 - every listed channel resolves to a valid answer for the workspace;
 - the impact selection contains every downstream that must be repackaged;
 - every selected artifact is uploaded and verified by its SHA-256 digest;

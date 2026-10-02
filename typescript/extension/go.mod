@@ -69,3 +69,5 @@ replace go.putnami.dev/protocol/workspace => ../../protocols/workspace
 replace go.putnami.dev/protocol/features => ../../protocols/features
 
 replace go.putnami.dev/protocol/architecture => ../../protocols/architecture
+
+replace go.putnami.dev/protocol/gomod => ../../protocols/gomod

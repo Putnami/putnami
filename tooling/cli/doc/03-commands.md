@@ -143,6 +143,8 @@ Members are keyed by `(ecosystem, coordinate)`, not by project: one project yiel
 
 The channels are resolved exactly once and never again. The run's `data.releaseSet` outcome carries the exact `{id, digest}` and the head each channel now points at, with its generation. A compare-and-swap conflict on **any** channel writes nothing on any of them: the publication fails naming every head whose observed ref differs from the expectation, and re-running the publish plans against the current heads. A plan that selects nothing still releases: the provider answers `already-current` and the outcome names the unchanged heads.
 
+A credential provider that negotiates `publication-v1` takes the release-set provider's place: it resolves and releases over its session, and the engine uploads every npm, Go module and OCI member; see [`--providers`](#credential-provider---providers).
+
 Without a release-set provider, `putnami publish --all` still publishes every member to the registries the workspace declares, with git-derived versions. `--channel` is refused, and `distribution` and `envs` in `putnami.ci.json` fail `putnami ci validate`.
 
 ### Promote and roll back: `channel set`, `channel status`
@@ -1234,7 +1236,7 @@ PUTNAMI_PROVIDERS=install putnami build --projects my-app
 | Value | Credential | Used by |
 |---|---|---|
 | `install` | `read` | the CLI's archive downloads: extensions, templates, agent workflows, the CLI binary |
-| `publish` | `publish` | reserved for in-process publication; no consumer uses it yet |
+| `publish` | `publish` | the engine's uploads in a release-set publish, when the provider negotiates `publication-v1` |
 
 The choice holds for one process. The CLI removes `PUTNAMI_PROVIDERS` from the
 environment of the tasks, hooks and extension commands it starts, so a nested
@@ -1249,7 +1251,36 @@ The credential provider is the one installed extension that declares the
 [ADR 0002](../../../protocols/registry/doc/adr/0002-one-credential-call-per-purpose.md)).
 The CLI starts it on the first download that needs a credential and asks it
 once per credential for the whole process, again only when the credential
-nears its expiry.
+nears its expiry. When `publish` is on, the CLI starts it before the first
+hook instead, locally as on a hosted run, so the publish credential comes from
+a provider that started before any repository code.
+
+When the provider also echoes the `publication-v1` capability, a release-set
+publish runs through that one session
+([ADR 0057](adr/0057-publication-authority-stays-in-the-engine.md)):
+
+1. The provider resolves the channels. No release-set provider process starts.
+2. The engine opens the plan once, after every task that neither publishes nor
+   depends on a task that publishes has succeeded. A bound request opens after
+   its barrier commands.
+3. Each publication job packs its members into a private outbox that
+   `PUTNAMI_PUBLICATION_OUTBOX` names, and receives no registry or cloud
+   credential. A publication job whose result is reused from a cache, or
+   shared with another run, packed nothing in this run, so the release refuses
+   the run and names the job.
+4. The engine hashes every packed file again, refuses a member the plan does
+   not assign to that job, and uploads each npm, Go module and OCI member
+   itself with the `publish` credential. Each upload node reports one
+   `published-member` event in the session.
+5. The engine releases the set over the same session. A refusal names its code
+   and moves no channel.
+
+The plan names the commit, its members and the channel heads, and nothing of
+the run that opens it, so a local run and a hosted run of one commit open the
+same plan and release the same set.
+
+Without the echo, the release set publishes through its release-set provider,
+unchanged.
 
 - **No provider.** When no installed extension declares the command, the flag
   changes nothing: every download uses the host-keyed credential
@@ -1280,7 +1311,9 @@ through the SDK's `registrycred` helpers gets none.
 A `--where remote` run carries the list in the execution request only when the
 runner provider echoes the `invocation-providers-v1` capability at initialize;
 the executing engine then enables exactly those purposes and ignores its own
-`PUTNAMI_PROVIDERS`. When the runner provider does not echo the capability,
+`PUTNAMI_PROVIDERS`. The one exception is `publish`: a request without
+`invocation.publication` plans no publication, so the executing engine leaves
+`publish` off and says so on stderr. When the runner provider does not echo the capability,
 the CLI refuses the run with a usage error that names it, before anything is
 submitted.
 

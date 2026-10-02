@@ -1993,7 +1993,7 @@
             "root": "command-output",
             "path": "docker/published-image.json",
             "optionalEmpty": true,
-            "description": "Publish-owned verified remote image record. Present only after registry digest verification; package never writes or rewrites it."
+            "description": "Publish-owned verified remote image record. Present only after registry digest verification: this task writes it when it pushes the image, and the engine writes it when this task packs the image into a publication outbox. Package never writes or rewrites it."
           }
         },
         "effects": [

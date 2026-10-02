@@ -148,6 +148,10 @@
       "text": "Every Go module publication, new or reused, reports one published member with the digest the registry served back, and writes no dist tag."
     },
     {
+      "id": "managed-publication-packs-only",
+      "text": "When the engine names a publication outbox, a Go module publication without an explicit registry token and a Docker image for the managed registry are packed into it with a descriptor that names their bytes, and the job resolves no credential, sends no registry request, runs no post-publication download, writes nothing else outside its build outputs and reports no published member. A publication with an explicit token or to any other registry ignores the outbox, and without one, publication is unchanged."
+    },
+    {
       "id": "dry-run-registry-probe",
       "text": "A dry-run Go module publication asks the registry, with one GET of the proxy zip, whether it serves the module at the version to publish, and emits one member-probe event. Without a release-set plan a served version is a conflict: the real publish fails if the registry released it. Under a plan it is identical, naming the zip, when the served zip equals the zip an earlier package staged, a conflict when it differs, and a conflict naming the remedy when none is staged. An unreadable staged zip is unverified."
     },
@@ -201,6 +205,7 @@
     "go/extension/doc/adr/0008-coverage-scope-decides-whose-tests-count.md",
     "go/extension/doc/adr/0009-coverage-names-the-packages-a-module-owns.md",
     "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
+    "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
     "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",
     "protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md"
   ]

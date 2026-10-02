@@ -215,6 +215,22 @@
           }
         },
         {
+          "id": "managed-publication-packs-only",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-managed-route-packs-into-the-outbox-and-uploads-nothing",
+              "a-native-route-ignores-the-outbox",
+              "the-job-writes-nothing-outside-the-outbox",
+              "without-the-outbox-publication-is-unchanged"
+            ]
+          }
+        },
+        {
           "id": "merged-config-survives-a-cache-hit",
           "stage": "coded",
           "evidenceKinds": [

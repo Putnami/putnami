@@ -232,6 +232,28 @@ a nested `putnami` run that a job starts describes its own checkout.
 `putnami version tag` refuses to run while `PUTNAMI_SOURCE_REVISION` names a
 commit other than `HEAD`: the tag it creates names the checked-out commit.
 
+A run that may publish also reads that commit's ancestry when the process
+starts, before the first-use bootstrap, an install or the first hook runs
+repository code: a run that names `publish` or `deploy`, or a bound execution
+request that carries `invocation.publication`. The engine run reuses that
+snapshot. The ancestry is every commit that
+`PUTNAMI_SOURCE_REVISION`, else `HEAD`, reaches through the parents its commit
+objects record; replace refs, grafts and the commit-graph file are ignored. The
+run holds it in memory, so a hook or a task that later moves a ref or adds a
+replace ref changes none of its answers. The run records whether the clone is
+shallow, where older ancestors are missing. A history above 1,000,000 commits
+is not read, and the ancestry then contains no commit. Every other run reads
+none.
+
+A release-set publish through a credential provider that negotiates
+`publication-v1` states that ancestry when it opens its plan: for each channel
+it advances, the head's source revision and whether the snapshot holds it. The
+provider refuses a head the snapshot does not hold (`not_forward`), so a
+channel moves only to a descendant of its head, and nothing is uploaded. A
+snapshot that is missing, failed, shallow or bound to another commit fails the
+publish before any job runs. The ancestry depends only on the commit, so a
+local run and a hosted run of one commit state the same ancestry.
+
 ### Channel semantics
 
 | Channel | Resolves to |

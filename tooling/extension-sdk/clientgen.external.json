@@ -2,6 +2,72 @@
   "protocolVersion": 2,
   "contracts": [
     {
+      "authority": "Go module proxy protocol (go.dev/ref/mod#goproxy-protocol) and the Putnami module registry publish routes it extends",
+      "adapter": "tooling/extension-sdk/gomodpublish/gomodpublish.go",
+      "callsites": [
+        {
+          "path": "tooling/extension-sdk/gomodpublish/gomodpublish.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "62efef67fbf5b532305665e19efd5c700447e0433ff224f9b01bbce87c3bd505"
+        },
+        {
+          "path": "tooling/extension-sdk/gomodpublish/gomodpublish.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "422f6778f03bda12c21068553f37d287002794c6fb9478e523cdcdd77ebec7d9"
+        },
+        {
+          "path": "tooling/extension-sdk/gomodpublish/gomodpublish.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "86487116af163c2ad529de51fc6a6b4b65f6ff30ab45613137e4fdc4d8b7270d"
+        },
+        {
+          "path": "tooling/extension-sdk/gomodpublish/gomodpublish.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "d2ce3b3c74bdceff75e98fec1717e4a294d113ed97d9c9efbe15b7b6664e75f0"
+        }
+      ],
+      "owner": "putnami-extension-sdk",
+      "tests": [
+        "tooling/extension-sdk/gomodpublish/gomodpublish_test.go",
+        "tooling/extension-sdk/uploaders_test.go"
+      ],
+      "reason": "Uploads a module zip and its metadata to a Go module registry over the module proxy protocol, with the bearer it is given sent to that registry only."
+    },
+    {
+      "authority": "npm registry API (github.com/npm/registry/blob/master/docs/REGISTRY-API.md)",
+      "adapter": "tooling/extension-sdk/npmpublish/npmpublish.go",
+      "callsites": [
+        {
+          "path": "tooling/extension-sdk/npmpublish/npmpublish.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "62efef67fbf5b532305665e19efd5c700447e0433ff224f9b01bbce87c3bd505"
+        },
+        {
+          "path": "tooling/extension-sdk/npmpublish/npmpublish.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "aaf66cdd3207836262ef01091ef1afaf4f1ca811a38c7f60f32b9741ba5b04ae"
+        },
+        {
+          "path": "tooling/extension-sdk/npmpublish/npmpublish.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "c2d762c61f66e63e57e12aa9ca226ff373ebacd980ccae3a8ca3cf61119f8c5a"
+        }
+      ],
+      "owner": "putnami-extension-sdk",
+      "tests": [
+        "tooling/extension-sdk/npmpublish/npmpublish_test.go",
+        "tooling/extension-sdk/uploaders_test.go"
+      ],
+      "reason": "Publishes a package tarball and reads it back to verify its digest, with the bearer it is given sent to that registry only."
+    },
+    {
       "authority": "OCI Distribution Specification v1.1 (github.com/opencontainers/distribution-spec)",
       "adapter": "tooling/extension-sdk/oci/tagdigest.go",
       "callsites": [

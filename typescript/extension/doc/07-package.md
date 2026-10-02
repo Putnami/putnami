@@ -206,6 +206,19 @@ Without the variable the path above is unchanged; a remote HTTPS value is
 ignored as Cloud compatibility input; a malformed loopback value fails the job
 before any credential or network call. Unmanaged publication never reads it.
 
+When the engine names a publication outbox in `PUTNAMI_PUBLICATION_OUTBOX`, a
+managed publication packs instead of uploading. It runs the same local
+`bun pm pack`, copies the tarball and the staged `package.json` into the outbox,
+and writes `outbox.json`, which names the package, the planned version, the
+owning project, the digest and size of each file, and the managed registry
+the job resolved, as described below. The job asks for no credential, consults
+no broker, sends no registry request and reports no published member: the
+engine uploads the bytes it verifies to that registry and reports the member.
+The engine refuses the member when the project's `registries.npm.publish`
+names another registry, so a `--registry` that contradicts the declaration
+fails instead of publishing. Unmanaged publication ignores the outbox and runs `npm` as described
+below. A dry run packs nothing.
+
 The staged npm tree is mode-canonical before packing: directories and ordinary
 files use `0755` and `0644`, while `package.json` `bin` targets and build
 outputs that start with a `#!` line use `0755`. Which files are executable
@@ -306,6 +319,14 @@ package bytes. It tags the image with its version and nothing
 else — channel tags are written by the release projection, not by the
 publisher — and the deployer injects the release id as
 `PUTNAMI_VERSION` / `PUTNAMI_REVISION` environment.
+
+When the engine names a publication outbox in `PUTNAMI_PUBLICATION_OUTBOX` and
+the target is `oci.putnami.dev`, publish packs instead: it copies the OCI
+layout into the outbox and writes `outbox.json` with the repository, the
+expected manifest digest and the version tag. It asks for no credential, sends
+no registry request and writes neither `published-image.json` nor
+`.gen/version.json`; the engine pushes the layout and writes
+`published-image.json`. Any other registry ignores the outbox.
 
 The content stamp lands at `/app/.gen/version.json`, where `getBuildInfo()`
 from `@putnami/utils` reads it at runtime and overlays the deploy-injected

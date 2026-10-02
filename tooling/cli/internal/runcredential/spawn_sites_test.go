@@ -159,7 +159,7 @@ var spawnSites = map[string]spawnSite{
 	"git/candidate.go:CandidatePaths": {spawns: 1, verdict: noRepositoryCode,
 		why: "git ls-files"},
 	"git/git.go:runCaptureEnv": {spawns: 1, verdict: noRepositoryCode,
-		why: "read verbs only: show, rev-parse, status, diff, merge-base, config --get, for-each-ref, ls-files, symbolic-ref"},
+		why: "read verbs only: show, rev-parse, rev-list, status, diff, merge-base, config --get, for-each-ref, ls-files, symbolic-ref"},
 	"githooks/install.go:Install": {spawns: 1, verdict: noRepositoryCode,
 		why: "git rev-parse"},
 	"jobs/environment.go:hostCPUModel": {spawns: 1, verdict: noRepositoryCode,
@@ -616,7 +616,11 @@ func scanSpawnSites(t *testing.T, root string) (map[string][]token.Pos, map[stri
 // itself or returns what starts one:
 //   - registrycred starts `putnami cloud registry-token`;
 //   - a releaseset client starts `putnami cloud release-set`;
-//   - a dbtestenv provider or job starts docker.
+//   - a dbtestenv provider or job starts docker;
+//   - the SDK's exec.Run starts the command it names;
+//   - the oci daemon helpers start docker: the export saves a daemon image,
+//     and a content push without a layout tags and pushes one. The CLI
+//     uploads a packed layout with oci.PushLayout, which starts nothing.
 //
 // TestEveryDependencySpawnHelperIsInventoried keeps the SDK entries complete.
 var spawnCalls = map[string]map[string]bool{
@@ -630,6 +634,10 @@ var spawnCalls = map[string]map[string]bool{
 	"go.putnami.dev/sdk/extension/releaseset": {"NewClient": true},
 	"go.putnami.dev/sdk/extension/dbtestenv": {
 		"SelectProvider": true, "NewProvisioner": true, "UpJob": true, "DownJob": true,
+	},
+	"go.putnami.dev/sdk/extension/exec": {"Run": true},
+	"go.putnami.dev/sdk/extension/oci": {
+		"ExportDaemonImageToLayout": true, "PushContent": true, "PushContentWithDigest": true,
 	},
 }
 

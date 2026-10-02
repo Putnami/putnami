@@ -83,6 +83,11 @@ func HandoffReleaseSetPlan(ctx context.Context, run *ReleaseSetRun, planned []*S
 	if capabilities == nil || capabilities.planCallback == "" || !executes || run == nil || run.dryRun {
 		return nil
 	}
+	// A publication-v1 run opens its plan with its own provider, after the
+	// barrier, and arms no loopback broker.
+	if run.Publication() {
+		return nil
+	}
 	// The finalizer's release is itself a cloud side effect, and a plan that
 	// selects nothing plans no publish job at all: it still needs the broker
 	// armed, or the head-confirming release is refused as an unarmed write.

@@ -90,3 +90,47 @@ func TestConformance_CredentialProvider(t *testing.T) {
 		t.Error("ValidPurpose drifted from the two purposes")
 	}
 }
+
+// TestConformance_PublicationProvider pins the publication-v1 tokens and
+// bounds: the capability, the ops, the refusal codes, the plan version and
+// the line bounds. The engine and every provider that echoes publication-v1
+// depend on them.
+func TestConformance_PublicationProvider(t *testing.T) {
+	if CapabilityPublicationV1 != "publication-v1" {
+		t.Errorf("CapabilityPublicationV1 = %q, want publication-v1", CapabilityPublicationV1)
+	}
+	if CredentialOpResolve != "resolve" || CredentialOpOpen != "open" || CredentialOpRelease != "release" {
+		t.Error("publication-v1 op names changed")
+	}
+	for _, op := range []CredentialOp{CredentialOpResolve, CredentialOpOpen, CredentialOpRelease} {
+		if op.Capability() != CapabilityPublicationV1 || op.MaxLineBytes() != 8<<20 {
+			t.Errorf("%s: capability %q, line bound %d; want publication-v1, 8 MiB", op, op.Capability(), op.MaxLineBytes())
+		}
+	}
+	for _, op := range []CredentialOp{CredentialOpInitialize, CredentialOpCredential, CredentialOpShutdown} {
+		if op.Capability() != CapabilityCredentialV1 || op.MaxLineBytes() != 64<<10 {
+			t.Errorf("%s: capability %q, line bound %d; want credential-v1, 64 KiB", op, op.Capability(), op.MaxLineBytes())
+		}
+	}
+	if unknown := CredentialOp("token"); unknown.Valid() || unknown.Capability() != "" || unknown.MaxLineBytes() != 0 || unknown.Allowed([]string{CapabilityCredentialV1, CapabilityPublicationV1}) {
+		t.Error("an unknown op is valid, defined by a capability, bounded or allowed")
+	}
+	if maxCredentialDepth != 5 || maxPublicationDepth != 12 {
+		t.Errorf("nesting bounds = %d, %d; want 5, 12", maxCredentialDepth, maxPublicationDepth)
+	}
+	want := []string{"plan_not_open", "plan_already_open", "plan_mismatch", "artifact_missing", "artifact_digest_mismatch", "not_forward", "conflict", "channel_immutable", "namespace_forbidden"}
+	if len(PublicationRefusalCodes) != len(want) {
+		t.Fatalf("PublicationRefusalCodes = %v, want %v", PublicationRefusalCodes, want)
+	}
+	for index, code := range want {
+		if PublicationRefusalCodes[index] != code {
+			t.Errorf("PublicationRefusalCodes[%d] = %q, want %q", index, PublicationRefusalCodes[index], code)
+		}
+		if err := ValidateRefusal(CredentialRefusal{Code: code}); err != nil {
+			t.Errorf("refusal code %q: %v", code, err)
+		}
+	}
+	if PublicationPlanProtocolVersion != 1 || MaxPublicationPlanBytes != 1<<20 || MaxAncestrySnapshotCommits != 1_000_000 {
+		t.Error("plan version, plan bound or ancestry snapshot bound changed")
+	}
+}

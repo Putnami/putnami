@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/memberprobe"
+	"go.putnami.dev/sdk/extension/npmpublish"
 )
 
 // maxNPMProbeTarballBytes bounds how much of a served tarball a probe hashes.
@@ -123,7 +124,7 @@ func readNPMTarballDigest(subject memberprobe.Subject, endpoint, token string) (
 	case resp.StatusCode == http.StatusNotFound:
 		return verdict(subject.Absent())
 	case resp.StatusCode != http.StatusOK:
-		return verdict(subject.Refused(resp.StatusCode, registryErrorExcerpt(resp.Body, token)))
+		return verdict(subject.Refused(resp.StatusCode, npmpublish.ErrorExcerpt(resp.Body, token)))
 	}
 	hash := sha256.New()
 	read, err := io.Copy(hash, io.LimitReader(resp.Body, maxNPMProbeTarballBytes+1))

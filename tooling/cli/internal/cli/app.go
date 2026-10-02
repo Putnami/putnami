@@ -300,6 +300,11 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return ExitUsage
 	}
+	// A run that may publish reads its bound commit's ancestry now, before the
+	// provider starts and before the bootstrap or an install runs repository
+	// code that could rewrite refs; its engine run reuses that snapshot
+	// (engine.CaptureAncestry).
+	ctx = engine.CaptureAncestry(ctx, wsRoot, parsed.Commands, nil)
 	// Resolve --cpu-policy and --providers, and start the credential provider
 	// for the purposes the invocation enabled. From here on, bootstrap,
 	// installs, extension commands and jobs download through it. Downloads

@@ -12,6 +12,7 @@ package credentialprovider
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -22,8 +23,10 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	distribution "go.putnami.dev/protocol/distribution"
 	registry "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/sdk/extension/proctree"
 )
@@ -58,6 +61,24 @@ func (e *RefusalError) Error() string {
 	return fmt.Sprintf("the credential provider refused the %s credential (%s): %s", e.Purpose, e.Code, e.Message)
 }
 
+// PublicationRefusalError is a provider's refusal of a publication-v1 op:
+// resolve, open or release. Code names the refusal, one of
+// registry.PublicationRefusalCodes or another code the provider defines, and
+// Message is the provider's text, at most registry.MaxRefusalMessageBytes. A
+// refusal is an answer: nothing retries it.
+type PublicationRefusalError struct {
+	Op      registry.CredentialOp
+	Code    string
+	Message string
+}
+
+func (e *PublicationRefusalError) Error() string {
+	if e.Message == "" {
+		return fmt.Sprintf("the credential provider refused %s (%s)", e.Op, e.Code)
+	}
+	return fmt.Sprintf("the credential provider refused %s (%s): %s", e.Op, e.Code, e.Message)
+}
+
 type pendingCall struct {
 	op registry.CredentialOp
 	ch chan *registry.CredentialResponse
@@ -78,18 +99,28 @@ type Session struct {
 	dead    bool
 	deadErr error
 	closing bool
+	// negotiated is what Initialize negotiated: the capabilities offered that
+	// the provider echoed, nil before.
+	negotiated []string
+	// lineLimit bounds one response line: registry.MaxCredentialLineBytes
+	// until the session negotiates publication-v1, then
+	// registry.MaxPublicationLineBytes. Each answer is then held to its own
+	// op's bound when it is parsed.
+	lineLimit atomic.Int64
 
 	waitCh   chan error
 	readDone chan struct{}
 }
 
 func newSession() *Session {
-	return &Session{
+	s := &Session{
 		pending:  make(map[int64]pendingCall),
 		nextID:   1,
 		waitCh:   make(chan error, 1),
 		readDone: make(chan struct{}),
 	}
+	s.lineLimit.Store(registry.MaxCredentialLineBytes)
+	return s
 }
 
 // Connect wires a Session over caller-supplied pipes; tests use it to speak
@@ -154,7 +185,8 @@ func Spawn(ctx context.Context, spec LaunchSpec, stderr io.Writer) (*Session, er
 func (s *Session) readLoop() {
 	defer close(s.readDone)
 	scanner := bufio.NewScanner(s.stdout)
-	scanner.Buffer(make([]byte, 0, 4<<10), registry.MaxCredentialLineBytes)
+	scanner.Buffer(make([]byte, 0, 4<<10), registry.MaxPublicationLineBytes+1)
+	scanner.Split(s.splitLine)
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
@@ -172,6 +204,17 @@ func (s *Session) readLoop() {
 	s.markDead(fmt.Errorf("credential provider session ended: %w", err))
 }
 
+// splitLine is bufio.ScanLines held to the session's current line limit: a
+// line longer than the limit, or unterminated data past it, ends the session.
+func (s *Session) splitLine(data []byte, atEOF bool) (int, []byte, error) {
+	limit := int(s.lineLimit.Load())
+	end := bytes.IndexByte(data, '\n')
+	if end > limit || (end < 0 && len(data) > limit) {
+		return 0, nil, fmt.Errorf("credential provider sent a line longer than %d bytes", limit)
+	}
+	return bufio.ScanLines(data, atEOF)
+}
+
 // deliver routes one response line to the call waiting for it. A line that
 // answers no request this session sent, or that the protocol refuses, ends
 // the session: a provider out of step with its caller is never trusted again.
@@ -185,6 +228,7 @@ func (s *Session) deliver(line []byte) error {
 	s.mu.Lock()
 	call, waiting := s.pending[envelope.ID]
 	issued := envelope.ID > 0 && envelope.ID < s.nextID
+	negotiated := s.negotiated
 	s.mu.Unlock()
 	if !issued {
 		return fmt.Errorf("credential provider answered request %d, which was never sent", envelope.ID)
@@ -193,7 +237,7 @@ func (s *Session) deliver(line []byte) error {
 		// The caller stopped waiting (its context ended); the late answer is dropped.
 		return nil
 	}
-	response, err := registry.ParseCredentialResponse(line, call.op)
+	response, err := registry.ParseNegotiatedCredentialResponse(line, call.op, negotiated)
 	if err != nil {
 		// The call stays pending, so markDead wakes it with the session's error.
 		return fmt.Errorf("credential provider sent an invalid %s response: %w", call.op, err)
@@ -257,6 +301,10 @@ func (s *Session) call(ctx context.Context, op registry.CredentialOp, params any
 		s.mu.Unlock()
 		return nil, err
 	}
+	if !op.Allowed(s.negotiated) {
+		s.mu.Unlock()
+		return nil, fmt.Errorf("credential provider op %s needs %s, which the session did not negotiate", op, op.Capability())
+	}
 	id := s.nextID
 	s.nextID++
 	ch := make(chan *registry.CredentialResponse, 1)
@@ -270,6 +318,9 @@ func (s *Session) call(ctx context.Context, op registry.CredentialOp, params any
 	line, err := json.Marshal(&registry.CredentialRequest{ProtocolVersion: registry.CredentialProtocolVersion, ID: id, Op: op, Payload: payload})
 	if err != nil {
 		return nil, fmt.Errorf("encode %s request: %w", op, err)
+	}
+	if len(line) > op.MaxLineBytes() {
+		return nil, fmt.Errorf("credential provider op %s: the request exceeds %d bytes", op, op.MaxLineBytes())
 	}
 	s.writeMu.Lock()
 	_, err = s.stdin.Write(append(line, '\n'))
@@ -289,8 +340,15 @@ func (s *Session) call(ctx context.Context, op registry.CredentialOp, params any
 	}
 }
 
+// offeredCapabilities is what Initialize offers: credential-v1, which every
+// provider must echo, and publication-v1, which the provider's echo alone
+// decides (registry ADR 0003).
+var offeredCapabilities = []string{registry.CapabilityCredentialV1, registry.CapabilityPublicationV1}
+
 // Initialize negotiates the protocol. A provider that answers with another
 // version or without the credential-v1 capability cannot serve this engine.
+// The session serves publication-v1 exactly when the answer echoes it
+// (Publication).
 //
 // A non-empty runCredential is the hosted run's bearer, handed to the provider
 // in the initialize line and nowhere else. An empty one leaves the line as it
@@ -302,7 +360,7 @@ func (s *Session) Initialize(ctx context.Context, runCredential string) (*regist
 	}
 	response, err := s.call(ctx, registry.CredentialOpInitialize, &registry.CredentialInitializeParams{
 		ProtocolVersion: registry.CredentialProtocolVersion,
-		Capabilities:    []string{registry.CapabilityCredentialV1},
+		Capabilities:    offeredCapabilities,
 		RunCredential:   runCredential,
 	})
 	if err != nil {
@@ -322,10 +380,104 @@ func (s *Session) Initialize(ctx context.Context, runCredential string) (*regist
 	if result.ProtocolVersion != registry.CredentialProtocolVersion {
 		return nil, fmt.Errorf("the credential provider speaks protocol version %d; this CLI requires %d", result.ProtocolVersion, registry.CredentialProtocolVersion)
 	}
-	if !slices.Contains(result.Capabilities, registry.CapabilityCredentialV1) {
+	negotiated := registry.NegotiatedCapabilities(offeredCapabilities, result.Capabilities)
+	if !slices.Contains(negotiated, registry.CapabilityCredentialV1) {
 		return nil, fmt.Errorf("the credential provider does not support %s", registry.CapabilityCredentialV1)
 	}
+	s.mu.Lock()
+	s.negotiated = negotiated
+	s.mu.Unlock()
+	if slices.Contains(negotiated, registry.CapabilityPublicationV1) {
+		s.lineLimit.Store(registry.MaxPublicationLineBytes)
+	}
 	return result, nil
+}
+
+// Publication reports whether the session negotiated publication-v1.
+func (s *Session) Publication() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Contains(s.negotiated, registry.CapabilityPublicationV1)
+}
+
+// Resolve asks for the heads of request's channels. The caller binds the
+// answer to the request (distribution.ValidateResolveExchange).
+func (s *Session) Resolve(ctx context.Context, request *distribution.ResolveRequest) (*distribution.ResolveResponse, error) {
+	if request == nil {
+		return nil, errors.New("credential provider resolve: no request")
+	}
+	result, err := publicationCall(ctx, s, registry.CredentialOpResolve, &registry.ResolveParams{Request: *request},
+		func(payload json.RawMessage) error { _, err := registry.ParseResolveParams(payload); return err },
+		registry.ParseResolveResult)
+	if err != nil {
+		return nil, err
+	}
+	return &result.Response, nil
+}
+
+// Open opens params.Plan in the session. The provider answers the plan's
+// digest; any other digest is an error.
+func (s *Session) Open(ctx context.Context, params *registry.OpenParams) error {
+	if params == nil {
+		return errors.New("credential provider open: no plan")
+	}
+	result, err := publicationCall(ctx, s, registry.CredentialOpOpen, params,
+		func(payload json.RawMessage) error { _, err := registry.ParseOpenParams(payload); return err },
+		registry.ParseOpenResult)
+	if err != nil {
+		return err
+	}
+	if result.PlanDigest != params.Plan.PlanDigest {
+		return fmt.Errorf("the credential provider opened plan %s, not %s", result.PlanDigest, params.Plan.PlanDigest)
+	}
+	return nil
+}
+
+// Release releases the opened plan's set. The caller binds the answer to the
+// request (distribution.ValidateReleaseExchange).
+func (s *Session) Release(ctx context.Context, params *registry.ReleaseParams) (*distribution.ReleaseResponse, error) {
+	if params == nil {
+		return nil, errors.New("credential provider release: no request")
+	}
+	result, err := publicationCall(ctx, s, registry.CredentialOpRelease, params,
+		func(payload json.RawMessage) error { _, err := registry.ParseReleaseParams(payload); return err },
+		registry.ParseReleaseResult)
+	if err != nil {
+		return nil, err
+	}
+	return &result.Response, nil
+}
+
+// publicationCall sends one publication-v1 op. It checks the payload with the
+// protocol's own parser before sending, so the provider never receives a
+// request this engine knows to be invalid, and it turns a refusal into a
+// *PublicationRefusalError.
+func publicationCall[R any](
+	ctx context.Context,
+	s *Session,
+	op registry.CredentialOp,
+	params any,
+	check func(json.RawMessage) error,
+	parse func(json.RawMessage) (*R, error),
+) (*R, error) {
+	if !s.Publication() {
+		return nil, fmt.Errorf("credential provider op %s needs %s, which the session did not negotiate", op, registry.CapabilityPublicationV1)
+	}
+	payload, err := json.Marshal(params)
+	if err != nil {
+		return nil, fmt.Errorf("encode %s params: %w", op, err)
+	}
+	if err := check(payload); err != nil {
+		return nil, fmt.Errorf("credential provider op %s: the request is invalid: %w", op, err)
+	}
+	response, err := s.call(ctx, op, json.RawMessage(payload))
+	if err != nil {
+		return nil, err
+	}
+	if !response.OK {
+		return nil, &PublicationRefusalError{Op: op, Code: response.Error.Code, Message: response.Error.Message}
+	}
+	return parse(response.Payload)
 }
 
 // Credential asks for the credential of one purpose. A nil credential with a

@@ -1186,10 +1186,14 @@ func TestResolveManagedNPMRouteKeepsTheDirectPathWithoutABroker(t *testing.T) {
 // TestMain strips the private publication broker variable the CI runner
 // exports for the whole DAG, so the direct-registry tests above see the same
 // environment on a laptop and under native publication. Tests that exercise
-// the broker set the variable themselves with t.Setenv.
+// the broker set the variable themselves with t.Setenv. It strips the
+// publication outbox for the same reason: under it, every managed publication
+// would pack instead of upload.
 func TestMain(m *testing.M) {
-	if err := os.Unsetenv("PUTNAMI_REGISTRY_NPM_URL"); err != nil {
-		panic(err)
+	for _, key := range []string{"PUTNAMI_REGISTRY_NPM_URL", extproto.PublicationOutboxEnv} {
+		if err := os.Unsetenv(key); err != nil {
+			panic(err)
+		}
 	}
 	os.Exit(m.Run())
 }

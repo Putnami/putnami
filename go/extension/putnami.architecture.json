@@ -373,6 +373,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/python/extension",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/python/extension",
           "producerProject": "/protocols/infra"
         },
         {
@@ -464,6 +469,11 @@
           "kind": "project-dependency",
           "consumerProject": "/tooling/clientgen-extension",
           "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/clientgen-extension",
+          "producerProject": "/protocols/gomod"
         },
         {
           "kind": "project-dependency",
@@ -608,6 +618,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/local-collaboration",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/local-collaboration",
           "producerProject": "/protocols/infra"
         },
         {
@@ -693,6 +708,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/memory-store",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/memory-store",
           "producerProject": "/protocols/infra"
         },
         {
@@ -769,6 +789,11 @@
           "kind": "project-dependency",
           "consumerProject": "/tooling/scaffold",
           "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/scaffold",
+          "producerProject": "/protocols/gomod"
         },
         {
           "kind": "project-dependency",
@@ -854,6 +879,11 @@
           "kind": "project-dependency",
           "consumerProject": "/typescript/extension",
           "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/gomod"
         },
         {
           "kind": "project-dependency",

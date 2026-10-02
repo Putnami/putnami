@@ -1,0 +1,28 @@
+{
+  "protocolVersion": 1,
+  "members": [
+    {
+      "ecosystem": "go",
+      "coordinate": "go.acme.dev/api",
+      "version": "v1.4.0",
+      "project": "/go/api",
+      "go": {
+        "zip": {
+          "path": "go/api/v1.4.0.zip",
+          "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "size": 524288001
+        },
+        "mod": {
+          "path": "go/api/v1.4.0.mod",
+          "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "size": 96
+        },
+        "info": {
+          "path": "go/api/v1.4.0.info",
+          "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "size": 58
+        }
+      }
+    }
+  ]
+}

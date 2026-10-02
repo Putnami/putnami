@@ -40,6 +40,10 @@ const releaseSetFixtureHeadEnv = "PUTNAMI_ENGINE_RELEASE_SET_FIXTURE_HEAD"
 // release it answered in.
 const releaseSetFixtureReleasesEnv = "PUTNAMI_ENGINE_RELEASE_SET_FIXTURE_RELEASES"
 
+// releaseSetFixtureCallsEnv names the file the fixture provider appends one
+// line to for every call it receives, before it answers.
+const releaseSetFixtureCallsEnv = "PUTNAMI_ENGINE_RELEASE_SET_FIXTURE_CALLS"
+
 // serveReleaseSetFixtureProvider answers one provider call. A `resolve` gets a
 // null head for every requested channel, the empty-channel answer that selects
 // every member, or the head the releaseSetFixtureHeadEnv file holds. A
@@ -47,6 +51,10 @@ const releaseSetFixtureReleasesEnv = "PUTNAMI_ENGINE_RELEASE_SET_FIXTURE_RELEASE
 // real provider must, so a malformed exchange fails here rather than silently
 // producing an empty plan.
 func serveReleaseSetFixtureProvider(args []string) int {
+	if err := recordReleaseSetFixtureCall(args); err != nil {
+		fmt.Fprintln(os.Stderr, "release-set fixture calls:", err)
+		return 2
+	}
 	requestPath := ""
 	for index, arg := range args {
 		if arg == distribution.RequestFileFlag && index+1 < len(args) {
@@ -90,6 +98,28 @@ func serveReleaseSetFixtureProvider(args []string) int {
 	}
 	fmt.Println(string(encoded))
 	return 0
+}
+
+// recordReleaseSetFixtureCall appends the call's command, release or resolve,
+// to the file releaseSetFixtureCallsEnv names, when it names one.
+func recordReleaseSetFixtureCall(args []string) error {
+	path := os.Getenv(releaseSetFixtureCallsEnv)
+	if path == "" {
+		return nil
+	}
+	call := "resolve"
+	if slices.Contains(args, distribution.ReleaseCommand) {
+		call = "release"
+	}
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // the path is the test's own temp file
+	if err != nil {
+		return err
+	}
+	if _, err := file.WriteString(call + "\n"); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
 }
 
 // resolveFixtureHead answers every requested channel with head.

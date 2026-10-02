@@ -1,0 +1,40 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/provider-publication",
+  "outcomes": [
+    "A run that may publish knows its bound commit's ancestry and holds its publish credential before any repository code runs",
+    "A bound request without invocation.publication only gates: it plans no publication and starts no publication provider",
+    "A run whose credential provider negotiates publication-v1 resolves, opens, uploads and releases through that one session, and no repository process holds a publish credential"
+  ],
+  "nonGoals": [
+    "Uploading a member of an ecosystem other than npm, Go modules and OCI images under publication-v1; such a plan is refused before it opens"
+  ],
+  "requirements": [
+    {
+      "id": "ancestry-is-read-before-repository-code",
+      "text": "A run naming publish or deploy, or a bound request with invocation.publication, reads the ancestry of its bound commit (PUTNAMI_SOURCE_REVISION, else HEAD) at process start, before the bootstrap, an install or a hook, ignoring replace refs, grafts and the commit-graph; the run reuses it. It names a shallow clone and holds an error above 1,000,000 commits. Other runs read none. With publish enabled, the credential provider starts before the first hook, locally as on a hosted run."
+    },
+    {
+      "id": "gate-only-launches-no-publication",
+      "text": "A bound request without invocation.publication enables no publish purpose, even when its invocation.providers names publish, and says so on stderr. When its plan holds a task of a publication command or with declared registry or cloud effects, or its versions start a release-set publication, the executing engine refuses it before any release-set or deploy provider starts. A gate-only request plans no publish job and starts no release-set provider."
+    },
+    {
+      "id": "open-credential-release-through-one-provider",
+      "text": "The engine uses publication-v1 only when the provider echoes it; otherwise nothing changes. With it, the provider resolves channels, one open sends plan, heads and ancestry after the barrier, and release sends artifacts, heads, ancestry and evidence. The provider refuses a second plan and a non-ancestor head. Open and release retry once after a timeout on a live session; release is idempotent by plan digest. A refusal names its code and moves no channel. Local and hosted runs open one plan."
+    },
+    {
+      "id": "uploads-run-in-the-engine",
+      "text": "Under publication-v1 a publication job gets a private 0700 outbox and no credential, credential descriptor or registry route. An engine upload node re-hashes the outbox, refuses a member, version or project the plan does not assign, asks the publish credential of the member's registry and uploads the npm tarball, Go zip or OCI layout itself, with published-image.json and one published-member event per upload. No descriptor means nothing packed. A reused publication job packed nothing; the release refuses."
+    },
+    {
+      "id": "bound-requests-publish-through-the-provider",
+      "text": "A bound request with invocation.publication publishes through publication-v1 when the credential provider echoes it, as a local run does: open waits for its barrier commands, and the provider receives the plan digest a local run of the commit opens. Its expected plan names no open or upload node, which run engine code only: the executing engine compares it with its graph without them, an edge to an upload moved to its publication job, so one submitted plan validates either path."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0055-run-credentials-stay-out-of-repository-processes.md",
+    "tooling/cli/doc/adr/0057-publication-authority-stays-in-the-engine.md",
+    "protocols/runner/doc/adr/0005-invocation-providers-and-publication-barrier.md"
+  ]
+}

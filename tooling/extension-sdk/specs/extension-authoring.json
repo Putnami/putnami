@@ -94,12 +94,17 @@
     {
       "id": "agent-content-staging",
       "text": "A packager that ships an executable stages an extension's agent content with the same builder: the tree built from the authored source under agentContent.path and the packaged form bound by its digest, leaving a manifest without agent content untouched. It refuses a contribution without a source, another name, an occupied path, and content the policy forbids, writing nothing; verification refuses any staged byte, file or symlink the digests do not bind."
+    },
+    {
+      "id": "publication-outbox",
+      "text": "A publication job packs its managed artifacts into the PUTNAMI_PUBLICATION_OUTBOX directory, writes outbox.json last, and uploads nothing. The descriptor is strict and bounded, and every path stays inside the outbox. The engine reads each artifact once, refuses a size or digest the descriptor does not state, and uploads the bytes it verified. A version published at the same digest is reused. Each uploader takes the bearer as an argument and sends it only to its registry; no error carries it."
     }
   ],
   "decisions": [
     "tooling/extension-sdk/doc/adr/0001-the-sdk-owns-the-neutral-half-of-a-lifecycle.md",
     "tooling/extension-sdk/doc/adr/0002-a-secret-lives-in-one-artifact.md",
     "protocols/extension/doc/adr/0006-agent-content-is-an-additive-contract.md",
-    "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md"
+    "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
+    "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md"
   ]
 }

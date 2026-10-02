@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -307,6 +308,36 @@ func CommitReachableFromHead(repoRoot, sha string) bool {
 	}
 	_, err := run(repoRoot, "merge-base", "--is-ancestor", sha, "HEAD")
 	return err == nil
+}
+
+// RevList returns the commits reachable from revision, revision first, as the
+// repository's commit objects record them. Replace refs, a graft file and the
+// commit-graph cache are ignored, so none of them can add or hide a parent. It
+// returns at most maxCount commits: a caller that must know whether the
+// history is longer asks for one more than it accepts. revision must be a full
+// lowercase hex commit id. A shallow clone answers with the commits it has;
+// IsShallow tells the caller that the list is incomplete.
+func RevList(repoRoot, revision string, maxCount int) ([]string, error) {
+	if !validSourceRevision(revision) {
+		return nil, fmt.Errorf("list the ancestry: %q is not a full lowercase hex commit id", revision)
+	}
+	if maxCount < 1 {
+		return nil, fmt.Errorf("list the ancestry: the commit limit %d is not positive", maxCount)
+	}
+	env := append(os.Environ(), "GIT_GRAFT_FILE="+filepath.Join(os.DevNull, "grafts"))
+	stdout, stderr, err := runCaptureEnv(repoRoot, env,
+		"--no-replace-objects", "-c", "core.commitGraph=false",
+		"rev-list", "--max-count="+strconv.Itoa(maxCount), revision, "--")
+	if err != nil {
+		return nil, fmt.Errorf("git rev-list (in %s): %w: %s", repoRoot, err, strings.TrimSpace(stderr))
+	}
+	commits := splitLines(stdout)
+	for _, commit := range commits {
+		if !validSourceRevision(commit) {
+			return nil, fmt.Errorf("git rev-list (in %s): %q is not a full lowercase hex commit id", repoRoot, commit)
+		}
+	}
+	return commits, nil
 }
 
 func validObjectID(s string) bool {

@@ -2871,6 +2871,97 @@
       ]
     },
     {
+      "id": "cli/provider-publication",
+      "type": "feature",
+      "name": "Publication through providers",
+      "outcome": "A user who publishes, locally or on a hosted runner, gets a run whose ancestry and publish credential are fixed before any repository code runs, whose uploads and channel release run in the engine through one provider session, and whose repository processes hold no publish credential, while a run or a bound request that only gates starts no publication",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "ancestry-is-read-before-repository-code",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-snapshot-precedes-the-first-hook",
+              "replace-refs-and-grafts-change-no-answer",
+              "a-shallow-clone-is-named",
+              "a-history-above-the-limit-contains-nothing",
+              "a-gate-only-run-reads-no-ancestry",
+              "the-publish-purpose-starts-its-provider-before-the-first-hook",
+              "the-snapshot-precedes-the-install"
+            ]
+          }
+        },
+        {
+          "id": "gate-only-launches-no-publication",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-publishing-request-without-the-block-is-refused-before-any-provider",
+              "a-request-without-the-block-enables-no-publish-purpose",
+              "a-request-without-the-block-starts-no-publish-provider",
+              "a-gate-only-request-plans-no-publish-job"
+            ]
+          }
+        },
+        {
+          "id": "open-credential-release-through-one-provider",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-session-offers-publication-v1-and-the-echo-decides",
+              "resolve-runs-through-the-session",
+              "open-follows-every-barrier-leaf-once",
+              "a-second-plan-is-refused-in-one-session",
+              "a-head-that-is-not-forward-is-refused-at-open",
+              "an-uncertain-release-is-resolved-by-plan-digest",
+              "a-refused-release-moves-no-channel",
+              "without-the-echo-the-legacy-path-runs",
+              "real-extensions-open-once-and-release-forward-only",
+              "a-local-and-a-hosted-run-open-the-same-plan"
+            ]
+          }
+        },
+        {
+          "id": "uploads-run-in-the-engine",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-publication-job-holds-no-credential",
+              "a-hostile-publication-job-finds-no-credential",
+              "each-packed-member-is-uploaded-by-the-engine",
+              "a-tampered-artifact-is-refused-by-digest",
+              "a-member-the-plan-does-not-select-is-refused",
+              "a-reused-publication-job-fails-the-release",
+              "real-extension-jobs-pack-and-the-engine-uploads",
+              "a-probe-during-an-upload-finds-no-credential"
+            ]
+          }
+        },
+        {
+          "id": "bound-requests-publish-through-the-provider",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-expected-plan-is-the-legacy-plan",
+              "a-bound-request-opens-uploads-and-releases-the-local-plan"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "cli/workspace-without-git",
       "type": "feature",
       "name": "Workspace without git",

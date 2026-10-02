@@ -1,0 +1,43 @@
+{
+  "protocolVersion": 1,
+  "members": [
+    {
+      "ecosystem": "npm",
+      "coordinate": "@acme/web",
+      "version": "1.2.3-r42",
+      "project": "/typescript/web",
+      "npm": {
+        "registry": "https://npm.acme.dev",
+        "tarball": {
+          "path": "npm/web/web-1.2.3-r42.tgz",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "size": 2048
+        },
+        "manifest": {
+          "path": "npm/web/package.json",
+          "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "size": 312
+        }
+      }
+    },
+    {
+      "ecosystem": "npm",
+      "coordinate": "@acme/web",
+      "version": "1.2.3-r42",
+      "project": "/typescript/web",
+      "npm": {
+        "registry": "https://npm.acme.dev",
+        "tarball": {
+          "path": "other/web.tgz",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "size": 1
+        },
+        "manifest": {
+          "path": "other/package.json",
+          "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "size": 1
+        }
+      }
+    }
+  ]
+}

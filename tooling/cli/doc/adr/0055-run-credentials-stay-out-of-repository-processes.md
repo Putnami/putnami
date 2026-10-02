@@ -1,6 +1,8 @@
 # ADR 0055 — Run credentials stay out of repository processes
 
-- **Status**: accepted
+- **Status**: accepted. On a run that publishes through `publication-v1`,
+  locally or hosted, the publish credential stays out of repository processes
+  too ([ADR 0057](0057-publication-authority-stays-in-the-engine.md)).
 - **Scope**: `@putnami/cli` (`internal/runcredential`, `internal/launch`,
   `internal/credentialprovider`, `internal/cacheprovider`, `internal/jobs`,
   `internal/commands/lifecycle`), `go.putnami.dev/sdk/extension`

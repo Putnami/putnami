@@ -12,12 +12,14 @@ require (
 	go.putnami.dev/protocol/distribution v0.0.0
 	go.putnami.dev/protocol/extension v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
+	go.putnami.dev/protocol/gomod v0.0.0
 	go.putnami.dev/protocol/infra v0.0.0
 	go.putnami.dev/protocol/job v0.0.0
 	go.putnami.dev/protocol/oci v0.0.0
 	go.putnami.dev/protocol/registry v0.0.0
 	go.putnami.dev/protocol/runtime v0.0.0
 	go.putnami.dev/protocol/workspace v0.0.0
+	golang.org/x/mod v0.36.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.44.0
 )
@@ -47,6 +49,7 @@ replace (
 	go.putnami.dev/protocol/events => ../../protocols/events
 	go.putnami.dev/protocol/extension => ../../protocols/extension
 	go.putnami.dev/protocol/features => ../../protocols/features
+	go.putnami.dev/protocol/gomod => ../../protocols/gomod
 	go.putnami.dev/protocol/infra => ../../protocols/infra
 	go.putnami.dev/protocol/job => ../../protocols/job
 	go.putnami.dev/protocol/oci => ../../protocols/oci

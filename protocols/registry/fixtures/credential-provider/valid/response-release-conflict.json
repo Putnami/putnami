@@ -1,0 +1,1 @@
+{"protocolVersion":1,"id":5,"ok":true,"payload":{"response":{"protocolVersion":2,"outcome":"conflict","current":{"canary":{"ref":{"id":"rs_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","digest":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},"generation":9},"v0.3.0":null}}}}

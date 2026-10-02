@@ -182,6 +182,13 @@ above it), obtains its target-bound publish credential, pushes the content once
 per unique content by digest, and tags the version only — channel tags are
 written by the release projection, not by the publisher. Only after reading the remote digest back does publish write
 `publish/docker/published-image.json`; the package manifest stays byte-identical.
+When the engine names a publication outbox in `PUTNAMI_PUBLICATION_OUTBOX` and
+the target is `oci.putnami.dev`, publish packs instead: it copies the OCI
+layout into the outbox and writes `outbox.json` with the repository, the
+expected manifest digest and the version tag. It asks for no credential, sends
+no registry request and writes neither `published-image.json` nor
+`.gen/version.json`; the engine pushes the layout and writes
+`published-image.json`. Any other registry ignores the outbox.
 The binary itself reports its version via `version-var`
 ldflags injection or `runtime/debug.ReadBuildInfo` (a `version-var` build
 embeds the release id in the binary, so such projects trade digest travel for
@@ -311,6 +318,17 @@ logical coordinate in every message and event. Without the variable the direct
 path above is unchanged; a remote HTTPS value is ignored as Cloud compatibility
 input; a loopback value that is malformed, or present without a release-set
 plan, fails the job before any credential or network call.
+
+When the engine names a publication outbox in `PUTNAMI_PUBLICATION_OUTBOX`,
+a module publication without an explicit token packs instead of uploading. It
+copies the packaged zip, `go.mod` and `.info` into the outbox and writes
+`outbox.json`, which names the module path, the version, the owning project
+and the digest and size of each file. The job asks for no credential, consults
+no broker, sends no registry request, runs no `go mod download` smoke and
+reports no published member: the engine uploads the bytes it verifies and
+reports the member. A publication with `--go-registry-token`,
+`PUTNAMI_REGISTRY_TOKEN` or `goRegistryToken` ignores the outbox and uploads as
+above. A dry run packs nothing.
 
 ## Output Location
 

@@ -1,34 +1,31 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"maps"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
 	osexec "os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"slices"
 	"strings"
-	"time"
-	"unicode"
 
 	extproto "go.putnami.dev/protocol/extension"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/dockerpublish"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/npmpublish"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/privatebroker"
+	"go.putnami.dev/sdk/extension/publicationoutbox"
 	"go.putnami.dev/sdk/extension/registrycred"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/typescript/extension/internal/pkg"
@@ -98,15 +95,23 @@ func npmCommand(goos string, args []string) (string, error) {
 // and ambient npm config, uploads without a dist-tag, and fails closed when the
 // cloud supplies no credential. There is no managed fallback to third-party
 // credentials or public npm.
+//
+// When the engine names a publication outbox, a release-set member is packed
+// into it and nothing else happens: no credential, no broker route, no upload
+// and no published-member event (packManagedNPMIntoOutbox). The member names
+// the managed registry resolved here, and the engine uploads there. Unmanaged
+// publication ignores the outbox.
 func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	if ctx.Project.Name == "" {
 		emit.Summary("Skipped: no project context")
 		return "SKIP", nil, nil
 	}
-	plannedVersion, managedReleaseSet, err := npmPublishReleaseSetMember(ctx)
+	plannedMember, managedReleaseSet, err := npmPublishReleaseSetMember(ctx)
 	if err != nil {
 		return "FAILED", nil, err
 	}
+	plannedVersion := plannedMember.Version
+	packOnly := managedReleaseSet && publicationOutboxRequested()
 
 	// A channel is no longer a publish input: the release set advances every
 	// channel it names, once, after every member has a verified digest. The
@@ -129,7 +134,7 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 		// registry's server-owned policy. A future public release needs a separate,
 		// explicit server attestation; sparse/full state cannot make it public.
 		access = ""
-		registry, err = validateManagedNPMRegistry(orDefaultNPMRegistry(registry))
+		registry, err = extproto.ManagedNPMRegistry(orDefaultNPMRegistry(registry))
 		if err != nil {
 			return "FAILED", nil, err
 		}
@@ -138,7 +143,7 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 	// publication may take the private broker; the unmanaged path keeps npm's
 	// native behavior and never sees the variable.
 	publishEndpoint, credentialHost := registry, hostFromURL(registry)
-	if managedReleaseSet {
+	if managedReleaseSet && !packOnly {
 		publishEndpoint, credentialHost, err = resolveManagedNPMRoute(registry)
 		if err != nil {
 			emit.Diagnostic("error", err.Error(), "", 0)
@@ -222,6 +227,15 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 			endpoint: publishEndpoint, credentialHost: credentialHost, authEnv: npmAuthEnv,
 		})
 		return "OK", map[string]any{"dryRun": true, "version": version}, nil
+	}
+
+	if packOnly {
+		project, err := npmOutboxProject(ctx, plannedMember)
+		if err != nil {
+			emit.Diagnostic("error", err.Error(), "", 0)
+			return "FAILED", nil, err
+		}
+		return packManagedNPMIntoOutbox(emit, wsRoot, projectPath, npmDir, pkgData, packageName, version, project, registry)
 	}
 
 	// Ask Cloud for the publication credential. The dry run above asks the same
@@ -325,45 +339,107 @@ func orDefaultNPMRegistry(registry string) string {
 	return registry
 }
 
-func validateManagedNPMRegistry(raw string) (string, error) {
-	raw = strings.TrimSpace(raw)
-	u, err := url.Parse(raw)
-	if err != nil || u.Opaque != "" || u.Host == "" || u.Hostname() == "" {
-		return "", fmt.Errorf("managed npm registry must be an absolute HTTP(S) URL without credentials")
-	}
-	if u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return "", fmt.Errorf("managed npm registry must be an absolute HTTP(S) URL without credentials, query, or fragment")
-	}
-	scheme := strings.ToLower(u.Scheme)
-	if scheme != "https" {
-		hostname := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
-		ip := net.ParseIP(hostname)
-		loopback := hostname == "localhost" || strings.HasSuffix(hostname, ".localhost") || (ip != nil && ip.IsLoopback())
-		if scheme != "http" || !loopback {
-			return "", fmt.Errorf("managed npm registry must use HTTPS (HTTP is allowed only for loopback)")
-		}
-	}
-	u.Scheme = scheme
-	u.Path = strings.TrimRight(u.Path, "/")
-	return u.String(), nil
-}
-
-func npmPublishReleaseSetMember(ctx *pctx.Context) (string, bool, error) {
+func npmPublishReleaseSetMember(ctx *pctx.Context) (releaseset.PlannedMember, bool, error) {
 	plan, err := releaseset.FromContext(ctx)
 	if err != nil || plan == nil {
-		return "", false, err
+		return releaseset.PlannedMember{}, false, err
 	}
 	member, ok := plan.Member("npm", ctx.Project.Name)
 	if !ok {
-		return "", true, fmt.Errorf("npm release-set plan has no member for %q", ctx.Project.Name)
+		return releaseset.PlannedMember{}, true, fmt.Errorf("npm release-set plan has no member for %q", ctx.Project.Name)
 	}
 	if !member.Selected {
-		return "", true, fmt.Errorf("npm release-set member %q is not selected for publishing", ctx.Project.Name)
+		return releaseset.PlannedMember{}, true, fmt.Errorf("npm release-set member %q is not selected for publishing", ctx.Project.Name)
 	}
 	if ctx.Identity != nil && member.ProjectID != ctx.Identity.Project.ID {
-		return "", true, fmt.Errorf("npm release-set member %q belongs to project %q, not %q", ctx.Project.Name, member.ProjectID, ctx.Identity.Project.ID)
+		return releaseset.PlannedMember{}, true, fmt.Errorf("npm release-set member %q belongs to project %q, not %q", ctx.Project.Name, member.ProjectID, ctx.Identity.Project.ID)
 	}
-	return member.Version, true, nil
+	return member, true, nil
+}
+
+// publicationOutboxRequested reports whether the engine named a publication
+// outbox (extproto.PublicationOutboxEnv) for this job.
+func publicationOutboxRequested() bool {
+	return os.Getenv(extproto.PublicationOutboxEnv) != ""
+}
+
+// npmOutboxProject is the project an outbox member names: the project the
+// release-set plan assigns the member to, else the task's typed project.
+func npmOutboxProject(ctx *pctx.Context, member releaseset.PlannedMember) (string, error) {
+	if member.ProjectID != "" {
+		return member.ProjectID, nil
+	}
+	if ctx.Identity != nil && ctx.Identity.Project.ID != "" {
+		return ctx.Identity.Project.ID, nil
+	}
+	return "", fmt.Errorf("publication outbox member %q has no project identity in the release-set plan or the task", member.Coordinate)
+}
+
+// The paths of an npm member's artifacts inside the publication outbox.
+const (
+	npmOutboxTarball  = "npm/package.tgz"
+	npmOutboxManifest = "npm/package.json"
+)
+
+// packManagedNPMIntoOutbox packs a managed release-set member into the
+// publication outbox and commits the descriptor. It packs with
+// packNPMArtifact, as the upload path does, and writes the tarball and
+// manifest, the staged package.json bytes the caller validated. The member
+// names registry, the managed registry the caller resolved, which is the
+// registry the upload path publishes to. It resolves no credential, sends no
+// request, and emits no published or published-member event: the engine
+// uploads the bytes it verifies and reports the member.
+func packManagedNPMIntoOutbox(emit *jsonl.Emitter, wsRoot, projectPath, npmDir string, manifest []byte, packageName, version, project, registry string) (string, map[string]any, error) {
+	fail := func(err error) error {
+		emit.Diagnostic("error", err.Error(), "", 0)
+		return err
+	}
+	writer, err := publicationoutbox.WriterFromEnv()
+	if err != nil {
+		return "FAILED", nil, fail(fmt.Errorf("publication outbox: %w", err))
+	}
+	npmConfig, configCleanup, err := newManagedNPMConfig(nil)
+	if err != nil {
+		return "FAILED", nil, fail(err)
+	}
+	defer configCleanup()
+
+	emit.PhaseStart("npm-pack")
+	artifact, digest, cleanup, err := packNPMArtifact(npmConfig, wsRoot, projectPath, npmDir)
+	if cleanup != nil {
+		defer cleanup()
+	}
+	if err != nil {
+		emit.PhaseEnd("npm-pack", "failed")
+		return "FAILED", nil, fail(err)
+	}
+	tarball, err := writer.CopyFile(npmOutboxTarball, artifact)
+	if err == nil && tarball.Digest != digest {
+		err = fmt.Errorf("packed npm tarball changed while it was copied into the publication outbox: %s, then %s", digest, tarball.Digest)
+	}
+	var manifestFile extproto.OutboxFile
+	if err == nil {
+		manifestFile, err = writer.WriteFile(npmOutboxManifest, manifest)
+	}
+	if err == nil {
+		err = writer.Add(extproto.OutboxMember{
+			Ecosystem: extproto.OutboxEcosystemNPM, Coordinate: packageName, Version: version, Project: project,
+			NPM: &extproto.OutboxNPM{Registry: registry, Tarball: tarball, Manifest: manifestFile},
+		})
+	}
+	if err == nil {
+		err = writer.Commit()
+	}
+	if err != nil {
+		emit.PhaseEnd("npm-pack", "failed")
+		return "FAILED", nil, fail(fmt.Errorf("publication outbox: %w", err))
+	}
+	emit.PhaseEnd("npm-pack", "success")
+	emit.Summary(fmt.Sprintf("Packed %s@%s [%s] into the publication outbox; the engine uploads it", packageName, version, tarball.Digest))
+	return "OK", map[string]any{
+		"version": version, "packageName": packageName,
+		"artifactDigest": tarball.Digest, "packed": true,
+	}, nil
 }
 
 // publishManagedNPM uploads a pre-built immutable tarball with an empty
@@ -542,146 +618,39 @@ func packNPMArtifact(config *managedNPMConfig, wsRoot, projectPath, npmDir strin
 	return matches[0], digest, cleanup, nil
 }
 
-type managedNPMAttachment struct {
-	ContentType string `json:"content_type"`
-	Data        string `json:"data"`
-	Length      int    `json:"length"`
-}
+// The managed npm upload lives in go.putnami.dev/sdk/extension/npmpublish;
+// these names bind this job and its tests to it.
+type (
+	managedNPMAttachment     = npmpublish.Attachment
+	managedNPMPublishPayload = npmpublish.Payload
+)
 
-type managedNPMPublishPayload struct {
-	Name        string                          `json:"name"`
-	Versions    map[string]json.RawMessage      `json:"versions"`
-	Attachments map[string]managedNPMAttachment `json:"_attachments"`
-	DistTags    map[string]string               `json:"dist-tags"`
-}
+// managedNPMRegistryExcerptLimit bounds, in characters, how much of a registry
+// error body a managed npm error carries.
+const managedNPMRegistryExcerptLimit = npmpublish.ErrorExcerptLimit
 
 func buildManagedNPMPublishPayload(npmDir, artifact, packageName, version string) (managedNPMPublishPayload, error) {
 	manifest, err := os.ReadFile(filepath.Join(npmDir, "package.json"))
 	if err != nil {
 		return managedNPMPublishPayload{}, fmt.Errorf("read managed npm manifest: %w", err)
 	}
-	var wireManifest map[string]json.RawMessage
-	if err := json.Unmarshal(manifest, &wireManifest); err != nil {
-		return managedNPMPublishPayload{}, fmt.Errorf("parse managed npm manifest: %w", err)
-	}
-	// publishConfig is npm-client authority, not package identity. Dangerous
-	// registry/access/tag entries have already failed closed; strip the whole
-	// object from the native PUT so the server never has to interpret any current
-	// or future repository-controlled publishing directive.
-	delete(wireManifest, "publishConfig")
-	manifest, err = json.Marshal(wireManifest)
-	if err != nil {
-		return managedNPMPublishPayload{}, fmt.Errorf("encode managed npm manifest: %w", err)
-	}
 	artifactBytes, err := os.ReadFile(artifact)
 	if err != nil {
 		return managedNPMPublishPayload{}, fmt.Errorf("read managed npm artifact: %w", err)
 	}
-	attachmentName := packageName
-	if slash := strings.LastIndexByte(attachmentName, '/'); slash >= 0 {
-		attachmentName = attachmentName[slash+1:]
-	}
-	attachmentName += "-" + version + ".tgz"
-	return managedNPMPublishPayload{
-		Name:     packageName,
-		Versions: map[string]json.RawMessage{version: manifest},
-		Attachments: map[string]managedNPMAttachment{
-			attachmentName: {
-				ContentType: "application/octet-stream",
-				Data:        base64.StdEncoding.EncodeToString(artifactBytes),
-				Length:      len(artifactBytes),
-			},
-		},
-		// Empty by construction: the publish-only lease must never reach the
-		// registry's channel/promote path.
-		DistTags: map[string]string{},
-	}, nil
+	return npmpublish.BuildPayload(npmpublish.Artifact{Name: packageName, Version: version, Manifest: manifest, Tarball: artifactBytes})
 }
 
 func sendManagedNPMPublish(registry, token string, payload managedNPMPublishPayload) error {
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("encode managed npm payload: %w", err)
-	}
-	endpoint := strings.TrimRight(registry, "/") + "/" + url.PathEscape(payload.Name)
-	req, err := http.NewRequest(http.MethodPut, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("build managed npm request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
 	client, err := newManagedNPMHTTPClient()
 	if err != nil {
 		return err
 	}
-	resp, err := client.Do(req) //nolint:gosec // registry is an explicit, validated managed publish target
-	if err != nil {
-		return fmt.Errorf("send managed npm request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("registry returned %s%s", resp.Status, registryErrorExcerpt(resp.Body, token))
-	}
-	return nil
-}
-
-// managedNPMRegistryExcerptLimit bounds, in characters, how much of a registry
-// error body a managed npm error carries.
-const managedNPMRegistryExcerptLimit = 300
-
-// managedNPMRegistryReadLimit bounds how much of an error body is read. It is
-// far above the excerpt limit, so a credential cut by the read bound always
-// lies past the excerpt and never shows partially.
-const managedNPMRegistryReadLimit = 4096
-
-var bearerCredential = regexp.MustCompile(`(?i)bearer\s+[^\s"',;]+`)
-
-// registryErrorExcerpt returns ": <excerpt>" for a registry error body, or ""
-// when it is empty. The status alone cannot tell a stale registry from a
-// refusal, so the body is shown, but it is upstream-controlled and may echo the
-// request's Authorization: the token and every bearer value are redacted before
-// control characters are replaced and the text is cut to the excerpt limit.
-func registryErrorExcerpt(body io.Reader, token string) string {
-	raw, _ := io.ReadAll(io.LimitReader(body, managedNPMRegistryReadLimit))
-	text := string(raw)
-	if token != "" {
-		text = strings.ReplaceAll(text, token, "[redacted]")
-		if escaped := url.QueryEscape(token); escaped != token {
-			text = strings.ReplaceAll(text, escaped, "[redacted]")
-		}
-	}
-	text = bearerCredential.ReplaceAllString(text, "Bearer [redacted]")
-	text = strings.TrimSpace(strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
-			return ' '
-		}
-		return r
-	}, text))
-	if text == "" {
-		return ""
-	}
-	if runes := []rune(text); len(runes) > managedNPMRegistryExcerptLimit {
-		text = string(runes[:managedNPMRegistryExcerptLimit]) + "..."
-	}
-	return ": " + text
+	return npmpublish.Put(context.Background(), client, registry, token, payload)
 }
 
 func newManagedNPMHTTPClient() (*http.Client, error) {
-	baseTransport, ok := http.DefaultTransport.(*http.Transport)
-	if !ok {
-		return nil, fmt.Errorf("managed npm transport is unavailable")
-	}
-	transport := baseTransport.Clone()
-	// A target-bound publisher bearer is authorized only for the selected
-	// registry origin. Ambient HTTP(S)_PROXY must not become a second recipient.
-	transport.Proxy = nil
-	return &http.Client{
-		Timeout:   5 * time.Minute,
-		Transport: transport,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}, nil
+	return npmpublish.NewHTTPClient()
 }
 
 func probeManagedNPMArtifact(registry, token, packageName, version, wantDigest string, wantSize int64) (bool, error) {
@@ -689,40 +658,14 @@ func probeManagedNPMArtifact(registry, token, packageName, version, wantDigest s
 	if err != nil {
 		return false, err
 	}
-	resp, err := getManagedNPMTarball(client, registry, token, packageName, version)
-	if err != nil {
-		return false, fmt.Errorf("download managed npm artifact: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode == http.StatusNotFound {
-		return false, nil
-	}
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return false, fmt.Errorf("registry tarball returned %s%s", resp.Status, registryErrorExcerpt(resp.Body, token))
-	}
-	if wantSize < 0 {
-		return false, fmt.Errorf("managed npm artifact size is invalid")
-	}
-	hash := sha256.New()
-	read, err := io.Copy(hash, io.LimitReader(resp.Body, wantSize+1))
-	if err != nil {
-		return false, fmt.Errorf("hash registry npm artifact: %w", err)
-	}
-	if read != wantSize {
-		return false, fmt.Errorf("published npm artifact size mismatch: staged %d, registry %d", wantSize, read)
-	}
-	gotDigest := fmt.Sprintf("sha256:%x", hash.Sum(nil))
-	if gotDigest != wantDigest {
-		return false, fmt.Errorf("published npm artifact digest mismatch: staged %s, registry %s", wantDigest, gotDigest)
-	}
-	return true, nil
+	return npmpublish.Probe(context.Background(), client, registry, token, packageName, version, wantDigest, wantSize)
 }
 
 // getManagedNPMTarball sends a GET of the tarball of packageName at version to
 // registry, with the bearer when token is set. A send error is a *url.Error; a
 // coordinate or request error is not.
 func getManagedNPMTarball(client *http.Client, registry, token, packageName, version string) (*http.Response, error) {
-	tarballURL, err := managedNPMTarballURL(registry, packageName, version)
+	tarballURL, err := npmpublish.TarballURL(registry, packageName, version)
 	if err != nil {
 		return nil, err
 	}
@@ -734,26 +677,6 @@ func getManagedNPMTarball(client *http.Client, registry, token, packageName, ver
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	return client.Do(req) //nolint:gosec // tarball URL is constructed from the validated registry origin and staged coordinate
-}
-
-func managedNPMTarballURL(registry, packageName, version string) (string, error) {
-	name := packageName
-	var coordinatePath string
-	if strings.HasPrefix(packageName, "@") {
-		scope, packagePart, found := strings.Cut(packageName, "/")
-		if !found || len(scope) < 2 || packagePart == "" || strings.Contains(packagePart, "/") {
-			return "", fmt.Errorf("managed npm package coordinate is invalid")
-		}
-		name = packagePart
-		coordinatePath = url.PathEscape(scope) + "/" + url.PathEscape(packagePart)
-	} else {
-		if packageName == "" || strings.Contains(packageName, "/") {
-			return "", fmt.Errorf("managed npm package coordinate is invalid")
-		}
-		coordinatePath = url.PathEscape(packageName)
-	}
-	filename := name + "-" + version + ".tgz"
-	return strings.TrimRight(registry, "/") + "/" + coordinatePath + "/-/" + url.PathEscape(filename), nil
 }
 
 func sha256File(path string) (string, error) {

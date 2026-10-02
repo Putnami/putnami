@@ -5,6 +5,9 @@ The registry credential seams between the framework and the credential issuer:
 - `credential-provider/v1`: the engine asks the workspace's credential provider
   for one credential per purpose, over a JSONL RPC, when the process enables
   it (`--providers`). See [ADR 0002](doc/adr/0002-one-credential-call-per-purpose.md).
+- `publication-v1`: a capability of that RPC. A session that negotiates it also
+  resolves channel heads, opens a publication plan and releases its set. See
+  [ADR 0003](doc/adr/0003-publication-ops-behind-a-negotiated-capability.md).
 - `registry-token/v1`: publishers and installs run
   `putnami cloud registry-token --host <host>` and read a bare bearer. See
   [ADR 0001](doc/adr/0001-host-keyed-credential-seam.md).
@@ -75,6 +78,92 @@ logged value never carries it. `CredentialInitializeParams` does the same for
 its run credential, and `CredentialRequest` prints its payload's size, never its
 bytes.
 
+## What: `publication-v1`
+
+`publication-v1` is a capability of `credential-provider/v1`. The engine offers
+it at `initialize`; a provider that echoes it answers three more ops on the same
+session. With them the engine publishes a release set without handing a publish
+credential to any repository process: `resolve` reads channel heads, `open`
+declares the plan, and `release` stores the set and advances its channels.
+
+```
+→ {"protocolVersion":1,"id":1,"op":"initialize","payload":{"protocolVersion":1,"capabilities":["credential-v1","publication-v1"]}}
+← {"protocolVersion":1,"id":1,"ok":true,"payload":{"protocolVersion":1,"capabilities":["credential-v1","publication-v1"]}}
+→ {"protocolVersion":1,"id":2,"op":"resolve","payload":{"request":{…}}}
+← {"protocolVersion":1,"id":2,"ok":true,"payload":{"response":{…}}}
+→ {"protocolVersion":1,"id":3,"op":"open","payload":{"plan":{…,"planDigest":"sha256:…"},"ancestry":{…}}}
+← {"protocolVersion":1,"id":3,"ok":true,"payload":{"planDigest":"sha256:…"}}
+→ {"protocolVersion":1,"id":4,"op":"credential","payload":{"purpose":"publish"}}
+← {"protocolVersion":1,"id":4,"ok":true,"payload":{"credential":{…}}}
+→ {"protocolVersion":1,"id":5,"op":"release","payload":{"planDigest":"sha256:…","request":{…},"ancestry":{…},"evidence":{…}}}
+← {"protocolVersion":1,"id":5,"ok":true,"payload":{"response":{…}}}
+```
+
+The capability is negotiated: it holds only when the engine offers it and the
+provider echoes it (`NegotiatedCapabilities`). In a session without it, both
+sides refuse the three ops (`ParseNegotiatedCredentialRequest`,
+`ParseNegotiatedCredentialResponse`). The fixtures in
+[`fixtures/credential-provider/valid/`](fixtures/credential-provider/valid) show
+every line in full.
+
+| Op | Payload | Answer payload |
+|----|---------|----------------|
+| `resolve` | `request`: a `distribution/release-set/v2` resolve request that names channels, never a `releaseId` | `response`: the resolve response, one head per channel. The engine binds it to the request with `distribution.ValidateResolveExchange`. |
+| `open` | `plan`: the plan tuple. `ancestry`: the ancestry of each channel the plan advances, in the plan's channel order. | `planDigest`: the plan's digest |
+| `release` | `planDigest` of the opened plan, `request`: a `distribution/release-set/v2` release request, `ancestry` of each channel the request advances, in its order, and `evidence` | `response`: the release response. The engine binds it to the request with `distribution.ValidateReleaseExchange`. |
+
+`credential` with purpose `publish` keeps its `credential-provider/v1` shape.
+
+The plan tuple names every selected member of one publication before its
+artifact exists:
+
+| Member | Rule |
+|--------|------|
+| `protocolVersion` | `1` |
+| `namespace` | The distribution namespace that owns every member and channel |
+| `sourceRevision` | The full lowercase commit (40 hex) the members are built from |
+| `channels` | 1 to 16 unique portable channel names the publication advances, in order |
+| `immutableChannel` | Absent, or one of `channels`: the channel created once and never moved again |
+| `members` | `{ecosystem, coordinate, version, sourceRevision, selectionFingerprint}` per selected member, unique, in (ecosystem, coordinate) order, each with the plan's `sourceRevision`. A plan that selects nothing has an empty list. |
+| `planDigest` | `sha256:` and the lowercase hex SHA-256 of the plan's compact JSON without `planDigest`: members in the order above, `immutableChannel` omitted when absent, and strings escaped as Go's `encoding/json` escapes them. `PlanDigest` computes it, and `TestOpenPlanDigestMatchesTheReleasePlanContract` pins a vector. |
+
+The ancestry is a statement the engine reads from the repository before any
+repository code runs:
+
+| Member | Rule |
+|--------|------|
+| `sourceRevision` | The commit the statement was read from: the plan's `sourceRevision` |
+| `snapshotCommits` | The number of commits reachable from `sourceRevision`, itself included: 1 to 1,000,000 |
+| `channels` | One entry per advanced channel, in order: `name`; `headSourceRevision`, the source revision of the channel's head, absent when the channel has no head; and `ancestor`, whether `headSourceRevision` is `sourceRevision` or one of its ancestors. `ancestor` is false without a head and true when the two revisions are equal. A `release` entry carries no `headSourceRevision` for a channel whose `expected` head is `null`. |
+
+The evidence binds what the run published to its release:
+
+| Member | Rule |
+|--------|------|
+| `images` | `{project, digest}` per published workload image, unique, in project order, under the rules of the published-images evidence of `go.putnami.dev/protocol/runtime` |
+| `members` | `{project, ecosystem, coordinate, version, digest, publisher, command, step}` per published member, unique, in (ecosystem, coordinate) order. The provider treats each entry as an assertion and verifies the artifact itself. |
+
+| Rule | Meaning |
+|------|---------|
+| Order | The engine sends `open` after every barrier task has succeeded and before the first upload. It asks for `credential` with purpose `publish` only after `open`; before it, a provider refuses with `plan_not_open`. It sends `release` after the last upload. |
+| Idempotency | `open` is idempotent on `planDigest`: the same plan gets the same answer, and another plan in the same session gets `plan_already_open`. A provider releases at most once per `planDigest`. It stores the outcome with the set ref the request derives (`distribution.DeriveReleaseSetRef`). A `release` with the same `planDigest` and the same set gets the stored outcome; one with another set gets `plan_mismatch`. |
+| Retry | The engine sends `open` or `release` again once, after the op timed out while the session was still live, and in no other case. A session that ends cannot carry a second attempt. An answer, a refusal included, is final. |
+| Forward only | A channel moves only to a source revision equal to its head's or descending from it: `ancestor` is true. A channel without a head, the immutable channel and a baseline channel, which the publication reads and does not advance, are exempt. The provider checks at `open`, and again at `release` for the heads its compare-and-swap matches, and refuses with `not_forward`. |
+| Trust | The provider records the ancestry statement with the release. It does not verify it against the repository. |
+| Bounds | A `resolve`, `open` or `release` line is at most 8 MiB (`MaxPublicationLineBytes`) and 12 levels deep. A plan encodes to at most 1 MiB, each evidence list to at most 4 MiB, and each distribution document to at most its protocol's 4 MiB. `initialize`, `credential` and `shutdown` keep 64 KiB and 5 levels in every session. `CredentialOp.MaxLineBytes` names the bound of each op. |
+| Null | Refused, as in `credential-provider/v1`, except inside `request` and `response`, where the distribution protocol decides: a channel's `expected` head, the `visibility.set` override and a channel without a head are `null` there. |
+| Refusals | `plan_not_open`, `plan_already_open`, `plan_mismatch`, `artifact_missing`, `artifact_digest_mismatch`, `not_forward`, `conflict`, `channel_immutable` and `namespace_forbidden` (`PublicationRefusalCodes`). A compare-and-swap miss is not a refusal: it is a `release` answer whose outcome is `conflict`. |
+
+| Symbol | Meaning |
+|--------|---------|
+| `CapabilityPublicationV1` / `CredentialOpResolve` / `CredentialOpOpen` / `CredentialOpRelease` | The capability and its ops |
+| `CredentialOp.Capability` / `CredentialOp.Allowed` / `CredentialOp.MaxLineBytes` / `NegotiatedCapabilities` | Which capability defines an op, whether a session may send it, its line bound, and a session's capabilities |
+| `ParseNegotiatedCredentialRequest` / `ParseNegotiatedCredentialResponse` | Strict decoders for a session's negotiated capabilities |
+| `ResolveParams` / `ResolveResult` / `OpenParams` / `OpenResult` / `ReleaseParams` / `ReleaseResult` | The op payloads, with `Parse*` strict decoders |
+| `PublicationPlan` / `PublicationAncestry` / `PublicationEvidence` and their entries | The plan tuple, the ancestry statement and the evidence |
+| `PlanDigest` / `ValidatePublicationPlan` / `ValidatePublicationAncestry` / `ValidatePublicationEvidence` | The digest and the validators |
+| `Refusal*` / `PublicationRefusalCodes` | The refusal codes |
+
 ## What: `registry-token/v1`
 
 This seam has no JSON wire. The contract is a CLI invocation and the exact
@@ -118,7 +207,21 @@ flag enables nothing and every path below stays on `registry-token/v1`.
 archive download, `AuthorizeRegistryRequest` in
 `tooling/cli/internal/extension`, which uses the `read` purpose. A host outside
 the credential's `hosts`, an absent provider, or `--providers` off keeps the
-request on the host-keyed seam, unchanged.
+request on the host-keyed seam, unchanged. The release set's upload nodes use
+the `publish` purpose, in a session that negotiated `publication-v1` only.
+
+**`publication-v1` producer** — none ships in this repository. `@putnami/cloud`
+is the intended producer, in a separate repository.
+`tooling/cli/internal/credentialprovider/providertest` is an in-process
+producer for tests: it keeps the heads, the plan and the released sets in
+memory.
+
+**`publication-v1` consumer** — the CLI engine. Its session
+(`tooling/cli/internal/credentialprovider`) offers the capability and sends the
+three ops. The release set (`tooling/cli/internal/jobs`) resolves through it,
+opens after the barrier, uploads every packed npm, Go module and OCI member in
+the engine with the `publish` credential, and releases. A session without the
+echo leaves the release set on its release-set provider process, unchanged.
 
 **`registry-token/v1` producer** — `putnami cloud registry-token`, implemented by `@putnami/cloud`
 in a separate repository. This repository ships no producer, which is exactly
@@ -143,7 +246,10 @@ cloudless-compatible fallback.
 | `tooling/extension-sdk/dockerpublish` | Docker registry login and push; managed OCI publication requests an exact workspace/package/action lease |
 
 Every one of them degrades to explicit or native credentials (`.npmrc`, the
-platform keychain, an explicit token) when the seam yields nothing.
+platform keychain, an explicit token) when the seam yields nothing. When
+`PUTNAMI_PUBLICATION_OUTBOX` is set, the npm, Go module and managed OCI paths
+pack a managed member into the outbox and ask the seam for nothing: the engine
+uploads it.
 
 ## The retired publish-provider marker
 
@@ -175,6 +281,8 @@ a new capability negotiated at `initialize`, never a silent addition, because
 both sides decode strictly. The one exception is `initialize`'s optional
 `runCredential`, added before any producer shipped; the amendment to
 [ADR 0002](doc/adr/0002-one-credential-call-per-purpose.md) records why.
+`publication-v1` is such a capability: a session that does not negotiate it
+reads and writes exactly the v1 lines above, under the v1 bounds.
 
 `registry-token/v1` retires only after the cloud producer serves
 `credential-provider`: the SDK's `--materialize` form and its per-host,
@@ -213,6 +321,21 @@ Compatibility of `registry-token/v1` is cross-repository and therefore conservat
   unsorted or duplicate hosts, a non-UTC or missing expiry, malformed
   refusals, and run credentials that are empty, carry whitespace, exceed
   16384 bytes or are spelled `RunCredential`.
+
+`publication-v1` shares that schema and corpus:
+
+- valid: an `initialize` that negotiates the capability, every op's request and
+  answer, an empty plan, a release without evidence, a `conflict` outcome, and
+  the `plan_already_open`, `plan_not_open` and `not_forward` refusals.
+- invalid: a plan whose digest is missing or wrong, or whose member order,
+  member source revision or immutable channel is wrong; ancestry that is
+  `null`, has no commits, is out of order, is read from another revision,
+  claims an ancestor without a head, denies its own head, or names a head for a
+  channel expected to have none; a resolve request with a `releaseId`, an
+  unknown member or an invalid channel; a resolve answer in its release form; a
+  release answer with an unknown outcome; a malformed plan digest; missing,
+  unsorted or malformed evidence; a case-variant member; and `null` outside a
+  distribution document or where that protocol refuses it.
 
 A fixture is one line. A response fixture names the op it answers:
 `response-<op>-<case>.json`. `TestCredentialFixtures` requires every valid
@@ -275,3 +398,4 @@ Durable decisions:
 
 - [ADR 0001 — Registry credentials come from a host-keyed cloud command](doc/adr/0001-host-keyed-credential-seam.md)
 - [ADR 0002 — One credential call per purpose, from the workspace's credential provider](doc/adr/0002-one-credential-call-per-purpose.md)
+- [ADR 0003 — Publication ops behind a negotiated capability](doc/adr/0003-publication-ops-behind-a-negotiated-capability.md)

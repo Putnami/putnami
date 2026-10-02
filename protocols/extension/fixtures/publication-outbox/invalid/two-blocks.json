@@ -1,0 +1,41 @@
+{
+  "protocolVersion": 1,
+  "members": [
+    {
+      "ecosystem": "npm",
+      "coordinate": "@acme/web",
+      "version": "1.2.3-r42",
+      "project": "/typescript/web",
+      "npm": {
+        "registry": "https://npm.acme.dev",
+        "tarball": {
+          "path": "npm/web/web-1.2.3-r42.tgz",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "size": 2048
+        },
+        "manifest": {
+          "path": "npm/web/package.json",
+          "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "size": 312
+        }
+      },
+      "go": {
+        "zip": {
+          "path": "go/api/v1.4.0.zip",
+          "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "size": 40960
+        },
+        "mod": {
+          "path": "go/api/v1.4.0.mod",
+          "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "size": 96
+        },
+        "info": {
+          "path": "go/api/v1.4.0.info",
+          "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "size": 58
+        }
+      }
+    }
+  ]
+}

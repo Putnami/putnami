@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	registry "go.putnami.dev/protocol/registry"
 	runner "go.putnami.dev/protocol/runner"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/credentialprovider"
@@ -134,19 +135,22 @@ func guardCredentials(providers []string) error {
 // host-keyed seam, or on a hosted run through the user scope's provider or
 // without a credential.
 //
-// On a hosted run the provider starts here, before the first repository
-// process, because none may start afterwards (runcredential.StartHolder). A
-// provider this run refuses to start as a credential holder, because it is not
-// its extension's native runtime (*runcredential.NativeHolderError) or
-// repository code already ran (*runcredential.CustodyError), fails the command
-// here with that refusal, before the first hook. Any other failed start answers
-// the first credentials as a lazy start would.
+// On a hosted run, and on any run that enables the publish purpose, the
+// provider starts here, before the first repository process. A hosted run
+// starts no credential holder afterwards (runcredential.StartHolder), and a
+// run that may publish holds its publish credential in a provider that
+// started before repository code, locally as on a hosted run. A provider this
+// run refuses to start as a credential holder, because it is not its
+// extension's native runtime (*runcredential.NativeHolderError) or repository
+// code already ran (*runcredential.CustodyError), fails the command here with
+// that refusal, before the first hook. Any other failed start answers the
+// first credentials as a lazy start would.
 func installCredentialProviders(providers []string, source, wsRoot string, cfg *wsproto.Config, extensions []*extension.ExtensionDescription, stderr io.Writer) (func(), error) {
 	broker := credentialBroker(providers, source, wsRoot, cfg, extensions, stderr)
 	if broker == nil {
 		return func() {}, nil
 	}
-	if runcredential.Hosted() {
+	if runcredential.Hosted() || broker.Enabled(registry.PurposePublish) {
 		if err := broker.Start(context.Background()); refusedHolder(err) {
 			_ = broker.Close()
 			return func() {}, err
@@ -154,7 +158,9 @@ func installCredentialProviders(providers []string, source, wsRoot string, cfg *
 	}
 	restore := broker.InstallRead()
 	restoreJob := broker.InstallJobRead()
+	restorePublication := broker.InstallPublication()
 	return func() {
+		restorePublication()
 		restoreJob()
 		restore()
 		_ = broker.Close()

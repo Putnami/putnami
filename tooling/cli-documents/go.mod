@@ -17,6 +17,13 @@ require (
 )
 
 require (
+	github.com/docker/cli v29.4.3+incompatible // indirect
+	github.com/docker/docker-credential-helpers v0.9.3 // indirect
+	github.com/google/go-containerregistry v0.21.6 // indirect
+	github.com/klauspost/compress v1.18.6 // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.1.1 // indirect
+	github.com/sirupsen/logrus v1.9.4 // indirect
 	go.putnami.dev/cli/model v0.0.0 // indirect
 	go.putnami.dev/protocol/agentcontext v0.0.0 // indirect
 	go.putnami.dev/protocol/cache v0.0.0 // indirect
@@ -31,9 +38,11 @@ require (
 	go.putnami.dev/protocol/doctor v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
 	go.putnami.dev/protocol/extension v0.0.0 // indirect
+	go.putnami.dev/protocol/gomod v0.0.0 // indirect
 	go.putnami.dev/protocol/http-routes v0.0.0-00010101000000-000000000000 // indirect
 	go.putnami.dev/protocol/infra v0.0.0 // indirect
 	go.putnami.dev/protocol/job v0.0.0 // indirect
+	go.putnami.dev/protocol/oci v0.0.0 // indirect
 	go.putnami.dev/protocol/platform v0.0.0-00010101000000-000000000000 // indirect
 	go.putnami.dev/protocol/qualify v0.0.0-00010101000000-000000000000 // indirect
 	go.putnami.dev/protocol/registry v0.0.0 // indirect
@@ -43,6 +52,8 @@ require (
 	go.putnami.dev/protocol/telemetry v0.0.0 // indirect
 	go.putnami.dev/protocol/template v0.0.0 // indirect
 	go.putnami.dev/sdk/extension v0.0.0 // indirect
+	golang.org/x/mod v0.36.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 )
 
@@ -65,6 +76,7 @@ replace (
 	go.putnami.dev/protocol/events => ../../protocols/events
 	go.putnami.dev/protocol/extension => ../../protocols/extension
 	go.putnami.dev/protocol/features => ../../protocols/features
+	go.putnami.dev/protocol/gomod => ../../protocols/gomod
 	go.putnami.dev/protocol/http-routes => ../../protocols/http-routes
 	go.putnami.dev/protocol/infra => ../../protocols/infra
 	go.putnami.dev/protocol/job => ../../protocols/job

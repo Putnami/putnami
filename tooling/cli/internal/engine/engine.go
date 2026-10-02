@@ -39,6 +39,8 @@ package engine
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"maps"
 	"os"
@@ -47,6 +49,7 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 	protocolcli "go.putnami.dev/protocol/cli"
 	protocoljob "go.putnami.dev/protocol/job"
+	runner "go.putnami.dev/protocol/runner"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
@@ -383,6 +386,12 @@ type Request struct {
 	// run proceeds either way (jobs.BuildRunVersions); --debug prints it, so a
 	// 0.0.0 stamp can be told apart from a line that is really untagged.
 	versionsErr error
+	// ancestry is the bound commit's ancestry, read before the first hook by a
+	// run that may publish (readsAncestry), nil for every other run.
+	//
+	// UNEXPORTED for the same reason preparation is: Engine.Run reads it
+	// itself, and nothing an adapter can set replaces it.
+	ancestry *AncestrySnapshot
 	// Stdout receives the notices the ENGINE itself prints on the human stdout
 	// stream: "No impacted projects found", "No projects matched", "No jobs
 	// matched", the --plan table, the auto-selection line, and a blocked
@@ -490,6 +499,9 @@ type SessionResult struct {
 	// Withheld are the serve steps a Request.WithholdServeSteps run planned and
 	// did not start, one per selected project that has one, in plan order.
 	Withheld []*jobs.ScheduledJob
+	// ancestry is the snapshot the run read before its first hook, or nil
+	// (Request.ancestry).
+	ancestry *AncestrySnapshot
 }
 
 // Engine runs the job lifecycle. It is stateless today; the type exists so
@@ -541,6 +553,19 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 		return SessionResult{ExitCode: ExitError}, reportRepositoryRefusal(req, err)
 	}
 
+	// A run that may publish reads its bound commit's ancestry here, before
+	// the first hook runs repository code that could rewrite refs or replace
+	// objects (AncestrySnapshot). The snapshot an adapter read at process
+	// start for the same workspace, before its bootstrap or install ran any
+	// repository code, is that read (CaptureAncestry).
+	req.ancestry = nil
+	if readsAncestry(req) {
+		req.ancestry = capturedAncestry(ctx, req.WorkspaceRoot)
+		if req.ancestry == nil {
+			req.ancestry = captureAncestrySnapshot(req.WorkspaceRoot, MaxAncestryCommits)
+		}
+	}
+
 	// Hook verbosity is resolved once, here, from the flags as parsed. The run
 	// stages layer env/config overrides onto Global later (applyEnvOverrides);
 	// re-reading it for the after-hooks would make a PUTNAMI_VERBOSE run print
@@ -583,7 +608,7 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 
 	// After hooks run even if jobs failed.
 	code, hookErr := runAfterHooks(ctx, req, verbose, result.ExitCode)
-	result.ExitCode = code
+	result.ExitCode, result.ancestry = code, req.ancestry
 	if runErr == nil {
 		runErr = hookErr
 	}
@@ -693,7 +718,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// and the run's own plan is rebuilt below from the projects and extensions
 	// the coordinator leaves. It is never filtered in place: a narrowed plan
 	// would key a different task graph than it measured.
-	planned, code := buildPlan(req, ws, selectedProjects, planningExtensions, discovered)
+	planned, code := keyingPlan(req, ws, selectedProjects, planningExtensions, discovered, releaseSetOptions)
 	if code != ExitSuccess {
 		return SessionResult{ExitCode: code}, nil
 	}
@@ -753,12 +778,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		return SessionResult{ExitCode: protocolcli.ExitCodeForError(err), Plan: planned, Projects: selectedProjects}, nil
 	}
 	if releaseSetRun != nil {
-		planned, err = releaseSetRun.AttachPlan(planned)
-		if err != nil {
-			iox.Fprintf(os.Stderr, "putnami: release-set publish: %v\n", err)
-			return SessionResult{ExitCode: ExitError, Plan: planned, Projects: selectedProjects}, nil
-		}
-		planned, req.internalJobs, err = releaseSetRun.AttachBarrier(planned)
+		planned, req.internalJobs, err = attachReleaseSet(req, releaseSetRun, planned)
 		if err != nil {
 			iox.Fprintf(os.Stderr, "putnami: release-set publish: %v\n", err)
 			return SessionResult{ExitCode: ExitError, Plan: planned, Projects: selectedProjects}, nil
@@ -829,7 +849,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// expected one before anything is scheduled. It sits after the preflight so
 	// a blocked run transfers nothing, and before the release-set handoff so no
 	// publication capability is ever armed for a request that leaves.
-	if result, handled := e.portableSeam(ctx, req, ws, discovered, planned); handled {
+	if result, handled := e.portableSeam(ctx, req, ws, discovered, planned, releaseSetRun); handled {
 		result.Projects = selectedProjects
 		return result, nil
 	}
@@ -871,8 +891,12 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		newCachedObservationRecovery(req, ws, planningExtensions, cacheManager), req.specGate); gate != nil {
 		finalizers = append(finalizers, gate)
 	}
-	// The publish finalizers come after every session gate (publishFinalizers).
-	finalizers = append(finalizers, publishFinalizers(ctx, req, releaseSetRun)...)
+	ctx, finalizers, closeOutboxes, err := releaseSetExecution(ctx, req, releaseSetRun, finalizers)
+	if err != nil {
+		iox.Fprintf(os.Stderr, "putnami: release-set publish: %v\n", err)
+		return SessionResult{ExitCode: ExitError, Plan: planned, Projects: selectedProjects}, nil
+	}
+	defer closeOutboxes()
 	result := e.execute(ctx, req, ws, selectedProjects, discovered, planned, cacheManager, sink, finalizers...)
 	result.Plan, result.Projects = planned, selectedProjects
 	result = attachWithheldServeSteps(result, req, ws, withheld)
@@ -881,6 +905,40 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		result.ExitCode = archivePublishExitCode(result.ExitCode, unpublishedArchives, fatalUnpublishedArchives)
 	}
 	return result, nil
+}
+
+// releaseSetExecution prepares the release set's part of the execution. It
+// appends the publish finalizers after every session gate (publishFinalizers),
+// and returns the context that carries the private outboxes of a
+// publication-v1 run's publication jobs, and the function that removes them
+// when the run ends.
+func releaseSetExecution(ctx context.Context, req *Request, run *jobs.ReleaseSetRun, finalizers []func(map[string]*jobs.JobResult)) (context.Context, []func(map[string]*jobs.JobResult), func(), error) {
+	finalizers = append(finalizers, publishFinalizers(ctx, req, run)...)
+	ctx, closeOutboxes, err := run.PublicationContext(ctx)
+	return ctx, finalizers, closeOutboxes, err
+}
+
+// attachReleaseSet adds the release set's nodes to the plan, and returns the
+// plan with the in-process runners of those nodes. A run that publishes
+// through a publication-v1 provider first binds what open sends: its plan
+// tuple and the ancestry snapshot the run read before any repository code ran.
+func attachReleaseSet(req *Request, run *jobs.ReleaseSetRun, planned []*jobs.ScheduledJob) ([]*jobs.ScheduledJob, map[string]jobs.InternalJobRunner, error) {
+	planned, err := run.AttachPlan(planned)
+	if err != nil {
+		return planned, nil, err
+	}
+	var ancestry jobs.AncestryReader
+	if req.ancestry != nil {
+		ancestry = req.ancestry
+	}
+	var barrier []string
+	if req.Portable != nil && req.Portable.Request.Invocation.Publication != nil {
+		barrier = req.Portable.Request.Invocation.Publication.Barrier
+	}
+	if err := run.BindPublication(ancestry, barrier); err != nil {
+		return planned, nil, err
+	}
+	return run.AttachBarrier(planned)
 }
 
 // publishFinalizers returns the finalizers a publish session ends with, in
@@ -893,14 +951,15 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 //
 // The release-set coordinator comes last. It sees the synthetic failure of a
 // session gate or of the probe report, and publishes no successful outcome
-// after one.
+// after one. A run whose deploy barrier releases the set has no release
+// finalizer.
 func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *jobs.ReleaseSetRun) []func(map[string]*jobs.JobResult) {
 	dryRun, _ := req.CommandParams["dry-run"].(bool)
 	finalizers := []func(map[string]*jobs.JobResult){jobs.MemberProbeReport{
 		Run: releaseSetRun, Commands: req.Commands, DryRun: dryRun, Quiet: req.Global.Quiet, Out: os.Stderr,
 	}.Finalizer()}
-	if releaseSetRun != nil && len(req.internalJobs) == 0 {
-		finalizers = append(finalizers, releaseSetRun.Finalizer(ctx))
+	if release := releaseSetRun.Finalizer(ctx); release != nil {
+		finalizers = append(finalizers, release)
 	}
 	return finalizers
 }
@@ -921,6 +980,51 @@ func buildReleaseSetOptions(req *Request, ws *workspace.Workspace) (jobs.Release
 		Impacted: req.Global.Impacted, All: req.Global.All,
 		Versions: req.runVersions(ws),
 	})
+}
+
+// keyingPlan builds the run's first plan, the keying plan, and refuses it
+// with ExitError when it belongs to a bound request that may publish without
+// invocation.publication (refusesUnauthorizedPublication).
+func keyingPlan(
+	req *Request,
+	ws *workspace.Workspace,
+	selectedProjects []*workspace.Project,
+	planningExtensions []*extension.ExtensionDescription,
+	discovered *extension.DiscoveryResult,
+	options jobs.ReleaseSetOptions,
+) ([]*jobs.ScheduledJob, int) {
+	planned, code := buildPlan(req, ws, selectedProjects, planningExtensions, discovered)
+	if code == ExitSuccess && refusesUnauthorizedPublication(req, options, planned) {
+		return planned, ExitError
+	}
+	return planned, code
+}
+
+// refusesUnauthorizedPublication refuses a bound request that carries no
+// invocation.publication when its keying plan may publish: a planned task of a
+// publication command or with declared registry or cloud effects, or a
+// release-set publication the request enables. It runs before the release-set
+// preparation and every later stage that can start a provider, so a gate-only
+// request starts none. It prints the refusal and reports whether it refused.
+func refusesUnauthorizedPublication(req *Request, options jobs.ReleaseSetOptions, planned []*jobs.ScheduledJob) bool {
+	if req.Portable == nil || req.Portable.Request.Invocation.Publication != nil {
+		return false
+	}
+	var err error
+	for _, job := range planned {
+		if slices.Contains(runner.PublicationCommands, job.CommandName()) || jobs.HasExternalEffects(job) {
+			err = fmt.Errorf("runner: plan task %s publishes, but the request carries no invocation.publication", job.TypedIdentity().Key)
+			break
+		}
+	}
+	if err == nil && jobs.RequestedReleaseSetMode(options) != jobs.ReleaseSetDisabled {
+		err = errors.New("runner: the request starts a release-set publication, but carries no invocation.publication")
+	}
+	if err == nil {
+		return false
+	}
+	iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
+	return true
 }
 
 // deployNarrowsToChannelMembers reports whether an --impacted deploy must

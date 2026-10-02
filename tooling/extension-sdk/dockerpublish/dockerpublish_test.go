@@ -31,10 +31,12 @@ import (
 // loopback broker and DOCKER_REGISTRY may name a real registry; both would
 // change which transport and host the code under test picks. Tests that
 // need either value pin it with t.Setenv, which restores this cleared state.
+// A publication outbox inherited from an enclosing publication would turn
+// every managed publication under test into a pack, so it is cleared too.
 // It also points DOCKER_CONFIG at a directory holding an empty config.json,
 // so the default keychain never runs the developer's credential helper.
 func TestMain(m *testing.M) {
-	for _, key := range []string{privateOCIRegistryURLEnv, "DOCKER_REGISTRY"} {
+	for _, key := range []string{privateOCIRegistryURLEnv, "DOCKER_REGISTRY", extproto.PublicationOutboxEnv} {
 		if err := os.Unsetenv(key); err != nil {
 			panic(err)
 		}

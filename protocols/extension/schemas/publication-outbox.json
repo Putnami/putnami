@@ -1,0 +1,125 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-publication-outbox.json",
+  "title": "Putnami publication outbox descriptor",
+  "description": "The outbox.json a publication job writes at the root of the directory PUTNAMI_PUBLICATION_OUTBOX names. Implementations must also enforce the rules documented in protocols/extension/README.md that this schema cannot express: a document of at most 262144 bytes of valid UTF-8; no null, no duplicate member and no trailing data; container nesting of at most 4 levels; exactly the ecosystem block the member's ecosystem names; no two members with the same ecosystem and coordinate; no two artifact paths that are equal or nest; an npm registry that is an absolute https URL, or an http URL to a loopback host, with no userinfo, query or fragment; an OCI repository whose path after the registry host is the coordinate; and coordinate, version, project and repository values of at most 512 bytes with no space or control character.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "members"],
+  "properties": {
+    "protocolVersion": { "const": 1 },
+    "members": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "$ref": "#/definitions/member" }
+    }
+  },
+  "definitions": {
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ecosystem", "coordinate", "version", "project"],
+      "properties": {
+        "ecosystem": { "enum": ["npm", "go", "oci"] },
+        "coordinate": { "$ref": "#/definitions/identity" },
+        "version": { "$ref": "#/definitions/identity" },
+        "project": { "$ref": "#/definitions/identity" },
+        "npm": { "$ref": "#/definitions/npm" },
+        "go": { "$ref": "#/definitions/go" },
+        "oci": { "$ref": "#/definitions/oci" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "ecosystem": { "const": "npm" } } },
+          "then": { "required": ["npm"], "not": { "anyOf": [{ "required": ["go"] }, { "required": ["oci"] }] } }
+        },
+        {
+          "if": { "properties": { "ecosystem": { "const": "go" } } },
+          "then": { "required": ["go"], "not": { "anyOf": [{ "required": ["npm"] }, { "required": ["oci"] }] } }
+        },
+        {
+          "if": { "properties": { "ecosystem": { "const": "oci" } } },
+          "then": { "required": ["oci"], "not": { "anyOf": [{ "required": ["npm"] }, { "required": ["go"] }] } }
+        }
+      ]
+    },
+    "identity": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\s]+$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "description": "Relative to the outbox root: slash-separated and clean, with no empty, '.' or '..' segment, no leading slash, backslash, colon or control character, and never outbox.json.",
+      "pattern": "^[^/\\\\:\\u0000-\\u001f\\u007f][^\\\\:\\u0000-\\u001f\\u007f]*$",
+      "not": { "const": "outbox.json" }
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest", "size"],
+      "properties": {
+        "path": { "$ref": "#/definitions/path" },
+        "digest": { "$ref": "#/definitions/digest" },
+        "size": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "npm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registry", "tarball", "manifest"],
+      "properties": {
+        "registry": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The registry the job publishes the version to, resolved as a managed npm publication without an outbox does.",
+          "pattern": "^\\s*[Hh][Tt][Tt][Pp][Ss]?://"
+        },
+        "tarball": {
+          "allOf": [{ "$ref": "#/definitions/file" }, { "properties": { "size": { "maximum": 268435456 } } }]
+        },
+        "manifest": {
+          "allOf": [{ "$ref": "#/definitions/file" }, { "properties": { "size": { "maximum": 16777216 } } }]
+        }
+      }
+    },
+    "go": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["zip", "mod", "info"],
+      "properties": {
+        "zip": {
+          "allOf": [{ "$ref": "#/definitions/file" }, { "properties": { "size": { "maximum": 524288000 } } }]
+        },
+        "mod": {
+          "allOf": [{ "$ref": "#/definitions/file" }, { "properties": { "size": { "maximum": 16777216 } } }]
+        },
+        "info": {
+          "allOf": [{ "$ref": "#/definitions/file" }, { "properties": { "size": { "maximum": 65536 } } }]
+        }
+      }
+    },
+    "oci": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layout", "repository", "digest"],
+      "properties": {
+        "layout": { "$ref": "#/definitions/path" },
+        "repository": { "$ref": "#/definitions/identity" },
+        "digest": { "$ref": "#/definitions/digest" },
+        "tags": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$" }
+        }
+      }
+    }
+  }
+}

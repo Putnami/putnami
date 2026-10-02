@@ -38,32 +38,8 @@
         {
           "path": "go/extension/internal/jobs/publish/gomodule.go",
           "transport": "http",
-          "symbol": "http.Client",
-          "fingerprint": "762221363d2a1fd655077a0e9116272e8f6c312946afb3251d1a073796a5624f"
-        },
-        {
-          "path": "go/extension/internal/jobs/publish/gomodule.go",
-          "transport": "http",
           "symbol": "http.NewRequest",
           "fingerprint": "3e64d9e9ba9241f0cf10cc093ec5cfd49d42987637893fcfdf75bcac9c38cef2"
-        },
-        {
-          "path": "go/extension/internal/jobs/publish/gomodule.go",
-          "transport": "http",
-          "symbol": "http.NewRequest",
-          "fingerprint": "ab9da0308137a55a9eb7a763026c3aa72dfaf400af27ea428f2ee12719ecf747"
-        },
-        {
-          "path": "go/extension/internal/jobs/publish/gomodule.go",
-          "transport": "http",
-          "symbol": "http.NewRequest",
-          "fingerprint": "d0bb1d6ac8ca1449c372fe33ff7d952ed9108260e257d32b74667cee271af50f"
-        },
-        {
-          "path": "go/extension/internal/jobs/publish/gomodule.go",
-          "transport": "http",
-          "symbol": "http.NewRequest",
-          "fingerprint": "f0217eadb0138236fbd7dfd5704e562757b30cc41ffb224383ce0ec43d708144"
         }
       ],
       "owner": "@putnami/go",

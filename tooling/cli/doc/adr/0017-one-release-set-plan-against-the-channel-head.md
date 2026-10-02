@@ -1,6 +1,9 @@
 # ADR 0017 — One release-set plan, measured against the channel head
 
-- **Status**: accepted
+- **Status**: accepted. A run whose credential provider negotiates
+  `publication-v1` resolves and releases through that session instead of a
+  release-set provider process
+  ([ADR 0057](0057-publication-authority-stays-in-the-engine.md)).
 - **Scope**: `@putnami/cli` (`tooling/cli/internal/jobs/release_set.go`,
   `tooling/cli/internal/engine`) and `@putnami/extension-sdk`
   (`tooling/extension-sdk/releaseset`)
