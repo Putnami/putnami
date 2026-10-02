@@ -438,6 +438,11 @@
       "status": "stable"
     },
     {
+      "id": "go.putnami.dev/protocol/put",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
       "id": "go.putnami.dev/protocol/qualify",
       "kind": "protocol",
       "status": "preview"

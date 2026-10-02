@@ -78,7 +78,8 @@ const (
 const (
 	// GzipBlobMediaType is a gzip-compressed archive.
 	GzipBlobMediaType = "application/gzip"
-	// BinaryBlobMediaType is a raw executable.
+	// BinaryBlobMediaType is a raw executable. Only the CLI's own release
+	// publishes one (tooling/cli decision D-W2); every other archive is gzip.
 	BinaryBlobMediaType = "application/octet-stream"
 	// MigrationBundleBlobMediaType is a migration bundle.
 	MigrationBundleBlobMediaType = "application/vnd.putnami.migration-bundle.v1.tar"

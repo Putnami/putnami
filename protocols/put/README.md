@@ -52,7 +52,9 @@ GET  {base}/{namespace}/{package}/versions/{version}/manifest
 | `doc` | `application/vnd.putnami.sitecontent.bundle+json` | `application/gzip` |
 | `archive` | `application/vnd.putnami.archive+json` | `application/gzip`, `application/octet-stream` |
 
-A release archive is a member of ecosystem `archive`; a config, migration or
+An `archive` blob is `application/gzip`, except the CLI's own release, whose
+platform assets may be raw executables (`application/octet-stream`, CLI
+decision D-W2). A release archive is a member of ecosystem `archive`; a config, migration or
 doc member is a member of ecosystem `put`. Both live on the Put registry.
 
 ### Coordinates and versions
@@ -141,7 +143,7 @@ trailing data are refused. Adding a field to any message is a v2 change.
 
 | | |
 |---|---|
-| **Status** | No support status is recorded: a status is a reviewed decision recorded only in the workspace-root [`putnami.support.json`](../../putnami.support.json) |
+| **Status** | `preview` — see the `go.putnami.dev/protocol/put` entry in the workspace-root [`putnami.support.json`](../../putnami.support.json), which is the only authority for this value |
 | **Owner** | The `protocols` scope (`protocols/putnami.json`). The publish upload may not spell an endpoint, media type or field name of its own. |
 
 Evidence:
