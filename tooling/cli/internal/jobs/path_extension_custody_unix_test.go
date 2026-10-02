@@ -128,3 +128,47 @@ func TestAHandoffAfterAPathExtensionRuntimeIsRefused(t *testing.T) {
 		})
 	}
 }
+
+// An extension installed from the artifact store is registry code: on a
+// hosted run, probing a runtime toolchain its manifest declares and starting
+// its runtime record no repository code, so the run keeps custody and a
+// credential holder still starts afterwards.
+func TestAStoreExtensionToolchainProbeAndRuntimeKeepCustody(t *testing.T) {
+	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "no-credential-after-repository-code")
+	fixtureproc.Prepare(t)
+	// The fixture programs are written before hostedJobTest moves TMPDIR.
+	ext := storeRuntimeProviderExtension(t)
+	runtimeRecord := filepath.Join(t.TempDir(), "runtime.jsonl")
+	fixtureproc.Write(t, filepath.Join(ext.Path, filepath.FromSlash(providerRuntimeExecutable)),
+		fixtureproc.Program{Record: runtimeRecord, Stdout: runtimeInfoFor(t, ext)})
+	bin, probeRecord := t.TempDir(), filepath.Join(t.TempDir(), "probe.jsonl")
+	writeProbedProgram(t, filepath.Join(bin, "compiler"), fixtureproc.Program{Record: probeRecord, Stdout: "1.2.3\n"})
+	hostedJobTest(t)
+
+	wsRoot := t.TempDir()
+	if !extension.InArtifactStore(wsRoot, ext) {
+		t.Fatalf("%s is not installed from the artifact store", ext.Path)
+	}
+	ext.Runtime.Toolchains = map[string]extensionproto.RuntimeToolchain{"compiler": runtimeToolchainFixture("compiler")}
+	writeRuntimeToolchainLock(t, wsRoot, "compiler", "1.2.3", "integrity-a")
+	if err := resolveRuntimeToolchains(wsRoot, ext, []string{"compiler"}, []string{"PATH=" + bin}); err != nil {
+		t.Fatal(err)
+	}
+	if runs := fixtureproc.Runs(t, probeRecord); len(runs) != 1 {
+		t.Fatalf("the toolchain probe ran %d times, want once", len(runs))
+	}
+	if err := SynchronizeExtensionRuntimes(t.Context(), &workspace.Workspace{Root: wsRoot}, []*extension.ExtensionDescription{ext}, nil); err != nil {
+		t.Fatalf("starting the store runtime: %v", err)
+	}
+	if runs := fixtureproc.Runs(t, runtimeRecord); len(runs) == 0 {
+		t.Fatal("the store runtime never started")
+	}
+
+	if err := runcredential.RequireCustody("the cache provider of " + ext.Name); err != nil {
+		t.Errorf("RequireCustody = %v after registry code only, want nil", err)
+	}
+	started := false
+	if err := runcredential.StartHolder("the credential provider of "+ext.Name, func() error { started = true; return nil }); err != nil || !started {
+		t.Errorf("StartHolder = %v (started %v) after registry code only, want the holder started", err, started)
+	}
+}

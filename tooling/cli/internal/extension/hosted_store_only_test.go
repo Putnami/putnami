@@ -131,8 +131,10 @@ func storeInstalled(t *testing.T, ws, storeRoot, name string) {
 // workspace or outside it, a declared path that links out of the workspace,
 // and a declared path inside a node_modules directory, at the root or deeper.
 // A key that names an extension, even one equal to a workspace directory or
-// project path, loads its build from the artifact store. A run without the run
-// credential loads every one of them from the workspace.
+// project path, loads its build from the artifact store; when that build is
+// not installed, the project of that name is skipped with a reason that names
+// the pin. A run without the run credential loads every one of them from the
+// workspace.
 func TestHostedDiscoverySkipsEveryOtherLocalSource(t *testing.T) {
 	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "hosted-run-runs-only-store-and-path-extensions")
 	ws, outside, storeRoot := t.TempDir(), t.TempDir(), t.TempDir()
@@ -150,6 +152,8 @@ func TestHostedDiscoverySkipsEveryOtherLocalSource(t *testing.T) {
 	// their keys pin; the store holds both builds.
 	writeExtensionManifest(t, filepath.Join(ws, "@acme", "named"), storeOnlyManifest("@acme/named"))
 	writeExtensionManifest(t, filepath.Join(ws, "@acme", "project"), storeOnlyManifest("@acme/project"))
+	// A project whose name a key pins, with no build installed.
+	writeExtensionManifest(t, filepath.Join(ws, "tools", "unpinned"), storeOnlyManifest("@acme/unpinned"))
 	storeInstalled(t, ws, storeRoot, "@acme/named")
 	storeInstalled(t, ws, storeRoot, "@acme/project")
 	cfg := &wsproto.Config{Extensions: wsproto.ExtensionsConfig{List: map[string]string{
@@ -161,8 +165,9 @@ func TestHostedDiscoverySkipsEveryOtherLocalSource(t *testing.T) {
 		"/tools/escape":                        "",
 		"@acme/named":                          "1.0.0",
 		"@acme/project":                        "1.0.0",
+		"@acme/unpinned":                       "1.0.0",
 	}}}
-	projects := []string{filepath.Join("@acme", "project")}
+	projects := []string{filepath.Join("@acme", "project"), filepath.Join("tools", "unpinned")}
 	fromWorkspace := func(result *DiscoveryResult, name string) bool {
 		ext := FindExtensionByName(result.Extensions, name)
 		return ext != nil && ext.LocalSource
@@ -172,10 +177,10 @@ func TestHostedDiscoverySkipsEveryOtherLocalSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(local.Extensions); got != 8 {
-		t.Fatalf("a local run discovered %v, want eight extensions", extensionNames(local.Extensions))
+	if got := len(local.Extensions); got != 9 {
+		t.Fatalf("a local run discovered %v, want nine extensions", extensionNames(local.Extensions))
 	}
-	for _, name := range []string{"@acme/named", "@acme/project"} {
+	for _, name := range []string{"@acme/named", "@acme/project", "@acme/unpinned"} {
 		if !fromWorkspace(local, name) {
 			t.Errorf("a local run loaded %s from the store, want its workspace directory", name)
 		}
@@ -197,20 +202,26 @@ func TestHostedDiscoverySkipsEveryOtherLocalSource(t *testing.T) {
 	}
 	reasons := map[error][]string{}
 	for _, skip := range hosted.Skipped {
-		for _, reason := range []error{errNotFromTheStore, errInstalledPackage} {
+		for _, reason := range []error{errNotFromTheStore, errInstalledPackage, errPinnedBuildMissing} {
 			if errors.Is(skip.Reason, reason) {
 				reasons[reason] = append(reasons[reason], skip.Name)
 			}
 		}
 	}
 	for reason, want := range map[error][]string{
-		errNotFromTheStore:  {"@acme/absolute-inside", "@acme/absolute-outside", "@acme/escaped"},
-		errInstalledPackage: {"@acme/nested", "@acme/node-modules"},
+		errNotFromTheStore:    {"@acme/absolute-inside", "@acme/absolute-outside", "@acme/escaped"},
+		errInstalledPackage:   {"@acme/nested", "@acme/node-modules"},
+		errPinnedBuildMissing: {"@acme/unpinned"},
 	} {
 		got := reasons[reason]
 		slices.Sort(got)
 		if !slices.Equal(got, want) {
 			t.Errorf("a hosted run skipped %v with %q, want %v", got, reason, want)
+		}
+	}
+	for _, skip := range hosted.Skipped {
+		if errors.Is(skip.Reason, errPinnedBuildMissing) && !strings.Contains(skip.Reason.Error(), "pins @acme/unpinned") {
+			t.Errorf("the skip of an uninstalled pin does not name the pin: %v", skip.Reason)
 		}
 	}
 	if strings.Contains(errInstalledPackage.Error(), "declare it by its path") {

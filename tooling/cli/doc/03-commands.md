@@ -1382,7 +1382,9 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
   inside the workspace that starts with `/` or `./`, such as
   `/tools/my-extension`. Any other key names an extension, and the CLI loads
   the build the lock pins from the artifact store, even when a workspace
-  directory has that name. The CLI skips any other extension with a reason:
+  directory or project has that name. When that build is not installed, the
+  CLI skips a project of that name with a reason that names the pin, and the
+  extension stays absent. The CLI skips any other extension with a reason:
   one from an absolute path, or from a path that resolves outside the
   workspace. It also skips, with a reason of its own, an extension whose path
   lies inside a `node_modules` directory at any depth. `putnami extensions

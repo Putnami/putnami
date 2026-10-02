@@ -13,7 +13,7 @@ Extensions are discovered from these sources, in order:
 
 Each name is registered once, by the first source that loads it. Use `putnami extensions list` to see all discovered extensions with their provided jobs.
 
-A hosted run ([`--credential-fd`](03-commands.md#run-credential---credential-fd)) loads only the extensions installed from the artifact store and the workspace's path extensions: a workspace project, or an `extensions` entry whose key is a path inside the workspace that starts with `/` or `./`. Any other key names an extension, and a hosted run loads the build the lock pins from the artifact store. A hosted run skips an extension whose path lies inside a `node_modules` directory at any depth. A path extension serves no provider there, and its runtime, probes, jobs and hooks start after the run credential's last handoff.
+A hosted run ([`--credential-fd`](03-commands.md#run-credential---credential-fd)) loads only the extensions installed from the artifact store and the workspace's path extensions: a workspace project, or an `extensions` entry whose key is a path inside the workspace that starts with `/` or `./`. Any other key names an extension, and a hosted run loads the build the lock pins from the artifact store, even when a workspace project has that name; when that build is not installed, the extension stays absent and the project is skipped with a reason that names the pin. A hosted run skips an extension whose path lies inside a `node_modules` directory at any depth. A path extension serves no provider there, and its runtime, probes, jobs and hooks start after the run credential's last handoff.
 
 ### Consuming the published build of an extension you develop
 

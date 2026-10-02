@@ -30,6 +30,12 @@ var errNotFromTheStore = errors.New("a hosted run (--credential-fd) runs only ex
 var errInstalledPackage = fmt.Errorf("a hosted run (--credential-fd) runs no extension from a %s directory; "+
 	"pin this extension from the registry in the workspace lock", installedPackagesDirName)
 
+// errPinnedBuildMissing is the reason a hosted run skips a workspace project
+// whose manifest name a workspace config key pins (pinnedByName) when the
+// pinned build did not load: the run never runs the project in its place.
+var errPinnedBuildMissing = errors.New("a hosted run (--credential-fd) runs the build the workspace lock pins, " +
+	"never the workspace project of the same name; pin this extension from the registry in the workspace lock and install it")
+
 // errPathExtensionProvider is the reason a hosted run removes a provider
 // capability from a path extension.
 var errPathExtensionProvider = errors.New("a hosted run takes every provider from an extension installed from the artifact store")

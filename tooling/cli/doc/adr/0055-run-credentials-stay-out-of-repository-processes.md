@@ -61,7 +61,10 @@ flag, nothing changes.
   `extensions` entry whose key is a path inside the workspace that starts with
   `/` or `./`. Any other key names an extension, and discovery loads the
   build the lock pins from the store, even when a workspace directory or
-  project has that name. Discovery looks in no `node_modules` and skips an
+  project has that name. When that build is not installed, discovery skips a
+  project of that name with a reason that names the pin, and the extension
+  stays absent; a run without the flag loads the project instead, with a
+  warning. Discovery looks in no `node_modules` and skips an
   extension loaded from an absolute path, or whose files resolve outside the
   workspace, naming the extension and the reason. It skips an extension whose
   files lie inside a `node_modules` directory at any depth with a reason of

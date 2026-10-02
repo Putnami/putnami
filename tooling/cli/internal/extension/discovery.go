@@ -63,7 +63,8 @@ func DiscoverExtensions(workspaceRoot string, cfg *wsproto.Config, projectPaths 
 // A hosted run (runcredential.Hosted) looks in no node_modules directory, and
 // reads a workspace config key as a workspace path only when the key is
 // path-shaped (declaredByPath): any other key names an extension, which loads
-// from the artifact store. It keeps the extensions installed from the artifact
+// from the artifact store, and a workspace project of that name never loads in
+// place of a pinned build that is not installed (settlePinnedProjects). It keeps the extensions installed from the artifact
 // store (InArtifactStore) and the workspace's own path extensions
 // (WorkspacePathExtension), and returns every other one in Skipped. A path
 // extension loses its provider capabilities, each recorded in
@@ -194,7 +195,8 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 	}
 
 	// 3. A project manifest set aside for a pin that loaded nothing.
-	extensions = settlePinnedProjects(workspaceRoot, extensions, pinnedLocal, seen)
+	extensions, unsettled := settlePinnedProjects(workspaceRoot, extensions, pinnedLocal, seen, hosted)
+	recordSkips(unsettled)
 
 	// 4. Scan root package.json devDependencies for extension packages.
 	// Quick-check: only attempt full manifest load for packages that
@@ -270,9 +272,11 @@ func scanProjectExtensions(workspaceRoot string, cfg *wsproto.Config, projectPat
 // settlePinnedProjects resolves each project manifest scanProjectExtensions
 // set aside. When the pinned build loaded, that build and its jobs record the
 // project it replaces, so a project that names that project's path keeps
-// running the extension; otherwise the project manifest loads, with a warning that the pin
-// is not installed.
-func settlePinnedProjects(workspaceRoot string, extensions, pinned []*ExtensionDescription, seen map[string]bool) []*ExtensionDescription {
+// running the extension. Otherwise the project manifest loads, with a warning
+// that the pin is not installed; on a hosted run it does not, and the project
+// is returned in skipped, with errPinnedBuildMissing.
+func settlePinnedProjects(workspaceRoot string, extensions, pinned []*ExtensionDescription, seen map[string]bool, hosted bool) ([]*ExtensionDescription, []SkippedExtension) {
+	var skipped []SkippedExtension
 	for _, local := range pinned {
 		if seen[local.Name] {
 			if ext := FindExtensionByName(extensions, local.Name); ext != nil && !ext.LocalSource {
@@ -285,13 +289,20 @@ func settlePinnedProjects(workspaceRoot string, extensions, pinned []*ExtensionD
 			}
 			continue
 		}
+		if hosted {
+			skipped = append(skipped, SkippedExtension{
+				Ref: local.Name, Name: local.Name, Path: local.Path, Version: local.Version,
+				Reason: fmt.Errorf("the workspace config pins %s, and its build is not installed: %w", local.Name, errPinnedBuildMissing),
+			})
+			continue
+		}
 		warnOnce("pin-unloaded:"+workspaceRoot+":"+local.Name,
 			"workspace config pins an extension whose build is not installed; using the workspace project's manifest instead — run putnami install",
 			"extension", local.Name, "project", filepath.ToSlash(local.RelPath))
 		seen[local.Name] = true
 		extensions = append(extensions, local)
 	}
-	return extensions
+	return extensions, skipped
 }
 
 // pinnedByName reports whether the workspace config names the extension by
