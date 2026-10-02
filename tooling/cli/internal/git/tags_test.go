@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -210,10 +211,44 @@ func TestCommitsSinceReadsSubjectBodyAndPathspec(t *testing.T) {
 	if !strings.Contains(scoped[0].Body, "BREAKING CHANGE:") || len(scoped[0].SHA) != 40 {
 		t.Errorf("commit = %+v, want the body and the full SHA", scoped[0])
 	}
+
 	// An empty fromCommit walks the whole history, which is the untagged line.
 	whole, err := CommitsSince(dir, "", nil)
 	if err != nil || len(whole) != 3 {
 		t.Fatalf("CommitsSince(whole history) = %d/%v, want 3 commits", len(whole), err)
+	}
+}
+
+// A rename lists both of its paths, so a file moved out of a project still
+// counts as a change to it; the pathspec limits the files; a path git would
+// quote keeps its bytes.
+func TestCommitFilesListsBothPathsOfARename(t *testing.T) {
+	t.Parallel()
+	dir := initGitRepo(t)
+	writeCommit(t, dir, "typescript/é \"q\".ts", "feat(ts): add")
+	if err := os.MkdirAll(filepath.Join(dir, "go"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitDo(t, dir, "mv", "typescript/é \"q\".ts", "go/é \"q\".ts")
+	gitDo(t, dir, "commit", "-m", "refactor!: move")
+	head, err := HeadSHA(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := CommitFiles(dir, head, nil)
+	if err != nil {
+		t.Fatalf("CommitFiles: %v", err)
+	}
+	if !slices.Equal(files, []string{"go/é \"q\".ts", "typescript/é \"q\".ts"}) {
+		t.Errorf("files = %q, want both paths of the rename", files)
+	}
+	scoped, err := CommitFiles(dir, head, []string{"typescript"})
+	if err != nil || !slices.Equal(scoped, []string{"typescript/é \"q\".ts"}) {
+		t.Errorf("CommitFiles(typescript) = %q/%v, want only the typescript path", scoped, err)
+	}
+	if _, err := CommitFiles(dir, "0000000000000000000000000000000000000000", nil); err == nil {
+		t.Error("CommitFiles accepted a commit the repository does not have")
 	}
 }
 

@@ -147,6 +147,7 @@ func authoredExtensionProvidersDomain() *arch.Builder {
 				arch.Bind("/go/extension", "/protocols/registry"),
 				arch.Bind("/go/extension", "/protocols/runtime"),
 				arch.Bind("/go/extension", "/protocols/storage"),
+				arch.Bind("/go/extension", "/protocols/support"),
 				arch.Bind("/go/extension", "/protocols/workspace"),
 				arch.Bind("/python/extension", "/protocols/architecture"),
 				arch.Bind("/python/extension", "/protocols/capabilities"),

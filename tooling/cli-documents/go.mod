@@ -49,6 +49,7 @@ require (
 	go.putnami.dev/protocol/runner v0.0.0 // indirect
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
+	go.putnami.dev/protocol/support v0.0.0 // indirect
 	go.putnami.dev/protocol/telemetry v0.0.0 // indirect
 	go.putnami.dev/protocol/template v0.0.0 // indirect
 	go.putnami.dev/sdk/extension v0.0.0 // indirect

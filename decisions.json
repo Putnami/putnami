@@ -32,6 +32,20 @@
       "settled": "2026-09-11",
       "settledBy": "fdumay",
       "reviewOnly": true
+    },
+    {
+      "id": "D-004",
+      "statement": "before 1.0, a feature that breaks nothing ships in a patch, and only a breaking change makes a minor",
+      "settled": "2026-10-02",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-005",
+      "statement": "with a support catalog, only a commit that touches a project the catalog lists as stable, or an unlisted project a stable one depends on, advances its version line past a patch",
+      "settled": "2026-10-02",
+      "settledBy": "fdumay",
+      "reviewOnly": true
     }
   ]
 }

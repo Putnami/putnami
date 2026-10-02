@@ -155,6 +155,30 @@ func CommitsSince(repoRoot, fromCommit string, pathspecs []string) ([]Commit, er
 	return commits, nil
 }
 
+// CommitFiles returns the repository-relative paths one commit changes, limited
+// to pathspecs. A rename lists both of its paths, so a file moved out of a
+// project still counts as a change to that project. A root commit lists every
+// file it adds; a merge commit lists none, as it changes nothing of its own.
+// Paths are read NUL-separated, so no name is quoted or split.
+func CommitFiles(repoRoot, sha string, pathspecs []string) ([]string, error) {
+	args := []string{"diff-tree", "-r", "--root", "--no-commit-id", "--name-only", "--no-renames", "-z", "--end-of-options", sha}
+	if len(pathspecs) > 0 {
+		args = append(args, "--")
+		args = append(args, pathspecs...)
+	}
+	output, err := run(repoRoot, args...)
+	if err != nil {
+		return nil, fmt.Errorf("read the files of %s: %w", sha, err)
+	}
+	var files []string
+	for _, file := range strings.Split(output, "\x00") {
+		if file != "" {
+			files = append(files, file)
+		}
+	}
+	return files, nil
+}
+
 // TreeState reads the git state of the working tree alone: the commit, the
 // branch, the ordered suffix, and whether anything is uncommitted.
 //

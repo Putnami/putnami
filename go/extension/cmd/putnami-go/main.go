@@ -12,6 +12,7 @@
 //	build-generate  Generate openapi/proto/etc. specs from project sources
 //	test            Run Go tests with coverage
 //	lint            Lint Go code with golangci-lint and staticcheck
+//	validate-api    Check a stable project's exported API against its line's last tag
 //	serve           Run Go application with hot-reload
 //	run             Run a Go workload once and forward its exit code
 //	package         Create distribution packages
@@ -35,6 +36,7 @@ import (
 	// Add a new generator by introducing a sibling subpackage and listing it
 	// here — no other plumbing is required.
 	_ "go.putnami.dev/go/extension/internal/codegen/openapi"
+	"go.putnami.dev/go/extension/internal/jobs/apicheck"
 	"go.putnami.dev/go/extension/internal/jobs/build"
 	"go.putnami.dev/go/extension/internal/jobs/cachepolicy"
 	"go.putnami.dev/go/extension/internal/jobs/configextract"
@@ -80,6 +82,7 @@ func commandHandlers() map[string]cli.JobFunc {
 		"test-env-down":  dbtestenv.DownJob(),
 		"test":           test.Run,
 		"lint":           lint.Run,
+		"validate-api":   apicheck.Run,
 		"serve":          serve.Run,
 		"run":            run.Run,
 		"package":        pkg.Run,

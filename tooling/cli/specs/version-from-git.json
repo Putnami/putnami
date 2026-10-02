@@ -19,7 +19,7 @@
     },
     {
       "id": "conventional-advance",
-      "text": "An untagged commit takes the line's last tag advanced by the conventional commits that touch the line, at least a patch, plus the ordered suffix; before 1.0 breaking and feat are minor."
+      "text": "An untagged commit takes the line's last tag advanced by the conventional commits that touch the line, at least a patch, plus the ordered suffix; breaking is a minor before 1.0 and a major after, feat a patch before 1.0 and a minor after, fix and perf a patch; with a support catalog, a commit that touches no project it lists as stable advances a patch at most."
     },
     {
       "id": "full-clone-required",

@@ -36,10 +36,9 @@ import (
 // spec engine for its completeness report and read two of its fields. These ask
 // the same question directly, of the workspace document and the support catalog
 // — which are the two authorities the answer was ever derived from. The
-// predicate is reproduced here rather than imported because the engine that
-// held it now ships in a different module; supportKindForProject's convention
-// (a `protocol` tag selects the protocol subject kind) is pinned by the first
-// test below, exactly as it was.
+// subject a project needs is SupportSubjectOf, the predicate the version bump
+// reads; its convention (a `protocol` tag selects the protocol subject kind) is
+// pinned by the first test below, exactly as it was.
 
 // TestCheckedInProtocolProjectsCarryProtocolTag pins the authored convention
 // that decides which support SUBJECT a project needs.
@@ -57,8 +56,8 @@ func TestCheckedInProtocolProjectsCarryProtocolTag(t *testing.T) {
 			continue
 		}
 		seen++
-		if !slices.Contains(project.Tags, protocolTag) {
-			t.Errorf("protocol project %s (%s) does not carry the %q tag", project.Name, project.Path, protocolTag)
+		if !slices.Contains(project.Tags, supportProtocolTag) {
+			t.Errorf("protocol project %s (%s) does not carry the %q tag", project.Name, project.Path, supportProtocolTag)
 		}
 	}
 	if seen == 0 {
@@ -105,7 +104,7 @@ func TestCheckedInWorkspaceClassifiesEveryPublicSubject(t *testing.T) {
 	var unclassified []string
 	for _, project := range assessed {
 		if !classified[requiredSupportSubject(project)] {
-			unclassified = append(unclassified, subjectIDForProject(project))
+			unclassified = append(unclassified, requiredSupportSubject(project).id)
 		}
 	}
 	sort.Strings(unclassified)
@@ -214,9 +213,7 @@ func readCheckedInSupportCatalog(t *testing.T, root string) *supportproto.Catalo
 	return catalog
 }
 
-// --- the predicate, reproduced --------------------------------------------
-
-const protocolTag = "protocol"
+// --- the predicate ---------------------------------------------------------
 
 // protocolPathPrefix is used ONLY to find the projects the tag convention
 // applies to, never to classify one. Classification reads the tag.
@@ -226,27 +223,9 @@ func isProtocolPath(path string) bool {
 	return len(path) > len(protocolPathPrefix) && path[:len(protocolPathPrefix)] == protocolPathPrefix
 }
 
-// supportSubject mirrors the support protocol's identity boundary: kind and id
-// are both required. A package entry and a protocol entry with the same id
-// classify different subjects and must never satisfy one another.
-type supportSubject struct {
-	kind supportproto.SubjectKind
-	id   string
-}
-
-func subjectIDForProject(project *Project) string {
-	if project.Name != "" {
-		return project.Name
-	}
-	return project.ID
-}
-
 func requiredSupportSubject(project *Project) supportSubject {
-	kind := supportproto.SubjectKindPackage
-	if slices.Contains(project.Tags, protocolTag) {
-		kind = supportproto.SubjectKindProtocol
-	}
-	return supportSubject{kind: kind, id: subjectIDForProject(project)}
+	kind, id := SupportSubjectOf(project)
+	return supportSubject{kind: kind, id: id}
 }
 
 // consumableSupportPublishChannels are the `options.publish` channels that

@@ -159,6 +159,7 @@ func TestRunEntrypointDispatchesCompleteCommandSet(t *testing.T) {
 		"build", "build-generate", "build-describe", "test", "lint", "serve",
 		"run", "package", "publish", "config-extract", "config-merge",
 		"workspace-sync", "workspace-fetch", "workspace-install", "deps-upgrade",
+		"validate-api",
 	} {
 		if commands[name] == nil {
 			t.Errorf("command %q is not registered", name)

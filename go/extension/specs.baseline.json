@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "go/go-project-toolchain#api-compatibility-marker",
     "go/go-project-toolchain#archive-agent-content",
     "go/go-project-toolchain#archive-matrix-honesty",
     "go/go-project-toolchain#bounded-test-output",

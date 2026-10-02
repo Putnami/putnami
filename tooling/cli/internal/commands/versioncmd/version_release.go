@@ -236,7 +236,10 @@ func proposedTag(wsRoot string, spec git.LineSpec, explicit string) (version, ta
 		if commitsErr != nil {
 			return "", "", commitsErr
 		}
-		bump = git.BumpFor(commits, majorOf(last) == 0)
+		bump, err = git.BumpFor(commits, majorOf(last) == 0, git.LineStableTest(wsRoot, spec))
+		if err != nil {
+			return "", "", err
+		}
 	}
 	version = git.NextVersion(last, bump, false)
 	return version, wsproto.RenderLineTag(spec.TagPattern, version), nil
@@ -268,7 +271,8 @@ func lastLineTag(wsRoot string, spec git.LineSpec) (tag, commit string, ok bool,
 }
 
 // lineSpecs are the workspace's version lines, in sorted scope-path order, each
-// bound to the paths whose commits advance it.
+// bound to the paths whose commits advance it and to the support catalog that
+// caps the bump of a commit touching no stable project.
 func lineSpecs(wsRoot string) ([]git.LineSpec, error) {
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
@@ -279,16 +283,22 @@ func lineSpecs(wsRoot string) ([]git.LineSpec, error) {
 		paths = append(paths, path)
 	}
 	sort.Strings(paths)
+	// A release must not read an unusable catalog as absent: that would raise
+	// the bump of every preview project without a word.
+	stable, err := workspace.StableChangeTest(ws)
+	if err != nil {
+		return nil, cmderr.InvalidConfigf("version: %v", err)
+	}
 	specs := make([]git.LineSpec, 0, len(paths))
 	for _, path := range paths {
-		spec := git.LineSpec{ScopePath: path, TagPattern: ws.Lines[path]}
+		spec := git.LineSpec{ScopePath: path, TagPattern: ws.Lines[path], Stable: stable}
 		if path != "" {
 			spec.Pathspecs = []string{path}
 		}
 		specs = append(specs, spec)
 	}
 	if len(specs) == 0 {
-		specs = append(specs, git.LineSpec{TagPattern: wsproto.LineTagPattern("", nil)})
+		specs = append(specs, git.LineSpec{TagPattern: wsproto.LineTagPattern("", nil), Stable: stable})
 	}
 	return specs, nil
 }

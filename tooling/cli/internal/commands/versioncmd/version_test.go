@@ -188,14 +188,36 @@ func TestVersionTagDryRunProposesTheTagAndTheChangelog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("VersionTag --dry-run: %v", err)
 	}
-	if !strings.Contains(out, "ts/v0.5.0") {
-		t.Fatalf("output = %q, want the feat advanced to 0.5.0", out)
+	if !strings.Contains(out, "ts/v0.4.1") {
+		t.Fatalf("output = %q, want the feat advanced to the patch 0.4.1 before 1.0", out)
 	}
 	if !strings.Contains(out, "### Features") || !strings.Contains(out, "feat(web): add the thing") {
 		t.Fatalf("output = %q, want the rendered changelog", out)
 	}
 	if _, statErr := os.Stat(filepath.Join(dir, "typescript", "CHANGELOG.md")); statErr == nil {
 		t.Fatal("--dry-run wrote the changelog")
+	}
+}
+
+// Before 1.0, only a breaking change moves a line to its next minor.
+func TestVersionTagDryRunProposesAMinorForABreakingChangeBeforeOne(t *testing.T) {
+	dir := versionLineRepo(t)
+	gitInRepo(t, dir, "tag", "-a", "ts/v0.4.0", "-m", "release")
+	writeRepoFile(t, dir, "typescript/web/src.ts", "export const x = 1\n")
+	gitInRepo(t, dir, "add", "-A")
+	gitInRepo(t, dir, "commit", "-m", "feat(web): add the thing")
+	writeRepoFile(t, dir, "typescript/web/src.ts", "export const y = 1\n")
+	gitInRepo(t, dir, "add", "-A")
+	gitInRepo(t, dir, "commit", "-m", "fix(web)!: rename x to y")
+
+	out, err := sharedtest.CaptureStdout(t, func() error {
+		return VersionTag(context.Background(), dir, []string{"--scope", "typescript", "--dry-run"})
+	})
+	if err != nil {
+		t.Fatalf("VersionTag --dry-run: %v", err)
+	}
+	if !strings.Contains(out, "ts/v0.5.0") {
+		t.Fatalf("output = %q, want the breaking change advanced to 0.5.0", out)
 	}
 }
 

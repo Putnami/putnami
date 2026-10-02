@@ -37,14 +37,23 @@ promise the project has not made.
 
 | Release | May contain | Must not contain |
 |---|---|---|
-| Patch (`x.y.Z`) | The fix and its test, cut from the released tag | A new feature, an unrelated dependency bump, or any change to a version window |
-| Minor (`x.Y.0`) | Features, and breaking changes to the stable core with their migrations | A silent breaking change — one without release notes naming the user action |
-| Major (`X.0.0`) | Whatever the version contract of the day allows | — |
+| Patch (`0.y.Z`, before 1.0) | Fixes and features that break nothing, with their tests | A breaking change, or any change to a version window |
+| Minor (`0.Y.0`, before 1.0) | Breaking changes to the stable core, with their migrations | A silent breaking change — one without release notes naming the user action |
+| Patch (`x.y.Z`, from 1.0) | The fix and its test, cut from the released tag | A new feature, an unrelated dependency bump, or any change to a version window |
+| Minor (`x.Y.0`, from 1.0) | Features that break nothing | A breaking change |
+| Major (`X.0.0`, from 1.0) | Whatever the version contract of the day allows | — |
 
 Pre-1.0, minor releases do not promise backward compatibility with earlier
 minors. That is the published contract, not an accident, and it is the reason
-the patch line above is narrow: a patch is the one release users can take
-without reading anything.
+only a minor may break: a pre-1.0 patch is the one release users can take
+without reading anything. npm and Cargo read `^0.3.0` as `>=0.3.0 <0.4.0`, so a
+feature shipped in a minor would stop every automatic upgrade for nothing to
+migrate; `putnami version` proposes a patch for it.
+
+The table holds for the projects `putnami.support.json` lists as `stable`. A
+`preview` or `experimental` project, or one the catalog does not list and no
+stable project depends on, promises no compatibility, so its changes, breaking ones included, ship in a patch; a
+breaking one still names its migration in the release notes.
 
 ## Release checklist
 
@@ -139,8 +148,9 @@ putnami version tag --scope tooling --yes --push
 
 A commit carrying its line's tag has the tag's version, with no suffix. Any
 other commit takes the line's last tag advanced by the conventional commits
-that touch the line — breaking and `feat` are a minor before 1.0, `fix` and
-`perf` a patch, anything else nothing — floored at a patch, plus the ordered
+that touch the line — breaking is a minor before 1.0, `feat`, `fix` and `perf`
+a patch, anything else nothing, and a commit that touches no `stable` project a
+patch at most — floored at a patch, plus the ordered
 suffix `<yyyymmddHHMMSS>-<sha>`. `version tag` regenerates
 `<line>/CHANGELOG.md` from those same commits, creates the release commit that
 carries it, then the annotated tag on that commit.

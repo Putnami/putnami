@@ -253,6 +253,11 @@
         }
       ]
     },
+    "validate": {
+      "description": "Hold the breaking-change marker: for a Go project the root putnami.support.json lists as stable, or every Go project when the workspace has no catalog, compare the exported API with the last tag of the project's version line. An incompatible change fails unless a commit since that tag declares a breaking change with \"!\" or a BREAKING CHANGE: footer.",
+      "activationFiles": ["**/*.go", "go.mod"],
+      "run": [{ "id": "api", "task": "validate-api" }]
+    },
     "serve": {
       "description": "Run Go application with hot-reload. Build-and-exec: the served process is compiled and run in one step, and no binary is emitted.",
       "activationFiles": ["**/*.go", "go.mod"],
@@ -1160,6 +1165,22 @@
       "timeoutMs": 120000,
       "outputs": {
         "data": { "description": "Documentation link result with diagnostics" }
+      },
+      "reads": ["sources"],
+      "cache": {
+        "enabled": false
+      },
+      "declares": {}
+    },
+    "validate-api": {
+      "description": "API compatibility check of one Go project against its version line's last reachable tag: the exported functions, types, methods, fields, interface methods, variables and constants of every importable package, read from source with go/parser and no type-checking. When the workspace has a support catalog, only a project it lists as stable is checked; a preview, experimental or unlisted project is skipped. UNCACHEABLE on purpose: the verdict reads the line's git tags, the files at the last one, and the messages of the commits since, and no file-pattern key covers git history, so a key would serve a stale verdict after a new tag or a new commit. The check starts no tool other than git.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["validate-api"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 120000,
+      "outputs": {
+        "data": { "description": "API check result: whether a tag was compared, the tag, the number of packages at that tag, the number of incompatible changes, and the commit that declares them breaking" }
       },
       "reads": ["sources"],
       "cache": {
