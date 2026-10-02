@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -282,37 +283,68 @@ func TestAPreviewOrExperimentalProjectIsSkipped(t *testing.T) {
 	}
 }
 
-func TestTheProtocolTagSelectsTheProtocolSubject(t *testing.T) {
-	t.Parallel()
-	listedAsPackage := newFixture(t, catalog("package", "experimental"), "protocol")
-	listedAsPackage.write("lib/greet/greet.go", waveOnlySource)
-	if report := listedAsPackage.check(); report.Skip != "" || len(report.Changes) != 1 {
-		t.Fatalf("a protocol project the catalog lists only as a package is unlisted, so stable: %+v", report)
+func TestAProjectTheCatalogDoesNotListIsSkipped(t *testing.T) {
+	spectest.Proves(t, feature, requirement, "an-unlisted-project-is-not-checked-when-a-catalog-exists")
+	f := newFixture(t, `{"protocolVersion":1,"entries":[{"id":"go.example.com/other","kind":"package","status":"stable"}]}`)
+	f.write("lib/greet/greet.go", waveOnlySource)
+	f.commit("feat: drop the greeting")
+
+	status, _, events := f.run()
+	if status != "SKIP" {
+		t.Fatalf("status = %q, want SKIP", status)
 	}
-	listedAsProtocol := newFixture(t, catalog("protocol", "experimental"), "protocol")
-	if report := listedAsProtocol.check(); report.Skip == "" {
-		t.Fatalf("report = %+v, want the protocol entry to skip it", report)
+	if found := diagnostics(events, runtime.SeverityError); len(found) != 0 {
+		t.Fatalf("error diagnostics = %+v, want none", found)
+	}
+	want := "putnami.support.json does not list the package go.example.com/lib, so it promises no compatibility: its API is not checked"
+	if report := f.check(); report.Skip != want {
+		t.Fatalf("skip = %q\nwant   %q", report.Skip, want)
 	}
 }
 
+func TestTheProtocolTagSelectsTheProtocolSubject(t *testing.T) {
+	t.Parallel()
+	listedAsPackage := newFixture(t, catalog("package", "stable"), "protocol")
+	listedAsPackage.write("lib/greet/greet.go", waveOnlySource)
+	if report := listedAsPackage.check(); !strings.Contains(report.Skip, "does not list the protocol "+projectName) {
+		t.Fatalf("a protocol project the catalog lists only as a package is unlisted: %+v", report)
+	}
+	listedAsProtocol := newFixture(t, catalog("protocol", "stable"), "protocol")
+	listedAsProtocol.write("lib/greet/greet.go", waveOnlySource)
+	if report := listedAsProtocol.check(); report.Skip != "" || len(report.Changes) != 1 {
+		t.Fatalf("report = %+v, want the protocol entry to check it", report)
+	}
+}
+
+// Tags resolve as the workspace loader resolves them: a project's own tags,
+// else its scope's, and an authored empty list blocks the scope's.
 func TestScopeTagsApplyWhenTheProjectDeclaresNone(t *testing.T) {
 	t.Parallel()
-	root := t.TempDir()
-	project := filepath.Join(root, "protocols", "lib")
-	for path, content := range map[string]string{
-		"protocols/putnami.json":     `{"tags":["protocol"],"includes":["lib"]}`,
-		"protocols/lib/putnami.json": `{"name":"` + projectName + `"}`,
+	for _, testCase := range []struct {
+		project string
+		want    []string
+	}{
+		{project: `{"name":"` + projectName + `"}`, want: []string{"protocol"}},
+		{project: `{"name":"` + projectName + `","tags":[]}`, want: []string{}},
+		{project: `{"name":"` + projectName + `","tags":["go"]}`, want: []string{"go"}},
 	} {
-		full := filepath.Join(root, filepath.FromSlash(path))
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatal(err)
+		root := t.TempDir()
+		project := filepath.Join(root, "protocols", "lib")
+		for path, content := range map[string]string{
+			"protocols/putnami.json":     `{"tags":["protocol"],"includes":["lib"]}`,
+			"protocols/lib/putnami.json": testCase.project,
+		} {
+			full := filepath.Join(root, filepath.FromSlash(path))
+			if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
 		}
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
+		if tags := projectTags(root, project); !slices.Equal(tags, testCase.want) {
+			t.Errorf("projectTags for %s = %v, want %v", testCase.project, tags, testCase.want)
 		}
-	}
-	if tags := projectTags(root, project); len(tags) != 1 || tags[0] != "protocol" {
-		t.Fatalf("tags = %v, want the scope's", tags)
 	}
 }
 
@@ -341,7 +373,6 @@ func TestALineWithoutATagHasNothingToCompare(t *testing.T) {
 	spectest.Proves(t, feature, requirement, "a-line-without-a-reachable-tag-passes")
 	f := newFixture(t, catalog("package", "stable"))
 	f.git("tag", "-d", firstTag)
-	f.git("tag", "other/v1.0.0")
 	f.write("lib/greet/greet.go", waveOnlySource)
 
 	status, data, events := f.run()
@@ -351,8 +382,20 @@ func TestALineWithoutATagHasNothingToCompare(t *testing.T) {
 	if found := diagnostics(events, runtime.SeverityError); len(found) != 0 {
 		t.Fatalf("error diagnostics = %+v, want none", found)
 	}
-	if report := f.check(); !strings.Contains(report.Note, "no tag of line lib/v{version} is reachable") {
+	if report := f.check(); !strings.Contains(report.Note, "no tag of line lib/v{version} is reachable") || report.Warning != "" {
 		t.Fatalf("report = %+v", report)
+	}
+
+	// Tags of other lines suggest the checkout lacks this line's: a warning.
+	f.git("tag", "other/v1.0.0")
+	status, data, events = f.run()
+	if status != "OK" || data["compared"] != false {
+		t.Fatalf("status = %q, data = %v, want OK without a comparison", status, data)
+	}
+	warnings := diagnostics(events, runtime.SeverityWarning)
+	if len(warnings) != 1 || warnings[0].Code != NotComparedCode ||
+		!strings.Contains(warnings[0].Message, "no tag of line lib/v{version} is reachable from HEAD, though the repository has other tags") {
+		t.Fatalf("warnings = %+v", warnings)
 	}
 }
 
@@ -365,7 +408,9 @@ func TestATagTheLineCouldNotRenderIsNoBaseline(t *testing.T) {
 	f.commit("chore: a later commit")
 	f.git("tag", "lib/v")
 	f.write("lib/greet/greet.go", waveOnlySource)
-	if report := f.check(); report.Note == "" || report.Tag != "" {
+	// The repository still has tags, lib/v0.4.0 among them, so the missing
+	// baseline is a warning.
+	if report := f.check(); report.Warning == "" || report.Tag != "" {
 		t.Fatalf("report = %+v, want no baseline", report)
 	}
 }
@@ -415,8 +460,34 @@ func TestAWorkspaceOutsideGitHasNothingToCompare(t *testing.T) {
 	// The temporary directory may sit inside a repository; git must not find it.
 	t.Setenv("GIT_CEILING_DIRECTORIES", root)
 	report, err := Check(root, project, projectName)
-	if err != nil || !strings.Contains(report.Note, "not in a git repository") {
+	if err != nil || !strings.Contains(report.Warning, "not in a git repository") || report.Note != "" {
 		t.Fatalf("report = %+v, err = %v", report, err)
+	}
+}
+
+func TestOnlyTheFilesTheSurfaceReadsAreLoadedFromTheTag(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t, catalog("package", "stable"))
+	for _, path := range []string{"internal/x/x.go", "testdata/x.go", "vendor/a/a.go", "_old/x.go", "sub/x.go", "greet_test.go"} {
+		f.write("lib/greet/"+path, "package x\n")
+	}
+	f.write("lib/greet/sub/go.mod", "module go.example.com/sub\n")
+	f.commit("chore: more files")
+	f.git("tag", "lib/v0.5.0")
+
+	files, err := filesAtTag(f.project, "lib/v0.5.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths := make([]string, 0, len(files))
+	for _, file := range files {
+		paths = append(paths, file.Path)
+	}
+	if want := []string{"go.mod", "greet.go", "sub/go.mod"}; !slices.Equal(paths, want) {
+		t.Fatalf("loaded %q, want %q", paths, want)
+	}
+	if string(files[1].Data) != greetSource {
+		t.Fatalf("greet.go = %q", files[1].Data)
 	}
 }
 

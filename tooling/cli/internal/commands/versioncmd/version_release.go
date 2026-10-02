@@ -236,7 +236,10 @@ func proposedTag(wsRoot string, spec git.LineSpec, explicit string) (version, ta
 		if commitsErr != nil {
 			return "", "", commitsErr
 		}
-		bump = git.BumpFor(commits, majorOf(last) == 0, spec.Stable)
+		bump, err = git.BumpFor(commits, majorOf(last) == 0, git.LineStableTest(wsRoot, spec))
+		if err != nil {
+			return "", "", err
+		}
 	}
 	version = git.NextVersion(last, bump, false)
 	return version, wsproto.RenderLineTag(spec.TagPattern, version), nil

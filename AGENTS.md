@@ -1,6 +1,6 @@
 # AGENTS.md
 
-<!-- putnami:guidance v2 begin sha256:2c82de283d6bbdd597ad728f67e79fabdc4bc60045037e63f7411fabf9d1d193 -->
+<!-- putnami:guidance v2 begin sha256:6e34a49b1c1b361b447547b0db8b50742e735c729eadc3b322f89b38629b43ed -->
 This is a Putnami workspace.
 - Build, test, lint, install, add dependencies, and generate with `./putnamiw` when present, otherwise `putnami`. Never call npm, bun, go, pip, or cargo directly for those.
 - While iterating, select the projects you changed with `--projects <a>,<b>`; unlike `--impacted`, it skips every project that depends on them. Before declaring work complete, run `putnami lint,test,build,validate --impacted --enforce-coverage` once, when feasible.
@@ -12,5 +12,6 @@ This is a Putnami workspace.
   - D-002 — every pull request names what it deletes (settled 2026-09-03, review-only, held by a human reviewer)
   - D-003 — every GitHub artifact, code comment and document is written in English (settled 2026-09-11, review-only, held by a human reviewer)
   - D-004 — before 1.0, a feature that breaks nothing ships in a patch, and only a breaking change makes a minor (settled 2026-10-02, review-only, held by a human reviewer)
+  - D-005 — with a support catalog, only a commit that touches a project the catalog lists as stable advances its version line past a patch; unlisted projects and unowned files promise nothing (settled 2026-10-02, review-only, held by a human reviewer)
   - Project decisions, returned by `putnami.context` with their project: `tooling/cli/decisions.json` (12).
 <!-- putnami:guidance v2 end -->

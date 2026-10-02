@@ -16,6 +16,7 @@ func TestDeclaresBreakingReadsMessagesAsTheVersionBumpDoes(t *testing.T) {
 		{name: "breaking marker", subject: "feat!: change", breaking: true},
 		{name: "scoped breaking marker", subject: "feat(cli)!: change", breaking: true},
 		{name: "breaking footer", subject: "refactor: move", body: "why\n\nBREAKING CHANGE: the flag is gone", breaking: true},
+		{name: "hyphenated footer", subject: "refactor: move", body: "why\n\nBREAKING-CHANGE: the flag is gone", breaking: true},
 		{name: "indented footer", subject: "refactor: move", body: "why\n\n  BREAKING CHANGE: gone", breaking: true},
 		{name: "footer in prose", subject: "docs: explain", body: "a line that mentions BREAKING CHANGE: later"},
 		{name: "no colon", subject: "just a message"},

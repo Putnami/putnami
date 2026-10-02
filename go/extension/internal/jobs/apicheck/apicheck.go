@@ -2,9 +2,10 @@
 // marker: a stable Go project's exported API may break only in a release whose
 // commits declare it.
 //
-// For a project the root putnami.support.json lists as stable (or does not
-// list), the task compares the exported API of the working tree with the API
-// at the last tag of the project's version line. An incompatible change fails
+// For a project the root putnami.support.json lists as stable, or for every
+// project of a workspace with no catalog, the task compares the exported API
+// of the working tree with the API at the last tag of the project's version
+// line. An incompatible change fails
 // the task unless a commit since that tag that touches the project declares a
 // breaking change, with "!" or a "BREAKING CHANGE:" footer: that marker is
 // what makes the version bump advance the line past a feature release.
@@ -21,13 +22,16 @@ import (
 
 	"go.putnami.dev/go/extension/internal/apisurface"
 	protocolcli "go.putnami.dev/protocol/cli"
-	supportproto "go.putnami.dev/protocol/support"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
 // Code is the diagnostic code of an incompatible API change.
 const Code = "api-compat"
+
+// NotComparedCode is the diagnostic code of the warning a check gives when the
+// checkout may lack what it needs to compare, so it compared nothing.
+const NotComparedCode = "api-compat-not-compared"
 
 // phase is the phase the task reports.
 const phase = "api-compat"
@@ -39,10 +43,12 @@ const markerHint = `declare the breaking change with "!" or a BREAKING CHANGE: f
 type Report struct {
 	// Skip says why the project is not checked; empty when it is.
 	Skip string
-	// Note says why nothing was compared, when nothing was.
+	// Note says why nothing was compared, when nothing was and the project
+	// has no released API yet.
 	Note string
-	// Warning says why nothing was compared when the reason is a gap in the
-	// checkout rather than in the project.
+	// Warning says why nothing was compared when the checkout may lack what
+	// the check needs: no repository, a shallow clone, or no tag of the line
+	// while the repository has other tags.
 	Warning string
 	// Tag is the line tag the API was compared with.
 	Tag string
@@ -78,18 +84,18 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string
 // line's last tag. name is the project's resolved name: its support-catalog
 // identity, and the module path used when the project has no go.mod.
 func Check(workspaceRoot, projectDir, name string) (*Report, error) {
-	status, err := supportStatus(workspaceRoot, projectDir, name)
+	skip, err := notChecked(workspaceRoot, projectDir, name)
 	if err != nil {
 		return nil, protocolcli.Classify(err, protocolcli.ErrInvalidConfig)
 	}
-	if status != supportproto.StatusStable {
-		return &Report{Skip: fmt.Sprintf("%s is %s in %s, which promises no compatibility: its API is not checked",
-			name, status, supportproto.CatalogFilename)}, nil
+	if skip != "" {
+		return &Report{Skip: skip}, nil
 	}
 
 	state, err := readRepoState(projectDir)
 	if errors.Is(err, errNotARepository) {
-		return &Report{Note: "the workspace is not in a git repository: there is no tagged API to compare with"}, nil
+		return &Report{Warning: "the workspace is not in a git repository, so it has no tags to compare with " +
+			"and the API is not compared; run the check in a git checkout"}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -107,6 +113,14 @@ func Check(workspaceRoot, projectDir, name string) (*Report, error) {
 		return nil, err
 	}
 	if !ok {
+		tagged, err := hasTags(projectDir)
+		if err != nil {
+			return nil, err
+		}
+		if tagged {
+			return &Report{Warning: fmt.Sprintf("no tag of line %s is reachable from HEAD, though the repository has other tags, "+
+				"so the API is not compared; fetch the line's tags if it has released", pattern)}, nil
+		}
 		return &Report{Note: fmt.Sprintf("no tag of line %s is reachable from HEAD: there is no released API to compare with", pattern)}, nil
 	}
 
@@ -199,7 +213,7 @@ func render(emit *jsonl.Emitter, workspaceRoot, projectDir string, report *Repor
 		emit.PhaseEnd(phase, "skipped")
 		return "SKIP", nil, nil
 	case report.Warning != "":
-		emit.Warn(report.Warning)
+		emit.DiagnosticWithCode("warning", report.Warning, "", 0, 0, NotComparedCode)
 		emit.PhaseEnd(phase, "success")
 		return "OK", map[string]any{"compared": false}, nil
 	case report.Note != "":

@@ -2,13 +2,15 @@ package apicheck
 
 import "strings"
 
-// breakingFooter is the conventional-commit footer that declares a breaking
-// change without the "!" marker. It is matched at the start of a body line.
-const breakingFooter = "BREAKING CHANGE:"
+// breakingFooters are the conventional-commit footers that declare a breaking
+// change without the "!" marker; Conventional Commits 1.0.0 makes the
+// hyphenated form a synonym. One is matched at the start of a body line.
+var breakingFooters = []string{"BREAKING CHANGE:", "BREAKING-CHANGE:"}
 
 // declaresBreaking reports whether a commit is a conventional commit that
 // declares a breaking change, with the "!" marker ("feat!: ...",
-// "feat(scope)!: ...") or a "BREAKING CHANGE:" footer line in its body.
+// "feat(scope)!: ...") or a "BREAKING CHANGE:" or "BREAKING-CHANGE:" footer
+// line in its body.
 //
 // It reads a message exactly as the version bump does
 // (tooling/cli/internal/git ParseConventional), because the two must agree: a
@@ -39,8 +41,11 @@ func declaresBreaking(subject, body string) bool {
 		return true
 	}
 	for line := range strings.SplitSeq(body, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), breakingFooter) {
-			return true
+		line = strings.TrimSpace(line)
+		for _, footer := range breakingFooters {
+			if strings.HasPrefix(line, footer) {
+				return true
+			}
 		}
 	}
 	return false

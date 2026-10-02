@@ -29,8 +29,8 @@ type LineSpec struct {
 	// Pathspecs bound which commits advance the line: only those that touch one
 	// of these paths are read. Empty means the whole tree.
 	Pathspecs []string
-	// Stable caps at a patch every commit that touches no stable project. Nil
-	// reads every commit as stable.
+	// Stable caps at a patch every commit that touches no stable project, by
+	// the files it changes inside Pathspecs. Nil reads every commit as stable.
 	Stable StableTest
 }
 
@@ -142,7 +142,11 @@ func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
 		return nil, err
 	}
 	major, _, _ := parseSemverCore(lastVersion)
-	info.Base = NextVersion(lastVersion, BumpFor(commits, major == 0, line.Stable), true)
+	bump, err := BumpFor(commits, major == 0, LineStableTest(repoRoot, line))
+	if err != nil {
+		return nil, err
+	}
+	info.Base = NextVersion(lastVersion, bump, true)
 	info.Full = info.Base + "-" + info.Suffix
 	return info, nil
 }

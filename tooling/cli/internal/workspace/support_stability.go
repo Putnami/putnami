@@ -41,14 +41,15 @@ func SupportSubjectOf(project *Project) (supportproto.SubjectKind, string) {
 // StableChangeTest is the test the version bump asks of each commit: does it
 // touch a project the root support catalog lists as stable?
 //
-// A commit reads as stable unless every file it changes belongs to a project
-// the catalog lists as preview or experimental. A file no project owns, and a
-// project the catalog does not list, count as stable: without a reviewed
-// status, the larger bump is the one that cannot surprise a user.
+// When a catalog exists, it is the authority: a commit counts as stable only
+// when a file it changes belongs to a project the catalog lists as `stable`. A
+// preview or experimental project promises no compatibility, and neither does a
+// project the catalog does not list or a file no project owns, so a commit that
+// touches only those advances a patch at most.
 //
 // A workspace with no catalog returns a nil test, which reads every commit as
-// stable. An unreadable or invalid catalog is an error, because reading it as
-// absent would raise the bump of every preview package without a word.
+// stable. An unreadable or invalid catalog is an error: reading it as absent
+// would raise the bump of every preview project without a word.
 func StableChangeTest(ws *Workspace) (git.StableTest, error) {
 	if ws == nil {
 		return nil, nil
@@ -64,26 +65,31 @@ func StableChangeTest(ws *Workspace) (git.StableTest, error) {
 	if catalog == nil || diag.HasErrors(findings) {
 		return nil, fmt.Errorf("%s is invalid: %s", supportproto.CatalogFilename, diag.ErrorText(findings))
 	}
-	unpromised := make(map[supportSubject]bool, len(catalog.Entries))
+	stable := make(map[supportSubject]bool, len(catalog.Entries))
 	for _, entry := range catalog.Entries {
-		if entry.Status == supportproto.StatusPreview || entry.Status == supportproto.StatusExperimental {
-			unpromised[supportSubject{kind: entry.Kind, id: entry.ID}] = true
+		if entry.Status == supportproto.StatusStable {
+			stable[supportSubject{kind: entry.Kind, id: entry.ID}] = true
 		}
 	}
+	// A path's owners are the same for every commit, and each lookup rebuilds
+	// the owner index, so a path is looked up once per test. The test is
+	// therefore not safe for concurrent use.
+	ownedByStable := make(map[string]bool)
 	return func(files []string) bool {
-		if len(files) == 0 {
-			return true
-		}
 		for _, file := range files {
-			owners := ProjectOwnersForPath(ws, file)
-			if len(owners) == 0 {
-				return true
-			}
-			for _, owner := range owners {
-				kind, id := SupportSubjectOf(owner)
-				if !unpromised[supportSubject{kind: kind, id: id}] {
-					return true
+			promised, seen := ownedByStable[file]
+			if !seen {
+				for _, owner := range ProjectOwnersForPath(ws, file) {
+					kind, id := SupportSubjectOf(owner)
+					if stable[supportSubject{kind: kind, id: id}] {
+						promised = true
+						break
+					}
 				}
+				ownedByStable[file] = promised
+			}
+			if promised {
+				return true
 			}
 		}
 		return false

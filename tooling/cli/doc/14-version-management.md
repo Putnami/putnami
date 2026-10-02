@@ -37,7 +37,9 @@ For each line, in order:
 
 Before 1.0, a minor is the release that may need a migration, and nothing else: a feature that breaks nothing ships in a patch, so a `^0.y.0` range picks it up.
 
-The bump reads the support status that the root [`putnami.support.json`](../../../protocols/support/README.md) gives the projects a commit touches. A commit counts as stable unless every file it changes belongs to a project the catalog lists as `preview` or `experimental`: those promise no compatibility, so their changes never move the line past a patch. A file that no project owns, and a project the catalog does not list, count as stable. A workspace with no catalog reads every commit as stable. `version get` and `version tag` refuse a catalog they cannot parse; a build stamps its pre-release versions with the stable reading and reports the catalog error.
+The bump reads the support status that the root [`putnami.support.json`](../../../protocols/support/README.md) gives the projects a commit touches inside the line. When the catalog exists, it is the authority: a commit counts as stable only when a file it changes inside the line belongs to a project the catalog lists as `stable`. A `preview` or `experimental` project, a project the catalog does not list, and a file no project owns promise no compatibility, so a commit that touches only those advances a patch at most. A workspace with no catalog reads every commit as stable. The files are read only for the commits whose type could move the line past a patch.
+
+`version get` and `version tag` refuse a catalog they cannot parse. A build stamps its pre-release versions with the stable reading instead, and prints the catalog error with `--debug`.
 
 A breaking change outside the stable projects still needs its migration in the release notes.
 

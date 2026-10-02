@@ -35,9 +35,10 @@ func (b Bump) String() string {
 	}
 }
 
-// breakingFooter is the conventional-commit footer that declares a breaking
-// change without the "!" marker. It is matched at the start of a body line.
-const breakingFooter = "BREAKING CHANGE:"
+// breakingFooters are the conventional-commit footers that declare a breaking
+// change without the "!" marker; Conventional Commits 1.0.0 makes the hyphenated
+// form a synonym. One is matched at the start of a body line.
+var breakingFooters = []string{"BREAKING CHANGE:", "BREAKING-CHANGE:"}
 
 // ParseConventional reads a commit subject as a conventional commit:
 // "type(scope)!: summary". ok is false when the subject does not have that
@@ -68,9 +69,11 @@ func ParseConventional(subject, body string) (typ string, breaking bool, ok bool
 		return "", false, false
 	}
 	for _, line := range strings.Split(body, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), breakingFooter) {
-			breaking = true
-			break
+		line = strings.TrimSpace(line)
+		for _, footer := range breakingFooters {
+			if strings.HasPrefix(line, footer) {
+				breaking = true
+			}
 		}
 	}
 	return typ, breaking, true
@@ -89,13 +92,33 @@ func isConventionalType(s string) bool {
 	return true
 }
 
-// StableTest reports whether a commit, by the files it changes, touches a
-// project the support catalog lists as stable. Only such a commit may advance a
-// line past a patch: a preview or experimental project promises no
-// compatibility, so neither its features nor its breaking changes move the
-// line's minor or major. A nil StableTest reads every commit as stable, which is
-// the reading of a workspace with no support catalog.
+// StableTest reports whether a commit, by the files it changes inside its
+// line, touches a project the support catalog lists as stable. Only such a
+// commit may advance a line past a patch: a preview or experimental project
+// promises no compatibility, so neither its features nor its breaking changes
+// move the line's minor or major. A nil StableTest reads every commit as stable,
+// which is the reading of a workspace with no support catalog.
 type StableTest func(files []string) bool
+
+// CommitStableTest is StableTest asked of a commit: reading its files is a git
+// call, so it can fail.
+type CommitStableTest func(commit Commit) (bool, error)
+
+// LineStableTest asks line.Stable of each commit, reading the commit's files
+// inside the line's pathspecs. It is nil when line.Stable is, so a workspace
+// with no catalog lists no file at all.
+func LineStableTest(repoRoot string, line LineSpec) CommitStableTest {
+	if line.Stable == nil {
+		return nil
+	}
+	return func(commit Commit) (bool, error) {
+		files, err := CommitFiles(repoRoot, commit.SHA, line.Pathspecs)
+		if err != nil {
+			return false, err
+		}
+		return line.Stable(files), nil
+	}
+}
 
 // BumpFor reduces a set of commits to the strongest advance they justify.
 // preOne selects the pre-1.0 reading, where the major number is not yet a
@@ -104,11 +127,20 @@ type StableTest func(files []string) bool
 // is new". A commit that stable reports as touching no stable project advances
 // a patch at most.
 //
+// stable is asked only where its answer can raise the result: a commit whose
+// level is above a patch and above the strongest one found so far. Before 1.0
+// that is a breaking commit alone, so a range of features reads no file. The
+// walk stops at the strongest level the reading allows.
+//
 // Types other than feat, fix and perf advance nothing on their own: a
 // documentation commit does not make a release. A pre-release still floors at a
 // patch, but that floor belongs to NextVersion, not here — an explicit
 // `version tag` on a docs-only range must be able to see BumpNone and say so.
-func BumpFor(commits []Commit, preOne bool, stable StableTest) Bump {
+func BumpFor(commits []Commit, preOne bool, stable CommitStableTest) (Bump, error) {
+	ceiling := BumpMajor
+	if preOne {
+		ceiling = BumpMinor
+	}
 	strongest := BumpNone
 	for _, commit := range commits {
 		typ, breaking, ok := ParseConventional(commit.Subject, commit.Body)
@@ -128,16 +160,26 @@ func BumpFor(commits []Commit, preOne bool, stable StableTest) Bump {
 		case typ == "fix", typ == "perf":
 			level = BumpPatch
 		}
-		// The stability test runs only where it can lower the answer, so a
-		// range of fixes reads no catalog attribution at all.
-		if level > BumpPatch && stable != nil && !stable(commit.Files) {
-			level = BumpPatch
+		if level <= strongest {
+			continue
+		}
+		if level > BumpPatch && stable != nil {
+			touchesStable, err := stable(commit)
+			if err != nil {
+				return BumpNone, err
+			}
+			if !touchesStable {
+				level = BumpPatch
+			}
 		}
 		if level > strongest {
 			strongest = level
 		}
+		if strongest == ceiling {
+			break
+		}
 	}
-	return strongest
+	return strongest, nil
 }
 
 // NextVersion advances last by bump and returns the result as "major.minor.patch".

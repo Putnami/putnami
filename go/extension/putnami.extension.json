@@ -254,7 +254,7 @@
       ]
     },
     "validate": {
-      "description": "Hold the breaking-change marker: for a Go project the root putnami.support.json lists as stable, or does not list, compare the exported API with the last tag of the project's version line. An incompatible change fails unless a commit since that tag declares a breaking change with \"!\" or a BREAKING CHANGE: footer.",
+      "description": "Hold the breaking-change marker: for a Go project the root putnami.support.json lists as stable, or every Go project when the workspace has no catalog, compare the exported API with the last tag of the project's version line. An incompatible change fails unless a commit since that tag declares a breaking change with \"!\" or a BREAKING CHANGE: footer.",
       "activationFiles": ["**/*.go", "go.mod"],
       "run": [{ "id": "api", "task": "validate-api" }]
     },

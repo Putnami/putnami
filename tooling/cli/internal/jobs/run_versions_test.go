@@ -186,3 +186,43 @@ func TestDegradedVersionLinesRendersOneLinePerVersionLine(t *testing.T) {
 		t.Fatalf("no degradation = %q, want nothing", got)
 	}
 }
+
+// A build's pre-release follows the support catalog as a release does, and an
+// unusable catalog degrades to the stable reading, the larger bump, with the
+// reason reported instead of failing a build that releases nothing.
+func TestBuildRunVersionsFollowsTheSupportCatalog(t *testing.T) {
+	t.Parallel()
+	for _, testCase := range []struct {
+		name, catalog, want, degraded string
+	}{
+		{name: "an experimental project advances a patch",
+			catalog: `{"protocolVersion": 1, "entries": [{"id": "web", "kind": "package", "status": "experimental"}]}`,
+			want:    "0.4.1"},
+		{name: "a stable project advances a minor",
+			catalog: `{"protocolVersion": 1, "entries": [{"id": "web", "kind": "package", "status": "stable"}]}`,
+			want:    "0.5.0"},
+		{name: "an invalid catalog degrades to the stable reading",
+			catalog: `{"protocolVersion": 1, "entries": [{"id": "web"}]}`,
+			want:    "0.5.0", degraded: "putnami.support.json"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			ws := runVersionsRepo(t)
+			writeRunVersionsFile(t, ws.Root, "putnami.support.json", testCase.catalog)
+			writeRunVersionsFile(t, ws.Root, "typescript/web/src.ts", "export const y = 1\n")
+			runVersionsGit(t, ws.Root, "add", "-A")
+			runVersionsGit(t, ws.Root, "commit", "-m", "feat(web)!: rename x to y")
+
+			versions, err := BuildRunVersions(ws, nil)
+			if testCase.degraded == "" && err != nil {
+				t.Fatalf("a readable catalog degraded a line: %v", err)
+			}
+			if testCase.degraded != "" && (err == nil || !strings.Contains(err.Error(), testCase.degraded)) {
+				t.Fatalf("err = %v, want the degraded reason naming %s", err, testCase.degraded)
+			}
+			if got := versions["typescript"]; got == nil || got.Base != testCase.want {
+				t.Fatalf("typescript = %+v, want base %s", got, testCase.want)
+			}
+		})
+	}
+}

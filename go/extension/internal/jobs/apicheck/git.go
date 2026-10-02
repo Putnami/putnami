@@ -130,6 +130,15 @@ func describeUntagged(dir, match string, describeErr error) error {
 	return nil
 }
 
+// hasTags reports whether the repository has at least one tag, of any line.
+func hasTags(dir string) (bool, error) {
+	output, err := gitOutput(dir, "for-each-ref", "--count=1", "--format=%(refname)", "refs/tags")
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(output) != "", nil
+}
+
 // withoutGitTrace is env without git's GIT_TRACE* settings, which write to
 // stderr.
 func withoutGitTrace(env []string) []string {
@@ -142,29 +151,38 @@ func withoutGitTrace(env []string) []string {
 	return kept
 }
 
-// filesAtTag returns the Go files and go.mod files under dir as the tag holds
-// them, with paths relative to dir. Symbolic links and submodules are not
-// files of the package and are left out.
+// filesAtTag returns the files under dir the API surface reads, as the tag
+// holds them, with paths relative to dir. It lists the tree first and loads
+// only the files apisurface.Reads selects, so the Go files of internal,
+// testdata and vendor directories and of nested modules are never loaded.
+// Symbolic links and submodules are not files of the package and are left
+// out.
 func filesAtTag(dir, tag string) ([]apisurface.File, error) {
 	listing, err := gitOutput(dir, "ls-tree", "-r", "-z", "refs/tags/"+tag, "--", ".")
 	if err != nil {
 		return nil, err
 	}
-	var paths, objects []string
+	blobs := map[string]string{}
+	var listed []string
 	for entry := range strings.SplitSeq(listing, "\x00") {
 		meta, name, found := strings.Cut(entry, "\t")
 		if !found {
 			continue
 		}
 		fields := strings.Fields(meta)
-		if len(fields) != 3 || fields[1] != "blob" || fields[0] == "120000" || !sourceFile(name) {
+		if len(fields) != 3 || fields[1] != "blob" || fields[0] == "120000" {
 			continue
 		}
-		paths = append(paths, name)
-		objects = append(objects, fields[2])
+		blobs[name] = fields[2]
+		listed = append(listed, name)
 	}
-	if len(objects) == 0 {
+	paths := apisurface.Reads(listed)
+	if len(paths) == 0 {
 		return nil, nil
+	}
+	objects := make([]string, len(paths))
+	for i, name := range paths {
+		objects[i] = blobs[name]
 	}
 	contents, err := readBlobs(dir, objects)
 	if err != nil {

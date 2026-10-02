@@ -11,9 +11,10 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 )
 
-// The bump reads the support status of the projects a commit touches: a
-// commit that touches no stable project advances a patch at most, and a
-// workspace with no catalog reads every commit as stable.
+// The bump reads the support status of the projects a commit touches inside
+// its line: a commit that touches no project the catalog lists as stable
+// advances a patch at most, and a workspace with no catalog reads every commit
+// as stable.
 func TestVersionTagBumpFollowsTheSupportCatalog(t *testing.T) {
 	spectest.Proves(t, "cli/version-from-git", "conventional-advance", "bump-follows-the-support-catalog")
 	for _, testCase := range []struct {
@@ -34,8 +35,12 @@ func TestVersionTagBumpFollowsTheSupportCatalog(t *testing.T) {
 			subject: "feat(lab): add a flag", files: []string{"typescript/lab/src.ts"}, want: "ts/v1.2.1"},
 		{name: "feat in a stable project is a minor from 1.0", last: "1.2.0",
 			subject: "feat(web): add a flag", files: []string{"typescript/web/src.ts"}, want: "ts/v1.3.0"},
-		{name: "a file no project owns counts as stable", last: "0.4.0",
-			subject: "feat(lab)!: drop the flag", files: []string{"typescript/lab/src.ts", "typescript/NOTES.md"}, want: "ts/v0.5.0"},
+		{name: "a file no project owns promises nothing", last: "0.4.0",
+			subject: "feat(lab)!: drop the flag", files: []string{"typescript/lab/src.ts", "typescript/NOTES.md"}, want: "ts/v0.4.1"},
+		{name: "a project the catalog does not list promises nothing", last: "0.4.0",
+			subject: "feat(kit)!: drop the flag", files: []string{"typescript/kit/src.ts"}, want: "ts/v0.4.1"},
+		{name: "a stable file outside the line does not count", last: "0.4.0",
+			subject: "feat!: drop the flag", files: []string{"typescript/lab/src.ts", "tooling/cli/main.go"}, want: "ts/v0.4.1"},
 		{name: "without a catalog every commit is stable", last: "0.4.0", noCatalog: true,
 			subject: "feat(lab)!: drop the flag", files: []string{"typescript/lab/src.ts"}, want: "ts/v0.5.0"},
 	} {
@@ -75,21 +80,25 @@ func TestVersionTagRefusesAnInvalidSupportCatalog(t *testing.T) {
 	}
 }
 
-// supportCatalogRepo is versionLineRepo with a second project on the
-// typescript line, @putnami/lab, and, when withCatalog is set, a catalog that
-// lists @putnami/web as stable and @putnami/lab as experimental.
+// supportCatalogRepo is versionLineRepo with two more projects on the
+// typescript line, @putnami/lab and @putnami/kit, and, when withCatalog is set,
+// a catalog that lists @putnami/web as stable, @putnami/lab as experimental and
+// @putnami/cli (on the tooling line) as stable, and does not list
+// @putnami/kit.
 func supportCatalogRepo(t *testing.T, withCatalog bool) string {
 	t.Helper()
 	dir := versionLineRepo(t)
 	writeRepoFile(t, dir, "typescript/"+wsproto.ConfigFilename,
-		`{"line": {"tag": "ts/v{version}"}, "includes": ["web", "lab"]}`)
+		`{"line": {"tag": "ts/v{version}"}, "includes": ["web", "lab", "kit"]}`)
 	writeRepoFile(t, dir, "typescript/lab/"+wsproto.ConfigFilename, `{"name": "@putnami/lab"}`)
+	writeRepoFile(t, dir, "typescript/kit/"+wsproto.ConfigFilename, `{"name": "@putnami/kit"}`)
 	if withCatalog {
 		catalog, err := supportproto.MarshalCatalog(&supportproto.Catalog{
 			ProtocolVersion: 1,
 			Entries: []supportproto.Entry{
 				{ID: "@putnami/lab", Kind: supportproto.SubjectKindPackage, Status: supportproto.StatusExperimental},
 				{ID: "@putnami/web", Kind: supportproto.SubjectKindPackage, Status: supportproto.StatusStable},
+				{ID: "@putnami/cli", Kind: supportproto.SubjectKindPackage, Status: supportproto.StatusStable},
 			},
 		})
 		if err != nil {

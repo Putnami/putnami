@@ -5,9 +5,16 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
-const testModule = "go.example.com/lib"
+const (
+	testModule = "go.example.com/lib"
+
+	feature     = "go/go-project-toolchain"
+	requirement = "api-compatibility-marker"
+)
 
 func files(sources map[string]string) []File {
 	out := make([]File, 0, len(sources))
@@ -186,6 +193,94 @@ func TestAMethodAddedToASealedInterfaceIsCompatible(t *testing.T) {
 		"type Event interface {\n\tName() string\n\tsealed()\n}\n",
 		"type Event interface {\n\tName() string\n\tAt() int64\n\tsealed()\n}\n",
 	))
+}
+
+func TestAnInterfaceThatEmbedsASealedInterfaceIsSealed(t *testing.T) {
+	t.Parallel()
+	const sealed = "type node interface{ node() }\n" +
+		"type Node interface{ isNode() }\n" +
+		"type base[T any] interface{ get() T }\n"
+	assertMessages(t, incompatible(t,
+		sealed+"type Expr interface {\n\tnode\n\tPos() int\n}\n"+
+			"type Stmt interface{ Expr }\n"+
+			"type Decl interface {\n\tNode\n\tName() string\n}\n"+
+			"type Getter interface{ base[int] }\n",
+		sealed+"type Expr interface {\n\tnode\n\tPos() int\n\tEnd() int\n}\n"+
+			"type Stmt interface {\n\tExpr\n\tBody() int\n}\n"+
+			"type Decl interface {\n\tNode\n\tName() string\n\tDoc() string\n}\n"+
+			"type Getter interface {\n\tbase[int]\n\tSet(int)\n}\n",
+	))
+
+	// An interface that embeds one any package can implement stays open.
+	assertMessages(t, incompatible(t,
+		"type Reader interface{ Read() }\ntype ReadCloser interface {\n\tReader\n\tClose()\n}\n",
+		"type Reader interface{ Read() }\ntype ReadCloser interface {\n\tReader\n\tClose()\n\tFlush()\n}\n",
+	), "interface method ReadCloser.Flush added: every implementation outside the package must add it")
+}
+
+func TestARenamedImportIsCompatible(t *testing.T) {
+	spectest.Proves(t, feature, requirement, "a-renamed-import-or-predeclared-alias-is-compatible")
+	t.Parallel()
+	assertMessages(t, incompatible(t,
+		"import foo \"go.example.com/model\"\n\nfunc F(x foo.T) foo.U { return nil }\n",
+		"import bar \"go.example.com/model\"\n\nfunc F(x bar.T) bar.U { return nil }\n",
+	))
+	// An import without a name is known by the name its path implies.
+	assertMessages(t, incompatible(t,
+		"import (\n\t\"go.example.com/model\"\n\t\"gopkg.in/yaml.v3\"\n\t\"go.example.com/mod/v2\"\n\t\"go.example.com/go-kit\"\n)\n\n"+
+			"func F(model.T, yaml.Node, mod.V, kit.K) {}\n",
+		"import (\n\tm \"go.example.com/model\"\n\ty \"gopkg.in/yaml.v3\"\n\tv2 \"go.example.com/mod/v2\"\n\tk \"go.example.com/go-kit\"\n)\n\n"+
+			"func F(m.T, y.Node, v2.V, k.K) {}\n",
+	))
+	// The same name for another import path is a change, shown by path.
+	assertMessages(t, incompatible(t,
+		"import m \"go.example.com/model\"\n\nfunc F(m.T) {}\n",
+		"import m \"go.example.com/other\"\n\nfunc F(m.T) {}\n",
+	), "func F changed from func(go.example.com/model.T) to func(go.example.com/other.T)")
+}
+
+// A declaration can be rendered twice: a grouped parameter shares its type,
+// and a const without a type repeats the previous spec's. Each rendering
+// resolves a qualifier once, even when its import path is another import's
+// name.
+func TestRenderingAnExpressionTwiceGivesTheSameText(t *testing.T) {
+	t.Parallel()
+	surface := read(t, lib("import (\n\tfoo \"bar\"\n\tbar \"baz\"\n)\n\n"+
+		"func F(a, b foo.T) {}\n\nconst (\n\tA foo.K = iota\n\tB\n)\n"))
+	objects := surface.Packages[testModule].Objects
+	if got := objects["F"].Type; got.Display != "func(bar.T, bar.T)" || got.Key != "func(bar.T, bar.T)" {
+		t.Fatalf("F = %+v", got)
+	}
+	if objects["A"].Type != objects["B"].Type || objects["B"].Type.Display != "bar.K" {
+		t.Fatalf("A = %+v, B = %+v", objects["A"].Type, objects["B"].Type)
+	}
+}
+
+func TestPredeclaredAliasesAreCompatible(t *testing.T) {
+	t.Parallel()
+	assertMessages(t, incompatible(t,
+		"func F(x interface{}) []byte { return nil }\nvar R rune\n"+
+			"type Buffer struct{ Data []byte }\nfunc Map[T interface{}](T) {}\n",
+		"func F(x any) []uint8 { return nil }\nvar R int32\n"+
+			"type Buffer struct{ Data []uint8 }\nfunc Map[T any](T) {}\n",
+	))
+	assertMessages(t, incompatible(t,
+		"func G(x any) {}\n",
+		"func G(x string) {}\n",
+	), "func G changed from func(any) to func(string)")
+}
+
+func TestReadsSelectsTheFilesReadReads(t *testing.T) {
+	t.Parallel()
+	got := Reads([]string{
+		"go.mod", "lib.go", "lib_test.go", "README.md", "client/client.go",
+		"internal/x/x.go", "testdata/x.go", "vendor/a/a.go", "_old/x.go", ".gen/x.go", "client/_x.go",
+		"tools/go.mod", "tools/tools.go",
+	})
+	want := []string{"go.mod", "lib.go", "client/client.go", "tools/go.mod"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("Reads = %q, want %q", got, want)
+	}
 }
 
 func TestValueTypeChanges(t *testing.T) {

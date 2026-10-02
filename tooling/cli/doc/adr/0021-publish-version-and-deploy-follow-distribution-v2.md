@@ -80,7 +80,9 @@ and the release call themselves follow
    `fix` and `perf` are patch, anything else does not advance. A pre-release is
    always at least a patch above the last tag. A line with no reachable tag
    starts at `0.0.0` with no advance. A shallow clone degrades an ordinary build
-   to `0.0.0`; a publication refuses it.
+   to `0.0.0`; a publication refuses it. D-004 in the root `decisions.json`
+   supersedes the `feat` rule: before 1.0 a `feat` is a patch. D-005 caps at a
+   patch a commit that touches no project the support catalog lists as stable.
 9. **`putnami version tag --scope <line>`** regenerates the line's changelog
    from the same commits, creates the release commit, then the annotated tag on
    it; `--push` pushes both, `--yes` skips the confirmation, and an explicit

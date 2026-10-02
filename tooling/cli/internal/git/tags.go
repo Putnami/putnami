@@ -102,22 +102,16 @@ func withoutGitTrace(env []string) []string {
 }
 
 // Commit is one commit of a line's history: what conventional-commit parsing
-// reads, the SHA a changelog bullet cites, and the files the bump attributes to
-// projects.
+// reads, plus the SHA a changelog bullet cites.
 type Commit struct {
 	SHA     string
 	Subject string
 	Body    string
-	// Files are the repository-relative paths the commit changes, limited to
-	// the pathspecs it was read under. A rename lists both of its paths, so a
-	// file moved out of a project still counts as a change to that project.
-	Files []string
 }
 
 // commitRecordSeparator is ASCII RS. A commit body is arbitrary text, newlines
 // included, so records are separated by a byte no message carries and fields by
-// NUL for the same reason. It opens each record because the file names
-// --name-only prints follow the formatted message.
+// NUL for the same reason.
 const commitRecordSeparator = "\x1e"
 
 // CommitsSince returns the commits between fromCommit (exclusive) and HEAD that
@@ -133,10 +127,7 @@ func CommitsSince(repoRoot, fromCommit string, pathspecs []string) ([]Commit, er
 		}
 		revision = resolved + "..HEAD"
 	}
-	// core.quotePath=false keeps a non-ASCII path as its bytes, so it can match
-	// a project directory.
-	args := []string{"-c", "core.quotePath=false", "log", "--format=" + commitRecordSeparator + "%H%x00%s%x00%b%x00",
-		"--name-only", "--no-renames", "--no-show-signature", revision}
+	args := []string{"log", "--format=%H%x00%s%x00%b" + commitRecordSeparator, "--no-show-signature", revision}
 	if len(pathspecs) > 0 {
 		args = append(args, "--")
 		args = append(args, pathspecs...)
@@ -151,18 +142,41 @@ func CommitsSince(repoRoot, fromCommit string, pathspecs []string) ([]Commit, er
 		if strings.TrimSpace(record) == "" {
 			continue
 		}
-		fields := strings.SplitN(record, "\x00", 4)
-		if len(fields) != 4 {
+		fields := strings.SplitN(record, "\x00", 3)
+		if len(fields) != 3 {
 			continue
 		}
 		commits = append(commits, Commit{
 			SHA:     strings.TrimSpace(fields[0]),
 			Subject: strings.TrimSpace(fields[1]),
 			Body:    strings.TrimRight(fields[2], "\n"),
-			Files:   splitLines(fields[3]),
 		})
 	}
 	return commits, nil
+}
+
+// CommitFiles returns the repository-relative paths one commit changes, limited
+// to pathspecs. A rename lists both of its paths, so a file moved out of a
+// project still counts as a change to that project. A root commit lists every
+// file it adds; a merge commit lists none, as it changes nothing of its own.
+// Paths are read NUL-separated, so no name is quoted or split.
+func CommitFiles(repoRoot, sha string, pathspecs []string) ([]string, error) {
+	args := []string{"diff-tree", "-r", "--root", "--no-commit-id", "--name-only", "--no-renames", "-z", "--end-of-options", sha}
+	if len(pathspecs) > 0 {
+		args = append(args, "--")
+		args = append(args, pathspecs...)
+	}
+	output, err := run(repoRoot, args...)
+	if err != nil {
+		return nil, fmt.Errorf("read the files of %s: %w", sha, err)
+	}
+	var files []string
+	for _, file := range strings.Split(output, "\x00") {
+		if file != "" {
+			files = append(files, file)
+		}
+	}
+	return files, nil
 }
 
 // TreeState reads the git state of the working tree alone: the commit, the

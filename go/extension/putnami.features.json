@@ -178,7 +178,9 @@
               "a-preview-or-experimental-project-is-not-checked",
               "a-line-without-a-reachable-tag-passes",
               "an-addition-is-compatible",
-              "renamed-parameters-are-compatible"
+              "renamed-parameters-are-compatible",
+              "an-unlisted-project-is-not-checked-when-a-catalog-exists",
+              "a-renamed-import-or-predeclared-alias-is-compatible"
             ]
           }
         },

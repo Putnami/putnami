@@ -151,11 +151,13 @@ differs from the file on disk. Fix the link; do not turn the check off. See
 ### API compatibility
 
 `validate` compares the exported API of a project that `putnami.support.json`
-lists as stable, or does not list, with the last tag of its version line. A
-removed or changed exported symbol fails unless a commit since the tag that
-touches the project declares a breaking change (`feat!:` or a
-`BREAKING CHANGE:` footer). Commit a deliberate break with the marker; do not
-work around the check. See [doc/validate.md](doc/validate.md).
+lists as stable, or of every project when the workspace has no catalog, with
+the last tag of its version line. A removed or changed exported symbol fails
+unless a commit since the tag that touches the project declares a breaking
+change (`feat!:` or a `BREAKING CHANGE:` footer). Commit a deliberate break with
+the marker, and put the marker in the pull request title too when the branch is
+squash-merged. Do not work around the check. See
+[doc/validate.md](doc/validate.md).
 
 ### Go build cache
 

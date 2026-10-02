@@ -211,9 +211,7 @@ func TestCommitsSinceReadsSubjectBodyAndPathspec(t *testing.T) {
 	if !strings.Contains(scoped[0].Body, "BREAKING CHANGE:") || len(scoped[0].SHA) != 40 {
 		t.Errorf("commit = %+v, want the body and the full SHA", scoped[0])
 	}
-	if !slices.Equal(scoped[0].Files, []string{"typescript/a.ts"}) || !slices.Equal(all[0].Files, []string{"go/a.go"}) {
-		t.Errorf("files = %v and %v, want each commit's changed file", scoped[0].Files, all[0].Files)
-	}
+
 	// An empty fromCommit walks the whole history, which is the untagged line.
 	whole, err := CommitsSince(dir, "", nil)
 	if err != nil || len(whole) != 3 {
@@ -222,32 +220,35 @@ func TestCommitsSinceReadsSubjectBodyAndPathspec(t *testing.T) {
 }
 
 // A rename lists both of its paths, so a file moved out of a project still
-// counts as a change to it; the pathspec limits the files as it limits the
-// commits; a non-ASCII path keeps its bytes.
-func TestCommitsSinceListsBothPathsOfARename(t *testing.T) {
+// counts as a change to it; the pathspec limits the files; a path git would
+// quote keeps its bytes.
+func TestCommitFilesListsBothPathsOfARename(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
-	writeCommit(t, dir, "typescript/é.ts", "feat(ts): add")
-	base, err := HeadSHA(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	writeCommit(t, dir, "typescript/é \"q\".ts", "feat(ts): add")
 	if err := os.MkdirAll(filepath.Join(dir, "go"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	gitDo(t, dir, "mv", "typescript/é.ts", "go/é.ts")
+	gitDo(t, dir, "mv", "typescript/é \"q\".ts", "go/é \"q\".ts")
 	gitDo(t, dir, "commit", "-m", "refactor!: move")
+	head, err := HeadSHA(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	whole, err := CommitsSince(dir, base, nil)
-	if err != nil || len(whole) != 1 {
-		t.Fatalf("CommitsSince = %+v/%v, want the move", whole, err)
+	files, err := CommitFiles(dir, head, nil)
+	if err != nil {
+		t.Fatalf("CommitFiles: %v", err)
 	}
-	if !slices.Equal(whole[0].Files, []string{"go/é.ts", "typescript/é.ts"}) {
-		t.Errorf("files = %v, want both paths of the rename", whole[0].Files)
+	if !slices.Equal(files, []string{"go/é \"q\".ts", "typescript/é \"q\".ts"}) {
+		t.Errorf("files = %q, want both paths of the rename", files)
 	}
-	scoped, err := CommitsSince(dir, base, []string{"typescript"})
-	if err != nil || len(scoped) != 1 || !slices.Equal(scoped[0].Files, []string{"typescript/é.ts"}) {
-		t.Errorf("CommitsSince(typescript) = %+v/%v, want only the typescript path", scoped, err)
+	scoped, err := CommitFiles(dir, head, []string{"typescript"})
+	if err != nil || !slices.Equal(scoped, []string{"typescript/é \"q\".ts"}) {
+		t.Errorf("CommitFiles(typescript) = %q/%v, want only the typescript path", scoped, err)
+	}
+	if _, err := CommitFiles(dir, "0000000000000000000000000000000000000000", nil); err == nil {
+		t.Error("CommitFiles accepted a commit the repository does not have")
 	}
 }
 

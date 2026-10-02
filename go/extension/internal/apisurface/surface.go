@@ -103,8 +103,9 @@ type Object struct {
 	// Interface holds the exported methods of an interface type under their
 	// name, and its embedded elements under "embedded <element>".
 	Interface map[string]*Member
-	// Sealed is true for an interface with an unexported method: no other
-	// package can implement it, so adding a method breaks no one.
+	// Sealed is true for an interface no other package can implement: one with
+	// an unexported method, or one that embeds a sealed interface of its own
+	// package. Adding a method to it breaks no one.
 	Sealed bool
 }
 
@@ -127,20 +128,16 @@ type Member struct {
 // "." or "_", and any directory below a nested go.mod, which is another
 // module.
 func Read(files []File, module string) (*Surface, error) {
-	nested := map[string]bool{}
-	for _, file := range files {
-		if path.Base(file.Path) != "go.mod" {
-			continue
-		}
-		dir := path.Dir(file.Path)
-		if dir == "." {
+	paths := make([]string, len(files))
+	for i, file := range files {
+		paths[i] = file.Path
+		if file.Path == "go.mod" {
 			if declared := modfile.ModulePath(file.Data); declared != "" {
 				module = declared
 			}
-			continue
 		}
-		nested[dir] = true
 	}
+	nested := nestedModules(paths)
 
 	byDir := map[string][]File{}
 	for _, file := range files {
@@ -162,6 +159,36 @@ func Read(files []File, module string) (*Surface, error) {
 		}
 	}
 	return surface, nil
+}
+
+// Reads returns, in their order, the paths among paths that Read reads: every
+// go.mod, which gives the module path or marks where a nested module starts,
+// and every Go file of an importable package. A caller that pays to load file
+// bytes can load only these; Read applies the same selection to the files it
+// is given.
+func Reads(paths []string) []string {
+	nested := nestedModules(paths)
+	var kept []string
+	for _, file := range paths {
+		if path.Base(file) == "go.mod" || importableGoFile(file, nested) {
+			kept = append(kept, file)
+		}
+	}
+	return kept
+}
+
+// nestedModules returns the directories below the project root that hold a
+// go.mod: each is another module.
+func nestedModules(paths []string) map[string]bool {
+	nested := map[string]bool{}
+	for _, file := range paths {
+		if path.Base(file) == "go.mod" {
+			if dir := path.Dir(file); dir != "." {
+				nested[dir] = true
+			}
+		}
+	}
+	return nested
 }
 
 // importPath joins a module path and a project-relative directory.
@@ -215,6 +242,7 @@ func readPackage(importPath string, files []File) (*Package, error) {
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
 	fset := token.NewFileSet()
 	pkg := &Package{ImportPath: importPath, Objects: map[string]*Object{}}
+	interfaces := map[string]*localInterface{}
 	var methods []pendingMethod
 	found := false
 	for _, file := range files {
@@ -232,13 +260,19 @@ func readPackage(importPath string, files []File) (*Package, error) {
 			return nil, fmt.Errorf("parse %s: %w", file.Path, err)
 		}
 		found = true
-		reader := declReader{fset: fset, pkg: pkg}
+		reader := declReader{fset: fset, pkg: pkg, interfaces: interfaces, render: newRenderer(parsed)}
 		for _, decl := range parsed.Decls {
 			methods = append(methods, reader.read(decl)...)
 		}
 	}
 	if !found {
 		return nil, nil
+	}
+	sealed := sealedInterfaces(interfaces)
+	for name, object := range pkg.Objects {
+		if object.Form == formInterface && sealed[name] {
+			object.Sealed = true
+		}
 	}
 	for _, method := range methods {
 		owner, ok := pkg.Objects[method.receiver]
@@ -313,6 +347,87 @@ func satisfiable(expr constraint.Expr) bool {
 type declReader struct {
 	fset *token.FileSet
 	pkg  *Package
+	// interfaces collects every interface type the package declares, exported
+	// or not, for sealedInterfaces.
+	interfaces map[string]*localInterface
+	render     renderer
+}
+
+// localInterface is what sealing reads of an interface type a package
+// declares.
+type localInterface struct {
+	// unexported is true when the interface declares an unexported method.
+	unexported bool
+	// embeds names the interfaces of the same package it embeds.
+	embeds []string
+}
+
+// describeInterface reads the sealing facts of an interface type.
+func describeInterface(typ *ast.InterfaceType) *localInterface {
+	described := &localInterface{}
+	for _, field := range typ.Methods.List {
+		if len(field.Names) == 0 {
+			if name := localTypeName(field.Type); name != "" {
+				described.embeds = append(described.embeds, name)
+			}
+			continue
+		}
+		for _, name := range field.Names {
+			if !name.IsExported() {
+				described.unexported = true
+			}
+		}
+	}
+	return described
+}
+
+// localTypeName returns the name of a type of the same package expr names,
+// with or without type arguments; empty for a qualified name or any other
+// expression.
+func localTypeName(expr ast.Expr) string {
+	switch e := expr.(type) {
+	case *ast.Ident:
+		return e.Name
+	case *ast.IndexExpr:
+		return localTypeName(e.X)
+	case *ast.IndexListExpr:
+		return localTypeName(e.X)
+	}
+	return ""
+}
+
+// sealedInterfaces returns the names of the interfaces no other package can
+// implement: those with an unexported method, and those that embed one,
+// through any number of embeddings within the package.
+func sealedInterfaces(interfaces map[string]*localInterface) map[string]bool {
+	sealed := map[string]bool{}
+	visiting := map[string]bool{}
+	done := map[string]bool{}
+	var visit func(name string) bool
+	visit = func(name string) bool {
+		described, ok := interfaces[name]
+		if !ok || visiting[name] {
+			return false
+		}
+		if done[name] {
+			return sealed[name]
+		}
+		visiting[name] = true
+		result := described.unexported
+		for _, embedded := range described.embeds {
+			if visit(embedded) {
+				result = true
+			}
+		}
+		visiting[name] = false
+		done[name] = true
+		sealed[name] = result
+		return result
+	}
+	for name := range interfaces {
+		visit(name)
+	}
+	return sealed
 }
 
 func (r declReader) position(pos token.Pos) Position {
@@ -341,8 +456,8 @@ func (r declReader) read(decl ast.Decl) []pendingMethod {
 				Kind:       KindFunc,
 				Name:       d.Name.Name,
 				Pos:        r.position(d.Name.Pos()),
-				TypeParams: renderTypeParams(d.Type.TypeParams, params),
-				Type:       renderSignature(d.Type, params),
+				TypeParams: r.render.renderTypeParams(d.Type.TypeParams, params),
+				Type:       r.render.renderSignature(d.Type, params),
 			})
 			return nil
 		}
@@ -351,7 +466,7 @@ func (r declReader) read(decl ast.Decl) []pendingMethod {
 			return nil
 		}
 		return []pendingMethod{{receiver: receiver, name: d.Name.Name, member: &Member{
-			Type:    renderSignature(d.Type, params),
+			Type:    r.render.renderSignature(d.Type, params),
 			Pointer: pointer,
 			Pos:     r.position(d.Name.Pos()),
 		}}}
@@ -359,7 +474,12 @@ func (r declReader) read(decl ast.Decl) []pendingMethod {
 		switch d.Tok {
 		case token.TYPE:
 			for _, spec := range d.Specs {
-				if typeSpec, ok := spec.(*ast.TypeSpec); ok && typeSpec.Name.IsExported() {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
+				r.recordInterface(typeSpec)
+				if typeSpec.Name.IsExported() {
 					r.add(r.readType(typeSpec))
 				}
 			}
@@ -368,6 +488,18 @@ func (r declReader) read(decl ast.Decl) []pendingMethod {
 		}
 	}
 	return nil
+}
+
+// recordInterface records the sealing facts of an interface type declaration,
+// exported or not, unless an earlier file already declared its name.
+func (r declReader) recordInterface(spec *ast.TypeSpec) {
+	typ, ok := spec.Type.(*ast.InterfaceType)
+	if !ok || spec.Assign.IsValid() {
+		return
+	}
+	if _, seen := r.interfaces[spec.Name.Name]; !seen {
+		r.interfaces[spec.Name.Name] = describeInterface(typ)
+	}
 }
 
 // readValues records the exported names of a var or const declaration with
@@ -394,7 +526,7 @@ func (r declReader) readValues(decl *ast.GenDecl) {
 		}
 		rendered := Text{}
 		if typ != nil {
-			rendered = renderType(typ, nil)
+			rendered = r.render.renderType(typ, nil)
 		}
 		for _, name := range value.Names {
 			if name.IsExported() {
@@ -411,11 +543,11 @@ func (r declReader) readType(spec *ast.TypeSpec) *Object {
 		Kind:       KindType,
 		Name:       spec.Name.Name,
 		Pos:        r.position(spec.Name.Pos()),
-		TypeParams: renderTypeParams(spec.TypeParams, params),
+		TypeParams: r.render.renderTypeParams(spec.TypeParams, params),
 	}
 	if spec.Assign.IsValid() {
 		object.Form = formAlias
-		object.Type = renderType(spec.Type, params)
+		object.Type = r.render.renderType(spec.Type, params)
 		return object
 	}
 	switch typ := spec.Type.(type) {
@@ -427,7 +559,7 @@ func (r declReader) readType(spec *ast.TypeSpec) *Object {
 			if len(names) == 0 {
 				continue
 			}
-			member := &Member{Type: renderType(field.Type, params), Pos: r.position(field.Type.Pos())}
+			member := &Member{Type: r.render.renderType(field.Type, params), Pos: r.position(field.Type.Pos())}
 			for _, name := range names {
 				if _, seen := object.Fields[name]; !seen {
 					object.Fields[name] = member
@@ -439,21 +571,22 @@ func (r declReader) readType(spec *ast.TypeSpec) *Object {
 		object.Interface = map[string]*Member{}
 		for _, field := range typ.Methods.List {
 			if len(field.Names) == 0 {
-				element := renderType(field.Type, params)
+				element := r.render.renderType(field.Type, params)
 				object.Interface[embeddedPrefix+element.Key] = &Member{Type: element, Pos: r.position(field.Type.Pos())}
 				continue
 			}
+			// An unexported method is no one else's to call or implement; it
+			// seals the interface, which readPackage records.
 			for _, name := range field.Names {
 				if !name.IsExported() {
-					object.Sealed = true
 					continue
 				}
-				object.Interface[name.Name] = &Member{Type: renderType(field.Type, params), Pos: r.position(name.Pos())}
+				object.Interface[name.Name] = &Member{Type: r.render.renderType(field.Type, params), Pos: r.position(name.Pos())}
 			}
 		}
 	default:
 		object.Form = formDefined
-		object.Type = renderType(spec.Type, params)
+		object.Type = r.render.renderType(spec.Type, params)
 	}
 	return object
 }

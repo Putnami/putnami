@@ -39,6 +39,13 @@
       "settled": "2026-10-02",
       "settledBy": "fdumay",
       "reviewOnly": true
+    },
+    {
+      "id": "D-005",
+      "statement": "with a support catalog, only a commit that touches a project the catalog lists as stable advances its version line past a patch; unlisted projects and unowned files promise nothing",
+      "settled": "2026-10-02",
+      "settledBy": "fdumay",
+      "reviewOnly": true
     }
   ]
 }

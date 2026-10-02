@@ -51,9 +51,9 @@ feature shipped in a minor would stop every automatic upgrade for nothing to
 migrate; `putnami version` proposes a patch for it.
 
 The table holds for the projects `putnami.support.json` lists as `stable`. A
-`preview` or `experimental` project promises no compatibility, so its changes,
-breaking ones included, ship in a patch; a breaking one still names its
-migration in the release notes.
+`preview` or `experimental` project, or one the catalog does not list, promises
+no compatibility, so its changes, breaking ones included, ship in a patch; a
+breaking one still names its migration in the release notes.
 
 ## Release checklist
 
@@ -148,8 +148,9 @@ putnami version tag --scope tooling --yes --push
 
 A commit carrying its line's tag has the tag's version, with no suffix. Any
 other commit takes the line's last tag advanced by the conventional commits
-that touch the line — breaking and `feat` are a minor before 1.0, `fix` and
-`perf` a patch, anything else nothing — floored at a patch, plus the ordered
+that touch the line — breaking is a minor before 1.0, `feat`, `fix` and `perf`
+a patch, anything else nothing, and a commit that touches no `stable` project a
+patch at most — floored at a patch, plus the ordered
 suffix `<yyyymmddHHMMSS>-<sha>`. `version tag` regenerates
 `<line>/CHANGELOG.md` from those same commits, creates the release commit that
 carries it, then the annotated tag on that commit.

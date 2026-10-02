@@ -2,8 +2,8 @@
 
 **Command:** `putnami validate [project]`
 
-For every stable Go project, `validate` compares the exported API with the last
-tag of the project's version line. An incompatible change fails the command
+For every Go project the support catalog lists as stable, `validate` compares
+the exported API with the last tag of the project's version line. An incompatible change fails the command
 unless a commit since that tag declares it breaking. The breaking-change marker
 is what makes `putnami version` advance the line past a feature release, so a
 stable package cannot break its users in a release that promises it does not.
@@ -19,13 +19,19 @@ The check reads the root [`putnami.support.json`](../../../protocols/support/REA
 |---|---|
 | `stable` | runs |
 | `preview` or `experimental` | skipped: these promise no compatibility |
-| nothing about the project | runs: an unreviewed project counts as stable |
+| nothing about the project | skipped: an unlisted project promises nothing |
 | no catalog in the workspace | runs for every project |
 | an invalid catalog | fails the task |
 
+When a catalog exists, it is the authority: only what it lists as stable is
+checked, and a skipped project says why in an information line. A workspace
+without a catalog has made no statement, so every project is checked.
+
 A project is looked up as a `protocol` subject when it carries the `protocol`
-tag, and as a `package` subject otherwise, under its project name. The version
-bump classifies projects the same way.
+tag, and as a `package` subject otherwise, under its project name. The tags
+are the project's own `tags` in `putnami.json`, else the tags of its scopes; an
+authored `"tags": []` blocks the scopes' tags. The version bump classifies
+projects the same way.
 
 ## What it compares
 
@@ -56,12 +62,19 @@ These changes are incompatible:
 | A declaration changed kind or form | `func Handler is now a var`, `type Opts changed from a struct to an interface` |
 
 Additions are compatible: a new package, function, type, method, field or
-constant breaks no caller. Two other changes are compatible too:
+constant breaks no caller. These changes are compatible too:
 
-- A method added to an interface that has an unexported method: no other
-  package can implement such an interface.
+- A method added to a sealed interface: one with an unexported method, or one
+  that embeds a sealed interface of the same package. No other package can
+  implement it.
 - A renamed parameter, result or type parameter: signatures are compared by
   their types and by type parameter position, never by name.
+- A renamed or added import name: a package qualifier is compared by the import
+  path the file gives it, so `foo.T` and `bar.T` are equal when `foo` and `bar`
+  import the same path. Messages write qualified types with the import path,
+  such as `go.example.com/lib/model.User`.
+- A predeclared alias for its type: `any` and `interface{}`, `byte` and
+  `uint8`, `rune` and `int32` compare equal.
 
 ## The breaking-change marker
 
@@ -80,9 +93,20 @@ BREAKING CHANGE: Greet is gone; use Wave.
 ```
 
 A message counts exactly when the version bump counts it: a subject of the form
-`type(scope)!: summary` or `type: summary` with a body line that starts with
-`BREAKING CHANGE:`. A marker on a commit that does not touch the project does
-not count. An uncommitted change has no marker yet: commit it with one.
+`type(scope)!: summary`, or `type: summary` with a body line that starts with
+`BREAKING CHANGE:` or its synonym `BREAKING-CHANGE:`. A marker on a commit that
+does not touch the project does not count. An uncommitted change has no marker
+yet: commit it with one.
+
+### Squash merges
+
+A squash merge replaces the branch's commits with one commit whose message is
+the pull request title and body. The marker on a branch commit lets the check
+pass on the pull request, but it does not reach the main branch. Put the marker
+in the pull request title as well, for example `feat(go)!: drop Greet`, so the
+commit on main declares the break and the version bump sees it. This change
+does not enforce the title: `validate` on the main branch reports a dropped
+marker after the merge, as an unmarked incompatible change.
 
 ## Failure output
 
@@ -104,14 +128,41 @@ changes the answer without changing any file a cache key could name.
 
 ## Limits
 
-- **Shallow clones.** A shallow clone lacks the tags and history the check
-  needs. The task warns and passes without comparing. Fetch the full history,
-  for example with `fetch-depth: 0` on GitHub Actions, to run the check in CI.
-- **No type information.** Types are compared by how they are written. Moving a
-  method to an embedded type keeps it in the method set but reads as removed;
-  replacing a type with an equivalent alias reads as a change. A change that
-  only type-checking reveals, such as a type that stops being comparable, is not
-  detected.
+- **Checkouts that cannot compare.** The task passes without comparing, with a
+  warning diagnostic coded `api-compat-not-compared`, when:
+  - the workspace is not in a git repository, for example a copied snapshot;
+  - the clone is shallow, so it lacks the tags and history the check needs;
+  - no tag of the line is reachable from HEAD while the repository has tags of
+    other lines, which suggests the line's tags were not fetched.
+
+  A clone with no tags at all, such as one fetched with `--no-tags`, reads as a
+  line with no release: it passes with an information line, not a warning.
+  Fetch the full history and the tags, for example with `fetch-depth: 0` on
+  GitHub Actions, to run the check in CI.
+- **No type information.** Types are compared by how they are written, after
+  the normalizations above. These compatible changes still read as
+  incompatible:
+  - moving a method to an embedded type, which keeps it in the method set;
+  - replacing a type with an equivalent alias or another spelling of the same
+    type;
+  - importing a package without a name in one version and with one in the
+    other, when the package's name differs from the name its import path
+    implies (the last path element, without a major version suffix or a `go-`
+    prefix);
+  - a dot import, whose names are compared unqualified;
+  - a package that declares its own `any`, `byte` or `rune`.
+
+  No waiver exists yet: a false positive can only be cleared with a breaking
+  marker, which also moves the version. A change that only type-checking
+  reveals, such as a type that stops being comparable, or an interface that
+  becomes sealed, is not detected.
+- **Tags a language provider reports.** The workspace loader also reads tags a
+  language provider reports for a project that declares none. The task cannot
+  see those, so such a project takes its scopes' tags when it chooses between a
+  `protocol` and a `package` subject.
 - **Platform files.** Files for every platform are read together. When two
   files declare the same name, the first in path order is compared.
 - **Go only.** TypeScript projects are not checked yet.
+
+The choice of a source-level comparison over `apidiff` or `gorelease` is
+recorded in [ADR 0010](adr/0010-the-api-check-compares-source-not-types.md).
