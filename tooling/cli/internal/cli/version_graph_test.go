@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,6 +46,36 @@ func TestVersionRecordsTheDependencyGraphOnlyWithASupportCatalog(t *testing.T) {
 				t.Fatalf("recorded view = %s, want %s", got, testCase.want)
 			}
 		})
+	}
+}
+
+// When the refresh fails, `version get` answers from the recorded view, since it
+// must work offline, and `version tag` refuses to release from it.
+func TestVersionFallsBackToTheRecordedGraphOnlyForGet(t *testing.T) {
+	wsRoot := versionGraphRepo(t, true)
+	registered, ok := lookupCommand("version")
+	if !ok {
+		t.Fatal("version command is not registered")
+	}
+	run := func(ctx context.Context, sub string) error {
+		return registered.run(&CommandEnv{Ctx: ctx, Cfg: wsproto.Load(wsRoot), WsRoot: wsRoot, Sub: sub})
+	}
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := run(canceled, "tag"); err == nil {
+		t.Fatal("version tag with no recorded view and a failed refresh succeeded, want a refusal")
+	}
+	if err := run(canceled, "get"); err == nil {
+		t.Fatal("version get with no recorded view and a failed refresh succeeded, want a refusal")
+	}
+	if err := run(context.Background(), "get"); err != nil {
+		t.Fatalf("version get: %v", err)
+	}
+	if err := run(canceled, "get"); err != nil {
+		t.Fatalf("version get with a recorded view and a failed refresh: %v, want the recorded answer", err)
+	}
+	if err := run(canceled, "tag"); err == nil || !strings.Contains(err.Error(), supportproto.CatalogFilename) {
+		t.Fatalf("version tag with a failed refresh: %v, want a refusal naming %s", err, supportproto.CatalogFilename)
 	}
 }
 

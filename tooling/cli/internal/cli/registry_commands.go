@@ -14,7 +14,6 @@ import (
 	ciproto "go.putnami.dev/protocol/ci"
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/commands/cachecmd"
 	"go.putnami.dev/tooling/cli/internal/commands/ci"
@@ -540,15 +539,25 @@ func cmdVersion(env *CommandEnv) error {
 // recorded provider view, so a version read from a missing or outdated view
 // would differ between a fresh clone and a machine that ran a build. A
 // workspace without a catalog never reads an edge and is not refreshed.
+//
+// When the refresh fails, `version get` still answers from a recorded view, and
+// says so, because it is a recovery command that must work offline or with a
+// broken provider. `version tag` writes a release and refuses.
 func synchronizeVersionGraph(env *CommandEnv) error {
 	if _, err := os.Stat(filepath.Join(env.WsRoot, supportproto.CatalogFilename)); err != nil {
 		return nil
 	}
-	if err := synchronizeWorkspaceGraph(env.Ctx, env.WsRoot, env.Cfg); err != nil {
-		return cmderr.InvalidConfigf("version: %s reads the dependency graph, which could not be refreshed: %v",
-			supportproto.CatalogFilename, err)
+	err := synchronizeWorkspaceGraph(env.Ctx, env.WsRoot, env.Cfg)
+	if err == nil {
+		return nil
 	}
-	return nil
+	if view := workspace.RecordedIndexView(env.WsRoot, time.Now()); env.Sub != "tag" && view.Usable() {
+		iox.Fprintf(os.Stderr, "putnami: version: the dependency graph could not be refreshed (%v); "+
+			"answering from the recorded view observed at %s\n", err, view.ObservedAt)
+		return nil
+	}
+	return fmt.Errorf("version: %s reads the dependency graph, which could not be refreshed: %w",
+		supportproto.CatalogFilename, err)
 }
 
 // cliBinDir resolves the directory holding the installed putnami CLI binaries:

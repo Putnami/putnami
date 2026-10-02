@@ -182,11 +182,11 @@ func preparedExtensionSelection(report lifecycle.ReadPreparationReport) (map[str
 	return roots, unavailable
 }
 
-// mcpGraphPreparationTimeout bounds the complete first graph request: exact
-// lock-pinned artifact selection, local runtime preparation, provider probes
-// and the atomic index publish. Individual probes have their own tighter
+// graphPreparationTimeout bounds one graph refresh, for the first MCP graph
+// request and for `version`: exact lock-pinned artifact selection, local
+// runtime preparation, provider probes and the atomic index publish. Individual probes have their own tighter
 // transport bound; this deadline also caps lock contention with another CLI.
-const mcpGraphPreparationTimeout = 60 * time.Second
+const graphPreparationTimeout = 60 * time.Second
 
 // prepareMCPWorkspaceView creates only the recorded provider graph a cold MCP
 // read needs. It deliberately re-runs exact read preparation on every missing-
@@ -209,7 +209,7 @@ func synchronizeWorkspaceGraph(ctx context.Context, wsRoot string, cfg *wsproto.
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	ctx, cancel := context.WithTimeout(ctx, mcpGraphPreparationTimeout)
+	ctx, cancel := context.WithTimeout(ctx, graphPreparationTimeout)
 	defer cancel()
 
 	workspace.InvalidateLoadCache(wsRoot)
