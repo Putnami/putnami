@@ -34,9 +34,11 @@ member field.
   absent, and the grammar admits no parenthesis. A project id outside the
   grammar records no project; publishing never fails for it.
 - `kind`: the closed role vocabulary `image`, `config`, `migration`, `doc`,
-  `library`, `archive`. It says what the artifact is, not how it was built. An
-  unknown kind is a hard diagnostic (`distribution.invalid_kind`), because a
-  consumer selecting by role must never guess.
+  `library`, `archive`, `deployment`. It says what the artifact is, not how it
+  was built. An unknown kind is a hard diagnostic (`distribution.invalid_kind`),
+  because a consumer selecting by role must never guess. `deployment` is a
+  workload's deployment declaration: its resolved requirements and runtime as
+  one document.
 - `sourceTree`: the full lowercase hex git tree of the checkout the member was
   built from, `^[0-9a-f]{40}$`. A malformed value is a hard diagnostic
   (`distribution.invalid_source_tree`). SHA-256 repositories are out of scope,
@@ -72,7 +74,10 @@ Rules:
    (`releaseset.KindFor`) from a declared package or publish step to a kind,
    falling back on the ecosystem when it admits one role (`oci` is an image,
    `npm` and `go` are libraries, `archive` is an archive). An unknown step and
-   ecosystem produce no kind.
+   ecosystem produce no kind. A kind that no ecosystem implies, such as
+   `deployment` in the `put` ecosystem, is emitted only for a member whose
+   extension declares the step that maps to it: the package step `deployment`
+   maps to the kind `deployment`, and nothing else does.
 7. **Opt-in per repository, off by default.** The publisher emits
    `project` and `kind` only when `putnami.ci.json` declares
    `distribution.memberAttribution: true`, and `sourceTree` only with
@@ -88,6 +93,15 @@ Rules:
    observe the backend. Once a head carries a field, every later plan inherits
    it, so the declaration is one-way for every channel that head reaches.
 
+   A new kind token follows the same order. The token is appended to the
+   vocabulary, never inserted, and readers learn it first: a strict reader
+   built before the token refuses a set that carries it with
+   `distribution.invalid_kind`. Emission comes second and only through an
+   extension's member declaration, under rule 6, so a workspace starts to emit
+   the token only when it declares the step and pins an extension that maps
+   it. Once a head carries a member of the new kind, every later plan inherits
+   it, so the addition is one-way: the token is never renamed or removed.
+
 ## Consequences
 
 - A consumer groups a head's members by project and binds image, config and
@@ -97,7 +111,7 @@ Rules:
 - A member published before the source-tree opt-in, from a dirty checkout, or
   from a checkout that changed before the commit carries no tree until it is
   next republished from a clean checkout.
-- The conformance corpus carries valid fixtures for attributed members and for
-  a set with and without a tree, invalid fixtures for an unknown kind, an
-  unrepresentable project and an abbreviated tree, and keeps the golden
-  reference of a set without the fields unchanged.
+- The conformance corpus carries valid fixtures for attributed members, for a
+  deployment member, and for a set with and without a tree, invalid fixtures
+  for an unknown kind, an unrepresentable project and an abbreviated tree, and
+  keeps the golden reference of a set without the fields unchanged.

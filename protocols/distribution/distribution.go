@@ -247,11 +247,15 @@ const (
 	KindLibrary MemberKind = "library"
 	// KindArchive is a downloadable archive, such as a released binary set.
 	KindArchive MemberKind = "archive"
+	// KindDeployment is a workload's deployment declaration: the resolved
+	// requirements and runtime a workload needs to run, as one document.
+	KindDeployment MemberKind = "deployment"
 )
 
 // MemberKinds is the vocabulary in its declared order. The schema, the
-// validator, and any consumer that enumerates roles read this one list.
-var MemberKinds = []MemberKind{KindImage, KindConfig, KindMigration, KindDoc, KindLibrary, KindArchive}
+// validator, and any consumer that enumerates roles read this one list. A new
+// kind is appended, never inserted.
+var MemberKinds = []MemberKind{KindImage, KindConfig, KindMigration, KindDoc, KindLibrary, KindArchive, KindDeployment}
 
 // Valid reports whether the kind is one of the closed roles. An empty kind is
 // not valid: it is ABSENT, which validation admits separately.

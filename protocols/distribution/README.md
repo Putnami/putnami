@@ -86,8 +86,12 @@ run in the loop:
   the member key stays `(ecosystem, coordinate)`, and one project still yields
   any number of members;
 - `kind` is the closed role vocabulary `image | config | migration | doc |
-  library | archive`. A publisher that cannot classify an artifact records no
-  kind; the protocol never invents one.
+  library | archive | deployment`. `deployment` is a workload's deployment
+  declaration: its resolved requirements and runtime as one document, published
+  in the `put` ecosystem by the package step `deployment`. A publisher that
+  cannot classify an artifact records no kind; the protocol never invents one.
+  A new token is appended, readers learn it before any publisher emits it, and
+  the addition is one-way (ADR 0005, rule 7).
 
 Both are optional, so a set accepted before they existed keeps validating and
 keeps deriving the same `rs_` reference: `omitempty` omits them, and an
