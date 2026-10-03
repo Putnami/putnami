@@ -695,6 +695,12 @@ handshake, exactly as for a task. When that runtime cannot be prepared:
 | `runner-provider` | Stops the remote run with the failure, before it submits anything |
 | `session-reporter` | Prints that the reporter is unavailable and keeps the session for `putnami sessions replay` |
 
+On a hosted run (`--credential-fd`), a `session-reporter` or `log-reporter`
+receives the run credential only when its command is `{extensionRuntime}` and
+it accepts the `initialize` line of
+[session reporting v2](../../../protocols/cli/doc/04-session-reporting.md#run-credential).
+Any other reporter starts without a credential and without its token.
+
 ### Workspace adapter
 
 ```json

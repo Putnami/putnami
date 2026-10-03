@@ -100,8 +100,9 @@ const (
 // overwrites the provider's executable, a hostile hook, task or publication
 // job that probes for the credential and packs an npm or Put registry member,
 // a probe that runs while the engine uploads, a package step that stages a
-// member, the bun a real extension packs with, or a probe that then runs a
-// real extension binary. A role process exits without running any test. As the
+// member, the bun a real extension packs with, a probe that then runs a real
+// extension binary, or a v2 or v1 session reporter. A role process exits
+// without running any test. As the
 // runtime of a fixture extension, this binary first answers the CLI's
 // runtime-info handshake and workspace probe, which inherit the engine's
 // environment and so its role.
@@ -140,6 +141,10 @@ func TestMain(m *testing.M) {
 		os.Exit(runBunRole())
 	case "exec-probe":
 		os.Exit(runExecProbeRole())
+	case "reporter":
+		os.Exit(runReporterRole(false))
+	case "reporter-v1":
+		os.Exit(runReporterRole(true))
 	default:
 		os.Exit(runHostileRole(role))
 	}

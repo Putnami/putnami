@@ -8,7 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"regexp"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Session reporter discovery names and bounded v1 wire constants.
@@ -20,6 +24,25 @@ const (
 	SessionReportingChunkBytes = 64 * 1024
 	SessionReportingLineBytes  = 96 * 1024
 	SessionReportingSchemaID   = "https://putnami.dev/schemas/putnami-session-reporting.json"
+)
+
+// Session reporting v2 is v1 opened by a handshake that hands the reporter the
+// run credential of a hosted run (--credential-fd). The engine sends
+// initialize, which carries no credential; only after a reporter answers it
+// with SessionReportingCredentialVersion does the engine send authenticate,
+// which carries the credential. A v1 reporter rejects initialize, whose version
+// and members it does not know, and so never receives the credential. Chunks
+// and acknowledgements carry SessionReportingVersion in every stream, and an
+// engine without a run credential sends no handshake.
+const (
+	SessionReportingCredentialVersion = 2
+	SessionReportingOpInitialize      = "initialize"
+	SessionReportingOpAuthenticate    = "authenticate"
+	// SessionReportingMaxCredentialBytes bounds, in UTF-8 bytes, the run
+	// credential that authenticate carries (ValidSessionReportingCredential).
+	// The schema's maxLength holds the same number in characters, a looser
+	// bound for a multi-byte credential.
+	SessionReportingMaxCredentialBytes = 16 << 10
 )
 
 // Log reporter discovery names. The log reporter speaks the same v1 wire as
@@ -184,6 +207,146 @@ func ParseSessionReportingAck(line []byte) (*SessionReportingAck, error) {
 	return &a, nil
 }
 
+// SessionReportingHandshake is one engine line of the v2 handshake: initialize,
+// then authenticate. Formatting redacts the credential; the wire encoding
+// carries it.
+type SessionReportingHandshake struct {
+	// ProtocolVersion is SessionReportingCredentialVersion.
+	ProtocolVersion int `json:"protocolVersion"`
+	// Op is SessionReportingOpInitialize or SessionReportingOpAuthenticate.
+	Op string `json:"op"`
+	// RunCredential is the hosted run's opaque bearer
+	// (ValidSessionReportingCredential). Only authenticate carries it.
+	RunCredential string `json:"runCredential,omitempty"`
+}
+
+// SessionReportingHandshakeResult is the reporter's answer to one handshake
+// line. Code is a bounded machine code, never arbitrary reporter output.
+type SessionReportingHandshakeResult struct {
+	// ProtocolVersion echoes SessionReportingCredentialVersion.
+	ProtocolVersion int `json:"protocolVersion"`
+	// Op echoes the answered operation.
+	Op string `json:"op"`
+	// OK accepts the operation. A refusal carries Code.
+	OK bool `json:"ok"`
+	// Code is required when OK is false and absent otherwise: a lowercase
+	// machine code matching [a-z][a-z0-9_]{0,63}.
+	Code string `json:"code,omitempty"`
+}
+
+// NewSessionReportingInitialize returns the first handshake line. It carries
+// no credential.
+func NewSessionReportingInitialize() SessionReportingHandshake {
+	return SessionReportingHandshake{ProtocolVersion: SessionReportingCredentialVersion, Op: SessionReportingOpInitialize}
+}
+
+// NewSessionReportingAuthenticate returns the handshake line that hands the
+// reporter credential. Call Validate before transporting it.
+func NewSessionReportingAuthenticate(credential string) SessionReportingHandshake {
+	return SessionReportingHandshake{ProtocolVersion: SessionReportingCredentialVersion, Op: SessionReportingOpAuthenticate, RunCredential: credential}
+}
+
+// String formats the line without the credential.
+func (h SessionReportingHandshake) String() string {
+	credential := ""
+	if h.RunCredential != "" {
+		credential = "<redacted>"
+	}
+	return fmt.Sprintf("{protocolVersion:%d op:%s runCredential:%s}", h.ProtocolVersion, h.Op, credential)
+}
+
+// Format renders String for every verb, so no verb prints the credential.
+func (h SessionReportingHandshake) Format(f fmt.State, _ rune) {
+	_, _ = io.WriteString(f, h.String())
+}
+
+// Validate checks the version, the operation, and that only authenticate
+// carries a credential, a valid one.
+func (h SessionReportingHandshake) Validate() error {
+	if h.ProtocolVersion != SessionReportingCredentialVersion {
+		return fmt.Errorf("invalid reporting handshake version")
+	}
+	switch h.Op {
+	case SessionReportingOpInitialize:
+		if h.RunCredential != "" {
+			return fmt.Errorf("reporting initialize carries a credential")
+		}
+	case SessionReportingOpAuthenticate:
+		if !ValidSessionReportingCredential(h.RunCredential) {
+			return fmt.Errorf("invalid reporting credential")
+		}
+	default:
+		return fmt.Errorf("invalid reporting handshake operation")
+	}
+	return nil
+}
+
+// Accept constructs the reporter's acceptance of this line.
+func (h SessionReportingHandshake) Accept() SessionReportingHandshakeResult {
+	return SessionReportingHandshakeResult{ProtocolVersion: h.ProtocolVersion, Op: h.Op, OK: true}
+}
+
+// Refuse constructs the reporter's refusal of this line with code.
+func (h SessionReportingHandshake) Refuse(code string) SessionReportingHandshakeResult {
+	return SessionReportingHandshakeResult{ProtocolVersion: h.ProtocolVersion, Op: h.Op, Code: code}
+}
+
+// Answers reports whether the result answers h: the same version and
+// operation, whatever its status.
+func (r SessionReportingHandshakeResult) Answers(h SessionReportingHandshake) bool {
+	return r.ProtocolVersion == h.ProtocolVersion && r.Op == h.Op
+}
+
+// ValidSessionReportingCredential reports whether credential is a well-formed
+// run credential: non-empty, valid UTF-8, at most
+// SessionReportingMaxCredentialBytes bytes, and free of every character
+// unicode.IsSpace reports. It is the rule of registry.ValidRunCredential,
+// restated so this module depends on no other protocol.
+func ValidSessionReportingCredential(credential string) bool {
+	return credential != "" && len(credential) <= SessionReportingMaxCredentialBytes && utf8.ValidString(credential) &&
+		strings.IndexFunc(credential, unicode.IsSpace) < 0
+}
+
+// ParseSessionReportingHandshake strictly decodes one engine handshake line.
+// It refuses an initialize line that holds the runCredential member, even an
+// empty one, as the schema does.
+func ParseSessionReportingHandshake(line []byte) (*SessionReportingHandshake, error) {
+	var h SessionReportingHandshake
+	if err := parseReporting(line, &h, "protocolVersion", "op"); err != nil {
+		return nil, err
+	}
+	if err := h.Validate(); err != nil {
+		return nil, err
+	}
+	// RunCredential decodes an empty member and an absent one alike, so the
+	// member's presence is read from the line, which parseReporting decoded.
+	var members map[string]json.RawMessage
+	_ = json.Unmarshal(line, &members)
+	if _, present := members["runCredential"]; present && h.Op == SessionReportingOpInitialize {
+		return nil, fmt.Errorf("reporting initialize carries a credential")
+	}
+	return &h, nil
+}
+
+// ParseSessionReportingHandshakeResult strictly decodes one reporter answer to
+// a handshake line.
+func ParseSessionReportingHandshakeResult(line []byte) (*SessionReportingHandshakeResult, error) {
+	var r SessionReportingHandshakeResult
+	if err := parseReporting(line, &r, "protocolVersion", "op", "ok"); err != nil {
+		return nil, err
+	}
+	if r.ProtocolVersion != SessionReportingCredentialVersion {
+		return nil, fmt.Errorf("invalid reporting handshake version")
+	}
+	if r.Op != SessionReportingOpInitialize && r.Op != SessionReportingOpAuthenticate {
+		return nil, fmt.Errorf("invalid reporting handshake operation")
+	}
+	if r.OK && r.Code != "" || !r.OK && !reportingCode.MatchString(r.Code) {
+		return nil, fmt.Errorf("invalid reporting handshake status")
+	}
+	return &r, nil
+}
+
 func parseReporting(line []byte, target any, required ...string) error {
 	if len(line) > SessionReportingLineBytes {
 		return fmt.Errorf("reporting line exceeds limit")
@@ -192,7 +355,11 @@ func parseReporting(line []byte, target any, required ...string) error {
 	if err := json.Unmarshal(line, &fields); err != nil {
 		return fmt.Errorf("invalid reporting JSON")
 	}
+	members := reportingMembers(target)
 	for key, value := range fields {
+		if !members[key] {
+			return fmt.Errorf("unknown reporting field")
+		}
 		if bytes.Equal(value, []byte("null")) {
 			return fmt.Errorf("null reporting field")
 		}
@@ -218,4 +385,19 @@ func parseReporting(line []byte, target any, required ...string) error {
 		return fmt.Errorf("trailing reporting JSON")
 	}
 	return nil
+}
+
+// reportingMembers returns the exact JSON member names of the struct that
+// target points to. encoding/json matches a member to a field whatever its
+// case, so parseReporting refuses every other name itself, as the schema and
+// the TypeScript parsers do.
+func reportingMembers(target any) map[string]bool {
+	t := reflect.TypeOf(target).Elem()
+	members := make(map[string]bool, t.NumField())
+	for i := range t.NumField() {
+		if name, _, _ := strings.Cut(t.Field(i).Tag.Get("json"), ","); name != "" && name != "-" {
+			members[name] = true
+		}
+	}
+	return members
 }

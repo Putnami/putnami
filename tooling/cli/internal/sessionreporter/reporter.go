@@ -14,6 +14,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/sdk/extension/robustio"
 	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/sessionstream"
 )
 
@@ -82,6 +83,10 @@ type LaunchSpec struct {
 	Args    []string
 	Dir     string
 	Env     []string
+	// Runtime is the runtime executable of the serving extension. A hosted
+	// run hands the run credential only to a reporter whose Command is it
+	// (runcredential.RequireNativeHolder).
+	Runtime string
 }
 type Resolve func(context.Context) (LaunchSpec, error)
 
@@ -111,6 +116,9 @@ type Run struct {
 	opTimeout     time.Duration
 	clock         clock
 	batchInterval time.Duration
+	// plain: on a hosted run, the reporter cannot hold the run credential
+	// (Holders.Start), so its process starts without one.
+	plain bool
 }
 
 // Start declares the capability as a subscriber of events, resuming at its
@@ -118,6 +126,12 @@ type Run struct {
 // prepared it still returns the Run with the error: the worker never starts,
 // and Finish records that the subscriber acknowledged nothing new.
 func Start(ctx context.Context, capability Capability, events *sessionstream.Log, sessionID string, resolve Resolve) (*Run, error) {
+	return startRun(ctx, capability, events, sessionID, resolve, nil)
+}
+
+// startRun is Start that adopts what holders started for the capability
+// before repository code (Holders.take).
+func startRun(ctx context.Context, capability Capability, events *sessionstream.Log, sessionID string, resolve Resolve, holders *Holders) (*Run, error) {
 	provider := capability.Provider(ctx)
 	if provider == "" {
 		return nil, nil
@@ -142,6 +156,7 @@ func Start(ctx context.Context, capability Capability, events *sessionstream.Log
 	}
 	launch.Env = capability.providerEnv(ctx, launch.Env)
 	r.launch = launch
+	r.process, r.plain = holders.take(capability, provider)
 	go r.work()
 	return r, nil
 }
@@ -451,9 +466,9 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 			return fmt.Errorf("reporting budget exhausted")
 		}
 		if r.process == nil {
-			p, err := spawn(r.launch)
+			p, err := r.start()
 			if err != nil {
-				return fmt.Errorf("reporter process could not start")
+				return err
 			}
 			r.process = p
 		}
@@ -483,6 +498,23 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 		}
 	}
 	return fmt.Errorf("reporter retry budget exhausted")
+}
+
+// start starts the provider process. Without a run credential, or for a
+// reporter that cannot hold it (plain), it starts without a credential and
+// sends no handshake. Otherwise it starts as a holder (startHolder): custody
+// refuses a reporter that starts, or restarts, after repository code ran, and
+// the delivery then fails with that refusal, never with a reporter that holds
+// no credential. Its errors are core-owned.
+func (r *Run) start() (*process, error) {
+	if !runcredential.Hosted() || r.plain {
+		p, err := spawn(r.launch)
+		if err != nil {
+			return nil, errReporterStart
+		}
+		return p, nil
+	}
+	return startHolder(r.ctx, r.capability.holderName(r.state.Provider), r.launch, r.opTimeout)
 }
 
 // Finish drains under one total budget even if the graph context was canceled.

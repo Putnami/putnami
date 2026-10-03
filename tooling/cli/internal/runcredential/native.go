@@ -10,9 +10,9 @@ import (
 	goruntime "runtime"
 )
 
-// NativeHolderError reports a cache provider or credential-provider that a
-// hosted run does not start, because it is not its extension's native runtime
-// executable started directly.
+// NativeHolderError reports a cache provider, credential-provider or reporter
+// that a hosted run does not hand its credential, because it is not its
+// extension's native runtime executable started directly.
 type NativeHolderError struct {
 	// Holder names the process that would receive the credential.
 	Holder string
@@ -21,18 +21,18 @@ type NativeHolderError struct {
 }
 
 func (e *NativeHolderError) Error() string {
-	return fmt.Sprintf("%s: %s cannot hold the run credential: %s; a hosted run starts a cache provider or "+
-		"a credential-provider only as its extension's native runtime executable, command {extensionRuntime}, "+
+	return fmt.Sprintf("%s: %s cannot hold the run credential: %s; a hosted run hands its credential to a cache provider, "+
+		"a credential-provider or a reporter only as its extension's native runtime executable, command {extensionRuntime}, "+
 		"because a script or an interpreted entry reads more files after it starts",
 		Flag, e.Holder, e.Reason)
 }
 
 // RequireNativeHolder fails with a *NativeHolderError on a hosted run unless
-// executable, the file a cache provider or credential-provider starts as, is
-// runtime, the runtime executable of the extension that serves it, and that
-// file is a native executable image of this system (nativeMagic): a regular
-// ELF file on Linux, Mach-O on macOS or PE on Windows, not a script or a
-// link. It returns nil without a run credential.
+// executable, the file a cache provider, credential-provider or reporter
+// starts as, is runtime, the runtime executable of the extension that serves
+// it, and that file is a native executable image of this system
+// (nativeMagic): a regular ELF file on Linux, Mach-O on macOS or PE on
+// Windows, not a script or a link. It returns nil without a run credential.
 //
 // Custody covers the executable a holder starts as, not the files it reads
 // later (ADR 0055, part 4). A shell launcher or an interpreted entry, such as

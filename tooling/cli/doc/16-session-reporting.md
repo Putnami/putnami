@@ -11,6 +11,9 @@ session, including failed and canceled work. Local and hosted execution use the
 same capability. A trusted launcher may supply `PUTNAMI_SESSION_REPORTER_TOKEN`;
 the authoritative CLI captures it before workspace setup/hooks/tasks and passes
 it only to the selected provider process. Do not put it in repository commands.
+A hosted run (`--credential-fd`) ignores the token instead: it removes it from
+the environment with a warning, and hands the reporter the run credential over
+the protocol. See [Hosted runs](#hosted-runs).
 
 A selected but unavailable provider produces a diagnostic and retains the
 session; an unset selector leaves reporting disabled. Reporting failure never
@@ -53,6 +56,39 @@ checkpoint (`log-reporting.json` for the log reporter) and its own
 or crashes produces one diagnostic, and changes neither the session reporter's
 delivery nor the exit code. The reverse also holds. See
 [ADR 0033](adr/0033-native-session-reporting.md).
+
+## Hosted runs
+
+A hosted run (`--credential-fd`, see
+[ADR 0055](adr/0055-run-credentials-stay-out-of-repository-processes.md))
+keeps every reporter token out of every process environment:
+
+1. At start, the CLI removes `PUTNAMI_SESSION_REPORTER_TOKEN` and
+   `PUTNAMI_LOG_REPORTER_TOKEN` from its environment, and prints one line for
+   each that held a value. It never reads them on that run.
+2. Before its first hook, install or job, it starts each selected reporter and
+   hands it the run credential over the protocol's version 2 handshake. The
+   session's delivery reuses that process.
+3. A reporter that does not accept the handshake (a version 1 reporter), or
+   whose command is not its extension's native runtime, starts without a
+   credential and without a token. The CLI prints one diagnostic for it.
+   Each handshake answer has its own five-second limit, and the CLI starts
+   the reporters one after another. A reporter answers two lines, so the
+   handshake can hold the first hook for up to ten seconds per reporter, and
+   up to twenty with both reporters selected. A reporter that ignores the
+   handshake instead of exiting costs five seconds.
+4. A reporter that must start again after repository code ran gets no
+   credential: its delivery fails with a custody diagnostic. What it did not
+   deliver stays pending in the session's checkpoint (`reporting.json` or
+   `log-reporting.json`), and `subscribers.json` records it. The hosted run
+   does not replay it. A later `putnami sessions replay` is a separate
+   invocation and needs a reporter credential of its own.
+5. `--watch`, and `serve`, which always watches, refuse `--credential-fd` with
+   a usage error before anything starts: each watch iteration starts after
+   repository code ran, when no reporter can receive the credential.
+
+A run without `--credential-fd` is unchanged: no handshake, and each token
+reaches only its own reporter's environment.
 
 ## Replay
 

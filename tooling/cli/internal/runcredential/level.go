@@ -14,7 +14,11 @@ import (
 // refuses every command in a credentialed workspace-fetch job (HostedFetchEnv).
 // A CLI that accepts Flag but advertises no level, such as an older build,
 // is below it. Raise the level when a change to custody must not be
-// undone by pinning an older CLI.
+// undone by pinning an older CLI. A variable Capture removes from the
+// environment needs no raise: Capture runs before the pin relaunch, so the
+// pinned CLI never sees it. Handing the reporters the run credential over
+// their protocol stays at level 2 for that reason: a pinned level 2 CLI finds
+// no reporter token, and hands its reporters no credential.
 const CustodyLevel = 2
 
 // custodyLevelWords precede the level in FlagDescription.

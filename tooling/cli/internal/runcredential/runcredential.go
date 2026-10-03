@@ -5,12 +5,15 @@
 // Capture reads it before the process can start anything. It denies inspection
 // of the process (procguard), reads the descriptor to its end, at most
 // MaxBytes, closes it, and keeps the bearer in memory only. A process that
-// captured a credential also drops PUTNAMI_CACHE_TOKEN and PUTNAMI_CLOUD_TOKEN
-// from its environment, because the run credential replaces them, and sets PUTNAMI_OFFLINE_DEPENDENCIES
-// to "1" there, because only the fetch downloads dependencies.
+// captured a credential also drops PUTNAMI_CACHE_TOKEN, PUTNAMI_CLOUD_TOKEN,
+// PUTNAMI_SESSION_REPORTER_TOKEN and PUTNAMI_LOG_REPORTER_TOKEN from its
+// environment, because the run credential replaces them, and sets
+// PUTNAMI_OFFLINE_DEPENDENCIES to "1" there, because only the fetch downloads
+// dependencies.
 //
-// The credential leaves the process only for a holder: the cache provider and
-// the credential-provider receive it over their RPC, a workspace-fetch job
+// The credential leaves the process only for a holder: the cache provider,
+// the credential-provider, the session reporter and the log reporter receive
+// it over their protocol, a workspace-fetch job
 // receives the job credential it yields, and when the process replaces its
 // image with another CLI (Exec), the new image receives the bearer on a fresh
 // pipe that --credential-fd names again. Every holder starts before the
@@ -27,6 +30,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
 	registry "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/sdk/extension/procguard"
@@ -230,8 +234,11 @@ func parseBearer(data []byte) (string, error) {
 }
 
 // credentialVariables are the framework credentials a CI environment
-// exports. A hosted run hands its providers the run credential instead.
-var credentialVariables = []string{CacheTokenEnv, CloudTokenEnv}
+// exports. A hosted run hands its providers and its reporters the run
+// credential instead.
+var credentialVariables = []string{
+	CacheTokenEnv, CloudTokenEnv, protocolcli.SessionReporterTokenEnv, protocolcli.LogReporterTokenEnv,
+}
 
 // dropCredentialVariables removes credentialVariables from the environment of
 // a process that holds the run credential, and names on stderr each one that

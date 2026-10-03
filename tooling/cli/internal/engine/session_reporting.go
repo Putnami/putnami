@@ -33,11 +33,79 @@ func startSessionReporting(ctx context.Context, req *Request, ws *workspace.Work
 	}
 	reporters, failures := sessionreporter.StartSelected(ctx, session.Events(), session.ID, func(capability sessionreporter.Capability) sessionreporter.Resolve {
 		return reportingResolver(ctx, capability, ws, discovered)
-	})
+	}, req.HostedReporters.holders())
 	for _, failure := range failures {
-		iox.Fprintf(os.Stderr, "putnami: %v\n", failure.Err)
+		printReportingFailure(failure)
 	}
 	return reporters
+}
+
+func printReportingFailure(failure sessionreporter.Failure) {
+	iox.Fprintf(os.Stderr, "putnami: %v\n", failure.Err)
+}
+
+// HostedReporters are the reporters of a hosted invocation, started once,
+// before its first repository code, so that each can hold the run credential
+// (sessionreporter.Holders): a reporter starts at its first chunk, after the
+// hooks and the first jobs, and a hosted run hands its credential to no
+// process started after repository code. The first-use bootstrap starts them
+// before the implicit install's first repository code, beside the remote
+// cache (HostedRemoteCache), and the run that follows adopts them
+// (Request.HostedReporters). The zero value is ready to use. Whoever creates
+// it closes it, after the last run that adopts from it.
+type HostedReporters struct {
+	held sessionreporter.Holders
+}
+
+// Start starts the reporters the context selects, once, for a hosted request
+// that records a session, and prints each one that does not hold the run
+// credential. It never fails the request: a reporter that did not start is
+// started by the session's run, which custody then refuses. Without a run
+// credential, or for a request that records no session (a workspace
+// lifecycle job, --plan, a dry run), it starts nothing. A workspace that does
+// not load starts nothing here: the run reports it after the hooks.
+func (h *HostedReporters) Start(ctx context.Context, req *Request) {
+	if h == nil || !runcredential.Hosted() || req.WorkspaceLifecycle || req.Global.Plan || req.previewsOnly() {
+		return
+	}
+	selected := sessionreporter.Selected(ctx)
+	if len(selected) == 0 {
+		return
+	}
+	ws, err := workspace.Load(req.WorkspaceRoot)
+	if err != nil {
+		return
+	}
+	projectPaths := make([]string, len(ws.Projects))
+	for i, p := range ws.Projects {
+		projectPaths[i] = p.Path
+	}
+	discovered, err := extension.DiscoverExtensionsDetailed(req.WorkspaceRoot, req.Config, projectPaths)
+	if err != nil {
+		return
+	}
+	for _, failure := range h.held.Start(ctx, selected, func(capability sessionreporter.Capability) sessionreporter.Resolve {
+		return reportingResolver(ctx, capability, ws, discovered)
+	}) {
+		printReportingFailure(failure)
+	}
+}
+
+// Close closes every reporter Start started that no run adopted. A nil
+// HostedReporters does nothing.
+func (h *HostedReporters) Close() {
+	if h == nil {
+		return
+	}
+	h.held.Close()
+}
+
+// holders is what a session's run adopts from, or nil.
+func (h *HostedReporters) holders() *sessionreporter.Holders {
+	if h == nil {
+		return nil
+	}
+	return &h.held
 }
 
 func finishSessionReporting(reporters *sessionreporter.Runs, sessionID string, finalizeErr error) {
@@ -82,7 +150,10 @@ func reportingResolver(ctx context.Context, capability sessionreporter.Capabilit
 			if !extension.InArtifactStore(ws.Root, ext) {
 				runcredential.MarkRepositoryCodeStarted("session reporter " + ext.Name)
 			}
-			return sessionreporter.LaunchSpec(launch), nil
+			return sessionreporter.LaunchSpec{
+				Command: launch.Command, Args: launch.Args, Dir: launch.Dir, Env: launch.Env,
+				Runtime: ext.RuntimeExecutable,
+			}, nil
 		}
 		return sessionreporter.LaunchSpec{}, fmt.Errorf("selected reporter was not discovered")
 	}
@@ -91,7 +162,9 @@ func reportingResolver(ctx context.Context, capability sessionreporter.Capabilit
 // ReplaySession sends only retained artifacts, for every selected reporting
 // capability whose evidence is not delivered. Discovery and each selected
 // reporter runtime use their normal mechanisms; no workload DAG or hook runs.
-// Normal reporter runtime preparation may build its provider executable.
+// Normal reporter runtime preparation may build its provider executable. A
+// hosted replay hands its reporters the run credential as a run does, and
+// prints each one that does not hold it.
 func (e *Engine) ReplaySession(ctx context.Context, wsRoot string, cfg *wsproto.Config, sessionID string) error {
 	ctx = sessionreporter.Capture(ctx)
 	if sessionID == "" || sessionID == "latest" || filepath.Base(sessionID) != sessionID {
@@ -113,5 +186,5 @@ func (e *Engine) ReplaySession(ctx context.Context, wsRoot string, cfg *wsproto.
 	}
 	return sessionreporter.ReplaySelected(ctx, dir, sessionID, func(capability sessionreporter.Capability) sessionreporter.Resolve {
 		return reportingResolver(ctx, capability, ws, discovered)
-	})
+	}, printReportingFailure)
 }

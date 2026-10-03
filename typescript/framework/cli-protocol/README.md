@@ -7,6 +7,9 @@ The package also exports `SessionReportingChunk`, `SessionReportingAck`,
 Go and TypeScript execute one shared conformance corpus. The reporter names
 (`SESSION_REPORTER_*`, `LOG_REPORTER_*`) and `sessionReportingArtifacts`
 state which artifacts the session reporter and the log reporter receive.
+`parseSessionReportingHandshake`, `parseSessionReportingHandshakeResult` and
+`sessionReportingHandshakeResultAnswers` decode the v2 handshake that hands a
+reporter the run credential of a hosted run.
 
 It also exports `SessionSubscribersFile` and `parseSessionSubscribersFile` for
 the [session subscriber evidence](../../../protocols/cli/doc/05-session-subscribers.md)
