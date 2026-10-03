@@ -122,3 +122,32 @@ func TestSelectDatasources_LeavesTheCallersBindingIntact(t *testing.T) {
 		t.Errorf("caller's binding lost entries: %v", tb.Databases)
 	}
 }
+
+// TestProvision_PlansOnlyTheSelectedDatasources proves Provision narrows the
+// binding before it plans. The unselected "broken" entry has no connection, so
+// planning it fails before any connection opens. The selected entry points at a
+// closed local port, so a narrowed run fails later, while connecting to it.
+func TestProvision_PlansOnlyTheSelectedDatasources(t *testing.T) {
+	tb := &pdb.TestBinding{
+		KeepDatabases: true,
+		Databases: map[string]pdb.Database{
+			"auth": {Engine: pdb.EnginePostgres, Connection: &pdb.Connection{
+				Host: "127.0.0.1", Port: 1, Database: "auth", User: "u", Password: "p",
+			}},
+			"broken": {Engine: pdb.EnginePostgres},
+		},
+	}
+
+	_, err := Provision(context.Background(), Options{Binding: tb})
+	if err == nil || !strings.Contains(err.Error(), `"broken" has no connection`) {
+		t.Fatalf("without a list, Provision error = %v, want it to plan the broken entry", err)
+	}
+
+	_, err = Provision(context.Background(), Options{Binding: tb, Datasources: []string{"auth"}})
+	if err == nil {
+		t.Fatal("Provision reached a closed port, want a connection error")
+	}
+	if strings.Contains(err.Error(), "broken") || !strings.Contains(err.Error(), `datasource "auth"`) {
+		t.Errorf("with a list, Provision error = %v, want a connection error for auth only", err)
+	}
+}

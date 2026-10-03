@@ -402,6 +402,30 @@ describe('selectDatasources', () => {
     expect(Object.keys(binding.databases ?? {})).toEqual(['auth', 'billing']);
   });
 
+  // provision narrows the binding before it plans. The unselected "broken" entry
+  // has no connection, so planning it fails before any connection opens. The
+  // selected entry points at a closed local port, so a narrowed run fails later,
+  // while connecting to it.
+  it('is applied by provision before it plans', async () => {
+    const binding = tb(
+      {
+        auth: {
+          engine: 'postgres',
+          connection: { host: '127.0.0.1', port: 1, database: 'auth', user: 'u', password: 'p' },
+        },
+        broken: { engine: 'postgres' },
+      },
+      { keepDatabases: true },
+    );
+    await expect(provision({ binding })).rejects.toThrow(/"broken" has no connection/);
+    const err = await provision({ binding, datasources: ['auth'] }).then(
+      () => undefined,
+      (e: unknown) => e as Error,
+    );
+    expect(err).toBeInstanceOf(Error);
+    expect(err?.message).not.toContain('broken');
+  });
+
   it('does not take an inherited property for a datasource', () => {
     const binding = tb({ auth: { engine: 'postgres', connection: tcp('auth') } });
     expect(() => selectDatasources(binding, ['toString'])).toThrow(/has no datasource "toString"/);

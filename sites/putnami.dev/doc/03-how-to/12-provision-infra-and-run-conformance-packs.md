@@ -71,15 +71,16 @@ const sql = await database('default');
 await sql`SELECT 1`;
 ```
 
-A suite that creates its own isolated databases with the test provider names the datasources it uses, so it does not pay for every datasource in the binding. The provider creates, migrates and drops only those, and the binding it returns carries only them:
+A suite that creates its own isolated databases with the test provider can name the datasources it uses, so it does not pay for every datasource in the binding. The provider then sets up only those, and the binding it returns carries only them:
 
 ```ts
 import { provision } from '@putnami/database';
+import * as sqlModule from '../src/.gen/src/.sql.gen'; // generated migration sources
 
-const db = await provision({ datasources: ['default'] });
+const db = await provision({ sources: Object.values(sqlModule), datasources: ['default'] });
 ```
 
-In Go, pass `testprovider.Options{Datasources: []string{"default"}}` to `testprovider.Provision`. A name the binding lacks follows the binding's mode: `skip` skips the suite, `require` fails and names the datasource.
+In Go, pass `testprovider.Options{Datasources: []string{"default"}}` to `testprovider.Provision`. A name the binding lacks follows the binding's mode: with `skip`, the provider raises its skip error (`TestProviderSkip`, or an error that wraps `testprovider.ErrSkip`) so the suite can skip; with `require`, it fails and names the datasource.
 
 ### 3) Opt into a conformance pack (one line)
 
