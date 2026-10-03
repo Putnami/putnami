@@ -88,7 +88,7 @@ run in the loop:
 - `kind` is the closed role vocabulary `image | config | migration | doc |
   library | archive | deployment`. `deployment` is a workload's deployment
   declaration: its resolved requirements and runtime as one document, published
-  in the `put` ecosystem by the package step `deployment`. A publisher that
+  in the `put` ecosystem and written by the package step `deployment`. A publisher that
   cannot classify an artifact records no kind; the protocol never invents one.
   A new token is appended, readers learn it before any publisher emits it, and
   the addition is one-way (ADR 0005, rule 7).

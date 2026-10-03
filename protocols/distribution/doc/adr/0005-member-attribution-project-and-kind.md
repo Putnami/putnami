@@ -76,8 +76,9 @@ Rules:
    `npm` and `go` are libraries, `archive` is an archive). An unknown step and
    ecosystem produce no kind. A kind that no ecosystem implies, such as
    `deployment` in the `put` ecosystem, is emitted only for a member whose
-   extension declares the step that maps to it: the package step `deployment`
-   maps to the kind `deployment`, and nothing else does.
+   extension declares the step that maps to it: a package or publish step
+   named `deployment` maps to the kind `deployment`, and `KindFor` consults
+   the publish step first.
 7. **Opt-in per repository, off by default.** The publisher emits
    `project` and `kind` only when `putnami.ci.json` declares
    `distribution.memberAttribution: true`, and `sourceTree` only with
@@ -97,9 +98,11 @@ Rules:
    vocabulary, never inserted, and readers learn it first: a strict reader
    built before the token refuses a set that carries it with
    `distribution.invalid_kind`. Emission comes second and only through an
-   extension's member declaration, under rule 6, so a workspace starts to emit
-   the token only when it declares the step and pins an extension that maps
-   it. Once a head carries a member of the new kind, every later plan inherits
+   extension's member declaration, under rule 6. The CLI maps the step to the
+   kind, and every extension that runs in the publication validates the plan
+   that carries it, so a workspace declares the step only after its CLI and
+   every extension it pins know the token. An older extension anywhere in the
+   publication refuses every later plan. Once a head carries a member of the new kind, every later plan inherits
    it, so the addition is one-way: the token is never renamed or removed.
 
 ## Consequences

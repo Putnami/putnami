@@ -372,7 +372,8 @@ Every output has exactly one owning task:
 | `package-deployment` | `.gen/deployment.json` (required: a run that writes none caches nothing) | project dir |
 | `config-extract-exec` | `schema/config.json`, `schema/config.jsonschema.json` | project dir |
 
-Each declared output above may legitimately be absent after a successful run —
+Except the required `.gen/deployment.json` of `package-deployment`, each
+declared output above may legitimately be absent after a successful run —
 a project with no entrypoint transpiles to nothing, coverage is only
 instrumented under `--enforce-coverage`, and a project with no config blocks
 emits no schema.

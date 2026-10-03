@@ -302,11 +302,15 @@ func TestCheckRefusesAMemberBeforeAnyRequest(t *testing.T) {
 		"a blob media type of another kind": {edit(archive, func(m *Member) { m.Blobs[0].MediaType = put.MigrationBundleBlobMediaType }), "uploads no"},
 		"a config blob":                     {edit(members()[distribution.KindConfig], func(m *Member) { m.Blobs = []Blob{BytesBlob(put.GzipBlobMediaType, []byte("x"))} }), "uploads no"},
 		"a deployment blob":                 {edit(members()[distribution.KindDeployment], func(m *Member) { m.Blobs = []Blob{BytesBlob(put.GzipBlobMediaType, []byte("x"))} }), "uploads no"},
-		"a deployment manifest media type":  {edit(members()[distribution.KindConfig], func(m *Member) { m.MediaType = put.DeploymentManifestMediaType }), "publishes its manifest as"},
-		"a blob without a digest":           {edit(archive, func(m *Member) { m.Blobs[0].Digest = "sha256:x" }), "names no sha256 digest"},
-		"an empty blob":                     {edit(archive, func(m *Member) { m.Blobs[0].Size = 0 }), "is empty"},
-		"a repeated blob":                   {edit(archive, func(m *Member) { m.Blobs[1] = m.Blobs[0] }), "repeats"},
-		"a missing blob":                    {edit(archive, func(m *Member) { m.Blobs = m.Blobs[:1] }), "must be the same blobs"},
+		"a deployment of another protocol version": {edit(members()[distribution.KindDeployment], func(m *Member) {
+			m.Manifest = []byte(strings.Replace(string(m.Manifest), `"protocolVersion":2`, `"protocolVersion":3`, 1))
+		}), "deployment manifest"},
+		"a deployment that is not a declaration": {edit(members()[distribution.KindDeployment], func(m *Member) { m.Manifest = []byte(`{"note":"x"}`) }), "deployment manifest"},
+		"a deployment manifest media type":       {edit(members()[distribution.KindConfig], func(m *Member) { m.MediaType = put.DeploymentManifestMediaType }), "publishes its manifest as"},
+		"a blob without a digest":                {edit(archive, func(m *Member) { m.Blobs[0].Digest = "sha256:x" }), "names no sha256 digest"},
+		"an empty blob":                          {edit(archive, func(m *Member) { m.Blobs[0].Size = 0 }), "is empty"},
+		"a repeated blob":                        {edit(archive, func(m *Member) { m.Blobs[1] = m.Blobs[0] }), "repeats"},
+		"a missing blob":                         {edit(archive, func(m *Member) { m.Blobs = m.Blobs[:1] }), "must be the same blobs"},
 		"an unreferenced blob": {edit(members()[distribution.KindDoc], func(m *Member) {
 			m.Blobs = append(m.Blobs, BytesBlob(put.GzipBlobMediaType, []byte("extra")))
 		}), "must be the same blobs"},
