@@ -71,6 +71,16 @@ const sql = await database('default');
 await sql`SELECT 1`;
 ```
 
+A suite that creates its own isolated databases with the test provider names the datasources it uses, so it does not pay for every datasource in the binding. The provider creates, migrates and drops only those, and the binding it returns carries only them:
+
+```ts
+import { provision } from '@putnami/database';
+
+const db = await provision({ datasources: ['default'] });
+```
+
+In Go, pass `testprovider.Options{Datasources: []string{"default"}}` to `testprovider.Provision`. A name the binding lacks follows the binding's mode: `skip` skips the suite, `require` fails and names the datasource.
+
 ### 3) Opt into a conformance pack (one line)
 
 A conformance pack is a shared, cross-language test corpus a framework ships so every adopter certifies the same behavior against its own provisioned infrastructure. Opt in with a single committed line in a test file.

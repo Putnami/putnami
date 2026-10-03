@@ -195,6 +195,13 @@ contract it reads. Two implementations realize it today:
 7. Return resolved bindings to the language adapter.
 8. Tear down deterministically unless `reuse` keeps a template warm.
 
+A caller can name the datasources its suite uses (`Options.Datasources` in Go,
+`datasources` in TypeScript). The provider then runs these steps for those
+entries only and returns a binding that carries only them; a name the binding
+lacks follows `mode`, as a missing binding does. Both providers run the case
+corpus in [`conformance/test-provider-datasources.json`](conformance/test-provider-datasources.json),
+which pins that selection.
+
 Performance expectations: do not start one container per test file; do not replay
 migrations per test when a bundle-digest template can be reused; CI normally
 provides Postgres as a service and passes a binding (Docker auto-provisioning is

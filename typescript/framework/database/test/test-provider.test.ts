@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { DatabaseConnectionSpec, DatabaseTestBinding } from '../src/postgres/binding';
 import { parseTestBinding } from '../src/postgres/binding';
 import { SQLSource } from '../src/migrations/sql-source';
@@ -13,6 +15,7 @@ import {
   provision,
   reuseTemplates,
   runtimeBinding,
+  selectDatasources,
   setConnectionDatabase,
   templateName,
   TestProviderSkip,
@@ -332,5 +335,75 @@ describe('provision (no live database)', () => {
     await expect(provision({ binding: { protocolVersion: 1, mode: 'require' } })).rejects.toThrow(
       /DATABASE_TEST_BINDINGS/,
     );
+  });
+});
+
+// The datasource-selection corpus both test providers run. Its Go twin is
+// go/framework/database/testprovider/datasources_conformance_test.go.
+const DATASOURCES_CORPUS = join(__dirname, '../../../../protocols/database/conformance/test-provider-datasources.json');
+
+interface DatasourcesCase {
+  id: string;
+  mode?: DatabaseTestBinding['mode'];
+  datasources?: string[];
+  expect: { datasources?: string[]; error?: 'skip' | 'require'; names?: string[] };
+}
+
+describe('datasource selection corpus', () => {
+  const corpus = JSON.parse(readFileSync(DATASOURCES_CORPUS, 'utf8')) as {
+    binding: unknown;
+    cases: DatasourcesCase[];
+  };
+
+  it('has cases', () => {
+    expect(corpus.cases.length).toBeGreaterThan(0);
+  });
+
+  for (const c of corpus.cases) {
+    it(c.id, async () => {
+      const binding = parseTestBinding(JSON.stringify(corpus.binding));
+      if (c.mode) {
+        binding.mode = c.mode;
+      }
+
+      if (c.expect.error) {
+        const err = await provision({ binding, datasources: c.datasources }).then(
+          () => undefined,
+          (e: unknown) => e as Error,
+        );
+        expect(err).toBeInstanceOf(Error);
+        expect(err instanceof TestProviderSkip).toBe(c.expect.error === 'skip');
+        const list = (c.expect.names ?? []).map((n) => JSON.stringify(n)).join(', ');
+        expect(err?.message).toContain(`has no datasource ${list}`);
+        return;
+      }
+
+      const plans = planDatabases(selectDatasources(binding, c.datasources), fixedSuffix('s'));
+      expect(plans.map((p) => p.name)).toEqual(c.expect.datasources ?? []);
+      expect(Object.keys(runtimeBinding(plans).databases ?? {}).sort()).toEqual(c.expect.datasources ?? []);
+    });
+  }
+});
+
+describe('selectDatasources', () => {
+  it("returns the binding itself without a list and never mutates the caller's binding", () => {
+    const binding = tb(
+      {
+        auth: { engine: 'postgres', connection: tcp('auth') },
+        billing: { engine: 'postgres', connection: tcp('billing') },
+      },
+      { mode: 'require' },
+    );
+    expect(selectDatasources(binding)).toBe(binding);
+    expect(selectDatasources(binding, [])).toBe(binding);
+    const selected = selectDatasources(binding, ['auth']);
+    expect(Object.keys(selected.databases ?? {})).toEqual(['auth']);
+    expect(selected.mode).toBe('require');
+    expect(Object.keys(binding.databases ?? {})).toEqual(['auth', 'billing']);
+  });
+
+  it('does not take an inherited property for a datasource', () => {
+    const binding = tb({ auth: { engine: 'postgres', connection: tcp('auth') } });
+    expect(() => selectDatasources(binding, ['toString'])).toThrow(/has no datasource "toString"/);
   });
 });

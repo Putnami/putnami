@@ -1,0 +1,54 @@
+{
+  "suite": "putnami.database.test-provider.datasources.v1",
+  "binding": {
+    "protocolVersion": 1,
+    "mode": "require",
+    "isolation": "database",
+    "reuse": "bundle-template",
+    "applyMigrations": true,
+    "keepDatabases": true,
+    "databases": {
+      "auth": { "engine": "postgres", "schema": "iam", "connection": { "host": "h", "database": "auth" } },
+      "billing": { "engine": "postgres", "schema": "billing", "connection": { "host": "h", "database": "billing" } },
+      "events": { "engine": "postgres", "schema": "events", "connection": { "host": "h", "database": "events" } }
+    }
+  },
+  "cases": [
+    {
+      "id": "absent-list-provisions-every-datasource",
+      "expect": { "datasources": ["auth", "billing", "events"] }
+    },
+    {
+      "id": "empty-list-provisions-every-datasource",
+      "datasources": [],
+      "expect": { "datasources": ["auth", "billing", "events"] }
+    },
+    {
+      "id": "list-provisions-only-the-named-datasources",
+      "datasources": ["events", "auth"],
+      "expect": { "datasources": ["auth", "events"] }
+    },
+    {
+      "id": "a-repeated-name-provisions-once",
+      "datasources": ["billing", "billing"],
+      "expect": { "datasources": ["billing"] }
+    },
+    {
+      "id": "require-fails-and-names-every-missing-datasource",
+      "datasources": ["auth", "ghost", "absent"],
+      "expect": { "error": "require", "names": ["absent", "ghost"] }
+    },
+    {
+      "id": "auto-fails-like-require",
+      "mode": "auto",
+      "datasources": ["ghost"],
+      "expect": { "error": "require", "names": ["ghost"] }
+    },
+    {
+      "id": "skip-skips-on-a-missing-datasource",
+      "mode": "skip",
+      "datasources": ["auth", "ghost"],
+      "expect": { "error": "skip", "names": ["ghost"] }
+    }
+  ]
+}
