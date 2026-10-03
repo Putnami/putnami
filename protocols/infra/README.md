@@ -27,6 +27,7 @@ This package defines the versioned contract for these shapes:
 | Workload runtime defaults | `<workload>/.gen/infra/runtime.json` | the build aggregator (`infra.DefaultRuntime()`) | the build aggregator |
 | Workload overrides | `<workload>/infra/overrides.json` | developer | the build aggregator |
 | Aggregated manifest | `<workload>/.gen/requirements.json` | the build aggregator | deployers |
+| Deployment declaration | `<workload>/.gen/deployment.json` | the `deployment` package step | release-set publishers, deployers |
 
 `infra/requirements.json` and `infra/runtime.json` are committed deployability
 markers. `.gen/requirements.json` is never committed: it is a release/build
@@ -221,6 +222,44 @@ stale deployability manifest. It is also **workload-only**: a project whose
 resolved type is not `application` is skipped, because a library is consumed,
 never deployed.
 
+### Deployment declaration
+
+A workload's deployment declaration is its aggregated manifest in the one byte
+form a content-addressed registry stores. A release set can carry it as a member
+of kind `deployment`, so a deployer that holds only the release set reads what
+the workload needs to run without a build in the loop.
+
+- **Content.** The aggregated manifest exactly as the build aggregator resolves
+  it: every closure contribution with its sources, the workload's overrides
+  applied, and the runtime from `infra/runtime.json` or `infra.DefaultRuntime()`
+  after the language compatibility hook.
+- **Bytes.** `infra.MarshalDeployment` writes what `encoding/json` writes for the
+  typed manifest: members in struct field order, no insignificant space, `<`,
+  `>` and `&` escaped, no trailing newline, and no `$schema` member. `$schema` is
+  an editor hint; carrying it would tie every digest to a URL. These bytes are
+  also the canonical payload form of the Put registry, so they publish as they
+  are.
+- **Reader.** `infra.ParseDeployment` strict-parses and validates the bytes as an
+  aggregated manifest, then refuses any spelling that is not the canonical one:
+  indented, reordered or newline-terminated bytes, a repeated member, or a
+  `$schema` member are `infra.non_canonical`. An unknown member is
+  `infra.unknown_field`, as for every strict reader.
+- **Version.** The payload carries `protocolVersion`, and the Put media type
+  `application/vnd.putnami.infra.deployment.v2+json` names it. A new protocol
+  version is a new media type.
+- **Producer.** The `deployment` package step of the Go and TypeScript
+  extensions (`package-deployment`) writes `<workload>/.gen/deployment.json`.
+  The step is off until a project turns on the `deployment` package channel
+  (the `--deployment` flag, a `deployment` entry in its `publish` list, or the
+  `deployment` option of its language extension). Unlike
+  `build~infra`, it is **cached**: its key covers `infra/requirements.json` of
+  every project in the dependency closure and the workload's `infra/runtime.json`
+  and `infra/overrides.json`, so a change to a library's requirements moves the
+  key. A library writes no declaration and loses a stale one. An aggregate with
+  an error finding writes nothing, removes a stale declaration, and reports its
+  findings as warnings, as `build~infra` does: a publisher that needs the
+  declaration refuses its absence.
+
 ### Generator scratch fragments
 
 Framework producers each own one scratch file at `<project>/.gen/infra/<slug>.json`. The slug names the producer — `database.json`, `storage.json`, `events.json`, `migration.json`, `document.json`, `secrets.json`. Language generators clear this scratch directory at the start of generation, producers rewrite their fragments, then the generator folds every fragment into the committed `<project>/infra/requirements.json`.
@@ -270,6 +309,7 @@ formatter override is needed. The collapse rule lives in `marshalCommitted`
 | `infra.invalid_schedule` | `scheduledJobs[].schedule` is non-empty but is not a well-formed 5-field Cloud Scheduler cron expression (wrong field count, out-of-range value, unknown name, or a `@macro`). |
 | `infra.conflicting_value` | Merge encountered a conflicting non-empty value (e.g. two storage retentions, two scheduled-job schedules). Severity is `warning` when resolved by contributor precedence (a `manual` override of a `framework:*` value) and `error` when the conflict is between same-precedence contributors. |
 | `infra.unused_override` | An `overrides.json` ignore rule matched no aggregated requirement (likely stale or a typo). Warning severity. |
+| `infra.non_canonical` | A deployment declaration parses and validates but is not in its canonical byte form, or carries a `$schema` member (see [Deployment declaration](#deployment-declaration)). |
 | `infra.build_invalidated` | **Retired: no producer emits this today.** It was the CLI's own gate reporting that it had removed a workload's aggregated manifest because a `build~*` step failed after that gate emitted it. The aggregating task now runs at the END of the workload's build pipeline, so a build that does not complete never reaches it and never writes a manifest for an unfinished build; a manifest from the last successful build is left in place instead of being deleted by an unrelated failure. The code stays in the taxonomy for consumers that still hold older diagnostics. Warning severity. |
 
 ### Compatibility

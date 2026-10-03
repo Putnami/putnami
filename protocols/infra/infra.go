@@ -68,6 +68,10 @@ const (
 
 	// AggregatedManifestFilename is the file name inside AggregatedManifestDir.
 	AggregatedManifestFilename = "requirements.json"
+
+	// DeploymentFilename is the file name inside AggregatedManifestDir of a
+	// workload's deployment declaration (see MarshalDeployment).
+	DeploymentFilename = "deployment.json"
 )
 
 // Engine identifies a database engine. The enum is intentionally
