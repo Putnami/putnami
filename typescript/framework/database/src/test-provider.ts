@@ -51,9 +51,11 @@ import { isolatedSuffix, pgOrphanServer, reclaimOrphans, SUFFIX_LEN } from './te
 /** Environment variable carrying the canonical test binding (JSON). */
 export const ENV_TEST_BINDING = 'DATABASE_TEST_BINDINGS';
 
+const SKIP_MESSAGE = 'database test provider: no usable test binding (mode=skip)';
+
 /** Raised (mode=skip) when no usable test binding/provider exists. */
 export class TestProviderSkip extends Error {
-  constructor(message = 'database test provider: no usable test binding (mode=skip)') {
+  constructor(message = SKIP_MESSAGE) {
     super(message);
     this.name = 'TestProviderSkip';
   }
@@ -64,6 +66,13 @@ export interface ProvisionOptions {
   binding?: DatabaseTestBinding;
   /** The workload's migration sources, applied when the binding sets applyMigrations. */
   sources?: readonly SQLSource[];
+  /**
+   * The datasources the suite uses. When set, only those entries of the binding are
+   * planned, provisioned, reclaimed and torn down, and the returned binding carries
+   * only them; a name the binding lacks follows the binding's mode (see
+   * selectDatasources). Omitted or empty provisions every datasource of the binding.
+   */
+  datasources?: readonly string[];
   /** Injects the isolated-identifier suffix; defaults to the creation time followed by random hex. */
   newSuffix?: () => string;
 }
@@ -153,6 +162,43 @@ export function templateName(base: string, datasource: string, digest: string): 
 }
 
 /**
+ * selectDatasources narrows the test binding to the named datasources, so a suite
+ * that uses one datasource of a workspace-wide binding pays for that one only. It
+ * returns `tb` itself when `names` is empty, and otherwise a copy that shares
+ * `tb`'s policy and holds only the named entries. A name the binding lacks is
+ * handled like a missing binding: mode skip throws TestProviderSkip, require and
+ * auto fail and name every missing datasource.
+ */
+export function selectDatasources(tb: DatabaseTestBinding, names: readonly string[] = []): DatabaseTestBinding {
+  if (names.length === 0) {
+    return tb;
+  }
+  const databases: NonNullable<DatabaseTestBinding['databases']> = {};
+  const missing = new Set<string>();
+  for (const name of names) {
+    const entry = Object.hasOwn(tb.databases ?? {}, name) ? tb.databases?.[name] : undefined;
+    if (entry) {
+      databases[name] = entry;
+    } else {
+      missing.add(name);
+    }
+  }
+  if (missing.size > 0) {
+    const list = [...missing]
+      .sort()
+      .map((n) => JSON.stringify(n))
+      .join(', ');
+    if (effectiveMode(tb) === 'skip') {
+      throw new TestProviderSkip(`${SKIP_MESSAGE}: the test binding has no datasource ${list}`);
+    }
+    failProvider(
+      `the test binding has no datasource ${list} (mode=${effectiveMode(tb)} requires every requested datasource)`,
+    );
+  }
+  return { ...tb, databases };
+}
+
+/**
  * planDatabases turns the test binding into one plan per datasource, sorted by
  * name, allocating a unique isolated identifier for each. Pure — unit-tested
  * without a live server.
@@ -239,7 +285,8 @@ export function runtimeBinding(plans: Plan[]): DatabaseBinding {
 
 /**
  * provision provisions isolated, migrated databases for every datasource in the
- * test binding and returns their runtime binding + a cleanup. With no usable
+ * test binding, or only for those `options.datasources` names, and returns their
+ * runtime binding + a cleanup. With no usable
  * binding it honors the mode: skip → TestProviderSkip, require/auto → a loud
  * error (Docker auto-provisioning is a later slice).
  *
@@ -249,13 +296,14 @@ export function runtimeBinding(plans: Plan[]): DatabaseBinding {
  * open connection that are older than an hour (see reclaimOrphans).
  */
 export async function provision(options: ProvisionOptions = {}): Promise<ProvisionResult> {
-  const tb = options.binding ?? readEnvBinding();
-  if (!tb || Object.keys(tb.databases ?? {}).length === 0) {
-    if (effectiveMode(tb) === 'skip') {
+  const bound = options.binding ?? readEnvBinding();
+  if (!bound || Object.keys(bound.databases ?? {}).length === 0) {
+    if (effectiveMode(bound) === 'skip') {
       throw new TestProviderSkip();
     }
-    failProvider(`no test database binding: set ${ENV_TEST_BINDING} (mode=${effectiveMode(tb)} requires one)`);
+    failProvider(`no test database binding: set ${ENV_TEST_BINDING} (mode=${effectiveMode(bound)} requires one)`);
   }
+  const tb = selectDatasources(bound, options.datasources);
 
   const suffix = options.newSuffix ?? (() => isolatedSuffix(new Date()));
   const sources = options.sources ?? [];

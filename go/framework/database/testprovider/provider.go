@@ -29,7 +29,9 @@ import (
 	"io/fs"
 	"net/url"
 	"os"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,6 +67,12 @@ type Options struct {
 	// bundle.json) applied to each provisioned database when the binding sets
 	// applyMigrations. Nil skips migration apply.
 	Bundle fs.FS
+	// Datasources names the datasources the suite uses. When set, only those
+	// entries of the binding are planned, provisioned, reclaimed and torn down,
+	// and the returned binding carries only them; a name the binding lacks
+	// follows the binding's mode (see selectDatasources). Empty provisions every
+	// datasource of the binding.
+	Datasources []string
 	// newSuffix injects the isolated-identifier suffix; nil uses the creation
 	// time followed by random hex (see isolatedSuffix). Exposed for
 	// deterministic tests.
@@ -109,7 +117,8 @@ func effectiveMode(tb *pdb.TestBinding) pdb.TestMode {
 }
 
 // Provision provisions isolated, migrated databases for every datasource in the
-// test binding and returns their runtime bindings plus a cleanup.
+// test binding, or only for those opts.Datasources names, and returns their
+// runtime bindings plus a cleanup.
 //
 // With no usable binding it honors the mode: skip → ErrSkip, require → a loud
 // error, auto → a loud error for now (Docker auto-provisioning is a later
@@ -134,6 +143,10 @@ func Provision(ctx context.Context, opts Options) (*Result, error) {
 		}
 		return nil, perrors.Newf(codeProvider,
 			"no test database binding: set %s (mode=%s requires a usable binding)", EnvTestBinding, effectiveMode(tb))
+	}
+	tb, err := selectDatasources(tb, opts.Datasources)
+	if err != nil {
+		return nil, err
 	}
 
 	suffix := opts.newSuffix
@@ -188,6 +201,48 @@ func Provision(ctx context.Context, opts Options) (*Result, error) {
 		return nil, err
 	}
 	return &Result{Binding: binding, Cleanup: cleanup}, nil
+}
+
+// selectDatasources narrows the test binding to the named datasources, so a
+// suite that uses one datasource of a workspace-wide binding pays for that one
+// only. It returns tb itself when names is empty, and otherwise a copy that
+// shares tb's policy and holds only the named entries. A name the binding lacks
+// is handled like a missing binding: mode skip returns ErrSkip, require and
+// auto fail and name every missing datasource.
+func selectDatasources(tb *pdb.TestBinding, names []string) (*pdb.TestBinding, error) {
+	if len(names) == 0 {
+		return tb, nil
+	}
+	selected := *tb
+	selected.Databases = make(map[string]pdb.Database, len(names))
+	var missing []string
+	for _, name := range names {
+		entry, ok := tb.Databases[name]
+		if !ok {
+			missing = append(missing, name)
+			continue
+		}
+		selected.Databases[name] = entry
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		list := quoteNames(slices.Compact(missing))
+		if effectiveMode(tb) == pdb.TestModeSkip {
+			return nil, fmt.Errorf("%w: the test binding has no datasource %s", ErrSkip, list)
+		}
+		return nil, perrors.Newf(codeProvider,
+			"the test binding has no datasource %s (mode=%s requires every requested datasource)", list, effectiveMode(tb))
+	}
+	return &selected, nil
+}
+
+// quoteNames renders names as a comma-separated list of quoted strings.
+func quoteNames(names []string) string {
+	quoted := make([]string, len(names))
+	for i, n := range names {
+		quoted[i] = strconv.Quote(n)
+	}
+	return strings.Join(quoted, ", ")
 }
 
 // plan is one datasource's provisioning decision.

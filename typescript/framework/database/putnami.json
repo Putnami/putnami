@@ -6,6 +6,7 @@
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
   "options": {
     "test": {
+      "filePatterns": ["../../../protocols/database/conformance/**"],
       "coverage-threshold": 40
     },
     "package": {

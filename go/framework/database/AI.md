@@ -693,6 +693,20 @@ target datasource), and it is multi-datasource by construction — no single-DSN
 env convention. Unit tests pay no database cost (the live path runs only when
 `DATABASE_TEST_BINDINGS` is set).
 
+`Options.Datasources` names the datasources a suite uses. When set, `Provision`
+plans, builds templates for, reclaims, provisions and tears down only those
+entries, and `Result.Binding` carries only them, so a suite handed a
+workspace-wide binding pays for the datasources it reads. A name the binding
+lacks follows the binding's mode, as a missing binding does: `skip` returns an
+error that wraps `ErrSkip`, `require` and `auto` fail and name the datasource.
+Empty provisions every datasource. The TypeScript provider's `datasources`
+option behaves the same; both run the shared corpus in
+`protocols/database/conformance/test-provider-datasources.json`.
+
+```go
+res, err := testprovider.Provision(ctx, testprovider.Options{Datasources: []string{"auth"}})
+```
+
 With `reuse: bundle-template` (and database isolation), migrations are applied
 once into a **template database keyed by the migration-bundle digest**; each
 suite is then a fast `CREATE DATABASE … TEMPLATE …` clone rather than a

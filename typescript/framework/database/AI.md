@@ -168,6 +168,20 @@ behind; a live suite's database is never dropped.
 `TestProviderSkip`; Docker `mode: 'auto'` is a later slice. Unit tests pay no
 database cost — the live path runs only when `DATABASE_TEST_BINDINGS` is set.
 
+`datasources` names the datasources a suite uses. When set, `provision` plans,
+builds templates for, reclaims, provisions and tears down only those entries,
+and the returned (and injected) binding carries only them, so a suite handed a
+workspace-wide binding pays for the datasources it reads. A name the binding
+lacks follows the binding's mode, as a missing binding does: `skip` throws
+`TestProviderSkip`, `require` and `auto` fail and name the datasource. Omitted
+or empty provisions every datasource. The Go provider's `Options.Datasources`
+behaves the same; both run the shared corpus in
+`protocols/database/conformance/test-provider-datasources.json`.
+
+```ts
+db = await provision({ sources: Object.values(sqlModule), datasources: ['auth'] });
+```
+
 ## Repository
 
 Type-safe CRUD with the Repository base class:

@@ -11,6 +11,7 @@
   },
   "options": {
     "test": {
+      "filePatterns": ["../../../protocols/database/conformance/**"],
       "coverage-threshold": 60
     },
     "publish": {
