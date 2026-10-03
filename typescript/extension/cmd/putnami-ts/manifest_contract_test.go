@@ -13,6 +13,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/infraagg"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
 
@@ -244,6 +245,10 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		{task: "build-types", id: "types", kind: "directory", root: "command-output", path: "types", optionalEmpty: true},
 		{task: "config-extract-exec", id: "jsonSchema", kind: "file", root: "project", path: "schema/config.jsonschema.json", optionalEmpty: true},
 		{task: "config-extract-exec", id: "schema", kind: "file", root: "project", path: "schema/config.json", optionalEmpty: true},
+		// The deployment declaration, inside the .gen/deployment.json
+		// build-generate cedes. Required, so a run that writes none caches
+		// nothing.
+		{task: "package-deployment", id: "deployment", kind: "file", root: "project", path: ".gen/deployment.json"},
 		{task: "package-docker", id: "docker", kind: "directory", root: "command-output", path: "docker", optionalEmpty: true},
 		{task: "package-npm", id: "npm", kind: "directory", root: "command-output", path: "npm", optionalEmpty: true},
 		{task: "publish-docker", id: "published-image", kind: "file", root: "command-output", path: "docker/published-image.json", optionalEmpty: true},
@@ -599,6 +604,88 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 	if !slices.Contains(step.DependsOn, "generate") {
 		t.Errorf("infra step dependsOn = %v, want it to include \"generate\" — the committed "+
 			"requirements are only current once that step has run", step.DependsOn)
+	}
+}
+
+// TestDeploymentDeclarationIsAGatedCachedPackageStep pins the manifest half of
+// the workload's deployment declaration, the payload of a release-set member of
+// kind deployment whose selection fingerprint is this step's task key.
+//
+//   - GATED. The step runs only under the deployment channel and never for an
+//     image project, so every package plan that does not ask for it is
+//     unchanged.
+//   - ORDERED. It reads the closure's committed infra/requirements.json, which
+//     generate writes, so it depends on generate, as build-infra does.
+//   - KEYED. Its key folds the closure's infra/requirements.json and the
+//     workload's runtime and overrides files. A requirements-only change in a
+//     dependency moves the key, so the member is republished.
+//   - OWNED. build-generate cedes exactly the declaration path, and the
+//     declaration is a required output, so a run that writes no declaration
+//     caches nothing and generate's restore never resurrects one.
+func TestDeploymentDeclarationIsAGatedCachedPackageStep(t *testing.T) {
+	m := loadExtensionManifest(t)
+
+	task, ok := m.Tasks["package-deployment"]
+	if !ok {
+		t.Fatal("manifest task \"package-deployment\" is missing")
+	}
+	if task.Cache == nil || !task.Cache.IsEnabled() || !task.Cache.Deterministic {
+		t.Errorf("package-deployment cache = %+v, want an enabled, deterministic cache: its key is the member's selection fingerprint", task.Cache)
+	}
+	key := proto.DeriveTaskCacheKey(task.Inputs)
+	if !slices.Equal(key.ClosureFiles, []string{"infra/requirements.json"}) {
+		t.Errorf("package-deployment closure files = %v, want [infra/requirements.json]", key.ClosureFiles)
+	}
+	if !slices.Equal(key.Files, []string{"infra/overrides.json", "infra/runtime.json"}) {
+		t.Errorf("package-deployment project files = %v, want the workload's runtime and overrides files", key.Files)
+	}
+	if task.Declares == nil || len(task.Declares.Outputs) != 1 {
+		t.Fatalf("package-deployment declarations = %+v, want exactly one output", task.Declares)
+	}
+	if len(task.Declares.Effects) != 0 || task.Declares.MutatesSources {
+		t.Errorf("package-deployment declares effects %v (mutatesSources %t); it reads committed files and writes one",
+			task.Declares.Effects, task.Declares.MutatesSources)
+	}
+	output, ok := task.Declares.Outputs["deployment"]
+	if !ok || output.Kind != proto.OutputKindFile || output.EffectiveRoot() != proto.OutputRootProject ||
+		output.Path != infraagg.DeploymentFile || output.OptionalEmpty {
+		t.Errorf("package-deployment deployment output = %+v, want the required project-rooted file %s", output, infraagg.DeploymentFile)
+	}
+	gen := m.Tasks["build-generate"].Declares.Outputs["gen"]
+	if !slices.Equal(gen.Excludes, []string{infraagg.DeploymentFile}) {
+		t.Errorf("build-generate gen excludes = %v, want exactly [%s], the path package-deployment claims", gen.Excludes, infraagg.DeploymentFile)
+	}
+
+	var commands []string
+	for name, cmd := range m.Commands {
+		for _, step := range cmd.Run {
+			if step.Task == "package-deployment" {
+				commands = append(commands, name)
+			}
+		}
+	}
+	if len(commands) != 1 || commands[0] != "package" {
+		t.Errorf("package-deployment commands = %v, want only [package]", commands)
+	}
+	var step *proto.PipelineStep
+	for i := range m.Commands["package"].Run {
+		if m.Commands["package"].Run[i].Task == "package-deployment" {
+			step = &m.Commands["package"].Run[i]
+		}
+	}
+	if step == nil || step.ID != "deployment" {
+		t.Fatalf("package step for package-deployment = %+v, want id deployment: the id is the member's package step", step)
+	}
+	if step.If != "params.deployment && !params.image" {
+		t.Errorf("deployment step if = %q, want it gated on the deployment channel and excluded for image projects", step.If)
+	}
+	if !slices.Contains(step.DependsOn, "generate") {
+		t.Errorf("deployment step dependsOn = %v, want it to include \"generate\": the committed requirements are only current once that step has run",
+			step.DependsOn)
+	}
+	flag, ok := m.Commands["package"].Flags["deployment"]
+	if !ok || flag.Type != "boolean" || flag.Default != false {
+		t.Errorf("package flag deployment = %+v, present=%t; want a boolean channel that defaults to off", flag, ok)
 	}
 }
 

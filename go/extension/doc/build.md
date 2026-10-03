@@ -309,6 +309,9 @@ there would serve a stored verdict for a test the run never executed.
    - Skipped for libraries (see [Project classification](#project-classification)),
      and never cached — its inputs are other projects' committed manifests, which
      no per-project cache key covers
+   - The `package` command's `deployment` step writes the same aggregate as
+     the workload's deployment declaration (see
+     [Package](package.md#deployment-channel))
 
 ## Usage
 
@@ -555,12 +558,15 @@ nothing to merge writes no merged config file,
 and a library's `bin/` is empty because its build evidence is a compile check.
 
 `build-generate` does NOT own every subpath of `.gen`. It declares the subtree
-with eight paths excluded. Seven of them exist because it runs FIRST and its
+with nine paths excluded. Seven of them exist because it runs FIRST and its
 snapshot predates everything `build-describe` writes there — so a run serving
 both tasks from cache used to restore a `.gen` missing all of it; five of those
 `build-describe` declares, at the documented contract path rather than a
-private staging copy. The eighth, `.gen/conf/`, is ceded for the opposite
-ordering: `config-merge` runs BEFORE generate, so generate's snapshot adopted
+private staging copy. `.gen/deployment.json` is ceded for the same reason: the
+`package` command's `deployment` step writes it after generate's snapshot and
+declares it as its one required output (see
+[Package](package.md#deployment-channel)). The ninth, `.gen/conf/`, is ceded for
+the opposite ordering: `config-merge` runs BEFORE generate, so generate's snapshot adopted
 whatever merged file was on disk at capture and its restore deleted the file
 whenever the snapshot lacked it, while a `config-merge` cache hit reproduced
 nothing because the task declared no output:
@@ -572,6 +578,7 @@ nothing because the task declared no output:
 | `.gen/design/` | `build-describe` | `@putnami/sdd`'s feature projection and `putnami context` read `.gen/design/graph.json` |
 | `.gen/migrations.json` | `build-describe` | none; ceded so a project that stops contributing migrations cannot have a stale dump resurrected |
 | `.gen/migration-bundle/` | `build-describe` | release-set migration publication, deploy, `database.ApplyBundle`, the database test provider |
+| `.gen/deployment.json` | `package-deployment` | the publication of the workload's release-set member of kind `deployment` |
 | `.gen/conf/` | `config-merge-test-exec` (`.gen/conf/.env.test.yaml`) and `config-merge-exec` (`.gen/conf/.env.<APP_ENV or local>.yaml`, via the `mergedConfig` port) | `test-exec`'s database binding fallback reads `.gen/conf/.env.test.yaml`; every dependent's `config-merge` reads its dependencies' merged file. The `.manifest.json` sidecar beside them is claimed by nobody: it carries a `generatedAt` timestamp and no consumer reads it |
 | `.gen/.describe.lock` | nobody | none: a run-scoped `lockedfile` mutex |
 | `.gen/config-deps.json` | nobody | none: a fragment the same describe run folds into `schema/config.json` |

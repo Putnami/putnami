@@ -328,6 +328,10 @@ reported as task warnings and never fail the build. The phase is skipped for
 libraries, and it is never cached: its inputs are other projects' committed
 manifests, which no per-project cache key covers.
 
+The `package` command's `deployment` step writes the same aggregate, under the
+same HTTP/2 hook, as the workload's deployment declaration (see
+[Package → Deployment Channel](./07-package.md#deployment-channel)).
+
 ## Output Layout
 
 Every step of one command shares a single output directory,
@@ -358,13 +362,14 @@ Every output has exactly one owning task:
 
 | Task | Owns | Root |
 |------|------|------|
-| `build-generate` | `.gen/`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
+| `build-generate` | `.gen/` minus `.gen/deployment.json`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
 | `build-transpile` | `lib/` | per-command output dir |
 | `build-types` | `types/` | per-command output dir |
 | `build-compile` | `compile/` | per-command output dir |
 | `test-run` | `lcov.info`, `results.junit.xml` | per-command output dir |
 | `package-npm` | `npm/` | per-command output dir |
 | `package-docker` | `docker/` | per-command output dir |
+| `package-deployment` | `.gen/deployment.json` (required: a run that writes none caches nothing) | project dir |
 | `config-extract-exec` | `schema/config.json`, `schema/config.jsonschema.json` | project dir |
 
 Each declared output above may legitimately be absent after a successful run —
@@ -374,7 +379,10 @@ emits no schema.
 
 `build-generate` is the single producer of `<project>/.gen` — anything else
 that writes inside `.gen` (such as the `config-extract` fallback location)
-writes into generate-owned territory rather than claiming a slice of it.
+writes into generate-owned territory rather than claiming a slice of it. The
+one exception is `.gen/deployment.json`: `build-generate` cedes it to
+`package-deployment`, which writes it after generate's snapshot (see
+[Package → Deployment Channel](./07-package.md#deployment-channel)).
 
 Every packaging task declares everything it writes, including the channel record
 it leaves inside its own output directory, which is what keeps `package` under

@@ -92,8 +92,9 @@ putnami publish --impacted --channel canary --providers publish
    registry credential, so no script or tool it starts can read one or upload.
 4. Putnami hashes every packed file again, checks each member against the
    plan, and uploads the npm tarball, the Go module zip, the OCI image, or the
-   release archive, config, migration or site-content bundle itself, with the
-   publish credential the provider issues after the open.
+   release archive, config, migration, site-content bundle or deployment
+   declaration itself, with the publish credential the provider issues after
+   the open.
 5. Putnami releases the set over the same session: the opened plan, the heads it
    moves from, and the digests it uploaded.
 
@@ -103,9 +104,9 @@ yours. The provider refuses a head that is not (`not_forward`), and nothing is
 uploaded. It refuses a release whose artifacts the registries do not store
 (`artifact_missing`). Each refusal names its code and moves no channel.
 
-A release archive, config, migration or site-content bundle uploads as a
-private, immutable version of the Put registry, and only the release moves its
-channel. When a selected one has no Putnami upload, because its job uploaded it
+A release archive, config, migration, site-content bundle or deployment
+declaration uploads as a private, immutable version of the Put registry, and
+only the release moves its channel. When a selected one has no Putnami upload, because its job uploaded it
 itself or packed nothing, the run fails and the release moves no channel.
 
 A publication job served from a cache packed nothing in this run, so the

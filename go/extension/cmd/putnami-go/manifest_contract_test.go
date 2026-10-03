@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/go/extension/internal/toolchain"
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/sdk/extension/infraagg"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"gopkg.in/yaml.v3"
 
@@ -413,6 +414,9 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		// The archive publication manifest. One producer — this task — so
 		// it is declared and restored with the archives it describes.
 		{task: "package-archives", id: "publication-manifest", kind: "file", root: "command-output", path: "metadata.json", optionalEmpty: true},
+		// The deployment declaration, inside the ceded .gen/deployment.json.
+		// Required, so a run that writes none caches nothing.
+		{task: "package-deployment", id: "deployment", kind: "file", root: "project", path: ".gen/deployment.json"},
 		{task: "package-docker", id: "docker", kind: "directory", root: "command-output", path: "docker", optionalEmpty: true},
 		{task: "package-go", id: "go", kind: "directory", root: "command-output", path: "go", optionalEmpty: true},
 		{task: "publish-docker", id: "published-image", kind: "file", root: "command-output", path: "docker/published-image.json", optionalEmpty: true},
@@ -493,6 +497,7 @@ var cededGenSubpaths = []string{
 	".gen/clientgen",
 	".gen/conf",
 	".gen/config-deps.json",
+	".gen/deployment.json",
 	".gen/design",
 	".gen/migration-bundle",
 	".gen/migrations.json",
@@ -505,6 +510,11 @@ var cededGenSubpaths = []string{
 type cededClaim struct {
 	task   string
 	output string
+	// required marks a claim whose output is not optionalEmpty: the claimant
+	// writes the path on every success, and a run that writes nothing caches
+	// nothing, so a cache hit never restores a file the current inputs do not
+	// produce.
+	required bool
 }
 
 // cededGenOwner maps each ceded subpath to the declared outputs that claim it,
@@ -535,6 +545,12 @@ var cededGenOwner = map[string][]cededClaim{
 	// The dependency-config fragment the describe binary emits and the SAME
 	// describe job folds into schema/config.json before it finishes.
 	".gen/config-deps.json": nil,
+	// The workload's deployment declaration, written by a package step that
+	// runs after generate. It is REQUIRED rather than optionalEmpty: the task
+	// removes the file when it writes none (a library, an aggregate with an
+	// error finding), and an empty optional capture would restore nothing over
+	// an earlier declaration, leaving it in place.
+	".gen/deployment.json":  {{task: "package-deployment", output: "deployment", required: true}},
 	".gen/design":           {{task: "build-describe", output: "design"}},
 	".gen/migration-bundle": {{task: "build-describe", output: "migrationBundle"}},
 	".gen/migrations.json":  {{task: "build-describe", output: "migrations"}},
@@ -561,7 +577,10 @@ func cededSubpathContains(ceded, declared string) bool {
 //     the table states that nobody does and why. Without a claim nobody
 //     captures the subtree and a run serving both tasks from cache restores a
 //     .gen without it. The path is the documented
-//     contract path consumers read, never a private staging copy.
+//     contract path consumers read, never a private staging copy. A claim the
+//     table marks required declares a required output instead, and the
+//     deployment step that holds it is pinned by
+//     TestDeploymentDeclarationIsAGatedCachedPackageStep.
 //  3. Every command that schedules generate also schedules describe AFTER it.
 //     Generate's restore leaves the ceded subtrees exactly as it finds them
 //     (protocol ADR 0003, 2026-09-14 amendment), so what sits there after a
@@ -615,8 +634,12 @@ func TestGenCedesEverySubpathDescribeProducesAfterGenerate(t *testing.T) {
 				t.Errorf("%s declares no %q output; nothing captures the ceded %q", claim.task, claim.output, ceded)
 				continue
 			}
-			if output.EffectiveRoot() != proto.OutputRootProject || !output.OptionalEmpty {
-				t.Errorf("%s.%s = %+v, want an optionalEmpty project-rooted output inside %q", claim.task, claim.output, output, ceded)
+			if output.EffectiveRoot() != proto.OutputRootProject || output.OptionalEmpty == claim.required {
+				want := "an optionalEmpty"
+				if claim.required {
+					want = "a required"
+				}
+				t.Errorf("%s.%s = %+v, want %s project-rooted output inside %q", claim.task, claim.output, output, want, ceded)
 				continue
 			}
 			if output.PathFrom != "" {
@@ -1566,6 +1589,73 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 			t.Errorf("infra step dependsOn = %v, want it to include %q — the committed requirements "+
 				"are only current once that step has run", step.DependsOn, want)
 		}
+	}
+}
+
+// TestDeploymentDeclarationIsAGatedCachedPackageStep pins the manifest half of
+// the workload's deployment declaration, the payload of a release-set member of
+// kind deployment whose selection fingerprint is this step's task key.
+//
+//   - GATED. The step runs only under the deployment channel and never for an
+//     image project, so every package plan that does not ask for it is
+//     unchanged.
+//   - ORDERED. It reads the closure's committed infra/requirements.json, which
+//     generate (libraries) and describe (applications) write, so it depends on
+//     both, exactly as build-infra does.
+//   - KEYED. Its key folds the closure's infra/requirements.json and the
+//     workload's runtime and overrides files. A requirements-only change in a
+//     dependency moves the key, so the member is republished.
+//   - REQUIRED. The output is the declaration path itself and is not
+//     optionalEmpty, so a run that writes no declaration caches nothing.
+func TestDeploymentDeclarationIsAGatedCachedPackageStep(t *testing.T) {
+	m := loadExtensionManifest(t)
+
+	task, ok := m.Tasks["package-deployment"]
+	if !ok {
+		t.Fatal("manifest task \"package-deployment\" is missing")
+	}
+	if task.Cache == nil || !task.Cache.IsEnabled() || !task.Cache.Deterministic {
+		t.Errorf("package-deployment cache = %+v, want an enabled, deterministic cache: its key is the member's selection fingerprint", task.Cache)
+	}
+	key := proto.DeriveTaskCacheKey(task.Inputs)
+	if !slices.Equal(key.ClosureFiles, []string{"infra/requirements.json"}) {
+		t.Errorf("package-deployment closure files = %v, want [infra/requirements.json]", key.ClosureFiles)
+	}
+	if !slices.Equal(key.Files, []string{"infra/overrides.json", "infra/runtime.json"}) {
+		t.Errorf("package-deployment project files = %v, want the workload's runtime and overrides files", key.Files)
+	}
+	if task.Declares == nil || len(task.Declares.Outputs) != 1 {
+		t.Fatalf("package-deployment declarations = %+v, want exactly one output", task.Declares)
+	}
+	if len(task.Declares.Effects) != 0 || task.Declares.MutatesSources {
+		t.Errorf("package-deployment declares effects %v (mutatesSources %t); it reads committed files and writes one",
+			task.Declares.Effects, task.Declares.MutatesSources)
+	}
+	output, ok := task.Declares.Outputs["deployment"]
+	if !ok || output.Kind != proto.OutputKindFile || output.EffectiveRoot() != proto.OutputRootProject ||
+		output.Path != infraagg.DeploymentFile || output.OptionalEmpty {
+		t.Errorf("package-deployment deployment output = %+v, want the required project-rooted file %s", output, infraagg.DeploymentFile)
+	}
+
+	if cmds := commandsByTask(m)["package-deployment"]; !slices.Equal(cmds, []string{"package"}) {
+		t.Errorf("package-deployment commands = %v, want only [package]", cmds)
+	}
+	step := stepForTask(m, "package", "package-deployment")
+	if step.ID != "deployment" {
+		t.Fatalf("package step for package-deployment = %+v, want id deployment: the id is the member's package step", step)
+	}
+	if step.If != "params.deployment && !params.image" {
+		t.Errorf("deployment step if = %q, want it gated on the deployment channel and excluded for image projects", step.If)
+	}
+	for _, want := range []string{"generate", "describe"} {
+		if !containsString(step.DependsOn, want) {
+			t.Errorf("deployment step dependsOn = %v, want it to include %q: the committed requirements are only current once that step has run",
+				step.DependsOn, want)
+		}
+	}
+	flag, ok := m.Commands["package"].Flags["deployment"]
+	if !ok || flag.Type != "boolean" || flag.Default != false {
+		t.Errorf("package flag deployment = %+v, present=%t; want a boolean channel that defaults to off", flag, ok)
 	}
 }
 

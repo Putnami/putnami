@@ -1,6 +1,6 @@
 # Package
 
-The package command creates distribution packages from build output. It supports two channels: **npm** (registry tarball) and **docker** (container image).
+The package command creates distribution packages from build output. It supports three channels: **npm** (registry tarball), **docker** (container image), and **deployment** (the workload's deployment declaration).
 
 ## Overview
 
@@ -9,6 +9,7 @@ The package command creates distribution packages from build output. It supports
 - Handles workspace dependency resolution at the git-derived version of each package's line
 - Inherits workspace metadata (author, license, repository) into output packages
 - Writes structured metadata for downstream CI/CD consumption
+- Writes a workload's deployment declaration, the payload of a release-set member of kind `deployment`
 
 ## Usage
 
@@ -23,6 +24,9 @@ putnami package . --docker
 
 # Both
 putnami package . --npm --docker
+
+# Deployment declaration
+putnami package . --deployment
 
 # Preview what would be packaged
 putnami package . --npm --dry-run
@@ -51,10 +55,11 @@ and candidate digest. No registry is needed between the two package tasks. See
 
 ```text
 generate ──→ transpile ──→ types ──→ npm
-         └──→ compile ──→ docker
+         ├──→ compile ──→ docker
+         └──→ deployment
 ```
 
-The package command runs the full build pipeline first, then packages the output. The npm channel requires transpile + types output. The docker channel requires compile output.
+The package command runs the full build pipeline first, then packages the output. The npm channel requires transpile + types output. The docker channel requires compile output. The deployment channel requires only the committed infra files that `generate` reconciles.
 
 When present, a project's `AI.md` and `doc/` directory are included in its npm package. `AI.md` is the sole supported root guidance file.
 
@@ -385,6 +390,71 @@ The image name is derived from the project name:
 | `--port` | `number` | `3000` | Container port to expose |
 | `--workspace-builder-image` | `string` | — | Accepted for compatibility; multi-stage builds are a Go-extension feature |
 
+## Deployment Channel
+
+### What It Does
+
+The `deployment` step writes the workload's deployment declaration to
+`<project>/.gen/deployment.json`. The file is the payload of a release-set
+member of kind `deployment`. The extension that publishes it declares the
+member with package publisher `@putnami/typescript` and package step
+`deployment`; nothing in this extension declares one.
+
+1. Builds the aggregate the build's infra phase builds (see
+   [Build → Phase 5: Infra](./02-build.md#phase-5-infra-workloads-only)): the
+   committed `infra/requirements.json` of every project in the workload's
+   dependency closure, `<workload>/infra/overrides.json`, and the runtime block,
+   an authored `<workload>/infra/runtime.json` or the framework defaults.
+2. Turns HTTP/2 off in the runtime block, with the same hook as the infra
+   phase, so the declaration and `.gen/requirements.json` never disagree.
+3. Writes it in the canonical bytes of the infra protocol's
+   `MarshalDeployment`: compact JSON, no `$schema`, no trailing newline. The
+   same aggregate always gives the same bytes, so the member's digest moves
+   only when the declaration does.
+4. Writes nothing for a library. Writes nothing for a workload whose aggregate
+   has errors either, and reports the findings as warnings. In both cases it
+   removes a declaration an earlier run left and caches nothing, because the
+   file is the step's required output. A publication that needs the file finds
+   none, never an old one.
+
+The step never writes the runtime defaults file `.gen/infra/runtime.json` or
+`.gen/requirements.json`; both stay the build's. `build-generate` cedes
+`.gen/deployment.json` to this step, because it writes the file after
+generate's snapshot.
+
+### Turning It On
+
+The channel is off by default. Turn it on for a project in any of these ways:
+
+| Where | Setting |
+|-------|---------|
+| Command line | `putnami package . --deployment` |
+| `putnami.json` publish list | `"publish": ["docker", "deployment"]` |
+| `putnami.json` options | `"options": { "@putnami/typescript": { "deployment": true } }` |
+
+A member of kind `deployment` declared for a project without the channel fails
+the publication before anything runs: its package step is not planned, so its
+selection fingerprint cannot be computed.
+
+### Caching
+
+The task is cached. Its key covers:
+
+- the committed `infra/requirements.json` of every project in the dependency
+  closure, so a requirements-only change in a library moves it;
+- the workload's own `infra/runtime.json` and `infra/overrides.json`;
+- the extension version and the key of the `generate` step it runs after.
+
+That key is the member's selection fingerprint. A source change that moves the
+`generate` key republishes the declaration under a new version with the same
+bytes.
+
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--deployment` | `boolean` | `false` | Write the workload's deployment declaration to `<project>/.gen/deployment.json` |
+
 ## Metadata Output
 
 Each channel writes a `channel.json` record INSIDE the output directory it owns
@@ -404,7 +474,7 @@ restores its record without the other channel running.
 
 ## Boundaries
 
-- **Scope**: Creating npm tarballs and Docker images from build output
+- **Scope**: Creating npm tarballs and Docker images from build output, and a workload's deployment declaration from its committed infra files
 - **Out of scope**: Registry publishing (see the publish docs). A `type: "image"` project packages a local OCI candidate for downstream composition; its publish task alone derives a remote target, pushes/verifies the digest, and never assigns release/channel tags.
 - **Dependencies**: Requires build output. npm channel requires transpile + types output. Docker channel needs network on first use to fetch the pinned base (cached afterwards); the `docker` CLI is only needed for `--docker-load`.
 - **Not supported**: Custom Dockerfiles — the image recipe is fixed so digests stay reproducible.
