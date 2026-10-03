@@ -65,7 +65,7 @@
     },
     {
       "id": "infra-aggregation-neutrality",
-      "text": "Infra aggregation merges the dependency closure, skips libraries, treats an unclassified project as a workload, ignores generator scratch, normalizes wire-compatible v1 generated manifests to v2, reports a conflict as a diagnostic, and lets a language extension's compatibility hook apply to both defaults and authored runtimes without ever failing the task."
+      "text": "Infra aggregation merges the dependency closure, skips libraries, treats an unclassified project as a workload, ignores generator scratch, normalizes v1 generated manifests to v2, reports a conflict as a diagnostic, and applies a language's compatibility hook to defaults and authored runtimes without failing the task. A workload's deployment declaration is that aggregate in canonical bytes, leaves the defaults sidecar alone, and is removed, never stale, when a library or an error finding writes none."
     },
     {
       "id": "shared-package-metadata-writer",

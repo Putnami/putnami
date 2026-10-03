@@ -49,10 +49,11 @@ func TestConformance_Paths(t *testing.T) {
 // producer, the engine and the registry read one table.
 func TestConformance_Profiles(t *testing.T) {
 	want := map[distribution.MemberKind]Profile{
-		distribution.KindConfig:    {Kind: distribution.KindConfig, ManifestMediaType: "application/vnd.putnami.config.authored-member+json"},
-		distribution.KindMigration: {Kind: distribution.KindMigration, ManifestMediaType: "application/vnd.putnami.data.migration.v2+json", BlobMediaTypes: []string{"application/vnd.putnami.migration-bundle.v1.tar"}},
-		distribution.KindDoc:       {Kind: distribution.KindDoc, ManifestMediaType: "application/vnd.putnami.sitecontent.bundle+json", BlobMediaTypes: []string{"application/gzip"}},
-		distribution.KindArchive:   {Kind: distribution.KindArchive, ManifestMediaType: "application/vnd.putnami.archive+json", BlobMediaTypes: []string{"application/gzip", "application/octet-stream"}},
+		distribution.KindConfig:     {Kind: distribution.KindConfig, ManifestMediaType: "application/vnd.putnami.config.authored-member+json"},
+		distribution.KindMigration:  {Kind: distribution.KindMigration, ManifestMediaType: "application/vnd.putnami.data.migration.v2+json", BlobMediaTypes: []string{"application/vnd.putnami.migration-bundle.v1.tar"}},
+		distribution.KindDoc:        {Kind: distribution.KindDoc, ManifestMediaType: "application/vnd.putnami.sitecontent.bundle+json", BlobMediaTypes: []string{"application/gzip"}},
+		distribution.KindArchive:    {Kind: distribution.KindArchive, ManifestMediaType: "application/vnd.putnami.archive+json", BlobMediaTypes: []string{"application/gzip", "application/octet-stream"}},
+		distribution.KindDeployment: {Kind: distribution.KindDeployment, ManifestMediaType: "application/vnd.putnami.infra.deployment.v2+json"},
 	}
 	if len(Profiles) != len(want) {
 		t.Fatalf("Profiles = %+v, want %d kinds", Profiles, len(want))

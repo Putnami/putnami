@@ -650,6 +650,11 @@
           "default": false,
           "description": "Build Docker image"
         },
+        "deployment": {
+          "type": "boolean",
+          "default": false,
+          "description": "Write the workload's deployment declaration to <project>/.gen/deployment.json, the payload of a release-set member of kind deployment"
+        },
         "dry-run": {
           "type": "boolean",
           "default": false,
@@ -717,6 +722,14 @@
             "^image"
           ],
           "if": "params.image"
+        },
+        {
+          "id": "deployment",
+          "task": "package-deployment",
+          "dependsOn": [
+            "generate"
+          ],
+          "if": "params.deployment && !params.image"
         }
       ]
     },
@@ -1021,7 +1034,7 @@
       }
     },
     "build-generate": {
-      "description": "Generate code into the project's .gen subtree (and, when the project generates one, the configured TypeScript client directory). Ownership decision: build-generate is the SINGLE producer of <project>/.gen — every other task that writes inside it (config-extract-exec's .gen/config-schema.json fallback) writes into generate-owned territory rather than claiming a slice of it. Its v3 `declares` block is deliberately still absent: six commands (build, test, serve, run, package, config-extract) schedule this one task, and the plan-time owner check counts each of those plan nodes as a separate owner of <project>/.gen, so declaring it today makes every multi-command TypeScript plan (`putnami lint,test,build`) unplannable. The declaration lands with the CLI change that treats repeated scheduling of ONE task for ONE project as one owner; until then this task keeps v2 inferred capture via its gen/clients write resources.",
+      "description": "Generate code into the project's .gen subtree (and, when the project generates one, the configured TypeScript client directory). Ownership decision: build-generate is the SINGLE producer of <project>/.gen, minus the .gen/deployment.json it cedes to package-deployment — every other task that writes inside it (config-extract-exec's .gen/config-schema.json fallback) writes into generate-owned territory rather than claiming a slice of it. Its v3 `declares` block is deliberately still absent: six commands (build, test, serve, run, package, config-extract) schedule this one task, and the plan-time owner check counts each of those plan nodes as a separate owner of <project>/.gen, so declaring it today makes every multi-command TypeScript plan (`putnami lint,test,build`) unplannable. The declaration lands with the CLI change that treats repeated scheduling of ONE task for ONE project as one owner; until then this task keeps v2 inferred capture via its gen/clients write resources.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1106,7 +1119,10 @@
             "kind": "directory",
             "root": "project",
             "path": ".gen",
-            "description": "Generated sources: the whole project-rooted .gen subtree, owned exclusively by this task (config-extract's schema fallback inside .gen is this task's output, not a second owner)."
+            "excludes": [
+              ".gen/deployment.json"
+            ],
+            "description": "Generated sources: the whole project-rooted .gen subtree, owned exclusively by this task (config-extract's schema fallback inside .gen is this task's output, not a second owner), minus .gen/deployment.json, which it cedes to package-deployment: that task writes the file after this task's snapshot and declares it."
           },
           "client": {
             "kind": "directory",
@@ -1409,6 +1425,53 @@
         }
       },
       "declares": {}
+    },
+    "package-deployment": {
+      "description": "Write the workload's deployment declaration to <project>/.gen/deployment.json: the aggregate build-infra resolves from the same committed files (every closure project's infra/requirements.json, the workload's infra/overrides.json, and its infra/runtime.json or the framework runtime defaults), under the same HTTP/2 compatibility hook, in the canonical bytes of infra.MarshalDeployment. It is the payload of a release-set member of kind deployment, so its key is that member's selection fingerprint. Scheduled only when the deployment channel is enabled (params.deployment), so no other package plan changes. Cached, unlike build-infra: the closure input folds every closure project's committed infra/requirements.json into the key, so a requirements-only change in a dependency moves it, and the upstream generate key covers the sources those files are generated from. The output is REQUIRED: a library (skipped) and an aggregate with an error finding (withheld, its findings reported as warnings) write no declaration and remove an earlier one, so such a run caches nothing and a cache hit never restores a declaration the current inputs do not produce. build-generate cedes the path because this task writes it after generate's snapshot. It never writes or removes the runtime defaults sidecar build-infra keeps.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-deployment"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 60000,
+      "inputs": {
+        "requirements": {
+          "from": "closure",
+          "files": [
+            "infra/requirements.json"
+          ]
+        },
+        "intent": {
+          "from": "project",
+          "files": [
+            "infra/runtime.json",
+            "infra/overrides.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Declaration outcome (emitted, withheld, skipped), the declaration path, and the number of contributing projects"
+        }
+      },
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "deployment": {
+            "kind": "file",
+            "root": "project",
+            "path": ".gen/deployment.json",
+            "description": "The workload's deployment declaration: its aggregated infra manifest in canonical bytes (infra.ParseDeployment accepts exactly these). Required: a run that writes none caches nothing."
+          }
+        }
+      }
     },
     "lint-all": {
       "kind": "command",

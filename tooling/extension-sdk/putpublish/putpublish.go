@@ -24,6 +24,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	distribution "go.putnami.dev/protocol/distribution"
+	infra "go.putnami.dev/protocol/infra"
 	put "go.putnami.dev/protocol/put"
 )
 
@@ -146,7 +147,7 @@ func withoutRedirects(client *http.Client) (*http.Client, error) {
 // media type and every blob media type must be the kind's, the payload must
 // be canonical, and the blobs must be exactly the blobs the payload
 // references. An archive payload must name each platform's blob at that
-// blob's size.
+// blob's size, and a deployment payload must be a canonical declaration.
 func Check(member Member) (map[string]string, error) {
 	profile, ok := put.ProfileFor(member.Kind)
 	if !ok {
@@ -191,6 +192,12 @@ func Check(member Member) (map[string]string, error) {
 	slices.Sort(uploaded)
 	if !slices.Equal(references, uploaded) {
 		return nil, fmt.Errorf("the manifest references %d blobs and the member carries %d others; they must be the same blobs", len(references), len(uploaded))
+	}
+	if member.Kind == distribution.KindDeployment {
+		if declaration, diags := infra.ParseDeployment(member.Manifest); declaration == nil || diag.HasErrors(diags) {
+			return nil, fmt.Errorf("deployment manifest: %s", firstMessage(diags))
+		}
+		return nil, nil
 	}
 	if member.Kind != distribution.KindArchive {
 		return nil, nil

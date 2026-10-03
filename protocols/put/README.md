@@ -51,11 +51,17 @@ GET  {base}/{namespace}/{package}/versions/{version}/manifest
 | `migration` | `application/vnd.putnami.data.migration.v2+json` | `application/vnd.putnami.migration-bundle.v1.tar` |
 | `doc` | `application/vnd.putnami.sitecontent.bundle+json` | `application/gzip` |
 | `archive` | `application/vnd.putnami.archive+json` | `application/gzip`, `application/octet-stream` |
+| `deployment` | `application/vnd.putnami.infra.deployment.v2+json` | none |
 
 An `archive` blob is `application/gzip`, except the CLI's own release, whose
 platform assets may be raw executables (`application/octet-stream`, CLI
-decision D-W2). A release archive is a member of ecosystem `archive`; a config, migration or
-doc member is a member of ecosystem `put`. Both live on the Put registry.
+decision D-W2). A release archive is a member of ecosystem `archive`; a config, migration,
+doc or deployment member is a member of ecosystem `put`. Both live on the Put registry.
+
+A `deployment` manifest is a workload's deployment declaration: the canonical
+bytes `infra.MarshalDeployment` writes (`go.putnami.dev/protocol/infra`), which
+are already in this registry's canonical payload form. The media type names the
+infra protocol version, so a new version is a new media type.
 
 ### Coordinates and versions
 

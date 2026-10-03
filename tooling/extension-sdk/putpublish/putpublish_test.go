@@ -14,6 +14,7 @@ import (
 
 	distribution "go.putnami.dev/protocol/distribution"
 	"go.putnami.dev/protocol/features/spectest"
+	infra "go.putnami.dev/protocol/infra"
 	put "go.putnami.dev/protocol/put"
 )
 
@@ -162,6 +163,17 @@ func archiveMember() Member {
 	}
 }
 
+// deploymentDeclaration is a workload's deployment declaration in the
+// canonical bytes infra.ParseDeployment accepts, which are the bytes the
+// package step writes and the only ones a member of kind deployment carries.
+func deploymentDeclaration() []byte {
+	declaration := []byte(`{"protocolVersion":2,"workload":"acme/orders","runtime":{"scaling":{"max":2}}}`)
+	if _, diagnostics := infra.ParseDeployment(declaration); len(diagnostics) != 0 {
+		panic(fmt.Sprintf("the deployment declaration fixture is not canonical: %v", diagnostics))
+	}
+	return declaration
+}
+
 // members is one member of every kind put-write/v1 publishes.
 func members() map[distribution.MemberKind]Member {
 	bundle := []byte("migration bundle bytes")
@@ -181,6 +193,10 @@ func members() map[distribution.MemberKind]Member {
 			Kind: distribution.KindDoc, Coordinate: "acme/doc-contents", Version: "1.0.0+build.7",
 			MediaType: put.DocManifestMediaType, Manifest: []byte(fmt.Sprintf(`{"artifact":{"blob":%q},"site":"docs"}`, put.Digest(site))),
 			Blobs: []Blob{BytesBlob(put.GzipBlobMediaType, site)},
+		},
+		distribution.KindDeployment: {
+			Kind: distribution.KindDeployment, Coordinate: "acme/orders-deployment", Version: "1.4.0",
+			MediaType: put.DeploymentManifestMediaType, Manifest: deploymentDeclaration(),
 		},
 	}
 }
@@ -285,10 +301,16 @@ func TestCheckRefusesAMemberBeforeAnyRequest(t *testing.T) {
 		"an unescaped payload":              {edit(members()[distribution.KindConfig], func(m *Member) { m.Manifest = []byte(`{"note":"<default>"}`) }), "canonical form"},
 		"a blob media type of another kind": {edit(archive, func(m *Member) { m.Blobs[0].MediaType = put.MigrationBundleBlobMediaType }), "uploads no"},
 		"a config blob":                     {edit(members()[distribution.KindConfig], func(m *Member) { m.Blobs = []Blob{BytesBlob(put.GzipBlobMediaType, []byte("x"))} }), "uploads no"},
-		"a blob without a digest":           {edit(archive, func(m *Member) { m.Blobs[0].Digest = "sha256:x" }), "names no sha256 digest"},
-		"an empty blob":                     {edit(archive, func(m *Member) { m.Blobs[0].Size = 0 }), "is empty"},
-		"a repeated blob":                   {edit(archive, func(m *Member) { m.Blobs[1] = m.Blobs[0] }), "repeats"},
-		"a missing blob":                    {edit(archive, func(m *Member) { m.Blobs = m.Blobs[:1] }), "must be the same blobs"},
+		"a deployment blob":                 {edit(members()[distribution.KindDeployment], func(m *Member) { m.Blobs = []Blob{BytesBlob(put.GzipBlobMediaType, []byte("x"))} }), "uploads no"},
+		"a deployment of another protocol version": {edit(members()[distribution.KindDeployment], func(m *Member) {
+			m.Manifest = []byte(strings.Replace(string(m.Manifest), `"protocolVersion":2`, `"protocolVersion":3`, 1))
+		}), "deployment manifest"},
+		"a deployment that is not a declaration": {edit(members()[distribution.KindDeployment], func(m *Member) { m.Manifest = []byte(`{"note":"x"}`) }), "deployment manifest"},
+		"a deployment manifest media type":       {edit(members()[distribution.KindConfig], func(m *Member) { m.MediaType = put.DeploymentManifestMediaType }), "publishes its manifest as"},
+		"a blob without a digest":                {edit(archive, func(m *Member) { m.Blobs[0].Digest = "sha256:x" }), "names no sha256 digest"},
+		"an empty blob":                          {edit(archive, func(m *Member) { m.Blobs[0].Size = 0 }), "is empty"},
+		"a repeated blob":                        {edit(archive, func(m *Member) { m.Blobs[1] = m.Blobs[0] }), "repeats"},
+		"a missing blob":                         {edit(archive, func(m *Member) { m.Blobs = m.Blobs[:1] }), "must be the same blobs"},
 		"an unreferenced blob": {edit(members()[distribution.KindDoc], func(m *Member) {
 			m.Blobs = append(m.Blobs, BytesBlob(put.GzipBlobMediaType, []byte("extra")))
 		}), "must be the same blobs"},

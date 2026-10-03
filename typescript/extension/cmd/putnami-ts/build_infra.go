@@ -13,6 +13,13 @@ func buildInfra() cli.JobFunc {
 	return infraagg.Job(infraagg.Options{RuntimeCompatibility: disableHTTP2})
 }
 
+// packageDeployment is the workload's deployment declaration task: the same
+// aggregate as buildInfra, under the same compatibility hook, in the canonical
+// bytes a release-set member of kind deployment carries.
+func packageDeployment() cli.JobFunc {
+	return infraagg.DeploymentJob(infraagg.Options{RuntimeCompatibility: disableHTTP2})
+}
+
 // disableHTTP2 turns HTTP/2 off for every TypeScript workload's runtime block.
 //
 // Bun-backed services do not serve h2c today, and Putnami Cloud may default a

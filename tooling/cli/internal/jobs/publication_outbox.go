@@ -227,8 +227,8 @@ func (run *ReleaseSetRun) publicationKind(member releaseset.PlannedMember) distr
 // admitPublicationMember refuses, before open, a selected member the engine
 // has no upload for: an ecosystem outside npm, go, oci, put and archive, or a
 // Put registry member of a kind put-write/v1 does not publish. A release
-// archive is the archive kind of the archive ecosystem; a config, migration
-// or doc member belongs to the put ecosystem.
+// archive is the archive kind of the archive ecosystem; a config, migration,
+// doc or deployment member belongs to the put ecosystem.
 func admitPublicationMember(member releaseset.PlannedMember, kind distribution.MemberKind) error {
 	key := printableReleaseKey(releaseset.MemberKey(member.Ecosystem, member.Coordinate))
 	switch ecosystem := string(member.Ecosystem); ecosystem {

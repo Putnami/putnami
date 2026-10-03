@@ -48,6 +48,10 @@ var commands = map[string]cli.JobFunc{
 	"workspace-sync":    runWorkspaceSync,
 	"deps-upgrade":      runDepsUpgrade,
 	"version":           runVersion,
+
+	// The deployment declaration is build-infra's aggregate in canonical
+	// bytes, under the same runtime compatibility hook.
+	"package-deployment": packageDeployment(),
 }
 
 func main() {

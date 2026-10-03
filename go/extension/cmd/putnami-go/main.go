@@ -71,6 +71,9 @@ func commandHandlers() map[string]cli.JobFunc {
 		// Infra aggregation is the SDK's shared task body. Go passes no runtime compatibility hook: a Go workload serves
 		// whatever the platform defaults to, so it constrains nothing.
 		"build-infra": infraagg.Job(infraagg.Options{}),
+		// The deployment declaration is the same aggregate in canonical bytes,
+		// under the same hook as build-infra so the two never disagree.
+		"package-deployment": infraagg.DeploymentJob(infraagg.Options{}),
 		// The documentation link check is the SDK's shared task body too, so a
 		// broken link fails lint the same way in every language.
 		"lint-docs": docslinks.Job(),

@@ -429,6 +429,7 @@ func TestValidErrorCodes_Membership(t *testing.T) {
 		ErrorCodeEmptySchedule,
 		ErrorCodeInvalidSchedule,
 		ErrorCodeConflictingValue,
+		ErrorCodeNonCanonical,
 	}
 	for _, code := range required {
 		if !ValidErrorCodes[code] {

@@ -338,6 +338,7 @@ func TestPublicationAdmitsPutRegistryMembersByKind(t *testing.T) {
 		{ecosystem: "put", kind: distribution.KindConfig},
 		{ecosystem: "put", kind: distribution.KindMigration},
 		{ecosystem: "put", kind: distribution.KindDoc},
+		{ecosystem: "put", kind: distribution.KindDeployment},
 		{ecosystem: "npm", kind: distribution.KindLibrary},
 		{ecosystem: "go"},
 		{ecosystem: "oci", kind: distribution.KindImage},

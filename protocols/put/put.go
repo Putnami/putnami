@@ -72,6 +72,10 @@ const (
 	// DocManifestMediaType is a site-content bundle. It references the bundle
 	// archive blob.
 	DocManifestMediaType = "application/vnd.putnami.sitecontent.bundle+json"
+	// DeploymentManifestMediaType is a workload's deployment declaration: the
+	// canonical bytes of infra protocol version 2's aggregated manifest. It
+	// references no blob. A new infra protocol version is a new media type.
+	DeploymentManifestMediaType = "application/vnd.putnami.infra.deployment.v2+json"
 )
 
 // The blob media types.
@@ -104,6 +108,7 @@ var Profiles = []Profile{
 	{Kind: distribution.KindMigration, ManifestMediaType: MigrationManifestMediaType, BlobMediaTypes: []string{MigrationBundleBlobMediaType}},
 	{Kind: distribution.KindDoc, ManifestMediaType: DocManifestMediaType, BlobMediaTypes: []string{GzipBlobMediaType}},
 	{Kind: distribution.KindArchive, ManifestMediaType: ArchiveManifestMediaType, BlobMediaTypes: []string{GzipBlobMediaType, BinaryBlobMediaType}},
+	{Kind: distribution.KindDeployment, ManifestMediaType: DeploymentManifestMediaType},
 }
 
 // ProfileFor returns the profile of kind, and false for a kind put-write/v1

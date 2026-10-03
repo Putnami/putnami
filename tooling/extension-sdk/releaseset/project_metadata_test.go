@@ -150,6 +150,8 @@ func TestKindForClassifiesDeclaredStepsAndFallsBackToTheEcosystem(t *testing.T) 
 		{"site content", "put", "site-content", "site-content", distribution.KindDoc},
 		{"cloud site content", "put", "cloud-site-content", "cloud-publish-site-content", distribution.KindDoc},
 		{"cloud site content with an unknown publish step", "put", "cloud-site-content", "bespoke", distribution.KindDoc},
+		{"deployment declaration", "put", "deployment", "publish-deployment", distribution.KindDeployment},
+		{"deployment declaration with an unknown publish step", "put", "deployment", "bespoke", distribution.KindDeployment},
 		{"unknown step in a generic ecosystem", "put", "bespoke", "bespoke", ""},
 		{"nothing declared", "", "", "", ""},
 	}
@@ -169,5 +171,16 @@ func TestKindForClassifiesDeclaredStepsAndFallsBackToTheEcosystem(t *testing.T) 
 	// registry, so a package step borrowed from another role never wins.
 	if got := KindFor("put", "docker", "cloud-publish-config"); got != distribution.KindConfig {
 		t.Fatalf("publish step lost to package step: %q", got)
+	}
+
+	// A deployment declaration is emitted only through a member whose declared
+	// step maps to it: no ecosystem implies the kind on its own.
+	for ecosystem, kind := range kindByEcosystem {
+		if kind == distribution.KindDeployment {
+			t.Fatalf("ecosystem %q implies the deployment kind without a declared step", ecosystem)
+		}
+	}
+	if got := KindFor("put", "", ""); got != "" {
+		t.Fatalf("a put member with no declared step classified as %q", got)
 	}
 }

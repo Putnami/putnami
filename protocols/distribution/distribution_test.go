@@ -654,9 +654,10 @@ func TestSourceTreeIsOptionalAndPartOfIdentity(t *testing.T) {
 }
 
 // TestMemberKindVocabularyIsClosed pins the vocabulary itself: a consumer that
-// groups members by role branches on exactly these six tokens.
+// groups members by role branches on exactly these seven tokens, and a new
+// token is appended after every existing one.
 func TestMemberKindVocabularyIsClosed(t *testing.T) {
-	want := []MemberKind{"image", "config", "migration", "doc", "library", "archive"}
+	want := []MemberKind{"image", "config", "migration", "doc", "library", "archive", "deployment"}
 	if len(MemberKinds) != len(want) {
 		t.Fatalf("kind vocabulary drifted: %v", MemberKinds)
 	}
@@ -665,9 +666,59 @@ func TestMemberKindVocabularyIsClosed(t *testing.T) {
 			t.Fatalf("kind %d = %q, want a valid %q", index, MemberKinds[index], kind)
 		}
 	}
-	for _, invalid := range []MemberKind{"", "Image", "images", "container", "binary"} {
+	for _, invalid := range []MemberKind{"", "Image", "images", "container", "binary", "Deployment", "deployments"} {
 		if invalid.Valid() {
 			t.Fatalf("kind %q is not part of the closed vocabulary", invalid)
+		}
+	}
+}
+
+// TestDeploymentMemberRoundTripsAndANearMissStaysUnknown pins the seventh
+// token on the wire: a put member of kind deployment survives the strict
+// reader and the canonical projection, its set derives a pinned ref, and a
+// spelling that is not the token is still refused as an unknown kind.
+func TestDeploymentMemberRoundTripsAndANearMissStaysUnknown(t *testing.T) {
+	fixtureBytes := mustFixture(t, "fixtures/valid/deployment-member.json")
+	fixture, diagnostics := ParseAndValidateReleaseSet(fixtureBytes)
+	if fixture == nil || diag.HasErrors(diagnostics) {
+		t.Fatalf("deployment-member fixture rejected: %v", diagnostics)
+	}
+	canonical, diagnostics := CanonicalReleaseSetBytes(fixture)
+	if diag.HasErrors(diagnostics) {
+		t.Fatalf("canonicalize the deployment-member fixture: %v", diagnostics)
+	}
+	if !bytes.Contains(canonical, []byte(`"project":"sites/putnami.dev","kind":"deployment"}`)) {
+		t.Fatalf("canonical bytes dropped the deployment kind: %s", canonical)
+	}
+	parsed, ref, parseDiagnostics := ParseCanonicalReleaseSet(canonical)
+	if parsed == nil || diag.HasErrors(parseDiagnostics) {
+		t.Fatalf("canonical deployment bytes rejected: %v", parseDiagnostics)
+	}
+	var deployments int
+	for _, member := range parsed.Members {
+		if member.Kind == KindDeployment {
+			deployments++
+			if member.Ecosystem != "put" || member.Project != "sites/putnami.dev" {
+				t.Fatalf("deployment member decoded to %#v", member)
+			}
+		}
+	}
+	if deployments != 1 {
+		t.Fatalf("round trip kept %d deployment members, want 1: %#v", deployments, parsed.Members)
+	}
+	const fixtureRef = "rs_e2d4965f7fecc3aef338d5cbfcfbd8971613ef84251f3fc8f5b81eefa4652b36"
+	if ref.ID != fixtureRef || mustRef(t, fixture).ID != fixtureRef {
+		t.Fatalf("deployment-member fixture ref = %s, want %s", ref.ID, fixtureRef)
+	}
+
+	for _, nearMiss := range []string{"deployments", "Deployment", "deploy"} {
+		document := bytes.Replace(fixtureBytes, []byte(`"kind": "deployment"`), []byte(`"kind": "`+nearMiss+`"`), 1)
+		if bytes.Equal(document, fixtureBytes) {
+			t.Fatal("the near-miss kind was not substituted")
+		}
+		value, diagnostics := ParseAndValidateReleaseSet(document)
+		if value != nil || !hasDiagnosticCode(diagnostics, ErrorCodeInvalidKind) {
+			t.Fatalf("kind %q = %#v %v, want %s", nearMiss, value, diagnostics, ErrorCodeInvalidKind)
 		}
 	}
 }

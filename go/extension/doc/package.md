@@ -2,7 +2,7 @@
 
 **Command:** `putnami package [project]`
 
-Creates distribution-ready artifacts for a Go project. Supports three channels: **archives** (platform-specific tarballs), **docker** (local Docker image), and **go** (Go module source for publishing).
+Creates distribution-ready artifacts for a Go project. Supports four channels: **archives** (platform-specific tarballs), **docker** (local Docker image), **go** (Go module source for publishing), and **deployment** (the workload's deployment declaration).
 
 This step **does not upload** anything. Workloads and projects with
 `type: "image"` both produce a typed local OCI candidate; publishing and remote
@@ -26,6 +26,7 @@ publication.
 - **archives**: cross-compiles the release matrix — by default the 5 platforms (linux-x64, linux-arm64, darwin-x64, darwin-arm64, windows-x64) — and packages each as a `.tar.gz` archive. The windows-x64 archive carries each program as `compiled/<name>.exe`. It packages the platforms at the same time, within the task's CPU grant.
 - **docker**: builds a Docker image locally using `gcr.io/distroless/static:nonroot` as the base; consumes the binary the `package` pipeline's own cross-compile step produced — **one** binary, for the image's `--platform`
 - **go**: prepares Go module source for publishing by stripping `replace` directives and stamping the version
+- **deployment**: writes the workload's deployment declaration, the payload of a release-set member of kind `deployment`, to `<project>/.gen/deployment.json`
 
 Channels are activated by passing the corresponding flag to `putnami package`.
 
@@ -130,6 +131,12 @@ silently discarding the requested base. See
 
 ```bash
 putnami package . --go
+```
+
+### Deployment declaration
+
+```bash
+putnami package . --deployment
 ```
 
 ## Execution Flow
@@ -330,6 +337,56 @@ reports the member. A publication with `--go-registry-token`,
 `PUTNAMI_REGISTRY_TOKEN` or `goRegistryToken` ignores the outbox and uploads as
 above. A dry run packs nothing.
 
+### deployment channel
+
+The `deployment` step writes the workload's deployment declaration to
+`<project>/.gen/deployment.json`. The file is the payload of a release-set
+member of kind `deployment`. The extension that publishes it declares the
+member with package publisher `@putnami/go` and package step `deployment`;
+nothing in this extension declares one.
+
+1. Build the aggregate the build command's infra phase builds (see
+   [Build](build.md#execution-flow)): the committed `infra/requirements.json` of
+   every project in the workload's dependency closure,
+   `<workload>/infra/overrides.json`, and the runtime block, an authored
+   `<workload>/infra/runtime.json` or the framework defaults.
+2. Write it in the canonical bytes of the infra protocol's `MarshalDeployment`:
+   compact JSON, no `$schema`, no trailing newline. The same aggregate always
+   gives the same bytes, so the member's digest moves only when the
+   declaration does.
+3. Write nothing for a library. Write nothing for a workload whose aggregate
+   has errors either: report the findings as warnings. In both cases, remove a
+   declaration an earlier run left, and cache nothing, because the file is the
+   step's required output. A publication that needs the file finds none,
+   never an old one.
+
+The step never writes the runtime defaults file `.gen/infra/runtime.json`,
+which stays the build's, and it never writes `.gen/requirements.json`.
+
+The channel is off by default. Turn it on for a project in any of these ways:
+
+| Where | Setting |
+|-------|---------|
+| Command line | `putnami package . --deployment` |
+| `putnami.json` publish list | `"publish": ["docker", "deployment"]` |
+| `putnami.json` options | `"options": { "@putnami/go": { "deployment": true } }` |
+
+A member of kind `deployment` declared for a project without the channel fails
+the publication before anything runs: its package step is not planned, so its
+selection fingerprint cannot be computed.
+
+The task is cached. It runs after the `generate` and `describe` steps, which
+commit `infra/requirements.json`, and its key covers:
+
+- the committed `infra/requirements.json` of every project in the dependency
+  closure, so a requirements-only change in a library moves it;
+- the workload's own `infra/runtime.json` and `infra/overrides.json`;
+- the extension version and the keys of the steps it runs after.
+
+That key is the member's selection fingerprint. A source change that moves the
+`generate` key republishes the declaration under a new version with the same
+bytes.
+
 ## Output Location
 
 Every step of the `package` command shares this directory and owns an exact
@@ -352,6 +409,10 @@ subpath of it (see [Declared Outputs](build.md#declared-outputs)):
 │   └── channel.json
 └── metadata.json           # archive publication manifest — owned by package-archives
 ```
+
+The deployment declaration is the one artifact outside this directory: it is
+`<project>/.gen/deployment.json`, owned by `package-deployment` (see
+[deployment channel](#deployment-channel)).
 
 Each packager records the channel it produced INSIDE the directory it owns, so a
 cache restore of that directory restores the record with the artifact it
@@ -473,6 +534,7 @@ ENTRYPOINT ["/app"]
 | `--archives` | `false` | Activate the archives channel (platform tarballs) |
 | `--docker` | `false` | Activate the docker channel (local Docker image) |
 | `--go` | `false` | Activate the go channel (Go module source) |
+| `--deployment` | `false` | Activate the deployment channel (`<project>/.gen/deployment.json`) |
 | `--dry-run` | `false` | Show what would be created without producing any artifacts |
 | `--docker-registry <url>` | — | **Override** of the publish target; the declared one is `registries.oci.publish`. Ignored by local packaging either way |
 | `--docker-tag <tag>` | — | Extra alias tag next to the content-addressed tag |

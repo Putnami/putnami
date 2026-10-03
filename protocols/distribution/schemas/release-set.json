@@ -70,7 +70,8 @@
         "migration",
         "doc",
         "library",
-        "archive"
+        "archive",
+        "deployment"
       ],
       "description": "The role the artifact plays, for a consumer that selects members by role rather than by coordinate. Absent when the publisher cannot classify the artifact, and on a set accepted before this field existed."
     },

@@ -138,6 +138,7 @@ var kindByStep = map[string]distribution.MemberKind{
 	"cloud-site-content":         distribution.KindDoc,
 	"cloud-publish-content":      distribution.KindDoc,
 	"cloud-publish-site-content": distribution.KindDoc,
+	"deployment":                 distribution.KindDeployment,
 }
 
 // kindByEcosystem is the fallback for an ecosystem whose profile admits exactly

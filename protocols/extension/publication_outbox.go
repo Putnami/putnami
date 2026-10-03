@@ -99,7 +99,8 @@ const (
 	OutboxEcosystemGo  = "go"
 	OutboxEcosystemOCI = "oci"
 	// OutboxEcosystemPut is a member of the Put registry that is not a release
-	// archive: a config, a migration or a doc member. It carries the put block.
+	// archive: a config, a migration, a doc or a deployment member. It carries
+	// the put block.
 	OutboxEcosystemPut = "put"
 	// OutboxEcosystemArchive is a release archive on the Put registry. It
 	// carries the put block.

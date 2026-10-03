@@ -33,6 +33,7 @@ const (
 	ErrorCodeConflictingValue       = "infra.conflicting_value"
 	ErrorCodeUnusedOverride         = "infra.unused_override"
 	ErrorCodeBuildInvalidated       = "infra.build_invalidated"
+	ErrorCodeNonCanonical           = "infra.non_canonical"
 )
 
 // ValidErrorCodes enumerates the canonical infra-protocol error taxonomy.
@@ -54,6 +55,7 @@ var ValidErrorCodes = map[string]bool{
 	ErrorCodeConflictingValue:       true,
 	ErrorCodeUnusedOverride:         true,
 	ErrorCodeBuildInvalidated:       true,
+	ErrorCodeNonCanonical:           true,
 }
 
 // resourceNamePattern matches a canonical resource identifier. We reuse

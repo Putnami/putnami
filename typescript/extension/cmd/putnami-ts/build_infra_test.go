@@ -114,3 +114,63 @@ func readRuntimeFile(t *testing.T, path string) *infra.Runtime {
 	}
 	return &rt
 }
+
+// The registered deployment task declares the same aggregate build-infra
+// emits, under the same hook: an authored request for HTTP/2 does not survive
+// into the declaration, and the bytes are the canonical form of build-infra's
+// manifest.
+func TestPackageDeployment_DeclaresBuildInfrasAggregate(t *testing.T) {
+	root := t.TempDir()
+	appRoot := filepath.Join(root, "app")
+	if err := os.MkdirAll(filepath.Join(appRoot, "infra"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	authored := `{"scaling":{"max":3},"protocols":{"http2":true}}`
+	if err := os.WriteFile(filepath.Join(appRoot, "infra", "runtime.json"), []byte(authored), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx := &pctx.Context{
+		WorkspaceRoot: root,
+		Project: pctx.Project{
+			Name:     "@example/app",
+			Path:     "app",
+			FullPath: appRoot,
+			Type:     "application",
+			DependencyClosure: []pctx.ProjectRef{
+				{ID: "/app", Name: "@example/app", Path: "app", FullPath: appRoot},
+			},
+		},
+	}
+
+	status, data, err := packageDeployment()(ctx, jsonl.NewForVersion(1), nil)
+	if err != nil || status != "OK" || data["outcome"] != string(infraagg.OutcomeEmitted) {
+		t.Fatalf("package-deployment = %q %v %v, want OK and emitted", status, data, err)
+	}
+	declaration, err := os.ReadFile(infraagg.DeploymentPath(appRoot))
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, diagnostics := infra.ParseDeployment(declaration)
+	if parsed == nil {
+		t.Fatalf("the declaration is not canonical: %v", diagnostics)
+	}
+	if rt := parsed.Runtime; rt == nil || rt.Protocols == nil || rt.Protocols.HTTP2 == nil || *rt.Protocols.HTTP2 {
+		t.Errorf("declared runtime = %+v, want http2 false even when the project asked for it", parsed.Runtime)
+	}
+
+	if _, _, err := buildInfra()(ctx, jsonl.NewForVersion(1), nil); err != nil {
+		t.Fatalf("build-infra: %v", err)
+	}
+	emitted, err := os.ReadFile(filepath.Join(appRoot, ".gen", "requirements.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var aggregate infra.AggregatedManifest
+	if err := json.Unmarshal(emitted, &aggregate); err != nil {
+		t.Fatal(err)
+	}
+	want, diagnostics := infra.MarshalDeployment(&aggregate)
+	if want == nil || string(want) != string(declaration) {
+		t.Errorf("declaration = %s\nwant the canonical form of build-infra's manifest %s %v", declaration, want, diagnostics)
+	}
+}
