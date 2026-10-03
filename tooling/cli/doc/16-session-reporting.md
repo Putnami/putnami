@@ -71,10 +71,12 @@ keeps every reporter token out of every process environment:
    session's delivery reuses that process.
 3. A reporter that does not accept the handshake (a version 1 reporter), or
    whose command is not its extension's native runtime, starts without a
-   credential and without a token. The CLI prints one diagnostic for it. The
-   CLI waits at most five seconds for each handshake answer, so a reporter
-   that ignores the handshake instead of exiting delays the first hook by at
-   most five seconds.
+   credential and without a token. The CLI prints one diagnostic for it.
+   Each handshake answer has its own five-second limit, and the CLI starts
+   the reporters one after another. A reporter answers two lines, so the
+   handshake can hold the first hook for up to ten seconds per reporter, and
+   up to twenty with both reporters selected. A reporter that ignores the
+   handshake instead of exiting costs five seconds.
 4. A reporter that must start again after repository code ran gets no
    credential: its delivery fails with a custody diagnostic. What it did not
    deliver stays pending in the session's checkpoint (`reporting.json` or

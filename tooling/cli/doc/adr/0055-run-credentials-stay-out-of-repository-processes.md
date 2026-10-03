@@ -242,14 +242,17 @@ ends when repository code starts.
   ([ADR 0033](0033-native-session-reporting.md)). A reporter whose command is
   not its native runtime, or that does not accept `initialize` of version 2,
   such as a version 1 reporter, starts without a credential and without its
-  token, and the CLI prints why. The CLI waits at most five seconds for each
-  handshake answer, so a reporter that ignores `initialize` delays the first
-  hook by at most that. A reporter that must start again after repository code
-  ran, after a crash for example, gets no credential: its delivery fails with
-  a custody error. What it did not deliver stays pending in the session's
-  checkpoint, and `subscribers.json` records it. The hosted run does not
-  replay it: a replay is a later invocation, which needs a reporter credential
-  of its own.
+  token, and the CLI prints why. Each handshake answer has its own
+  five-second limit, each reporter answers two lines, and the CLI starts the
+  reporters one after another. The handshake can therefore hold the first
+  hook for up to ten seconds per reporter, and up to twenty with both
+  reporters selected;
+  a reporter that ignores `initialize` costs five seconds. A reporter that
+  must start again after repository code ran, after a crash for example, gets
+  no credential: its delivery fails with a custody error. What it did not
+  deliver stays pending in the session's checkpoint, and `subscribers.json`
+  records it. The hosted run does not replay it: a replay is a later
+  invocation, which needs a reporter credential of its own.
 - A hosted runner passes `--credential-fd` to one invocation per fresh sandbox:
   a fresh checkout, `HOME`, artifact store and `TMPDIR`, in a container or VM no
   earlier process outlives. An earlier invocation can leave `.git/config`

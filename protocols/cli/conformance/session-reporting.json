@@ -246,6 +246,22 @@
     }
   },
   {
+    "name": "wrong-case-member",
+    "kind": "chunk",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "events.jsonl",
+      "offset": 0,
+      "sequence": 0,
+      "data": "YWJj",
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false,
+      "SessionId": "20260914-120000-abc123"
+    }
+  },
+  {
     "name": "noncanonical-base64",
     "kind": "chunk",
     "valid": false,
@@ -352,6 +368,22 @@
       "final": false,
       "ok": false,
       "code": "https://secret.invalid"
+    }
+  },
+  {
+    "name": "wrong-case-code",
+    "kind": "ack",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "events.jsonl",
+      "offset": 0,
+      "sequence": 0,
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false,
+      "ok": false,
+      "Code": "unavailable"
     }
   },
   {
@@ -578,6 +610,26 @@
     }
   },
   {
+    "name": "handshake-initialize-wrong-case-credential",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "initialize",
+      "RunCredential": ""
+    }
+  },
+  {
+    "name": "handshake-authenticate-wrong-case-credential",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "RUNCREDENTIAL": "hosted-run-credential-7c1e"
+    }
+  },
+  {
     "name": "handshake-authenticate-without-credential",
     "kind": "handshake",
     "valid": false,
@@ -728,6 +780,17 @@
       "op": "initialize",
       "ok": true,
       "message": "ready"
+    }
+  },
+  {
+    "name": "handshake-result-wrong-case-code",
+    "kind": "handshake-result",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "ok": false,
+      "Code": "unauthorized"
     }
   },
   {

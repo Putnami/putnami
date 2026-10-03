@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"regexp"
 	"strings"
 	"unicode"
@@ -354,7 +355,11 @@ func parseReporting(line []byte, target any, required ...string) error {
 	if err := json.Unmarshal(line, &fields); err != nil {
 		return fmt.Errorf("invalid reporting JSON")
 	}
+	members := reportingMembers(target)
 	for key, value := range fields {
+		if !members[key] {
+			return fmt.Errorf("unknown reporting field")
+		}
 		if bytes.Equal(value, []byte("null")) {
 			return fmt.Errorf("null reporting field")
 		}
@@ -380,4 +385,19 @@ func parseReporting(line []byte, target any, required ...string) error {
 		return fmt.Errorf("trailing reporting JSON")
 	}
 	return nil
+}
+
+// reportingMembers returns the exact JSON member names of the struct that
+// target points to. encoding/json matches a member to a field whatever its
+// case, so parseReporting refuses every other name itself, as the schema and
+// the TypeScript parsers do.
+func reportingMembers(target any) map[string]bool {
+	t := reflect.TypeOf(target).Elem()
+	members := make(map[string]bool, t.NumField())
+	for i := range t.NumField() {
+		if name, _, _ := strings.Cut(t.Field(i).Tag.Get("json"), ","); name != "" && name != "-" {
+			members[name] = true
+		}
+	}
+	return members
 }

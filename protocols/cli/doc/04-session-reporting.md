@@ -103,22 +103,30 @@ The credential is 1 to 16384 bytes of UTF-8 with no whitespace
 characters, so only a parser enforces the byte bound. Every answer echoes
 `protocolVersion` and `op`; a refusal carries a machine `code`
 (`[a-z][a-z0-9_]{0,63}`) and no message. The engine waits at most five seconds
-for each answer. It closes a reporter that refuses `authenticate` or does not
-answer it in time; that reporter's delivery fails, and the graph verdict is
-unchanged. After the handshake, chunks and ACKs carry `protocolVersion: 1`,
+for each answer, and closes a reporter that refuses `authenticate` or does not
+answer a line in time; that reporter's delivery fails, and the graph verdict
+is unchanged. After the handshake, chunks and ACKs carry `protocolVersion: 1`,
 unchanged. An engine without a run credential sends no handshake, so the first
 line a reporter reads on a local run is a chunk, byte-identical to before.
+
+**How long it waits.** Each answer has its own five-second limit. The engine
+hands the credential to the selected reporters one after another, and each
+reporter answers two lines, so the handshake holds the run's first hook for at
+most ten seconds per reporter, and twenty seconds with both a session reporter
+and a log reporter selected, plus the time to stop a reporter that missed its
+limit. A reporter that ignores `initialize` costs five seconds; one that
+accepts `initialize` and never answers `authenticate` costs ten.
 
 **A version 1 reporter.** A version 1 reporter does not accept `initialize`,
 whose version and members it does not know, and so never reads the
 credential. Version 1 does not say what a reporter does with a line it cannot
 parse. One that exits fails the handshake at once. One that ignores the line
-and keeps reading is closed when the five-second deadline for `initialize`
-passes, so it delays the run's first hook by at most five seconds. A hosted
-run starts a reporter that does not accept `initialize` again without a
-credential: no handshake and no token. The engine prints that the reporter
-cannot hold the run credential and starts without one. The reporter's own
-destination then decides whether it delivers.
+and keeps reading is closed when the five-second limit for `initialize`
+passes, so it delays the run's first hook by five seconds. A hosted run starts
+a reporter that does not accept `initialize` again without a credential: no
+handshake and no token. The engine prints that the reporter cannot hold the
+run credential and starts without one. The reporter's own destination then
+decides whether it delivers.
 
 **Who holds it.** A hosted run hands the credential only to a reporter that
 runs as its extension's native runtime executable (`{extensionRuntime}`), and
