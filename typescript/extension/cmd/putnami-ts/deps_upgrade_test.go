@@ -1157,6 +1157,127 @@ func TestResolvePutnamiNPMVersion_ErrorNamesPackageChannelHostAndStatus(t *testi
 	}
 }
 
+// A packument lists every published version, so it outgrows any small read
+// cap: several @putnami/* packuments already exceed 2 MiB with a credential.
+func TestResolvePutnamiNPMVersion_ReadsAPackumentLargerThanTwoMiB(t *testing.T) {
+	dir := t.TempDir()
+	originalClient := npmMetadataClient
+	t.Cleanup(func() { npmMetadataClient = originalClient })
+
+	padding := strings.Repeat("x", 3<<20)
+	var gotAccept string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAccept = r.Header.Get("Accept")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"name":"@putnami/web","dist-tags":{"canary":"0.3.1-canary"},"readme":"` + padding + `"}`))
+	}))
+	t.Cleanup(server.Close)
+	npmMetadataClient = server.Client()
+
+	got, err := resolvePutnamiNPMVersion(context.Background(), dir, scopeRegistries(server.URL), "@putnami/web", "canary")
+	if err != nil {
+		t.Fatalf("resolvePutnamiNPMVersion: %v", err)
+	}
+	if got != "0.3.1-canary" {
+		t.Fatalf("version = %q, want the canary dist-tag", got)
+	}
+	if !strings.HasPrefix(gotAccept, "application/vnd.npm.install-v1+json") {
+		t.Fatalf("Accept = %q, want the abbreviated packument first", gotAccept)
+	}
+}
+
+func TestResolvePutnamiNPMVersion_NamesAnOversizedPackument(t *testing.T) {
+	dir := t.TempDir()
+	originalClient := npmMetadataClient
+	t.Cleanup(func() { npmMetadataClient = originalClient })
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"readme":"` + strings.Repeat("x", npmPackumentMaxBytes) + `"}`))
+	}))
+	t.Cleanup(server.Close)
+	npmMetadataClient = server.Client()
+
+	_, err := resolvePutnamiNPMVersion(context.Background(), dir, scopeRegistries(server.URL), "@putnami/web", "canary")
+	if err == nil || !strings.Contains(err.Error(), "packument is larger than") {
+		t.Fatalf("err = %v, want an oversized packument named", err)
+	}
+	var unpublished *npmUnpublishedError
+	if errors.As(err, &unpublished) {
+		t.Fatalf("an oversized packument is not an unpublished package: %v", err)
+	}
+}
+
+// A package the channel does not publish keeps its version, with a warning
+// diagnostic the default output shows; it never stays behind silently.
+func TestResolvePutnamiNPMVersions_WarnsAboutAnUnpublishedPackage(t *testing.T) {
+	dir := t.TempDir()
+	originalClient := npmMetadataClient
+	t.Cleanup(func() { npmMetadataClient = originalClient })
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "gone") {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"dist-tags":{"canary":"0.3.1-canary"}}`))
+	}))
+	t.Cleanup(server.Close)
+	npmMetadataClient = server.Client()
+
+	var versions map[string]string
+	var err error
+	events := captureEvents(t, func() {
+		versions, err = resolvePutnamiNPMVersions(context.Background(), dir, scopeRegistries(server.URL),
+			[]string{"@putnami/web", "@putnami/gone"}, "canary", jsonl.New())
+	})
+	if err != nil {
+		t.Fatalf("resolvePutnamiNPMVersions: %v", err)
+	}
+	if !reflect.DeepEqual(versions, map[string]string{"@putnami/web": "0.3.1-canary"}) {
+		t.Fatalf("versions = %#v, want only the published package", versions)
+	}
+	warning := findEvent(events, func(event map[string]any) bool {
+		message, _ := event["message"].(string)
+		return event["type"] == "diagnostic" && event["severity"] == "warning" &&
+			strings.Contains(message, "@putnami/gone")
+	})
+	if warning == nil {
+		t.Fatalf("no warning diagnostic names the skipped package: %v", events)
+	}
+}
+
+// Any other lookup failure would leave a published package behind and mix
+// framework versions, so the upgrade stops before it writes anything.
+func TestResolvePutnamiNPMVersions_FailsWhenAPublishedPackageCannotResolve(t *testing.T) {
+	dir := t.TempDir()
+	originalClient := npmMetadataClient
+	t.Cleanup(func() { npmMetadataClient = originalClient })
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.HasSuffix(r.URL.Path, "application") {
+			_, _ = w.Write([]byte(`{"dist-tags":{"canary":`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"dist-tags":{"canary":"0.3.1-canary"}}`))
+	}))
+	t.Cleanup(server.Close)
+	npmMetadataClient = server.Client()
+
+	versions, err := resolvePutnamiNPMVersions(context.Background(), dir, scopeRegistries(server.URL),
+		[]string{"@putnami/web", "@putnami/application"}, "canary", jsonl.New())
+	if err == nil {
+		t.Fatalf("versions = %#v, want a failure for the unreadable packument", versions)
+	}
+	for _, want := range []string{"@putnami/application", "packument is not readable"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %q", err, want)
+		}
+	}
+}
+
 // A consumer workspace is not the publisher: a downstream consumer workspace
 // consuming a `putnami` snapshot is the normal case, and rejecting a foreign
 // release-set namespace is a defect on the extension side.

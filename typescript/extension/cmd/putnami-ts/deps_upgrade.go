@@ -27,6 +27,18 @@ var exactNPMVersionPattern = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+([-.+]
 
 const cliUserAgentEnv = "PUTNAMI_CLI_USER_AGENT"
 
+// npmPackumentMaxBytes bounds one packument (the package metadata document).
+// A packument lists every published version, so it grows with each release:
+// several @putnami/* packuments already exceed 2 MiB with a credential. The
+// bound only guards against an endless response; it sits far above any real
+// packument.
+const npmPackumentMaxBytes = 64 << 20
+
+// npmPackumentAccept asks for the abbreviated packument, which still carries
+// dist-tags, the way npm itself does. A registry that ignores it answers with
+// the full document.
+const npmPackumentAccept = "application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*"
+
 const upgradeReleaseSetParam = "releaseSet"
 
 // The authority that produced the resolved versions, so the reported table says
@@ -88,9 +100,10 @@ func runDepsUpgrade(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (stri
 	if setMode {
 		emit.Log("info", fmt.Sprintf("Resolved release set %s (%s)", releaseRef.ID, releaseRef.Digest))
 	} else {
-		// Legacy selector mode remains deliberately lenient per package. Release-
-		// set mode is fail-closed instead: its full member map is the authority and
-		// a referenced package missing from it invalidates the snapshot.
+		// Legacy selector mode skips a package the channel does not publish, and
+		// warns about it. Release-set mode is fail-closed instead: its full member
+		// map is the authority and a referenced package missing from it
+		// invalidates the snapshot.
 		packages = resolvedPackages(packages, resolvedVersions)
 	}
 	if len(packages) == 0 {
@@ -338,6 +351,7 @@ func resolvePutnamiNPMVersion(ctx context.Context, wsRoot string, declared npmRe
 		return "", fail("cannot build the metadata request", 0, err)
 	}
 	setPutnamiUserAgent(req)
+	req.Header.Set("Accept", npmPackumentAccept)
 	// Anonymous metadata hides the versions a private registry only shows to an
 	// authenticated client, which reports a published channel as missing. Present
 	// the same _authToken npm itself would use.
@@ -353,22 +367,40 @@ func resolvePutnamiNPMVersion(ctx context.Context, wsRoot string, declared npmRe
 		return "", fail("registry is unreachable", 0, err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", &npmUnpublishedError{fail("packument request failed", resp.StatusCode, nil)}
+	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fail("packument request failed", resp.StatusCode, nil)
 	}
 
+	body, err := io.ReadAll(io.LimitReader(resp.Body, npmPackumentMaxBytes+1))
+	if err != nil {
+		return "", fail("packument is not readable", resp.StatusCode, err)
+	}
+	if len(body) > npmPackumentMaxBytes {
+		return "", fail(fmt.Sprintf("packument is larger than %d MiB", npmPackumentMaxBytes>>20), resp.StatusCode, nil)
+	}
 	var metadata struct {
 		DistTags map[string]string `json:"dist-tags"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 2*1024*1024)).Decode(&metadata); err != nil {
+	if err := json.Unmarshal(body, &metadata); err != nil {
 		return "", fail("packument is not readable", resp.StatusCode, err)
 	}
 	version := strings.TrimSpace(metadata.DistTags[target])
 	if version == "" {
-		return "", fail("no dist-tag with that name", resp.StatusCode, nil)
+		return "", &npmUnpublishedError{fail("no dist-tag with that name", resp.StatusCode, nil)}
 	}
 	return version, nil
 }
+
+// npmUnpublishedError marks a package the registry does not publish on the
+// requested channel: the registry answered, and the package or its dist-tag is
+// absent. It is the only lookup failure the upgrade skips.
+type npmUnpublishedError struct{ err error }
+
+func (e *npmUnpublishedError) Error() string { return e.err.Error() }
+func (e *npmUnpublishedError) Unwrap() error { return e.err }
 
 func npmRegistryHost(registry string) string {
 	parsed, err := url.Parse(strings.TrimSpace(registry))
@@ -413,21 +445,33 @@ func npmRegistryAuthToken(wsRoot, registry string) string {
 
 func resolvePutnamiNPMVersions(ctx context.Context, wsRoot string, declared npmRegistries, packages []string, target string, emit *jsonl.Emitter) (map[string]string, error) {
 	versions := make(map[string]string, len(packages))
+	var failures []string
 	for _, pkg := range packages {
 		version, err := resolvePutnamiNPMVersion(ctx, wsRoot, declared, pkg, target)
-		if err != nil {
-			// A single unresolvable package (e.g. a stale catalog entry that was
-			// never published) is warned and skipped rather than aborting the
-			// whole upgrade — mirroring the Go upgrader's per-module leniency.
-			emit.Log("warn", fmt.Sprintf("Skipping %s: %v", pkg, err))
-			continue
+		var unpublished *npmUnpublishedError
+		switch {
+		case errors.As(err, &unpublished):
+			// A package the channel does not publish (e.g. a stale catalog entry)
+			// keeps its version rather than aborting the whole upgrade. The
+			// warning diagnostic reaches the default output, so the package does
+			// not stay behind silently.
+			emit.Diagnostic("warning", fmt.Sprintf("%s keeps its current version: %v", pkg, err), "", 0)
+		case err != nil:
+			failures = append(failures, err.Error())
+		default:
+			versions[pkg] = version
 		}
-		versions[pkg] = version
 	}
-	// Nothing resolving at all points at the selector or the registry, not one
-	// package — surface that as a hard failure.
+	// Any other failure (unreachable registry, refused credential, unreadable
+	// packument) would leave a published package behind and mix framework
+	// versions: stop before anything is written.
+	if len(failures) > 0 {
+		return nil, fmt.Errorf("could not resolve %d @putnami/* package(s): %s", len(failures), strings.Join(failures, "; "))
+	}
+	// Nothing published at all points at the selector, not one package —
+	// surface that as a hard failure.
 	if len(versions) == 0 && len(packages) > 0 {
-		return nil, fmt.Errorf("could not resolve %q for any @putnami/* package (registry unreachable or selector unknown)", target)
+		return nil, fmt.Errorf("channel %q publishes none of the referenced @putnami/* packages", target)
 	}
 	return versions, nil
 }
