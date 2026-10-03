@@ -1157,6 +1157,151 @@ func TestResolvePutnamiNPMVersion_ErrorNamesPackageChannelHostAndStatus(t *testi
 	}
 }
 
+// packumentServer answers each package path with the handler's status and
+// body; an empty body with status 200 is invalid JSON.
+func packumentServer(t *testing.T, answer func(name string) (int, string)) string {
+	t.Helper()
+	originalClient := npmMetadataClient
+	t.Cleanup(func() { npmMetadataClient = originalClient })
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		status, body := answer(r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:])
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(server.Close)
+	npmMetadataClient = server.Client()
+	return server.URL
+}
+
+func TestResolvePutnamiNPMVersion_ReadsAPackumentLargerThanTwoMiB(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "upgrade-reports-unresolved-packages", "a-large-packument-resolves")
+
+	var gotAccept string
+	originalClient := npmMetadataClient
+	t.Cleanup(func() { npmMetadataClient = originalClient })
+	padding := strings.Repeat("x", 3<<20)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAccept = r.Header.Get("Accept")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"name":"@putnami/web","dist-tags":{"canary":"0.3.1-canary"},"readme":"` + padding + `"}`))
+	}))
+	t.Cleanup(server.Close)
+	npmMetadataClient = server.Client()
+
+	got, err := resolvePutnamiNPMVersion(context.Background(), t.TempDir(), scopeRegistries(server.URL), "@putnami/web", "canary")
+	if err != nil {
+		t.Fatalf("resolvePutnamiNPMVersion: %v", err)
+	}
+	if got != "0.3.1-canary" {
+		t.Fatalf("version = %q, want the canary dist-tag", got)
+	}
+	if !strings.HasPrefix(gotAccept, "application/vnd.npm.install-v1+json") {
+		t.Fatalf("Accept = %q, want the abbreviated packument first", gotAccept)
+	}
+}
+
+func TestResolvePutnamiNPMVersion_NamesAnOversizedPackument(t *testing.T) {
+	original := npmPackumentMaxBytes
+	npmPackumentMaxBytes = 1024
+	t.Cleanup(func() { npmPackumentMaxBytes = original })
+	registry := packumentServer(t, func(string) (int, string) {
+		return http.StatusOK, `{"dist-tags":{"canary":"0.3.1-canary"},"readme":"` + strings.Repeat("x", 2048) + `"}`
+	})
+
+	_, err := resolvePutnamiNPMVersion(context.Background(), t.TempDir(), scopeRegistries(registry), "@putnami/web", "canary")
+	if err == nil || !strings.Contains(err.Error(), "packument is larger than 1024 bytes") {
+		t.Fatalf("err = %v, want the oversized packument named", err)
+	}
+	var unpublished *npmUnpublishedError
+	if errors.As(err, &unpublished) {
+		t.Fatalf("an oversized packument is not an unpublished package: %v", err)
+	}
+}
+
+func TestResolvePutnamiNPMVersions_WarnsAboutAnUnpublishedPackage(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "upgrade-reports-unresolved-packages", "an-unpublished-package-is-warned-and-kept")
+
+	registry := packumentServer(t, func(name string) (int, string) {
+		switch name {
+		case "gone":
+			return http.StatusNotFound, `{"error":"not found"}`
+		case "stable-only":
+			return http.StatusOK, `{"dist-tags":{"latest":"1.0.0"}}`
+		}
+		return http.StatusOK, `{"dist-tags":{"canary":"0.3.1-canary"}}`
+	})
+
+	var versions map[string]string
+	var err error
+	events := captureEvents(t, func() {
+		versions, err = resolvePutnamiNPMVersions(context.Background(), t.TempDir(), scopeRegistries(registry),
+			[]string{"@putnami/web", "@putnami/gone", "@putnami/stable-only"}, "canary", jsonl.New())
+	})
+	if err != nil {
+		t.Fatalf("resolvePutnamiNPMVersions: %v", err)
+	}
+	if !reflect.DeepEqual(versions, map[string]string{"@putnami/web": "0.3.1-canary"}) {
+		t.Fatalf("versions = %#v, want only the published package", versions)
+	}
+	for _, pkg := range []string{"@putnami/gone", "@putnami/stable-only"} {
+		warning := findEvent(events, func(event map[string]any) bool {
+			message, _ := event["message"].(string)
+			return event["type"] == "diagnostic" && event["severity"] == "warning" &&
+				strings.Contains(message, pkg) && strings.Contains(message, "no credential sent")
+		})
+		if warning == nil {
+			t.Errorf("no warning diagnostic names %s and the missing credential: %v", pkg, events)
+		}
+	}
+}
+
+func TestResolvePutnamiNPMVersions_FailsWhenAPublishedPackageCannotResolve(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "upgrade-reports-unresolved-packages", "any-other-lookup-failure-stops-the-upgrade")
+
+	for _, tc := range []struct {
+		name   string
+		status int
+		body   string
+		want   string
+	}{
+		{"refused credential", http.StatusForbidden, `{"error":"forbidden"}`, "HTTP 403"},
+		{"server error", http.StatusBadGateway, ``, "HTTP 502"},
+		{"unreadable packument", http.StatusOK, `{"dist-tags":{"canary":`, "packument is not readable"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			registry := packumentServer(t, func(name string) (int, string) {
+				if name == "application" {
+					return tc.status, tc.body
+				}
+				return http.StatusOK, `{"dist-tags":{"canary":"0.3.1-canary"}}`
+			})
+			versions, err := resolvePutnamiNPMVersions(context.Background(), t.TempDir(), scopeRegistries(registry),
+				[]string{"@putnami/web", "@putnami/application"}, "canary", jsonl.New())
+			if err == nil {
+				t.Fatalf("versions = %#v, want a failure", versions)
+			}
+			for _, want := range []string{"@putnami/application", tc.want} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not name %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+func TestResolvePutnamiNPMVersions_FailsWhenNoPackageResolves(t *testing.T) {
+	registry := packumentServer(t, func(string) (int, string) {
+		return http.StatusNotFound, `{"error":"not found"}`
+	})
+
+	_, err := resolvePutnamiNPMVersions(context.Background(), t.TempDir(), scopeRegistries(registry),
+		[]string{"@putnami/web", "@putnami/application"}, "canary", jsonl.New())
+	if err == nil || !strings.Contains(err.Error(), `no referenced @putnami/* package resolved "canary"`) {
+		t.Fatalf("err = %v, want the all-unresolved failure", err)
+	}
+}
+
 // A consumer workspace is not the publisher: a downstream consumer workspace
 // consuming a `putnami` snapshot is the normal case, and rejecting a foreign
 // release-set namespace is a defect on the extension side.

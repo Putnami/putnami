@@ -128,6 +128,10 @@
       "text": "A dry-run npm publication asks the registry, without writing, whether it already holds the staged package at its version, and emits one member-probe event: absent, identical when the registry copy equals the tarball the real publish would upload, conflict when it differs or cannot be compared, unverified when the registry cannot answer. A release-set member sends one GET of the tarball, with a bearer only when one resolved, and runs no npm process. Any other publication asks through npm view and npm pack."
     },
     {
+      "id": "upgrade-reports-unresolved-packages",
+      "text": "A dist-tag upgrade reads a packument of any realistic size. A package the registry answers as absent, or whose packument has no dist-tag for the channel, keeps its version and is named in a warning diagnostic. Any other lookup failure stops the upgrade before it writes anything."
+    },
+    {
       "id": "upgrade-table-shows-source-revision",
       "text": "The upgrade table shows, for every resolved version, the source revision carried by its suffix."
     },
