@@ -196,6 +196,12 @@ func TestSessionReportingHandshakeHandsTheCredentialOnlyInAuthenticate(t *testin
 			t.Errorf("a %d-byte credential: error %v, want valid=%v", size, err, valid)
 		}
 	}
+	// The bound counts UTF-8 bytes: 8193 two-byte characters are within the
+	// schema's maxLength, which counts characters, and over the parser's bound.
+	wide, _ := json.Marshal(NewSessionReportingAuthenticate(strings.Repeat("é", 8193)))
+	if _, err := ParseSessionReportingHandshake(wide); err == nil {
+		t.Error("a credential of 16386 UTF-8 bytes was accepted")
+	}
 	if !initialize.Accept().Answers(initialize) || initialize.Accept().Answers(authenticate) || !authenticate.Refuse("unauthorized").Answers(authenticate) {
 		t.Fatal("a result answers another operation, or not its own")
 	}

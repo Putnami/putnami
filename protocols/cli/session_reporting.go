@@ -37,8 +37,10 @@ const (
 	SessionReportingCredentialVersion = 2
 	SessionReportingOpInitialize      = "initialize"
 	SessionReportingOpAuthenticate    = "authenticate"
-	// SessionReportingMaxCredentialBytes bounds the run credential that
-	// authenticate carries.
+	// SessionReportingMaxCredentialBytes bounds, in UTF-8 bytes, the run
+	// credential that authenticate carries (ValidSessionReportingCredential).
+	// The schema's maxLength holds the same number in characters, a looser
+	// bound for a multi-byte credential.
 	SessionReportingMaxCredentialBytes = 16 << 10
 )
 
@@ -305,6 +307,8 @@ func ValidSessionReportingCredential(credential string) bool {
 }
 
 // ParseSessionReportingHandshake strictly decodes one engine handshake line.
+// It refuses an initialize line that holds the runCredential member, even an
+// empty one, as the schema does.
 func ParseSessionReportingHandshake(line []byte) (*SessionReportingHandshake, error) {
 	var h SessionReportingHandshake
 	if err := parseReporting(line, &h, "protocolVersion", "op"); err != nil {
@@ -312,6 +316,13 @@ func ParseSessionReportingHandshake(line []byte) (*SessionReportingHandshake, er
 	}
 	if err := h.Validate(); err != nil {
 		return nil, err
+	}
+	// RunCredential decodes an empty member and an absent one alike, so the
+	// member's presence is read from the line, which parseReporting decoded.
+	var members map[string]json.RawMessage
+	_ = json.Unmarshal(line, &members)
+	if _, present := members["runCredential"]; present && h.Op == SessionReportingOpInitialize {
+		return nil, fmt.Errorf("reporting initialize carries a credential")
 	}
 	return &h, nil
 }

@@ -1460,6 +1460,11 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
 - **`putnami upgrade` refuses the flag.** An upgrade rewrites the lock that a
   hosted run executes as committed. Upgrade without the flag and commit the
   lock.
+- **Watch refuses the flag.** `--watch`, and `serve`, which always watches,
+  stop with exit 2 before anything starts. Each watch iteration starts after
+  repository code ran, when the CLI hands the credential to no new process,
+  and a hosted runner runs one finite invocation per fresh sandbox. Run a
+  finite command, such as `putnami build`, without `--watch`.
 - **Extension command groups refuse the flag.** A command group that an
   extension adds, such as `putnami cloud …`, resolves its remote cache only
   after the install ran repository code, too late for the cache provider of

@@ -112,6 +112,9 @@ test('session reporter schema field sets and byte bounds', async () => {
   };
   expect(Object.keys(refused).sort()).toEqual(Object.keys(schema.$defs.handshakeResult.properties).sort());
   expect(schema.$defs.handshake.properties.protocolVersion.const).toBe(SESSION_REPORTING_CREDENTIAL_VERSION);
+  // maxLength counts characters: the schema holds the byte bound's number, and
+  // only a parser bounds the UTF-8 bytes (the handshake test checks a
+  // multi-byte credential).
   expect(schema.$defs.handshake.properties.runCredential.maxLength).toBe(SESSION_REPORTING_MAX_CREDENTIAL_BYTES);
   for (const size of [SESSION_REPORTING_CHUNK_BYTES, SESSION_REPORTING_CHUNK_BYTES + 1]) {
     const bytes = new Uint8Array(size).fill(120);

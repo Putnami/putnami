@@ -138,7 +138,11 @@ export function sessionReportingAckMatches(ack: SessionReportingAck, chunk: Sess
 export const SESSION_REPORTING_CREDENTIAL_VERSION = 2;
 export const SESSION_REPORTING_OP_INITIALIZE = 'initialize';
 export const SESSION_REPORTING_OP_AUTHENTICATE = 'authenticate';
-/** Bounds the run credential that authenticate carries, in UTF-8 bytes. */
+/**
+ * Bounds, in UTF-8 bytes, the run credential that authenticate carries
+ * (validSessionReportingCredential). The schema's maxLength holds the same
+ * number in characters, a looser bound for a multi-byte credential.
+ */
 export const SESSION_REPORTING_MAX_CREDENTIAL_BYTES = 16_384;
 
 export type SessionReportingOp = typeof SESSION_REPORTING_OP_INITIALIZE | typeof SESSION_REPORTING_OP_AUTHENTICATE;

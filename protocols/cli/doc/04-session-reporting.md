@@ -99,20 +99,26 @@ handshake:
    or `"ok":false` with a `code`.
 
 The credential is 1 to 16384 bytes of UTF-8 with no whitespace
-(`ValidSessionReportingCredential`). Every answer echoes `protocolVersion` and
-`op`; a refusal carries a machine `code` (`[a-z][a-z0-9_]{0,63}`) and no
-message. The engine closes a reporter that refuses `authenticate` or does not
-answer it; that reporter's delivery fails, and the graph verdict is unchanged.
-After the handshake, chunks and ACKs carry `protocolVersion: 1`, unchanged. An engine without a run credential sends no handshake, so the
-first line a reporter reads on a local run is a chunk, byte-identical to
-before.
+(`ValidSessionReportingCredential`). The schema's `maxLength` counts
+characters, so only a parser enforces the byte bound. Every answer echoes
+`protocolVersion` and `op`; a refusal carries a machine `code`
+(`[a-z][a-z0-9_]{0,63}`) and no message. The engine waits at most five seconds
+for each answer. It closes a reporter that refuses `authenticate` or does not
+answer it in time; that reporter's delivery fails, and the graph verdict is
+unchanged. After the handshake, chunks and ACKs carry `protocolVersion: 1`,
+unchanged. An engine without a run credential sends no handshake, so the first
+line a reporter reads on a local run is a chunk, byte-identical to before.
 
-**A version 1 reporter.** A strict version 1 reporter rejects `initialize`,
+**A version 1 reporter.** A version 1 reporter does not accept `initialize`,
 whose version and members it does not know, and so never reads the
-credential. A hosted run starts a reporter that does not accept `initialize`
-again without a credential: no handshake and no token. The engine prints
-that the reporter cannot hold the run credential and starts without one. The
-reporter's own destination then decides whether it delivers.
+credential. Version 1 does not say what a reporter does with a line it cannot
+parse. One that exits fails the handshake at once. One that ignores the line
+and keeps reading is closed when the five-second deadline for `initialize`
+passes, so it delays the run's first hook by at most five seconds. A hosted
+run starts a reporter that does not accept `initialize` again without a
+credential: no handshake and no token. The engine prints that the reporter
+cannot hold the run credential and starts without one. The reporter's own
+destination then decides whether it delivers.
 
 **Who holds it.** A hosted run hands the credential only to a reporter that
 runs as its extension's native runtime executable (`{extensionRuntime}`), and
@@ -121,9 +127,13 @@ without a credential, with the same diagnostic. The run starts every selected
 reporter before its first hook, install or job, and the session's delivery
 reuses that process. A reporter that a hosted run must start again after
 repository code ran, after a crash for example, gets no credential: its
-delivery fails, and `putnami sessions replay --session <id>` delivers the
-rest. A reporter keeps the credential in memory only, and should deny
-inspection of its process
+delivery fails. What it did not deliver stays pending in the session's
+checkpoint, and `subscribers.json` records it. The hosted run does not replay
+it; a later `putnami sessions replay --session <id>` is a separate invocation
+and needs a reporter credential of its own. A hosted run refuses `--watch`,
+and `serve`, which always watches, because every watch iteration starts after
+repository code ran. A reporter keeps the credential in memory only, and
+should deny inspection of its process
 (`go.putnami.dev/sdk/extension/procguard.DenyInspection`) before it answers
 `initialize`.
 

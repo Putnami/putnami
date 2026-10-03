@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -385,6 +386,25 @@ var ErrHostedExtensionCommand = fmt.Errorf("an extension command group does not 
 	"it resolves its remote cache after the workspace install ran repository code, and a hosted run starts its cache provider before that; "+
 	"run a job command, such as build, or a built-in command, such as install", runcredential.Flag)
 
+// ErrHostedWatch refuses a hosted run (runcredential.Flag) that watches:
+// --watch, or serve, which always watches. Every watch iteration starts after
+// repository code ran, when custody hands the run credential to no new
+// process, so its reporters could never hold it; and a hosted runner runs one
+// finite invocation per fresh sandbox.
+var ErrHostedWatch = fmt.Errorf("--watch and serve do not accept %s: "+
+	"a hosted run is one finite invocation per fresh sandbox, and each watch iteration starts after repository code ran, "+
+	"when no process may receive the run credential; run a finite command, such as build, without --watch", runcredential.Flag)
+
+// refuseHostedWatch refuses, as a usage error, a hosted run whose commands
+// watch: global.Watch, or serve, which the engine always runs in watch mode
+// (ErrHostedWatch).
+func refuseHostedWatch(hosted bool, global *GlobalFlags, commands []string) error {
+	if !hosted || !global.Watch && !slices.Contains(commands, "serve") {
+		return nil
+	}
+	return cmderr.Classify(ErrHostedWatch, cmderr.ErrUsage)
+}
+
 // closeHostedHolders closes the reporters, then the remote cache provider,
 // that a hosted job command started and its run did not adopt.
 func closeHostedHolders(cache *engine.HostedRemoteCache, reporters *engine.HostedReporters) {
@@ -460,10 +480,14 @@ func withAutomaticReadPreparation(ctx context.Context, wsRoot string, cfg *wspro
 // resolveCommandCacheTrust resolves the remote cache authority of a job
 // command. A built-in structured command reads no remote job cache, and an
 // extension command group resolves it once its job command is known, after
-// the first-use bootstrap. A hosted run starts its remote cache provider
-// before the bootstrap's repository code, so it refuses an extension command
-// group here (ErrHostedExtensionCommand).
+// the first-use bootstrap. A hosted run starts its remote cache provider and
+// its reporters before the bootstrap's repository code, so it refuses here,
+// before anything starts, an extension command group
+// (ErrHostedExtensionCommand) and a run that watches (refuseHostedWatch).
 func resolveCommandCacheTrust(global *GlobalFlags, cfg *wsproto.Config, commands []string, subcommand string, extensionGroups map[string]bool) error {
+	if err := refuseHostedWatch(runcredential.Hosted(), global, commands); err != nil {
+		return err
+	}
 	if extensionGroups[commands[0]] && runcredential.Hosted() {
 		return cmderr.Classify(fmt.Errorf("putnami %s: %w", commands[0], ErrHostedExtensionCommand), cmderr.ErrUsage)
 	}

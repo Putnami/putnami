@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,6 +17,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
+	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/layout"
@@ -279,5 +282,42 @@ func TestFlagOffStartsTheReporterAsBefore(t *testing.T) {
 	}
 	if strings.Contains(output, "removed "+protocolcli.SessionReporterTokenEnv) {
 		t.Errorf("a local run removed the reporter token:\n%s", output)
+	}
+}
+
+// A hosted run that watches is refused before anything starts: each watch
+// iteration starts after repository code ran, when its reporters could no
+// longer receive the run credential, and a hosted runner runs one finite
+// invocation per fresh sandbox. `build --watch` and `serve`, which always
+// watches, exit 2 with the named usage error, and no reporter, install, hook
+// or task starts.
+func TestAHostedRunThatWatchesIsRefusedBeforeAnythingStarts(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "no-credential-after-repository-code")
+	clitest.RequireShell(t)
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, args := range map[string]string{
+		"build --watch": "build\n--projects\napp\n--watch",
+		"serve":         "serve\n--projects\napp",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			home := t.TempDir()
+			wsRoot, log := writeReporterFixture(t, home, "reporter")
+			code, output := runEngine(t, self, wsRoot, home, true, custodyArgsEnv+"="+args, "PUTNAMI_NO_AUTO_INSTALL=",
+				protocolcli.SessionReporterEnv+"=@fixture/reporter", protocolcli.SessionReporterTokenEnv+"="+reporterEnvToken)
+			if code != 2 {
+				t.Errorf("hosted %s exit=%d, want 2\n%s", name, code, output)
+			}
+			if want := "putnami: " + cli.ErrHostedWatch.Error(); !strings.Contains(output, want) {
+				t.Errorf("hosted %s output lacks %q:\n%s", name, want, output)
+			}
+			if _, err := os.Stat(log); !errors.Is(err, fs.ErrNotExist) {
+				t.Errorf("hosted %s started a process: log stat err=%v", name, err)
+			}
+		})
 	}
 }

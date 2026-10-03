@@ -222,8 +222,9 @@ ends when repository code starts.
   installers; the `before` hooks and the tasks. The install that
   `putnami build` runs first follows it, and the build reuses that provider
   and those reporters. A run without an install starts its reporters before
-  its first `before` hook, and `putnami sessions replay` starts the reporters
-  it resumes the same way.
+  its first `before` hook. `putnami sessions replay` with `--credential-fd`
+  starts the reporters it resumes the same way, but it is a separate
+  invocation, and this decision defines no hosted replay.
   Every executable that receives the credential is bytes the store held before
   any repository process of the invocation ran, and no path extension's runtime
   starts before the last handoff.
@@ -241,9 +242,14 @@ ends when repository code starts.
   ([ADR 0033](0033-native-session-reporting.md)). A reporter whose command is
   not its native runtime, or that does not accept `initialize` of version 2,
   such as a version 1 reporter, starts without a credential and without its
-  token, and the CLI prints why. A reporter that must start again after
-  repository code ran, after a crash for example, gets no credential: its
-  delivery fails with a custody error, and a replay resumes it.
+  token, and the CLI prints why. The CLI waits at most five seconds for each
+  handshake answer, so a reporter that ignores `initialize` delays the first
+  hook by at most that. A reporter that must start again after repository code
+  ran, after a crash for example, gets no credential: its delivery fails with
+  a custody error. What it did not deliver stays pending in the session's
+  checkpoint, and `subscribers.json` records it. The hosted run does not
+  replay it: a replay is a later invocation, which needs a reporter credential
+  of its own.
 - A hosted runner passes `--credential-fd` to one invocation per fresh sandbox:
   a fresh checkout, `HOME`, artifact store and `TMPDIR`, in a container or VM no
   earlier process outlives. An earlier invocation can leave `.git/config`
@@ -254,9 +260,13 @@ ends when repository code starts.
   lock a hosted run executes as committed, and restarts after the
   `deps-upgrade` hooks.
 - An extension command group refuses `--credential-fd` with a usage error: it
-  resolves its remote cache after the install ran repository code. A hosted run
-  supports job commands, such as `build`, and built-in commands, such as
-  `install`.
+  resolves its remote cache after the install ran repository code.
+- `--watch`, and `serve`, which always watches, refuse `--credential-fd` with a
+  usage error before anything starts. Each watch iteration starts after
+  repository code ran, so no reporter it starts could receive the credential,
+  and a hosted runner runs one finite invocation per fresh sandbox.
+- A hosted run therefore supports finite job commands, such as `build`, and
+  built-in commands, such as `install`.
 
 ## Consequences
 

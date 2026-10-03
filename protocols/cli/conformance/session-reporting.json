@@ -568,6 +568,16 @@
     }
   },
   {
+    "name": "handshake-initialize-empty-credential",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "initialize",
+      "runCredential": ""
+    }
+  },
+  {
     "name": "handshake-authenticate-without-credential",
     "kind": "handshake",
     "valid": false,

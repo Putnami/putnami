@@ -34,6 +34,10 @@ const (
 	v2Reporter = "v2"
 	// v1Reporter parses every line as a chunk, and exits on any other line.
 	v1Reporter = "v1"
+	// silentReporter parses every line as a chunk, and ignores any other line
+	// without an answer: a v1 reporter that keeps reading past a line it cannot
+	// parse.
+	silentReporter = "silent"
 	// refusingReporter accepts initialize and refuses authenticate.
 	refusingReporter = "refuse"
 	// crashingReporter is v2Reporter that exits at its first chunk.
@@ -79,7 +83,7 @@ func TestReporterHolderHelperProcess(t *testing.T) {
 	in.Buffer(make([]byte, 4096), protocolcli.SessionReportingLineBytes)
 	for in.Scan() {
 		record(holderRecord{Line: in.Text()})
-		if mode != v1Reporter {
+		if mode != v1Reporter && mode != silentReporter {
 			if handshake, err := protocolcli.ParseSessionReportingHandshake(in.Bytes()); err == nil {
 				result := handshake.Accept()
 				if mode == refusingReporter && handshake.Op == protocolcli.SessionReportingOpAuthenticate {
@@ -90,6 +94,9 @@ func TestReporterHolderHelperProcess(t *testing.T) {
 			}
 		}
 		chunk, err := protocolcli.ParseSessionReportingChunk(in.Bytes())
+		if err != nil && mode == silentReporter {
+			continue
+		}
 		if err != nil || mode == crashingReporter {
 			os.Exit(21)
 		}
@@ -317,10 +324,13 @@ func TestWithoutACredentialAReporterReadsTheSameFrames(t *testing.T) {
 }
 
 // On a hosted run a reporter that cannot hold the run credential gets none:
-// one that does not accept initialize, such as a v1 reporter, and one that is
-// not its extension's native runtime. Holders.Start names it, and its session
-// is delivered by a process started without a credential. Neither process
-// sees the bearer or a token, in its environment or on its stdin.
+// one that does not accept initialize, such as a v1 reporter that exits on
+// the line or one that ignores it, and one that is not its extension's native
+// runtime. Holders.Start names it, and its session is delivered by a process
+// started without a credential. Neither process sees the bearer or a token,
+// in its environment or on its stdin. A reporter that ignores initialize
+// holds Holders.Start for the operation timeout and no longer; one that exits
+// or does not start returns at once.
 func TestAHostedReporterThatCannotHoldTheCredentialGetsNone(t *testing.T) {
 	spectest.Proves(t, "cli/credential-custody", "providers-receive-it-over-rpc", "a-reporter-that-cannot-hold-it-gets-none")
 	for _, tc := range []struct {
@@ -329,9 +339,13 @@ func TestAHostedReporterThatCannotHoldTheCredentialGetsNone(t *testing.T) {
 		reason     string
 		// started is how many processes Holders.Start starts.
 		started int
+		// waits is whether Holders.Start waits for the operation timeout.
+		waits bool
 	}{
 		{name: "v1 reporter", mode: v1Reporter, runtime: func(self string) string { return self },
 			reason: "did not accept initialize of session reporting protocol 2", started: 1},
+		{name: "silent v1 reporter", mode: silentReporter, runtime: func(self string) string { return self },
+			reason: "did not accept initialize of session reporting protocol 2", started: 1, waits: true},
 		{name: "not the native runtime", mode: v2Reporter, runtime: func(string) string { return "/opt/runtime" },
 			reason: "is not its extension's runtime executable", started: 0},
 	} {
@@ -343,9 +357,17 @@ func TestAHostedReporterThatCannotHoldTheCredentialGetsNone(t *testing.T) {
 			holders := &Holders{}
 			defer holders.Close()
 
+			started := time.Now()
 			failures := holders.Start(ctx, Selected(ctx), fx.resolver())
+			elapsed := time.Since(started)
 			if len(failures) != 1 {
 				t.Fatalf("holder start failures = %d, want 1", len(failures))
+			}
+			if tc.waits && (elapsed < operationTimeout || elapsed > operationTimeout+3*time.Second) {
+				t.Errorf("Holders.Start took %v, want the operation timeout, %v, and no longer", elapsed, operationTimeout)
+			}
+			if !tc.waits && elapsed >= operationTimeout {
+				t.Errorf("Holders.Start took %v, want less than the operation timeout, %v", elapsed, operationTimeout)
 			}
 			for _, want := range []string{"the log reporter of " + holderProvider + " cannot hold the run credential", tc.reason, "it starts without a credential"} {
 				if !strings.Contains(failures[0].Err.Error(), want) {

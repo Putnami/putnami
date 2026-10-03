@@ -178,7 +178,7 @@
       ]
     },
     "handshake": {
-      "description": "An engine line of the v2 handshake. initialize carries no credential; authenticate carries the run credential of a hosted run, at most 16384 bytes of UTF-8.",
+      "description": "An engine line of the v2 handshake. initialize carries no credential; authenticate carries the run credential of a hosted run. maxLength bounds the credential in characters; the Go and TypeScript parsers also bound its UTF-8 encoding to 16384 bytes.",
       "type": "object",
       "additionalProperties": false,
       "required": [
