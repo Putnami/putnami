@@ -25,6 +25,7 @@
     "typescript/typescript-project-toolchain#serve-entrypoint",
     "typescript/typescript-project-toolchain#serve-supervision",
     "typescript/typescript-project-toolchain#structured-reports",
+    "typescript/typescript-project-toolchain#upgrade-reports-unresolved-packages",
     "typescript/typescript-project-toolchain#upgrade-table-shows-source-revision",
     "typescript/typescript-project-toolchain#workspace-biome-default",
     "typescript/typescript-project-toolchain#workspace-bun-pin",

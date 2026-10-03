@@ -27,16 +27,14 @@ var exactNPMVersionPattern = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+([-.+]
 
 const cliUserAgentEnv = "PUTNAMI_CLI_USER_AGENT"
 
-// npmPackumentMaxBytes bounds one packument (the package metadata document).
-// A packument lists every published version, so it grows with each release:
-// several @putnami/* packuments already exceed 2 MiB with a credential. The
-// bound only guards against an endless response; it sits far above any real
-// packument.
-const npmPackumentMaxBytes = 64 << 20
+// npmPackumentMaxBytes is the largest packument (the package metadata
+// document) the dist-tag lookup reads, in decoded bytes. A packument lists
+// every published version, so the bound sits far above any real one and only
+// limits memory.
+var npmPackumentMaxBytes int64 = 64 << 20
 
-// npmPackumentAccept asks for the abbreviated packument, which still carries
-// dist-tags, the way npm itself does. A registry that ignores it answers with
-// the full document.
+// npmPackumentAccept prefers the abbreviated packument, which carries
+// dist-tags, and accepts the full one.
 const npmPackumentAccept = "application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*"
 
 const upgradeReleaseSetParam = "releaseSet"
@@ -332,10 +330,14 @@ func resolvePutnamiNPMVersion(ctx context.Context, wsRoot string, declared npmRe
 
 	registry := resolvePutnamiNPMRegistry(declared, packageName)
 	host := npmRegistryHost(registry)
+	token := npmRegistryAuthToken(wsRoot, registry)
 	fail := func(reason string, status int, cause error) error {
 		message := fmt.Sprintf("dist-tag %q for %s: %s (registry %s", target, packageName, reason, host)
 		if status != 0 {
 			message += fmt.Sprintf(", HTTP %d", status)
+		}
+		if token == "" {
+			message += ", no credential sent"
 		}
 		message += ")"
 		if cause != nil {
@@ -355,7 +357,7 @@ func resolvePutnamiNPMVersion(ctx context.Context, wsRoot string, declared npmRe
 	// Anonymous metadata hides the versions a private registry only shows to an
 	// authenticated client, which reports a published channel as missing. Present
 	// the same _authToken npm itself would use.
-	if token := npmRegistryAuthToken(wsRoot, registry); token != "" {
+	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
@@ -378,8 +380,8 @@ func resolvePutnamiNPMVersion(ctx context.Context, wsRoot string, declared npmRe
 	if err != nil {
 		return "", fail("packument is not readable", resp.StatusCode, err)
 	}
-	if len(body) > npmPackumentMaxBytes {
-		return "", fail(fmt.Sprintf("packument is larger than %d MiB", npmPackumentMaxBytes>>20), resp.StatusCode, nil)
+	if int64(len(body)) > npmPackumentMaxBytes {
+		return "", fail(fmt.Sprintf("packument is larger than %d bytes", npmPackumentMaxBytes), resp.StatusCode, nil)
 	}
 	var metadata struct {
 		DistTags map[string]string `json:"dist-tags"`
@@ -394,9 +396,9 @@ func resolvePutnamiNPMVersion(ctx context.Context, wsRoot string, declared npmRe
 	return version, nil
 }
 
-// npmUnpublishedError marks a package the registry does not publish on the
-// requested channel: the registry answered, and the package or its dist-tag is
-// absent. It is the only lookup failure the upgrade skips.
+// npmUnpublishedError marks a package the registry answers as absent, or
+// whose packument has no dist-tag for the channel. It is the only lookup
+// failure the upgrade skips.
 type npmUnpublishedError struct{ err error }
 
 func (e *npmUnpublishedError) Error() string { return e.err.Error() }
@@ -451,10 +453,6 @@ func resolvePutnamiNPMVersions(ctx context.Context, wsRoot string, declared npmR
 		var unpublished *npmUnpublishedError
 		switch {
 		case errors.As(err, &unpublished):
-			// A package the channel does not publish (e.g. a stale catalog entry)
-			// keeps its version rather than aborting the whole upgrade. The
-			// warning diagnostic reaches the default output, so the package does
-			// not stay behind silently.
 			emit.Diagnostic("warning", fmt.Sprintf("%s keeps its current version: %v", pkg, err), "", 0)
 		case err != nil:
 			failures = append(failures, err.Error())
@@ -462,16 +460,13 @@ func resolvePutnamiNPMVersions(ctx context.Context, wsRoot string, declared npmR
 			versions[pkg] = version
 		}
 	}
-	// Any other failure (unreachable registry, refused credential, unreadable
-	// packument) would leave a published package behind and mix framework
-	// versions: stop before anything is written.
+	// Any other lookup failure fails the whole resolution, before anything is
+	// written.
 	if len(failures) > 0 {
 		return nil, fmt.Errorf("could not resolve %d @putnami/* package(s): %s", len(failures), strings.Join(failures, "; "))
 	}
-	// Nothing published at all points at the selector, not one package —
-	// surface that as a hard failure.
 	if len(versions) == 0 && len(packages) > 0 {
-		return nil, fmt.Errorf("channel %q publishes none of the referenced @putnami/* packages", target)
+		return nil, fmt.Errorf("no referenced @putnami/* package resolved %q", target)
 	}
 	return versions, nil
 }

@@ -82,11 +82,11 @@ carries the credential the `go` command would send to the origin, the
 `machine <host>` entry of your netrc file, so a private origin answers it; an
 anonymous refusal names the missing credential.
 
-An npm package the channel does not publish, because the registry has no such
-package or no such dist-tag for it, keeps its current version, and the upgrade
-prints a warning that names it. Any other npm failure, such as a refused
-credential or an unreadable packument (the package metadata document), stops
-the upgrade before it writes anything.
+An npm package the registry does not have keeps its current version. So does
+a package with no dist-tag for the channel. The upgrade prints a warning that
+names each such package, and notes when it sent no credential. Any other npm
+failure stops the upgrade before it writes anything: a refused credential, a
+server error, or an unreadable packument (the package metadata document).
 
 The dependency run stops at the first failing ecosystem, so a
 channel npm serves and the Go origin does not moves neither; pass

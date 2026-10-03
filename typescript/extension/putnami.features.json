@@ -460,6 +460,21 @@
           }
         },
         {
+          "id": "upgrade-reports-unresolved-packages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-large-packument-resolves",
+              "an-unpublished-package-is-warned-and-kept",
+              "any-other-lookup-failure-stops-the-upgrade"
+            ]
+          }
+        },
+        {
           "id": "upgrade-table-shows-source-revision",
           "stage": "coded",
           "evidenceKinds": [
