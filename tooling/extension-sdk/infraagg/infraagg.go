@@ -30,10 +30,17 @@
 //     removal, overrides, validation, and the atomic write. That policy is
 //     identical for every language, and three copies of it would drift.
 //
-// Nothing here is fatal. A malformed contribution, a merge conflict, a
+// Nothing in Aggregate is fatal. A malformed contribution, a merge conflict, a
 // validation finding and a failed write all come back as diagnostics: a build
 // that produced binaries must not be failed by a deployability manifest, and a
 // finding nobody sees is worse than one attributed to its project.
+//
+// Deployment derives the same manifest from the same committed files and
+// writes it as the workload's deployment declaration, the canonical bytes a
+// release set carries as a member of kind deployment. It never touches the
+// defaults sidecar, so it can run beside Aggregate. It writes a declaration
+// only for an aggregate without an error finding, and it removes an earlier
+// one otherwise, so the file on disk never describes other inputs.
 package infraagg
 
 import (
@@ -157,22 +164,9 @@ func Aggregate(ctx *pctx.Context, opts Options) Result {
 		return Result{Outcome: OutcomeCleared, ManifestPath: manifestPath, Diagnostics: diags}
 	}
 
-	merged, mergeDiags := infra.Merge(ctx.Project.Name, contributions)
-	diags = append(diags, mergeDiags...)
-
-	// Apply workload-level suppression rules so an owner can drop a
-	// requirement a library or framework generator declared.
-	merged, overrideDiags := applyWorkloadOverrides(workloadRoot, merged)
-	diags = append(diags, overrideDiags...)
-
-	if runtime != nil {
-		merged = infra.WithRuntime(merged, runtime)
-	}
+	merged, assembleDiags := assemble(ctx.Project.Name, workloadRoot, contributions, runtime)
+	diags = append(diags, assembleDiags...)
 	merged.Schema = AggregatedSchemaURL
-
-	// Validate the assembled artifact as a safety net (e.g. negative scaling
-	// from the runtime file). Findings are surfaced, not fatal.
-	diags = append(diags, infra.ValidateAggregatedManifest(&merged)...)
 
 	if err := writeAggregatedManifest(manifestPath, merged); err != nil {
 		diags = append(diags, diag.Errorf(infra.ErrorCodeParseError, "",
@@ -184,6 +178,29 @@ func Aggregate(ctx *pctx.Context, opts Options) Result {
 		Contributions: len(contributions),
 		Diagnostics:   diags,
 	}
+}
+
+// assemble is the pure half of an aggregation: it merges the contributions,
+// applies the workload's overrides, attaches the runtime block, and validates
+// the result. It reads the workload's committed overrides file and writes
+// nothing, so Aggregate and Deployment derive the same manifest from the same
+// committed files. The returned manifest carries no $schema.
+func assemble(workload, workloadRoot string, contributions []infra.ProjectContribution, runtime *infra.Runtime) (infra.AggregatedManifest, []diag.Diagnostic) {
+	merged, diags := infra.Merge(workload, contributions)
+
+	// Apply workload-level suppression rules so an owner can drop a
+	// requirement a library or framework generator declared.
+	merged, overrideDiags := applyWorkloadOverrides(workloadRoot, merged)
+	diags = append(diags, overrideDiags...)
+
+	if runtime != nil {
+		merged = infra.WithRuntime(merged, runtime)
+	}
+
+	// Validate the assembled artifact as a safety net (e.g. negative scaling
+	// from the runtime file). The caller decides what a finding costs.
+	diags = append(diags, infra.ValidateAggregatedManifest(&merged)...)
+	return merged, diags
 }
 
 // AggregatedManifestPath is the workload's aggregated manifest location.
@@ -260,43 +277,65 @@ func loadContribution(path, project string) (*infra.ProjectContribution, []diag.
 }
 
 // sourceRuntime resolves the workload-only runtime block for the aggregated
-// manifest. Resolution order:
+// manifest (see resolveRuntime) and keeps the defaults sidecar in step with it:
 //
-//  1. <workload>/infra/runtime.json (developer-authored) — wins when present,
-//     then the language's runtime compatibility constraints are applied.
-//  2. <workload>/.gen/infra/runtime.json (framework defaults) — synthesized and
-//     written here when no developer file exists, so deployers and operators
-//     can see the values the workload will run under. The defaults are
-//     re-emitted on every build to track changes in infra.DefaultRuntime() and
-//     in the language's compatibility constraints.
+//  1. <workload>/infra/runtime.json (developer-authored) wins when present; any
+//     stale <workload>/.gen/infra/runtime.json is removed so operators never
+//     see two competing values on disk.
+//  2. Otherwise the synthesized defaults are written to
+//     <workload>/.gen/infra/runtime.json, so deployers and operators can see the
+//     values the workload will run under. The defaults are re-emitted on every
+//     build to track changes in infra.DefaultRuntime() and in the language's
+//     compatibility constraints.
 //
-// A missing developer file is not an error; a malformed one yields diagnostics.
-// Scaling-range validation happens later via ValidateAggregatedManifest on the
-// assembled artifact.
+// A failed sidecar removal or write costs the runtime block and yields that one
+// diagnostic.
 func sourceRuntime(workloadRoot string, opts Options) (*infra.Runtime, []diag.Diagnostic) {
-	developerPath := filepath.Join(workloadRoot, infra.PerProjectManifestDir, RuntimeManifestFilename)
-	defaultsPath := filepath.Join(workloadRoot, infra.AggregatedManifestDir,
-		infra.PerProjectManifestDir, RuntimeManifestFilename)
+	runtime, authored, diags := resolveRuntime(workloadRoot, opts)
+	defaultsPath := runtimeDefaultsPath(workloadRoot)
 
-	if _, err := os.Stat(developerPath); err == nil {
-		// Developer-authored runtime wins; drop any stale defaults sidecar so
-		// operators don't see two competing values on disk.
+	if authored {
 		if err := robustio.Remove(defaultsPath); err != nil && !os.IsNotExist(err) {
 			return nil, []diag.Diagnostic{diag.Errorf(infra.ErrorCodeParseError, "",
 				"remove stale runtime defaults %s: %v", defaultsPath, err)}
 		}
+		return runtime, diags
+	}
+
+	if err := writeRuntimeDefaults(defaultsPath, runtime); err != nil {
+		return nil, []diag.Diagnostic{diag.Errorf(infra.ErrorCodeParseError, "",
+			"write runtime defaults %s: %v", defaultsPath, err)}
+	}
+	return runtime, diags
+}
+
+// resolveRuntime returns the workload-only runtime block and whether the
+// developer authored it, without writing anything:
+//
+//  1. <workload>/infra/runtime.json (developer-authored) wins when present,
+//     then the language's runtime compatibility constraints are applied.
+//  2. Otherwise infra.DefaultRuntime(), with the same constraints applied.
+//
+// A missing developer file is not an error; a malformed one yields diagnostics
+// and no block. Scaling-range validation happens later via
+// ValidateAggregatedManifest on the assembled artifact.
+func resolveRuntime(workloadRoot string, opts Options) (*infra.Runtime, bool, []diag.Diagnostic) {
+	developerPath := filepath.Join(workloadRoot, infra.PerProjectManifestDir, RuntimeManifestFilename)
+	if _, err := os.Stat(developerPath); err == nil {
 		rt, diags := readRuntimeFile(developerPath)
 		applyRuntimeCompatibility(rt, opts)
-		return rt, diags
+		return rt, true, diags
 	}
 
 	defaults := infra.DefaultRuntime()
 	applyRuntimeCompatibility(defaults, opts)
-	if err := writeRuntimeDefaults(defaultsPath, defaults); err != nil {
-		return nil, []diag.Diagnostic{diag.Errorf(infra.ErrorCodeParseError, "",
-			"write runtime defaults %s: %v", defaultsPath, err)}
-	}
-	return defaults, nil
+	return defaults, false, nil
+}
+
+// runtimeDefaultsPath is the workload's framework-generated runtime defaults
+// sidecar.
+func runtimeDefaultsPath(workloadRoot string) string {
+	return filepath.Join(workloadRoot, infra.AggregatedManifestDir, infra.PerProjectManifestDir, RuntimeManifestFilename)
 }
 
 func applyRuntimeCompatibility(rt *infra.Runtime, opts Options) {

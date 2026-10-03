@@ -2,6 +2,7 @@ package infraagg
 
 import (
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/infra"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -45,11 +46,50 @@ func Job(opts Options) cli.JobFunc {
 	}
 }
 
+// DeploymentPhaseName is the phase every language's deployment declaration
+// task reports under.
+const DeploymentPhaseName = "deployment"
+
+// DeploymentJob adapts Deployment to an extension job entry point, the whole
+// body of a language's deployment package step, with the language supplying
+// only its runtime compatibility:
+//
+//	"package-deployment": infraagg.DeploymentJob(infraagg.Options{RuntimeCompatibility: noHTTP2})
+//
+// It reports OK when it wrote the declaration, and SKIP for a project that is
+// not a workload and for a withheld aggregate, whose findings it reports as
+// warnings, exactly as Job does. A step that writes no declaration does not
+// fail: the publisher that needs the declaration refuses its absence. A failed
+// write or removal fails the task, because it can leave an earlier declaration
+// in place.
+func DeploymentJob(opts Options) cli.JobFunc {
+	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
+		emit.PhaseStart(DeploymentPhaseName)
+		result, err := Deployment(ctx, opts)
+		reportDiagnosticsWithPrefix(emit, "deployment declaration: ", result.Diagnostics)
+		if err != nil {
+			emit.PhaseEnd(DeploymentPhaseName, "failed")
+			return "FAILED", result.Data(), err
+		}
+		if result.Outcome != OutcomeEmitted {
+			emit.PhaseEnd(DeploymentPhaseName, "skipped")
+			return "SKIP", result.Data(), nil
+		}
+		emit.PhaseEnd(DeploymentPhaseName, "success")
+		emit.Artifact("deployment-declaration", infra.DeploymentFilename, "manifest", result.ManifestPath)
+		return "OK", result.Data(), nil
+	}
+}
+
 // reportDiagnostics forwards each finding, prefixed so a reader knows which
 // subsystem produced it and carrying the protocol's own severity and code in
 // the message (diag.Diagnostic.String()).
 func reportDiagnostics(emit *jsonl.Emitter, diags []diag.Diagnostic) {
+	reportDiagnosticsWithPrefix(emit, "infra requirements: ", diags)
+}
+
+func reportDiagnosticsWithPrefix(emit *jsonl.Emitter, prefix string, diags []diag.Diagnostic) {
 	for _, d := range diags {
-		emit.Warn("infra requirements: " + d.String())
+		emit.Warn(prefix + d.String())
 	}
 }

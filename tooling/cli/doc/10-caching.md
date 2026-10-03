@@ -1042,8 +1042,9 @@ and runs tasks serially so each task's filesystem observation has one owner:
    for that project, not the writing task's own outputs alone. That matches the
    one-owner-per-output model the manifests declare: `build-generate` is the
    single producer of `<project>/.gen` and declares that subtree whole minus
-   the subpaths it cedes (to `build-describe`, and `.gen/conf` to the two
-   `config-merge` tasks, which declare the merged file inside it), while
+   the subpaths it cedes (to `build-describe`, `.gen/conf` to the two
+   `config-merge` tasks, which declare the merged file inside it, and
+   `.gen/deployment.json` to `package-deployment`, which declares it), while
    `build-describe`'s staging and `build-infra`'s requirements write inside it
    and declare nothing. What the
    check still catches is a write that escapes the project's declared surface
