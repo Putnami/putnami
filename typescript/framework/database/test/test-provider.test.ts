@@ -424,6 +424,7 @@ describe('selectDatasources', () => {
     );
     expect(err).toBeInstanceOf(Error);
     expect(err?.message).not.toContain('broken');
+    expect(err?.message).toMatch(/ECONNREFUSED/);
   });
 
   it('does not take an inherited property for a datasource', () => {
