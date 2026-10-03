@@ -497,5 +497,256 @@
       "sha256": "489fa9634d3d8ba23b49e7bf7cef9d2679e719d496133b36298467ea71a7624e",
       "final": false
     }
+  },
+  {
+    "name": "handshake-initialize",
+    "kind": "handshake",
+    "valid": true,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "initialize"
+    }
+  },
+  {
+    "name": "handshake-authenticate",
+    "kind": "handshake",
+    "valid": true,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "runCredential": "hosted-run-credential-7c1e"
+    }
+  },
+  {
+    "name": "handshake-authenticate-byte-order-mark",
+    "kind": "handshake",
+    "valid": true,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "runCredential": "hosted\ufeffcredential"
+    }
+  },
+  {
+    "name": "handshake-version-1",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 1,
+      "op": "initialize"
+    }
+  },
+  {
+    "name": "handshake-unknown-op",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "shutdown"
+    }
+  },
+  {
+    "name": "handshake-unknown-field",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "initialize",
+      "capabilities": [
+        "run-credential"
+      ]
+    }
+  },
+  {
+    "name": "handshake-initialize-with-credential",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "initialize",
+      "runCredential": "hosted-run-credential-7c1e"
+    }
+  },
+  {
+    "name": "handshake-authenticate-without-credential",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate"
+    }
+  },
+  {
+    "name": "handshake-authenticate-empty-credential",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "runCredential": ""
+    }
+  },
+  {
+    "name": "handshake-authenticate-null-credential",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "runCredential": null
+    }
+  },
+  {
+    "name": "handshake-authenticate-space-credential",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "runCredential": "hosted run"
+    }
+  },
+  {
+    "name": "handshake-authenticate-no-break-space-credential",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "runCredential": "hosted\u00a0run"
+    }
+  },
+  {
+    "name": "handshake-authenticate-next-line-credential",
+    "kind": "handshake",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "runCredential": "hosted\u0085run"
+    }
+  },
+  {
+    "name": "handshake-initialize-accepted",
+    "kind": "handshake-result",
+    "valid": true,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "initialize",
+      "ok": true
+    }
+  },
+  {
+    "name": "handshake-authenticate-accepted",
+    "kind": "handshake-result",
+    "valid": true,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "ok": true
+    }
+  },
+  {
+    "name": "handshake-authenticate-refused",
+    "kind": "handshake-result",
+    "valid": true,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "ok": false,
+      "code": "unauthorized"
+    }
+  },
+  {
+    "name": "handshake-result-version-1",
+    "kind": "handshake-result",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 1,
+      "op": "initialize",
+      "ok": true
+    }
+  },
+  {
+    "name": "handshake-result-unknown-op",
+    "kind": "handshake-result",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "shutdown",
+      "ok": true
+    }
+  },
+  {
+    "name": "handshake-result-accepted-with-code",
+    "kind": "handshake-result",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "initialize",
+      "ok": true,
+      "code": "unauthorized"
+    }
+  },
+  {
+    "name": "handshake-result-refused-without-code",
+    "kind": "handshake-result",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "ok": false
+    }
+  },
+  {
+    "name": "handshake-result-refused-with-message",
+    "kind": "handshake-result",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "ok": false,
+      "code": "Bearer hosted-run-credential-7c1e"
+    }
+  },
+  {
+    "name": "handshake-result-unknown-field",
+    "kind": "handshake-result",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "initialize",
+      "ok": true,
+      "message": "ready"
+    }
+  },
+  {
+    "name": "initialize-is-not-a-chunk",
+    "kind": "chunk",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "initialize"
+    }
+  },
+  {
+    "name": "authenticate-is-not-a-chunk",
+    "kind": "chunk",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "authenticate",
+      "runCredential": "hosted-run-credential-7c1e"
+    }
+  },
+  {
+    "name": "handshake-result-is-not-an-ack",
+    "kind": "ack",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 2,
+      "op": "initialize",
+      "ok": true
+    }
   }
 ]

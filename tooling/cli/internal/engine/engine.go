@@ -344,6 +344,11 @@ type Request struct {
 	// provider before the implicit install's first repository code. Nil gives
 	// the run one of its own. The adapter closes it.
 	HostedRemoteCache *HostedRemoteCache
+	// HostedReporters are the reporters a hosted run hands the run credential
+	// when its adapter shares them with the first-use bootstrap, which starts
+	// them before the implicit install's first repository code. Nil gives the
+	// run its own, started before its first hook. The adapter closes them.
+	HostedReporters *HostedReporters
 	// hostedRemote is the remote cache whose provider a hosted run started
 	// before its first hook (HostedRemoteCache.Start), or nil. Every stage of
 	// the run that reads the remote cache reads it through this one; execute
@@ -588,6 +593,13 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 		return SessionResult{ExitCode: ExitError}, err
 	}
 	req.hostedRemote = hostedRemote
+	// Its reporters start before the first hook too, so that each can hold
+	// the run credential; the session's reporting adopts them.
+	if req.HostedReporters == nil {
+		req.HostedReporters = &HostedReporters{}
+		defer req.HostedReporters.Close()
+	}
+	req.HostedReporters.Start(ctx, req)
 
 	if err := runBeforeHooks(ctx, req, verbose); err != nil {
 		return SessionResult{ExitCode: ExitError}, err

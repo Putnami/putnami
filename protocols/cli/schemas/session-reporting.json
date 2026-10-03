@@ -8,6 +8,12 @@
     },
     {
       "$ref": "#/$defs/ack"
+    },
+    {
+      "$ref": "#/$defs/handshake"
+    },
+    {
+      "$ref": "#/$defs/handshakeResult"
     }
   ],
   "$defs": {
@@ -162,6 +168,106 @@
                 "const": false
               }
             },
+            "not": {
+              "required": [
+                "code"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "handshake": {
+      "description": "An engine line of the v2 handshake. initialize carries no credential; authenticate carries the run credential of a hosted run, at most 16384 bytes of UTF-8.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "op"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": 2
+        },
+        "op": {
+          "enum": [
+            "initialize",
+            "authenticate"
+          ]
+        },
+        "runCredential": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384,
+          "pattern": "^[^\\t\\n\\u000b\\f\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+(?![\\s\\S])"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "authenticate"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "runCredential"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "runCredential"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "handshakeResult": {
+      "description": "A reporter's answer to one handshake line.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "op",
+        "ok"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": 2
+        },
+        "op": {
+          "enum": [
+            "initialize",
+            "authenticate"
+          ]
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ok": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "code"
+            ]
+          },
+          "else": {
             "not": {
               "required": [
                 "code"

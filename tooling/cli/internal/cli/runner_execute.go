@@ -90,16 +90,23 @@ func (a *App) runBoundRequest(ctx context.Context, wsRoot string, cfg *wsproto.C
 		return ExitError
 	}
 	defer stopProviders()
-	// A hosted request reads the remote cache through one provider, which the
-	// bootstrap starts before the implicit install's first repository code.
+	// A hosted request reads the remote cache through one provider, and hands
+	// its reporters the run credential, which the bootstrap starts before the
+	// implicit install's first repository code.
 	hostedCache := &engine.HostedRemoteCache{}
 	defer hostedCache.Close()
+	hostedReporters := &engine.HostedReporters{}
+	defer hostedReporters.Close()
 	lifecycle.EnsureWorkspaceBootstrap(ctx, wsRoot, cfg, lifecycle.BootstrapOptions{
 		Command: request.Invocation.Commands[0], Output: bootstrapGlobal.Output,
 		Display: bootstrapLifecycleDisplay(bootstrapGlobal), RunJob: RunWorkspaceJob,
 		BeforeRepositoryCode: func(ctx context.Context) error {
-			_, err := hostedCache.Start(ctx, &engine.Request{WorkspaceRoot: wsRoot, Config: cfg, Global: global})
-			return err
+			req := &engine.Request{WorkspaceRoot: wsRoot, Config: cfg, Global: global}
+			if _, err := hostedCache.Start(ctx, req); err != nil {
+				return err
+			}
+			hostedReporters.Start(ctx, req)
+			return nil
 		},
 	})
 	result, _ := engine.New().Run(ctx, engine.Request{
@@ -110,6 +117,7 @@ func (a *App) runBoundRequest(ctx context.Context, wsRoot string, cfg *wsproto.C
 		CommandParams:     params,
 		Hooks:             cfg.Hooks,
 		HostedRemoteCache: hostedCache,
+		HostedReporters:   hostedReporters,
 		// No observer (ADR 0001 §4): the submitter's placement is the user's
 		// run, and the executing side must not report a second session for it.
 		Preflight:       doctor.DoctorPreflight,

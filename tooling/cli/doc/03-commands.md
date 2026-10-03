@@ -1349,10 +1349,13 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
 - **Nothing is kept.** The CLI closes the descriptor once it has read it, so no
   process it starts inherits it. The credential goes in no environment variable
   and no file, and the CLI never prints it. With the flag, the CLI also removes
-  `PUTNAMI_CACHE_TOKEN` and `PUTNAMI_CLOUD_TOKEN` from its environment, so no
-  process it starts receives either token. For each variable that held a
-  value, one line on stderr says so. A job that publishes with
-  `PUTNAMI_CLOUD_TOKEN` therefore fails on a run with the flag.
+  `PUTNAMI_CACHE_TOKEN`, `PUTNAMI_CLOUD_TOKEN`,
+  `PUTNAMI_SESSION_REPORTER_TOKEN` and `PUTNAMI_LOG_REPORTER_TOKEN` from its
+  environment, so no process it starts receives any of them. For each
+  variable that held a value, one line on stderr says so. A job that publishes
+  with `PUTNAMI_CLOUD_TOKEN` therefore fails on a run with the flag. A
+  session reporter or log reporter receives the run credential over its
+  protocol instead ([session reporting](16-session-reporting.md#hosted-runs)).
 - **The same invocation keeps it.** When the CLI replaces itself with the
   pinned CLI of the workspace, or restarts into the CLI `upgrade` just
   installed, the next image receives the credential on a new descriptor, and
@@ -1423,8 +1426,10 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
   of a runtime toolchain that its manifest declares has started, the CLI
   gives the credential to no new process: a fetch job, a cache provider or a
   credential provider that would receive it later fails the run with an
-  error that names both. With the flag, the store extensions' dependency fetch runs
-  first, then the remote cache provider starts, then the path extensions'
+  error that names both, and a reporter that would receive it later fails
+  its delivery. With the flag, the store extensions' dependency fetch runs
+  first, then the remote cache provider starts, then the selected reporters
+  start, then the path extensions'
   `workspace-fetch`, then the install hooks, the installers, the `before`
   hooks and the tasks. Only the store extensions' dependency fetch receives
   the job credential. It starts no path extension's runtime. A path
@@ -1447,8 +1452,11 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
   once it runs. A hosted run with a remote cache therefore needs an
   `@putnami/cloud` release whose `cache-provider` task runs
   `{extensionRuntime}`: move its pin with `putnami upgrade`, run without the
-  flag, and commit the lock. Without the flag, a provider starts as its task
-  declares.
+  flag, and commit the lock. A session reporter or a log reporter follows
+  the same rule but does not fail the run: one that is not its native
+  runtime, or that does not speak session reporting v2, starts without a
+  credential and without its token, and the CLI prints why. Without the
+  flag, a provider starts as its task declares.
 - **`putnami upgrade` refuses the flag.** An upgrade rewrites the lock that a
   hosted run executes as committed. Upgrade without the flag and commit the
   lock.

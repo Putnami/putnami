@@ -333,10 +333,11 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// own — and the guard is inert under --plan/--dry-run and best-effort.
 	bootstrapGlobal := parsed.Global
 	engine.ApplyEnvOverrides(&bootstrapGlobal, cfg)
-	// A hosted job command reads the remote cache through one provider, which
-	// the bootstrap starts before the implicit install's first repository code.
-	hostedCache := &engine.HostedRemoteCache{}
-	defer hostedCache.Close()
+	// A hosted job command reads the remote cache through one provider, and
+	// hands its reporters the run credential, which the bootstrap starts
+	// before the implicit install's first repository code.
+	hostedCache, hostedReporters := &engine.HostedRemoteCache{}, &engine.HostedReporters{}
+	defer closeHostedHolders(hostedCache, hostedReporters)
 	if !providerMode && wsRoot != "" && !isStructuredCommand(parsed.Commands[0]) {
 		lifecycle.EnsureWorkspaceBootstrap(ctx, wsRoot, cfg, lifecycle.BootstrapOptions{
 			Command:    parsed.Commands[0],
@@ -350,7 +351,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 			RunJob:               RunWorkspaceJob,
 			Plan:                 bootstrapGlobal.Plan,
 			DryRun:               bootstrapGlobal.DryRun,
-			BeforeRepositoryCode: startHostedCacheOfJobCommand(hostedCache, parsed, extensionGroups, wsRoot, cfg),
+			BeforeRepositoryCode: startHostedHoldersOfJobCommand(hostedCache, hostedReporters, parsed, extensionGroups, wsRoot, cfg),
 		})
 	}
 
@@ -374,7 +375,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		return noWorkspaceFound(os.Stderr)
 	}
 
-	return a.runTerminalSession(ctx, cfg, parsed, wsRoot, hostedCache)
+	return a.runTerminalSession(ctx, cfg, parsed, wsRoot, hostedCache, hostedReporters)
 }
 
 // ErrHostedExtensionCommand refuses an extension command group on a hosted
@@ -384,20 +385,32 @@ var ErrHostedExtensionCommand = fmt.Errorf("an extension command group does not 
 	"it resolves its remote cache after the workspace install ran repository code, and a hosted run starts its cache provider before that; "+
 	"run a job command, such as build, or a built-in command, such as install", runcredential.Flag)
 
-// startHostedCacheOfJobCommand is the first-use bootstrap's
+// closeHostedHolders closes the reporters, then the remote cache provider,
+// that a hosted job command started and its run did not adopt.
+func closeHostedHolders(cache *engine.HostedRemoteCache, reporters *engine.HostedReporters) {
+	reporters.Close()
+	cache.Close()
+}
+
+// startHostedHoldersOfJobCommand is the first-use bootstrap's
 // BeforeRepositoryCode for a job command: it starts the provider of the remote
-// cache the command's run then reads (engine.Request.HostedRemoteCache), with
-// the flags that run has. An extension command group resolves its cache trust
-// only once its job command is known, and its run starts its own provider, so
-// its bootstrap starts none; a hosted run refuses it before the bootstrap
-// (ErrHostedExtensionCommand).
-func startHostedCacheOfJobCommand(hosted *engine.HostedRemoteCache, parsed *ParsedArgs, extensionGroups map[string]bool, wsRoot string, cfg *wsproto.Config) func(context.Context) error {
+// cache the command's run then reads (engine.Request.HostedRemoteCache), then
+// the reporters that run's session adopts (engine.Request.HostedReporters),
+// with the flags that run has. An extension command group resolves its cache
+// trust only once its job command is known, and its run starts its own
+// provider, so its bootstrap starts none; a hosted run refuses it before the
+// bootstrap (ErrHostedExtensionCommand).
+func startHostedHoldersOfJobCommand(hosted *engine.HostedRemoteCache, reporters *engine.HostedReporters, parsed *ParsedArgs, extensionGroups map[string]bool, wsRoot string, cfg *wsproto.Config) func(context.Context) error {
 	if extensionGroups[parsed.Commands[0]] {
 		return nil
 	}
 	return func(ctx context.Context) error {
-		_, err := hosted.Start(ctx, &engine.Request{WorkspaceRoot: wsRoot, Config: cfg, Global: parsed.Global})
-		return err
+		req := &engine.Request{WorkspaceRoot: wsRoot, Config: cfg, Global: parsed.Global}
+		if _, err := hosted.Start(ctx, req); err != nil {
+			return err
+		}
+		reporters.Start(ctx, req)
+		return nil
 	}
 }
 
@@ -787,7 +800,7 @@ func projectPathsForRoot(wsRoot string) []string {
 // named runWithConfigHooks until a rework moved the lifecycle hooks it
 // used to bracket into Engine.Run, next to the version stamp that has to be read
 // before a hook can dirty the tree.
-func (a *App) runTerminalSession(ctx context.Context, cfg *wsproto.Config, parsed *ParsedArgs, wsRoot string, hostedCache *engine.HostedRemoteCache) (exitCode int) {
+func (a *App) runTerminalSession(ctx context.Context, cfg *wsproto.Config, parsed *ParsedArgs, wsRoot string, hostedCache *engine.HostedRemoteCache, hostedReporters *engine.HostedReporters) (exitCode int) {
 	telemetryStartedAt := time.Now()
 	tc := telemetry.NewClient()
 	interactive := stderrIsTTY()
@@ -814,5 +827,5 @@ func (a *App) runTerminalSession(ctx context.Context, cfg *wsproto.Config, parse
 	// this call are engine stages now: the stamp has to be read before the
 	// before-hooks can dirty the tree, so the two belong to the same
 	// owner. What stays here is the once-per-process telemetry session above.
-	return a.runJobCommands(ctx, parsed, cfg, wsRoot, tc, interactive, hostedCache)
+	return a.runJobCommands(ctx, parsed, cfg, wsRoot, tc, interactive, hostedCache, hostedReporters)
 }

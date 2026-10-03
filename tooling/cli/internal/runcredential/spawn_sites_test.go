@@ -107,8 +107,6 @@ var spawnSites = map[string]spawnSite{
 		why: "an extension tool runs in the workspace"},
 	"runnerprovider/session.go:Spawn": {spawns: 1, verdict: marked, by: "runnerprovider/launch.go:LaunchSpecFor",
 		why: "the runner provider of an extension not installed from the artifact store"},
-	"sessionreporter/process.go:spawn": {spawns: 1, verdict: marked, by: "engine/session_reporting.go:reportingResolver",
-		why: "the session reporter of an extension not installed from the artifact store"},
 	"workspace/probe_exec.go:(*ExecProbeProvider).Probe": {spawns: 1, verdict: marked, by: "workspace/probe_exec.go:(*ExecProbeProvider).Probe",
 		why: "the workspace probe of an extension not installed from the artifact store"},
 
@@ -117,6 +115,10 @@ var spawnSites = map[string]spawnSite{
 		native: true, why: "the remote cache provider"},
 	"credentialprovider/session.go:Spawn": {spawns: 1, verdict: holder, by: "credentialprovider/resolve.go:New",
 		native: true, why: "the credential provider"},
+	"sessionreporter/process.go:spawn": {spawns: 1, verdict: holder, by: "sessionreporter/holder.go:startHolder",
+		native: true, why: "the session reporter and the log reporter; a hosted run takes both from the artifact store, " +
+			"and starts one that cannot hold the credential without it; reportingResolver records a reporter of an extension " +
+			"not installed from the artifact store as repository code"},
 	"runcredential/descriptor_unix.go:Exec": {spawns: 2, verdict: holder, by: "runcredential/descriptor_unix.go:Exec",
 		why: "the pinned or upgraded CLI replaces this process"},
 

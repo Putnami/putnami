@@ -201,7 +201,7 @@ func TestRunWithConfigHooks_BeforeFailureRecordsTelemetryEnd(t *testing.T) {
 	cfg := &wsproto.Config{Hooks: &wsproto.HooksConfig{
 		CLI: &wsproto.HookPhaseConfig{Before: []string{"false"}},
 	}}
-	if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil); code != ExitError {
+	if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil, nil); code != ExitError {
 		t.Fatalf("runTerminalSession exit code = %d, want %d", code, ExitError)
 	}
 
@@ -235,7 +235,7 @@ func TestRunWithConfigHooks_HookOptOutDiscardsTelemetry(t *testing.T) {
 	}}
 	// The root holds no project and no repository, so the bare run selects
 	// every project, finds none, and ends as a usage error after the hook ran.
-	if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil); code != ExitUsage {
+	if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil, nil); code != ExitUsage {
 		t.Fatalf("runTerminalSession exit code = %d, want %d", code, ExitUsage)
 	}
 
@@ -262,7 +262,7 @@ func TestRunWithConfigHooks_InteractiveNoticeAppearsOnce(t *testing.T) {
 	}}
 
 	first := captureStderr(t, func() {
-		if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil); code != ExitError {
+		if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil, nil); code != ExitError {
 			t.Fatalf("first run exit code = %d, want %d", code, ExitError)
 		}
 	})
@@ -271,7 +271,7 @@ func TestRunWithConfigHooks_InteractiveNoticeAppearsOnce(t *testing.T) {
 	}
 
 	second := captureStderr(t, func() {
-		if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil); code != ExitError {
+		if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil, nil); code != ExitError {
 			t.Fatalf("second run exit code = %d, want %d", code, ExitError)
 		}
 	})

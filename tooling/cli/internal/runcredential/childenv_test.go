@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
 )
 
@@ -28,9 +29,9 @@ func TestChildEnvWithoutARunCredentialIsUnchanged(t *testing.T) {
 	}
 }
 
-// A hosted run removes the cache and cloud tokens from every child, sets the offline
-// signal last so that no earlier entry overrides it, and gives the fetch no
-// offline signal at all.
+// A hosted run removes the cache, cloud and reporter tokens from every child,
+// sets the offline signal last so that no earlier entry overrides it, and gives
+// the fetch no offline signal at all.
 func TestChildEnvOnAHostedRun(t *testing.T) {
 	restore := SetForTest(testBearer)
 	t.Cleanup(restore)
@@ -42,6 +43,11 @@ func TestChildEnvOnAHostedRun(t *testing.T) {
 	}{
 		"a job": {
 			env:  []string{"PATH=/bin", CacheTokenEnv + "=cache-token", CloudTokenEnv + "=cloud-token", "LAST=x"},
+			want: []string{"PATH=/bin", "LAST=x", offline + "=1"},
+		},
+		"a job that declares the reporter tokens": {
+			env: []string{"PATH=/bin", protocolcli.SessionReporterTokenEnv + "=session-token",
+				protocolcli.LogReporterTokenEnv + "=log-token", "LAST=x"},
 			want: []string{"PATH=/bin", "LAST=x", offline + "=1"},
 		},
 		"a job whose own entry says online": {

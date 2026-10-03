@@ -1,4 +1,4 @@
-# Session reporter protocol v1
+# Session reporter protocol
 
 The engine discovers `session-reporter` on the extension explicitly named by
 `PUTNAMI_SESSION_REPORTER`, and `log-reporter` on the extension explicitly named
@@ -73,11 +73,65 @@ replay validates finalized session documents up to 16 MiB. Retention follows
 [`sessions.keep`](../../../tooling/cli/doc/16-session-reporting.md).
 
 `PUTNAMI_SESSION_REPORTER_TOKEN` is an optional explicit provider credential.
-The authoritative CLI captures it before repository subprocesses, then places
-it only in the selected reporter's environment. Selecting a name does not prove
-the repository manifest/runtime is trusted. This capability enforces no
-same-principal, file or metadata/network isolation; hosted launchers must
-establish these independently.
+On a run without `--credential-fd`, the authoritative CLI captures it before
+repository subprocesses, then places it only in the selected reporter's
+environment. A hosted run ignores it; see [Run credential](#run-credential).
+Selecting a name does not prove the repository manifest/runtime is trusted.
+This capability enforces no same-principal, file or metadata/network
+isolation; hosted launchers must establish these independently.
+
+## Run credential
+
+A hosted run (`--credential-fd`) hands a reporter the run's credential over
+the protocol, never in its environment, arguments or files. The engine removes
+`PUTNAMI_SESSION_REPORTER_TOKEN` and `PUTNAMI_LOG_REPORTER_TOKEN` from its own
+environment, says so on stderr, and places neither in any reporter's
+environment. Version 2 of the protocol is version 1 opened by a two-line
+handshake:
+
+1. The engine sends `{"protocolVersion":2,"op":"initialize"}`. It carries no
+   credential.
+2. A reporter that speaks version 2 answers
+   `{"protocolVersion":2,"op":"initialize","ok":true}`.
+3. Only then does the engine send
+   `{"protocolVersion":2,"op":"authenticate","runCredential":"<credential>"}`.
+4. The reporter answers `{"protocolVersion":2,"op":"authenticate","ok":true}`,
+   or `"ok":false` with a `code`.
+
+The credential is 1 to 16384 bytes of UTF-8 with no whitespace
+(`ValidSessionReportingCredential`). Every answer echoes `protocolVersion` and
+`op`; a refusal carries a machine `code` (`[a-z][a-z0-9_]{0,63}`) and no
+message. The engine closes a reporter that refuses `authenticate` or does not
+answer it; that reporter's delivery fails, and the graph verdict is unchanged.
+After the handshake, chunks and ACKs carry `protocolVersion: 1`, unchanged. An engine without a run credential sends no handshake, so the
+first line a reporter reads on a local run is a chunk, byte-identical to
+before.
+
+**A version 1 reporter.** A strict version 1 reporter rejects `initialize`,
+whose version and members it does not know, and so never reads the
+credential. A hosted run starts a reporter that does not accept `initialize`
+again without a credential: no handshake and no token. The engine prints
+that the reporter cannot hold the run credential and starts without one. The
+reporter's own destination then decides whether it delivers.
+
+**Who holds it.** A hosted run hands the credential only to a reporter that
+runs as its extension's native runtime executable (`{extensionRuntime}`), and
+only before the first repository code runs. Any other reporter command starts
+without a credential, with the same diagnostic. The run starts every selected
+reporter before its first hook, install or job, and the session's delivery
+reuses that process. A reporter that a hosted run must start again after
+repository code ran, after a crash for example, gets no credential: its
+delivery fails, and `putnami sessions replay --session <id>` delivers the
+rest. A reporter keeps the credential in memory only, and should deny
+inspection of its process
+(`go.putnami.dev/sdk/extension/procguard.DenyInspection`) before it answers
+`initialize`.
+
+Go publishes `SessionReportingHandshake` and `SessionReportingHandshakeResult`,
+their constructors and parsers, and `SessionReportingCredentialVersion`;
+TypeScript exports `parseSessionReportingHandshake`,
+`parseSessionReportingHandshakeResult` and
+`sessionReportingHandshakeResultAnswers`. The shared corpus covers both lines.
 
 ## Log reporter
 
@@ -98,7 +152,8 @@ with its own provider process, cursor and
 [`subscribers.json`](05-session-subscribers.md) entry. Selecting one never
 selects the other. One extension may serve both by declaring both commands.
 Each token reaches only its own provider, never a task, a hook or the other
-provider. One capability's outage, refusal or crash changes neither the other
+provider. On a hosted run, both receive the run credential over the
+handshake instead. One capability's outage, refusal or crash changes neither the other
 capability's delivery nor the graph verdict.
 
 Go publishes `LogReporterCommand`, `LogReporterEnv`, `LogReporterTokenEnv` and

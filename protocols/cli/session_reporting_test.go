@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -32,16 +33,23 @@ func TestSessionReportingSharedCorpus(t *testing.T) {
 		t.Run(c.Name, func(t *testing.T) {
 			var err error
 			var artifact string
-			if c.Kind == "chunk" {
+			switch c.Kind {
+			case "chunk":
 				var chunk *SessionReportingChunk
 				if chunk, err = ParseSessionReportingChunk(c.Wire); err == nil {
 					artifact = chunk.Artifact
 				}
-			} else {
+			case "ack":
 				var ack *SessionReportingAck
 				if ack, err = ParseSessionReportingAck(c.Wire); err == nil {
 					artifact = ack.Artifact
 				}
+			case "handshake":
+				_, err = ParseSessionReportingHandshake(c.Wire)
+			case "handshake-result":
+				_, err = ParseSessionReportingHandshakeResult(c.Wire)
+			default:
+				t.Fatalf("unknown corpus kind %q", c.Kind)
 			}
 			if err == nil && c.Reporter != "" && !slices.Contains(SessionReportingArtifacts(c.Reporter), artifact) {
 				err = fmt.Errorf("%s does not receive %s", c.Reporter, artifact)
@@ -104,7 +112,10 @@ func TestSessionReportingSchemaAndBounds(t *testing.T) {
 	if schema.ID != SessionReportingSchemaID {
 		t.Fatal("schema id drift")
 	}
-	for name, value := range map[string]any{"chunk": SessionReportingChunk{}, "ack": SessionReportingAck{}} {
+	for name, value := range map[string]any{
+		"chunk": SessionReportingChunk{}, "ack": SessionReportingAck{},
+		"handshake": SessionReportingHandshake{}, "handshakeResult": SessionReportingHandshakeResult{},
+	} {
 		if !reflect.DeepEqual(keys(schema.Defs[name].Properties), jsonFieldNames(t, value)) {
 			t.Fatalf("%s fields drift", name)
 		}
@@ -146,4 +157,58 @@ func TestSessionReportingAckBindsEveryIdentityField(t *testing.T) {
 			t.Fatal("malformed ack accepted")
 		}
 	}
+}
+
+// TestSessionReportingHandshakeHandsTheCredentialOnlyInAuthenticate pins the
+// v2 handshake: initialize carries no credential and a v1 parser rejects it,
+// authenticate carries the credential within its bound, every format verb
+// redacts it, and a result answers only the line of its own operation.
+func TestSessionReportingHandshakeHandsTheCredentialOnlyInAuthenticate(t *testing.T) {
+	const credential = "hosted-run-credential-7c1e"
+	initialize := NewSessionReportingInitialize()
+	wire, err := json.Marshal(initialize)
+	if err != nil || string(wire) != `{"protocolVersion":2,"op":"initialize"}` {
+		t.Fatalf("initialize wire = %s, %v", wire, err)
+	}
+	if _, err := ParseSessionReportingChunk(wire); err == nil {
+		t.Fatal("a v1 chunk parser accepted initialize")
+	}
+	authenticate := NewSessionReportingAuthenticate(credential)
+	wire, err = json.Marshal(authenticate)
+	if err != nil || string(wire) != `{"protocolVersion":2,"op":"authenticate","runCredential":"`+credential+`"}` {
+		t.Fatalf("authenticate wire = %s, %v", wire, err)
+	}
+	parsed, err := ParseSessionReportingHandshake(wire)
+	if err != nil || parsed.RunCredential != credential {
+		t.Fatalf("authenticate round trip = %+v, %v", parsed, err)
+	}
+	for _, verb := range []string{"%v", "%+v", "%#v", "%s", "%q", "%d", "%x"} {
+		if got := fmt.Sprintf(verb, authenticate); strings.Contains(got, credential) || !strings.Contains(got, "<redacted>") {
+			t.Errorf("%s renders %q", verb, got)
+		}
+	}
+	for size, valid := range map[int]bool{SessionReportingMaxCredentialBytes: true, SessionReportingMaxCredentialBytes + 1: false} {
+		line, _ := json.Marshal(NewSessionReportingAuthenticate(strings.Repeat("x", size)))
+		if len(line) > SessionReportingLineBytes {
+			t.Fatalf("a %d-byte credential does not fit the line bound", size)
+		}
+		if _, err := ParseSessionReportingHandshake(line); (err == nil) != valid {
+			t.Errorf("a %d-byte credential: error %v, want valid=%v", size, err, valid)
+		}
+	}
+	if !initialize.Accept().Answers(initialize) || initialize.Accept().Answers(authenticate) || !authenticate.Refuse("unauthorized").Answers(authenticate) {
+		t.Fatal("a result answers another operation, or not its own")
+	}
+	if result, err := ParseSessionReportingHandshakeResult(mustJSON(t, authenticate.Refuse("unauthorized"))); err != nil || result.OK || result.Code != "unauthorized" {
+		t.Fatalf("refusal round trip = %+v, %v", result, err)
+	}
+}
+
+func mustJSON(t *testing.T, value any) []byte {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }
