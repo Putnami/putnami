@@ -748,11 +748,12 @@ func computeJobCacheHashWith(
 	// Resolve cross-project generate assets as extra files for cache key
 	policy.ExtraFiles = append(policy.ExtraFiles, generateAssetFiles(ws, job)...)
 
-	// Ambient runtime facts the task declared (host platform). Nothing else in
-	// the key names the machine: ExtensionImplementationDigest differs between
-	// platforms only when the extension ships platform executables, and the key
-	// of a platform-independent extension's task is shared between a developer
-	// and CI by design.
+	// Ambient runtime facts the task declared (host platform). The toolchain
+	// field differs between platforms for a task that uses a runtime toolchain,
+	// and the implementation digest for an installed extension that ships
+	// platform executables; a task with neither shares its key between a
+	// developer and CI on another platform. Neither is a declaration, so a task
+	// whose output depends on the machine declares the host platform here.
 	policy.RuntimeIdentity = taskRuntimeIdentity(job)
 
 	// Collect upstream hashes for dependencies

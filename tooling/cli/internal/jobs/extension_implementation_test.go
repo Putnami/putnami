@@ -346,6 +346,61 @@ func TestInstalledExtensionDigestRecordIsTrustedOnlyInsideTheStore(t *testing.T)
 	}
 }
 
+// A tree laid out as an entry of another artifact store, such as one an
+// install under another artifact directory linked, has the identity of its
+// payload: the bookkeeping any store rewrites at an entry's root stays out of
+// the digest, and a record there is neither read nor written, because only
+// this store's entries are trusted.
+func TestAnotherStoresEntryIsDigestedWithoutItsBookkeeping(t *testing.T) {
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
+	ws := makeExecutorTestWorkspace(t)
+	other := artifactstore.New(t.TempDir())
+	entry, err := other.Admit(strings.Repeat("cd", 32), func(stage string) error {
+		writeInstalledExtension(t, stage, canaryVersion, "  ")
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := installedExtensionJob(entry, canaryVersion)
+	digestNow := func() string {
+		t.Helper()
+		digest, err := extensionImplementationDigest(ws, job, store.NewCacheManager(nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return digest
+	}
+	payload := filepath.Join(t.TempDir(), "payload")
+	writeInstalledExtension(t, payload, canaryVersion, "  ")
+	want := mustTreeDigest(t, payload)
+
+	if got := digestNow(); got != want {
+		t.Fatalf("another store's entry digests %s, want its payload's %s", got, want)
+	}
+	planted := installedTreeDigestSchema + " " + strings.Repeat("0", 64)
+	for name, content := range map[string]string{
+		"lastused":                    "1759572000000000000",
+		"lastused-123":                "1759572000000000001",
+		".lastused.42":                "1759572000000000002",
+		"implementationdigest":        planted,
+		"implementationdigest-123456": planted,
+	} {
+		writeTestFile(t, filepath.Join(entry, name), content)
+	}
+	if got := digestNow(); got != want {
+		t.Errorf("that store's bookkeeping moved the digest to %s, want %s", got, want)
+	}
+	if record, err := os.ReadFile(filepath.Join(entry, "implementationdigest")); err != nil || string(record) != planted {
+		t.Errorf("the record of another store was rewritten: %q, %v", record, err)
+	}
+	// Below the entry's root, a file of a bookkeeping name is payload.
+	writeTestFile(t, filepath.Join(entry, "config", "lastused"), "payload")
+	if got := digestNow(); got == want {
+		t.Error("a payload file named like bookkeeping below the root left the digest unchanged")
+	}
+}
+
 // A runtime toolchain pin keys the task through the toolchain field, whatever
 // the implementation digest: the same installed tree under a new pin misses.
 func TestInstalledExtensionKeyMovesWithAToolchainPin(t *testing.T) {

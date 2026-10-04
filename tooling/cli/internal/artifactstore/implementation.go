@@ -45,6 +45,24 @@ func (s *Store) Entry(dir string) (string, bool) {
 	return parts[1], true
 }
 
+// HasEntryLayout reports whether dir, after resolving symbolic links, sits
+// where an artifact store keeps a published entry: a directory named by a
+// 64-hex digest, below a directory named by its first two digits, below a
+// directory named sha256. It does not say which store holds dir, so it never
+// makes a record beside dir trustworthy; Entry does that for this store. It
+// lets a reader skip the bookkeeping that any store writes at an entry's root.
+func HasEntryLayout(dir string) bool {
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return false
+	}
+	digest := filepath.Base(resolved)
+	prefixDir := filepath.Dir(resolved)
+	return isHexDigest(digest) &&
+		filepath.Base(prefixDir) == digest[:2] &&
+		filepath.Base(filepath.Dir(prefixDir)) == shaDirName
+}
+
 // Implementation returns the implementation record of the published entry for
 // digest.
 //

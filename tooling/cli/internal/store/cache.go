@@ -205,9 +205,15 @@ type CacheKey struct {
 	// one toolchain must not be served under another. A toolchain pin moves the
 	// key through this field, whatever the extension's implementation digest.
 	//
-	// It does NOT identify the MACHINE: runtime.Version() is "go1.24.0" on every
-	// operating system and architecture. A task whose output or verdict depends
-	// on the host platform must say so through RuntimeIdentity.
+	// Its CLI part is the same on every machine: runtime.Version() is
+	// "go1.24.0" on every operating system and architecture. Its runtime
+	// toolchain part differs between platforms, because each resolved identity
+	// hashes the host platform and that platform's lock integrity, so a task
+	// that uses a runtime toolchain, its own or one its extension's runtime
+	// declares for every task, keys differently on each platform. That is a
+	// consequence of the toolchain identity, not a declaration: a task whose
+	// output or verdict depends on the host platform says so through
+	// RuntimeIdentity.
 	ToolchainVersion string
 
 	// RuntimeIdentity holds resolved `name=value` pairs for the ambient runtime
@@ -216,11 +222,14 @@ type CacheKey struct {
 	// It exists because some outputs are a function of the machine and not only
 	// of the sources: a host-platform compile produces Mach-O on darwin and ELF
 	// on linux, and a host-platform compile CHECK returns a different verdict on
-	// each, because `//go:build linux` files are only compiled on linux. No other
-	// field names the machine. ExtensionImplementationDigest differs between
-	// platforms only when the extension ships platform executables, and a
-	// platform-independent extension shares its entries between a developer's
-	// laptop and CI, so a task never relies on that digest to separate platforms.
+	// each, because `//go:build linux` files are only compiled on linux. Two
+	// other fields differ between platforms as a consequence of what they
+	// identify: ToolchainVersion for a task that uses a runtime toolchain, and
+	// ExtensionImplementationDigest for an installed extension that ships
+	// platform executables. A task with neither shares its entries between a
+	// developer's laptop and CI on another platform. Neither field declares that
+	// an output depends on the platform, so a task never relies on them to
+	// separate platforms.
 	//
 	// Only tasks that declare a runtime input carry values here, and the hash
 	// omits the field entirely when it is empty, so declaring one moves that

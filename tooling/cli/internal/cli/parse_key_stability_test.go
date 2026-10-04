@@ -31,27 +31,16 @@ import (
 // Preserving the key SET is therefore not enough; the corpus pins the rendered
 // type of every value as well.
 //
-// The three expectations below were computed from the earlier implementation
-// and pasted in as literals. They are not regenerated from the new parser: a
-// pin recomputed from the code it guards rubber-stamps its own drift. A row
-// that moves is a repo-wide cold-cache event plus run-marker mismatches, with
-// no error anywhere — the failure mode this repo has shipped twice.
+// The expectations below are literals computed outside the code they guard,
+// never regenerated from it: a pin recomputed from the code it guards
+// rubber-stamps its own drift. A row that moves is a repo-wide cold-cache event
+// plus run-marker mismatches, with no error anywhere.
 //
-// Deliberate cache-format movements since: an earlier change bumped to v5 for
-// task-contract digests, a later change bumped to v6 for the
-// implementation digest of a workspace-local direct extension, and a further
-// change bumps to v7 for the workspace-probe project metadata
-// digest, and a further change bumps to v8 because a key that carries an
-// extension implementation digest no longer carries the extension version.
-// Each is an intentional repo-wide cold-cache event. The wantCacheKey
-// column is remapped to v8; wantParams and wantMarker remain the ORIGINAL
-// pre-rewrite pins, proving the parser seam itself has not drifted — which is the
-// property this corpus exists for, and the reason the key column is the only
-// one a format bump is ever allowed to touch. The key column now pins v8
-// against accidental movement. A later change removed the store's
-// name-based volatile-parameter filter in favor of task-contract projection;
-// only rows that passed those formerly filtered names directly to this store
-// fixture moved.
+// wantParams and wantMarker pin the parser seam, and nothing moves them.
+// wantCacheKey pins the current cache-key format against accidental movement,
+// and it is the only column a format change may touch: a format change is an
+// intentional repo-wide cold-cache event, and it remaps that column to values
+// computed independently of the new code.
 
 // keyStabilityCase is one currently-valid invocation and the exact hashes its
 // leftover tokens must keep producing.

@@ -127,15 +127,31 @@ version in any other file, such as a package manifest, is the extension's own
 content. Any other change to the tree, such as a runtime binary, a
 configuration file or an executable bit, moves the digest and misses the cache.
 
+The digest does not decide which files a task reads, so documentation counts
+like any other file. Any byte of the installed archive moves the digest,
+including `README.md`, `AI.md` and the framework docs the Go extension bundles
+under `framework-docs/`. A build that changes only documentation misses the
+cache for every task of the extension.
+
 A runtime binary that embeds its version or its commit moves the digest at
 every build. The Go and TypeScript extension runtimes are built without a
 version variable and with `buildvcs: false`, and read their version from the
 manifest at run time, so their bytes change only when their sources do.
 
-The digest reads the binaries of the installed platform, so a task of an
-extension that ships platform executables keys differently on each platform.
-Its entries are not shared between a developer machine and CI on another
-platform. An extension without platform executables shares them.
+Two key fields differ between platforms as a side effect of what they
+identify:
+
+- The implementation digest reads the binaries of the installed platform, so
+  it differs on each platform for an extension that ships platform
+  executables.
+- The toolchain field differs on each platform for a task that uses a runtime
+  toolchain: its own, or one the extension's runtime declares for every task,
+  as the Go and TypeScript extensions do.
+
+Only a task with neither shares its entries between a developer machine and
+CI on another platform. A task whose output depends on the platform still
+declares the `hostPlatform` runtime input, because neither field is that
+declaration.
 
 A runtime toolchain pin keys the task through the toolchain field, whatever
 the implementation digest.
@@ -1561,7 +1577,11 @@ record of another schema, or one that cannot be read, is computed again and
 replaced. Only an entry inside the store is trusted with a record: a
 `node_modules` package or a per-worktree install can change between runs, so
 each run hashes it again, and a file named `implementationdigest` there is
-payload like any other file.
+payload like any other file. An entry of another store, such as one a link
+installed under another `PUTNAMI_ARTIFACT_DIR` names, is hashed again on each
+run too, and its record is neither read nor written. The bookkeeping files any
+store writes at an entry's root, `lastused` and `implementationdigest`, stay
+out of its digest, so the runs that use that store do not move it.
 
 ### Zero-init worktrees
 

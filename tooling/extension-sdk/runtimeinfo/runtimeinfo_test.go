@@ -43,7 +43,8 @@ func TestHandleIgnoresNormalCommands(t *testing.T) {
 
 // installRuntime lays out an installed extension tree at root: a manifest
 // that declares name at version with compiled/runtime as its runtime, and that
-// runtime. It returns the runtime's path.
+// runtime. An empty name writes a manifest without one, as the Go and
+// TypeScript extensions publish it. It returns the runtime's path.
 func installRuntime(t *testing.T, root, name, version string) string {
 	t.Helper()
 	executable := filepath.Join(root, filepath.FromSlash(pkgmeta.ExecutableName(runtime.GOOS, "compiled/runtime")))
@@ -53,10 +54,14 @@ func installRuntime(t *testing.T, root, name, version string) string {
 	if err := os.WriteFile(executable, []byte("runtime"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	manifest, err := json.Marshal(map[string]any{
-		"name": name, "version": version,
+	declaration := map[string]any{
+		"version": version,
 		"runtime": map[string]string{"executable": "compiled/runtime"},
-	})
+	}
+	if name != "" {
+		declaration["name"] = name
+	}
+	manifest, err := json.Marshal(declaration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,6 +91,15 @@ func TestManifestVersionReadsTheManifestThatDeclaresTheRuntime(t *testing.T) {
 	}
 }
 
+// A manifest without a name declares the runtime it names as executable: the
+// Go and TypeScript extensions publish their manifests without one.
+func TestManifestVersionReadsAManifestWithoutAName(t *testing.T) {
+	executable := installRuntime(t, t.TempDir(), "", "1.2.3-20261004-abc")
+	if got := ManifestVersion(executable, "@putnami/test"); got != "1.2.3-20261004-abc" {
+		t.Fatalf("ManifestVersion = %q, want the version of the manifest without a name", got)
+	}
+}
+
 // A manifest that does not declare this executable, or declares another
 // extension, gives the runtime no version; so does no manifest at all.
 func TestManifestVersionRefusesAManifestThatDoesNotDeclareTheRuntime(t *testing.T) {
@@ -97,7 +111,7 @@ func TestManifestVersionRefusesAManifestThatDoesNotDeclareTheRuntime(t *testing.
 	})
 	t.Run("another executable", func(t *testing.T) {
 		root := t.TempDir()
-		installRuntime(t, root, "@putnami/test", "1.2.3")
+		installRuntime(t, root, "", "1.2.3")
 		prepared := filepath.Join(root, "prepared", "runtime")
 		if err := os.MkdirAll(filepath.Dir(prepared), 0o755); err != nil {
 			t.Fatal(err)

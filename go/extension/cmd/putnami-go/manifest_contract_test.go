@@ -862,11 +862,11 @@ func TestPlatformSelectionParamsAreCacheKeyInputs(t *testing.T) {
 
 	// The DEFAULT platform set is the machine, and no parameter carries the
 	// machine. build-compile therefore declares the `hostPlatform` runtime input,
-	// which is what puts GOOS/GOARCH in its key: ToolchainVersion is
-	// runtime.Version() (identical across operating systems) and
-	// ExtensionImplementationDigest exists only for workspace-local extensions,
-	// so a consumer workspace on a published @putnami/go would otherwise have no
-	// machine-bearing key component while sharing entries between laptops and CI.
+	// which is what puts GOOS/GOARCH in its key. Other key components differ
+	// between platforms only as a side effect of what they identify: the runtime
+	// toolchain identity, and the implementation digest of an installed
+	// extension that ships platform binaries. A side effect is not a contract,
+	// and entries are shared between laptops and CI.
 	// The same gap is PRE-EXISTING on test-exec and is left to its own change.
 	hostInput, ok := m.Tasks["build-compile"].Inputs["hostPlatform"]
 	if !ok || hostInput.From != "runtime" {

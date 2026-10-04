@@ -209,13 +209,13 @@ those bytes were stored.
 
 The **default** set is the host, and the host is a property of the machine, not
 of the parameters — so `build-compile` also declares the `hostPlatform` runtime
-input, which puts `GOOS/GOARCH` in its key. Nothing else in the key does this:
-the toolchain component is `runtime.Version()`, the same `go1.x` string on every
-operating system, and the extension-implementation digest applies only to
-workspace-local extensions, so a workspace consuming a published `@putnami/go`
-would have no machine-bearing component at all. Since cache entries are shared
-between developer machines and CI on purpose, without that declaration a darwin
-laptop's entry could be restored on a linux runner: the app's `bin/<name>` would
+input, which puts `GOOS/GOARCH` in its key. Other key components differ between
+platforms only as a side effect of what they identify: the runtime toolchain
+identity, which hashes the host platform for every task of this extension, and
+the implementation digest of an installed `@putnami/go`, which reads its
+platform binary. A side effect is not a contract, and cache entries are shared
+between developer machines and CI on purpose, so without that declaration a
+darwin laptop's entry could be restored on a linux runner: the app's `bin/<name>` would
 be a Mach-O binary, and a library's compile-check verdict would be reused across
 operating systems even though `//go:build linux` files are only ever compiled on
 linux — so linux-only compile errors would pass CI.

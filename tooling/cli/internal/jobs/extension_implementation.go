@@ -88,7 +88,10 @@ func extensionImplementationDigest(
 // A tree inside the artifact store is immutable: its digest is recorded beside
 // it, per archive digest, and later runs read that record. Every other tree,
 // such as a node_modules package or a per-worktree install, can change between
-// runs, so each run digests it again and nothing records it.
+// runs, so each run digests it again and nothing records it. A tree laid out as
+// an entry of another store, such as one an install under another artifact
+// directory linked, is digested the same way, without the bookkeeping that
+// store writes at its root and without reading any record there.
 func installedExtensionDigest(
 	workspaceRoot string,
 	ext *extension.ExtensionDescription,
@@ -108,7 +111,7 @@ func installedExtensionDigest(
 		artifacts := artifactstore.New(store.ResolveArtifactStoreRoot(workspaceRoot))
 		entry, inStore := artifacts.Entry(root)
 		if !inStore {
-			digest, err := installedTreeDigest(root, false)
+			digest, err := installedTreeDigest(root, artifactstore.HasEntryLayout(root))
 			if err != nil {
 				return "", fmt.Errorf("digest installed extension %q: %w", ext.Name, err)
 			}
@@ -162,10 +165,10 @@ func isInstalledTreeRecord(record string) bool {
 // canonically; a file that is not one valid JSON object is hashed raw. Every
 // other file, whatever version it carries, is hashed as bytes.
 //
-// inStore skips the artifact store's bookkeeping files at the root of the
-// tree, which the store writes into every entry and which are not part of the
+// storeEntry skips the artifact store's bookkeeping files at the root of the
+// tree, which a store writes into every entry and which are not part of the
 // archive.
-func installedTreeDigest(root string, inStore bool) (string, error) {
+func installedTreeDigest(root string, storeEntry bool) (string, error) {
 	versionless := versionMetadata(root)
 	h := sha256.New()
 	hashField(h, "schema", []byte(installedTreeDigestSchema))
@@ -181,7 +184,7 @@ func installedTreeDigest(root string, inStore bool) (string, error) {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		if inStore && !strings.Contains(rel, "/") && artifactstore.IsBookkeeping(rel) {
+		if storeEntry && !strings.Contains(rel, "/") && artifactstore.IsBookkeeping(rel) {
 			return nil
 		}
 		info, err := d.Info()

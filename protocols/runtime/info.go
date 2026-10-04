@@ -11,7 +11,12 @@ type Info struct {
 	// Extension is the extension name the executable answers for
 	// ("@putnami/go"). It must match the name the loaded manifest declares.
 	Extension string `json:"extension"`
-	// Version is the executable's own release version.
+	// Version is the release version the executable answers for. The CLI
+	// requires it to equal the version of the extension it loaded. An
+	// executable built with its version reports that version; one built
+	// without a version reports the version of the extension manifest that
+	// declares it as its runtime executable, so its bytes do not change
+	// between builds that differ only in their version.
 	Version string `json:"version"`
 	// Platform is the host triple the binary was built for ("darwin/arm64").
 	Platform string `json:"platform"`

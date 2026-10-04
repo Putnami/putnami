@@ -63,6 +63,50 @@ func TestEntryNamesOnlyAPublishedEntryRoot(t *testing.T) {
 	}
 }
 
+// The entry layout is recognized wherever it is, in this store or another one,
+// and only at an entry's root: it tells a reader which root names are store
+// bookkeeping, never that a record there can be trusted.
+func TestHasEntryLayoutNamesAnEntryRootOfAnyStore(t *testing.T) {
+	_, dir := admitEntry(t, New(t.TempDir()), "entry")
+	digest := hexDigest("other")
+	otherStore := filepath.Join(t.TempDir(), shaDirName, digest[:2], digest)
+	if err := os.MkdirAll(otherStore, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{dir, otherStore} {
+		if !HasEntryLayout(path) {
+			t.Errorf("HasEntryLayout(%s) = false, want true", path)
+		}
+	}
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(otherStore, link); err == nil {
+		if !HasEntryLayout(link) {
+			t.Error("HasEntryLayout(link to an entry) = false, want true")
+		}
+	} else if runtime.GOOS != "windows" {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	below := filepath.Join(otherStore, "bin")
+	wrongShard := filepath.Join(root, shaDirName, "zz", digest)
+	notHex := filepath.Join(root, shaDirName, "ab", "ab-not-a-digest")
+	upper := filepath.Join(root, shaDirName, strings.ToUpper(digest[:2]), strings.ToUpper(digest))
+	otherAlgorithm := filepath.Join(root, "sha512", digest[:2], digest)
+	for _, path := range []string{below, wrongShard, notHex, upper, otherAlgorithm} {
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if HasEntryLayout(path) {
+			t.Errorf("HasEntryLayout(%s) = true, want false", path)
+		}
+	}
+	missing := hexDigest("missing")
+	if HasEntryLayout(filepath.Join(root, shaDirName, missing[:2], missing)) {
+		t.Error("HasEntryLayout of a missing path = true, want false")
+	}
+}
+
 func TestImplementationRecordsTheDerivedValueOnce(t *testing.T) {
 	s := New(t.TempDir())
 	digest, dir := admitEntry(t, s, "record")

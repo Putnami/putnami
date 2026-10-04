@@ -67,9 +67,15 @@ func isHandshake(args []string) bool {
 
 // ManifestVersion returns the version of the extension manifest that declares
 // executable as the runtime of extension: the nearest putnami.extension.json
-// in a directory above executable, when its name is extension and its
-// runtime.executable, with the platform's executable suffix, is the same file
-// as executable. Symbolic links in executable are resolved first.
+// in a directory above executable, when its runtime.executable, with the
+// platform's executable suffix, is the same file as executable, and its name,
+// when it has one, is extension. Symbolic links in executable are resolved
+// first.
+//
+// The same-file check is what binds the manifest to the executable. The name
+// is optional in a manifest: the Go and TypeScript extensions publish theirs
+// without one, and the CLI then names the extension by its package or by the
+// reference that installs it. A manifest without a name is therefore accepted.
 //
 // It returns "" when that manifest does not exist, names another extension or
 // another file, or cannot be read. A prepared workspace runtime, whose output
@@ -101,7 +107,8 @@ func ManifestVersion(executable, extension string) string {
 }
 
 // declaredVersion returns the version of the manifest data found in dir when
-// it declares extension with self as its runtime executable, and "" otherwise.
+// it declares self as its runtime executable and names extension or no
+// extension, and "" otherwise.
 func declaredVersion(data []byte, dir, extension string, self fs.FileInfo) string {
 	var manifest struct {
 		Name    string `json:"name"`
@@ -110,7 +117,7 @@ func declaredVersion(data []byte, dir, extension string, self fs.FileInfo) strin
 			Executable string `json:"executable"`
 		} `json:"runtime"`
 	}
-	if json.Unmarshal(data, &manifest) != nil || manifest.Name != extension ||
+	if json.Unmarshal(data, &manifest) != nil || (manifest.Name != "" && manifest.Name != extension) ||
 		manifest.Runtime == nil || manifest.Runtime.Executable == "" {
 		return ""
 	}
