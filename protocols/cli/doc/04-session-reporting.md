@@ -90,25 +90,29 @@ isolation; hosted launchers must establish these independently.
 The session reporter sends `plan.json` before any other frame: the session's
 recorded plan (`SessionPlanFile`: its commands, and its tasks with their
 `dependsOn` and `after` edges), the bytes the CLI persisted in the session
-directory, then its final marker. It leaves as soon as the reporter starts,
-before the first task starts, without a batching wait. Core adds no
-redaction: like `session.json`, it goes out as persisted. Every `plan.json`
-frame ends at or before 16777216 decoded bytes (`SessionReportingPlanBytes`),
-so its final marker's offset is at most that bound; both parsers refuse a
-frame or ACK past it, and the schema bounds its `offset`.
+directory, then its final marker. It waits for no batching interval. A
+receiver therefore reads the whole plan and its final marker before any other
+frame, so before the first `task:start` record; a task may start before the
+plan leaves. Core adds no redaction: like `session.json`, it goes out as
+persisted. Every `plan.json` frame ends at or before 16777216 decoded bytes
+(`SessionReportingPlanBytes`), so its final marker's offset is at most that
+bound; both parsers refuse a frame or ACK past it, and the schema bounds its
+`offset`.
 
 `plan.json` is best-effort. Core omits it, records why in its checkpoint, and
-delivers the other artifacts when the file is absent or past its bound, when
-the receiver refuses a `plan.json` frame without retry or on the last attempt,
-or when every attempt fails in transport. Once omitted, no further `plan.json`
-frame is sent, its final marker included. An omission changes neither the
-graph verdict, the other artifacts' delivery, nor `subscribers.json`, and
-prints no diagnostic. A receiver that does not keep the plan answers its
-frames `ok: false` without `retryable`. A receiver that exits at the frame
-costs three process starts before core starts it again for the other
-artifacts; on a hosted run, a reporter started again after repository code
-ran gets no credential (see [Run credential](#run-credential)), so that
-receiver's delivery fails.
+delivers the other artifacts when the file is absent, past its bound or
+unreadable at its cursor, when the receiver refuses a `plan.json` frame
+without retry, or when every attempt fails in transport. Once omitted, no
+further `plan.json` frame is sent, its final marker included. An omission
+changes neither the graph verdict, the other artifacts' delivery, nor
+`subscribers.json`, and prints no diagnostic. A refusal with `retryable: true`
+on the last attempt is not an omission: delivery fails as for any other
+artifact, the frame stays pending, and replay sends it first. A receiver that
+does not keep the plan answers its frames `ok: false` without `retryable`. A
+receiver that exits at the frame costs three process starts before core
+starts it again for the other artifacts; on a hosted run, a reporter started
+again after repository code ran gets no credential (see
+[Run credential](#run-credential)), so that receiver's delivery fails.
 
 ## Run credential
 

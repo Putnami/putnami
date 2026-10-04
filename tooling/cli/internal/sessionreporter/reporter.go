@@ -43,12 +43,13 @@ const maxAttempts = 3
 // the limit that canceled it.
 var errBudgetExhausted = errors.New("reporting budget exhausted")
 
-// errPlanAbsent and errPlanTooLarge are why plan.json cannot be framed: no
-// plan.json exists before its first chunk, or it exceeds
-// protocolcli.SessionReportingPlanBytes.
+// errPlanAbsent, errPlanTooLarge and errPlanUnreadable are why plan.json
+// cannot be framed: no plan.json exists before its first chunk, it exceeds
+// protocolcli.SessionReportingPlanBytes, or it cannot be read at its cursor.
 var (
-	errPlanAbsent   = errors.New("plan.json absent")
-	errPlanTooLarge = errors.New("plan.json exceeds its bound")
+	errPlanAbsent     = errors.New("plan.json absent")
+	errPlanTooLarge   = errors.New("plan.json exceeds its bound")
+	errPlanUnreadable = errors.New("plan.json unreadable")
 )
 
 // The reasons a checkpoint records in planOmitted. plan.json is best-effort:
@@ -59,8 +60,12 @@ const (
 	planAbsent = "absent"
 	// planTooLarge: plan.json exceeds protocolcli.SessionReportingPlanBytes.
 	planTooLarge = "too_large"
-	// planRefused: the reporter answered a plan.json chunk ok:false, without
-	// retry or on its last attempt.
+	// planUnreadable: plan.json cannot be read at its cursor: it is not a
+	// regular file, a read fails, or it was removed or truncated after its
+	// first chunk.
+	planUnreadable = "unreadable"
+	// planRefused: the reporter answered a plan.json chunk ok:false without
+	// retry.
 	planRefused = "refused"
 	// planUndeliverable: every attempt to deliver a plan.json chunk failed in
 	// transport.
@@ -71,7 +76,7 @@ const (
 	planLate = "late"
 )
 
-var planOmissions = map[string]bool{planAbsent: true, planTooLarge: true, planRefused: true, planUndeliverable: true, planLate: true}
+var planOmissions = map[string]bool{planAbsent: true, planTooLarge: true, planUnreadable: true, planRefused: true, planUndeliverable: true, planLate: true}
 
 // EventsBatchInterval is the longest a live session reporter events.jsonl chunk
 // shorter than one frame waits before it leaves: the chunk count, and the
@@ -396,8 +401,8 @@ func (r *Run) work() {
 
 func (r *Run) deliver() error {
 	terminal := false
-	// The batch interval starts with the worker, so a trickle's first chunk
-	// waits one interval like every later one.
+	// The batch interval starts with the worker, so a trickle's first events
+	// chunk waits one interval like every later one.
 	lastEventsSend := r.clock.Now()
 	for !r.state.Complete {
 		if r.ctx.Err() != nil {
@@ -502,7 +507,8 @@ func (r *Run) frame(terminal bool, lastEventsSend *time.Time) (pending, finished
 // planOmission is the reason to omit plan.json after err framed or sent one of
 // its chunks, or "" when err is nil, concerns another artifact, or stops the
 // delivery: a budget, a reporter that cannot start, an acknowledgement of
-// another identity, a changed artifact.
+// another identity, a refusal with retry on the last attempt (errRetryBudget),
+// whose frame stays pending for replay.
 func planOmission(artifact string, err error) string {
 	if artifact != planFile || err == nil {
 		return ""
@@ -513,6 +519,8 @@ func planOmission(artifact string, err error) string {
 		return planAbsent
 	case errors.Is(err, errPlanTooLarge):
 		return planTooLarge
+	case errors.Is(err, errPlanUnreadable):
+		return planUnreadable
 	case errors.As(err, &failure) && failure.refused:
 		return planRefused
 	case errors.As(err, &failure):
@@ -618,9 +626,12 @@ func (r *Run) next(artifact string, terminal bool) (*protocolcli.SessionReportin
 	return &chunk, nil
 }
 
-// readPlan reads the plan.json bytes after c. It fails with errPlanAbsent when
-// no plan.json exists before its first chunk, and with errPlanTooLarge when
-// plan.json exceeds protocolcli.SessionReportingPlanBytes.
+// readPlan reads the plan.json bytes after c. Every failure omits plan.json:
+// errPlanAbsent when no plan.json exists before its first chunk,
+// errPlanTooLarge when plan.json exceeds
+// protocolcli.SessionReportingPlanBytes, and errPlanUnreadable otherwise, for
+// a plan.json that is not a regular file, fails to read, or was removed or
+// truncated after its first chunk.
 func readPlan(dir string, c cursor) ([]byte, error) {
 	info, err := os.Stat(filepath.Join(dir, planFile))
 	if errors.Is(err, fs.ErrNotExist) && c == (cursor{}) {
@@ -631,7 +642,7 @@ func readPlan(dir string, c cursor) ([]byte, error) {
 	}
 	data, err := readArtifact(dir, planFile, c.Offset)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", errPlanUnreadable, err)
 	}
 	if c.Offset+int64(len(data)) > protocolcli.SessionReportingPlanBytes {
 		return nil, errPlanTooLarge
@@ -657,10 +668,13 @@ func readArtifact(dir, artifact string, offset int64) ([]byte, error) {
 	return data[:n], nil
 }
 
-// chunkFailure is a chunk the reporter did not accept within its attempts:
-// refused when it answered the last attempt ok:false, otherwise because the
-// last attempt failed in transport (an exit, a closed pipe, a timeout, an
-// unreadable acknowledgement).
+// chunkFailure is a chunk the reporter did not accept, for a reason that lets
+// plan.json be omitted (planOmission): refused when it answered ok:false
+// without retry, otherwise because every attempt ended with a failure in
+// transport (an exit, a closed pipe, a timeout, an unreadable
+// acknowledgement). A chunk the reporter answered ok:false with retry on its
+// last attempt is not a chunkFailure: its frame stays pending for replay, as
+// for any artifact.
 type chunkFailure struct {
 	refused bool
 	reason  string
@@ -668,8 +682,12 @@ type chunkFailure struct {
 
 func (f *chunkFailure) Error() string { return f.reason }
 
+// errRetryBudget is a chunk the reporter answered ok:false with retry on its
+// last attempt.
+var errRetryBudget = errors.New("reporter retry budget exhausted")
+
 func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
-	refused := false
+	retryable := false
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		if r.ctx.Err() != nil {
 			return errBudgetExhausted
@@ -694,11 +712,11 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 			if !ack.Retryable {
 				return &chunkFailure{refused: true, reason: "reporter refused chunk"}
 			}
-			refused = true
+			retryable = true
 		} else {
 			r.process.close()
 			r.process = nil
-			refused = false
+			retryable = false
 		}
 		if attempt+1 < maxAttempts {
 			select {
@@ -708,7 +726,10 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 			}
 		}
 	}
-	return &chunkFailure{refused: refused, reason: "reporter retry budget exhausted"}
+	if retryable {
+		return errRetryBudget
+	}
+	return &chunkFailure{reason: errRetryBudget.Error()}
 }
 
 // start starts the provider process. Without a run credential, or for a

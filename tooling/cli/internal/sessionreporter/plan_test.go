@@ -28,6 +28,19 @@ func acknowledgeEveryChunk(chunk protocolcli.SessionReportingChunk) *protocolcli
 	return &ack
 }
 
+// refusePlan answers every plan.json chunk ok:false, with retry or without,
+// and acknowledges every other chunk.
+func refusePlan(retryable bool) planAnswer {
+	code := map[bool]string{true: "receiver_unavailable", false: "invalid_chunk"}[retryable]
+	return func(chunk protocolcli.SessionReportingChunk) *protocolcli.SessionReportingAck {
+		ack := chunk.Ack()
+		if chunk.Artifact == planFile {
+			ack.OK, ack.Retryable, ack.Code = false, retryable, code
+		}
+		return &ack
+	}
+}
+
 // planHarness runs the session reporter's delivery worker over a session whose
 // plan.json and first events exist before the worker starts, against an
 // in-memory receiver.
@@ -234,7 +247,8 @@ func TestPlanPrecedesEveryOtherFrame(t *testing.T) {
 
 // TestPlanIsReadUpToItsBound frames a plan.json of exactly
 // SessionReportingPlanBytes to its end, and refuses one byte more before its
-// first chunk. Only a plan.json missing before its first chunk is absent.
+// first chunk. Only a plan.json missing before its first chunk is absent; one
+// removed or truncated after it, or not a regular file, is unreadable.
 func TestPlanIsReadUpToItsBound(t *testing.T) {
 	spectest.Proves(t, "cli/native-session-reporting", "bounded-transport", "plan-is-bounded-and-omitted-past-its-bound")
 	dir := t.TempDir()
@@ -268,27 +282,33 @@ func TestPlanIsReadUpToItsBound(t *testing.T) {
 	if _, err := readPlan(dir, cursor{}); !errors.Is(err, errPlanAbsent) {
 		t.Fatalf("missing plan.json: %v, want errPlanAbsent", err)
 	}
-	if _, err := readPlan(dir, cursor{Offset: 5, Sequence: 1}); err == nil || errors.Is(err, errPlanAbsent) {
-		t.Fatalf("plan.json removed after its first chunk: %v, want a changed artifact", err)
+	if _, err := readPlan(dir, cursor{Offset: 5, Sequence: 1}); !errors.Is(err, errPlanUnreadable) {
+		t.Fatalf("plan.json removed after its first chunk: %v, want errPlanUnreadable", err)
+	}
+	if err := os.WriteFile(path, []byte("abc"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readPlan(dir, cursor{Offset: 5, Sequence: 1}); !errors.Is(err, errPlanUnreadable) {
+		t.Fatalf("plan.json truncated below its cursor: %v, want errPlanUnreadable", err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readPlan(dir, cursor{}); !errors.Is(err, errPlanUnreadable) {
+		t.Fatalf("plan.json as a directory: %v, want errPlanUnreadable", err)
 	}
 }
 
 // TestAnOmittedPlanLeavesTheOtherArtifactsDelivered covers every omission the
-// worker decides alone: no plan.json, a plan.json past its bound, and a
-// receiver that refuses a plan.json chunk, at once or on every attempt. The
-// worker records the reason, sends no further plan.json frame, delivers
-// events.jsonl and session.json, and Finish succeeds.
+// worker decides alone: no plan.json, a plan.json past its bound, one that is
+// not a regular file, and a receiver that refuses a plan.json chunk without
+// retry. The worker records the reason, sends no further plan.json frame,
+// delivers events.jsonl and session.json, and Finish succeeds.
 func TestAnOmittedPlanLeavesTheOtherArtifactsDelivered(t *testing.T) {
 	spectest.Proves(t, "cli/native-session-reporting", "engine-lifecycle", "an-omitted-plan-leaves-delivery-and-the-verdict-unchanged")
-	refuse := func(retryable bool) planAnswer {
-		return func(chunk protocolcli.SessionReportingChunk) *protocolcli.SessionReportingAck {
-			ack := chunk.Ack()
-			if chunk.Artifact == planFile {
-				ack.OK, ack.Retryable, ack.Code = false, retryable, "invalid_chunk"
-			}
-			return &ack
-		}
-	}
 	for _, tc := range []struct {
 		name   string
 		plan   []byte
@@ -299,8 +319,8 @@ func TestAnOmittedPlanLeavesTheOtherArtifactsDelivered(t *testing.T) {
 	}{
 		{"absent", nil, acknowledgeEveryChunk, planAbsent, 0},
 		{"past its bound", planOf(protocolcli.SessionReportingPlanBytes + 1), acknowledgeEveryChunk, planTooLarge, 0},
-		{"refused", planOf(10), refuse(false), planRefused, 1},
-		{"refused on every attempt", planOf(10), refuse(true), planRefused, maxAttempts},
+		{"not a regular file", nil, acknowledgeEveryChunk, planUnreadable, 0},
+		{"refused", planOf(10), refusePlan(false), planRefused, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.name == "past its bound" {
@@ -308,6 +328,11 @@ func TestAnOmittedPlanLeavesTheOtherArtifactsDelivered(t *testing.T) {
 			}
 			events := []byte(`{"record":"task:start"}`)
 			h := newPlanHarness(t, tc.plan, events)
+			if tc.reason == planUnreadable {
+				if err := os.Mkdir(filepath.Join(h.dir, planFile), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
 			h.serve(tc.answer)
 			if err := h.finish(); err != nil {
 				t.Fatalf("Finish = %v, want an omitted plan.json to leave delivery complete", err)
@@ -337,6 +362,218 @@ func TestAnOmittedPlanLeavesTheOtherArtifactsDelivered(t *testing.T) {
 			}
 			if h.run.state != s {
 				t.Fatalf("in-memory state %+v differs from the durable checkpoint %+v", h.run.state, s)
+			}
+		})
+	}
+}
+
+// sameFrame reports whether two frames have the same identity and bytes.
+func sameFrame(t *testing.T, a, b protocolcli.SessionReportingChunk) bool {
+	t.Helper()
+	left, err := json.Marshal(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	right, err := json.Marshal(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bytes.Equal(left, right)
+}
+
+// resumePlan replays the session reporter over the finalized session in dir,
+// from the checkpoint there, as sessions replay does, against a receiver that
+// acknowledges every chunk. It returns the chunks the receiver read and the
+// checkpoint the worker left.
+func resumePlan(t *testing.T, dir string) ([]protocolcli.SessionReportingChunk, state) {
+	t.Helper()
+	log, err := sessionstream.Open(dir, batchSessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := openRun(context.Background(), SessionReporter, dir, batchSessionID, "@test/provider")
+	if err != nil {
+		t.Fatalf("replay refused the checkpoint: %v", err)
+	}
+	if err := r.subscribe(log); err != nil {
+		r.release()
+		t.Fatal(err)
+	}
+	p, remote := pipeProcess()
+	p.done = make(chan struct{})
+	close(p.done)
+	r.process = p
+	var chunks []protocolcli.SessionReportingChunk
+	received := make(chan struct{})
+	go func() {
+		defer close(received)
+		scanner := bufio.NewScanner(remote)
+		scanner.Buffer(make([]byte, 4096), protocolcli.SessionReportingLineBytes)
+		for scanner.Scan() {
+			chunk, err := protocolcli.ParseSessionReportingChunk(scanner.Bytes())
+			if err != nil {
+				return
+			}
+			chunks = append(chunks, *chunk)
+			if err := json.NewEncoder(remote).Encode(chunk.Ack()); err != nil {
+				return
+			}
+		}
+	}()
+	go r.work()
+	err = r.Finish()
+	_ = remote.Close()
+	<-received
+	if err != nil {
+		t.Fatalf("replay Finish = %v (sent %s)", err, frameOrder(chunks))
+	}
+	data, err := os.ReadFile(filepath.Join(dir, StateFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s state
+	if err := json.Unmarshal(data, &s); err != nil {
+		t.Fatal(err)
+	}
+	return chunks, s
+}
+
+// TestAPlanRefusedWithRetryOnEveryAttemptFailsDelivery has the receiver answer
+// plan.json ok:false with retry on every attempt. The plan is not omitted:
+// delivery fails with the frame pending, as for any artifact, and a replay
+// sends that exact frame first, then session.json and events.jsonl.
+func TestAPlanRefusedWithRetryOnEveryAttemptFailsDelivery(t *testing.T) {
+	spectest.Proves(t, "cli/native-session-reporting", "durable-replay", "replay-sends-an-undelivered-plan-first")
+	plan := planOf(10)
+	events := []byte(`{"record":"task:start"}`)
+	h := newPlanHarness(t, plan, events)
+	h.serve(refusePlan(true))
+	if err := h.finish(); !errors.Is(err, errRetryBudget) {
+		t.Fatalf("Finish = %v, want the retry budget to fail delivery", err)
+	}
+	frame := protocolcli.NewSessionReportingChunk(batchSessionID, planFile, 0, 0, plan, false)
+	sent := h.sent()
+	if len(sent) != maxAttempts {
+		t.Fatalf("frames = %s, want %d plan.json attempts", frameOrder(sent), maxAttempts)
+	}
+	for _, chunk := range sent {
+		if !sameFrame(t, chunk, frame) {
+			t.Fatalf("attempt %+v, want the identical plan.json frame %+v", chunk, frame)
+		}
+	}
+	s := h.checkpoint()
+	if s.Pending == nil || !sameFrame(t, *s.Pending, frame) || s.PlanOmitted != "" || s.Plan != (cursor{}) || s.Complete || s.Error != "delivery_incomplete" {
+		t.Fatalf("checkpoint = %+v, want the plan.json frame pending and the plan not omitted", s)
+	}
+
+	replayed, s := resumePlan(t, h.dir)
+	if got := frameOrder(replayed); got != "plan.json,plan.json:final,session.json,session.json:final,events.jsonl,events.jsonl:final" {
+		t.Fatalf("replay frames = %s", got)
+	}
+	if !sameFrame(t, replayed[0], frame) {
+		t.Fatalf("replay sent %+v first, want the pending frame %+v", replayed[0], frame)
+	}
+	if got, final := reassemble(t, replayed, planFile); !bytes.Equal(got, plan) || !final {
+		t.Fatalf("plan.json arrived as %q (final %v)", got, final)
+	}
+	if got, final := reassemble(t, replayed, sessionstream.EventsFile); string(got) != string(events)+"\n" || !final {
+		t.Fatalf("events.jsonl arrived as %q (final %v)", got, final)
+	}
+	if !s.Complete || s.Pending != nil || s.PlanOmitted != "" || s.Error != "" || s.Plan != (cursor{Offset: int64(len(plan)), Sequence: 2, Final: true}) {
+		t.Fatalf("replayed checkpoint = %+v", s)
+	}
+}
+
+// TestACrashMidPlanResumesAtItsPendingFrame replays checkpoints a worker left
+// when it stopped partway through plan.json: with its next frame pending, the
+// replay sends that exact frame first; with only its cursor, the frame at the
+// cursor. Either way the rest of plan.json, then session.json and events.jsonl
+// follow. A plan.json removed since its first chunk is omitted as unreadable,
+// and the other artifacts still arrive.
+func TestACrashMidPlanResumesAtItsPendingFrame(t *testing.T) {
+	spectest.Proves(t, "cli/native-session-reporting", "durable-replay", "a-crash-mid-plan-resumes-at-its-pending-frame")
+	size := protocolcli.SessionReportingChunkBytes
+	plan := make([]byte, 2*size+10)
+	for i := range plan {
+		plan[i] = byte('a' + i%26)
+	}
+	events := []byte(`{"record":"task:start"}`)
+	midway := cursor{Offset: int64(size), Sequence: 1}
+	// A pending frame shorter than a read at its cursor would be shows that
+	// the replay sends the saved frame, not a fresh read.
+	short := protocolcli.NewSessionReportingChunk(batchSessionID, planFile, midway.Offset, midway.Sequence, plan[size:size+100], false)
+	atCursor := protocolcli.NewSessionReportingChunk(batchSessionID, planFile, midway.Offset, midway.Sequence, plan[size:2*size], false)
+	delivered := "plan.json,plan.json,plan.json:final,session.json,session.json:final,events.jsonl,events.jsonl:final"
+	for _, tc := range []struct {
+		name    string
+		plan    []byte
+		pending *protocolcli.SessionReportingChunk
+		first   *protocolcli.SessionReportingChunk
+		frames  string
+		omitted string
+	}{
+		{"pending frame", plan, &short, &short, delivered, ""},
+		{"cursor only", plan, nil, &atCursor, delivered, ""},
+		{"plan.json removed", nil, nil, nil, "session.json,session.json:final,events.jsonl,events.jsonl:final", planUnreadable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			log, err := sessionstream.Create(dir, batchSessionID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := log.Append(events); err != nil {
+				t.Fatal(err)
+			}
+			if err := log.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, sessionFile), []byte(`{"protocolVersion":2}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if tc.plan != nil {
+				if err := os.WriteFile(filepath.Join(dir, planFile), tc.plan, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			crashed, err := json.Marshal(state{Version: 1, Provider: "@test/provider", SessionID: batchSessionID, Plan: midway, Pending: tc.pending, Error: "delivery_incomplete"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, StateFile), crashed, 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			sent, s := resumePlan(t, dir)
+			if got := frameOrder(sent); got != tc.frames {
+				t.Fatalf("replay frames = %s\nwant %s", got, tc.frames)
+			}
+			if tc.first != nil && !sameFrame(t, sent[0], *tc.first) {
+				t.Fatalf("replay sent %+v first, want %+v", sent[0], *tc.first)
+			}
+			offset, sequence, final := midway.Offset, midway.Sequence, false
+			for _, chunk := range sent {
+				if chunk.Artifact != planFile {
+					continue
+				}
+				end := offset + int64(len(chunk.Data))
+				if final || chunk.Offset != offset || chunk.Sequence != sequence || end > int64(len(plan)) || !bytes.Equal(chunk.Data, plan[offset:end]) {
+					t.Fatalf("plan.json chunk at offset %d sequence %d, want offset %d sequence %d (final sent: %v)", chunk.Offset, chunk.Sequence, offset, sequence, final)
+				}
+				offset, sequence, final = end, sequence+1, chunk.Final
+			}
+			if tc.omitted == "" && (offset != int64(len(plan)) || !final) {
+				t.Fatalf("plan.json ended at %d (final %v), want %d", offset, final, len(plan))
+			}
+			if got, final := reassemble(t, sent, sessionstream.EventsFile); string(got) != string(events)+"\n" || !final {
+				t.Fatalf("events.jsonl arrived as %q (final %v)", got, final)
+			}
+			wantPlan := cursor{Offset: int64(len(plan)), Sequence: 4, Final: true}
+			if tc.omitted != "" {
+				wantPlan = midway
+			}
+			if !s.Complete || s.Pending != nil || s.PlanOmitted != tc.omitted || s.Error != "" || s.Plan != wantPlan {
+				t.Fatalf("replayed checkpoint = %+v, want plan %+v omitted as %q", s, wantPlan, tc.omitted)
 			}
 		})
 	}

@@ -88,12 +88,13 @@ func TestNativeSessionReporterProvider(t *testing.T) {
 			os.Exit(30)
 		}
 		ack := chunk.Ack()
+		// offline refuses every chunk without retry, unavailable with retry.
 		// offline-after-live acknowledges the chunk that carries task:start,
 		// then refuses every later chunk. refuse-plan refuses every plan.json
 		// chunk without retry and acknowledges the other artifacts.
 		goOffline := false
-		if exists("offline") {
-			ack.OK, ack.Code = false, "unavailable"
+		if unavailable := exists("unavailable"); unavailable || exists("offline") {
+			ack.OK, ack.Retryable, ack.Code = false, unavailable, "unavailable"
 			fmt.Fprintln(os.Stderr, "provider diagnostic "+token)
 		} else if chunk.Artifact == "plan.json" && exists("refuse-plan") {
 			ack.OK, ack.Code = false, "unsupported_artifact"
@@ -387,10 +388,15 @@ func TestNativeSessionReportingCancellation(t *testing.T) {
 	verifyReporterArtifacts(t, root, workspace_state.NewSessionStore(root).LatestID())
 }
 
+// TestNativeSessionReportingOutageAndReplay runs against a receiver that
+// answers every chunk ok:false with retry: plan.json is not omitted, the
+// delivery fails with its first frame pending, and replay sends that exact
+// frame first and runs no workload.
 func TestNativeSessionReportingOutageAndReplay(t *testing.T) {
 	spectest.Proves(t, "cli/native-session-reporting", "durable-replay", "outage-retains-identical-frame-and-replay-runs-no-workload")
+	spectest.Proves(t, "cli/native-session-reporting", "durable-replay", "replay-sends-an-undelivered-plan-first")
 	root, req := reporterFixture(t, fixtureproc.Program{Record: "executions"})
-	if err := os.WriteFile(filepath.Join(root, "offline"), nil, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "unavailable"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var result SessionResult
@@ -412,14 +418,31 @@ func TestNativeSessionReportingOutageAndReplay(t *testing.T) {
 	if json.Unmarshal(stateBytes, &checkpoint) != nil || checkpoint.Pending == nil || checkpoint.Complete {
 		t.Fatalf("no pending frame: %s", stateBytes)
 	}
-	// The outage refused plan.json first, without retry: plan.json is
-	// best-effort and closes as refused, so replay resumes at the frame the
-	// outage left pending.
-	if checkpoint.PlanOmitted != "refused" || checkpoint.Pending.Artifact == "plan.json" {
+	// The outage refused the first plan.json frame with retry on every
+	// attempt: the plan is not omitted, and its frame stays pending.
+	pending := checkpoint.Pending
+	if checkpoint.PlanOmitted != "" || pending.Artifact != "plan.json" || pending.Offset != 0 || pending.Sequence != 0 {
 		t.Fatalf("outage checkpoint: %s", stateBytes)
 	}
-	outage := len(traceLines(t, filepath.Join(root, "trace.jsonl")))
-	if err := os.Remove(filepath.Join(root, "offline")); err != nil {
+	want, err := json.Marshal(pending)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attempts := traceLines(t, filepath.Join(root, "trace.jsonl"))
+	if len(attempts) != 3 {
+		t.Fatalf("outage frames = %d, want 3 plan.json attempts", len(attempts))
+	}
+	for _, line := range attempts {
+		chunk, err := protocolcli.ParseSessionReportingChunk(line)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := json.Marshal(chunk); err != nil || !bytes.Equal(got, want) {
+			t.Fatalf("attempt %s, want the pending frame %s", line, want)
+		}
+	}
+	outage := len(attempts)
+	if err := os.Remove(filepath.Join(root, "unavailable")); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv(protocolcli.SessionReporterEnv, "@test/reporter")
@@ -427,7 +450,7 @@ func TestNativeSessionReportingOutageAndReplay(t *testing.T) {
 	if err := New().ReplaySession(context.Background(), root, req.Config, sessionID); err != nil {
 		t.Fatal(err)
 	}
-	verifyReporterDelivery(t, root, sessionID, "refused")
+	verifyReporterArtifacts(t, root, sessionID)
 	lines := traceLines(t, filepath.Join(root, "trace.jsonl"))
 	if len(lines) <= outage || !bytes.Equal(lines[outage], lines[outage-1]) {
 		t.Fatalf("pending identity changed on replay: %s", bytes.Join(lines, []byte("\n")))
