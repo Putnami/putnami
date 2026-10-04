@@ -151,7 +151,7 @@ func (h *Holders) Start(ctx context.Context, capabilities []Capability, resolve 
 		if provider == "" {
 			continue
 		}
-		setupCtx, cancel := context.WithTimeout(ctx, FinalizationBudget)
+		setupCtx, cancel := context.WithTimeout(ctx, providerSetupTimeout)
 		launch, err := resolve(capability)(setupCtx)
 		cancel()
 		if err != nil {

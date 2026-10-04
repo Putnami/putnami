@@ -61,9 +61,10 @@ func StartSelected(ctx context.Context, events *sessionstream.Log, sessionID str
 	return runs, failures
 }
 
-// Finish drains every run at once, each under its own budget, and records each
-// run's evidence. It returns the runs whose delivery is incomplete, in start
-// order. One run's failure never changes another run's delivery or evidence.
+// Finish drains every run at once, each under its own finalization limits, and
+// records each run's evidence. It returns the runs whose delivery is
+// incomplete, in start order. One run's failure never changes another run's
+// delivery or evidence.
 func (rs *Runs) Finish() []Failure {
 	if rs == nil {
 		return nil
@@ -89,13 +90,14 @@ func (rs *Runs) Finish() []Failure {
 
 // ReplaySelected replays every selected capability whose recorded evidence is
 // not delivered, each from its own acknowledged cursor, with the caller's fresh
-// credentials and under its own total budget shared by provider setup and every
-// chunk. A delivered capability is left alone, so its subscribers.json entry is
-// not rewritten. It requires a real finalized session, since executor loss
-// never invents a terminal document. Providers are prepared one after another,
-// then every replay drains at once. It fails when no capability is selected,
-// and joins the failures of the capabilities it replayed, each naming its
-// capability.
+// credentials. Each capability's provider setup is bounded on its own, and its
+// delivery drains under the finalization limits of a run (Run.Finish). A
+// canceled ctx stops every replay at once. A delivered capability is left
+// alone, so its subscribers.json entry is not rewritten. It requires a real
+// finalized session, since executor loss never invents a terminal document.
+// Providers are prepared one after another, then every replay drains at once.
+// It fails when no capability is selected, and joins the failures of the
+// capabilities it replayed, each naming its capability.
 //
 // A replay runs no repository code. On a hosted run, it first starts the
 // reporters it replays as holders (Holders.Start) and hands report each one
@@ -151,25 +153,23 @@ func ReplaySelected(ctx context.Context, dir, sessionID string, resolve Resolver
 	return errors.Join(errs...)
 }
 
-// startReplay starts one capability's replay under its own budget. It returns
-// the function that drains it, or the error that kept it from starting.
+// startReplay starts one capability's replay. It returns the function that
+// drains it under the finalization limits, or the error that kept it from
+// starting. A canceled ctx stops the replay at once.
 func startReplay(ctx context.Context, capability Capability, dir, sessionID string, resolve Resolve, holders *Holders) (func() error, error) {
 	events, err := sessionstream.Open(dir, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("%s: session has no readable event stream", capability.Label)
 	}
-	budgetCtx, cancel := context.WithTimeout(ctx, FinalizationBudget)
-	r, err := startRun(budgetCtx, capability, events, sessionID, resolve, holders)
+	r, err := startRun(ctx, capability, events, sessionID, resolve, holders)
 	if err != nil {
 		if r != nil {
 			_ = r.recordEvidence()
 		}
-		cancel()
 		return nil, err
 	}
-	stop := context.AfterFunc(budgetCtx, r.cancel)
+	stop := context.AfterFunc(ctx, r.cancel)
 	return func() error {
-		defer cancel()
 		defer stop()
 		if err := r.Finish(); err != nil {
 			return fmt.Errorf("%s: %w", capability.Label, err)

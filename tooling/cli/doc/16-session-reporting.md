@@ -100,7 +100,7 @@ PUTNAMI_SESSION_REPORTER=@example/reporter PUTNAMI_LOG_REPORTER=@example/logs pu
 
 Replay resumes each selected reporter whose entry is not `delivered`, from its
 own acknowledged position, and leaves a delivered reporter untouched. At least
-one reporter must be selected. Each reporter has its own thirty-second budget.
+one reporter must be selected. Each reporter has its own finalization limits.
 Replay uses the original sequences, offsets and pending identity. It requires a
 valid finalized v2 session with the exact matching id (`latest` is refused),
 performs normal reporter discovery/runtime preparation, and runs no workload
@@ -108,11 +108,24 @@ DAG or workspace lifecycle hooks. It refuses a changed extension on an existing
 checkpoint. The provider must also refuse a changed destination/execution binding
 behind the same extension name.
 
-Transport uses chunks of at most 64 KiB, five-second RPC deadlines, at most three attempts,
-and one thirty-second normal drain/replay budget. Canceled graphs drain for two
-seconds so existing shutdown cleanup can run. A large or unavailable receiver
-can require another replay. Checkpoint reads are bounded to 192 KiB; replay
-refuses session documents above 16 MiB with the original artifacts intact.
+Transport uses chunks of at most 64 KiB, five-second RPC deadlines and at most
+three attempts. Each reporter's finalization, and its replay, stops after thirty
+seconds without an acknowledged chunk, or five minutes after it began, whichever
+comes first: a reporter that keeps acknowledging delivers its backlog and its
+final markers, and a stuck one stops at the latest thirty seconds after its
+last acknowledgement. The diagnostic names the limit, and keeps the replay
+hint:
+
+```text
+putnami: session reporting incomplete: reporting budget exhausted: no chunk acknowledged for 30s; replay with putnami sessions replay --session <id>
+putnami: log reporting incomplete: reporting budget exhausted: finalization reached its 5m0s cap; replay with putnami sessions replay --session <id>
+```
+
+Replay bounds each reporter's setup to thirty seconds before its delivery
+starts. Canceled graphs drain for two seconds so existing shutdown cleanup can
+run. A large or unavailable receiver can require another replay. Checkpoint
+reads are bounded to 192 KiB; replay refuses session documents above 16 MiB
+with the original artifacts intact.
 Deadlines bound subprocess waits and transport, not arbitrary local filesystem I/O.
 
 Pending reporting, for either reporter, has priority over ordinary history

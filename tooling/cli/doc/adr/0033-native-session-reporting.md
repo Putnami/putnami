@@ -89,8 +89,9 @@ A reporting capability is one row of `Capabilities()` in
   refuses a changed destination. Core refuses a different extension on an
   existing cursor. There is no cursor reset.
 - RPC reads and writes share a deadline, retries are finite, and each
-  capability's finalization and replay have a total budget. A canceled graph
-  drains for at most 2 s, inside the CLI's 10 s forced shutdown.
+  capability's finalization and replay stop after 30 s without an
+  acknowledged chunk, or 5 min after they began. A canceled graph drains for
+  at most 2 s, inside the CLI's 10 s forced shutdown.
 - `putnami sessions replay` resumes each selected capability whose evidence is
   not `delivered`, from its own cursor, rewrites only those entries, and runs
   no workload. It fails when no capability is selected.
