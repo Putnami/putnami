@@ -11,8 +11,8 @@ Only the native engine observes the whole graph lifecycle and owns the
 persisted session. An after-build uploader cannot stream live work and cannot
 describe a failed or canceled graph; a report task with successful
 prerequisites has the same defect. Extensions need two kinds of delivery: the
-full session (events, then the terminal `session.json`) and the live event
-stream alone, such as a log view. Neither may slow a task or change a verdict.
+full session (the recorded plan, events, then the terminal `session.json`) and
+the live event stream alone, such as a log view. Neither may slow a task or change a verdict.
 
 ## Decision
 
@@ -54,7 +54,7 @@ A reporting capability is one row of `Capabilities()` in
 
 | Capability | Command | Selector | Token | Artifacts | Live chunk leaves at | Checkpoint, lock |
 | --- | --- | --- | --- | --- | --- | --- |
-| Session reporter | `session-reporter` | `PUTNAMI_SESSION_REPORTER` | `PUTNAMI_SESSION_REPORTER_TOKEN` | `events.jsonl`, then `session.json` | 64 KiB or 10 s | `reporting.json`, `reporting.lock` |
+| Session reporter | `session-reporter` | `PUTNAMI_SESSION_REPORTER` | `PUTNAMI_SESSION_REPORTER_TOKEN` | `plan.json`, then `events.jsonl`, then `session.json` | 64 KiB or 10 s | `reporting.json`, `reporting.lock` |
 | Log reporter | `log-reporter` | `PUTNAMI_LOG_REPORTER` | `PUTNAMI_LOG_REPORTER_TOKEN` | `events.jsonl` | 64 KiB or 2 s | `log-reporting.json`, `log-reporting.lock` |
 
 - Command, environment and artifact names belong to the protocol
@@ -71,6 +71,13 @@ A reporting capability is one row of `Capabilities()` in
 - The session reporter closes `session.json` before its events final marker,
   so a consumer can derive event metrics from the final resource accounting.
   The log reporter's final marker follows graph termination.
+- The session reporter sends the recorded `plan.json`, whole and as persisted,
+  before any other frame, so a consumer holds the planned tasks and their edges
+  before the first `task:start`. It is best-effort and bounded to 16 MiB
+  (`SessionReportingPlanBytes`). An absent, oversized, refused or undeliverable
+  plan is omitted, with its reason in the checkpoint, and changes neither the
+  other artifacts, the evidence nor the verdict. A checkpoint written before
+  `plan.json` existed, whose other artifacts progressed, omits it as late.
 - A failing capability (unavailable extension, refused chunk, crash, exhausted
   budget) produces at most one diagnostic of its own. It never changes the
   other capability, the graph verdict or the exit code.
@@ -82,7 +89,7 @@ A reporting capability is one row of `Capabilities()` in
 ### Durable delivery
 
 - One atomic checkpoint per capability beside the retained session holds the
-  ACK cursors and the exact pending frame. Provider identity, sequence, byte
+  ACK cursors, the exact pending frame and why `plan.json` was omitted. Provider identity, sequence, byte
   offset, SHA-256 and final identity survive retry and replay.
 - ACK means durable acceptance. An identical duplicate succeeds; conflicting
   bytes fail. A provider binds the destination to the execution identity and
@@ -141,6 +148,8 @@ service or dependency. Unset selectors leave behavior unchanged.
   session reporter and ties a live consumer to finalization order.
 - **One provider process fanning out to both consumers.** One crash loses both
   deliveries.
+- **A `plan.json` every receiver must accept.** A receiver that predates it
+  would fail every session's delivery, not only the plan's.
 - **A polling reporter.** Subscribers wait on the wake signal and batch by
   frame or interval, so the chunk count follows run duration, not ACK round
   trips.

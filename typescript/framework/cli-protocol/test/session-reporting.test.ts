@@ -19,6 +19,7 @@ import {
   SESSION_REPORTING_MAX_CREDENTIAL_BYTES,
   SESSION_REPORTING_OP_AUTHENTICATE,
   SESSION_REPORTING_OP_INITIALIZE,
+  SESSION_REPORTING_PLAN_BYTES,
   SESSION_REPORTING_SCHEMA_ID,
   type SessionReportingAck,
   type SessionReportingChunk,
@@ -85,7 +86,7 @@ test('reporter capability names and artifacts match the Go constants', () => {
     'PUTNAMI_LOG_REPORTER',
     'PUTNAMI_LOG_REPORTER_TOKEN',
   ]);
-  expect(sessionReportingArtifacts(SESSION_REPORTER_COMMAND)).toEqual(['session.json', 'events.jsonl']);
+  expect(sessionReportingArtifacts(SESSION_REPORTER_COMMAND)).toEqual(['plan.json', 'session.json', 'events.jsonl']);
   expect(sessionReportingArtifacts(LOG_REPORTER_COMMAND)).toEqual(['events.jsonl']);
   expect(sessionReportingArtifacts('cache-provider')).toEqual([]);
   sessionReportingArtifacts(LOG_REPORTER_COMMAND).push('session.json');
@@ -129,6 +130,79 @@ test('session reporter schema field sets and byte bounds', async () => {
       expect(line.length).toBeLessThan(SESSION_REPORTING_LINE_BYTES);
       expect((await parseSessionReportingChunk(line)).data).toBe(large.data);
     } else await expect(parseSessionReportingChunk(line)).rejects.toThrow();
+  }
+});
+
+async function sha256(bytes: Uint8Array): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+  return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+test('plan.json chunks end at or before the plan bound, as in Go', async () => {
+  expect(SESSION_REPORTING_PLAN_BYTES).toBe(16 * 1024 * 1024);
+  const frame = async (artifact: string, offset: number, size: number) => {
+    const bytes = new Uint8Array(size).fill(120);
+    return JSON.stringify({
+      protocolVersion: 1,
+      sessionId: 'session',
+      artifact,
+      offset,
+      sequence: 7,
+      data: btoa('x'.repeat(size)),
+      sha256: await sha256(bytes),
+      final: size === 0,
+    });
+  };
+  for (const [name, artifact, offset, size, valid] of [
+    ['plan chunk ending at the bound', 'plan.json', SESSION_REPORTING_PLAN_BYTES - 3, 3, true],
+    ['plan chunk ending past the bound', 'plan.json', SESSION_REPORTING_PLAN_BYTES - 2, 3, false],
+    [
+      'full plan chunk ending at the bound',
+      'plan.json',
+      SESSION_REPORTING_PLAN_BYTES - SESSION_REPORTING_CHUNK_BYTES,
+      SESSION_REPORTING_CHUNK_BYTES,
+      true,
+    ],
+    ['plan final marker at the bound', 'plan.json', SESSION_REPORTING_PLAN_BYTES, 0, true],
+    ['plan final marker past the bound', 'plan.json', SESSION_REPORTING_PLAN_BYTES + 1, 0, false],
+    ['events chunk past the plan bound', 'events.jsonl', SESSION_REPORTING_PLAN_BYTES, 3, true],
+    ['session chunk past the plan bound', 'session.json', SESSION_REPORTING_PLAN_BYTES, 3, true],
+  ] as const) {
+    const line = await frame(artifact, offset, size);
+    let accepted = true;
+    try {
+      expect((await parseSessionReportingChunk(line)).artifact).toBe(artifact);
+    } catch {
+      accepted = false;
+    }
+    expect({ name, accepted }).toEqual({ name, accepted: valid });
+  }
+  for (const [offset, valid] of [
+    [SESSION_REPORTING_PLAN_BYTES, true],
+    [SESSION_REPORTING_PLAN_BYTES + 1, false],
+  ] as const) {
+    const ack = JSON.stringify({
+      protocolVersion: 1,
+      sessionId: 'session',
+      artifact: 'plan.json',
+      offset,
+      sequence: 1,
+      sha256: await sha256(new Uint8Array()),
+      final: true,
+      ok: true,
+    });
+    if (valid) expect(parseSessionReportingAck(ack).offset).toBe(offset);
+    else expect(() => parseSessionReportingAck(ack)).toThrow();
+  }
+  const schema = JSON.parse(readFileSync(join(root, 'schemas/session-reporting.json'), 'utf8'));
+  for (const name of ['chunk', 'ack']) {
+    const def = schema.$defs[name];
+    expect(def.properties.artifact.enum).toEqual(['events.jsonl', 'session.json', 'plan.json']);
+    const bound = def.allOf.find(
+      (rule: { if?: { properties?: { artifact?: { const?: string } } } }) =>
+        rule.if?.properties?.artifact?.const === 'plan.json',
+    );
+    expect(bound?.then?.properties?.offset?.maximum).toBe(SESSION_REPORTING_PLAN_BYTES);
   }
 });
 

@@ -6,6 +6,13 @@ export const SESSION_REPORTING_VERSION = 1;
 export const SESSION_REPORTING_CHUNK_BYTES = 65_536;
 export const SESSION_REPORTING_LINE_BYTES = 98_304;
 export const SESSION_REPORTING_SCHEMA_ID = 'https://putnami.dev/schemas/putnami-session-reporting.json';
+/**
+ * Bounds plan.json on the wire: every plan.json chunk ends at or before this
+ * decoded byte offset, so its final marker sits at or before it too.
+ * events.jsonl and session.json have no artifact bound beyond the chunk and
+ * line bounds. Twin of SessionReportingPlanBytes.
+ */
+export const SESSION_REPORTING_PLAN_BYTES = 16_777_216;
 
 /**
  * Log reporter discovery names. The log reporter speaks the same v1 wire as the
@@ -16,16 +23,19 @@ export const LOG_REPORTER_COMMAND = 'log-reporter';
 export const LOG_REPORTER_ENV = 'PUTNAMI_LOG_REPORTER';
 export const LOG_REPORTER_TOKEN_ENV = 'PUTNAMI_LOG_REPORTER_TOKEN';
 
-export type SessionReportingArtifact = 'events.jsonl' | 'session.json';
+export type SessionReportingArtifact = 'events.jsonl' | 'session.json' | 'plan.json';
+
+const artifacts: string[] = ['events.jsonl', 'session.json', 'plan.json'];
 
 /**
  * The artifacts the reporter capability named by its reserved command receives,
- * in the order they close: session.json then events.jsonl for the session
- * reporter, events.jsonl alone for the log reporter. Any other command receives
- * nothing. Twin of SessionReportingArtifacts; the result is a fresh array.
+ * in the order they close: plan.json, then session.json, then events.jsonl for
+ * the session reporter, events.jsonl alone for the log reporter. Any other
+ * command receives nothing. Twin of SessionReportingArtifacts; the result is a
+ * fresh array.
  */
 export function sessionReportingArtifacts(command: string): SessionReportingArtifact[] {
-  if (command === SESSION_REPORTER_COMMAND) return ['session.json', 'events.jsonl'];
+  if (command === SESSION_REPORTER_COMMAND) return ['plan.json', 'session.json', 'events.jsonl'];
   if (command === LOG_REPORTER_COMMAND) return ['events.jsonl'];
   return [];
 }
@@ -73,9 +83,10 @@ function parse(line: string, required: string[], optional: string[] = []): Recor
     typeof v['sessionId'] !== 'string' ||
     !whole(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}/, v['sessionId']) ||
     typeof v['artifact'] !== 'string' ||
-    !['events.jsonl', 'session.json'].includes(v['artifact']) ||
+    !artifacts.includes(v['artifact']) ||
     !Number.isSafeInteger(v['offset']) ||
     Number(v['offset']) < 0 ||
+    (v['artifact'] === 'plan.json' && Number(v['offset']) > SESSION_REPORTING_PLAN_BYTES) ||
     !Number.isSafeInteger(v['sequence']) ||
     Number(v['sequence']) < 0 ||
     typeof v['sha256'] !== 'string' ||
@@ -86,7 +97,10 @@ function parse(line: string, required: string[], optional: string[] = []): Recor
   return v;
 }
 
-/** Validates bytes and digest using Web Crypto, usable in providers and browsers. */
+/**
+ * Validates bytes and digest using Web Crypto, usable in providers and browsers.
+ * A plan.json chunk that ends past SESSION_REPORTING_PLAN_BYTES is invalid.
+ */
 export async function parseSessionReportingChunk(line: string): Promise<SessionReportingChunk> {
   const v = parse(line, [...identityKeys, 'data']);
   if (typeof v['data'] !== 'string') throw new Error('invalid reporting data');
@@ -102,6 +116,8 @@ export async function parseSessionReportingChunk(line: string): Promise<SessionR
     v['final'] !== (binary.length === 0)
   )
     throw new Error('invalid reporting chunk size or final marker');
+  if (v['artifact'] === 'plan.json' && Number(v['offset']) + binary.length > SESSION_REPORTING_PLAN_BYTES)
+    throw new Error('reporting chunk exceeds the plan.json bound');
   const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   const hex = Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');

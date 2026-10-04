@@ -11,6 +11,10 @@ import (
 // beside the event stream.
 const sessionFile = "session.json"
 
+// planFile is the recorded plan a capability may transmit before the event
+// stream. The engine writes it whole before the capability starts.
+const planFile = "plan.json"
+
 // LogStateFile is the log reporter's checkpoint beside the session. StateFile
 // is the session reporter's.
 const LogStateFile = "log-reporting.json"
@@ -44,7 +48,8 @@ type Capability struct {
 	StateFile, LockFile string
 }
 
-// SessionReporter delivers the event stream and the finalized session.
+// SessionReporter delivers the recorded plan, the event stream and the
+// finalized session.
 var SessionReporter = Capability{
 	Name: protocolcli.SessionReporterCommand, Label: "session reporter", Activity: "session reporting",
 	SelectorEnv: protocolcli.SessionReporterEnv, TokenEnv: protocolcli.SessionReporterTokenEnv,
@@ -68,7 +73,8 @@ func Capabilities() []Capability {
 }
 
 // sends reports whether the capability transmits artifact. A capability that
-// sends session.json closes it before the events final marker.
+// sends plan.json closes it before any other frame leaves; one that sends
+// session.json closes it before the events final marker.
 func (c Capability) sends(artifact string) bool {
 	return slices.Contains(c.Artifacts, artifact)
 }
