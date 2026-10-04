@@ -24,7 +24,7 @@ Useful options:
 - `--readonly`
 - `--mod <readonly|vendor|mod>`
 - `--ldflags`, `--gcflags`, `--asmflags`, `--tags`
-- `--race`, `--trimpath`, `--buildmode`, `--cgo`
+- `--race`, `--trimpath`, `--buildmode`, `--cgo`, `--buildvcs`
 
 ## Test
 

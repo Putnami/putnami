@@ -159,8 +159,8 @@ type ExtensionDescription struct {
 
 	// LocalSource identifies a mutable development source discovered from a
 	// workspace project/ref or an explicit filesystem path. Package and
-	// lock-pinned installed extensions deliberately leave it false: their
-	// resolved version remains their cache identity.
+	// lock-pinned installed extensions leave it false: their cache identity is
+	// the content digest of their installed tree, without version metadata.
 	LocalSource bool
 
 	// PinnedOver is the workspace-relative path of the project whose manifest

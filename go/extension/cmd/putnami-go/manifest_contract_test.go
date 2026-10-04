@@ -803,17 +803,17 @@ func TestLibraryCompilePruningConditionPreservesExplicitBuildEvidence(t *testing
 	// condition, a combined gate could prune the only task that observes it.
 	for _, name := range []string{
 		"platforms", "target", "ldflags", "gcflags", "asmflags", "tags",
-		"race", "trimpath", "buildmode", "cgo", "version-var",
+		"race", "trimpath", "buildmode", "cgo", "buildvcs", "version-var",
 	} {
 		if !strings.Contains(compile.If, "params."+name) {
 			t.Errorf("build compile condition %q does not preserve explicit %q evidence", compile.If, name)
 		}
 	}
 
-	// False is meaningful for cgo (it forces CGO_ENABLED=0), and zero is still
-	// an explicit -p request. Presence checks keep those falsy values from being
-	// confused with absence.
-	for _, fragment := range []string{"params.cgo != null", "params.p != null"} {
+	// False is meaningful for cgo (it forces CGO_ENABLED=0) and for buildvcs (it
+	// strips the VCS stamp), and zero is still an explicit -p request. Presence
+	// checks keep those falsy values from being confused with absence.
+	for _, fragment := range []string{"params.cgo != null", "params.buildvcs != null", "params.p != null"} {
 		if !strings.Contains(compile.If, fragment) {
 			t.Errorf("build compile condition %q is missing presence check %q", compile.If, fragment)
 		}

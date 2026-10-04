@@ -115,8 +115,8 @@ func TestNormalizeTree_LeavesSymlinksAlone(t *testing.T) {
 }
 
 // TestStoreNormalize_StripsHostLocalBookkeeping pins what a packaging
-// destination must NOT carry: staging, per-digest locks, the advisory flock, and
-// the wall-clock recency sidecars.
+// destination must NOT carry: staging, per-digest locks, the advisory flock, the
+// wall-clock recency sidecars, and the implementation records a run left.
 func TestStoreNormalize_StripsHostLocalBookkeeping(t *testing.T) {
 	root := t.TempDir()
 	s := New(root)
@@ -133,6 +133,10 @@ func TestStoreNormalize_StripsHostLocalBookkeeping(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, lastUsedFile)); err != nil {
 		t.Fatalf("test setup: expected a lastused sidecar: %v", err)
 	}
+	writeImplementation(dir, "recorded")
+	if _, err := os.Stat(filepath.Join(dir, implementationFile)); err != nil {
+		t.Fatalf("test setup: expected an implementation record: %v", err)
+	}
 
 	if err := s.Normalize(); err != nil {
 		t.Fatalf("Normalize: %v", err)
@@ -145,6 +149,9 @@ func TestStoreNormalize_StripsHostLocalBookkeeping(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(dir, lastUsedFile)); !os.IsNotExist(err) {
 		t.Errorf("lastused survived Normalize (err=%v)", err)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, implementationFile)); !os.IsNotExist(err) {
+		t.Errorf("the implementation record survived Normalize (err=%v)", err)
 	}
 
 	// Everything that remains, including the store's own shard directories, is

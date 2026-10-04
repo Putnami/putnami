@@ -10,8 +10,8 @@ Compiles Go packages and binaries **for the host platform**, with cross-compilat
 - Generates schema artifacts before compiling
 - Runs build-time describe mode for runtime plugin artifacts such as OpenAPI
 - Compiles the describe entrypoint with the compile step's own configuration
-  (`mod`/`readonly`, `cgo`, `tags`, `gcflags`, `asmflags`, `race`, `trimpath`,
-  `installsuffix`, `p`, `buildmode`), so the two steps build one program, compile
+  (`mod`/`readonly`, `cgo`, `buildvcs`, `tags`, `gcflags`, `asmflags`, `race`,
+  `trimpath`, `installsuffix`, `p`, `buildmode`), so the two steps build one program, compile
   reuses Go's build cache, and compiling is a link rather than a second
   compilation of every package above `net`. Every one of those parameters is a
   declared cache-key input of both steps, except where a task pins the value in
@@ -771,6 +771,7 @@ putnami-go gocacheprog: object cache served 182 objects, offered 3
 | `--race` | `false` | Enable race detector |
 | `--trimpath` | `false` | Remove local file system paths from binary |
 | `--cgo` | auto | Enable CGO (disabled automatically when cross-compiling) |
+| `--buildvcs` | auto | Stamp version control information (revision, commit time, modified state) into the binary. Absent keeps Go's default, which stamps it inside a repository. `false` builds the same bytes at every commit whose compiled sources are unchanged; together with no `version-var`, the binary does not change between builds that differ only in their version |
 | `--buildmode` | `default` | Build mode: `default`, `archive`, `c-archive`, `c-shared`, `shared`, `exe`, `pie` |
 | `--installsuffix` | — | Install suffix for build cache isolation |
 | `--p <n>` | GOMAXPROCS | Number of parallel compilations |

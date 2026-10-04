@@ -41,11 +41,13 @@ import (
 // task-contract digests, a later change bumped to v6 for the
 // implementation digest of a workspace-local direct extension, and a further
 // change bumps to v7 for the workspace-probe project metadata
-// digest. Each is an intentional repo-wide cold-cache event. The wantCacheKey
-// column is remapped to v7; wantParams and wantMarker remain the ORIGINAL
+// digest, and a further change bumps to v8 because a key that carries an
+// extension implementation digest no longer carries the extension version.
+// Each is an intentional repo-wide cold-cache event. The wantCacheKey
+// column is remapped to v8; wantParams and wantMarker remain the ORIGINAL
 // pre-rewrite pins, proving the parser seam itself has not drifted — which is the
 // property this corpus exists for, and the reason the key column is the only
-// one a format bump is ever allowed to touch. The key column now pins v7
+// one a format bump is ever allowed to touch. The key column now pins v8
 // against accidental movement. A later change removed the store's
 // name-based volatile-parameter filter in favor of task-contract projection;
 // only rows that passed those formerly filtered names directly to this store
@@ -81,35 +83,35 @@ var keyStabilityCorpus = []keyStabilityCase{
 		name:         "bare root task",
 		args:         []string{"build"},
 		wantParams:   "",
-		wantCacheKey: "e8afe931182e0e171df3b8ec455e98a7de7f4bc30f586d3ad9d9b87932387e15",
+		wantCacheKey: "5b877407b6b908a1bf29d507c1f48e1d7eeeae31fd904c161d81f08093ad305c",
 		wantMarker:   "",
 	},
 	{
 		name:         "root task with a positional project selector",
 		args:         []string{"build", "@putnami/cli"},
 		wantParams:   "",
-		wantCacheKey: "e8afe931182e0e171df3b8ec455e98a7de7f4bc30f586d3ad9d9b87932387e15",
+		wantCacheKey: "5b877407b6b908a1bf29d507c1f48e1d7eeeae31fd904c161d81f08093ad305c",
 		wantMarker:   "",
 	},
 	{
 		name:         "root task with the dot selector",
 		args:         []string{"build", "."},
 		wantParams:   "",
-		wantCacheKey: "e8afe931182e0e171df3b8ec455e98a7de7f4bc30f586d3ad9d9b87932387e15",
+		wantCacheKey: "5b877407b6b908a1bf29d507c1f48e1d7eeeae31fd904c161d81f08093ad305c",
 		wantMarker:   "",
 	},
 	{
 		name:         "explicit --projects never reaches params",
 		args:         []string{"build", "--projects", "@putnami/cli"},
 		wantParams:   "",
-		wantCacheKey: "e8afe931182e0e171df3b8ec455e98a7de7f4bc30f586d3ad9d9b87932387e15",
+		wantCacheKey: "5b877407b6b908a1bf29d507c1f48e1d7eeeae31fd904c161d81f08093ad305c",
 		wantMarker:   "",
 	},
 	{
 		name:         "comma commands with a builtin alias",
 		args:         []string{"l,t,b", "--impacted"},
 		wantParams:   "",
-		wantCacheKey: "e8afe931182e0e171df3b8ec455e98a7de7f4bc30f586d3ad9d9b87932387e15",
+		wantCacheKey: "5b877407b6b908a1bf29d507c1f48e1d7eeeae31fd904c161d81f08093ad305c",
 		wantMarker:   "",
 	},
 	{
@@ -117,98 +119,98 @@ var keyStabilityCorpus = []keyStabilityCase{
 		args:         []string{"ci", "--all"},
 		userAliases:  map[string]string{"ci": "b"},
 		wantParams:   "",
-		wantCacheKey: "e8afe931182e0e171df3b8ec455e98a7de7f4bc30f586d3ad9d9b87932387e15",
+		wantCacheKey: "5b877407b6b908a1bf29d507c1f48e1d7eeeae31fd904c161d81f08093ad305c",
 		wantMarker:   "",
 	},
 	{
 		name:         "global execution flags are consumed, never params",
 		args:         []string{"build", "--max-parallel", "4", "--retry", "2", "--output", "jsonl", "--no-cache"},
 		wantParams:   "",
-		wantCacheKey: "e8afe931182e0e171df3b8ec455e98a7de7f4bc30f586d3ad9d9b87932387e15",
+		wantCacheKey: "5b877407b6b908a1bf29d507c1f48e1d7eeeae31fd904c161d81f08093ad305c",
 		wantMarker:   "",
 	},
 	{
 		name:         "job flag with a separate value is a string",
 		args:         []string{"build", "--target", "linux/amd64"},
 		wantParams:   "target=string(linux/amd64)",
-		wantCacheKey: "23d3a9be346bafe3de098af1878fdef348eb611f6e90080009c26b9ca9d2829d",
+		wantCacheKey: "af3d2a624d77fa282d83851c95ed6fa51e7c90442b01466776e31f82aeb4afb6",
 		wantMarker:   "dee4bcd7033c",
 	},
 	{
 		name:         "job flag with an inline value is a string",
 		args:         []string{"build", "--target=linux/amd64"},
 		wantParams:   "target=string(linux/amd64)",
-		wantCacheKey: "23d3a9be346bafe3de098af1878fdef348eb611f6e90080009c26b9ca9d2829d",
+		wantCacheKey: "af3d2a624d77fa282d83851c95ed6fa51e7c90442b01466776e31f82aeb4afb6",
 		wantMarker:   "dee4bcd7033c",
 	},
 	{
 		name:         "bare job flag is bool true",
 		args:         []string{"build", "--minify"},
 		wantParams:   "minify=bool(true)",
-		wantCacheKey: "c0844516566d52981ee0ce2ac348272c007841f5108d14c4754f86e1c14a6508",
+		wantCacheKey: "13b9d1d9b901f5c3f6150301ba312dfc0a69602fed72fc94dfe5ce44f3f46e6f",
 		wantMarker:   "190e6b9bab6a",
 	},
 	{
 		name:         "job flag followed by another flag is bool true",
 		args:         []string{"build", "--minify", "--sourcemap"},
 		wantParams:   "minify=bool(true) sourcemap=bool(true)",
-		wantCacheKey: "ea579d8efa5905d7a504113ed108b1c6f3a8901b658e9de5280f5778a8c850ae",
+		wantCacheKey: "311ac78e9d35c8b0f56012da3324fc64c6e7ee206141f2435d99998e07d8985c",
 		wantMarker:   "6f0eb87789a5",
 	},
 	{
 		name:         "--no-flag is bool false",
 		args:         []string{"build", "--no-minify"},
 		wantParams:   "minify=bool(false)",
-		wantCacheKey: "f62f8e1182192b67f05dbf86a3ca540e4a04231674a1b22198bb488ed8df7269",
+		wantCacheKey: "8a93243accc2028ec406a25027dd8d4915fadbe13f663df4b8746325b6f83113",
 		wantMarker:   "87c1fa2fec66",
 	},
 	{
 		name:         "single-dash no- form is stripped to the same name",
 		args:         []string{"build", "-no-minify"},
 		wantParams:   "minify=bool(false)",
-		wantCacheKey: "f62f8e1182192b67f05dbf86a3ca540e4a04231674a1b22198bb488ed8df7269",
+		wantCacheKey: "8a93243accc2028ec406a25027dd8d4915fadbe13f663df4b8746325b6f83113",
 		wantMarker:   "87c1fa2fec66",
 	},
 	{
 		name:         "numeric job flag value stays a string",
 		args:         []string{"build", "--workers", "8"},
 		wantParams:   "workers=string(8)",
-		wantCacheKey: "fb762e4b4d6e167b26a6c1959ef66fec5130a2e62c51fc31676c112c80cbc477",
+		wantCacheKey: "eb35abbe4fc41c9b91940e622605cb0f2df033bc0f88e753bfa12bf574bb1143",
 		wantMarker:   "888d52d60695",
 	},
 	{
 		name:         "mixed job flag shapes",
 		args:         []string{"build", "--target", "linux/amd64", "--minify", "--mode=release", "--no-sourcemap"},
 		wantParams:   "minify=bool(true) mode=string(release) sourcemap=bool(false) target=string(linux/amd64)",
-		wantCacheKey: "cc7e487bd11a058229efc1bda593b047980f64de00005df6c8ca645cd9899c55",
+		wantCacheKey: "1a10c1ecf3cec2c5ce0ee38b9d13faeaf793480eb21f9523dcd02ffb5ff55e63",
 		wantMarker:   "cc794bb26d54",
 	},
 	{
 		name:         "positional selector plus job flags",
 		args:         []string{"build", "@putnami/cli", "--target", "wasm"},
 		wantParams:   "target=string(wasm)",
-		wantCacheKey: "b606be36269691ade1e10e01cdf9ae5c401b70031087891b4863214f7e358610",
+		wantCacheKey: "4f570d235d231003b96d4d13711ec910913c0286bc8212a4abba8c6ddcc8fa49",
 		wantMarker:   "670b817f4333",
 	},
 	{
 		name:         "comma commands carrying a job flag",
 		args:         []string{"lint,test", ".", "--coverage"},
 		wantParams:   "coverage=bool(true)",
-		wantCacheKey: "ba477a37467c1c10b1d7f2e70dd912d9609ab190d247dd8e1ab357701cd4bf16",
+		wantCacheKey: "c52251f5945d7188e98ec2441bb0b02610604f723c10f8e941236ffbb72335ab",
 		wantMarker:   "4e0f808f956c",
 	},
 	{
 		name:         "double dash passthrough",
 		args:         []string{"run", "--", "--verbose", "arg"},
 		wantParams:   "=string(arg)",
-		wantCacheKey: "8189f1505b2273048a550099328ce3ae55224a58f6dd538763d1527e807b668a",
+		wantCacheKey: "cd5617f240ca368d668cb30fa5bf3eb63b712a582e7fb7b5e2217d74c58c4f98",
 		wantMarker:   "48a9f69878fc",
 	},
 	{
 		name:         "double dash after a job flag",
 		args:         []string{"test", "--filter", "unit", "--", "-race"},
 		wantParams:   "=bool(true) filter=string(unit) race=bool(true)",
-		wantCacheKey: "4aa74d58cbd6ed5ff0f2195fff82c44a6839f43dc562333f3afb824590897676",
+		wantCacheKey: "bd8c3298b801dda82405a54c5b99bcae9d66649302a937d7098c3cd93c9395ca",
 		wantMarker:   "2c2723740f0d",
 	},
 	{
@@ -216,7 +218,7 @@ var keyStabilityCorpus = []keyStabilityCase{
 		args:            []string{"cloud", "deploy", "--env", "prod", "--force"},
 		extensionGroups: map[string]bool{"cloud": true},
 		wantParams:      "env=string(prod) force=bool(true)",
-		wantCacheKey:    "26c2650718036e383fc092cba6d2c68a374fc876f0234cb052c1accb2180e390",
+		wantCacheKey:    "83c951d1a60cb3ac2aae672d107de78d7e618f3c96b54851852effa2474ec2b3",
 		wantMarker:      "52d6c5cfbe5d",
 	},
 	{
@@ -224,28 +226,28 @@ var keyStabilityCorpus = []keyStabilityCase{
 		args:            []string{"cloud", "deploy", "--env=prod"},
 		extensionGroups: map[string]bool{"cloud": true},
 		wantParams:      "env=string(prod)",
-		wantCacheKey:    "fc7eb9cd8f6f9650a46769e6e4309a73958de09941ff154301c93dadb5d21779",
+		wantCacheKey:    "fba0014269afc3fff5b474f9b1cc45d2729a123beb79f40780ab84fbae859970",
 		wantMarker:      "fdf65bc0fcac",
 	},
 	{
 		name:         "operational-looking params retain their typed identity",
 		args:         []string{"build", "--verbose-report", "--dryRun"},
 		wantParams:   "dryRun=bool(true) verbose-report=bool(true)",
-		wantCacheKey: "209a69f5d3148ff73854de158fb44860597bde70917d07c546bfc7f5b79439f4",
+		wantCacheKey: "e90247ce1e84e43724f2deef8e567650b277f8a0fd52f2340f351c31088f119e",
 		wantMarker:   "87cc12d18645",
 	},
 	{
 		name:         "inline global value form never reaches params",
 		args:         []string{"build", "--projects=@putnami/cli"},
 		wantParams:   "",
-		wantCacheKey: "e8afe931182e0e171df3b8ec455e98a7de7f4bc30f586d3ad9d9b87932387e15",
+		wantCacheKey: "5b877407b6b908a1bf29d507c1f48e1d7eeeae31fd904c161d81f08093ad305c",
 		wantMarker:   "",
 	},
 	{
 		name:         "operational-looking param reaches both raw hashers",
 		args:         []string{"build", "--dryRun"},
 		wantParams:   "dryRun=bool(true)",
-		wantCacheKey: "ea8093cdc42201688e0933c7fc71986941769753224dac0dde21e3232be58946",
+		wantCacheKey: "2f6e339148ad636eb2d97b1dcc7c05d9c87910cf3b30def51d31677822c8cd75",
 		wantMarker:   "e59f1698ce59",
 	},
 }

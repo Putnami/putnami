@@ -31,9 +31,10 @@ func HostPlatform() string {
 // Only declared names are resolved, and only names the CLI knows how to answer:
 // an unrecognized runtime input contributes nothing rather than an empty value,
 // because a placeholder would silently claim the key covers something it does
-// not. `extensionVersion` resolves to nothing on purpose — the version is
-// already an unconditional field of every key, so answering it here would add a
-// redundant component and move the key of all 25 tasks that declare it today.
+// not. `extensionVersion` resolves to nothing on purpose — every key already
+// names the extension's implementation, by its version or by the digest that
+// replaces it, and answering the version here would move, at every build
+// stamp, the keys that digest keeps stable.
 //
 // The result feeds CacheKey.RuntimeIdentity, which is hashed only when
 // non-empty, so a task that declares no runtime input keeps its exact key.
@@ -747,11 +748,11 @@ func computeJobCacheHashWith(
 	// Resolve cross-project generate assets as extra files for cache key
 	policy.ExtraFiles = append(policy.ExtraFiles, generateAssetFiles(ws, job)...)
 
-	// Ambient runtime facts the task declared (host platform). Without this, the
-	// only platform-bearing key component is ExtensionImplementationDigest, which
-	// covers workspace-local extensions ONLY — so in a consumer workspace on a
-	// published extension nothing in the key varies with the machine, and remote
-	// entries are shared dev↔CI by design.
+	// Ambient runtime facts the task declared (host platform). Nothing else in
+	// the key names the machine: ExtensionImplementationDigest differs between
+	// platforms only when the extension ships platform executables, and the key
+	// of a platform-independent extension's task is shared between a developer
+	// and CI by design.
 	policy.RuntimeIdentity = taskRuntimeIdentity(job)
 
 	// Collect upstream hashes for dependencies
@@ -839,9 +840,9 @@ func computeJobCacheHashWith(
 		}
 	}
 
-	extensionImplementationDigest, err := localExtensionImplementationDigest(ws, job)
+	extensionImplementationDigest, err := extensionImplementationDigest(ws, job, cache)
 	if err != nil {
-		return "", fmt.Errorf("hash local extension implementation: %w", err)
+		return "", fmt.Errorf("hash extension implementation: %w", err)
 	}
 
 	workspaceVersion := LineBaseVersion(versions, job.Project)

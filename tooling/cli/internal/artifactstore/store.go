@@ -16,6 +16,7 @@
 //	<root>/                              (~/.putnami/artifacts, or $PUTNAMI_ARTIFACT_DIR)
 //	  sha256/<digest[:2]>/<digest>/      extracted tree; manifest at the dir root
 //	    lastused                         recency sidecar for GC (unix-nano)
+//	    implementationdigest             implementation digest derived from the payload
 //	  cli/<sha>/putnami                  prebuilt CLI, by binary digest
 //	  cli-source/<key>/putnami           CLI built from a source workspace, by source key
 //	  roots/<id> → <workspace>           GC roots: workspaces whose links pin entries
@@ -102,16 +103,19 @@ func (s *Store) Touch(digest string) {
 
 // IsBookkeeping reports whether name, an entry at the root of an artifact
 // directory, is store bookkeeping rather than artifact payload: the lastused
-// recency sidecar and the temporary files its writers rename into place (Touch
-// writes "lastused-<random>", the putnamiw wrapper writes ".lastused.<pid>").
-// The store writes these names into every entry it serves, so a reader that
-// copies an artifact's payload out of the store, such as rendering a template
-// into a project, skips them. An artifact never ships a root file under these
-// names.
+// recency sidecar, the implementationdigest record, and the temporary files
+// their writers rename into place (Touch writes "lastused-<random>", the
+// putnamiw wrapper writes ".lastused.<pid>", Implementation writes
+// "implementationdigest-<random>"). The store writes these names into the
+// entries it serves, so a reader that copies or hashes an artifact's payload
+// out of the store, such as rendering a template into a project, skips them.
+// An artifact never ships a root file under these names.
 func IsBookkeeping(name string) bool {
 	return name == lastUsedFile ||
 		strings.HasPrefix(name, lastUsedFile+"-") ||
-		strings.HasPrefix(name, "."+lastUsedFile+".")
+		strings.HasPrefix(name, "."+lastUsedFile+".") ||
+		name == implementationFile ||
+		strings.HasPrefix(name, implementationFile+"-")
 }
 
 // isHexDigest reports whether d is a 64-char lowercase-hex SHA-256 — the exact

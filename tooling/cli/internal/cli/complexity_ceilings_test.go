@@ -557,7 +557,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "cache",
 		prefix: "internal/store/",
 		files:  33,
-		funcs:  275,
+		funcs:  276,
 		why: "internal/store: the content-addressed local cache — entries, task entries, CAS, " +
 			"leases, GC, generations and the remote bridge. Cache-key completeness and atomicity " +
 			"under concurrency are the two invariants this repository has been burned by most " +
@@ -709,7 +709,12 @@ var complexityCeilings = []complexityCeiling{
 			"RAISED, from 33/274 to 33/275, with no new file. RecordManagedRoot records a root a git " +
 			"command of the run already answered for, so SourceState answers it without a process; " +
 			"it never replaces an answer the manager holds, so one invocation keeps one answer per " +
-			"root. It reads no entry and writes none",
+			"root. It reads no entry and writes none. " +
+			"RAISED, from 33/275 to 33/276, with no new file. Digest computes, once per key for the " +
+			"life of the manager, a value its caller derives, error included: the installed-tree " +
+			"digest that names an installed extension in every key of its tasks. One run reads each " +
+			"installed tree once, and every key of the run names one identity per extension even if " +
+			"the tree changes mid-run. It reads no entry and writes none",
 	},
 	{
 		unit:   "output",

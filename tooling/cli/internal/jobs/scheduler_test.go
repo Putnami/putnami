@@ -309,6 +309,10 @@ func TestScheduler_CoalescesConcurrentColdMissAcrossWorktrees(t *testing.T) {
 	}
 
 	sharedRoot := t.TempDir()
+	// Both worktrees run one installed extension, in a directory of its own:
+	// its tree names it in every key, so it must not hold the files the job
+	// writes while the sibling computes its key.
+	extDir := t.TempDir()
 	storeRoot := filepath.Join(sharedRoot, "store")
 	counterPath := filepath.Join(sharedRoot, "executions")
 	releasePath := filepath.Join(sharedRoot, "release")
@@ -349,7 +353,7 @@ func TestScheduler_CoalescesConcurrentColdMissAcrossWorktrees(t *testing.T) {
 		job := &ScheduledJob{
 			Project: project,
 			Extension: &extension.ExtensionDescription{
-				Name: "@putnami/test", Path: sharedRoot,
+				Name: "@putnami/test", Path: extDir,
 				Tasks: map[string]extension.TaskDefinition{
 					task: {Declares: &extension.TaskDeclaration{}},
 				},
@@ -455,6 +459,10 @@ func TestScheduler_CoalescedSourceFixReexecutesInEveryWorktree(t *testing.T) {
 	}
 
 	sharedRoot := t.TempDir()
+	// Both worktrees run one installed extension, in a directory of its own:
+	// its tree names it in every key, so it must not hold the files the job
+	// writes while the sibling computes its key.
+	extDir := t.TempDir()
 	storeRoot := filepath.Join(sharedRoot, "store")
 	counterPath := filepath.Join(sharedRoot, "executions")
 	releasePath := filepath.Join(sharedRoot, "release")
@@ -499,7 +507,7 @@ func TestScheduler_CoalescedSourceFixReexecutesInEveryWorktree(t *testing.T) {
 			Project: project,
 			Extension: &extension.ExtensionDescription{
 				Name: "@putnami/test",
-				Path: sharedRoot,
+				Path: extDir,
 				Tasks: map[string]extension.TaskDefinition{
 					taskName: {Declares: &extension.TaskDeclaration{MutatesSources: true}},
 				},

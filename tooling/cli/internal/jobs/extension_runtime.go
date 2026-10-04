@@ -548,31 +548,6 @@ func ExtensionImplementationIdentity(ext *extension.ExtensionDescription) string
 	return digest
 }
 
-// localExtensionImplementationDigest returns the synchronized content identity
-// for a mutable local extension runtime. Every task from that extension carries
-// it: a runtime-backed preBuild hook can affect a task whose own command does
-// not reference {extensionRuntime}. Installed extensions remain keyed by their
-// immutable resolved version. Direct-exec classification no longer exists: a
-// local extension without a declared prepared runtime has no implementation
-// digest to contribute.
-func localExtensionImplementationDigest(
-	ws *workspace.Workspace,
-	job *ScheduledJob,
-) (string, error) {
-	if !isLocalDevExtensionSource(ws, job) {
-		return "", nil
-	}
-	if job.Extension.Runtime == nil || job.Extension.Runtime.Prepare == nil {
-		return "", nil
-	}
-	if job.Extension.RuntimeDigest != "" {
-		return job.Extension.RuntimeDigest, nil
-	}
-	// Focused callers assembled outside the engine synchronization lifecycle
-	// still fail closed on stale cache reuse by hashing the declared runtime.
-	return extensionRuntimeDigest(job.Extension)
-}
-
 func isLocalDevExtensionSource(ws *workspace.Workspace, job *ScheduledJob) bool {
 	if ws == nil || ws.Root == "" || job == nil || job.Extension == nil || !job.Extension.LocalSource {
 		return false

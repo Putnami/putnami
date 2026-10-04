@@ -621,9 +621,11 @@ func TestCacheKeyIncludesAbsoluteLocalRuntimeImplementationDigest(t *testing.T) 
 	}
 }
 
-// Installed extension artifacts are selected by their resolved version, and
-// jobs that do not reference a declared runtime do not hash adjacent source.
-func TestCacheKeyLeavesNonRuntimeAndInstalledExtensionSourcesOut(t *testing.T) {
+// A workspace-local extension without a declared runtime keeps its version as
+// its identity: the key does not hash the source beside its manifest. (An
+// installed extension's whole tree is its identity; see
+// TestInstalledExtensionTreeKeysItsTasks.)
+func TestCacheKeyLeavesNonRuntimeExtensionSourcesOut(t *testing.T) {
 	ws := makeExecutorTestWorkspace(t)
 
 	for _, tc := range []struct {
@@ -639,14 +641,6 @@ func TestCacheKeyLeavesNonRuntimeAndInstalledExtensionSourcesOut(t *testing.T) {
 			relPath:     "extensions/non-direct",
 			localSource: true,
 			command:     "{extensionRoot}/bin/custom-run",
-			args:        []string{"build"},
-		},
-		{
-			name:        "installed runtime extension",
-			relPath:     "",
-			localSource: false,
-			runtime:     true,
-			command:     "{extensionRuntime}",
 			args:        []string{"build"},
 		},
 	} {

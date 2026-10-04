@@ -787,14 +787,15 @@ const (
 	// a host-platform compile emits Mach-O on darwin and ELF on linux, and a
 	// host-platform compile check accepts sources on one OS that do not build
 	// on another (`//go:build linux` files are compiled only on linux). Nothing
-	// else in the cache key varies with the machine, and cache entries are
-	// shared between developer laptops and CI, so without this declaration a
-	// darwin verdict can be served to linux.
+	// else in the cache key names the machine: the extension's implementation
+	// digest differs between platforms only when the extension ships platform
+	// executables, and cache entries are shared between developer laptops and
+	// CI, so without this declaration a darwin verdict can be served to linux.
 	RuntimeInputHostPlatform = "hostPlatform"
 	// RuntimeInputExtensionVersion is the resolved extension version. It is
-	// accepted for documentation value only: the version is already an
-	// unconditional field of every cache key, so declaring it adds no key
-	// material and moves no existing key.
+	// accepted for documentation value only and adds no key material: every
+	// cache key already names the extension's implementation, by its version
+	// or by the implementation digest that replaces the version.
 	RuntimeInputExtensionVersion = "extensionVersion"
 )
 

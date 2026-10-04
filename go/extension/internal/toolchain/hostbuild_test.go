@@ -18,6 +18,7 @@ func TestBuildArgsEmitsEveryConfiguredFlagInOrder(t *testing.T) {
 	host := HostBuild{
 		Mod: "mod", Gcflags: "gcf", Asmflags: "asmf", Tags: "tag1",
 		Race: true, Trimpath: true, Installsuffix: "suffix", Parallelism: "4", Buildmode: "pie",
+		Buildvcs: "false",
 	}
 	want := []string{
 		"-mod", "mod",
@@ -30,6 +31,7 @@ func TestBuildArgsEmitsEveryConfiguredFlagInOrder(t *testing.T) {
 		"-installsuffix", "suffix",
 		"-p", "4",
 		"-buildmode", "pie",
+		"-buildvcs=false",
 	}
 	if got := host.BuildArgs("ldf"); !reflect.DeepEqual(got, want) {
 		t.Errorf("BuildArgs =\n  %v\nwant\n  %v", got, want)
@@ -146,6 +148,29 @@ func TestRaceForcesCGOOn(t *testing.T) {
 	}
 }
 
+// TestBuildvcsIsTriState pins the difference between "say nothing" and "say
+// false": an absent `buildvcs` leaves Go's VCS stamp in the binary, while
+// false removes it, so a build at a new commit with unchanged sources yields
+// the same bytes.
+func TestBuildvcsIsTriState(t *testing.T) {
+	if args := ResolveHostBuild(&pctx.Context{Params: pctx.Params{}}, nil).Args(); len(args) != 0 {
+		t.Errorf("args = %v for an absent parameter, want Go's default", args)
+	}
+	off := ResolveHostBuild(&pctx.Context{Params: pctx.Params{"buildvcs": []byte(`false`)}}, nil)
+	if got := off.Args(); !reflect.DeepEqual(got, []string{"-buildvcs=false"}) {
+		t.Errorf("args = %v, want [-buildvcs=false]", got)
+	}
+	on := ResolveHostBuild(&pctx.Context{Params: pctx.Params{"buildvcs": []byte(`true`)}}, nil)
+	if got := on.Args(); !reflect.DeepEqual(got, []string{"-buildvcs=true"}) {
+		t.Errorf("args = %v, want [-buildvcs=true]", got)
+	}
+	argv := ResolveHostBuild(&pctx.Context{Params: pctx.Params{"buildvcs": []byte(`true`)}},
+		map[string]string{"buildvcs": "false"})
+	if argv.Buildvcs != "false" {
+		t.Errorf("Buildvcs = %q, want the argv value to win", argv.Buildvcs)
+	}
+}
+
 func TestHostBuildInvocationReturnsTheFlagsAndTheEnvironmentTogether(t *testing.T) {
 	ctx := &pctx.Context{Params: pctx.Params{"tags": []byte(`"integration"`), "cgo": []byte(`false`)}}
 	args, env := HostBuildInvocation(ctx, nil, []string{"CGO_ENABLED=1"}, t.TempDir(), "")
@@ -194,6 +219,7 @@ func TestHostBuildParamNamesCoversEveryReadParameter(t *testing.T) {
 		"p":             []byte(`4`),
 		"buildmode":     []byte(`"pie"`),
 		"cgo":           []byte(`true`),
+		"buildvcs":      []byte(`false`),
 	}
 
 	for _, name := range HostBuildParamNames {

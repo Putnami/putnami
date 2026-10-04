@@ -15,8 +15,6 @@ import (
 	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
-var runtimeVersion string
-
 var commands = map[string]cli.JobFunc{
 	"build":           runBuild,
 	"build-generate":  runBuildGenerate,
@@ -64,7 +62,9 @@ func main() {
 	// directory, which the CLI names in BUN_INSTALL for the task.
 	toolchain.ApplyManagedBunEnv()
 
-	if handled, err := runtimeinfo.Handle(os.Args[1:], os.Stdout, tsExtensionName, runtimeVersion); handled {
+	// The runtime carries no version of its own: it reports the version of the
+	// manifest that declares it, so one build serves every version stamp.
+	if handled, err := runtimeinfo.HandleFromManifest(os.Args[1:], os.Stdout, tsExtensionName); handled {
 		if err != nil {
 			os.Exit(1)
 		}
