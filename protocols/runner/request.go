@@ -36,7 +36,10 @@ const (
 	CLISourcePublished = "published"
 	CLISourceUnpinned  = "unpinned"
 
+	// CallerCLI is the CLI, the only caller of a version 1 request.
 	CallerCLI = "cli"
+	// CallerCI is a hosted CI service, a caller of a version 2 request only.
+	CallerCI = "ci"
 )
 
 // ExecutionRequest is the versioned, bound portable execution request. Its
@@ -305,7 +308,8 @@ type Platform struct {
 
 // ControlBlock carries the caller, the idempotency key and the finite deadline.
 type ControlBlock struct {
-	// Caller identifies the submitting caller; only cli is defined.
+	// Caller identifies the submitting caller: cli in a version 1 request, cli
+	// or ci in a version 2 request.
 	Caller string `json:"caller"`
 	// IdempotencyKey is the 32-hex key that identifies one submission attempt.
 	IdempotencyKey string `json:"idempotencyKey"`
@@ -412,6 +416,9 @@ func strictRequestShape(data []byte) error {
 	if _, err := strictObject(root["protocol"], []string{"version", "capabilities"}, nil); err != nil {
 		return fmt.Errorf("runner: protocol: %w", err)
 	}
+	if err := refuseCommitSource(root["source"]); err != nil {
+		return err
+	}
 	source, err := strictObject(root["source"], []string{"digest", "indexDigest", "git", "versions"}, []string{"tree", "bound"})
 	if err != nil {
 		return fmt.Errorf("runner: source: %w", err)
@@ -434,15 +441,8 @@ func strictRequestShape(data []byte) error {
 	if err := strictEach(source["versions"], MaxSourceEntries, []string{"line", "base", "full", "sha", "branch", "suffix", "tag", "tagged", "dirty"}); err != nil {
 		return fmt.Errorf("runner: source.versions: %w", err)
 	}
-	invocation, err := strictObject(root["invocation"], []string{"commands", "params", "flags", "cwd"}, []string{"providers", "publication"})
-	if err != nil {
-		return fmt.Errorf("runner: invocation: %w", err)
-	}
-	if err := strictInvocationExtensions(invocation); err != nil {
+	if err := strictInvocationShape(root["invocation"]); err != nil {
 		return err
-	}
-	if _, err := strictObject(invocation["flags"], []string{"noCache", "noCacheExplicit", "retryFailed", "continueOnError", "impactedStrict", "verbose", "debug", "quiet", "retry", "maxParallel", "maxParallelMode", "cpuBudgetPolicy", "cacheTrust", "output", "profile", "resourceBudgets"}, nil); err != nil {
-		return fmt.Errorf("runner: invocation.flags: %w", err)
 	}
 	if _, err := strictObject(root["selection"], []string{"requestedMode", "mode", "scoped", "projects", "baseline", "baselineSource", "changedPaths", "diagnostics", "noCacheProjects"}, []string{"taskScopes"}); err != nil {
 		return fmt.Errorf("runner: selection: %w", err)
@@ -477,6 +477,37 @@ func strictRequestShape(data []byte) error {
 	}
 	if _, err := strictObject(root["control"], []string{"caller", "idempotencyKey", "deadline"}, nil); err != nil {
 		return fmt.Errorf("runner: control: %w", err)
+	}
+	return nil
+}
+
+// refuseCommitSource names the version 2 source members a version 1 source
+// mixes in: a commit address belongs to a commit-addressed request.
+func refuseCommitSource(raw json.RawMessage) error {
+	var members map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &members); err != nil {
+		return fmt.Errorf("runner: source: %w", err)
+	}
+	for _, member := range []string{"commit", "base"} {
+		if _, ok := members[member]; ok {
+			return fmt.Errorf("runner: source.%s addresses a commit, which only a version %d request does; a version %d source is a snapshot", member, CommitRequestVersion, ExecutionRequestVersion)
+		}
+	}
+	return nil
+}
+
+// strictInvocationShape checks the invocation block, which both request
+// versions share.
+func strictInvocationShape(raw json.RawMessage) error {
+	invocation, err := strictObject(raw, []string{"commands", "params", "flags", "cwd"}, []string{"providers", "publication"})
+	if err != nil {
+		return fmt.Errorf("runner: invocation: %w", err)
+	}
+	if err := strictInvocationExtensions(invocation); err != nil {
+		return err
+	}
+	if _, err := strictObject(invocation["flags"], []string{"noCache", "noCacheExplicit", "retryFailed", "continueOnError", "impactedStrict", "verbose", "debug", "quiet", "retry", "maxParallel", "maxParallelMode", "cpuBudgetPolicy", "cacheTrust", "output", "profile", "resourceBudgets"}, nil); err != nil {
+		return fmt.Errorf("runner: invocation.flags: %w", err)
 	}
 	return nil
 }
@@ -553,7 +584,7 @@ func ValidateExecutionRequest(request ExecutionRequest) error {
 	if err := validateEnvironment(request.Environment); err != nil {
 		return err
 	}
-	return validateControl(request.Control)
+	return validateControl(request.Control, ExecutionRequestVersion)
 }
 
 func validateSourceBlock(source SourceBlock) error {
@@ -812,8 +843,15 @@ func validateEnvironment(environment EnvironmentBlock) error {
 	return nil
 }
 
-func validateControl(control ControlBlock) error {
-	if control.Caller != CallerCLI {
+// validateControl checks the control block of a request of version. The cli
+// calls either version; ci calls version 2 only.
+func validateControl(control ControlBlock, version int) error {
+	switch {
+	case control.Caller == CallerCLI:
+	case control.Caller == CallerCI && version == CommitRequestVersion:
+	case control.Caller == CallerCI:
+		return fmt.Errorf("runner: control.caller %q calls a version %d request only; a version %d request is the cli's", CallerCI, CommitRequestVersion, version)
+	default:
 		return fmt.Errorf("runner: control.caller %q is not supported", control.Caller)
 	}
 	if !validHex(control.IdempotencyKey, 32) {

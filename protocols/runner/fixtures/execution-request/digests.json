@@ -1,5 +1,10 @@
 {
   "bound-inputs.json": "sha256:6d23bd163b7470be800c9738f40f367c4507ae2d477d48e089e0db4a4e064a67",
+  "commit-all.json": "sha256:b1f7be40842b47fb641487be3d9fc5ba4ab3685bc43cffc222457a00db4f7dcd",
+  "commit-ci-publication.json": "sha256:7ca1dfaa2082108c5282078268eaca4b404f65b0afd962d2b326c029a2c9b56f",
+  "commit-impacted.json": "sha256:224ed858afcb39332aa1ae6632144b511af4633ecc7b3cb0aa17bbd00630e2b8",
+  "commit-projects.json": "sha256:8b4bc96cc566868c512b4fc6ab471c81ea55ae6b3ecb6a154a8d7824894ce5a4",
+  "commit-sha256.json": "sha256:d1996b05cfda12df800be355a0cefead79bba040e3bdea56eee9977068aa84d7",
   "impacted-fallback.json": "sha256:81d1b2a60b3c9f97db2b975501fa769fdada52539317676fd649606420ae273f",
   "impacted-task-scoped.json": "sha256:8669e01e3f85580db2663d2d4de1a30000b4580040f243b6c6a3a50c130eebb5",
   "impacted.json": "sha256:6db802dc4594883da964bbc1c3b3c348bf954fbe26d28b8628a82c1b5b10984c",

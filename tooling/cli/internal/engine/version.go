@@ -62,10 +62,11 @@ var gitHistoryCommands = []string{"publish", "deploy"}
 // It asks git only when the tree-state capture found no commit and the run
 // includes such a command, so every other run starts no extra process. A run
 // that only previews its plan ships nothing and is not refused. The executing
-// side of a portable request is exempt: the submitter resolved its versions,
-// and the snapshot it runs in carries no repository.
+// side of a frozen portable request is exempt: the submitter resolved its
+// versions, and the snapshot it runs in carries no repository. A version 2
+// request runs on a checkout, which is asked like any other root.
 func requireRepository(req *Request) error {
-	if req.VersionSnapshot != nil || req.Portable != nil || req.Global.Plan || req.previewsOnly() {
+	if req.VersionSnapshot != nil || req.Portable.frozen() || req.Global.Plan || req.previewsOnly() {
 		return nil
 	}
 	for _, command := range gitHistoryCommands {
@@ -133,16 +134,16 @@ func discoverDeclaredExtensions(req *Request) *internalextension.DiscoveryResult
 //
 // A tree state this run captured is git answering inside the workspace root,
 // so the manager starts out knowing Git manages the root: no execution key and
-// no version stamp of the run asks Git again. A portable request carries the
-// tree state its submitter captured, which proves nothing about the root it
-// runs in, so that root is asked like any other.
+// no version stamp of the run asks Git again. A frozen portable request
+// carries the tree state its submitter captured, which proves nothing about
+// the root it runs in, so that root is asked like any other.
 func newRunCacheManager(req *Request, ws *workspace.Workspace) *store.CacheManager {
 	var storeRootOverride string
 	if req.CacheVerification != nil {
 		storeRootOverride = req.CacheVerification.StoreRoot
 	}
 	cache := jobs.NewRunCacheManager(req.WorkspaceRoot, storeRootOverride)
-	if req.VersionSnapshot != nil && req.Portable == nil {
+	if req.VersionSnapshot != nil && !req.Portable.frozen() {
 		cache.RecordManagedRoot(ws.Root)
 	}
 	return cache
@@ -156,7 +157,7 @@ func newRunCacheManager(req *Request, ws *workspace.Workspace) *store.CacheManag
 // fields, as for callers outside the engine lifecycle.
 func (req *Request) runVersions(ws *workspace.Workspace) jobs.RunVersions {
 	if req.versions == nil {
-		if req.Portable != nil {
+		if req.Portable.frozen() {
 			// The executing side stamps exactly the lines the submitter resolved:
 			// the snapshot carries no tags or history to derive them from.
 			req.versions = portableRunVersions(req.Portable.Request.Source.Versions)

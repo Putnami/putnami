@@ -92,7 +92,7 @@ func TestABoundRequestEnablesExactlyItsProviders(t *testing.T) {
 	spectest.Proves(t, "cli/credential-provider", "providers-are-opt-in", "bound-request-decides-alone")
 	var request runner.ExecutionRequest
 	request.Invocation.Providers = []string{"install"}
-	providers, source, err := invocationProviders(&request, nil, "publish")
+	providers, source, err := invocationProviders(&request.Invocation, nil, "publish")
 	if err != nil || !reflect.DeepEqual(providers, []string{"install"}) || source != providersFromRequest {
 		t.Fatalf("bound request naming install, environment naming publish = %v from %q, %v", providers, source, err)
 	}
@@ -101,7 +101,7 @@ func TestABoundRequestEnablesExactlyItsProviders(t *testing.T) {
 		t.Fatalf("the bound broker serves read=%v publish=%v; want read only", broker.Enabled(registry.PurposeRead), broker.Enabled(registry.PurposePublish))
 	}
 	_ = broker.Close()
-	providers, _, err = invocationProviders(&runner.ExecutionRequest{}, nil, "install")
+	providers, _, err = invocationProviders(&runner.InvocationBlock{}, nil, "install")
 	if err != nil || len(providers) != 0 {
 		t.Fatalf("bound request with no providers, environment naming install = %v, %v; want none", providers, err)
 	}

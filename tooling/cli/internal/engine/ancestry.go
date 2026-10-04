@@ -139,13 +139,14 @@ type ancestryContextKey struct{}
 
 // CaptureAncestry reads the ancestry snapshot of the workspace at root when
 // the invocation may publish, and returns ctx carrying it. commands are the
-// invocation's commands and portable its bound request, nil without one.
+// invocation's commands and portable its bound request's invocation block, nil
+// without one.
 //
 // An adapter calls it at process start, before the first-use bootstrap or an
 // install runs repository code. Engine.Run then reuses the snapshot for the
 // same workspace instead of reading one after them. An invocation that cannot
 // publish reads nothing and returns ctx unchanged.
-func CaptureAncestry(ctx context.Context, root string, commands []string, portable *runner.ExecutionRequest) context.Context {
+func CaptureAncestry(ctx context.Context, root string, commands []string, portable *runner.InvocationBlock) context.Context {
 	if root == "" || !mayPublish(commands, portable) {
 		return ctx
 	}
@@ -174,17 +175,13 @@ func readsAncestry(req *Request) bool {
 	if req.watchIteration {
 		return false
 	}
-	var portable *runner.ExecutionRequest
-	if req.Portable != nil {
-		portable = &req.Portable.Request
-	}
-	return mayPublish(req.Commands, portable)
+	return mayPublish(req.Commands, req.Portable.invocation())
 }
 
 // mayPublish reports whether an invocation may publish: a bound request that
 // carries invocation.publication, or a publish or deploy command.
-func mayPublish(commands []string, portable *runner.ExecutionRequest) bool {
-	if portable != nil && portable.Invocation.Publication != nil {
+func mayPublish(commands []string, portable *runner.InvocationBlock) bool {
+	if portable != nil && portable.Publication != nil {
 		return true
 	}
 	return slices.ContainsFunc(commands, func(command string) bool {

@@ -33,11 +33,62 @@ import (
 )
 
 // PortableExecution binds an engine run to a bound execution request it
-// received from a runner provider. The EXECUTING engine honors the frozen
-// selection, refuses to schedule a plan that differs from the expected one,
-// and records the remote placement. Only the bound-request adapter sets it.
+// received from a runner provider. The EXECUTING engine records the remote
+// placement and never resolves placement itself. For a frozen version 1
+// request it honors the frozen selection and refuses to schedule a plan that
+// differs from the expected one. A commit-addressed version 2 request is
+// engine-planned instead: the run resolves the requested selection on its
+// checkout and stamps versions from its Git history, like a local run. Only
+// the bound-request adapter sets it.
 type PortableExecution struct {
+	// Request is the snapshot-addressed version 1 request the run executes
+	// frozen. It is unused when Commit is set.
 	Request runner.ExecutionRequest
+	// Commit is the commit-addressed version 2 request the run plans itself,
+	// or nil for a version 1 request.
+	Commit *runner.CommitRequest
+}
+
+// frozen reports whether the run executes a frozen version 1 request: the
+// stages that plan, stamp versions and record the tree then read the request
+// instead of the root the run sits in, which is a snapshot with no Git
+// history. It is false without a bound request and for a version 2 one.
+func (p *PortableExecution) frozen() bool {
+	return p != nil && p.Commit == nil
+}
+
+// invocation is the invocation block of the bound request, nil without one.
+func (p *PortableExecution) invocation() *runner.InvocationBlock {
+	switch {
+	case p == nil:
+		return nil
+	case p.Commit != nil:
+		return &p.Commit.Invocation
+	}
+	return &p.Request.Invocation
+}
+
+// bindSelection projects a version 2 request's requested selection onto the
+// run's selection flags, which the ordinary selection stage then resolves on
+// the checkout: impacted against source.base, the projects selectors, or
+// every project. The request is the run's only selection authority, so every
+// other selection flag is cleared. A version 1 request, or none, leaves the
+// flags as they are: a frozen selection binds at the selection stage
+// (selectFrozenProjects).
+func (p *PortableExecution) bindSelection(global *GlobalFlags) {
+	if p == nil || p.Commit == nil {
+		return
+	}
+	global.Projects, global.All, global.Impacted, global.Baseline, global.AutoSelected = "", false, false, "", false
+	global.FilterTag, global.ExcludeTag, global.Exclude, global.NoCacheProjects = "", "", "", ""
+	switch p.Commit.Selection.Mode {
+	case runner.SelectionModeImpacted:
+		global.Impacted, global.Baseline = true, p.Commit.Source.Base
+	case runner.SelectionModeProjects:
+		global.Projects = strings.Join(p.Commit.Selection.Projects, ",")
+	default:
+		global.All = true
+	}
 }
 
 // selectionEvidence is what the selection stage learned beyond the resolved
@@ -68,6 +119,34 @@ type selectionEvidence struct {
 	taskScopes map[string][]string
 }
 
+// validateCommitPublication is the executing side's publication check of a
+// version 2 request on the plan this engine made, since no expected plan came
+// with it. A plan with a publication task, by command name or by declared
+// registry or cloud effects, is held to both version 1 checks over the plan
+// without the nodes a publication-v1 provider adds: the protocol's, which
+// classifies by command name and which a version 1 request passes when it is
+// parsed, and the executing engine's (jobs.ValidatePortablePublication). It
+// needs invocation.publication, and every publication task waits for every
+// task of the barrier commands. A plan with no publication task passes, the
+// block or not: the caller authorized publication before any plan existed,
+// and a commit whose selection publishes nothing is a run that publishes
+// nothing.
+func validateCommitPublication(request runner.CommitRequest, comparable, planned []*jobs.ScheduledJob) error {
+	if !slices.ContainsFunc(planned, func(job *jobs.ScheduledJob) bool {
+		return jobs.HasExternalEffects(job) || slices.Contains(runner.PublicationCommands, job.CommandName())
+	}) {
+		return nil
+	}
+	plan, err := expectedPlan(comparable)
+	if err != nil {
+		return err
+	}
+	if err := runner.ValidatePublication(request.Invocation, plan, runner.IsPublicationTask); err != nil {
+		return err
+	}
+	return jobs.ValidatePortablePublication(runner.ExecutionRequest{Invocation: request.Invocation, Plan: plan}, planned)
+}
+
 // remoteDeadline is the finite deadline a submission carries. The provider
 // enforces it; the client's own observation is bounded by its context only.
 const remoteDeadline = 4 * time.Hour
@@ -82,6 +161,8 @@ const remoteDeadline = 4 * time.Hour
 // nodes a publication-v1 provider adds (jobs.ReleaseSetRun.WithoutPublicationNodes),
 // so the submitter plans the same graph whether or not the provider echoes
 // the capability. The publication and admission checks read the whole graph.
+// A version 2 request carries no expected plan and captured no input, so its
+// executing side runs the publication check alone (validateCommitPublication).
 //
 // Between the unsupported-shape refusal and the request projection sits the
 // input admission (ADR 0037): on the plan's declared inputs it binds every
@@ -91,6 +172,13 @@ const remoteDeadline = 4 * time.Hour
 // the same decision on the materialized tree and refuses a divergence exactly
 // as it refuses a divergent plan.
 func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.Workspace, discovered *internalextension.DiscoveryResult, planned []*jobs.ScheduledJob, releaseSetRun *jobs.ReleaseSetRun) (SessionResult, bool) {
+	if req.Portable != nil && !req.Portable.frozen() {
+		if err := validateCommitPublication(*req.Portable.Commit, releaseSetRun.WithoutPublicationNodes(planned), planned); err != nil {
+			iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
+			return SessionResult{ExitCode: ExitError, Plan: planned}, true
+		}
+		return SessionResult{}, false
+	}
 	if req.Portable != nil {
 		if err := validateExpectedPlan(req.Portable.Request.Plan, releaseSetRun.WithoutPublicationNodes(planned)); err != nil {
 			iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)

@@ -45,14 +45,14 @@ func takeProvidersEnv() string {
 }
 
 // invocationProviders resolves the providers this process enables and names
-// their source. A bound execution request decides alone: its
-// invocation.providers, whatever fromEnv says. Otherwise the precedence is
+// their source. A bound execution request decides alone: bound, its
+// invocation block, names the providers, whatever fromEnv says. Otherwise the precedence is
 // flag (--providers) > fromEnv (the PUTNAMI_PROVIDERS value) > none. The flag
 // cannot name an empty list, so an empty flag means it was absent. An empty
 // result is the feature off.
-func invocationProviders(bound *runner.ExecutionRequest, flag []string, fromEnv string) (providers []string, source string, err error) {
+func invocationProviders(bound *runner.InvocationBlock, flag []string, fromEnv string) (providers []string, source string, err error) {
 	if bound != nil {
-		return append([]string(nil), bound.Invocation.Providers...), providersFromRequest, nil
+		return append([]string(nil), bound.Providers...), providersFromRequest, nil
 	}
 	if len(flag) > 0 {
 		return flag, providersFromFlag, nil

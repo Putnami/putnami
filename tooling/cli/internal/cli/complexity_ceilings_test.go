@@ -84,8 +84,17 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  24,
-		funcs:  168,
-		why: "RAISED 164→168 (cli/credential-custody, reporters): a hosted run hands its session " +
+		funcs:  172,
+		why: "RAISED 168→172 (cli/portable-runner, commit-request): a version 2 bound request names " +
+			"a commit and a requested selection, and the executing engine plans its checkout through " +
+			"the ordinary stages. portable.go holds PortableExecution's frozen, the one predicate every " +
+			"stage that reads a version 1 snapshot instead of the root asks; invocation, the block the " +
+			"publication sites read from either version; bindSelection, which binds the requested " +
+			"selection onto the selection flags before any stage reads them; and " +
+			"validateCommitPublication, the publication check of the plan this engine made, since no " +
+			"expected plan came with the request. The request's shape lives in protocols/runner and the " +
+			"checkout check in the bound-request adapter, not here. " +
+			"RAISED 164→168 (cli/credential-custody, reporters): a hosted run hands its session " +
 			"reporter and log reporter the run credential over their protocol, and custody hands it to " +
 			"no process started after repository code, so the run starts them before its first hook. " +
 			"session_reporting.go holds HostedReporters with Start, which starts the selected reporters " +

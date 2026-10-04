@@ -232,6 +232,10 @@ func TestExecutionRequestRejectsSemanticViolations(t *testing.T) {
 	}
 }
 
+// TestExecutionRequestFixtures reads the corpus through the bound-request
+// channel's parser, which dispatches on version. Each version's own parser
+// accepts exactly that version's valid fixtures, so a version 1 document parses,
+// encodes and digests as it does without a version 2.
 func TestExecutionRequestFixtures(t *testing.T) {
 	t.Parallel()
 	data, err := os.ReadFile(filepath.Join("fixtures", "execution-request", "digests.json"))
@@ -242,28 +246,58 @@ func TestExecutionRequestFixtures(t *testing.T) {
 	if err := json.Unmarshal(data, &golden); err != nil {
 		t.Fatal(err)
 	}
+	valid := 0
 	for _, validity := range []string{"valid", "invalid"} {
 		paths, err := filepath.Glob(filepath.Join("fixtures", "execution-request", validity, "*.json"))
 		if err != nil || len(paths) == 0 {
 			t.Fatalf("fixture corpus: %v, %v", paths, err)
 		}
 		for _, path := range paths {
+			if validity == "valid" {
+				valid++
+			}
 			t.Run(validity+"/"+filepath.Base(path), func(t *testing.T) {
 				data, err := os.ReadFile(path)
 				if err != nil {
 					t.Fatal(err)
 				}
-				request, err := ParseExecutionRequest(data)
+				bound, err := ParseBoundRequest(data)
+				_, snapshotErr := ParseExecutionRequest(data)
+				_, commitErr := ParseCommitRequest(data)
 				if validity == "invalid" {
-					if err == nil {
-						t.Fatalf("invalid fixture accepted: %s", data)
+					if err == nil || snapshotErr == nil || commitErr == nil {
+						t.Fatalf("invalid fixture accepted (bound %v, v1 %v, v2 %v): %s", err, snapshotErr, commitErr, data)
+					}
+					if want := fixtureRefusals[filepath.Base(path)]; want != "" && !strings.Contains(err.Error(), want) {
+						t.Fatalf("refusal %q does not name %q", err, want)
 					}
 					return
 				}
 				if err != nil {
 					t.Fatal(err)
 				}
-				canonical, err := CanonicalExecutionRequest(request)
+				var canonical []byte
+				var digest string
+				switch {
+				case bound.Snapshot != nil && bound.Commit == nil:
+					if snapshotErr != nil || commitErr == nil {
+						t.Fatalf("a version 1 fixture: v1 parser %v, v2 parser %v", snapshotErr, commitErr)
+					}
+					canonical, err = CanonicalExecutionRequest(*bound.Snapshot)
+					if err == nil {
+						digest, err = ExecutionInputDigest(*bound.Snapshot)
+					}
+				case bound.Commit != nil && bound.Snapshot == nil:
+					if commitErr != nil || snapshotErr == nil {
+						t.Fatalf("a version 2 fixture: v2 parser %v, v1 parser %v", commitErr, snapshotErr)
+					}
+					canonical, err = CanonicalCommitRequest(*bound.Commit)
+					if err == nil {
+						digest, err = CommitInputDigest(*bound.Commit)
+					}
+				default:
+					t.Fatalf("bound request sets %v and %v", bound.Snapshot != nil, bound.Commit != nil)
+				}
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -274,13 +308,41 @@ func TestExecutionRequestFixtures(t *testing.T) {
 				if !bytes.Equal(canonical, compact.Bytes()) {
 					t.Fatalf("noncanonical fixture:\n%s\n%s", canonical, compact.Bytes())
 				}
-				digest, err := ExecutionInputDigest(request)
-				if err != nil || digest != golden[filepath.Base(path)] {
-					t.Fatalf("digest = %s, %v; want %s", digest, err, golden[filepath.Base(path)])
+				if digest != golden[filepath.Base(path)] {
+					t.Fatalf("digest = %s; want %s", digest, golden[filepath.Base(path)])
 				}
 			})
 		}
 	}
+	if len(golden) != valid {
+		t.Fatalf("digests.json pins %d digests for %d valid fixtures", len(golden), valid)
+	}
+}
+
+// fixtureRefusals names, for the invalid fixtures that mix the two versions or
+// break a version 2 pairing rule, what the refusal must say.
+var fixtureRefusals = map[string]string{
+	"wrong-version.json":                         "carries no plan",
+	"caller-unknown.json":                        "calls a version 2 request only",
+	"snapshot-commit-source.json":                "source.commit addresses a commit",
+	"version-unsupported.json":                   "unsupported execution request version 3",
+	"commit-with-plan.json":                      "a frozen plan names no commit it was planned from",
+	"commit-with-environment.json":               "carries no environment",
+	"commit-with-source-digest.json":             "source.digest addresses a snapshot",
+	"commit-with-source-versions.json":           "source.versions addresses a snapshot",
+	"commit-with-frozen-selection.json":          "selection.requestedMode is a frozen selection output",
+	"commit-base-without-impacted.json":          "source.base is the impacted baseline",
+	"commit-impacted-without-base.json":          "an impacted selection needs source.base",
+	"commit-projects-without-selectors.json":     "a projects selection must list its selectors",
+	"commit-projects-outside-projects-mode.json": "selection.projects belongs to the projects mode",
+	"commit-projects-empty.json":                 "selection.projects must be a non-empty array",
+	"commit-base-empty.json":                     "source.base must be a full commit id",
+	"commit-short-commit.json":                   "source.commit must be a full lowercase commit id",
+	"commit-mixed-object-format.json":            "one object format",
+	"commit-selector-comma.json":                 "holds a comma",
+	"commit-selector-mode.json":                  "spells a selection mode",
+	"commit-caller-unknown.json":                 "control.caller \"bot\" is not supported",
+	"commit-unknown-root-field.json":             "unknown field \"extra\"",
 }
 
 func TestExecutionRequestSchemaTracksWireShape(t *testing.T) {

@@ -26,7 +26,7 @@ func TestBoundRequestWithoutPublicationEnablesNoPublishPurpose(t *testing.T) {
 	request.Invocation.Providers = []string{"install", "publish"}
 
 	var stderr strings.Builder
-	providers, source := boundRequestProviders(&request, "publish", &stderr)
+	providers, source := boundRequestProviders(&request.Invocation, "publish", &stderr)
 	if !reflect.DeepEqual(providers, []string{"install"}) || source != providersFromRequest {
 		t.Fatalf("bound request without the block = %v from %q; want install from the request", providers, source)
 	}
@@ -44,13 +44,13 @@ func TestBoundRequestWithoutPublicationEnablesNoPublishPurpose(t *testing.T) {
 
 	only := runner.ExecutionRequest{}
 	only.Invocation.Providers = []string{"publish"}
-	if providers, source := boundRequestProviders(&only, "", io.Discard); len(providers) != 0 || credentialBroker(providers, source, "", nil, declarers, io.Discard) != nil {
+	if providers, source := boundRequestProviders(&only.Invocation, "", io.Discard); len(providers) != 0 || credentialBroker(providers, source, "", nil, declarers, io.Discard) != nil {
 		t.Fatalf("a request naming only publish without the block enables %v", providers)
 	}
 
 	request.Invocation.Publication = &runner.PublicationBlock{Barrier: []string{"build"}}
 	stderr.Reset()
-	providers, _ = boundRequestProviders(&request, "", &stderr)
+	providers, _ = boundRequestProviders(&request.Invocation, "", &stderr)
 	if !reflect.DeepEqual(providers, []string{"install", "publish"}) || stderr.Len() != 0 {
 		t.Fatalf("bound request with the block = %v, stderr %q; want install and publish, silently", providers, stderr.String())
 	}
@@ -103,7 +103,7 @@ func TestPublishPurposeStartsTheProviderBeforeTheFirstHook(t *testing.T) {
 		provider.Jobs[registry.CredentialProviderCommand].Args = []string{"-c", "printf started > '" + marker + "'"}
 		providers, source, stderr := tc.providers, providersFromFlag, &strings.Builder{}
 		if tc.request != nil {
-			providers, source = boundRequestProviders(tc.request, "", stderr)
+			providers, source = boundRequestProviders(&tc.request.Invocation, "", stderr)
 		}
 
 		stop, err := installCredentialProviders(providers, source, t.TempDir(), nil, []*extension.ExtensionDescription{provider}, io.Discard)

@@ -169,6 +169,27 @@ func BoundFixtureRequest(t *testing.T, root string, keys ...string) []byte {
 	return data
 }
 
+// CommitFixtureRequest writes a version 2 bound request for the placement
+// fixture: the build command over selection, on commit, measured against base
+// for an impacted selection.
+func CommitFixtureRequest(t *testing.T, commit, base string, selection runner.RequestedSelection) []byte {
+	t.Helper()
+	request := runner.CommitRequest{
+		Version:  runner.CommitRequestVersion,
+		Protocol: runner.ProtocolBlock{Version: runner.ProviderProtocolVersion, Capabilities: []string{}},
+		Source:   runner.CommitSource{Commit: commit, Base: base},
+		Invocation: runner.InvocationBlock{Commands: []string{"build"}, Params: map[string]runner.ParamValue{},
+			Flags: runner.ExecutionFlags{NoCache: true, ResourceBudgets: map[string]int{}}, Cwd: "."},
+		Selection: selection,
+		Control:   runner.ControlBlock{Caller: runner.CallerCI, IdempotencyKey: strings.Repeat("b", 32), Deadline: "2030-01-01T00:00:00Z"},
+	}
+	data, err := runner.CanonicalCommitRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
 func AttemptRecords(t *testing.T, root string) []*runnerprovider.AttemptRecord {
 	t.Helper()
 	records, err := runnerprovider.NewAttemptStore(root).List()
