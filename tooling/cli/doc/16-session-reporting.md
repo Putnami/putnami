@@ -54,12 +54,12 @@ session:
 | `too_large` | `plan.json` is above 16 MiB. |
 | `unreadable` | `plan.json` cannot be read: it is not a regular file, a read fails, or it was removed or truncated after its first chunk. |
 | `refused` | The receiver refused a `plan.json` chunk without retry. |
-| `undeliverable` | Every attempt to send a `plan.json` chunk failed in transport, for example a receiver that exits. |
+| `undeliverable` | The last attempt to send a `plan.json` chunk failed in transport, for example a receiver that exits. |
 | `late` | A checkpoint written by an earlier CLI already sent events or the session. |
 
 An omitted plan prints no diagnostic and changes neither the exit code nor
 `subscribers.json`. Replay never sends a plan the run omitted. A receiver that
-refuses a `plan.json` chunk with retry on every attempt does not omit it: the
+refuses a `plan.json` chunk with retry on its last attempt does not omit it: the
 delivery fails as for any chunk, and replay sends the plan first. The log
 reporter never receives `plan.json`. On a hosted run, a receiver that exits at
 `plan.json` instead of refusing it is started again after repository code ran,

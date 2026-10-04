@@ -67,8 +67,8 @@ const (
 	// planRefused: the reporter answered a plan.json chunk ok:false without
 	// retry.
 	planRefused = "refused"
-	// planUndeliverable: every attempt to deliver a plan.json chunk failed in
-	// transport.
+	// planUndeliverable: the last attempt to deliver a plan.json chunk failed
+	// in transport.
 	planUndeliverable = "undeliverable"
 	// planLate: events.jsonl or session.json progressed while plan.json was
 	// open, as in a checkpoint without a plan cursor, so plan.json can no
@@ -670,7 +670,7 @@ func readArtifact(dir, artifact string, offset int64) ([]byte, error) {
 
 // chunkFailure is a chunk the reporter did not accept, for a reason that lets
 // plan.json be omitted (planOmission): refused when it answered ok:false
-// without retry, otherwise because every attempt ended with a failure in
+// without retry, otherwise because its last attempt ended with a failure in
 // transport (an exit, a closed pipe, a timeout, an unreadable
 // acknowledgement). A chunk the reporter answered ok:false with retry on its
 // last attempt is not a chunkFailure: its frame stays pending for replay, as

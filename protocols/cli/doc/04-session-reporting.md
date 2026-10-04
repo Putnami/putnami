@@ -102,7 +102,7 @@ bound; both parsers refuse a frame or ACK past it, and the schema bounds its
 `plan.json` is best-effort. Core omits it, records why in its checkpoint, and
 delivers the other artifacts when the file is absent, past its bound or
 unreadable at its cursor, when the receiver refuses a `plan.json` frame
-without retry, or when every attempt fails in transport. Once omitted, no
+without retry, or when its last attempt fails in transport. Once omitted, no
 further `plan.json` frame is sent, its final marker included. An omission
 changes neither the graph verdict, the other artifacts' delivery, nor
 `subscribers.json`, and prints no diagnostic. A refusal with `retryable: true`

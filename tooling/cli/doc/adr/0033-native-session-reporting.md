@@ -78,7 +78,7 @@ A reporting capability is one row of `Capabilities()` in
   to 16 MiB (`SessionReportingPlanBytes`). An absent, oversized, unreadable,
   refused or undeliverable plan is omitted, with its reason in the checkpoint,
   and changes neither the other artifacts, the evidence nor the verdict. A
-  refusal with retry on every attempt fails delivery instead, so replay sends
+  refusal with retry on the last attempt fails delivery instead, so replay sends
   the plan. A checkpoint written before `plan.json` existed, whose other
   artifacts progressed, omits it as late.
 - A failing capability (unavailable extension, refused chunk, crash, exhausted
