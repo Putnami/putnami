@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "protocol": {
+    "version": 1,
+    "capabilities": [
+      "execution-request-v1",
+      "session-bundle-v1"
+    ]
+  },
+  "source": {
+    "commit": "1111111111111111111111111111111111111111111111111111111111111111",
+    "base": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "invocation": {
+    "commands": [
+      "test"
+    ],
+    "params": {},
+    "flags": {
+      "noCache": false,
+      "noCacheExplicit": false,
+      "retryFailed": false,
+      "continueOnError": false,
+      "impactedStrict": false,
+      "verbose": false,
+      "debug": false,
+      "quiet": false,
+      "retry": 0,
+      "maxParallel": 0,
+      "maxParallelMode": "",
+      "cpuBudgetPolicy": "",
+      "cacheTrust": "",
+      "output": "",
+      "profile": "",
+      "resourceBudgets": {}
+    },
+    "cwd": "."
+  },
+  "selection": {
+    "mode": "impacted"
+  },
+  "control": {
+    "caller": "ci",
+    "idempotencyKey": "ffffffffffffffffffffffffffffffff",
+    "deadline": "2026-10-04T12:00:00Z"
+  }
+}

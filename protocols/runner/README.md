@@ -1,8 +1,9 @@
 # Runner contract
 
 This package owns the credential-free wire contracts of optional runner
-execution: the source manifest, the execution request, the provider RPC and
-the session bundle. `runner-provider` is the reserved extension command name.
+execution: the source manifest, the execution request (snapshot-addressed in
+version 1, commit-addressed in version 2), the provider RPC and the session
+bundle. `runner-provider` is the reserved extension command name.
 Nothing here grants execution authority or source access; the executing
 Putnami engine remains the only planner, scheduler and verdict producer.
 
@@ -135,6 +136,64 @@ pin the same digest), `control` (per submission), negotiated capabilities and
 the selection diagnostics (human notices). It establishes applicability; it
 is not a task cache key.
 
+## Execution request (v2)
+
+`CommitRequest` is the commit-addressed, engine-planned request. A caller that
+holds a commit and no snapshot, such as a hosted CI service, names the commit
+and the selection it wants, and the executing engine plans the checkout
+itself. It has `version: 2` and five blocks, in this order
+(`schemas/execution-request-v2.json`):
+
+| Block | Content |
+| --- | --- |
+| `protocol` | As in version 1. |
+| `source` | `commit` (the full lowercase commit id, 40 or 64 hex digits, that the checkout's HEAD must equal) and optional `base` (the full commit an impacted selection is measured against, of the same length; present exactly when `selection.mode` is `impacted`). |
+| `invocation` | The version 1 block, under the same rules, naming no command of `UnportableCommands`. |
+| `selection` | `mode` (`all`, `impacted`, `projects`) and optional `projects`: the sorted unique selectors of a `projects` selection in the `--projects` grammar, one per entry, none holding a comma, spelling a mode (`*`, `[impacted]`) or carrying surrounding whitespace. Present, and non-empty, exactly in the `projects` mode. |
+| `control` | As in version 1, except that `caller` is `cli` or `ci`. |
+
+Each version pairs an address with a planner. A snapshot has no Git history,
+so an engine that receives one can neither measure an impacted selection nor
+stamp versions: the submitter does both and freezes the plan. A frozen plan
+names no commit it was planned from, so it never travels with a commit
+address. Decoders refuse every mix with an error that names it: a version 2
+document with `plan`, `environment`, a version 1 source member (`digest`,
+`indexDigest`, `git`, `versions`, `tree`, `bound`) or a frozen selection
+member; a version 1 document with `source.commit` or `source.base`, or with
+caller `ci`. Version 1 stays the CLI's alone.
+
+Canonical bytes follow the version 1 rules. `ParseBoundRequest` reads the
+root `version` and hands the document to the parser of that version, so a
+version 1 document parses, encodes and digests exactly as
+`ParseExecutionRequest` reads it. It refuses any other version.
+
+A version 2 request reaches an engine with no submitting CLI in front of it,
+so `ValidateCommitRequest` refuses the commands no portable run carries
+(`UnportableCommands`): `serve`, `run` and `compose` stream a live workload,
+`qualify` reaches one, and `format` rewrites the source. The submitting CLI
+refuses the same commands before it builds a version 1 request; version 1
+validation is unchanged.
+
+`CommitInputDigest` is `sha256:` over the canonical JSON of
+`{"domain":"putnami/runner/execution-input/v2","protocolVersion":1,"source":…,"invocation":…,"selection":…}`.
+It excludes `control` and the negotiated capabilities. Its domain differs
+from version 1's, so no version 1 input digest names a version 2 input.
+
+Without a plan, `ValidatePublication` has nothing to check on the request.
+The executing engine holds the plan it makes to both version 1 checks when
+that plan publishes, and runs a plan that publishes nothing with or without
+`invocation.publication`.
+
+A version 2 request travels only through the bound-request channel
+(`PUTNAMI_RUNNER_REQUEST`): `submit` carries version 1 only, and no capability
+negotiates version 2. The executing engine refuses a checkout whose HEAD is
+not `source.commit` or whose tracked files differ from it, and a planned task
+whose cwd leaves the checkout. The session it
+records states the remote placement and no `placement.provenance`, because
+the `protocols/cli` provenance block requires a source digest, which this
+request does not have. [ADR 0006](doc/adr/0006-commit-addressed-engine-planned-request.md)
+records the decision.
+
 ## Provider RPC (v1)
 
 A provider is the extension command named `runner-provider`, spoken to over its
@@ -200,7 +259,9 @@ under an existing id is refused.
 
 `fixtures/source-manifest`, `fixtures/execution-request` and
 `fixtures/session-bundle` hold valid and invalid corpora; `digests.json` pins
-canonical content and execution-input identities. The Go decoder consumes the
+canonical content and execution-input identities. The execution-request
+corpus holds both versions, the version 2 documents prefixed `commit-`, and is
+read through `ParseBoundRequest`. The Go decoder consumes the
 corpus. There is no TypeScript runner runtime in this repository yet; any
 future reader must consume the same corpus and match its bytes/digests before
 claiming cross-runtime conformance.

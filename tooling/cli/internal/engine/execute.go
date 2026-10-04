@@ -102,11 +102,16 @@ func recordedSessionDocument(
 	}
 	document.Placement = &protocolcli.SessionPlacement{Requested: requested, Actual: "local"}
 	if req.Portable != nil {
-		// The executing side of a portable request IS the remote placement, and
-		// the snapshot it runs in carries no Git history: the tree and branch it
-		// records are the ones the submitter bound into the request, which the
-		// provider materialized byte for byte.
+		// The executing side of a portable request IS the remote placement.
 		document.Placement = &protocolcli.SessionPlacement{Requested: "remote", Actual: "remote"}
+	}
+	if req.Portable.frozen() {
+		// The snapshot a frozen request runs in carries no Git history: the tree
+		// and branch it records are the ones the submitter bound into the
+		// request, which the provider materialized byte for byte. A version 2
+		// request runs on a checkout, whose tree and branch the session records
+		// as a local run's; it records no provenance, which names a source
+		// snapshot the request does not have.
 		source := req.Portable.Request.Source
 		if source.Tree != nil {
 			document.Tree = &protocolcli.SessionTree{Fingerprint: source.Tree.Fingerprint, Dirty: source.Tree.Dirty, HeadSHA: source.Tree.HeadSHA}
@@ -263,15 +268,16 @@ func (e *Engine) executeSession(
 		if sessionCreateErr != nil && req.Global.Debug {
 			iox.Fprintf(os.Stderr, "[debug] session create failed: %v\n", sessionCreateErr)
 		}
-		if session != nil && req.Portable == nil {
+		if session != nil && !req.Portable.frozen() {
 			// Here, and nowhere later: the recorded fingerprint must describe the
 			// tree this run's tasks CONSUME, and the first of them has not started
 			// yet. A capture taken at finalize would describe what the run
 			// produced — the tree after `lint --fix` rewrote a file — which is a
 			// different claim, and not the one a consumer asking "was this gate run
-			// on the code I am looking at?" needs. A portable execution records the
-			// submitter's bound tree instead (recordedSessionDocument): its snapshot
-			// has no history, and a parent directory's repository is not its tree.
+			// on the code I am looking at?" needs. A frozen portable execution records
+			// the submitter's bound tree instead (recordedSessionDocument): its
+			// snapshot has no history, and a parent directory's repository is not
+			// its tree.
 			session.CaptureTree(wsRoot)
 		}
 	}

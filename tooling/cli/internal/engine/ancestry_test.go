@@ -123,9 +123,7 @@ func TestAncestryIsCapturedBeforeTheInstallRunsRepositoryCode(t *testing.T) {
 	if capturedAncestry(CaptureAncestry(context.Background(), root, gate, nil), root) != nil {
 		t.Fatal("a gate-only invocation read the ancestry")
 	}
-	bound := &runner.ExecutionRequest{Invocation: runner.InvocationBlock{
-		Commands: gate, Publication: &runner.PublicationBlock{Barrier: []string{"test"}},
-	}}
+	bound := &runner.InvocationBlock{Commands: gate, Publication: &runner.PublicationBlock{Barrier: []string{"test"}}}
 	if capturedAncestry(CaptureAncestry(context.Background(), root, gate, bound), root) == nil {
 		t.Fatal("a bound request carrying invocation.publication read no ancestry")
 	}
@@ -244,6 +242,13 @@ func TestAncestrySnapshotIsNotTakenForAGateOnlyRun(t *testing.T) {
 			Invocation: runner.InvocationBlock{Commands: gate, Publication: publication},
 		}}
 	}
+	commit := func(publication *runner.PublicationBlock) *PortableExecution {
+		return &PortableExecution{Commit: &runner.CommitRequest{
+			Source:     runner.CommitSource{Commit: head},
+			Invocation: runner.InvocationBlock{Commands: gate, Publication: publication},
+			Selection:  runner.RequestedSelection{Mode: runner.SelectionModeAll},
+		}}
+	}
 	for _, tc := range []struct {
 		name     string
 		commands []string
@@ -255,6 +260,8 @@ func TestAncestrySnapshotIsNotTakenForAGateOnlyRun(t *testing.T) {
 		{"publish", []string{"build", "publish"}, nil, true},
 		{"deploy", []string{"deploy"}, nil, true},
 		{"bound request with the block", gate, bound(&runner.PublicationBlock{Barrier: []string{"test"}}), true},
+		{"commit request without the block", gate, commit(nil), false},
+		{"commit request with the block", gate, commit(&runner.PublicationBlock{Barrier: []string{"test"}}), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := runQuietly(t, Request{WorkspaceRoot: root, Config: &wsproto.Config{}, Commands: tc.commands, Portable: tc.portable})

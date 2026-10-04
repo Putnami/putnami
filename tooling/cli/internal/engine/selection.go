@@ -38,9 +38,11 @@ type autoProjectSelectionNote struct {
 // req.Global, so a caller outside Engine.Run would be resolving selection for a
 // run that never happens — the state the run markers and planning read.
 func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extension.ExtensionDescription) ([]*workspace.Project, int) {
-	// The executing side of a portable request plans the frozen selection: no
-	// smart default, no impact analysis, no marker lookup can widen or narrow it.
-	if req.Portable != nil {
+	// The executing side of a frozen portable request plans the frozen
+	// selection: no smart default, no impact analysis, no marker lookup can
+	// widen or narrow it. A version 2 request reaches the ordinary stage below
+	// with the selection flags it bound (PortableExecution.bindSelection).
+	if req.Portable.frozen() {
 		return selectFrozenProjects(req, ws)
 	}
 	autoNote, code := applyBareProjectSelection(req, ws, extensions)
@@ -309,7 +311,7 @@ func verificationSelection(
 	ws *workspace.Workspace,
 	extensions ...*extension.ExtensionDescription,
 ) (*jobs.ReleaseSetVerification, selectionEvidence, int) {
-	if req.Portable != nil {
+	if req.Portable.frozen() {
 		return nil, selectionEvidence{}, ExitSuccess
 	}
 	verifies := false

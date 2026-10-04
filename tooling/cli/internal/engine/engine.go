@@ -205,12 +205,14 @@ type Request struct {
 	CacheVerification *CacheVerificationRequest
 	// Portable binds this run to a bound execution request a runner provider
 	// delivered (internal/runnerprovider.BoundRequestEnv). It is the typed
-	// request decomposition for the EXECUTING side of portable execution: the
-	// selection stage plans exactly the frozen project ids, the seam before
-	// execution refuses a re-planned graph that differs from the expected plan,
-	// placement resolution is skipped (this engine IS the remote), and the
-	// recorded session states the remote placement. Nil preserves the normal
-	// lifecycle exactly. Only the bound-request adapter in internal/cli sets it.
+	// request decomposition for the EXECUTING side of portable execution:
+	// placement resolution is skipped (this engine IS the remote) and the
+	// recorded session states the remote placement. For a frozen version 1
+	// request the selection stage plans exactly the frozen project ids and the
+	// seam before execution refuses a re-planned graph that differs from the
+	// expected plan; a version 2 request plans its checkout through the
+	// ordinary stages (PortableExecution). Nil preserves the normal lifecycle
+	// exactly. Only the bound-request adapter in internal/cli sets it.
 	Portable *PortableExecution
 	// EphemeralSession records the run's session file as usual but keeps it OUT of
 	// the `latest` rotation. Set it when the run is not the user's build.
@@ -534,6 +536,9 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	ctx = jobs.CaptureProcessCapabilities(ctx)
 	req := &request
 	req.versions, req.versionsErr = nil, nil
+	// A version 2 bound request names the selection this engine resolves; it
+	// binds onto the selection flags before any stage reads them.
+	req.Portable.bindSelection(&req.Global)
 
 	// The version stamp reflects the tree as the user left it, so it is captured
 	// BEFORE the before-hooks and any codegen job runs. Computing it afterwards
@@ -951,8 +956,8 @@ func attachReleaseSet(req *Request, run *jobs.ReleaseSetRun, planned []*jobs.Sch
 		ancestry = req.ancestry
 	}
 	var barrier []string
-	if req.Portable != nil && req.Portable.Request.Invocation.Publication != nil {
-		barrier = req.Portable.Request.Invocation.Publication.Barrier
+	if invocation := req.Portable.invocation(); invocation != nil && invocation.Publication != nil {
+		barrier = invocation.Publication.Barrier
 	}
 	if err := run.BindPublication(ancestry, barrier); err != nil {
 		return planned, nil, err
@@ -1026,7 +1031,7 @@ func keyingPlan(
 // preparation and every later stage that can start a provider, so a gate-only
 // request starts none. It prints the refusal and reports whether it refused.
 func refusesUnauthorizedPublication(req *Request, options jobs.ReleaseSetOptions, planned []*jobs.ScheduledJob) bool {
-	if req.Portable == nil || req.Portable.Request.Invocation.Publication != nil {
+	if invocation := req.Portable.invocation(); invocation == nil || invocation.Publication != nil {
 		return false
 	}
 	var err error

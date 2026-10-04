@@ -53,10 +53,10 @@ task runs in the submitting worktree. Two providers are an ambiguous
 configuration. An edit made after submission never reaches execution.
 
 Refused before submission, with a diagnostic: `--watch`, `serve`, `run`,
-`format`, an executing `--dry-run`, tasks with registry or cloud side effects,
-tasks whose declared cwd leaves the workspace, and cacheable tasks keyed on
-environment variables. Verification never publishes or deploys through this
-path.
+`compose`, `qualify`, `format`, an executing `--dry-run`, tasks with registry
+or cloud side effects, tasks whose declared cwd leaves the workspace, and
+cacheable tasks keyed on environment variables. Verification never publishes
+or deploys through this path.
 
 ## Required inputs
 
@@ -124,6 +124,45 @@ registry or cloud effects, or a release-set publication its tagged versions
 start: no release-set or deploy provider starts for it. The session of an executed
 request states `placement: {requested: remote, actual: remote}`, the submitter's tree
 fingerprint and branch, and the frozen baseline.
+
+## A commit-addressed request
+
+A caller that holds a commit and no snapshot, such as a hosted CI service,
+sends a version 2 request on the same channel: the commit, the invocation, and
+a requested selection (`all`, `impacted` with `source.base`, or `projects`
+with selectors), with no plan and no environment (see the `protocols/runner`
+README). No submitting CLI checked it, so the protocol refuses the commands
+the submitting side refuses: a request that names `serve`, `run`, `compose`,
+`qualify` or `format` is malformed and exits 2. The provider checks the commit
+out and launches its pinned entrypoint as it does for a snapshot. The engine
+then:
+
+1. Refuses the request unless the checkout's HEAD is `source.commit` and no
+   tracked file differs from it, in the index or the working tree. The check
+   runs before the first-use bootstrap, hooks, or any task. It does not run
+   before the entrypoint: that comes from the checkout, and in a source
+   workspace `./putnamiw` builds the CLI from it. Untracked files are not
+   checked. A refused request exits 1 and records no session.
+2. Plans the checkout through the ordinary selection. `impacted` is
+   `--impacted --baseline <source.base>`: untracked files count as changes, a
+   baseline the checkout cannot read falls back to every project unless
+   `impactedStrict` is set, and an empty selection is the ordinary no-op.
+   `projects` resolves its selectors as `--projects` does, and `all` is
+   `--all`.
+3. Stamps versions from the checkout's Git history, never resolves placement,
+   and compares no expected plan, because none came with the request. It
+   refuses a task whose cwd leaves the checkout, as the submitting side does.
+4. Holds a plan that publishes, by command or by declared effects, to the
+   version 1 rules. Without `invocation.publication` it is refused on the
+   first plan; with it, every publication task waits for every barrier task.
+   A plan that publishes nothing runs, with or without the block.
+
+Providers come from `invocation.providers`, and the run credential descriptor
+flag stays the only accepted argument. The session states
+`placement: {requested: remote, actual: remote}` and the checkout's own tree
+fingerprint, branch and baseline. It records no `placement.provenance`: that
+block names a source snapshot digest, which a commit-addressed request does
+not have.
 
 ## Durable attempts, resume and cancellation
 

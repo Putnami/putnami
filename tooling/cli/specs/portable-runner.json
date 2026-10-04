@@ -26,6 +26,10 @@
       "text": "After preflight, a remote run becomes a strict versioned request: typed parameters and flags, frozen selection and baseline, expected ChangePlan, pinned engine, extensions, toolchains and platform. Watch, serve, run, format, dry-run and side-effect tasks are refused before submission. An unready provider is an error, never a local run. The executing engine plans the frozen selection; it refuses a graph unlike the expected plan and, before a provider starts, a publishing plan without invocation.publication."
     },
     {
+      "id": "commit-request",
+      "text": "A version 2 bound request names a commit and a requested selection, never a snapshot or expected plan, and is malformed when it names serve, run, compose, qualify or format. The engine refuses it unless HEAD is that commit with no modified tracked file, then plans the checkout: impacted against source.base, the projects selectors, or all. It stamps versions from Git, never resolves placement, refuses a task whose cwd leaves the checkout or an unauthorized publication, and records no provenance."
+    },
+    {
       "id": "durable-lifecycle",
       "text": "A submission is recorded before it is sent and its key is looked up before any submit, so a lost acknowledgement, a duplicate submit or a CLI restart never creates a second attempt; a settled one run again is new. Follow persists an ordered cursor; a disconnect replays from it without duplicates. An interrupt cancels within bounded time and terminates the process tree; a cancel racing a completion keeps the provider's outcome. Expired or corrupt evidence never rewrites the verdict or reruns work."
     },

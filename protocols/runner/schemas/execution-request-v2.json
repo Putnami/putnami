@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/runner-execution-request-v2.json",
+  "title": "Runner execution request version 2",
+  "description": "The commit-addressed, engine-planned execution request: a commit, the typed invocation and the requested selection mode, and no plan or environment, because the executing engine plans the checkout of the commit. Implementations must also enforce the semantic rules and strict JSON rules documented in protocols/runner/README.md; the schema describes the structural shape only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "protocol", "source", "invocation", "selection", "control"],
+  "allOf": [
+    {
+      "description": "The invocation block is version 1's, and a version 2 request names no unportable command: serve, run and compose stream a live workload, qualify reaches one, and format rewrites the source.",
+      "properties": { "invocation": { "properties": { "commands": { "items": { "not": { "enum": ["compose", "format", "qualify", "run", "serve"] } } } } } }
+    }
+  ],
+  "properties": {
+    "version": { "const": 2 },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "capabilities"],
+      "properties": {
+        "version": { "const": 1 },
+        "capabilities": { "$ref": "#/definitions/sortedStrings" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit"],
+      "properties": {
+        "commit": { "$ref": "#/definitions/objectId", "description": "the commit the executing checkout's HEAD must equal, with no modified tracked file" },
+        "base": { "$ref": "#/definitions/objectId", "description": "the commit an impacted selection is measured against; present exactly when selection.mode is impacted, in the object format of commit" }
+      }
+    },
+    "invocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commands", "params", "flags", "cwd"],
+      "properties": {
+        "commands": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/definitions/identifier" } },
+        "params": {
+          "type": "object",
+          "maxProperties": 256,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "value"],
+            "properties": {
+              "type": { "enum": ["string", "bool", "int", "float", "strings"] },
+              "value": {}
+            },
+            "description": "value must match type: string, boolean, integer, finite number, or array of strings"
+          }
+        },
+        "flags": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["noCache", "noCacheExplicit", "retryFailed", "continueOnError", "impactedStrict", "verbose", "debug", "quiet", "retry", "maxParallel", "maxParallelMode", "cpuBudgetPolicy", "cacheTrust", "output", "profile", "resourceBudgets"],
+          "properties": {
+            "noCache": { "type": "boolean" },
+            "noCacheExplicit": { "type": "boolean" },
+            "retryFailed": { "type": "boolean" },
+            "continueOnError": { "type": "boolean" },
+            "impactedStrict": { "type": "boolean" },
+            "verbose": { "type": "boolean" },
+            "debug": { "type": "boolean" },
+            "quiet": { "type": "boolean" },
+            "retry": { "type": "integer", "minimum": 0 },
+            "maxParallel": { "type": "integer", "minimum": 0 },
+            "maxParallelMode": { "$ref": "#/definitions/text" },
+            "cpuBudgetPolicy": { "$ref": "#/definitions/text" },
+            "cacheTrust": { "$ref": "#/definitions/text" },
+            "output": { "$ref": "#/definitions/text" },
+            "profile": { "$ref": "#/definitions/text" },
+            "resourceBudgets": { "type": "object", "maxProperties": 64, "additionalProperties": { "type": "integer", "minimum": 0 } }
+          }
+        },
+        "cwd": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "providers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "enum": ["install", "publish"] },
+          "description": "sorted; absent when no provider is enabled, never an empty list"
+        },
+        "publication": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["barrier"],
+          "properties": {
+            "barrier": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "uniqueItems": true,
+              "items": { "$ref": "#/definitions/identifier" },
+              "description": "sorted; each entry is one of invocation.commands and none is a publication command"
+            }
+          },
+          "description": "required when the plan holds a task of a publication command (checked by the protocol); the executing engine, which classifies by declared effects, also refuses it over a plan with no registry or cloud effect; each publication task depends, transitively, on every task of every barrier command"
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "enum": ["all", "impacted", "projects"] },
+        "projects": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100000,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^(?!\\s)(?!.*\\s$)(?!\\*$)(?!\\[impacted\\]$)[^,\\u0000-\\u001f\\u007f]+$" },
+          "description": "sorted project selectors in the grammar of --projects, one selector per entry; present exactly when mode is projects"
+        }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caller", "idempotencyKey", "deadline"],
+      "properties": {
+        "caller": { "enum": ["cli", "ci"] },
+        "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "deadline": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$" }
+      }
+    }
+  },
+  "definitions": {
+    "objectId": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+    "text": { "type": "string", "maxLength": 1024, "pattern": "^[^\\u0000-\\u001f\\u007f]*$" },
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9._@/~-]+$" },
+    "sortedStrings": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 1024 }, "description": "sorted by UTF-8 bytes, strictly increasing" }
+  }
+}

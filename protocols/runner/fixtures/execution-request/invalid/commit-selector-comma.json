@@ -1,0 +1,51 @@
+{
+  "version": 2,
+  "protocol": {
+    "version": 1,
+    "capabilities": [
+      "execution-request-v1",
+      "session-bundle-v1"
+    ]
+  },
+  "source": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "invocation": {
+    "commands": [
+      "lint",
+      "test",
+      "build"
+    ],
+    "params": {},
+    "flags": {
+      "noCache": false,
+      "noCacheExplicit": false,
+      "retryFailed": false,
+      "continueOnError": false,
+      "impactedStrict": false,
+      "verbose": false,
+      "debug": false,
+      "quiet": false,
+      "retry": 0,
+      "maxParallel": 0,
+      "maxParallelMode": "",
+      "cpuBudgetPolicy": "",
+      "cacheTrust": "",
+      "output": "",
+      "profile": "",
+      "resourceBudgets": {}
+    },
+    "cwd": "."
+  },
+  "selection": {
+    "mode": "projects",
+    "projects": [
+      "app,lib"
+    ]
+  },
+  "control": {
+    "caller": "cli",
+    "idempotencyKey": "ffffffffffffffffffffffffffffffff",
+    "deadline": "2026-10-04T12:00:00Z"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "version": 2,
+  "protocol": {
+    "version": 1,
+    "capabilities": [
+      "execution-request-v1",
+      "session-bundle-v1"
+    ]
+  },
+  "source": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "dddddddddddddddddddddddddddddddddddddddd"
+  },
+  "invocation": {
+    "commands": [
+      "lint",
+      "test",
+      "build",
+      "validate"
+    ],
+    "params": {
+      "coverage": {
+        "type": "bool",
+        "value": true
+      }
+    },
+    "flags": {
+      "noCache": false,
+      "noCacheExplicit": false,
+      "retryFailed": false,
+      "continueOnError": false,
+      "impactedStrict": true,
+      "verbose": false,
+      "debug": false,
+      "quiet": false,
+      "retry": 0,
+      "maxParallel": 0,
+      "maxParallelMode": "",
+      "cpuBudgetPolicy": "",
+      "cacheTrust": "ci",
+      "output": "json",
+      "profile": "",
+      "resourceBudgets": {}
+    },
+    "cwd": "."
+  },
+  "selection": {
+    "mode": "impacted"
+  },
+  "control": {
+    "caller": "ci",
+    "idempotencyKey": "ffffffffffffffffffffffffffffffff",
+    "deadline": "2026-10-04T12:00:00Z"
+  }
+}

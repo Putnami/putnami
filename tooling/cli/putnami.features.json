@@ -43,6 +43,18 @@
           }
         },
         {
+          "id": "commit-request",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "commit-request-plans-and-runs-the-checkout",
+              "commit-request-refuses-another-checkout"
+            ]
+          }
+        },
+        {
           "id": "isolated-execution",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
