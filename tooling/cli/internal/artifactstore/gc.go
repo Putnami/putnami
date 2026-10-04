@@ -413,15 +413,16 @@ func readUsed(dir string) (time.Time, bool) {
 }
 
 // dirBytes sums the sizes of all regular files under dir, excluding the
-// lastused recency sidecar (GC bookkeeping, not artifact payload) so the budget
-// accounts for the bytes a re-fetch would actually have to recreate.
+// lastused recency sidecar and the implementationdigest record (bookkeeping,
+// not artifact payload) so the budget accounts for the bytes a re-fetch would
+// actually have to recreate.
 func dirBytes(dir string) int64 {
 	var total int64
 	_ = filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil
 		}
-		if d.Name() == lastUsedFile {
+		if d.Name() == lastUsedFile || d.Name() == implementationFile {
 			return nil
 		}
 		if info, err := d.Info(); err == nil {

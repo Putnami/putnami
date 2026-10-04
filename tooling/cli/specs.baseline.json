@@ -84,6 +84,7 @@
     "cli/job-planning-execution#command-catalog",
     "cli/job-planning-execution#declared-output-cache-boundary",
     "cli/job-planning-execution#dependency-plan",
+    "cli/job-planning-execution#extension-implementation-cache-key",
     "cli/job-planning-execution#failure-replay-cache",
     "cli/job-planning-execution#generated-output-drift",
     "cli/job-planning-execution#preview-no-effects",

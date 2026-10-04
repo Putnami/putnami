@@ -123,7 +123,10 @@ func NormalizeTree(root string) error {
 //   - the per-entry `lastused` recency sidecars, whose unix-nano wall clock is
 //     the one field that can never be reproduced. GC falls back to the entry's
 //     directory mtime when the sidecar is absent, and the consuming machine
-//     re-stamps every lock-pinned digest through Touch on its next run.
+//     re-stamps every lock-pinned digest through Touch on its next run;
+//   - the per-entry `implementationdigest` records, which exist only where a
+//     run computed a cache key, so their presence is host history. The
+//     consuming machine derives them again from the payload.
 //
 // NEVER call this on a live store: deleting .lock while other processes hold it
 // breaks the lock identity that keeps GC from reaping an in-flight admit, and
@@ -148,12 +151,12 @@ func (s *Store) Normalize() error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() || d.Name() != lastUsedFile {
+		if d.IsDir() || (d.Name() != lastUsedFile && d.Name() != implementationFile) {
 			return nil
 		}
 		return os.Remove(path)
 	}); err != nil {
-		return fmt.Errorf("normalize: drop artifact-store recency sidecars: %w", err)
+		return fmt.Errorf("normalize: drop artifact-store bookkeeping sidecars: %w", err)
 	}
 	if err := NormalizeTree(s.root); err != nil {
 		return err

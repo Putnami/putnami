@@ -46,6 +46,12 @@ type HostBuild struct {
 	// CGO is the tri-state `cgo` parameter: "" keeps the host default, "true"
 	// sets CGO_ENABLED=1, "false" sets CGO_ENABLED=0.
 	CGO string
+	// Buildvcs is the tri-state `buildvcs` parameter: "" keeps Go's default
+	// (`auto`, which stamps the checkout's revision, time and modified state
+	// into the binary), "true" and "false" pass `-buildvcs=true` and
+	// `-buildvcs=false`. A binary built with false is the same bytes at every
+	// commit whose sources it compiles are unchanged.
+	Buildvcs string
 }
 
 // HostBuildParamNames is the closed set of parameters ResolveHostBuild reads,
@@ -75,6 +81,7 @@ var HostBuildParamNames = []string{
 	"p",
 	"buildmode",
 	"cgo",
+	"buildvcs",
 }
 
 // ResolveHostBuild reads the host build configuration the way every job of
@@ -121,6 +128,13 @@ func ResolveHostBuild(ctx *pctx.Context, flags map[string]string) HostBuild {
 		host.CGO = cgoValue(flagBool(v))
 	} else if _, ok := params["cgo"]; ok {
 		host.CGO = cgoValue(params.Bool("cgo", false))
+	}
+	// `buildvcs` is presence-sensitive for the same reason: false strips the
+	// VCS stamp, saying nothing keeps it.
+	if v, ok := flags["buildvcs"]; ok {
+		host.Buildvcs = cgoValue(flagBool(v))
+	} else if _, ok := params["buildvcs"]; ok {
+		host.Buildvcs = cgoValue(params.Bool("buildvcs", false))
 	}
 	return host
 }
@@ -169,6 +183,9 @@ func (h HostBuild) BuildArgs(ldflags string) []string {
 	}
 	if h.Buildmode != "" {
 		args = append(args, "-buildmode", h.Buildmode)
+	}
+	if h.Buildvcs != "" {
+		args = append(args, "-buildvcs="+h.Buildvcs)
 	}
 	return args
 }

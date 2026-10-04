@@ -25,6 +25,7 @@ import (
 // with proj/.gen/hook.txt.
 type outputRaceFixture struct {
 	root     string
+	extDir   string
 	outDir   string
 	hookFile string
 	started  string
@@ -43,8 +44,12 @@ func newOutputRaceFixture(t *testing.T) *outputRaceFixture {
 		t.Skip("/bin/sh unavailable on this platform")
 	}
 	root := t.TempDir()
+	// The extension is installed in a directory of its own: its installed tree
+	// names it in every key, so it must not hold the workspace, whose files the
+	// sessions write while they run.
 	f := &outputRaceFixture{
 		root:     root,
+		extDir:   t.TempDir(),
 		outDir:   filepath.Join(root, ".putnami", "out", "proj", "test"),
 		hookFile: filepath.Join(root, "proj", ".gen", "hook.txt"),
 		started:  filepath.Join(root, "started.fifo"),
@@ -155,7 +160,7 @@ func (f *outputRaceFixture) jobNamed(name, command string, cacheable bool) *Sche
 	return &ScheduledJob{
 		Project: f.project,
 		Extension: &extension.ExtensionDescription{
-			Name: "@putnami/test", Path: f.root,
+			Name: "@putnami/test", Path: f.extDir,
 			Tasks: map[string]extension.TaskDefinition{
 				task: {Declares: &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
 					"report": fileDeclaration(extension.OutputRootCommandOutput, "report.txt", false),

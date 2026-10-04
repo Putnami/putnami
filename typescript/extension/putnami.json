@@ -15,7 +15,7 @@
   "options": {
     "@putnami/go": {
       "entrypoint": "./cmd/putnami-ts",
-      "version-var": "main.runtimeVersion"
+      "buildvcs": false
     },
     "package": {
       "archives": true

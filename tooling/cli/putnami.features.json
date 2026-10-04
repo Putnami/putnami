@@ -788,6 +788,24 @@
               "retry-failed-is-execution-policy-only"
             ]
           }
+        },
+        {
+          "id": "extension-implementation-cache-key",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-digest-replaces-the-version-in-the-key",
+              "an-installed-tree-digest-ignores-version-metadata",
+              "an-installed-tree-digest-follows-the-implementation",
+              "a-version-only-build-keeps-the-key",
+              "a-store-record-is-trusted-only-inside-the-store",
+              "a-toolchain-pin-still-moves-the-key"
+            ]
+          }
         }
       ]
     },

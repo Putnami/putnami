@@ -74,11 +74,18 @@ caches outside this root keep their existing lifetimes. See
 A cache key is a SHA-256 hash composed of:
 
 ```
-v2                          ← format version (for compatibility)
+v8                          ← format version (for compatibility)
 + extension name            ← e.g., "@putnami/typescript"
++ extension version         ← only when the extension has no implementation digest (see below)
++ implementation digest     ← what the extension runs; empty when it has none
++ toolchain                 ← the CLI's Go runtime and each declared runtime toolchain's lock identity
++ runtime identity          ← declared runtime inputs such as hostPlatform, absent when none
++ OS class                  ← "windows" on Windows, absent elsewhere
 + source state              ← "unmanaged" where Git does not manage the workspace root, absent inside a repository
 + task name                 ← e.g., "build~transpile"
++ task contract digest      ← the task's declaration in the manifest
 + project name              ← e.g., "my-app"
++ project metadata digest   ← provider-owned project metadata
 + workspace version         ← from putnami.workspace.json
 + publish version           ← full version incl. commit suffix, only for version-bearing tasks (see Version-Aware Tasks)
 + task params hash          ← resolved task inputs plus owning-command flags
@@ -86,6 +93,68 @@ v2                          ← format version (for compatibility)
 + env vars hash             ← values of declared environment variables
 + upstream hashes           ← cache hashes from dependency tasks
 ```
+
+### Extension Implementation
+
+Every key names the implementation of the extension that runs the task, in
+one of three ways:
+
+| Extension | Key carries |
+|-----------|-------------|
+| Workspace-local, with a prepared runtime | The prepared-runtime digest (see [Artifact Store](#artifact-store-binaries)) |
+| Installed: lock-pinned, per-worktree install, or `node_modules` package | The content digest of the installed tree, without version metadata |
+| Workspace-local without a prepared runtime, or local outside the workspace | The extension version |
+
+When the key carries a digest, it does not carry the version, so two builds of
+an extension that differ only in the version they stamp share their entries.
+Every framework build stamps a new version, so moving between canary builds of
+an unchanged extension keeps the cache warm.
+
+The installed-tree digest reads every regular file (path, executable bit and
+bytes), every symbolic link (path and target), and every other file, such as a
+named pipe (path and type), in the installed directory. It removes the version
+an extension build stamps from the two files the extension protocol defines,
+each re-encoded as canonical JSON:
+
+- the top-level `version` of `putnami.extension.json`, and its
+  `agentContent.manifestSha256`, which binds the agent-content manifest bytes
+  that carry the version;
+- the top-level `version` of the agent-content manifest
+  (`<agentContent.path>/putnami.agent-artifact.json`).
+
+A file among these that is not one JSON object is hashed as raw bytes. A
+version in any other file, such as a package manifest, is the extension's own
+content. Any other change to the tree, such as a runtime binary, a
+configuration file or an executable bit, moves the digest and misses the cache.
+
+The digest does not decide which files a task reads, so documentation counts
+like any other file. Any byte of the installed archive moves the digest,
+including `README.md`, `AI.md` and the framework docs the Go extension bundles
+under `framework-docs/`. A build that changes only documentation misses the
+cache for every task of the extension.
+
+A runtime binary that embeds its version or its commit moves the digest at
+every build. The Go and TypeScript extension runtimes are built without a
+version variable and with `buildvcs: false`, and read their version from the
+manifest at run time, so their bytes change only when their sources do.
+
+Two key fields differ between platforms as a side effect of what they
+identify:
+
+- The implementation digest reads the binaries of the installed platform, so
+  it differs on each platform for an extension that ships platform
+  executables.
+- The toolchain field differs on each platform for a task that uses a runtime
+  toolchain: its own, or one the extension's runtime declares for every task,
+  as the Go and TypeScript extensions do.
+
+Only a task with neither shares its entries between a developer machine and
+CI on another platform. A task whose output depends on the platform still
+declares the `hostPlatform` runtime input, because neither field is that
+declaration.
+
+A runtime toolchain pin keys the task through the toolchain field, whatever
+the implementation digest.
 
 ### Task Parameters
 
@@ -1428,7 +1497,8 @@ Separate from the per-repo build cache above, the CLI keeps a **flat, machine-gl
 ```
 ~/.putnami/artifacts/
 ├── sha256/<digest[0:2]>/<digest>/   # extracted extension/template tree; the manifest sits at the dir root
-│   └── lastused                     # recency sidecar for GC
+│   ├── lastused                     # recency sidecar for GC
+│   └── implementationdigest         # the installed-tree digest of an extension entry, once a run computed it
 ├── cli/<sha256>/                    # the downloaded prebuilt CLI (content-addressed)
 │   ├── putnami                      #   the CLI binary
 │   └── lastused                     #   recency sidecar — GC'd by recency, like sha256/ entries
@@ -1477,6 +1547,9 @@ and atomic first-writer-wins admit. Before an executable is admitted or reused,
 the CLI verifies that it is a regular non-symlink executable and runs the
 bounded `__putnami runtime-info` handshake. That handshake binds extension
 name/version, host platform, CLI contract, runtime protocol, and runtime ABI.
+A runtime that carries no version of its own, such as the Go and TypeScript
+extension runtimes, answers the version of the `putnami.extension.json` that
+declares it as its executable, and an empty version when no manifest does.
 Its 10-second deadline counts from the moment the operating system has started
 the runtime process. The time the operating system spends admitting a freshly
 written binary, such as darwin's code-signature assessment on a loaded machine,
@@ -1491,6 +1564,24 @@ The synchronized content digest is included in local task cache keys, so a
 runtime source or replacement-module edit cannot restore a result produced by
 older executable bytes. GC/Clean remove orphan digest-lock files only while
 holding the store-exclusive lock, avoiding flock inode-split races.
+
+An installed extension's tasks carry the content digest of its installed tree
+instead (see [Extension Implementation](#extension-implementation)). An entry
+under `sha256/` never changes, so the first run that computes the digest
+records it in the entry's `implementationdigest` file, tagged with the digest
+schema, and later runs read that file instead of hashing the tree again. The
+record is read and written under the store's shared lock, so GC never removes
+an entry while its digest is computed or recorded; when the lock is not
+available within 2 seconds, the run computes the digest and records nothing. A
+record of another schema, or one that cannot be read, is computed again and
+replaced. Only an entry inside the store is trusted with a record: a
+`node_modules` package or a per-worktree install can change between runs, so
+each run hashes it again, and a file named `implementationdigest` there is
+payload like any other file. An entry of another store, such as one a link
+installed under another `PUTNAMI_ARTIFACT_DIR` names, is hashed again on each
+run too, and its record is neither read nor written. The bookkeeping files any
+store writes at an entry's root, `lastused` and `implementationdigest`, stay
+out of its digest, so the runs that use that store do not move it.
 
 ### Zero-init worktrees
 
@@ -1547,4 +1638,5 @@ putnami cache clean
 | Env var changed | Different env hash | Check `cache.key.env` |
 | Wrong glob pattern | Files not included in hash | Update `cache.key.files` |
 | Version bump | Different effective project version | Expected behavior |
-| New task format | `v2` prefix changed | Clean cache after CLI upgrade |
+| Extension changed | Different implementation digest, or a different version for an extension without one | Expected behavior |
+| New task format | Format version changed (now `v8`) | Clean cache after CLI upgrade |

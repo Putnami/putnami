@@ -786,15 +786,18 @@ const (
 	// CLI. A task declares it when its output or its VERDICT is host-specific:
 	// a host-platform compile emits Mach-O on darwin and ELF on linux, and a
 	// host-platform compile check accepts sources on one OS that do not build
-	// on another (`//go:build linux` files are compiled only on linux). Nothing
-	// else in the cache key varies with the machine, and cache entries are
-	// shared between developer laptops and CI, so without this declaration a
-	// darwin verdict can be served to linux.
+	// on another (`//go:build linux` files are compiled only on linux). Other
+	// cache key fields differ between platforms only as a consequence of what
+	// they identify: the runtime toolchain identity of a task that uses a
+	// runtime toolchain, and the implementation digest of an installed
+	// extension that ships platform executables. A task with neither shares
+	// cache entries between developer laptops and CI, so without this
+	// declaration a darwin verdict can be served to linux.
 	RuntimeInputHostPlatform = "hostPlatform"
 	// RuntimeInputExtensionVersion is the resolved extension version. It is
-	// accepted for documentation value only: the version is already an
-	// unconditional field of every cache key, so declaring it adds no key
-	// material and moves no existing key.
+	// accepted for documentation value only and adds no key material: every
+	// cache key already names the extension's implementation, by its version
+	// or by the implementation digest that replaces the version.
 	RuntimeInputExtensionVersion = "extensionVersion"
 )
 

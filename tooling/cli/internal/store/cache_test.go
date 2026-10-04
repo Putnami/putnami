@@ -8,6 +8,7 @@ import (
 	"time"
 
 	protocolcache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestCacheKey_ComputeHash_Deterministic(t *testing.T) {
@@ -38,7 +39,7 @@ func TestCacheKey_ComputeHash_Deterministic(t *testing.T) {
 }
 
 func TestCacheKeyFormatVersion(t *testing.T) {
-	const want = "v7"
+	const want = "v8"
 	if cacheKeyVersion != want {
 		t.Fatalf("cache key format version = %q, want %q", cacheKeyVersion, want)
 	}
@@ -627,7 +628,7 @@ func TestCacheKey_ComputeHash_ExtensionImplementationDigestMoves(t *testing.T) {
 }
 
 func TestCacheKey_HashFormatIsPinned(t *testing.T) {
-	// Golden pin of the v7 key format: a fixed key must hash to a fixed value.
+	// Golden pin of the v8 key format: a fixed key must hash to a fixed value.
 	// If this moves, the KEY FORMAT changed and every existing cache entry
 	// becomes a miss — that is sometimes the intent (a version bump like
 	// v4→v5), but it must be a reviewed, deliberate event, never a side
@@ -638,9 +639,9 @@ func TestCacheKey_HashFormatIsPinned(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "9386f2a81cee23d19ea159164f9d84bc28b5d91be3fb4fc6e700b6897ccc0297"
+	const want = "0c6e523e28d04888c42e9d19ae36a3c4aeba1ab429b661eff9d3d639bdf0c3c6"
 	if got != want {
-		t.Errorf("v7 key format moved: got %s, pinned %s", got, want)
+		t.Errorf("v8 key format moved: got %s, pinned %s", got, want)
 	}
 }
 
@@ -807,10 +808,9 @@ func TestCacheKey_ComputeHash_EmbeddedVersionVariesHash(t *testing.T) {
 }
 
 func TestCacheKey_ComputeHash_ExtensionVersionVariesHash(t *testing.T) {
-	// An extension upgrade can change a task's output for byte-identical
-	// sources, so the version must move the hash. (This is what invalidates a
-	// Go project's cached coverage when the @putnami/go extension — which pins
-	// the toolchain — is bumped.)
+	// Without an implementation digest the version is the only identity of the
+	// extension's implementation, and an extension upgrade can change a task's
+	// output for byte-identical sources, so the version must move the hash.
 	base := CacheKey{Extension: "ext", Task: "test", Project: "pkg"}
 
 	keyA := base
@@ -822,6 +822,42 @@ func TestCacheKey_ComputeHash_ExtensionVersionVariesHash(t *testing.T) {
 	hB, _ := keyB.ComputeHashUsing(NewCacheManager(nil))
 	if hA == hB {
 		t.Error("different ExtensionVersion values should produce different hashes")
+	}
+}
+
+// A digest identifies the implementation itself, so the version is not key
+// material beside it: two builds of an unchanged extension that differ in
+// version alone share their entries, and a different digest still misses.
+func TestCacheKey_ComputeHash_ImplementationDigestReplacesTheVersion(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "extension-implementation-cache-key",
+		"a-digest-replaces-the-version-in-the-key")
+	cm := NewCacheManager(nil)
+	hash := func(version, digest string) string {
+		t.Helper()
+		key := pinnedFormatKey()
+		key.ExtensionVersion = version
+		key.ExtensionImplementationDigest = digest
+		h, err := key.ComputeHashUsing(cm)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return h
+	}
+
+	canary := hash("0.3.1-20261003152506-4da6833", "ied1:aa")
+	if next := hash("0.3.1-20261004094924-a389c95", "ied1:aa"); next != canary {
+		t.Errorf("a version moved the key of an unchanged implementation: %s -> %s", canary, next)
+	}
+	if changed := hash("0.3.1-20261003152506-4da6833", "ied1:bb"); changed == canary {
+		t.Error("a changed implementation digest kept the key at one version")
+	}
+	if a, b := hash("1.0.0", ""), hash("1.1.0", ""); a == b {
+		t.Error("without an implementation digest, the version no longer moves the key")
+	}
+	// The two shapes of the (version, digest) pair never meet: a version
+	// spelled like a digest, with no digest, is not the key of that digest.
+	if hash("ied1:aa", "") == hash("", "ied1:aa") {
+		t.Error("a key with only a version equals a key with only a digest")
 	}
 }
 

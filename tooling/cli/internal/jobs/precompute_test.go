@@ -197,11 +197,12 @@ func TestTopoSortJobs_DetectsCycle(t *testing.T) {
 // embedded version.
 //
 // So it moves with everything that shapes the packaging recipe — here, the
-// packager's own version — and stays put for everything that only shapes THIS
-// invocation: the channels it advances, whether it is a dry run, the version
-// stamp being applied, and the release-set plan bound into the job (which is
-// derived from these very fingerprints and would otherwise define them in
-// terms of themselves).
+// packager's installed implementation — and stays put for everything that only
+// shapes THIS invocation: the channels it advances, whether it is a dry run,
+// the version stamp being applied, and the release-set plan bound into the job
+// (which is derived from these very fingerprints and would otherwise define
+// them in terms of themselves). A packager build that differs only in its
+// version is the same recipe.
 func TestSelectionFingerprintChangesWithPackagerIdentity(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "release-set-channel-advance", "selection-fingerprint-follows-the-package-key")
 
@@ -268,10 +269,25 @@ func TestSelectionFingerprintChangesWithPackagerIdentity(t *testing.T) {
 		t.Fatalf("the bound release-set plan moved the selection fingerprint: %s != %s", got, base)
 	}
 
-	// The packaging recipe's own identity DOES move it — the failure a tree
-	// hash never saw: a packager upgrade republishes every member it packages.
-	if got := fingerprint(newPlan("2.0.0"), map[string]any{"channel": "canary"}, nil); got == base {
-		t.Fatalf("a packager upgrade left the selection fingerprint at %s", base)
+	// A packager build that differs from this one in its version alone is the
+	// same packaging recipe, so it republishes nothing. The packaging recipe's
+	// own identity DOES move it — the failure a tree hash never saw: a packager
+	// upgrade, a new installed implementation, republishes every member it
+	// packages.
+	upgradedPath := t.TempDir()
+	writeTestFile(t, filepath.Join(upgradedPath, "compiled", "packager"), "upgraded packager")
+	for _, packager := range []struct {
+		name      string
+		plan      []*ScheduledJob
+		republish bool
+	}{
+		{"a version-only packager build", newPlan("2.0.0"), false},
+		{"a packager upgrade", []*ScheduledJob{packageTaskFixture(project, "test-provider", "2.0.0", upgradedPath)}, true},
+	} {
+		got := fingerprint(packager.plan, map[string]any{"channel": "canary"}, nil)
+		if moved := got != base; moved != packager.republish {
+			t.Fatalf("%s: selection fingerprint %s (base %s), want moved = %v", packager.name, got, base, packager.republish)
+		}
 	}
 
 	// A source edit moves it too, through the same declared file inputs.
@@ -381,7 +397,10 @@ func TestSelectionFingerprintsUseTheDeclaredPackagePublisher(t *testing.T) {
 	if base == "" {
 		t.Fatalf("fingerprints = %v, want the distinct package provider's task identity", got)
 	}
-	upgraded := packageTaskFixtureFor(project, "go-packager", "2.0.0", packageJob.Extension.Path, "archive")
+	// An upgrade installs another implementation of the package provider.
+	upgradedPath := t.TempDir()
+	writeTestFile(t, filepath.Join(upgradedPath, "compiled", "packager"), "upgraded packager")
+	upgraded := packageTaskFixtureFor(project, "go-packager", "2.0.0", upgradedPath, "archive")
 	got, err = SelectionFingerprints(ws, []*ScheduledJob{upgraded}, nil, cache, testProfiles(), members)
 	if err != nil {
 		t.Fatal(err)

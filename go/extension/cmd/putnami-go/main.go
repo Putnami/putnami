@@ -57,8 +57,6 @@ import (
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 )
 
-var runtimeVersion string
-
 // commandHandlers is the job dispatch table. Every entry that can reach the Go
 // module origin over the network is wrapped so the user's registry credential is
 // refreshed first — see withRegistryCredential for why the table is the right
@@ -164,7 +162,9 @@ func runEntrypoint(
 	getenv func(string) string,
 	runSubcommands func(map[string]cli.JobFunc),
 ) error {
-	if handled, err := runtimeinfo.Handle(args, stdout, goExtensionName, runtimeVersion); handled {
+	// The runtime carries no version of its own: it reports the version of the
+	// manifest that declares it, so one build serves every version stamp.
+	if handled, err := runtimeinfo.HandleFromManifest(args, stdout, goExtensionName); handled {
 		return err
 	}
 

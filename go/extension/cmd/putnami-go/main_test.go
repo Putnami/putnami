@@ -16,10 +16,6 @@ import (
 )
 
 func TestRunEntrypointRuntimeInfo(t *testing.T) {
-	originalVersion := runtimeVersion
-	runtimeVersion = "1.2.3-test"
-	t.Cleanup(func() { runtimeVersion = originalVersion })
-
 	var out bytes.Buffer
 	dispatched := false
 	err := runEntrypoint(
@@ -39,7 +35,9 @@ func TestRunEntrypointRuntimeInfo(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &info); err != nil {
 		t.Fatalf("decode runtime info: %v", err)
 	}
-	if info.Extension != "@putnami/go" || info.Version != "1.2.3-test" {
+	// The version is the one the manifest declaring the running executable
+	// carries; no manifest declares a test binary.
+	if info.Extension != "@putnami/go" || info.Version != "" {
 		t.Fatalf("runtime info = %+v", info)
 	}
 	if info.RuntimeABI == 0 || info.RuntimeProtocol == 0 || info.CLIContract == 0 {

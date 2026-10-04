@@ -84,9 +84,11 @@ func newInvocationFixture(t *testing.T, setupBody, consumeBody fixtureScript) *i
 	}
 
 	project := &workspace.Project{ID: "/proj", Name: "proj", Path: "."}
+	// The extension is installed in a directory of its own: its installed tree
+	// names it in every key, so it must not hold the workspace's files.
 	ext := &extension.ExtensionDescription{
 		Name: "@acme/provider",
-		Path: root,
+		Path: t.TempDir(),
 		Tasks: map[string]extension.TaskDefinition{
 			"provision": {
 				Kind: "command",
@@ -1202,7 +1204,7 @@ func TestInvocation_ConsumerKeyFollowsTheProducersClosure(t *testing.T) {
 
 	ext := &extension.ExtensionDescription{
 		Name: "@acme/provider",
-		Path: root,
+		Path: t.TempDir(),
 		Tasks: map[string]extension.TaskDefinition{
 			"provision": {Kind: "command", Command: "/bin/true", Declares: &extensionproto.TaskDeclaration{
 				Outputs: map[string]extensionproto.DeclaredOutput{

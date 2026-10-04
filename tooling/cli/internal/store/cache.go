@@ -26,6 +26,15 @@ type CacheManager struct {
 	extraFileHashMu    sync.Mutex
 	sourceStates       map[string]string // memoizes SourceState: workspace root → state
 	sourceStateMu      sync.Mutex
+	digests            map[string]*memoizedDigest // memoizes Digest: key → one computation
+	digestsMu          sync.Mutex
+}
+
+// memoizedDigest is one key's computation in CacheManager.Digest.
+type memoizedDigest struct {
+	once  sync.Once
+	value string
+	err   error
 }
 
 // NewCacheManager creates a CacheManager backed by the given store.
@@ -141,37 +150,70 @@ func (cm *CacheManager) lookupExtraFilesHash(paths []string) string {
 	return hash
 }
 
+// Digest returns the value compute derives for key, computing it at most once
+// for the life of the manager: the first caller computes, and concurrent
+// callers for the same key wait for that answer instead of computing again.
+// An error is the key's answer too, so one invocation never keys one input two
+// ways. A nil manager has no answer to share and computes on every call.
+//
+// The memo lives as long as the manager, one per run, so a value derived from
+// files that may change between runs is derived again by the next run.
+func (cm *CacheManager) Digest(key string, compute func() (string, error)) (string, error) {
+	if cm == nil {
+		return compute()
+	}
+	cm.digestsMu.Lock()
+	if cm.digests == nil {
+		cm.digests = make(map[string]*memoizedDigest)
+	}
+	entry, ok := cm.digests[key]
+	if !ok {
+		entry = &memoizedDigest{}
+		cm.digests[key] = entry
+	}
+	cm.digestsMu.Unlock()
+	entry.once.Do(func() { entry.value, entry.err = compute() })
+	return entry.value, entry.err
+}
+
 // CacheKey holds the inputs that contribute to a cache key.
 type CacheKey struct {
 	// Extension is the extension name (e.g., "@putnami/typescript").
 	Extension string
 
 	// ExtensionVersion is the resolved version of the extension that runs the
-	// job. It must contribute to the key: an extension upgrade can change a
-	// task's output for byte-identical sources (new codegen, a different bundled
-	// toolchain, changed defaults). For Go-built projects the test/build job is
-	// provided by the @putnami/go extension, whose version moves with the pinned
-	// Go toolchain — so this field is what invalidates coverage/build artifacts
-	// across a toolchain bump.
+	// job. The hash carries it only when ExtensionImplementationDigest is empty,
+	// because then the version is the only identity of the implementation: an
+	// extension upgrade can change a task's output for byte-identical sources
+	// (new codegen, changed defaults). A digest identifies the implementation
+	// itself, so two versions of an unchanged extension share their entries.
 	ExtensionVersion string
 
-	// ExtensionImplementationDigest identifies the artifact inputs of a
-	// workspace-local direct extension executable. Local development extensions
-	// keep a stable version while their source changes, so their executable
-	// identity must enter the key separately. It is empty for installed and
-	// non-direct extensions, whose immutable artifact/version behavior is
-	// unchanged.
+	// ExtensionImplementationDigest identifies the implementation of the
+	// extension that runs the job: the prepared-runtime input digest of a
+	// workspace-local extension, or the content digest of an installed
+	// extension's tree without its version metadata. It is empty for a local
+	// extension that declares no prepared runtime. An installed tree holds the
+	// executables built for the host platform, so an extension that ships
+	// platform executables has a different digest on each platform.
 	ExtensionImplementationDigest string
 
-	// ToolchainVersion identifies the language toolchain that produced the
-	// cached output. Every task includes the CLI's Go runtime signal; TypeScript
-	// tasks additionally include the resolved Bun binary version. Coverage
-	// instrumentation and compiler output differ across toolchain versions, so a
-	// result cached under one toolchain must not be served under another.
+	// ToolchainVersion identifies the language toolchains that produced the
+	// cached output: the CLI's Go runtime signal, plus the resolved identity of
+	// every runtime toolchain the task declares. Coverage instrumentation and
+	// compiler output differ across toolchain versions, so a result cached under
+	// one toolchain must not be served under another. A toolchain pin moves the
+	// key through this field, whatever the extension's implementation digest.
 	//
-	// It does NOT identify the MACHINE: runtime.Version() is "go1.24.0" on every
-	// operating system and architecture. A task whose output or verdict depends
-	// on the host platform must say so through RuntimeIdentity.
+	// Its CLI part is the same on every machine: runtime.Version() is
+	// "go1.24.0" on every operating system and architecture. Its runtime
+	// toolchain part differs between platforms, because each resolved identity
+	// hashes the host platform and that platform's lock integrity, so a task
+	// that uses a runtime toolchain, its own or one its extension's runtime
+	// declares for every task, keys differently on each platform. That is a
+	// consequence of the toolchain identity, not a declaration: a task whose
+	// output or verdict depends on the host platform says so through
+	// RuntimeIdentity.
 	ToolchainVersion string
 
 	// RuntimeIdentity holds resolved `name=value` pairs for the ambient runtime
@@ -180,11 +222,14 @@ type CacheKey struct {
 	// It exists because some outputs are a function of the machine and not only
 	// of the sources: a host-platform compile produces Mach-O on darwin and ELF
 	// on linux, and a host-platform compile CHECK returns a different verdict on
-	// each, because `//go:build linux` files are only compiled on linux. Nothing
-	// else in this key varies with the machine — ExtensionImplementationDigest
-	// covers workspace-local extensions only, so a consumer workspace on a
-	// published extension has no platform-bearing component at all, and entries
-	// are shared between a developer's laptop and CI by design.
+	// each, because `//go:build linux` files are only compiled on linux. Two
+	// other fields differ between platforms as a consequence of what they
+	// identify: ToolchainVersion for a task that uses a runtime toolchain, and
+	// ExtensionImplementationDigest for an installed extension that ships
+	// platform executables. A task with neither shares its entries between a
+	// developer's laptop and CI on another platform. Neither field declares that
+	// an output depends on the platform, so a task never relies on them to
+	// separate platforms.
 	//
 	// Only tasks that declare a runtime input carry values here, and the hash
 	// omits the field entirely when it is empty, so declaring one moves that
@@ -299,15 +344,11 @@ type CacheKey struct {
 	UpstreamHashes []string
 }
 
-// cacheKeyVersion prefixes every computed key, keeping entries written under
-// a different key format from ever being served as hits. History: bumped to
-// v3 when EmbeddedVersion was added, to v4 when ExtensionVersion and
-// ToolchainVersion were added, to v5 when TaskContractDigest was added, and to
-// v6 when workspace-local direct extensions began including their executable
-// implementation identity, and to v7 when the workspace-probe project metadata
-// digest was added. Each bump is a deliberate one-time whole-cache
-// miss: pre-bump entries may disagree about what the key covers.
-const cacheKeyVersion = "v7"
+// cacheKeyVersion prefixes every computed key, so an entry written under one
+// key format is never served as a hit under another. It changes whenever a
+// field is added or what a field covers changes, and each change is a
+// deliberate one-time whole-cache miss.
+const cacheKeyVersion = "v8"
 
 // ComputeHashUsing computes a SHA-256 cache key from all CacheKey fields,
 // using the CacheManager's file hash memoization to avoid redundant I/O when
@@ -317,7 +358,14 @@ func (k *CacheKey) ComputeHashUsing(cm *CacheManager) (string, error) {
 
 	writeField(h, cacheKeyVersion)
 	writeField(h, k.Extension)
-	writeField(h, k.ExtensionVersion)
+	// The version field is empty whenever a digest follows it, so the pair
+	// (version, digest) is either (version, "") or ("", digest) and no key of
+	// one shape equals a key of the other.
+	if k.ExtensionImplementationDigest != "" {
+		writeField(h, "")
+	} else {
+		writeField(h, k.ExtensionVersion)
+	}
 	writeField(h, k.ExtensionImplementationDigest)
 	writeField(h, k.ToolchainVersion)
 	// Written only when non-empty, and behind its own marker, so adding a

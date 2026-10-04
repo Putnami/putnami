@@ -7,21 +7,22 @@ import (
 	"testing"
 )
 
-// pinnedPOSIXKeyHash is TestCacheKey_HashFormatIsPinned's v7 golden: the key of
+// pinnedPOSIXKeyHash is TestCacheKey_HashFormatIsPinned's v8 golden: the key of
 // pinnedFormatKey on every POSIX host.
-const pinnedPOSIXKeyHash = "9386f2a81cee23d19ea159164f9d84bc28b5d91be3fb4fc6e700b6897ccc0297"
+const pinnedPOSIXKeyHash = "0c6e523e28d04888c42e9d19ae36a3c4aeba1ab429b661eff9d3d639bdf0c3c6"
 
 // pinnedWindowsKeyHash is the key of pinnedFormatKey on a Windows host,
 // computed outside Go from the same preimage plus "osClass\0windows\0".
-const pinnedWindowsKeyHash = "dc2d8964082c70ed4a0a502febc5d5ecf7f1d9f40699be43a5a27e2353a526b8"
+const pinnedWindowsKeyHash = "715168a1fdaf806d51e2237202a9f50e08f564913a013961e268b42b8141da4a"
 
 // pinnedFormatPreimageDigest spells out, byte by byte, the stream
 // ComputeHashUsing folds for pinnedFormatKey: every field followed by a NUL.
-// optional lands right after the toolchain version, where the runtimeIdentity
-// and osClass blocks sit, and before the task.
+// The version field is empty because pinnedFormatKey carries an implementation
+// digest. optional lands right after the toolchain version, where the
+// runtimeIdentity and osClass blocks sit, and before the task.
 func pinnedFormatPreimageDigest(optional ...string) string {
 	zeros := "0000000000000000000000000000000000000000000000000000000000000000"
-	fields := []string{"v7", "ext", "1.2.3", "ed1:" + zeros, "go1.25.7"}
+	fields := []string{"v8", "ext", "", "ed1:" + zeros, "go1.25.7"}
 	fields = append(fields, optional...)
 	fields = append(fields,
 		"build~transpile", "tc1:"+zeros, "proj", "wsid1:"+zeros, "1.0.0", "1.0.0-abc",
@@ -38,13 +39,13 @@ func pinnedFormatPreimageDigest(optional ...string) string {
 }
 
 // An empty OS class writes zero bytes, so every Linux and macOS key keeps its
-// v7 address. The Windows class inserts exactly "osClass\0windows\0" after the
+// v8 address. The Windows class inserts exactly "osClass\0windows\0" after the
 // runtime-identity block and before the task, and nothing else moves: a Windows
 // key differs from the POSIX key of the same task by that marker alone.
 func TestCacheKey_OSClassAddsOnlyItsMarker(t *testing.T) {
 	cm := NewCacheManager(nil)
 	if structural := pinnedFormatPreimageDigest(); structural != pinnedPOSIXKeyHash {
-		t.Fatalf("the structural preimage drifted from the v7 golden: %s != %s", structural, pinnedPOSIXKeyHash)
+		t.Fatalf("the structural preimage drifted from the v8 golden: %s != %s", structural, pinnedPOSIXKeyHash)
 	}
 
 	posix, err := pinnedFormatKey().ComputeHashUsing(cm)
