@@ -156,4 +156,14 @@ func TestPortableExecutingEngineRefusesACommitRequestOnAnotherCheckout(t *testin
 	if code != cli.ExitUsage || !strings.Contains(output, "carries no plan") {
 		t.Fatalf("a version 2 request with a plan: exit %d: %s", code, output)
 	}
+	// So is one that names a command no portable run carries: no CLI
+	// submitter refused it, so the protocol does.
+	serve := strings.Replace(string(clitest.CommitFixtureRequest(t, second, "", all)), `"commands":["build"]`, `"commands":["serve"]`, 1)
+	code, output = runBoundRequest(t, root, []byte(serve))
+	if code != cli.ExitUsage || !strings.Contains(output, `invocation.commands names "serve", which no portable run carries`) {
+		t.Fatalf("a version 2 serve request: exit %d: %s", code, output)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".putnami", "sessions")); !os.IsNotExist(err) {
+		t.Fatalf("a refused request recorded a session: %v", err)
+	}
 }

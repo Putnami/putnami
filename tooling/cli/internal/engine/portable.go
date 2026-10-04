@@ -161,8 +161,12 @@ const remoteDeadline = 4 * time.Hour
 // nodes a publication-v1 provider adds (jobs.ReleaseSetRun.WithoutPublicationNodes),
 // so the submitter plans the same graph whether or not the provider echoes
 // the capability. The publication and admission checks read the whole graph.
-// A version 2 request carries no expected plan and captured no input, so its
-// executing side runs the publication check alone (validateCommitPublication).
+// A version 2 request carries no expected plan and captured no input, and no
+// CLI submitter ran rejectUnsupportedRemoteShape on it: the protocol refuses
+// its unportable commands (runner.UnportableCommands), and its executing side
+// refuses a task outside the checkout, then checks publication
+// (validateCommitPublication). Its publication rides invocation.publication,
+// as on the version 1 executing side, so declared effects are not refused.
 //
 // Between the unsupported-shape refusal and the request projection sits the
 // input admission (ADR 0037): on the plan's declared inputs it binds every
@@ -173,6 +177,12 @@ const remoteDeadline = 4 * time.Hour
 // as it refuses a divergent plan.
 func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.Workspace, discovered *internalextension.DiscoveryResult, planned []*jobs.ScheduledJob, releaseSetRun *jobs.ReleaseSetRun) (SessionResult, bool) {
 	if req.Portable != nil && !req.Portable.frozen() {
+		for _, job := range planned {
+			if err := outsideWorkspace(req.WorkspaceRoot, job); err != nil {
+				iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
+				return SessionResult{ExitCode: ExitError, Plan: planned}, true
+			}
+		}
 		if err := validateCommitPublication(*req.Portable.Commit, releaseSetRun.WithoutPublicationNodes(planned), planned); err != nil {
 			iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
 			return SessionResult{ExitCode: ExitError, Plan: planned}, true
@@ -248,7 +258,9 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 // rejectUnsupportedRemoteShape refuses, before any transfer, the invocations
 // this release does not carry: long-running or interactive modes, source
 // rewriting, and jobs with side effects outside the workspace. Rejection is a
-// precise diagnostic, never a silent modification of the request.
+// precise diagnostic, never a silent modification of the request. Its command
+// refusals cover runner.UnportableCommands, which a version 2 request meets in
+// the protocol instead.
 func rejectUnsupportedRemoteShape(req *Request, planned []*jobs.ScheduledJob) error {
 	if req.Global.Watch {
 		return fmt.Errorf("--watch is not portable; remote execution covers finite commands only")
@@ -276,9 +288,21 @@ func rejectUnsupportedRemoteShape(req *Request, planned []*jobs.ScheduledJob) er
 		if jobs.HasExternalEffects(job) {
 			return fmt.Errorf("task %s declares registry or cloud effects; publication and deployment never ride a verification request", job.Key())
 		}
-		if cwd := job.JobDef.Cwd; filepath.IsAbs(cwd) && !strings.HasPrefix(filepath.Clean(cwd)+string(filepath.Separator), filepath.Clean(req.WorkspaceRoot)+string(filepath.Separator)) {
-			return fmt.Errorf("task %s runs outside the workspace (%s) and is not portable", job.Key(), cwd)
+		if err := outsideWorkspace(req.WorkspaceRoot, job); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+// outsideWorkspace refuses a task whose absolute working directory lies
+// outside the workspace root: a portable run reaches nothing beyond its tree.
+func outsideWorkspace(root string, job *jobs.ScheduledJob) error {
+	if job == nil || job.JobDef == nil {
+		return nil
+	}
+	if cwd := job.JobDef.Cwd; filepath.IsAbs(cwd) && !strings.HasPrefix(filepath.Clean(cwd)+string(filepath.Separator), filepath.Clean(root)+string(filepath.Separator)) {
+		return fmt.Errorf("task %s runs outside the workspace (%s) and is not portable", job.Key(), cwd)
 	}
 	return nil
 }

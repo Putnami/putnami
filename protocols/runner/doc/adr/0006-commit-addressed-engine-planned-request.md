@@ -42,14 +42,26 @@ error that names the member it mixed in.
 Selectors are sorted and unique, one selector per entry. An explicit empty
 `base` or selector list is refused, so one request has one canonical form.
 
-### 3. Its own digest domain
+### 3. The protocol refuses unportable commands
+
+A version 1 request comes from a CLI submitter, which refuses the commands no
+portable run carries before it freezes a plan. A version 2 request has no such
+submitter, so `ValidateCommitRequest` refuses them: `serve`, `run` and
+`compose` stream a live workload until the deadline, `qualify` reaches one
+from the executing machine, and `format` rewrites a source that never returns
+to the caller. `UnportableCommands` names them, and the submitting side
+refuses every one of them. Version 1 validation does not change. Declared
+side effects are not refused: `invocation.publication` authorizes them, as on
+the version 1 executing side.
+
+### 4. Its own digest domain
 
 `CommitInputDigest` covers the commit, the invocation and the requested
 selection under `putnami/runner/execution-input/v2`. It excludes `control`
 and the negotiated capabilities, as version 1 does. The separate domain means
 no version 1 input digest can name a version 2 input.
 
-### 4. The bound-request channel carries both versions
+### 5. The bound-request channel carries both versions
 
 `ParseBoundRequest` reads the root `version` once and hands the document to
 that version's parser, so a version 1 document parses, encodes and digests as
@@ -57,13 +69,16 @@ it did before version 2 existed. `control.caller` accepts `ci` in version 2
 only; version 1 stays the CLI's. The provider RPC's `submit` keeps carrying
 version 1: a version 2 request reaches an engine through the channel alone.
 
-### 5. The executing engine binds the checkout before anything runs
+### 6. The executing engine binds the checkout before anything runs
 
 The executing engine refuses a version 2 request unless its checkout's HEAD
 is `source.commit` with no modified tracked file, before the first-use
-bootstrap runs repository code. It then plans through its ordinary selection,
-stamps versions from Git and never resolves placement. It compares no expected
-plan, because none came. A plan that publishes is held to both version 1
+bootstrap runs repository code. The entrypoint that runs the check comes from
+the checkout, so the check binds the bootstrap, hooks and tasks, not the
+entrypoint. The engine then plans through its ordinary selection, stamps
+versions from Git and never resolves placement. It compares no expected plan,
+because none came, and refuses a planned task whose cwd leaves the checkout,
+as the submitting side does. A plan that publishes is held to both version 1
 publication checks; a plan that publishes nothing runs whether or not the
 request carries `invocation.publication`, because the caller authorized
 publication before any plan existed.

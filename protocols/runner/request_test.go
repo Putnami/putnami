@@ -342,6 +342,7 @@ var fixtureRefusals = map[string]string{
 	"commit-selector-comma.json":                 "holds a comma",
 	"commit-selector-mode.json":                  "spells a selection mode",
 	"commit-caller-unknown.json":                 "control.caller \"bot\" is not supported",
+	"commit-unportable-command.json":             "invocation.commands names \"serve\", which no portable run carries",
 	"commit-unknown-root-field.json":             "unknown field \"extra\"",
 }
 

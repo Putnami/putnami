@@ -142,6 +142,15 @@ func TestRejectUnsupportedRemoteShape(t *testing.T) {
 			t.Errorf("%s: accepted", name)
 		}
 	}
+	// The submitting side refuses every command the protocol refuses in a
+	// version 2 request, so both versions leave the same commands behind.
+	for _, command := range runner.UnportableCommands {
+		req := base()
+		req.Commands = []string{"build", command}
+		if err := rejectUnsupportedRemoteShape(req, portablePlan()); err == nil || !strings.Contains(err.Error(), "is not portable") {
+			t.Errorf("%s: %v; want the submitting side to refuse it", command, err)
+		}
+	}
 	// A manifest task's declared effect is refused even when its command's
 	// traits declare none: the submitter never sets invocation.publication.
 	declared := portablePlan()

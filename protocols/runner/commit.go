@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -19,6 +20,14 @@ const (
 	// the version 1 one and from every other SHA-256 value.
 	CommitInputDomain = "putnami/runner/execution-input/v2"
 )
+
+// UnportableCommands are the well-known commands no portable run carries:
+// serve, run and compose stream a live workload, qualify reaches one from the
+// executing machine, and format rewrites a source that never returns to the
+// caller. The submitting CLI refuses them before it builds a version 1
+// request; a version 2 request has no such submitter, so ValidateCommitRequest
+// refuses them.
+var UnportableCommands = []string{"compose", "format", "qualify", "run", "serve"}
 
 // CommitRequest is the version 2 execution request. It names a commit instead
 // of a snapshot and a requested selection instead of a frozen one, and carries
@@ -257,9 +266,10 @@ func strictRequestedSelection(raw json.RawMessage) error {
 }
 
 // ValidateCommitRequest checks the semantic rules of a version 2 request. The
-// invocation block follows the version 1 rules. ValidatePublication does not
-// run, because there is no plan: the executing engine checks the plan it makes
-// against invocation.publication instead.
+// invocation block follows the version 1 rules and names no command of
+// UnportableCommands. ValidatePublication does not run, because there is no
+// plan: the executing engine checks the plan it makes against
+// invocation.publication instead.
 func ValidateCommitRequest(request CommitRequest) error {
 	if request.Version != CommitRequestVersion {
 		return fmt.Errorf("runner: unsupported commit request version %d", request.Version)
@@ -275,6 +285,11 @@ func ValidateCommitRequest(request CommitRequest) error {
 	}
 	if err := validateInvocation(request.Invocation); err != nil {
 		return err
+	}
+	for _, command := range request.Invocation.Commands {
+		if slices.Contains(UnportableCommands, command) {
+			return fmt.Errorf("runner: invocation.commands names %q, which no portable run carries: serve, run and compose stream a live workload, qualify reaches one, and format rewrites the source", command)
+		}
 	}
 	if err := validateRequestedSelection(request.Selection, request.Source); err != nil {
 		return err

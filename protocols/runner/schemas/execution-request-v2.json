@@ -6,6 +6,12 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "protocol", "source", "invocation", "selection", "control"],
+  "allOf": [
+    {
+      "description": "The invocation block is version 1's, and a version 2 request names no unportable command: serve, run and compose stream a live workload, qualify reaches one, and format rewrites the source.",
+      "properties": { "invocation": { "properties": { "commands": { "items": { "not": { "enum": ["compose", "format", "qualify", "run", "serve"] } } } } } }
+    }
+  ],
   "properties": {
     "version": { "const": 2 },
     "protocol": {

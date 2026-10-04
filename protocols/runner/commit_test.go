@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -208,6 +210,29 @@ func TestCommitRequestRejectsSemanticViolations(t *testing.T) {
 	}
 }
 
+// A version 2 request reaches an engine with no CLI submitter in front of it,
+// so the protocol refuses each command no portable run carries, wherever it
+// sits in the list, and names it.
+func TestCommitRequestRefusesUnportableCommands(t *testing.T) {
+	t.Parallel()
+	if !slices.IsSorted(UnportableCommands) || len(UnportableCommands) != 5 {
+		t.Fatalf("UnportableCommands = %v; want the five sorted commands", UnportableCommands)
+	}
+	for _, command := range UnportableCommands {
+		for _, commands := range [][]string{{command}, {"build", command}} {
+			request := validCommitRequest()
+			request.Invocation.Commands = commands
+			want := fmt.Sprintf("invocation.commands names %q, which no portable run carries", command)
+			if err := ValidateCommitRequest(request); err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("%v: %v; want a refusal naming %q", commands, err, command)
+			}
+			if _, err := CommitInputDigest(request); err == nil {
+				t.Errorf("%v: digested", commands)
+			}
+		}
+	}
+}
+
 // TestBoundRequestRefusesEveryVersionMix pins the precise refusal of each
 // member one version carries and the other does not, so a caller learns which
 // version it mixed in rather than meeting a bare unknown field.
@@ -326,6 +351,28 @@ func TestCommitRequestSchemaTracksWireShape(t *testing.T) {
 	}
 	if err := json.Unmarshal(control.Properties["caller"], &caller); err != nil || strings.Join(caller.Enum, ",") != CallerCLI+","+CallerCI {
 		t.Fatalf("schema callers diverged: %v (%v)", caller.Enum, err)
+	}
+	// The unportable commands sit beside the shared invocation block, not in it.
+	var unportable struct {
+		AllOf []struct {
+			Properties struct {
+				Invocation struct {
+					Properties struct {
+						Commands struct {
+							Items struct {
+								Not struct {
+									Enum []string `json:"enum"`
+								} `json:"not"`
+							} `json:"items"`
+						} `json:"commands"`
+					} `json:"properties"`
+				} `json:"invocation"`
+			} `json:"properties"`
+		} `json:"allOf"`
+	}
+	if err := json.Unmarshal(data, &unportable); err != nil || len(unportable.AllOf) != 1 ||
+		!slices.Equal(unportable.AllOf[0].Properties.Invocation.Properties.Commands.Items.Not.Enum, UnportableCommands) {
+		t.Fatalf("schema unportable commands diverged from UnportableCommands (%v)", err)
 	}
 	// Both versions share one invocation block, so its schema is the version 1 one.
 	v1, err := os.ReadFile(filepath.Join("schemas", "execution-request-v1.json"))

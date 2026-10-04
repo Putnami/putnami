@@ -148,7 +148,7 @@ itself. It has `version: 2` and five blocks, in this order
 | --- | --- |
 | `protocol` | As in version 1. |
 | `source` | `commit` (the full lowercase commit id, 40 or 64 hex digits, that the checkout's HEAD must equal) and optional `base` (the full commit an impacted selection is measured against, of the same length; present exactly when `selection.mode` is `impacted`). |
-| `invocation` | The version 1 block, under the same rules. |
+| `invocation` | The version 1 block, under the same rules, naming no command of `UnportableCommands`. |
 | `selection` | `mode` (`all`, `impacted`, `projects`) and optional `projects`: the sorted unique selectors of a `projects` selection in the `--projects` grammar, one per entry, none holding a comma, spelling a mode (`*`, `[impacted]`) or carrying surrounding whitespace. Present, and non-empty, exactly in the `projects` mode. |
 | `control` | As in version 1, except that `caller` is `cli` or `ci`. |
 
@@ -167,6 +167,13 @@ root `version` and hands the document to the parser of that version, so a
 version 1 document parses, encodes and digests exactly as
 `ParseExecutionRequest` reads it. It refuses any other version.
 
+A version 2 request reaches an engine with no submitting CLI in front of it,
+so `ValidateCommitRequest` refuses the commands no portable run carries
+(`UnportableCommands`): `serve`, `run` and `compose` stream a live workload,
+`qualify` reaches one, and `format` rewrites the source. The submitting CLI
+refuses the same commands before it builds a version 1 request; version 1
+validation is unchanged.
+
 `CommitInputDigest` is `sha256:` over the canonical JSON of
 `{"domain":"putnami/runner/execution-input/v2","protocolVersion":1,"source":…,"invocation":…,"selection":…}`.
 It excludes `control` and the negotiated capabilities. Its domain differs
@@ -180,7 +187,8 @@ that plan publishes, and runs a plan that publishes nothing with or without
 A version 2 request travels only through the bound-request channel
 (`PUTNAMI_RUNNER_REQUEST`): `submit` carries version 1 only, and no capability
 negotiates version 2. The executing engine refuses a checkout whose HEAD is
-not `source.commit` or whose tracked files differ from it. The session it
+not `source.commit` or whose tracked files differ from it, and a planned task
+whose cwd leaves the checkout. The session it
 records states the remote placement and no `placement.provenance`, because
 the `protocols/cli` provenance block requires a source digest, which this
 request does not have. [ADR 0006](doc/adr/0006-commit-addressed-engine-planned-request.md)

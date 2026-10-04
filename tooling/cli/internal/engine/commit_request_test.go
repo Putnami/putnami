@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -72,15 +73,22 @@ func TestPortableExecutionNamesItsVersion(t *testing.T) {
 }
 
 // The executing side of a version 2 request has no expected plan to compare
-// and no bound inputs to verify: its seam checks publication alone, on the
-// plan this engine made. A version 1 request over the same plan, with an
-// expected plan that names nothing, is refused there.
-func TestCommitRequestSeamChecksPublicationOnly(t *testing.T) {
+// and no bound inputs to verify: its seam checks the plan this engine made
+// for a task outside the checkout and for publication, and refuses no
+// declared effect that invocation.publication authorizes. A version 1 request
+// over the same plan, with an expected plan that names nothing, is refused
+// there.
+func TestCommitRequestSeamChecksItsOwnPlan(t *testing.T) {
 	t.Parallel()
 	plain := portablePlan()
 	shipping := append(portablePlan(), portableJob(plain[0].Project, "ship", "/app:build"))
 	shipping[len(shipping)-1].JobDef.Traits.SideEffects = extensionproto.SideEffectsCloud
 	modeljobs.AttachIdentities(shipping)
+	root := t.TempDir()
+	inside := portablePlan()
+	inside[0].JobDef.Cwd = filepath.Join(root, "app")
+	outside := portablePlan()
+	outside[0].JobDef.Cwd = hostAbs("/elsewhere")
 	all := runner.RequestedSelection{Mode: runner.SelectionModeAll}
 	for _, tc := range []struct {
 		name     string
@@ -90,11 +98,13 @@ func TestCommitRequestSeamChecksPublicationOnly(t *testing.T) {
 	}{
 		{"a frozen request with another plan", &PortableExecution{}, plain, "differs from the expected plan"},
 		{"a commit request", commitExecution(all, "", nil), plain, ""},
+		{"a commit request with a task inside the checkout", commitExecution(all, "", nil), inside, ""},
+		{"a commit request with a task outside the checkout", commitExecution(all, "", nil), outside, "runs outside the workspace"},
 		{"a commit request that publishes without the block", commitExecution(all, "", nil), shipping, "no invocation.publication"},
 		{"a commit request that publishes behind its barrier", commitExecution(all, "", &runner.PublicationBlock{Barrier: []string{"build"}}), shipping, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			req := &Request{WorkspaceRoot: t.TempDir(), Portable: tc.portable}
+			req := &Request{WorkspaceRoot: root, Portable: tc.portable}
 			var result SessionResult
 			var handled bool
 			stderr := captureStderr(t, func() {

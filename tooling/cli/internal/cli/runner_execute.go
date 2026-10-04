@@ -58,7 +58,9 @@ func (a *App) runBoundRequest(ctx context.Context, wsRoot string, cfg *wsproto.C
 		return ExitUsage
 	}
 	// A version 2 request runs on the checkout of the commit it names, and on
-	// nothing else: the check precedes every step that runs repository code.
+	// nothing else: the check precedes the first-use bootstrap, hooks and every
+	// task. It cannot precede this process, which the checkout's entrypoint
+	// started, built from the checkout in a source workspace.
 	if request.Commit != nil {
 		if err := verifyCommitCheckout(wsRoot, request.Commit.Source.Commit); err != nil {
 			iox.Fprintf(os.Stderr, "putnami: bound execution request refused: %v\n", err)
