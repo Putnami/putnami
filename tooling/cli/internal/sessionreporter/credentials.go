@@ -6,6 +6,8 @@ import (
 	"context"
 	"os"
 	"strings"
+
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
 type credentialKey struct{}
@@ -22,10 +24,20 @@ func (*credentials) String() string { return "<session reporter credentials>" }
 // ambient environment before repository subprocesses run, and keeps them in the
 // context. This is not a same-principal or network sandbox. A trusted launcher
 // must independently establish provider provenance.
+//
+// A hosted run keeps no token: its reporters receive the run credential over
+// the protocol (startHolder), and the process that captured the run
+// credential already removed the tokens from its environment, with a warning
+// (runcredential.Capture).
 func Capture(ctx context.Context) context.Context {
 	captured := &credentials{selected: map[string]selection{}}
+	hosted := runcredential.Hosted()
 	for _, c := range Capabilities() {
-		captured.selected[c.Name] = selection{strings.TrimSpace(os.Getenv(c.SelectorEnv)), os.Getenv(c.TokenEnv)}
+		token := os.Getenv(c.TokenEnv)
+		if hosted {
+			token = ""
+		}
+		captured.selected[c.Name] = selection{strings.TrimSpace(os.Getenv(c.SelectorEnv)), token}
 		_ = os.Unsetenv(c.SelectorEnv)
 		_ = os.Unsetenv(c.TokenEnv)
 	}
@@ -50,7 +62,8 @@ func (c Capability) selection(ctx context.Context) selection {
 
 // providerEnv is the capability's provider environment: every capability's
 // selector and token are removed, then only this capability's own token is
-// added back.
+// added back. A hosted run adds none: no environment of its reporters holds a
+// token.
 func (c Capability) providerEnv(ctx context.Context, env []string) []string {
 	reserved := map[string]bool{}
 	for _, other := range Capabilities() {
@@ -63,7 +76,7 @@ func (c Capability) providerEnv(ctx context.Context, env []string) []string {
 			clean = append(clean, entry)
 		}
 	}
-	if token := c.selection(ctx).token; token != "" {
+	if token := c.selection(ctx).token; token != "" && !runcredential.Hosted() {
 		clean = append(clean, c.TokenEnv+"="+token)
 	}
 	return clean

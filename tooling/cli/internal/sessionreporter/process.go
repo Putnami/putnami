@@ -2,6 +2,7 @@ package sessionreporter
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -58,9 +59,37 @@ func (p *process) call(ctx context.Context, chunk protocolcli.SessionReportingCh
 	if err != nil {
 		return nil, fmt.Errorf("encode reporter frame")
 	}
+	reply, err := p.roundTrip(ctx, line)
+	if err != nil {
+		return nil, err
+	}
+	return protocolcli.ParseSessionReportingAck(reply)
+}
+
+// handshake sends one line of the v2 handshake and returns the reporter's
+// answer to it. Its errors are core-owned and never carry the line the
+// reporter wrote.
+func (p *process) handshake(ctx context.Context, line protocolcli.SessionReportingHandshake) (*protocolcli.SessionReportingHandshakeResult, error) {
+	data, err := json.Marshal(line)
+	if err != nil {
+		return nil, fmt.Errorf("encode reporter handshake")
+	}
+	reply, err := p.roundTrip(ctx, data)
+	if err != nil {
+		return nil, err
+	}
+	result, err := protocolcli.ParseSessionReportingHandshakeResult(reply)
+	if err != nil || !result.Answers(line) {
+		return nil, fmt.Errorf("reporter answered %s with an invalid line", line.Op)
+	}
+	return result, nil
+}
+
+// roundTrip writes one line and reads one line back, both bounded by ctx.
+func (p *process) roundTrip(ctx context.Context, line []byte) ([]byte, error) {
 	type response struct {
-		ack *protocolcli.SessionReportingAck
-		err error
+		line []byte
+		err  error
 	}
 	result := make(chan response, 1)
 	go func() {
@@ -72,12 +101,11 @@ func (p *process) call(ctx context.Context, chunk protocolcli.SessionReportingCh
 			result <- response{err: fmt.Errorf("reporter pipe closed or exceeded limit")}
 			return
 		}
-		ack, err := protocolcli.ParseSessionReportingAck(p.scanner.Bytes())
-		result <- response{ack, err}
+		result <- response{line: bytes.Clone(p.scanner.Bytes())}
 	}()
 	select {
 	case r := <-result:
-		return r.ack, r.err
+		return r.line, r.err
 	case <-ctx.Done():
 		// Closing both pipes also interrupts a provider that never reads stdin;
 		// a timeout must bound writes as well as acknowledgement reads.

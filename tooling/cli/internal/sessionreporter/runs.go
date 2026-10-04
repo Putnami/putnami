@@ -43,12 +43,14 @@ func Selected(ctx context.Context) []Capability {
 // events, one after another so that two capabilities served by one extension
 // never prepare its runtime concurrently. A capability that cannot start is
 // reported in the failures and never prevents another from starting; one that
-// reached its checkpoint still records its evidence at Finish.
-func StartSelected(ctx context.Context, events *sessionstream.Log, sessionID string, resolve Resolver) (*Runs, []Failure) {
+// reached its checkpoint still records its evidence at Finish. Each run adopts
+// what holders started for its capability before repository code; holders
+// may be nil.
+func StartSelected(ctx context.Context, events *sessionstream.Log, sessionID string, resolve Resolver, holders *Holders) (*Runs, []Failure) {
 	runs := &Runs{}
 	var failures []Failure
 	for _, capability := range Selected(ctx) {
-		run, err := Start(ctx, capability, events, sessionID, resolve(capability))
+		run, err := startRun(ctx, capability, events, sessionID, resolve(capability), holders)
 		if err != nil {
 			failures = append(failures, Failure{capability, err})
 		}
@@ -94,7 +96,11 @@ func (rs *Runs) Finish() []Failure {
 // then every replay drains at once. It fails when no capability is selected,
 // and joins the failures of the capabilities it replayed, each naming its
 // capability.
-func ReplaySelected(ctx context.Context, dir, sessionID string, resolve Resolver) error {
+//
+// A replay runs no repository code. On a hosted run, it first starts the
+// reporters it replays as holders (Holders.Start) and hands report each one
+// that does not hold the run credential.
+func ReplaySelected(ctx context.Context, dir, sessionID string, resolve Resolver, report func(Failure)) error {
 	selected := Selected(ctx)
 	if len(selected) == 0 {
 		envs := make([]string, 0, len(Capabilities()))
@@ -112,11 +118,22 @@ func ReplaySelected(ctx context.Context, dir, sessionID string, resolve Resolver
 			delivered[entry.Name] = entry.Evidence == protocolcli.SubscriberEvidenceDelivered
 		}
 	}
+	var replayed []Capability
+	for _, capability := range selected {
+		if !delivered[capability.Name] {
+			replayed = append(replayed, capability)
+		}
+	}
+	holders := &Holders{}
+	defer holders.Close()
+	for _, failure := range holders.Start(ctx, replayed, resolve) {
+		report(failure)
+	}
 	errs := make([]error, len(selected))
 	finishes := make([]func() error, len(selected))
 	for i, capability := range selected {
 		if !delivered[capability.Name] {
-			finishes[i], errs[i] = startReplay(ctx, capability, dir, sessionID, resolve(capability))
+			finishes[i], errs[i] = startReplay(ctx, capability, dir, sessionID, resolve(capability), holders)
 		}
 	}
 	var wg sync.WaitGroup
@@ -136,13 +153,13 @@ func ReplaySelected(ctx context.Context, dir, sessionID string, resolve Resolver
 
 // startReplay starts one capability's replay under its own budget. It returns
 // the function that drains it, or the error that kept it from starting.
-func startReplay(ctx context.Context, capability Capability, dir, sessionID string, resolve Resolve) (func() error, error) {
+func startReplay(ctx context.Context, capability Capability, dir, sessionID string, resolve Resolve, holders *Holders) (func() error, error) {
 	events, err := sessionstream.Open(dir, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("%s: session has no readable event stream", capability.Label)
 	}
 	budgetCtx, cancel := context.WithTimeout(ctx, FinalizationBudget)
-	r, err := Start(budgetCtx, capability, events, sessionID, resolve)
+	r, err := startRun(budgetCtx, capability, events, sessionID, resolve, holders)
 	if err != nil {
 		if r != nil {
 			_ = r.recordEvidence()

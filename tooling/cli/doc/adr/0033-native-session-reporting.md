@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Scope**: `tooling/cli/internal/engine`, `internal/sessionstream`,
-  `internal/sessionreporter`, `protocols/cli` (session reporting v1, session
-  subscribers)
+  `internal/sessionreporter`, `protocols/cli` (session reporting v1 and v2,
+  session subscribers)
 
 ## Context
 
@@ -59,7 +59,8 @@ A reporting capability is one row of `Capabilities()` in
 
 - Command, environment and artifact names belong to the protocol
   (`go.putnami.dev/protocol/cli`, `@putnami/cli-protocol`). The wire is session
-  reporting v1 ([contract](../../../../protocols/cli/doc/04-session-reporting.md)).
+  reporting v1 ([contract](../../../../protocols/cli/doc/04-session-reporting.md)),
+  opened on a hosted run by the v2 handshake that hands the run credential.
 - The engine runs each selected capability as its own subscriber, provider
   subprocess, checkpoint, lock and `subscribers.json` entry. It prepares
   providers one after another, so one extension serving both commands never
@@ -108,6 +109,19 @@ frames. Provider stderr is discarded and provider text never enters
 diagnostics. These are environment-custody guarantees only: choosing an
 extension name does not prove its manifest or runtime trustworthy, and this
 decision adds no same-principal isolation and no metadata or network fence.
+
+A hosted run (`--credential-fd`,
+[ADR 0055](0055-run-credentials-stay-out-of-repository-processes.md)) ignores
+both tokens: the CLI removes them with a warning and places neither in any
+environment. It hands each reporter the run credential over session reporting
+v2 instead: `initialize`, which carries no credential, then, only after the
+reporter accepts it, `authenticate`. A version 1 reporter rejects
+`initialize`, so it starts without a credential or a token, with a
+diagnostic. The run starts every selected reporter before its first
+repository code, because custody hands nothing to a process started later; a
+reporter restarted after repository code gets no credential and its delivery
+fails. A run without the flag sends no handshake, and its frames are
+byte-identical to version 1.
 
 ### Boundaries
 

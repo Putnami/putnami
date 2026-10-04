@@ -28,11 +28,13 @@ import (
 var drainTelemetry = telemetry.DrainContext
 
 // runJobCommands runs the selected job commands through the engine. A hosted
-// run reads the remote cache through hostedCache, whose provider the first-use
-// bootstrap may have started before its first repository code.
-func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc *telemetry.Client, interactive bool, hostedCache *engine.HostedRemoteCache) int {
+// run reads the remote cache through hostedCache, and its session adopts
+// hostedReporters, which the first-use bootstrap may have started before its
+// first repository code.
+func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc *telemetry.Client, interactive bool, hostedCache *engine.HostedRemoteCache, hostedReporters *engine.HostedReporters) int {
 	req := terminalRequest(parsed, cfg, wsRoot, tc, interactive)
 	req.HostedRemoteCache = hostedCache
+	req.HostedReporters = hostedReporters
 	result, _ := engine.New().Run(ctx, req, nil)
 	return result.ExitCode
 }

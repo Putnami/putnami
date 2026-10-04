@@ -5,9 +5,9 @@
   too ([ADR 0057](0057-publication-authority-stays-in-the-engine.md)).
 - **Scope**: `@putnami/cli` (`internal/runcredential`, `internal/launch`,
   `internal/credentialprovider`, `internal/cacheprovider`, `internal/jobs`,
-  `internal/commands/lifecycle`, `internal/extension`, `internal/engine`),
-  `go.putnami.dev/sdk/extension`
-  (`procguard`, `registrycred`), `go.putnami.dev/protocol/{registry,cache,extension,runner}`,
+  `internal/commands/lifecycle`, `internal/extension`, `internal/engine`,
+  `internal/sessionreporter`), `go.putnami.dev/sdk/extension`
+  (`procguard`, `registrycred`), `go.putnami.dev/protocol/{registry,cache,extension,runner,cli}`,
   `@putnami/typescript` and `@putnami/go` extensions (`workspace-fetch`)
 
 ## Context
@@ -35,8 +35,11 @@ flag, nothing changes.
   descriptor, 3 or more, holding the bearer on one line.
 - The engine calls `procguard.DenyInspection` first, reads the descriptor and
   closes it before it starts any process, keeps the bearer in memory only, and
-  removes `PUTNAMI_CACHE_TOKEN` and `PUTNAMI_CLOUD_TOKEN` from its environment.
-  No job, hook or child receives either, even when a manifest declares it.
+  removes `PUTNAMI_CACHE_TOKEN`, `PUTNAMI_CLOUD_TOKEN`,
+  `PUTNAMI_SESSION_REPORTER_TOKEN` and `PUTNAMI_LOG_REPORTER_TOKEN` from its
+  environment, naming each one that held a value. It ignores them for the rest
+  of the run. No job, hook or child receives any of them, even when a manifest
+  declares it.
 - On Linux the engine is non-dumpable (`PR_SET_DUMPABLE` 0) whenever it holds a
   credential, through `--credential-fd` or a credential purpose enabled by
   `--providers`. A same-user process then cannot read its `/proc/<pid>/environ`
@@ -47,8 +50,11 @@ flag, nothing changes.
 - Providers receive the credential over RPC, never in their environment: a
   credential-provider in the `initialize` member `runCredential`; a cache
   provider through `authenticate`, after both sides negotiate the
-  `run-credential` capability. A provider that receives it calls
-  `procguard.DenyInspection`.
+  `run-credential` capability; a session reporter or a log reporter through
+  `authenticate` of session reporting v2, sent only after the reporter accepts
+  `initialize`, which carries no credential
+  ([protocol](../../../../protocols/cli/doc/04-session-reporting.md#run-credential)).
+  A provider or reporter that receives it calls `procguard.DenyInspection`.
 - The executing engine of a `--where remote` run receives it the same way: the
   runner provider starts the pinned entrypoint with `--credential-fd <n>` as its
   only argument.
@@ -171,6 +177,13 @@ exists, so a bootstrap provider serves them.
   only when the command exits 0 and advertises a level at or above its own; a
   line with no level is below. A relaunch without the run credential runs no
   check. Extensions advertise no level.
+- Handing the reporters the credential over the protocol keeps the level at
+  2. The starting CLI removes the reporter tokens when it reads the
+  descriptor, before the relaunch, and the relaunched CLI inherits that
+  environment. A pinned level 2 CLI that predates the change therefore never
+  sees a reporter token, and hands its reporters no credential at all: it
+  fails closed. Pinning an older CLI cannot undo the change, so raising the
+  level would only refuse every workspace pinned to a level 2 CLI.
 - The check trusts the printed level because the binary was verified against the
   lock when it entered the store; it stops an older genuine build, not a forged
   one. A stored binary is not hashed again, so a hosted run refuses a store the
@@ -195,17 +208,23 @@ ends when repository code starts.
   then on,
   every handoff fails with an error naming the process that asked and the one
   that ran repository code: the job credential descriptor, a cache provider's
-  `authenticate`, and `initialize.runCredential`. A holder keeps what it has.
+  `authenticate`, `initialize.runCredential`, and a reporter's
+  `authenticate`. A holder keeps what it has.
 - A test lists every place under `internal/` that starts a process, directly,
   through a variable that holds a helper, or through an SDK helper
   (`registrycred`, `releaseset`, `dbtestenv`), and fails on an unclassified one.
   A second test reads every package outside the CLI that the CLI imports and
   fails on an unlisted helper that starts a process.
 - On a hosted run the order is fixed: every store extension's
-  `workspace-fetch`; the remote cache provider starts and authenticates; every
-  path extension's `workspace-fetch`, offline; the extensions' `onInstall`
-  hooks and the installers; the `before` hooks and the tasks. The install that
-  `putnami build` runs first follows it, and the build reuses that provider.
+  `workspace-fetch`; the remote cache provider starts and authenticates; each
+  selected reporter starts and authenticates; every path extension's
+  `workspace-fetch`, offline; the extensions' `onInstall` hooks and the
+  installers; the `before` hooks and the tasks. The install that
+  `putnami build` runs first follows it, and the build reuses that provider
+  and those reporters. A run without an install starts its reporters before
+  its first `before` hook. `putnami sessions replay` with `--credential-fd`
+  starts the reporters it resumes the same way, but it is a separate
+  invocation, and this decision defines no hosted replay.
   Every executable that receives the credential is bytes the store held before
   any repository process of the invocation ran, and no path extension's runtime
   starts before the last handoff.
@@ -217,6 +236,23 @@ ends when repository code starts.
   (ELF, Mach-O, PE). The run fails before its first hook. A hosted run with a
   remote cache therefore needs an `@putnami/cloud` release whose
   `cache-provider` task runs `{extensionRuntime}`.
+- A session reporter or a log reporter holds the credential under the same
+  native-runtime rule, but a reporter that cannot hold it does not fail the
+  run: reporting never changes a verdict
+  ([ADR 0033](0033-native-session-reporting.md)). A reporter whose command is
+  not its native runtime, or that does not accept `initialize` of version 2,
+  such as a version 1 reporter, starts without a credential and without its
+  token, and the CLI prints why. Each handshake answer has its own
+  five-second limit, each reporter answers two lines, and the CLI starts the
+  reporters one after another. The handshake can therefore hold the first
+  hook for up to ten seconds per reporter, and up to twenty with both
+  reporters selected;
+  a reporter that ignores `initialize` costs five seconds. A reporter that
+  must start again after repository code ran, after a crash for example, gets
+  no credential: its delivery fails with a custody error. What it did not
+  deliver stays pending in the session's checkpoint, and `subscribers.json`
+  records it. The hosted run does not replay it: a replay is a later
+  invocation, which needs a reporter credential of its own.
 - A hosted runner passes `--credential-fd` to one invocation per fresh sandbox:
   a fresh checkout, `HOME`, artifact store and `TMPDIR`, in a container or VM no
   earlier process outlives. An earlier invocation can leave `.git/config`
@@ -227,9 +263,13 @@ ends when repository code starts.
   lock a hosted run executes as committed, and restarts after the
   `deps-upgrade` hooks.
 - An extension command group refuses `--credential-fd` with a usage error: it
-  resolves its remote cache after the install ran repository code. A hosted run
-  supports job commands, such as `build`, and built-in commands, such as
-  `install`.
+  resolves its remote cache after the install ran repository code.
+- `--watch`, and `serve`, which always watches, refuse `--credential-fd` with a
+  usage error before anything starts. Each watch iteration starts after
+  repository code ran, so no reporter it starts could receive the credential,
+  and a hosted runner runs one finite invocation per fresh sandbox.
+- A hosted run therefore supports finite job commands, such as `build`, and
+  built-in commands, such as `install`.
 
 ## Consequences
 
@@ -247,7 +287,8 @@ ends when repository code starts.
   the run fails with exit 2, naming the pinned version and `putnami pin
   <version>`. A check that cannot run fails with exit 1. Each hosted relaunch
   costs one extra process start. A change that closes a custody gap raises the
-  level.
+  level, unless the starting CLI closes it before the relaunch, as it does for
+  the reporter tokens.
 - An extension that downloads dependencies outside `workspace-fetch` fails on a
   hosted run. That failure is the contract.
 - A hosted install writes no committed file: not `putnami.lock.json`,
@@ -257,6 +298,12 @@ ends when repository code starts.
 - A credential-provider without the `runCredential` member fails at the first
   credential of a hosted run. A cache provider that does not echo
   `run-credential` receives no credential. A run without the flag sends neither.
+- A hosted run that selects a reporter starts it before its first repository
+  code, even when the run delivers nothing to it. A version 1 reporter gets
+  neither the credential nor its token on a hosted run: one whose destination
+  needs a credential delivers nothing there until its extension speaks session
+  reporting v2. A run without the flag sends no handshake and passes each
+  reporter its token as before.
 - A runner that reuses any part of the sandbox across credentialed invocations
   breaks custody: the store is verified at download, not at each run.
 - A hosted run with a remote cache starts the cache provider even when every

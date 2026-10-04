@@ -84,8 +84,16 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  24,
-		funcs:  164,
-		why: "RAISED 158→164 (ADR 0057): a run that may publish reads its ancestry at process start, " +
+		funcs:  168,
+		why: "RAISED 164→168 (cli/credential-custody, reporters): a hosted run hands its session " +
+			"reporter and log reporter the run credential over their protocol, and custody hands it to " +
+			"no process started after repository code, so the run starts them before its first hook. " +
+			"session_reporting.go holds HostedReporters with Start, which starts the selected reporters " +
+			"once, from the first-use bootstrap or Engine.Run, Close, and holders, the nil-safe seam the " +
+			"session's reporting adopts from; and printReportingFailure, the one diagnostic line the run, " +
+			"the pre-start and a replay share. The process and handshake logic lives in " +
+			"internal/sessionreporter, not here. " +
+			"RAISED 158→164 (ADR 0057): a run that may publish reads its ancestry at process start, " +
 			"before the first-use bootstrap or an install runs repository code, and Engine.Run reuses " +
 			"that read. ancestry.go holds CaptureAncestry, the one entry adapters call, capturedAncestry, " +
 			"which hands Engine.Run the snapshot only for the same workspace, mayPublish, the predicate " +

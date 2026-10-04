@@ -30,7 +30,7 @@ import protocolcli "go.putnami.dev/protocol/cli"
 | `ValidateDocument`, `ValidateSessionStream` / `Violation` | Per-document and whole bounded-stream validation, mirrored in TypeScript and pinned by the cross-language corpus |
 | `Result` / `ResultError` | The version-1 envelope, retained as a READ-ONLY shape for documents recorded by builds published before its removal — its constructor and writer are deleted |
 | `Err*` sentinels, `Classify`, `ExitCodeForError`, `ErrorCode` | Error classification → exit code |
-| `SessionReporterCommand`, `LogReporterCommand` and their `*Env`/`*TokenEnv`, `SessionReportingArtifacts`, `SessionReportingChunk`, `SessionReportingAck` | The native reporting capabilities (session reporter, log reporter) and their chunk/ACK wire — [doc/04-session-reporting.md](doc/04-session-reporting.md) |
+| `SessionReporterCommand`, `LogReporterCommand` and their `*Env`/`*TokenEnv`, `SessionReportingArtifacts`, `SessionReportingChunk`, `SessionReportingAck`, `SessionReportingHandshake`, `SessionReportingHandshakeResult` | The native reporting capabilities (session reporter, log reporter), their chunk/ACK wire, and the v2 handshake that hands a reporter the run credential of a hosted run — [doc/04-session-reporting.md](doc/04-session-reporting.md) |
 | `SessionSubscribersFile`, `NewSessionSubscriberEvidence`, `ParseSessionSubscribersFile` | Per-subscriber delivery evidence (`subscribers.json`) for a session's event stream — [doc/05-session-subscribers.md](doc/05-session-subscribers.md) |
 | `ReservedGlobalFlags`, `IsReservedGlobalFlag`, `LookupReservedGlobalFlag`, `ValidateNoReservedShadow` | The reserved global-flag registry — flags every surface handles and no extension may redefine |
 
