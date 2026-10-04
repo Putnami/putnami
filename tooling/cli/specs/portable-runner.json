@@ -27,7 +27,7 @@
     },
     {
       "id": "commit-request",
-      "text": "A version 2 bound request names a commit and a requested selection instead of a snapshot, a frozen selection and an expected plan, and is malformed when it names serve, run, compose, qualify or format. The executing engine refuses it unless the checkout's HEAD is that commit with no modified tracked file, then plans the checkout through the ordinary selection: impacted against source.base, the projects selectors, or every project. It stamps versions from Git, never resolves placement, refuses a task whose cwd leaves the checkout and a publishing plan without invocation.publication, and records a canonical session with remote placement and no provenance."
+      "text": "A version 2 bound request names a commit and a requested selection, never a snapshot or expected plan, and is malformed when it names serve, run, compose, qualify or format. The engine refuses it unless HEAD is that commit with no modified tracked file, then plans the checkout: impacted against source.base, the projects selectors, or all. It stamps versions from Git, never resolves placement, refuses a task whose cwd leaves the checkout or an unauthorized publication, and records no provenance."
     },
     {
       "id": "durable-lifecycle",
