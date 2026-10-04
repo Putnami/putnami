@@ -19,10 +19,28 @@ import (
 )
 
 const StateFile = "reporting.json"
-const FinalizationBudget = 30 * time.Second
+
+// FinalizationProgressDeadline ends a capability's finalization once this long
+// has passed without an acknowledged chunk of any artifact: a reporter that
+// keeps acknowledging keeps delivering, a stuck one stops.
+const FinalizationProgressDeadline = 30 * time.Second
+
+// FinalizationCap ends a capability's finalization this long after it began,
+// however steadily its reporter acknowledges.
+const FinalizationCap = 5 * time.Minute
+
+// CanceledFinalizationBudget caps what remains of a finalization once the
+// graph is canceled.
 const CanceledFinalizationBudget = 2 * time.Second
+
+// providerSetupTimeout bounds the resolution of a reporter's launch.
+const providerSetupTimeout = 30 * time.Second
 const operationTimeout = 5 * time.Second
 const maxAttempts = 3
+
+// errBudgetExhausted is the worker's error once it is canceled. drain names
+// the limit that canceled it.
+var errBudgetExhausted = errors.New("reporting budget exhausted")
 
 // EventsBatchInterval is the longest a live session reporter events.jsonl chunk
 // shorter than one frame waits before it leaves: the chunk count, and the
@@ -119,6 +137,10 @@ type Run struct {
 	// plain: on a hosted run, the reporter cannot hold the run credential
 	// (Holders.Start), so its process starts without one.
 	plain bool
+	// progressMu guards lastAck, the clock time of the latest chunk the
+	// reporter accepted, which drain reads to apply the progress deadline.
+	progressMu sync.Mutex
+	lastAck    time.Time
 }
 
 // Start declares the capability as a subscriber of events, resuming at its
@@ -144,7 +166,7 @@ func startRun(ctx context.Context, capability Capability, events *sessionstream.
 		r.release()
 		return nil, fmt.Errorf("%s: %w", capability.Label, err)
 	}
-	setupCtx, cancel := context.WithTimeout(ctx, FinalizationBudget)
+	setupCtx, cancel := context.WithTimeout(ctx, providerSetupTimeout)
 	launch, err := resolve(setupCtx)
 	cancel()
 	if err != nil {
@@ -308,7 +330,7 @@ func (r *Run) deliver() error {
 	lastEventsSend := r.clock.Now()
 	for !r.state.Complete {
 		if r.ctx.Err() != nil {
-			return fmt.Errorf("reporting budget exhausted")
+			return errBudgetExhausted
 		}
 		select {
 		case <-r.finish:
@@ -345,7 +367,7 @@ func (r *Run) deliver() error {
 				}
 				select {
 				case <-r.ctx.Done():
-					return fmt.Errorf("reporting budget exhausted")
+					return errBudgetExhausted
 				case <-finish:
 					terminal = true
 				case <-r.events.Wake():
@@ -373,6 +395,7 @@ func (r *Run) deliver() error {
 		if err := r.save(); err != nil {
 			return err
 		}
+		r.acknowledged()
 		if p.Artifact == sessionstream.EventsFile {
 			// Acknowledged only once the checkpoint is durable. A refused
 			// acknowledgement can only make the evidence under-report delivery.
@@ -380,6 +403,26 @@ func (r *Run) deliver() error {
 		}
 	}
 	return nil
+}
+
+// acknowledged records that the reporter accepted a chunk and that the
+// checkpoint holding it is durable.
+func (r *Run) acknowledged() {
+	now := r.clock.Now()
+	r.progressMu.Lock()
+	r.lastAck = now
+	r.progressMu.Unlock()
+}
+
+// lastProgress is the latest chunk acceptance at or after since, or since when
+// the reporter accepted none.
+func (r *Run) lastProgress(since time.Time) time.Time {
+	r.progressMu.Lock()
+	defer r.progressMu.Unlock()
+	if r.lastAck.After(since) {
+		return r.lastAck
+	}
+	return since
 }
 
 // eventsBatchWait applies the live batching rule to the bytes committed past the
@@ -405,7 +448,7 @@ func (r *Run) eventsBatchWait(lastSend time.Time) time.Duration {
 func (r *Run) awaitEvents(wait time.Duration) (bool, error) {
 	select {
 	case <-r.ctx.Done():
-		return false, fmt.Errorf("reporting budget exhausted")
+		return false, errBudgetExhausted
 	case <-r.finish:
 		return true, nil
 	case <-r.events.Wake():
@@ -463,7 +506,7 @@ func readArtifact(dir, artifact string, offset int64) ([]byte, error) {
 func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		if r.ctx.Err() != nil {
-			return fmt.Errorf("reporting budget exhausted")
+			return errBudgetExhausted
 		}
 		if r.process == nil {
 			p, err := r.start()
@@ -492,7 +535,7 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 		if attempt+1 < maxAttempts {
 			select {
 			case <-r.ctx.Done():
-				return fmt.Errorf("reporting budget exhausted")
+				return errBudgetExhausted
 			case <-time.After(100 * time.Millisecond):
 			}
 		}
@@ -517,10 +560,11 @@ func (r *Run) start() (*process, error) {
 	return startHolder(r.ctx, r.capability.holderName(r.state.Provider), r.launch, r.opTimeout)
 }
 
-// Finish drains under one total budget even if the graph context was canceled.
-// A failed worker is not restarted here: its exact pending frame is retained
-// for an explicit replay, without re-running graph work. Once the worker has
-// stopped, the reporter's delivery evidence is recorded beside the session.
+// Finish drains under the finalization limits (drain) even if the graph
+// context was canceled. A failed worker is not restarted here: its exact
+// pending frame is retained for an explicit replay, without re-running graph
+// work. Once the worker has stopped, the reporter's delivery evidence is
+// recorded beside the session.
 func (r *Run) Finish() error {
 	if r == nil {
 		return nil
@@ -541,33 +585,53 @@ func (r *Run) recordEvidence() error {
 	return nil
 }
 
+// drain enables terminal transmission and waits for the worker. It cancels the
+// worker FinalizationProgressDeadline after the latest acknowledged chunk, or
+// after drain began when none was acknowledged since, and FinalizationCap after
+// drain began, whichever comes first. A graph canceled before or during the
+// drain caps what remains to CanceledFinalizationBudget. A worker that
+// completes before a limit succeeds.
 func (r *Run) drain() error {
 	r.once.Do(func() { close(r.finish) })
-	deadline := time.Now().Add(FinalizationBudget)
+	started := r.clock.Now()
+	limit, limitReason := started.Add(FinalizationCap), fmt.Sprintf("finalization reached its %s cap", FinalizationCap)
 	graphDone := r.graphCtx.Done()
 	if r.graphCtx.Err() != nil {
-		deadline = time.Now().Add(CanceledFinalizationBudget)
+		limit, limitReason = started.Add(CanceledFinalizationBudget), ""
 		graphDone = nil
 	}
-	timer := time.NewTimer(time.Until(deadline))
-	defer timer.Stop()
 	for {
+		now := r.clock.Now()
+		deadline, reason := limit, limitReason
+		if stalled := r.lastProgress(started).Add(FinalizationProgressDeadline); stalled.Before(deadline) {
+			deadline, reason = stalled, fmt.Sprintf("no chunk acknowledged for %s", FinalizationProgressDeadline)
+		}
+		if !now.Before(deadline) {
+			return r.stop(reason)
+		}
 		select {
 		case <-r.done:
 			return r.err
 		case <-graphDone:
-			cancelDeadline := time.Now().Add(CanceledFinalizationBudget)
-			if cancelDeadline.Before(deadline) {
-				deadline = cancelDeadline
-				timer.Reset(time.Until(deadline))
+			if canceled := r.clock.Now().Add(CanceledFinalizationBudget); canceled.Before(limit) {
+				limit, limitReason = canceled, ""
 			}
 			graphDone = nil
-		case <-timer.C:
-			r.cancel()
-			<-r.done
-			return r.err
+		case <-r.clock.After(deadline.Sub(now)):
 		}
 	}
+}
+
+// stop cancels the worker at a finalization limit and waits for it. A worker
+// the cancellation stopped fails naming reason; an empty reason keeps the
+// worker's own error, as does a worker that failed or completed on its own.
+func (r *Run) stop(reason string) error {
+	r.cancel()
+	<-r.done
+	if reason != "" && errors.Is(r.err, errBudgetExhausted) {
+		return fmt.Errorf("%w: %s", r.err, reason)
+	}
+	return r.err
 }
 
 func readBounded(path string, limit int64) ([]byte, error) {

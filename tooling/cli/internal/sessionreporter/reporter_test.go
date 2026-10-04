@@ -338,19 +338,19 @@ func TestReportingCancellationDuringDrainShortensTheTotalBudget(t *testing.T) {
 	defer cancelGraph()
 	workerCtx, cancelWorker := context.WithCancel(context.Background())
 	defer cancelWorker()
-	r := &Run{ctx: workerCtx, graphCtx: graphCtx, cancel: cancelWorker, finish: make(chan struct{}), done: make(chan struct{})}
+	r := &Run{ctx: workerCtx, graphCtx: graphCtx, cancel: cancelWorker, finish: make(chan struct{}), done: make(chan struct{}), clock: systemClock{}}
 	go func() { <-workerCtx.Done(); r.err = errors.New("pending delivery"); close(r.done) }()
 	result := make(chan error, 1)
 	go func() { result <- r.Finish() }()
 	<-r.finish
 	cancelGraph()
 	// Finish always returns, so the wait is unbounded and the verdict comes from
-	// the elapsed time: a regression keeps the full FinalizationBudget, which a
-	// wait of a few seconds could only tell apart on an idle host.
+	// the elapsed time: a regression keeps the full FinalizationProgressDeadline,
+	// which a wait of a few seconds could only tell apart on an idle host.
 	started := time.Now()
 	err := <-result
-	if elapsed := time.Since(started); elapsed >= FinalizationBudget {
-		t.Fatalf("cancellation during drain kept the normal %s budget: Finish took %s", FinalizationBudget, elapsed)
+	if elapsed := time.Since(started); elapsed >= FinalizationProgressDeadline {
+		t.Fatalf("cancellation during drain kept the normal %s progress deadline: Finish took %s", FinalizationProgressDeadline, elapsed)
 	}
 	if err == nil {
 		t.Fatal("incomplete canceled drain reported success")

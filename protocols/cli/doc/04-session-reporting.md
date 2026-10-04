@@ -66,8 +66,12 @@ the exact pending frame before sending and saves ACK progress atomically. It
 never resets a cursor or rebuilds completed work after delivery failure.
 
 RPC deadlines are five seconds with at most three attempts. Normal finalization
-and replay have a thirty-second total budget; already canceled graphs drain for
-two seconds. Errors preserve the graph verdict and leave retained state for
+and replay stop after thirty seconds without an acknowledged chunk of any
+artifact, or five minutes after they began, whichever comes first: a receiver
+that keeps acknowledging keeps receiving. Already canceled graphs drain for two
+seconds. The diagnostic names the limit that stopped delivery (`no chunk
+acknowledged for 30s` or `finalization reached its 5m0s cap`). Errors preserve
+the graph verdict and leave retained state for
 `putnami sessions replay --session <id>`. Checkpoint reads are bounded to 192 KiB;
 replay validates finalized session documents up to 16 MiB. Retention follows
 [`sessions.keep`](../../../tooling/cli/doc/16-session-reporting.md).
