@@ -18,8 +18,11 @@ import type { Envelope } from './transport';
 // ---------------------------------------------------------------------------
 
 export interface DispatchDeps {
-  /** Optional factory for creating a DI scope per handler invocation. */
-  readonly scopeFactory?: () => Promise<DetachedScope>;
+  /**
+   * Optional factory for creating a DI scope per handler invocation. A factory
+   * that resolves to undefined runs the handler with no scope.
+   */
+  readonly scopeFactory?: () => Promise<DetachedScope | undefined>;
   /**
    * When provided, a handler failure is routed here (inside the event
    * context, after logging/telemetry) instead of being rethrown — the
@@ -82,7 +85,9 @@ export async function dispatchToHandler(
         // histogram) before being routed to onFailure.
         if (deps.scopeFactory) {
           detachedScope = await deps.scopeFactory();
-          (ctx as Record<string | symbol, unknown>)[SCOPE_CONTAINER_KEY] = detachedScope.scope;
+          if (detachedScope) {
+            (ctx as Record<string | symbol, unknown>)[SCOPE_CONTAINER_KEY] = detachedScope.scope;
+          }
         }
 
         assertValidPayload(message, definition.topic);
