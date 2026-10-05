@@ -18,6 +18,7 @@
   ],
   "$defs": {
     "chunk": {
+      "description": "One frame of a persisted session artifact. A plan.json frame starts at or before 16777216 decoded bytes; the Go and TypeScript parsers also refuse one whose offset plus decoded data length exceeds it.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -41,7 +42,8 @@
         "artifact": {
           "enum": [
             "events.jsonl",
-            "session.json"
+            "session.json",
+            "plan.json"
           ]
         },
         "offset": {
@@ -90,6 +92,22 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "artifact": {
+                "const": "plan.json"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "offset": {
+                "maximum": 16777216
+              }
+            }
+          }
         }
       ]
     },
@@ -117,7 +135,8 @@
         "artifact": {
           "enum": [
             "events.jsonl",
-            "session.json"
+            "session.json",
+            "plan.json"
           ]
         },
         "offset": {
@@ -172,6 +191,22 @@
               "required": [
                 "code"
               ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "artifact": {
+                "const": "plan.json"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "offset": {
+                "maximum": 16777216
+              }
             }
           }
         }

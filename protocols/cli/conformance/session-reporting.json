@@ -515,6 +515,178 @@
     }
   },
   {
+    "name": "session-reporter-plan-chunk",
+    "kind": "chunk",
+    "valid": true,
+    "reporter": "session-reporter",
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "plan.json",
+      "offset": 0,
+      "sequence": 0,
+      "data": "YWJj",
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false
+    }
+  },
+  {
+    "name": "session-reporter-plan-final",
+    "kind": "chunk",
+    "valid": true,
+    "reporter": "session-reporter",
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "plan.json",
+      "offset": 3,
+      "sequence": 1,
+      "data": "",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "final": true
+    }
+  },
+  {
+    "name": "session-reporter-plan-ack",
+    "kind": "ack",
+    "valid": true,
+    "reporter": "session-reporter",
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "plan.json",
+      "offset": 0,
+      "sequence": 0,
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false,
+      "ok": true
+    }
+  },
+  {
+    "name": "session-reporter-plan-refused",
+    "kind": "ack",
+    "valid": true,
+    "reporter": "session-reporter",
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "plan.json",
+      "offset": 0,
+      "sequence": 0,
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false,
+      "ok": false,
+      "code": "invalid_chunk"
+    }
+  },
+  {
+    "name": "plan-chunk-ending-at-bound",
+    "kind": "chunk",
+    "valid": true,
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "plan.json",
+      "offset": 16777213,
+      "sequence": 256,
+      "data": "YWJj",
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false
+    }
+  },
+  {
+    "name": "plan-chunk-ending-past-bound",
+    "kind": "chunk",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "plan.json",
+      "offset": 16777214,
+      "sequence": 256,
+      "data": "YWJj",
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false
+    }
+  },
+  {
+    "name": "plan-final-at-bound",
+    "kind": "chunk",
+    "valid": true,
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "plan.json",
+      "offset": 16777216,
+      "sequence": 257,
+      "data": "",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "final": true
+    }
+  },
+  {
+    "name": "plan-final-past-bound",
+    "kind": "chunk",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "plan.json",
+      "offset": 16777217,
+      "sequence": 257,
+      "data": "",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "final": true
+    }
+  },
+  {
+    "name": "plan-ack-past-bound",
+    "kind": "ack",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "plan.json",
+      "offset": 16777217,
+      "sequence": 257,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "final": true,
+      "ok": true
+    }
+  },
+  {
+    "name": "log-reporter-plan-chunk",
+    "kind": "chunk",
+    "valid": false,
+    "reporter": "log-reporter",
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "plan.json",
+      "offset": 0,
+      "sequence": 0,
+      "data": "YWJj",
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false
+    }
+  },
+  {
+    "name": "log-reporter-plan-final",
+    "kind": "chunk",
+    "valid": false,
+    "reporter": "log-reporter",
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "plan.json",
+      "offset": 3,
+      "sequence": 1,
+      "data": "",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "final": true
+    }
+  },
+  {
     "name": "unknown-reporter-events-chunk",
     "kind": "chunk",
     "valid": false,

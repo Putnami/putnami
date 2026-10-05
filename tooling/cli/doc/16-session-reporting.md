@@ -6,14 +6,15 @@ Select an installed extension implementing `session-reporter`:
 PUTNAMI_SESSION_REPORTER=@example/reporter putnami lint,test,build
 ```
 
-The engine reports persisted events while the graph runs, then the terminal
-session, including failed and canceled work. Local and hosted execution use the
-same capability. A trusted launcher may supply `PUTNAMI_SESSION_REPORTER_TOKEN`;
-the authoritative CLI captures it before workspace setup/hooks/tasks and passes
-it only to the selected provider process. Do not put it in repository commands.
-A hosted run (`--credential-fd`) ignores the token instead: it removes it from
-the environment with a warning, and hands the reporter the run credential over
-the protocol. See [Hosted runs](#hosted-runs).
+The engine reports the recorded plan and persisted events while the graph
+runs, then the terminal session, including failed and canceled work. Local and
+hosted execution use the same capability. A trusted launcher may supply
+`PUTNAMI_SESSION_REPORTER_TOKEN`; the authoritative CLI captures it before
+workspace setup/hooks/tasks and passes it only to the selected provider
+process. Do not put it in repository commands. A hosted run
+(`--credential-fd`) ignores the token instead: it removes it from the
+environment with a warning, and hands the reporter the run credential over the
+protocol. See [Hosted runs](#hosted-runs).
 
 A selected but unavailable provider produces a diagnostic and retains the
 session; an unset selector leaves reporting disabled. Reporting failure never
@@ -24,7 +25,7 @@ bounded pending checkpoint alongside the ordinary artifacts.
 The reporter is a declared subscriber of the session's event stream
 (`events.jsonl`) and never slows a task. While the graph runs it batches: an
 events chunk leaves once a full 64 KiB frame is committed, or 10 seconds after the
-previous events chunk. The first chunk waits 10 seconds from the reporter's start.
+previous events chunk. The first events chunk waits 10 seconds from the reporter's start.
 A long run therefore sends a number of chunks bounded by its duration, not one per
 record. When the graph ends, the reporter sends the rest at once. When it stops, `.putnami/sessions/<id>/subscribers.json` records its evidence:
 `delivered`, `partial` or `lost`, the last acknowledged position, and how many
@@ -32,6 +33,39 @@ records it never acknowledged. `putnami sessions inspect <id>` prints it. A repl
 rewrites only the entries of the reporters it replays. See the
 [evidence contract](../../../protocols/cli/doc/05-session-subscribers.md) and
 [ADR 0033](adr/0033-native-session-reporting.md).
+
+## Recorded plan
+
+Before any event, the session reporter sends the session's recorded plan,
+`.putnami/sessions/<id>/plan.json`: the commands, and the planned tasks with
+their edges. It waits for no batching interval, and every other frame
+follows it, so the receiver has it before the first `task:start` record. A
+task may start before the plan leaves. The CLI sends the persisted bytes
+unchanged and adds no redaction, as for `session.json`. A `plan.json` above
+16 MiB is not sent.
+
+The plan is best-effort. The reporter skips it, records why in
+`reporting.json` (`planOmitted`), and still delivers the events and the
+session:
+
+| `planOmitted` | Why |
+| --- | --- |
+| `absent` | The session has no `plan.json`. |
+| `too_large` | `plan.json` is above 16 MiB. |
+| `unreadable` | `plan.json` cannot be read: it is not a regular file, a read fails, or it was removed or truncated after its first chunk. |
+| `refused` | The receiver refused a `plan.json` chunk without retry. |
+| `undeliverable` | The last attempt to send a `plan.json` chunk failed in transport, for example a receiver that exits. |
+| `late` | A checkpoint written by an earlier CLI already sent events or the session. |
+
+An omitted plan prints no diagnostic and changes neither the exit code nor
+`subscribers.json`. Replay never sends a plan the run omitted. A receiver that
+refuses a `plan.json` chunk with retry on its last attempt does not omit it: the
+delivery fails as for any chunk, and replay sends the plan first. The log
+reporter never receives `plan.json`. On a hosted run, a receiver that exits at
+`plan.json` instead of refusing it is started again after repository code ran,
+gets no credential, and the session's delivery fails (see
+[Hosted runs](#hosted-runs)): upgrade a hosted receiver to accept or refuse
+`plan.json` before you upgrade the CLI.
 
 ## Log reporter
 
@@ -43,7 +77,7 @@ PUTNAMI_LOG_REPORTER=@example/logs putnami lint,test,build
 ```
 
 The log reporter receives `events.jsonl` through the same wire and never
-receives `session.json`. A live chunk leaves once a full 64 KiB frame is
+receives `session.json` or `plan.json`. A live chunk leaves once a full 64 KiB frame is
 committed, or 2 seconds after the previous events chunk. When the graph ends, it
 sends the rest at once and closes the stream. `PUTNAMI_LOG_REPORTER_TOKEN` is
 its optional credential. The CLI captures it like the session reporter's token

@@ -82,13 +82,22 @@ func TestNativeSessionReporterProvider(t *testing.T) {
 		if exists("crash") {
 			os.Exit(29)
 		}
+		// exit-on-plan exits at every plan.json frame, as a receiver whose
+		// parser does not know the artifact does.
+		if chunk.Artifact == "plan.json" && exists("exit-on-plan") {
+			os.Exit(30)
+		}
 		ack := chunk.Ack()
+		// offline refuses every chunk without retry, unavailable with retry.
 		// offline-after-live acknowledges the chunk that carries task:start,
-		// then refuses every later chunk.
+		// then refuses every later chunk. refuse-plan refuses every plan.json
+		// chunk without retry and acknowledges the other artifacts.
 		goOffline := false
-		if exists("offline") {
-			ack.OK, ack.Code = false, "unavailable"
+		if unavailable := exists("unavailable"); unavailable || exists("offline") {
+			ack.OK, ack.Retryable, ack.Code = false, unavailable, "unavailable"
 			fmt.Fprintln(os.Stderr, "provider diagnostic "+token)
+		} else if chunk.Artifact == "plan.json" && exists("refuse-plan") {
+			ack.OK, ack.Code = false, "unsupported_artifact"
 		} else {
 			path := file("received-" + chunk.Artifact)
 			f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
@@ -379,10 +388,15 @@ func TestNativeSessionReportingCancellation(t *testing.T) {
 	verifyReporterArtifacts(t, root, workspace_state.NewSessionStore(root).LatestID())
 }
 
+// TestNativeSessionReportingOutageAndReplay runs against a receiver that
+// answers every chunk ok:false with retry: plan.json is not omitted, the
+// delivery fails with its first frame pending, and replay sends that exact
+// frame first and runs no workload.
 func TestNativeSessionReportingOutageAndReplay(t *testing.T) {
 	spectest.Proves(t, "cli/native-session-reporting", "durable-replay", "outage-retains-identical-frame-and-replay-runs-no-workload")
+	spectest.Proves(t, "cli/native-session-reporting", "durable-replay", "replay-sends-an-undelivered-plan-first")
 	root, req := reporterFixture(t, fixtureproc.Program{Record: "executions"})
-	if err := os.WriteFile(filepath.Join(root, "offline"), nil, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "unavailable"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var result SessionResult
@@ -397,13 +411,38 @@ func TestNativeSessionReportingOutageAndReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	var checkpoint struct {
-		Pending  *protocolcli.SessionReportingChunk `json:"pending"`
-		Complete bool                               `json:"complete"`
+		Pending     *protocolcli.SessionReportingChunk `json:"pending"`
+		Complete    bool                               `json:"complete"`
+		PlanOmitted string                             `json:"planOmitted"`
 	}
 	if json.Unmarshal(stateBytes, &checkpoint) != nil || checkpoint.Pending == nil || checkpoint.Complete {
 		t.Fatalf("no pending frame: %s", stateBytes)
 	}
-	if err := os.Remove(filepath.Join(root, "offline")); err != nil {
+	// The outage refused the first plan.json frame with retry on every
+	// attempt: the plan is not omitted, and its frame stays pending.
+	pending := checkpoint.Pending
+	if checkpoint.PlanOmitted != "" || pending.Artifact != "plan.json" || pending.Offset != 0 || pending.Sequence != 0 {
+		t.Fatalf("outage checkpoint: %s", stateBytes)
+	}
+	want, err := json.Marshal(pending)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attempts := traceLines(t, filepath.Join(root, "trace.jsonl"))
+	if len(attempts) != 3 {
+		t.Fatalf("outage frames = %d, want 3 plan.json attempts", len(attempts))
+	}
+	for _, line := range attempts {
+		chunk, err := protocolcli.ParseSessionReportingChunk(line)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := json.Marshal(chunk); err != nil || !bytes.Equal(got, want) {
+			t.Fatalf("attempt %s, want the pending frame %s", line, want)
+		}
+	}
+	outage := len(attempts)
+	if err := os.Remove(filepath.Join(root, "unavailable")); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv(protocolcli.SessionReporterEnv, "@test/reporter")
@@ -412,17 +451,122 @@ func TestNativeSessionReportingOutageAndReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	verifyReporterArtifacts(t, root, sessionID)
-	trace, _ := os.ReadFile(filepath.Join(root, "trace.jsonl"))
-	lines := bytes.Split(bytes.TrimSpace(trace), []byte("\n"))
-	if len(lines) < 2 || !bytes.Equal(lines[0], lines[1]) {
-		t.Fatalf("pending identity changed on replay: %s", trace)
+	lines := traceLines(t, filepath.Join(root, "trace.jsonl"))
+	if len(lines) <= outage || !bytes.Equal(lines[outage], lines[outage-1]) {
+		t.Fatalf("pending identity changed on replay: %s", bytes.Join(lines, []byte("\n")))
 	}
 	if runs := fixtureproc.Runs(t, filepath.Join(root, "executions")); len(runs) != 1 {
 		t.Fatalf("replay ran the workload: %d executions, want 1", len(runs))
 	}
 }
 
+// TestNativeSessionReportingSendsThePlanBeforeTheFirstTask holds the task until
+// the receiver closed plan.json: plan.json leaves while the graph runs, before
+// the first task:start record, as the bytes the session persisted.
+func TestNativeSessionReportingSendsThePlanBeforeTheFirstTask(t *testing.T) {
+	spectest.Proves(t, "cli/native-session-reporting", "engine-lifecycle", "plan-precedes-every-other-frame")
+	root, req := reporterFixture(t, fixtureproc.Program{Record: "executions", WaitFor: []string{"received-plan.json.final"}})
+	result, err := New().Run(context.Background(), req, discardEvents{})
+	if err != nil || result.ExitCode != 0 {
+		t.Fatalf("engine exit=%d error=%v", result.ExitCode, err)
+	}
+	sessionID := workspace_state.NewSessionStore(root).LatestID()
+	verifyReporterArtifacts(t, root, sessionID)
+	var plan protocolcli.SessionPlanFile
+	data, err := os.ReadFile(filepath.Join(sessionDir(root, sessionID), "plan.json"))
+	if err != nil || json.Unmarshal(data, &plan) != nil || plan.SessionID != sessionID || len(plan.Tasks) != 1 {
+		t.Fatalf("the delivered plan.json is not the session's plan: %s (%v)", data, err)
+	}
+	taskRanWithoutReporter(t, root)
+}
+
+// TestNativeSessionReportingARefusedPlanLeavesTheRunUnchanged runs against a
+// receiver that refuses plan.json, or exits at it as a receiver that does not
+// know the artifact does: the verdict, the other artifacts and the delivery
+// evidence stay as without plan.json, and no diagnostic is printed.
+func TestNativeSessionReportingARefusedPlanLeavesTheRunUnchanged(t *testing.T) {
+	spectest.Proves(t, "cli/native-session-reporting", "engine-lifecycle", "an-omitted-plan-leaves-delivery-and-the-verdict-unchanged")
+	for _, tc := range []struct {
+		marker, omitted string
+		// frames is how many plan.json frames reach the receiver: one refusal,
+		// or one per attempt when the receiver exits.
+		frames int
+	}{
+		{"refuse-plan", "refused", 1},
+		{"exit-on-plan", "undeliverable", 3},
+	} {
+		for _, exit := range []int{0, 1} {
+			t.Run(fmt.Sprintf("%s exit %d", tc.marker, exit), func(t *testing.T) {
+				root, req := reporterFixture(t, fixtureproc.Program{Record: "executions", Exit: exit})
+				if err := os.WriteFile(filepath.Join(root, tc.marker), nil, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				var result SessionResult
+				var err error
+				stderr := captureStderr(t, func() { result, err = New().Run(context.Background(), req, discardEvents{}) })
+				if err != nil || result.ExitCode != exit || strings.Contains(stderr, "incomplete") {
+					t.Fatalf("an omitted plan.json changed the run: exit=%d err=%v diagnostics=%s", result.ExitCode, err, stderr)
+				}
+				sessionID := workspace_state.NewSessionStore(root).LatestID()
+				verifyReporterDelivery(t, root, sessionID, tc.omitted)
+				frames := 0
+				for _, line := range traceLines(t, filepath.Join(root, "trace.jsonl")) {
+					if chunk, err := protocolcli.ParseSessionReportingChunk(line); err == nil && chunk.Artifact == "plan.json" {
+						frames++
+					}
+				}
+				if frames != tc.frames {
+					t.Fatalf("plan.json frames = %d, want %d", frames, tc.frames)
+				}
+				if got := subscriberEvidence(t, root, sessionID)[protocolcli.SessionReporterCommand].Evidence; got != protocolcli.SubscriberEvidenceDelivered {
+					t.Fatalf("session reporter evidence %q", got)
+				}
+				taskRanWithoutReporter(t, root)
+			})
+		}
+	}
+}
+
+// TestNativeSessionReportingReplaySendsThePlanFirst replays a session no
+// reporter received: replay sends plan.json first, as the run would have, and
+// runs no workload.
+func TestNativeSessionReportingReplaySendsThePlanFirst(t *testing.T) {
+	spectest.Proves(t, "cli/native-session-reporting", "durable-replay", "replay-sends-an-undelivered-plan-first")
+	root, req := reporterFixture(t, fixtureproc.Program{Record: "executions"})
+	t.Setenv(protocolcli.SessionReporterEnv, "")
+	t.Setenv(protocolcli.SessionReporterTokenEnv, "")
+	result, err := New().Run(context.Background(), req, discardEvents{})
+	if err != nil || result.ExitCode != 0 {
+		t.Fatalf("engine exit=%d error=%v", result.ExitCode, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "trace.jsonl")); !os.IsNotExist(err) {
+		t.Fatalf("an unselected reporter received frames: %v", err)
+	}
+	sessionID := workspace_state.NewSessionStore(root).LatestID()
+	t.Setenv(protocolcli.SessionReporterEnv, "@test/reporter")
+	t.Setenv(protocolcli.SessionReporterTokenEnv, "reporter-test-secret")
+	if err := New().ReplaySession(context.Background(), root, req.Config, sessionID); err != nil {
+		t.Fatal(err)
+	}
+	verifyReporterArtifacts(t, root, sessionID)
+	if runs := fixtureproc.Runs(t, filepath.Join(root, "executions")); len(runs) != 1 {
+		t.Fatalf("replay ran the workload: %d executions, want 1", len(runs))
+	}
+}
+
+// verifyReporterArtifacts fails t unless the session reporter delivered the
+// session's plan.json, session.json and events.jsonl unchanged, closed each,
+// and closed plan.json before any other frame reached the receiver.
 func verifyReporterArtifacts(t *testing.T, root, sessionID string) {
+	t.Helper()
+	verifyReporterDelivery(t, root, sessionID, "")
+}
+
+// verifyReporterDelivery is verifyReporterArtifacts for a session whose
+// checkpoint omits plan.json as planOmitted says, "" when it does not: an
+// omitted plan.json is never closed, and every plan.json frame the receiver
+// read, refused ones included, precedes every other frame.
+func verifyReporterDelivery(t *testing.T, root, sessionID, planOmitted string) {
 	t.Helper()
 	if sessionID == "" {
 		t.Fatal("engine produced no session")
@@ -432,8 +576,9 @@ func verifyReporterArtifacts(t *testing.T, root, sessionID string) {
 		t.Fatal(err)
 	}
 	var state struct {
-		Complete bool                               `json:"complete"`
-		Pending  *protocolcli.SessionReportingChunk `json:"pending"`
+		Complete    bool                               `json:"complete"`
+		Pending     *protocolcli.SessionReportingChunk `json:"pending"`
+		PlanOmitted string                             `json:"planOmitted"`
 	}
 	if err := json.Unmarshal(checkpoint, &state); err != nil {
 		t.Fatal(err)
@@ -441,7 +586,16 @@ func verifyReporterArtifacts(t *testing.T, root, sessionID string) {
 	if !state.Complete || state.Pending != nil {
 		t.Fatal("provider exited after final ACK but reporting remained incomplete")
 	}
-	for _, artifact := range []string{"session.json", "events.jsonl"} {
+	if state.PlanOmitted != planOmitted {
+		t.Fatalf("checkpoint omits plan.json as %q, want %q", state.PlanOmitted, planOmitted)
+	}
+	artifacts := []string{"session.json", "events.jsonl"}
+	if planOmitted == "" {
+		artifacts = append(artifacts, "plan.json")
+	} else if _, err := os.Stat(filepath.Join(root, "received-plan.json.final")); err == nil {
+		t.Fatal("the receiver closed an omitted plan.json")
+	}
+	for _, artifact := range artifacts {
 		want, err := os.ReadFile(filepath.Join(root, ".putnami", "sessions", sessionID, artifact))
 		if err != nil {
 			t.Fatal(err)
@@ -461,11 +615,24 @@ func verifyReporterArtifacts(t *testing.T, root, sessionID string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var sessionFinal bool
+	var sessionFinal, planFinal, otherFrame bool
 	for _, line := range bytes.Split(bytes.TrimSpace(trace), []byte("\n")) {
 		chunk, err := protocolcli.ParseSessionReportingChunk(line)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if chunk.Artifact == "plan.json" {
+			if otherFrame {
+				t.Fatal("a plan.json frame followed another artifact's frame")
+			}
+			planFinal = planFinal || chunk.Final
+		} else {
+			// Every events.jsonl frame, the one that carries the first
+			// task:start record included, follows the plan.json final marker.
+			if planOmitted == "" && !planFinal {
+				t.Fatalf("%s reached the receiver before plan.json closed", chunk.Artifact)
+			}
+			otherFrame = true
 		}
 		if chunk.Artifact == "session.json" && chunk.Final {
 			sessionFinal = true

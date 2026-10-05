@@ -108,8 +108,10 @@ func startHolder(ctx context.Context, holder string, launch LaunchSpec, timeout 
 // repository code, so that each can hold the run credential: a hosted run
 // hands its credential to no process started after repository code
 // (runcredential.StartHolder), and a reporter starts lazily, at its first
-// chunk, after the hooks and the first jobs started. Start starts them once,
-// and the session's Run of each capability adopts its process (StartSelected).
+// frame, after the hooks: the session reporter's plan.json while the first
+// jobs start, the log reporter's first events chunk after them. Start starts
+// them once, and the session's Run of each capability adopts its process
+// (StartSelected).
 // The zero value is ready to use. Whoever creates it closes it, after the last
 // Run that adopts from it started.
 type Holders struct {

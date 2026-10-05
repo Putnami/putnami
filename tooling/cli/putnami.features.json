@@ -114,10 +114,10 @@
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
-        { "id": "engine-lifecycle", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["live-events-and-finalized-success-failure-cancellation", "stream-subscribers-leave-recorded-bytes-unchanged", "a-killed-subscriber-keeps-the-verdict-and-records-partial-evidence", "reporting-capabilities-deliver-and-fail-independently"] } },
-        { "id": "durable-replay", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["outage-retains-identical-frame-and-replay-runs-no-workload", "replay-resumes-only-undelivered-capabilities"] } },
+        { "id": "engine-lifecycle", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["live-events-and-finalized-success-failure-cancellation", "stream-subscribers-leave-recorded-bytes-unchanged", "a-killed-subscriber-keeps-the-verdict-and-records-partial-evidence", "reporting-capabilities-deliver-and-fail-independently", "plan-precedes-every-other-frame", "an-omitted-plan-leaves-delivery-and-the-verdict-unchanged"] } },
+        { "id": "durable-replay", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["outage-retains-identical-frame-and-replay-runs-no-workload", "replay-resumes-only-undelivered-capabilities", "replay-sends-an-undelivered-plan-first", "a-checkpoint-without-a-plan-cursor-stays-valid", "a-crash-mid-plan-resumes-at-its-pending-frame"] } },
         { "id": "credential-boundary", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["explicit-secret-is-withheld-from-hooks-and-tasks", "each-token-reaches-only-its-own-provider", "hosted-run-ignores-reporter-tokens"] } },
-        { "id": "bounded-transport", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["writes-reads-retries-and-finalization-are-bounded", "pending-retention-honors-session-policy-and-active-locks", "live-chunks-wait-for-a-full-frame-or-the-interval", "log-reporter-chunks-wait-for-a-full-frame-or-two-seconds"] } }
+        { "id": "bounded-transport", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["writes-reads-retries-and-finalization-are-bounded", "pending-retention-honors-session-policy-and-active-locks", "live-chunks-wait-for-a-full-frame-or-the-interval", "log-reporter-chunks-wait-for-a-full-frame-or-two-seconds", "plan-is-bounded-and-omitted-past-its-bound"] } }
       ]
     },
     {

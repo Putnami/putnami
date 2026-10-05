@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
@@ -41,6 +42,41 @@ const maxAttempts = 3
 // errBudgetExhausted is the worker's error once it is canceled. drain names
 // the limit that canceled it.
 var errBudgetExhausted = errors.New("reporting budget exhausted")
+
+// errPlanAbsent, errPlanTooLarge and errPlanUnreadable are why plan.json
+// cannot be framed: no plan.json exists before its first chunk, it exceeds
+// protocolcli.SessionReportingPlanBytes, or it cannot be read at its cursor.
+var (
+	errPlanAbsent     = errors.New("plan.json absent")
+	errPlanTooLarge   = errors.New("plan.json exceeds its bound")
+	errPlanUnreadable = errors.New("plan.json unreadable")
+)
+
+// The reasons a checkpoint records in planOmitted. plan.json is best-effort:
+// the worker closes it without its final marker, records why, and delivers
+// the other artifacts.
+const (
+	// planAbsent: no plan.json existed before its first chunk.
+	planAbsent = "absent"
+	// planTooLarge: plan.json exceeds protocolcli.SessionReportingPlanBytes.
+	planTooLarge = "too_large"
+	// planUnreadable: plan.json cannot be read at its cursor: it is not a
+	// regular file, a read fails, or it was removed or truncated after its
+	// first chunk.
+	planUnreadable = "unreadable"
+	// planRefused: the reporter answered a plan.json chunk ok:false without
+	// retry.
+	planRefused = "refused"
+	// planUndeliverable: the last attempt to deliver a plan.json chunk failed
+	// in transport.
+	planUndeliverable = "undeliverable"
+	// planLate: events.jsonl or session.json progressed while plan.json was
+	// open, as in a checkpoint without a plan cursor, so plan.json can no
+	// longer precede them.
+	planLate = "late"
+)
+
+var planOmissions = map[string]bool{planAbsent: true, planTooLarge: true, planUnreadable: true, planRefused: true, planUndeliverable: true, planLate: true}
 
 // EventsBatchInterval is the longest a live session reporter events.jsonl chunk
 // shorter than one frame waits before it leaves: the chunk count, and the
@@ -85,15 +121,19 @@ type cursor struct {
 // state retains at most one bounded pending frame, saved before it can leave
 // the process. A crash after remote acceptance but before the local checkpoint
 // therefore replays the exact same identity, including a short live chunk.
+// plan.json is closed once its final marker is acknowledged or PlanOmitted
+// records why it is not sent (planAbsent and the other reasons).
 type state struct {
-	Version   int                                `json:"version"`
-	Provider  string                             `json:"provider"`
-	SessionID string                             `json:"sessionId"`
-	Events    cursor                             `json:"events"`
-	Session   cursor                             `json:"session"`
-	Pending   *protocolcli.SessionReportingChunk `json:"pending,omitempty"`
-	Complete  bool                               `json:"complete"`
-	Error     string                             `json:"error,omitempty"`
+	Version     int                                `json:"version"`
+	Provider    string                             `json:"provider"`
+	SessionID   string                             `json:"sessionId"`
+	Events      cursor                             `json:"events"`
+	Session     cursor                             `json:"session"`
+	Plan        cursor                             `json:"plan"`
+	PlanOmitted string                             `json:"planOmitted,omitempty"`
+	Pending     *protocolcli.SessionReportingChunk `json:"pending,omitempty"`
+	Complete    bool                               `json:"complete"`
+	Error       string                             `json:"error,omitempty"`
 }
 
 type LaunchSpec struct {
@@ -201,6 +241,7 @@ func openRun(ctx context.Context, capability Capability, dir, sessionID, provide
 			r.release()
 			return nil, fmt.Errorf("reporting checkpoint is invalid or belongs to a different provider/session")
 		}
+		r.omitLatePlan()
 		if err := r.validate(); err != nil {
 			r.release()
 			return nil, err
@@ -231,13 +272,45 @@ func (r *Run) subscribe(events *sessionstream.Log) error {
 	return nil
 }
 
+// omitLatePlan closes an open plan.json as planLate once events.jsonl or
+// session.json progressed, or holds the pending frame: plan.json precedes
+// every other frame or is not sent. A checkpoint without a plan member holds
+// an open plan cursor.
+func (r *Run) omitLatePlan() {
+	if r.capability.sends(planFile) && !r.planClosed() && r.otherArtifactProgressed() {
+		r.state.PlanOmitted = planLate
+	}
+}
+
+// otherArtifactProgressed reports whether an artifact other than plan.json
+// framed a chunk.
+func (r *Run) otherArtifactProgressed() bool {
+	s := r.state
+	return s.Events.Sequence > 0 || s.Session.Sequence > 0 || s.Pending != nil && s.Pending.Artifact != planFile
+}
+
+// planClosed reports whether plan.json acknowledged its final marker or was
+// omitted.
+func (r *Run) planClosed() bool {
+	return r.state.Plan.Final || r.state.PlanOmitted != ""
+}
+
 func (r *Run) validate() error {
-	for _, c := range []cursor{r.state.Events, r.state.Session} {
+	for _, c := range []cursor{r.state.Events, r.state.Session, r.state.Plan} {
 		if c.Offset < 0 || c.Sequence < 0 {
 			return fmt.Errorf("invalid reporting cursor")
 		}
 	}
 	if !r.capability.sends(sessionFile) && r.state.Session != (cursor{}) {
+		return fmt.Errorf("invalid reporting cursor")
+	}
+	if !r.capability.sends(planFile) && (r.state.Plan != (cursor{}) || r.state.PlanOmitted != "") {
+		return fmt.Errorf("invalid reporting cursor")
+	}
+	if r.state.PlanOmitted != "" && (r.state.Plan.Final || !planOmissions[r.state.PlanOmitted]) {
+		return fmt.Errorf("invalid reporting cursor")
+	}
+	if r.capability.sends(planFile) && !r.planClosed() && r.otherArtifactProgressed() {
 		return fmt.Errorf("invalid reporting cursor")
 	}
 	if r.capability.sends(sessionFile) && r.state.Events.Final && !r.state.Session.Final || r.state.Complete != r.complete() {
@@ -248,7 +321,7 @@ func (r *Run) validate() error {
 			return fmt.Errorf("invalid pending reporting frame")
 		}
 		c := r.cursor(p.Artifact)
-		if c.Final || p.Offset != c.Offset || p.Sequence != c.Sequence {
+		if c.Final || p.Offset != c.Offset || p.Sequence != c.Sequence || p.Artifact == planFile && r.state.PlanOmitted != "" {
 			return fmt.Errorf("pending reporting frame disagrees with cursor")
 		}
 	}
@@ -256,16 +329,19 @@ func (r *Run) validate() error {
 }
 
 func (r *Run) cursor(artifact string) *cursor {
-	if artifact == sessionFile {
+	switch artifact {
+	case sessionFile:
 		return &r.state.Session
+	case planFile:
+		return &r.state.Plan
 	}
 	return &r.state.Events
 }
 
-// complete reports whether the capability acknowledged the final marker of
-// every artifact it transmits.
+// complete reports whether the capability closed every artifact it transmits:
+// it acknowledged each final marker, or omitted plan.json.
 func (r *Run) complete() bool {
-	return r.state.Events.Final && (r.state.Session.Final || !r.capability.sends(sessionFile))
+	return r.state.Events.Final && (r.state.Session.Final || !r.capability.sends(sessionFile)) && (r.planClosed() || !r.capability.sends(planFile))
 }
 
 // save publishes the checkpoint through a staged file and a rename. The rename
@@ -325,8 +401,8 @@ func (r *Run) work() {
 
 func (r *Run) deliver() error {
 	terminal := false
-	// The batch interval starts with the worker, so a trickle's first chunk
-	// waits one interval like every later one.
+	// The batch interval starts with the worker, so a trickle's first events
+	// chunk waits one interval like every later one.
 	lastEventsSend := r.clock.Now()
 	for !r.state.Complete {
 		if r.ctx.Err() != nil {
@@ -338,51 +414,22 @@ func (r *Run) deliver() error {
 		default:
 		}
 		if r.state.Pending == nil {
-			// Preserve the consumer ordering: session.json, when the capability
-			// transmits it, closes before events.
-			artifact := sessionstream.EventsFile
-			if terminal && r.capability.sends(sessionFile) && !r.state.Session.Final {
-				artifact = sessionFile
-			}
-			if !terminal {
-				if wait := r.eventsBatchWait(lastEventsSend); wait > 0 {
-					finished, err := r.awaitEvents(wait)
-					if err != nil {
-						return err
-					}
-					terminal = finished
-					continue
-				}
-			}
-			chunk, err := r.next(artifact, terminal)
+			pending, finished, err := r.frame(terminal, &lastEventsSend)
 			if err != nil {
 				return err
 			}
-			if chunk == nil {
-				// Nothing new is committed: wait for the stream to grow, for Finish,
-				// or for the budget. A closed finish channel is not waited on again.
-				finish := r.finish
-				if terminal {
-					finish = nil
-				}
-				select {
-				case <-r.ctx.Done():
-					return errBudgetExhausted
-				case <-finish:
-					terminal = true
-				case <-r.events.Wake():
-				}
+			terminal = terminal || finished
+			if !pending {
 				continue
-			}
-			if artifact == sessionstream.EventsFile {
-				lastEventsSend = r.clock.Now()
-			}
-			r.state.Pending = chunk
-			if err := r.save(); err != nil {
-				return err
 			}
 		}
 		if err := r.send(*r.state.Pending); err != nil {
+			if reason := planOmission(r.state.Pending.Artifact, err); reason != "" {
+				if err := r.omitPlan(reason); err != nil {
+					return err
+				}
+				continue
+			}
 			return err
 		}
 		p := r.state.Pending
@@ -403,6 +450,92 @@ func (r *Run) deliver() error {
 		}
 	}
 	return nil
+}
+
+// frame saves the next frame as pending and reports whether it did. When it
+// did not, it waited, under the live batching rule or for a stream with
+// nothing new, or it omitted plan.json, and the worker loops; finished reports
+// that Finish was called while it waited. lastEventsSend is the time of the
+// latest events frame, which frame updates.
+func (r *Run) frame(terminal bool, lastEventsSend *time.Time) (pending, finished bool, err error) {
+	// Preserve the consumer ordering: plan.json, when the capability transmits
+	// it, closes before any other frame leaves, and session.json closes before
+	// events.
+	artifact := sessionstream.EventsFile
+	switch {
+	case r.capability.sends(planFile) && !r.planClosed():
+		artifact = planFile
+	case terminal && r.capability.sends(sessionFile) && !r.state.Session.Final:
+		artifact = sessionFile
+	}
+	if artifact == sessionstream.EventsFile && !terminal {
+		if wait := r.eventsBatchWait(*lastEventsSend); wait > 0 {
+			called, err := r.awaitEvents(wait)
+			return false, called, err
+		}
+	}
+	chunk, err := r.next(artifact, terminal)
+	if reason := planOmission(artifact, err); reason != "" {
+		return false, false, r.omitPlan(reason)
+	}
+	if err != nil {
+		return false, false, err
+	}
+	if chunk == nil {
+		// Nothing new is committed: wait for the stream to grow, for Finish, or
+		// for the budget. A closed finish channel is not waited on again.
+		finish := r.finish
+		if terminal {
+			finish = nil
+		}
+		select {
+		case <-r.ctx.Done():
+			return false, false, errBudgetExhausted
+		case <-finish:
+			return false, true, nil
+		case <-r.events.Wake():
+			return false, false, nil
+		}
+	}
+	if artifact == sessionstream.EventsFile {
+		*lastEventsSend = r.clock.Now()
+	}
+	r.state.Pending = chunk
+	return true, false, r.save()
+}
+
+// planOmission is the reason to omit plan.json after err framed or sent one of
+// its chunks, or "" when err is nil, concerns another artifact, or stops the
+// delivery: a budget, a reporter that cannot start, an acknowledgement of
+// another identity, a refusal with retry on the last attempt (errRetryBudget),
+// whose frame stays pending for replay.
+func planOmission(artifact string, err error) string {
+	if artifact != planFile || err == nil {
+		return ""
+	}
+	var failure *chunkFailure
+	switch {
+	case errors.Is(err, errPlanAbsent):
+		return planAbsent
+	case errors.Is(err, errPlanTooLarge):
+		return planTooLarge
+	case errors.Is(err, errPlanUnreadable):
+		return planUnreadable
+	case errors.As(err, &failure) && failure.refused:
+		return planRefused
+	case errors.As(err, &failure):
+		return planUndeliverable
+	}
+	return ""
+}
+
+// omitPlan closes plan.json without its final marker, records reason, and
+// drops its pending frame, durably, before another artifact is framed.
+func (r *Run) omitPlan(reason string) error {
+	r.state.PlanOmitted = reason
+	r.state.Pending = nil
+	r.state.Complete = r.complete()
+	return r.save()
 }
 
 // acknowledged records that the reporter accepted a chunk and that the
@@ -460,18 +593,26 @@ func (r *Run) awaitEvents(wait time.Duration) (bool, error) {
 // next frames the artifact bytes after its cursor. events.jsonl is read through
 // the stream subscription, which never reads past what the producer committed;
 // its final marker additionally waits for the stream's own final marker.
-// session.json is not a stream: it is read once it exists.
+// session.json is not a stream: it is read once it exists. plan.json is whole
+// before the worker starts, so its final marker never waits for the graph.
 func (r *Run) next(artifact string, terminal bool) (*protocolcli.SessionReportingChunk, error) {
 	c := r.cursor(artifact)
 	var data []byte
-	if artifact == sessionstream.EventsFile {
+	switch artifact {
+	case sessionstream.EventsFile:
 		read, err := r.events.Read(c.Offset, protocolcli.SessionReportingChunkBytes)
 		if err != nil {
 			return nil, fmt.Errorf("reporting artifact changed: %s", artifact)
 		}
 		_, final := r.events.Extent()
 		data, terminal = read, terminal && final
-	} else {
+	case planFile:
+		read, err := readPlan(r.dir, *c)
+		if err != nil {
+			return nil, err
+		}
+		data, terminal = read, true
+	default:
 		read, err := readArtifact(r.dir, artifact, c.Offset)
 		if err != nil {
 			return nil, err
@@ -483,6 +624,30 @@ func (r *Run) next(artifact string, terminal bool) (*protocolcli.SessionReportin
 	}
 	chunk := protocolcli.NewSessionReportingChunk(r.state.SessionID, artifact, c.Offset, c.Sequence, data, len(data) == 0)
 	return &chunk, nil
+}
+
+// readPlan reads the plan.json bytes after c. Every failure omits plan.json:
+// errPlanAbsent when no plan.json exists before its first chunk,
+// errPlanTooLarge when plan.json exceeds
+// protocolcli.SessionReportingPlanBytes, and errPlanUnreadable otherwise, for
+// a plan.json that is not a regular file, fails to read, or was removed or
+// truncated after its first chunk.
+func readPlan(dir string, c cursor) ([]byte, error) {
+	info, err := os.Stat(filepath.Join(dir, planFile))
+	if errors.Is(err, fs.ErrNotExist) && c == (cursor{}) {
+		return nil, errPlanAbsent
+	}
+	if err == nil && info.Size() > protocolcli.SessionReportingPlanBytes {
+		return nil, errPlanTooLarge
+	}
+	data, err := readArtifact(dir, planFile, c.Offset)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errPlanUnreadable, err)
+	}
+	if c.Offset+int64(len(data)) > protocolcli.SessionReportingPlanBytes {
+		return nil, errPlanTooLarge
+	}
+	return data, nil
 }
 
 func readArtifact(dir, artifact string, offset int64) ([]byte, error) {
@@ -503,7 +668,26 @@ func readArtifact(dir, artifact string, offset int64) ([]byte, error) {
 	return data[:n], nil
 }
 
+// chunkFailure is a chunk the reporter did not accept, for a reason that lets
+// plan.json be omitted (planOmission): refused when it answered ok:false
+// without retry, otherwise because its last attempt ended with a failure in
+// transport (an exit, a closed pipe, a timeout, an unreadable
+// acknowledgement). A chunk the reporter answered ok:false with retry on its
+// last attempt is not a chunkFailure: its frame stays pending for replay, as
+// for any artifact.
+type chunkFailure struct {
+	refused bool
+	reason  string
+}
+
+func (f *chunkFailure) Error() string { return f.reason }
+
+// errRetryBudget is a chunk the reporter answered ok:false with retry on its
+// last attempt.
+var errRetryBudget = errors.New("reporter retry budget exhausted")
+
 func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
+	retryable := false
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		if r.ctx.Err() != nil {
 			return errBudgetExhausted
@@ -526,11 +710,13 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 				return nil
 			}
 			if !ack.Retryable {
-				return fmt.Errorf("reporter refused chunk")
+				return &chunkFailure{refused: true, reason: "reporter refused chunk"}
 			}
+			retryable = true
 		} else {
 			r.process.close()
 			r.process = nil
+			retryable = false
 		}
 		if attempt+1 < maxAttempts {
 			select {
@@ -540,7 +726,10 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 			}
 		}
 	}
-	return fmt.Errorf("reporter retry budget exhausted")
+	if retryable {
+		return errRetryBudget
+	}
+	return &chunkFailure{reason: errRetryBudget.Error()}
 }
 
 // start starts the provider process. Without a run credential, or for a

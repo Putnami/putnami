@@ -46,12 +46,13 @@ func printReportingFailure(failure sessionreporter.Failure) {
 
 // HostedReporters are the reporters of a hosted invocation, started once,
 // before its first repository code, so that each can hold the run credential
-// (sessionreporter.Holders): a reporter starts at its first chunk, after the
-// hooks and the first jobs, and a hosted run hands its credential to no
-// process started after repository code. The first-use bootstrap starts them
-// before the implicit install's first repository code, beside the remote
-// cache (HostedRemoteCache), and the run that follows adopts them
-// (Request.HostedReporters). The zero value is ready to use. Whoever creates
+// (sessionreporter.Holders): a reporter starts at its first frame, after the
+// hooks (the session reporter's plan.json while the first jobs start, the log
+// reporter's first events chunk after them), and a hosted run hands its
+// credential to no process started after repository code. The first-use
+// bootstrap starts them before the implicit install's first repository code,
+// beside the remote cache (HostedRemoteCache), and the run that follows adopts
+// them (Request.HostedReporters). The zero value is ready to use. Whoever creates
 // it closes it, after the last run that adopts from it.
 type HostedReporters struct {
 	held sessionreporter.Holders

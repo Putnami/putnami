@@ -37,20 +37,20 @@ asynchronous because it verifies SHA-256 with Web Crypto. Both execute the
 [shared conformance corpus](../conformance/session-reporting.json).
 
 A data frame contains `protocolVersion: 1`, `sessionId`, `artifact`
-(`events.jsonl` or `session.json`), `offset` in decoded bytes, `sequence` (zero
-based per artifact), canonical base64 `data`, lowercase hex `sha256` of decoded
-bytes, and `final: false`. Chunks carry at most 65536 bytes; JSONL lines contain
-at most 98304 bytes excluding LF. Integers are nonnegative JavaScript-safe
-integers. No arbitrary paths, URLs, credentials or destination metadata enter
-the protocol.
+(`events.jsonl`, `session.json` or `plan.json`), `offset` in decoded bytes,
+`sequence` (zero based per artifact), canonical base64 `data`, lowercase hex
+`sha256` of decoded bytes, and `final: false`. Chunks carry at most 65536
+bytes; JSONL lines contain at most 98304 bytes excluding LF. Integers are
+nonnegative JavaScript-safe integers. No arbitrary paths, URLs, credentials or
+destination metadata enter the protocol.
 
 A final marker is a separate empty chunk with `final: true`, SHA-256 of empty
 bytes, EOF offset, and the next sequence ordinal. During execution only
-non-final events chunks flow. After graph termination, all session bytes and
-the session final marker precede the events final marker. An already pending
-events chunk may precede the session, but events final always follows session
-final. Chunks may split a JSON line or UTF-8 character: reassemble bytes before
-parsing the canonical documents.
+`plan.json` frames, which come first, and non-final events chunks flow. After
+graph termination, all session bytes and the session final marker precede the
+events final marker. An already pending events chunk may precede the session,
+but events final always follows session final. Chunks may split a JSON line or
+UTF-8 character: reassemble bytes before parsing the canonical documents.
 
 ACKs echo `protocolVersion`, `sessionId`, `artifact`, `offset`, `sequence`,
 `sha256`, and `final`, plus `ok`. `ok: true` means durable acceptance, including
@@ -73,7 +73,8 @@ seconds. The diagnostic names the limit that stopped delivery (`no chunk
 acknowledged for 30s` or `finalization reached its 5m0s cap`). Errors preserve
 the graph verdict and leave retained state for
 `putnami sessions replay --session <id>`. Checkpoint reads are bounded to 192 KiB;
-replay validates finalized session documents up to 16 MiB. Retention follows
+replay validates finalized session documents up to 16 MiB, and `plan.json`
+frames end at or before 16 MiB. Retention follows
 [`sessions.keep`](../../../tooling/cli/doc/16-session-reporting.md).
 
 `PUTNAMI_SESSION_REPORTER_TOKEN` is an optional explicit provider credential.
@@ -83,6 +84,35 @@ environment. A hosted run ignores it; see [Run credential](#run-credential).
 Selecting a name does not prove the repository manifest/runtime is trusted.
 This capability enforces no same-principal, file or metadata/network
 isolation; hosted launchers must establish these independently.
+
+### The recorded plan
+
+The session reporter sends `plan.json` before any other frame: the session's
+recorded plan (`SessionPlanFile`: its commands, and its tasks with their
+`dependsOn` and `after` edges), the bytes the CLI persisted in the session
+directory, then its final marker. It waits for no batching interval. A
+receiver therefore reads the whole plan and its final marker before any other
+frame, so before the first `task:start` record; a task may start before the
+plan leaves. Core adds no redaction: like `session.json`, it goes out as
+persisted. Every `plan.json` frame ends at or before 16777216 decoded bytes
+(`SessionReportingPlanBytes`), so its final marker's offset is at most that
+bound; both parsers refuse a frame or ACK past it, and the schema bounds its
+`offset`.
+
+`plan.json` is best-effort. Core omits it, records why in its checkpoint, and
+delivers the other artifacts when the file is absent, past its bound or
+unreadable at its cursor, when the receiver refuses a `plan.json` frame
+without retry, or when its last attempt fails in transport. Once omitted, no
+further `plan.json` frame is sent, its final marker included. An omission
+changes neither the graph verdict, the other artifacts' delivery, nor
+`subscribers.json`, and prints no diagnostic. A refusal with `retryable: true`
+on the last attempt is not an omission: delivery fails as for any other
+artifact, the frame stays pending, and replay sends it first. A receiver that
+does not keep the plan answers its frames `ok: false` without `retryable`. A
+receiver that exits at the frame costs three process starts before core
+starts it again for the other artifacts; on a hosted run, a reporter started
+again after repository code ran gets no credential (see
+[Run credential](#run-credential)), so that receiver's delivery fails.
 
 ## Run credential
 
@@ -160,13 +190,14 @@ TypeScript exports `parseSessionReportingHandshake`,
 `log-reporter` is a second reporting capability for an extension that needs
 only the live event stream. It uses this wire unchanged, restricted to
 `events.jsonl`: every frame and ACK names `events.jsonl`, and the provider never
-receives `session.json`. Its events final marker follows graph termination.
+receives `session.json` or `plan.json`. Its events final marker follows graph
+termination.
 
 | | `session-reporter` | `log-reporter` |
 | --- | --- | --- |
 | Selector | `PUTNAMI_SESSION_REPORTER` | `PUTNAMI_LOG_REPORTER` |
 | Optional token | `PUTNAMI_SESSION_REPORTER_TOKEN` | `PUTNAMI_LOG_REPORTER_TOKEN` |
-| Artifacts | `session.json`, then `events.jsonl` | `events.jsonl` |
+| Artifacts | `plan.json` first, then `session.json` closes before `events.jsonl` | `events.jsonl` |
 | Live chunk leaves at | a full frame or 10 s | a full frame or 2 s |
 
 Each selected capability is a separate subscriber of the session event stream,
@@ -178,8 +209,10 @@ provider. On a hosted run, both receive the run credential over the
 handshake instead. One capability's outage, refusal or crash changes neither the other
 capability's delivery nor the graph verdict.
 
-Go publishes `LogReporterCommand`, `LogReporterEnv`, `LogReporterTokenEnv` and
-`SessionReportingArtifacts(command)`; TypeScript exports `LOG_REPORTER_COMMAND`,
-`LOG_REPORTER_ENV`, `LOG_REPORTER_TOKEN_ENV` and `sessionReportingArtifacts`.
+Go publishes `LogReporterCommand`, `LogReporterEnv`, `LogReporterTokenEnv`,
+`SessionReportingArtifacts(command)` and `SessionReportingPlanBytes`;
+TypeScript exports `LOG_REPORTER_COMMAND`, `LOG_REPORTER_ENV`,
+`LOG_REPORTER_TOKEN_ENV`, `sessionReportingArtifacts` and
+`SESSION_REPORTING_PLAN_BYTES`.
 A corpus case may name its `reporter`; both runtimes reject a case whose
 artifact that reporter never transmits.

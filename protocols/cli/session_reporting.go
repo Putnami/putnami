@@ -24,6 +24,11 @@ const (
 	SessionReportingChunkBytes = 64 * 1024
 	SessionReportingLineBytes  = 96 * 1024
 	SessionReportingSchemaID   = "https://putnami.dev/schemas/putnami-session-reporting.json"
+	// SessionReportingPlanBytes bounds plan.json on the wire: every plan.json
+	// chunk ends at or before this decoded byte offset, so its final marker
+	// sits at or before it too. events.jsonl and session.json have no
+	// artifact bound beyond the chunk and line bounds.
+	SessionReportingPlanBytes = 16 << 20
 )
 
 // Session reporting v2 is v1 opened by a handshake that hands the reporter the
@@ -56,13 +61,14 @@ const (
 )
 
 // SessionReportingArtifacts returns the artifacts the reporter capability named
-// by its reserved command receives, in the order they close: session.json then
-// events.jsonl for the session reporter, events.jsonl alone for the log
-// reporter. Any other command receives nothing. The result is a fresh slice.
+// by its reserved command receives, in the order they close: plan.json, then
+// session.json, then events.jsonl for the session reporter, events.jsonl alone
+// for the log reporter. Any other command receives nothing. The result is a
+// fresh slice.
 func SessionReportingArtifacts(command string) []string {
 	switch command {
 	case SessionReporterCommand:
-		return []string{"session.json", "events.jsonl"}
+		return []string{"plan.json", "session.json", "events.jsonl"}
 	case LogReporterCommand:
 		return []string{"events.jsonl"}
 	}
@@ -78,7 +84,8 @@ type SessionReportingChunk struct {
 	ProtocolVersion int `json:"protocolVersion"`
 	// SessionID is the stable identity of the original retained execution.
 	SessionID string `json:"sessionId"`
-	// Artifact names the canonical events.jsonl or session.json document.
+	// Artifact names the canonical events.jsonl, session.json or plan.json
+	// document.
 	Artifact string `json:"artifact"`
 	// Offset is the zero-based position in decoded artifact bytes.
 	Offset int64 `json:"offset"`
@@ -137,6 +144,7 @@ func NewSessionReportingChunk(sessionID, artifact string, offset, sequence int64
 }
 
 // Validate checks the identity, byte bounds, final marker and content digest.
+// A plan.json chunk that ends past SessionReportingPlanBytes is invalid.
 func (c SessionReportingChunk) Validate() error {
 	if err := validateReportingIdentity(c.ProtocolVersion, c.SessionID, c.Artifact, c.Offset, c.SHA256); err != nil {
 		return err
@@ -146,6 +154,9 @@ func (c SessionReportingChunk) Validate() error {
 	}
 	if len(c.Data) > SessionReportingChunkBytes || c.Final != (len(c.Data) == 0) {
 		return fmt.Errorf("invalid reporting chunk size or final marker")
+	}
+	if c.Artifact == "plan.json" && c.Offset+int64(len(c.Data)) > SessionReportingPlanBytes {
+		return fmt.Errorf("reporting chunk exceeds the plan.json bound")
 	}
 	if c.SHA256 != SessionReportingDigest(c.Data) {
 		return fmt.Errorf("reporting chunk digest mismatch")
@@ -163,8 +174,13 @@ func (a SessionReportingAck) Matches(c SessionReportingChunk) bool {
 	return a.ProtocolVersion == c.ProtocolVersion && a.SessionID == c.SessionID && a.Artifact == c.Artifact && a.Offset == c.Offset && a.Sequence == c.Sequence && a.SHA256 == c.SHA256 && a.Final == c.Final
 }
 
+// validateReportingIdentity checks the members a chunk and its acknowledgement
+// share. A plan.json offset past SessionReportingPlanBytes is invalid.
 func validateReportingIdentity(version int, sessionID, artifact string, offset int64, digest string) error {
-	if version != SessionReportingVersion || !reportingSessionID.MatchString(sessionID) || (artifact != "events.jsonl" && artifact != "session.json") || offset < 0 || offset > 9007199254740991 || !reportingDigest.MatchString(digest) {
+	if version != SessionReportingVersion || !reportingSessionID.MatchString(sessionID) || (artifact != "events.jsonl" && artifact != "session.json" && artifact != "plan.json") || offset < 0 || offset > 9007199254740991 || !reportingDigest.MatchString(digest) {
+		return fmt.Errorf("invalid reporting identity")
+	}
+	if artifact == "plan.json" && offset > SessionReportingPlanBytes {
 		return fmt.Errorf("invalid reporting identity")
 	}
 	return nil

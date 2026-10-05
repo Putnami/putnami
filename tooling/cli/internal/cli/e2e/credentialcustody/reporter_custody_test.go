@@ -262,9 +262,9 @@ func TestAHostedV1ReporterGetsNoCredential(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/credential-custody", "providers-receive-it-over-rpc", "a-reporter-that-cannot-hold-it-gets-none")
 	output, got := runReporterBuild(t, "reporter-v1", true, false)
-	want := []string{reporterStarted, reporterRefusedALine, hookRan, taskRan, reporterStarted, reporterReadChunkFirst, reporterDelivered}
-	if !slices.Equal(got, want) {
-		t.Errorf("hosted build log = %q, want %q\n%s", got, want, output)
+	want := []string{reporterStarted, reporterRefusedALine, hookRan, reporterStarted, reporterReadChunkFirst, reporterDelivered}
+	if !withTaskRan(got, want) {
+		t.Errorf("hosted build log = %q, want %q with %q once after %q\n%s", got, want, taskRan, hookRan, output)
 	}
 	for _, line := range []string{removedReporterToken,
 		"the session reporter of @fixture/reporter cannot hold the run credential: it did not accept initialize of session reporting protocol 2; it starts without a credential"} {
@@ -275,19 +275,32 @@ func TestAHostedV1ReporterGetsNoCredential(t *testing.T) {
 }
 
 // Without --credential-fd the session reporter starts as it always did: at its
-// first chunk, after the hooks and the task, with its token in its
-// environment, and its first line is a chunk.
+// first chunk, after the hooks, with its token in its environment, and its
+// first line is a chunk.
 func TestFlagOffStartsTheReporterAsBefore(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/credential-custody", "flag-off-changes-nothing", "flag-off-reporter-frames-unchanged")
 	output, got := runReporterBuild(t, "reporter", false, true)
-	want := []string{installHookRan, installerRan, hookRan, taskRan, reporterStartedWithToken, reporterReadChunkFirst, reporterDelivered}
-	if !slices.Equal(got, want) {
-		t.Errorf("local build log = %q, want %q\n%s", got, want, output)
+	want := []string{installHookRan, installerRan, hookRan, reporterStartedWithToken, reporterReadChunkFirst, reporterDelivered}
+	if !withTaskRan(got, want) {
+		t.Errorf("local build log = %q, want %q with %q once after %q\n%s", got, want, taskRan, hookRan, output)
 	}
 	if strings.Contains(output, "removed "+protocolcli.SessionReporterTokenEnv) {
 		t.Errorf("a local run removed the reporter token:\n%s", output)
 	}
+}
+
+// withTaskRan reports whether log is want with taskRan once, after hookRan and
+// before reporterDelivered. The session reporter's first chunk is plan.json,
+// which leaves once the plan is recorded, after the before-hook: a reporter
+// that starts at its first chunk starts while the task runs.
+func withTaskRan(log, want []string) bool {
+	i := slices.Index(log, taskRan)
+	if i < 0 || slices.Contains(log[i+1:], taskRan) {
+		return false
+	}
+	return slices.Equal(slices.Delete(slices.Clone(log), i, i+1), want) &&
+		i > slices.Index(log, hookRan) && i < slices.Index(log, reporterDelivered)
 }
 
 // A hosted run that watches is refused before anything starts: each watch
