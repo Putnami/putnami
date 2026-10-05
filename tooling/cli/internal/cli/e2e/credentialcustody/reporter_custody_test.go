@@ -90,9 +90,14 @@ func runReporterRole(v1 bool) int {
 				return 1
 			}
 		}
-		_ = out.Encode(chunk.Ack())
-		if chunk.Final && chunk.Artifact == "events.jsonl" {
+		// The final marker is recorded before it is acknowledged: the
+		// acknowledgement lets the engine finish and stop this process.
+		final := chunk.Final && chunk.Artifact == "events.jsonl"
+		if final {
 			_ = appendLog(log, reporterDelivered)
+		}
+		_ = out.Encode(chunk.Ack())
+		if final {
 			return 0
 		}
 	}
