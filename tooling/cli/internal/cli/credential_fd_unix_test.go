@@ -44,13 +44,22 @@ func TestAppRunCredentialHelper(t *testing.T) {
 	if err := os.Chdir(t.TempDir()); err != nil {
 		t.Fatal(err)
 	}
+	var before unix.Stat_t
+	if err := unix.Fstat(3, &before); err != nil {
+		t.Fatal(err)
+	}
 	code := (&App{}).Run(context.Background(), args)
 	bearer, held := runcredential.Current()
 	sum := sha256.Sum256([]byte(bearer))
 	_, token := os.LookupEnv(runcredential.CacheTokenEnv)
-	_, err := unix.FcntlInt(3, unix.F_GETFD, 0)
+	// Once closed, descriptor 3 is the lowest free one: a file the process
+	// opens afterwards reuses it. The credential's pipe is closed when the
+	// descriptor no longer names that pipe.
+	var after unix.Stat_t
+	err := unix.Fstat(3, &after)
+	closed := errors.Is(err, unix.EBADF) || err == nil && (after.Dev != before.Dev || after.Ino != before.Ino)
 	fmt.Printf("app-credential: exit=%d held=%v digest=%s cache-token=%v descriptor-closed=%v\n",
-		code, held, hex.EncodeToString(sum[:]), token, errors.Is(err, unix.EBADF))
+		code, held, hex.EncodeToString(sum[:]), token, closed)
 }
 
 func runAppWithCredential(t *testing.T, args []string, content string, env ...string) (stdout, stderr string) {

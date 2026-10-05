@@ -78,8 +78,10 @@ func TestPortableExecutionNamesItsVersion(t *testing.T) {
 // declared effect that invocation.publication authorizes. A version 1 request
 // over the same plan, with an expected plan that names nothing, is refused
 // there.
+//
+// It is not parallel: captureStderr swaps the process's os.Stderr, which every
+// parallel test that builds a renderer reads.
 func TestCommitRequestSeamChecksItsOwnPlan(t *testing.T) {
-	t.Parallel()
 	plain := portablePlan()
 	shipping := append(portablePlan(), portableJob(plain[0].Project, "ship", "/app:build"))
 	shipping[len(shipping)-1].JobDef.Traits.SideEffects = extensionproto.SideEffectsCloud

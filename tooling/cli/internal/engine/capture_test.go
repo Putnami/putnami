@@ -67,7 +67,8 @@ func TestCaptureStdout_DrainsBeyondPipeCapacity(t *testing.T) {
 }
 
 // captureStderr runs fn with os.Stderr redirected to a pipe and returns
-// everything written to stderr during the call.
+// everything written to stderr during the call. It swaps a process global, so
+// its caller must not be a parallel test.
 func captureStderr(t *testing.T, fn func()) string {
 	t.Helper()
 	orig := os.Stderr

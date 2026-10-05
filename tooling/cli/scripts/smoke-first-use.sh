@@ -124,7 +124,9 @@ block="$(awk '
 if [ -z "$block" ]; then
   fail "block leg: ${page} has no fenced bash block"
 fi
-if ! printf '%s\n' "$block" | grep -Fq "curl -fsSL ${documented_installer} | bash"; then
+# A here-string, not a pipe: grep -q exits at its first match, and under
+# pipefail a printf still writing the next lines then fails on SIGPIPE.
+if ! grep -Fq "curl -fsSL ${documented_installer} | bash" <<<"$block"; then
   fail "block leg: the first bash block of ${page} does not install with 'curl -fsSL ${documented_installer} | bash'"
 fi
 serve_line="$(printf '%s\n' "$block" | tail -n 1)"
