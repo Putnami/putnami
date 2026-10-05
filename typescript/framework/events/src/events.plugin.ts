@@ -517,10 +517,16 @@ export class EventsPlugin implements Plugin, DesignContributor, InfraContributor
     return this.config.delivery ?? 'pull';
   }
 
-  /** Resolve a per-handler DI scope factory from the app's container, if any. */
-  private resolveScopeFactory(app: Module): (() => Promise<DetachedScope>) | undefined {
-    const containerContext = app instanceof Application ? app.getActiveContext() : undefined;
-    return containerContext ? async () => containerContext.createScope() : undefined;
+  /**
+   * A per-delivery DI scope factory for the push receiver. It reads the app's
+   * context when a message arrives, not when the receiver is registered:
+   * warmup() registers the receiver, and Application.prepare() builds the
+   * context only after every plugin's warmup(). With no context (an app with
+   * no DI registrations), the handler runs with no scope.
+   */
+  private resolveScopeFactory(app: Module): (() => Promise<DetachedScope | undefined>) | undefined {
+    if (!(app instanceof Application)) return undefined;
+    return async () => app.getActiveContext()?.createScope();
   }
 
   /**

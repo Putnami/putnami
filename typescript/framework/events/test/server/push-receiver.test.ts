@@ -114,6 +114,18 @@ describe('push receiver auth', () => {
 });
 
 describe('push receiver dispatch + status mapping', () => {
+  it('runs the handler with no scope when the scope factory resolves to none', async () => {
+    let called = false;
+    const receiver = createPushReceiver(
+      baseConfig(),
+      [makeHandler('order.created', () => (called = true))],
+      async () => undefined,
+    );
+    const res = await receiver(ctx({ token: 'good', body: pushBody() }));
+    expect(res.status).toBe(204);
+    expect(called).toBe(true);
+  });
+
   it('acknowledges a valid push (204) and runs the matching handler', async () => {
     let receivedId: string | undefined;
     const receiver = createPushReceiver(baseConfig(), [

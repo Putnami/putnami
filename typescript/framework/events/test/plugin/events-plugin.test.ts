@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { dirname, join, relative, resolve } from 'node:path';
-import { Application, registerModuleLoader } from '@putnami/application';
+import { Application, type HttpRequestContext, type HttpResponse, registerModuleLoader } from '@putnami/application';
 import { resetConfigLoader, Uuid } from '@putnami/runtime';
 import { getDesignPublications, getTransport, getPublisher } from '../../src/publisher/publisher';
 import { EventsPlugin, events } from '../../src/events.plugin';
@@ -419,6 +419,82 @@ describe('EventsPlugin', () => {
         // owns delivery), so the published event is not delivered in-process.
         await Bun.sleep(5);
         expect(delivered).toBe(0);
+      } finally {
+        await plugin.stop(app);
+      }
+    });
+
+    it('push delivery: runs injected handlers in a scope of the context built after warmup', async () => {
+      const PushTopic = topic('push.scoped', { id: Uuid });
+      const dependencyToken = Symbol('push-dependency');
+      const closeScope = mock(async () => {});
+      const createScope = mock(async () => ({
+        scope: {
+          get(token: unknown) {
+            expect(token).toBe(dependencyToken);
+            return { name: 'injected-dependency' };
+          },
+          list() {
+            return [];
+          },
+        },
+        close: closeScope,
+      }));
+      let receiver: ((ctx: HttpRequestContext) => Promise<HttpResponse>) | undefined;
+      const app = new Application();
+      (app as unknown as { ensurePlugin: unknown }).ensurePlugin = async () => ({
+        post: (_path: string, route: typeof receiver) => {
+          receiver = route;
+        },
+      });
+
+      let received: { name: string } | undefined;
+      const plugin = new EventsPlugin({
+        autoScan: false,
+        port: await nextPort(),
+        delivery: 'push',
+        push: {
+          issuer: 'https://accounts.google.com',
+          audience: 'aud',
+          allowedServiceAccounts: ['pusher@sa.example'],
+          verify: async () => ({ email: 'pusher@sa.example', email_verified: true }),
+        },
+        handlers: [
+          handler(PushTopic)
+            .inject({ dependency: dependencyToken })
+            .handle(async ({ dependency }) => {
+              received = dependency;
+            }),
+        ],
+      });
+
+      try {
+        // Application.prepare() runs every plugin's warmup() before it builds
+        // the DI context, so the context exists only from here on.
+        await plugin.warmup(app);
+        (app as unknown as { _context: { createScope: typeof createScope } })._context = { createScope };
+        await plugin.start(app);
+
+        const envelope = {
+          topic: 'push.scoped',
+          id: 'evt-1',
+          payload: { id: crypto.randomUUID() },
+          timestamp: new Date().toISOString(),
+          attempt: 1,
+          attributes: {},
+        };
+        const res = await receiver?.({
+          headers: new Headers({ authorization: 'Bearer token' }),
+          body: async () => ({
+            subscription: 'sub',
+            message: { data: Buffer.from(JSON.stringify(envelope)).toString('base64') },
+          }),
+        } as unknown as HttpRequestContext);
+
+        expect(res?.status).toBe(204);
+        expect(received).toEqual({ name: 'injected-dependency' });
+        expect(createScope).toHaveBeenCalledTimes(1);
+        expect(closeScope).toHaveBeenCalledTimes(1);
       } finally {
         await plugin.stop(app);
       }

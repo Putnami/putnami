@@ -95,7 +95,7 @@ interface PushWrapper {
 export function createPushReceiver(
   config: PushConfig,
   handlers: HandlerDefinition[],
-  scopeFactory?: () => Promise<DetachedScope>,
+  scopeFactory?: () => Promise<DetachedScope | undefined>,
 ): (ctx: HttpRequestContext) => Promise<HttpResponse> {
   if (config.enabled === false) {
     return async () => json({ error: 'event push receiver disabled' }, { status: 503 });
@@ -224,7 +224,7 @@ async function dispatch(
   envelope: Envelope,
   handlers: HandlerDefinition[],
   roundRobin: Map<string, number>,
-  scopeFactory?: () => Promise<DetachedScope>,
+  scopeFactory?: () => Promise<DetachedScope | undefined>,
 ): Promise<HttpResponse> {
   for (const def of selectPushTargets(envelope, handlers, roundRobin)) {
     const { message, ackState, abortController } = createTransportMessage(envelope, def.options);
