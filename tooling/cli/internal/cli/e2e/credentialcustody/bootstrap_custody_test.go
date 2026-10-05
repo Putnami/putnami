@@ -150,8 +150,8 @@ func writeBootstrapFixture(t *testing.T, home string) (wsRoot, log string) {
 
 // runBootstrapBuild runs `build` in a bootstrap fixture with a remote cache
 // configured, the build cache on and the implicit install on, hosted or not,
-// and returns the log.
-func runBootstrapBuild(t *testing.T, hosted bool) []string {
+// and returns the log and the engine's output.
+func runBootstrapBuild(t *testing.T, hosted bool) (log []string, output string) {
 	t.Helper()
 	clitest.RequireShell(t)
 	self, err := os.Executable()
@@ -159,14 +159,14 @@ func runBootstrapBuild(t *testing.T, hosted bool) []string {
 		t.Fatal(err)
 	}
 	home := t.TempDir()
-	wsRoot, log := writeBootstrapFixture(t, home)
+	wsRoot, logPath := writeBootstrapFixture(t, home)
 	code, output := runEngine(t, self, wsRoot, home, hosted,
 		custodyCacheEnv+"=1", "PUTNAMI_CACHE_URL=https://cache.invalid", "PUTNAMI_CACHE_TRUST=any",
 		"PUTNAMI_NO_AUTO_INSTALL=")
 	if code != 0 {
 		t.Fatalf("build exit=%d, want 0\n%s", code, output)
 	}
-	return readLog(t, log)
+	return readLog(t, logPath), output
 }
 
 // ADR 0055 part 4: a hosted `build` on a workspace no install
@@ -180,10 +180,10 @@ func TestAHostedBuildBootstrapsWithTheCacheProviderStartedOnce(t *testing.T) {
 	spectest.Proves(t, "cli/credential-custody", "fetch-before-repository-code", "fetch-completes-before-install")
 	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "no-credential-after-repository-code")
 
-	got := runBootstrapBuild(t, true)
+	got, output := runBootstrapBuild(t, true)
 	want := []string{fetchRan, providerStarted, providerAuthenticated, installHookRan, installerRan, taskRan}
 	if !slices.Equal(got, want) {
-		t.Errorf("hosted build log = %q, want %q", got, want)
+		t.Errorf("hosted build log = %q, want %q\n%s", got, want, output)
 	}
 }
 
@@ -193,10 +193,10 @@ func TestAHostedBuildBootstrapsWithTheCacheProviderStartedOnce(t *testing.T) {
 func TestFlagOffBootstrapsAsBefore(t *testing.T) {
 	t.Parallel()
 
-	got := runBootstrapBuild(t, false)
+	got, output := runBootstrapBuild(t, false)
 	want := []string{installHookRan, installerRan, providerStarted, taskRan}
 	if !slices.Equal(got, want) {
-		t.Errorf("local build log = %q, want %q", got, want)
+		t.Errorf("local build log = %q, want %q\n%s", got, want, output)
 	}
 }
 
