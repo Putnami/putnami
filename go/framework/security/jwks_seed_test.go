@@ -172,14 +172,23 @@ func TestJWKSJWT_SeedKeys_ToleratesDiscoveryOutage(t *testing.T) {
 	priv := generateRSAKey(t)
 	seed := jwkFromMap(t, rsaJWKJSON("kid-a", &priv.PublicKey))
 
-	// Issuer points at a closed server so OIDC discovery fails at first use. With
-	// a seed the resolver must still verify seeded tokens rather than disabling
-	// itself on the discovery error.
+	// Issuer points at a closed server so OIDC discovery fails. A token with an
+	// unseeded kid triggers that discovery first; with a seed the resolver must
+	// still verify seeded tokens rather than disabling itself on the error.
 	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	deadURL := dead.URL
 	dead.Close()
 
 	mw := JWKSJWT(JWKSJWTConfig{Issuer: deadURL, SeedKeys: []JWK{seed}, AllowInsecure: true})
+
+	unseeded := makeRSAJWT(t, map[string]any{
+		"sub": "svc-a",
+		"iss": deadURL,
+		"exp": float64(time.Now().Add(time.Hour).Unix()),
+	}, "kid-z", generateRSAKey(t))
+	if user := bearerUser(mw, unseeded); user != nil {
+		t.Fatalf("unseeded kid verified while discovery fails: user=%+v", user)
+	}
 
 	// Issuer is set, so the "iss" claim is enforced; it must match deadURL even
 	// though discovery against it fails.
