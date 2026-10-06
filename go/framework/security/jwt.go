@@ -16,6 +16,7 @@ import (
 	"time"
 
 	phttp "go.putnami.dev/http"
+	"go.putnami.dev/logger"
 	identity "go.putnami.dev/protocol/identity/schema"
 )
 
@@ -272,12 +273,13 @@ type JWKSJWTConfig struct {
 	// SeedKeys pre-populates the verifier with public keys distributed
 	// out-of-band — e.g. through a config plane — so JWT verification works
 	// before the JWKS endpoint is ever reached, and keeps working while it is
-	// down. On an unknown kid the verifier still refreshes from JWKSURL/Issuer
-	// (rate-limited), so key rotation continues to work. When SeedKeys is set,
-	// JWKSURL/Issuer may be omitted for a fully offline verifier (rotation then
-	// requires re-seeding via config), and a JWKS/discovery outage at first use
-	// no longer disables the resolver — seeded kids still verify. See
-	// NewSeededJWKSFetcher.
+	// down. A seeded kid never waits for, nor triggers, a JWKS fetch or OIDC
+	// discovery. On an unknown kid the verifier refreshes from JWKSURL/Issuer
+	// (rate-limited), so key rotation continues to work: with Issuer, a failed
+	// discovery is retried by a later unknown kid at least 5 seconds after the
+	// failure, until it succeeds. When SeedKeys is set, JWKSURL/Issuer may be
+	// omitted for a fully offline verifier (rotation then requires re-seeding via
+	// config). See NewSeededJWKSFetcher.
 	SeedKeys []JWK
 }
 
@@ -294,13 +296,15 @@ type JWKSJWTConfig struct {
 // The JWKS is fetched lazily on first request and cached with TTL.
 // Unknown key IDs trigger a force-refresh (rate-limited).
 //
-// With Issuer set and JWKSURL empty, the first request discovers the JWKS URL,
-// and the resolver keeps a successful discovery for its lifetime. Concurrent
-// requests share one discovery. When discovery fails and SeedKeys is empty, the
-// failure is logged and every token is refused; the first request at least 5
-// seconds after the failure discovers again, and requests before then do no
-// network I/O. Without JWKSURL, Issuer, or SeedKeys there is no key source: the
-// resolver logs an error once and refuses every token.
+// With Issuer set and JWKSURL empty, the first token that needs the JWKS
+// discovers its URL, after the "iss" check. The resolver keeps a successful
+// discovery for its lifetime, and concurrent tokens share one discovery. A
+// failed discovery is logged, and the first token that needs the JWKS at least
+// 5 seconds after the failure discovers again; tokens before then do no network
+// I/O. Until a discovery succeeds, a token is refused unless its kid is in
+// SeedKeys: a seeded kid verifies at once, without waiting for discovery.
+// Without JWKSURL, Issuer, or SeedKeys there is no key source: the resolver
+// logs an error once and refuses every token.
 //
 // The "iss" claim is enforced when an expected issuer is known: the OIDC
 // Issuer used for key discovery doubles as the required "iss", and RequiredIssuer
@@ -343,8 +347,14 @@ func jwksJWT(cfg JWKSJWTConfig, clock func() time.Time) phttp.Middleware {
 
 	keys := &lazyJWKSFetcher{
 		build:         func() (*JWKSFetcher, error) { return buildJWKSFetcher(cfg) },
+		issuer:        cfg.Issuer,
 		clock:         clock,
 		retryInterval: jwksDiscoveryRetryInterval,
+	}
+	if cfg.JWKSURL == "" && cfg.Issuer != "" && len(cfg.SeedKeys) > 0 {
+		if seeded := NewSeededJWKSFetcher("", cfg.SeedKeys, cfg.CacheTTL, cfg.AllowInsecure); len(seeded.seed) > 0 {
+			keys.seeded = seeded
+		}
 	}
 
 	return IdentityResolver(func(ctx *phttp.Context) *phttp.Claims {
@@ -352,11 +362,7 @@ func jwksJWT(cfg JWKSJWTConfig, clock func() time.Time) phttp.Middleware {
 		if token == "" {
 			return nil
 		}
-		fetcher, err := keys.get()
-		if err != nil {
-			return nil
-		}
-		claims, err := validateJWKS(token, fetcher, cfg.Audience, expectedIssuer, !cfg.AllowMissingExpiration)
+		claims, err := validateJWKS(token, keys, cfg.Audience, expectedIssuer, !cfg.AllowMissingExpiration)
 		if err != nil {
 			return nil
 		}
@@ -366,22 +372,16 @@ func jwksJWT(cfg JWKSJWTConfig, clock func() time.Time) phttp.Middleware {
 
 // buildJWKSFetcher builds the key fetcher of a JWKSJWT resolver whose config
 // names at least one key source. With Issuer set and JWKSURL empty it discovers
-// the JWKS URL. A discovery failure is logged and returned when SeedKeys is
-// empty. With SeedKeys it still builds a seeded fetcher, without a URL to
-// refresh from, so seeded kids keep verifying offline.
+// the JWKS URL and returns the discovery error. The fetcher holds SeedKeys when
+// set; without JWKSURL and Issuer it has no URL and verifies seeded kids only.
 func buildJWKSFetcher(cfg JWKSJWTConfig) (*JWKSFetcher, error) {
 	url := cfg.JWKSURL
 	if url == "" && cfg.Issuer != "" {
 		discovered, err := DiscoverJWKSURL(cfg.Issuer, cfg.AllowInsecure)
-		switch {
-		case err == nil:
-			url = discovered
-		case len(cfg.SeedKeys) == 0:
-			decisionLogger().Error("security.JWKSJWT OIDC discovery failed — rejecting all bearer tokens until a later discovery succeeds", err,
-				slog.String("issuer", cfg.Issuer),
-				slog.Duration("retryAfter", jwksDiscoveryRetryInterval))
+		if err != nil {
 			return nil, err
 		}
+		url = discovered
 	}
 	if len(cfg.SeedKeys) > 0 {
 		return NewSeededJWKSFetcher(url, cfg.SeedKeys, cfg.CacheTTL, cfg.AllowInsecure), nil
@@ -389,16 +389,29 @@ func buildJWKSFetcher(cfg JWKSJWTConfig) (*JWKSFetcher, error) {
 	return NewJWKSFetcher(url, cfg.CacheTTL, cfg.AllowInsecure), nil
 }
 
-// lazyJWKSFetcher builds a key fetcher on first use and keeps the first one
-// built for its lifetime. A failed build is recorded with the time it failed:
-// until retryInterval has elapsed, get returns that error without calling
-// build, and the first call after that builds again. Concurrent calls share one
-// build: the build runs under mu, and every caller re-checks the state once it
-// holds mu.
+// jwkSource returns the verification key for a kid.
+type jwkSource interface {
+	GetKey(kid string) (*JWK, error)
+}
+
+// lazyJWKSFetcher is the jwkSource of a JWKSJWT resolver. It builds the key
+// fetcher on first use and keeps the first one built for its lifetime. A failed
+// build is logged once and recorded with the time it failed: until
+// retryInterval has elapsed, a lookup that needs the build returns that error
+// without calling build, and the first one after that builds again. Concurrent
+// lookups share one build: the build runs under mu, and every caller re-checks
+// the state once it holds mu. Until a build succeeds, a kid that seeded holds
+// resolves from seeded, without mu and without network I/O.
 type lazyJWKSFetcher struct {
 	build         func() (*JWKSFetcher, error)
+	issuer        string
 	clock         func() time.Time
 	retryInterval time.Duration
+
+	// seeded is a fetcher without a URL that holds the configured seed keys
+	// when the build discovers the JWKS URL. It is nil otherwise, and it is set
+	// before the first lookup and never replaced.
+	seeded *JWKSFetcher
 
 	// built is set once, under mu, and read without mu.
 	built atomic.Pointer[JWKSFetcher]
@@ -408,11 +421,26 @@ type lazyJWKSFetcher struct {
 	failedAt time.Time
 }
 
-// get returns the built fetcher, building it when none is built and no failure
-// is recorded within retryInterval; otherwise it returns the recorded error.
-func (l *lazyJWKSFetcher) get() (*JWKSFetcher, error) {
+// GetKey returns the key for kid from the fetcher that resolves it.
+func (l *lazyJWKSFetcher) GetKey(kid string) (*JWK, error) {
+	f, err := l.fetcherFor(kid)
+	if err != nil {
+		return nil, err
+	}
+	return f.GetKey(kid)
+}
+
+// fetcherFor returns the built fetcher, or seeded when it holds kid and no
+// fetcher is built yet. Otherwise it builds the fetcher, unless a failure is
+// recorded within retryInterval, in which case it returns the recorded error.
+func (l *lazyJWKSFetcher) fetcherFor(kid string) (*JWKSFetcher, error) {
 	if f := l.built.Load(); f != nil {
 		return f, nil
+	}
+	if l.seeded != nil {
+		if _, ok := l.seeded.seed[kid]; ok {
+			return l.seeded, nil
+		}
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -426,6 +454,7 @@ func (l *lazyJWKSFetcher) get() (*JWKSFetcher, error) {
 	if err != nil {
 		l.err = err
 		l.failedAt = l.clock()
+		l.logFailure(err)
 		return nil, err
 	}
 	l.err = nil
@@ -433,8 +462,24 @@ func (l *lazyJWKSFetcher) get() (*JWKSFetcher, error) {
 	return f, nil
 }
 
-// validateJWKS validates a JWT using keys from the JWKS fetcher.
-func validateJWKS(token string, fetcher *JWKSFetcher, audience, issuer string, requireExp bool) (*phttp.Claims, error) {
+// logFailure logs a failed build with the issuer, the cause, and the time
+// until the next build. It logs at Warn when seeded keeps verifying seeded
+// kids, and at Error when every token is refused.
+func (l *lazyJWKSFetcher) logFailure(err error) {
+	attrs := []slog.Attr{
+		slog.String("issuer", l.issuer),
+		slog.Duration("retryAfter", l.retryInterval),
+	}
+	if l.seeded != nil {
+		decisionLogger().Warn("security.JWKSJWT OIDC discovery failed — only seeded keys verify until a later discovery succeeds",
+			append(attrs, logger.ErrorAttr(err))...)
+		return
+	}
+	decisionLogger().Error("security.JWKSJWT OIDC discovery failed — rejecting all bearer tokens until a later discovery succeeds", err, attrs...)
+}
+
+// validateJWKS validates a JWT using keys from keys.
+func validateJWKS(token string, keys jwkSource, audience, issuer string, requireExp bool) (*phttp.Claims, error) {
 	header, parts, err := parseJWTHeader(token)
 	if err != nil {
 		return nil, err
@@ -463,7 +508,7 @@ func validateJWKS(token string, fetcher *JWKSFetcher, audience, issuer string, r
 	}
 
 	// Fetch the signing key.
-	jwk, err := fetcher.GetKey(header.Kid)
+	jwk, err := keys.GetKey(header.Kid)
 	if err != nil {
 		return nil, err
 	}

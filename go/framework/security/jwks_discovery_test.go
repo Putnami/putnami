@@ -25,9 +25,9 @@ func bearerUser(mw phttp.Middleware, token string) *phttp.Claims {
 }
 
 // oidcIssuer serves an OIDC discovery document that points at its own /jwks,
-// which publishes key under kid "key-1". discovery runs before each discovery
-// response and counts the reads; a non-nil error from it answers 500.
-func oidcIssuer(t *testing.T, key *rsa.PrivateKey, discovery func() error) *httptest.Server {
+// which publishes keys. discovery runs before each discovery response and
+// counts the reads; a non-nil error from it answers 500.
+func oidcIssuer(t *testing.T, discovery func() error, keys ...map[string]any) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -38,7 +38,7 @@ func oidcIssuer(t *testing.T, key *rsa.PrivateKey, discovery func() error) *http
 			}
 			_ = json.NewEncoder(w).Encode(map[string]string{"jwks_uri": "http://" + r.Host + "/jwks"})
 		case "/jwks":
-			_ = json.NewEncoder(w).Encode(map[string]any{"keys": []any{rsaJWKJSON("key-1", &key.PublicKey)}})
+			_ = json.NewEncoder(w).Encode(map[string]any{"keys": keys})
 		default:
 			http.NotFound(w, r)
 		}
@@ -50,12 +50,12 @@ func oidcIssuer(t *testing.T, key *rsa.PrivateKey, discovery func() error) *http
 func TestJWKSJWT_FailedDiscoveryIsRetriedAfterTheInterval(t *testing.T) {
 	key := generateRSAKey(t)
 	var discoveries atomic.Int64
-	srv := oidcIssuer(t, key, func() error {
+	srv := oidcIssuer(t, func() error {
 		if discoveries.Add(1) == 1 {
 			return &ValidationError{"issuer unavailable"}
 		}
 		return nil
-	})
+	}, rsaJWKJSON("key-1", &key.PublicKey))
 	token := makeRSAJWT(t, map[string]any{
 		"sub": "svc-a",
 		"iss": srv.URL,
@@ -108,13 +108,13 @@ func TestJWKSJWT_ConcurrentFirstTokensShareOneDiscovery(t *testing.T) {
 	var releaseOnce sync.Once
 	releaseDiscovery := func() { releaseOnce.Do(func() { close(release) }) }
 	defer releaseDiscovery()
-	srv := oidcIssuer(t, key, func() error {
+	srv := oidcIssuer(t, func() error {
 		if discoveries.Add(1) == 1 {
 			close(firstDiscovery)
 		}
 		<-release
 		return nil
-	})
+	}, rsaJWKJSON("key-1", &key.PublicKey))
 	token := makeRSAJWT(t, map[string]any{
 		"sub": "svc-a",
 		"iss": srv.URL,
@@ -130,13 +130,11 @@ func TestJWKSJWT_ConcurrentFirstTokensShareOneDiscovery(t *testing.T) {
 	users := make([]*phttp.Claims, tokens)
 	for i := range tokens {
 		entered.Add(1)
-		done.Add(1)
-		go func() {
-			defer done.Done()
+		done.Go(func() {
 			<-start
 			entered.Done()
 			users[i] = bearerUser(mw, token)
-		}()
+		})
 	}
 	close(start)
 	entered.Wait()
@@ -185,6 +183,114 @@ func TestJWKSJWT_NoKeySourceRefusesEveryToken(t *testing.T) {
 	}
 }
 
+// seededIssuerTokens returns a token signed under the seeded kid "kid-seeded"
+// and one signed under "kid-rotated", which only the issuer's JWKS publishes,
+// both issued by issuer.
+func seededIssuerTokens(t *testing.T, issuer string, seededKey, rotatedKey *rsa.PrivateKey) (seeded, rotated string) {
+	t.Helper()
+	sign := func(kid string, key *rsa.PrivateKey) string {
+		return makeRSAJWT(t, map[string]any{
+			"sub": "svc-" + kid,
+			"iss": issuer,
+			"exp": float64(time.Now().Add(time.Hour).Unix()),
+		}, kid, key)
+	}
+	return sign("kid-seeded", seededKey), sign("kid-rotated", rotatedKey)
+}
+
+func TestJWKSJWT_SeededResolverRetriesFailedDiscovery(t *testing.T) {
+	seededKey := generateRSAKey(t)
+	rotatedKey := generateRSAKey(t)
+	var discoveries atomic.Int64
+	srv := oidcIssuer(t, func() error {
+		if discoveries.Add(1) == 1 {
+			return &ValidationError{"issuer unavailable"}
+		}
+		return nil
+	}, rsaJWKJSON("kid-rotated", &rotatedKey.PublicKey))
+	seededToken, rotatedToken := seededIssuerTokens(t, srv.URL, seededKey, rotatedKey)
+
+	now := time.Now()
+	mw := jwksJWT(JWKSJWTConfig{
+		Issuer:   srv.URL,
+		SeedKeys: []JWK{jwkFromMap(t, rsaJWKJSON("kid-seeded", &seededKey.PublicKey))},
+	}, func() time.Time { return now })
+
+	check := func(step, token string, wantAccepted bool, wantDiscoveries int64) {
+		t.Helper()
+		if user := bearerUser(mw, token); (user != nil) != wantAccepted {
+			t.Fatalf("%s: accepted = %v, want %v", step, user != nil, wantAccepted)
+		}
+		if got := discoveries.Load(); got != wantDiscoveries {
+			t.Fatalf("%s: discovery reads = %d, want %d", step, got, wantDiscoveries)
+		}
+	}
+
+	check("seeded kid before any discovery", seededToken, true, 0)
+	check("new kid while discovery fails", rotatedToken, false, 1)
+	check("seeded kid after the failed discovery", seededToken, true, 1)
+	now = now.Add(jwksDiscoveryRetryInterval - time.Nanosecond)
+	check("new kid inside the retry interval", rotatedToken, false, 1)
+	now = now.Add(time.Nanosecond)
+	check("new kid once the retry interval elapsed", rotatedToken, true, 2)
+	check("seeded kid after a successful discovery", seededToken, true, 2)
+	now = now.Add(10 * jwksDiscoveryRetryInterval)
+	check("new kid long after a successful discovery", rotatedToken, true, 2)
+}
+
+func TestJWKSJWT_SeededKidDoesNotWaitForDiscovery(t *testing.T) {
+	seededKey := generateRSAKey(t)
+	rotatedKey := generateRSAKey(t)
+	var discoveries atomic.Int64
+	discovering := make(chan struct{})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseDiscovery := func() { releaseOnce.Do(func() { close(release) }) }
+	defer releaseDiscovery()
+	srv := oidcIssuer(t, func() error {
+		if discoveries.Add(1) == 1 {
+			close(discovering)
+		}
+		<-release
+		return nil
+	}, rsaJWKJSON("kid-rotated", &rotatedKey.PublicKey))
+	seededToken, rotatedToken := seededIssuerTokens(t, srv.URL, seededKey, rotatedKey)
+
+	mw := JWKSJWT(JWKSJWTConfig{
+		Issuer:   srv.URL,
+		SeedKeys: []JWK{jwkFromMap(t, rsaJWKJSON("kid-seeded", &seededKey.PublicKey))},
+	})
+
+	// A new kid starts a discovery that the issuer holds open.
+	rotated := make(chan *phttp.Claims, 1)
+	go func() { rotated <- bearerUser(mw, rotatedToken) }()
+	select {
+	case <-discovering:
+	case <-time.After(10 * time.Second):
+		t.Fatal("no discovery read within 10s of a new-kid token")
+	}
+
+	// A seeded kid verifies while that discovery is in flight.
+	seeded := make(chan *phttp.Claims, 1)
+	go func() { seeded <- bearerUser(mw, seededToken) }()
+	select {
+	case user := <-seeded:
+		if user == nil || user.Subject != "svc-kid-seeded" {
+			t.Fatalf("seeded kid refused during discovery: user=%+v", user)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("seeded kid waited for the in-flight discovery")
+	}
+
+	releaseDiscovery()
+	if user := <-rotated; user == nil || user.Subject != "svc-kid-rotated" {
+		t.Fatalf("new kid refused after discovery succeeded: user=%+v", user)
+	}
+	if got := discoveries.Load(); got != 1 {
+		t.Fatalf("discovery reads = %d, want 1", got)
+	}
+}
+
 func TestLazyJWKSFetcher_RecordsFailureAndKeepsSuccess(t *testing.T) {
 	now := time.Now()
 	built := NewJWKSFetcher("https://issuer.example.com/jwks", 0, false)
@@ -218,13 +324,13 @@ func TestLazyJWKSFetcher_RecordsFailureAndKeepsSuccess(t *testing.T) {
 	}
 	for i, step := range steps {
 		now = now.Add(step.advance)
-		f, err := l.get()
+		f, err := l.fetcherFor("key-1")
 		if step.wantErr {
 			if !errors.Is(err, failure) || f != nil {
-				t.Fatalf("step %d: get() = (%v, %v), want (nil, %v)", i, f, err, failure)
+				t.Fatalf("step %d: fetcherFor() = (%v, %v), want (nil, %v)", i, f, err, failure)
 			}
 		} else if err != nil || f != built {
-			t.Fatalf("step %d: get() = (%v, %v), want (%v, nil)", i, f, err, built)
+			t.Fatalf("step %d: fetcherFor() = (%v, %v), want (%v, nil)", i, f, err, built)
 		}
 		if builds != step.wantBuilds {
 			t.Fatalf("step %d: builds = %d, want %d", i, builds, step.wantBuilds)
