@@ -170,6 +170,15 @@ const CapabilityObjectCache = "object-cache"
 // it, so a local run's initialize is unchanged.
 const CapabilityRunCredential = "run-credential" // #nosec G101 -- capability name, not a credential
 
+// CapabilityRestoreResultOnly is listed in the v1-bootstrap
+// InitializeParams.Capabilities by a core that can serve a cache hit from its
+// result alone, and echoed in InitializeResult.Capabilities by a provider that
+// honors RestoreParams.ResultOnly and PrefetchParams.ResultOnlyKeys. Core sends
+// either field only after the echo, so a provider without the capability keeps
+// receiving the wire it already parses strictly. A provider that echoes it may
+// still place blobs for a result-only key; core ignores them.
+const CapabilityRestoreResultOnly = "restore-result-only"
+
 // ObjectCacheSocketEnv is the environment variable core exports to every job
 // subprocess, carrying the absolute path of the provider's object-cache socket
 // (InitializeResult.ObjectCacheSocket). Its ABSENCE is the off switch: a job
@@ -220,11 +229,11 @@ const (
 	// blobs into the CAS in the background, hiding their latency behind the
 	// local build of the misses that depend on them. Returns promptly.
 	OpPrefetch ProviderOp = "prefetch"
-	// OpRestore downloads one key's blobs into the blob-exchange directory and
-	// returns the cached ActionResult and Manifest on a hit (RestoreHit) — core
-	// then ingests those blobs into the CAS — reports a clean miss (RestoreMiss),
-	// or signals that the provider tried and failed (RestoreError) — both
-	// non-hits tell core to build locally.
+	// OpRestore returns the cached ActionResult and Manifest on a hit
+	// (RestoreHit), a clean miss (RestoreMiss), or a provider failure
+	// (RestoreError); both non-hits tell core to build locally. On a hit the
+	// provider places every Manifest blob in the blob-exchange directory, and
+	// core ingests them into the CAS, unless RestoreParams.ResultOnly is set.
 	OpRestore ProviderOp = "restore"
 	// OpUpload hands the provider a freshly built entry (key + result +
 	// manifest) whose blobs core has exported into the blob-exchange directory,
@@ -489,6 +498,12 @@ func ValidRunCredential(credential string) bool {
 type PrefetchParams struct {
 	// Keys are the cache keys to speculatively materialize into the CAS.
 	Keys []string `json:"keys"`
+	// ResultOnlyKeys is the subset of Keys whose files the caller will not
+	// read: it restores each of them with RestoreParams.ResultOnly set. A
+	// provider may look such a key up but need not download any of its blobs.
+	// Every entry is a valid key, appears once, and is also listed in Keys.
+	// Core sends it only to a provider that echoed CapabilityRestoreResultOnly.
+	ResultOnlyKeys []string `json:"resultOnlyKeys,omitempty"`
 }
 
 // PrefetchResult reports how many keys the provider accepted for background
@@ -504,6 +519,18 @@ type PrefetchResult struct {
 type RestoreParams struct {
 	// Key is the single cache key to restore.
 	Key string `json:"key"`
+	// ResultOnly reports that the caller needs the entry's result, not its
+	// files. On a hit the provider still returns Status, Result, the full
+	// Manifest, and the provenance fields, but it need not place any Manifest
+	// blob in the blob-exchange directory, and the caller reads none. Miss and
+	// error keep their meaning. Core sets it only for a provider that echoed
+	// CapabilityRestoreResultOnly.
+	//
+	// Core does not verify a result-only hit's entry descriptor: it reads no
+	// blob, so it cannot check that the entry records the requested key. The
+	// provider must answer with exactly the entry stored under Key, and must
+	// report a miss rather than any other entry.
+	ResultOnly bool `json:"resultOnly,omitempty"`
 }
 
 // RestoreStatus is the outcome of a restore.
@@ -577,15 +604,16 @@ func (c Channel) Valid() bool {
 }
 
 // RestoreResult answers OpRestore. On RestoreHit, Result and Manifest are set
-// and every Manifest digest is guaranteed present in the blob-exchange directory
-// so core can ingest the blobs into its CAS and materialize the outputs locally.
+// and, unless the request set RestoreParams.ResultOnly, every Manifest digest is
+// guaranteed present in the blob-exchange directory so core can ingest the blobs
+// into its CAS and materialize the outputs locally.
 type RestoreResult struct {
 	// Status is the restore outcome (hit/miss/error).
 	Status RestoreStatus `json:"status"`
 	// Result is the cached ActionResult, set on RestoreHit.
 	Result *ActionResult `json:"result,omitempty"`
-	// Manifest is the hit's file set (all digests present in the exchange dir),
-	// set on RestoreHit.
+	// Manifest is the hit's file set, set on RestoreHit. Its digests are present
+	// in the exchange dir unless the request set RestoreParams.ResultOnly.
 	Manifest *Manifest `json:"manifest,omitempty"`
 	// Producer is the provider-authoritative producer class of the restored
 	// entry. It is omitted by v1/channel-less providers.

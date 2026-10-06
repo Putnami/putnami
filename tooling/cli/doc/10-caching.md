@@ -930,11 +930,63 @@ job-cost floor as computation leases skips known-cheap work, while an expired
 lease or bounded wait falls back to a direct provider restore so coordination
 cannot make the cache less reliable.
 
-| Mode | Behaviour |
+| Mode | A remote hit is restored with its files when |
 |------|-----------|
-| `minimal` | Status only (the CI gate). Bytes move only when a local build consumes them as an input. |
-| `toplevel` | Materialize requested deliverables. |
-| `full` | Materialize every hit's outputs (local development; the default). |
+| `minimal` | a planned job waits for the task, the task declares a post-run report, or the task polices output drift. Every other hit is status only (the CI gate). |
+| `toplevel` | the same, or the task belongs to a project the run selected. |
+| `full` | always (local development; the default). |
+
+A planned job waits for a task when it depends on it, or when the plan orders
+it after the task because it reads what the task writes: a resource the task
+writes, or the generated client a contract provider writes into the client's
+directory. The later job may execute and read those files, and even a later
+hit computes its own cache key from the workspace, so the files must be there.
+A post-run report is the feature verification report or the executable
+criteria projection, which the spec gate reads from the command output
+directory after the run, or a command-output file whose path the task reports
+at run time. A task that polices drift compares the restored bytes with the
+committed ones, which needs the bytes.
+
+A status-only hit needs a provider that echoes `restore-result-only`
+([`16-cache-provider-rpc.md`](16-cache-provider-rpc.md)). The provider then
+returns the result and places no blob, core records the result in a local
+result-only entry, and the task reports its cached status without writing the
+workspace or taking its output locks. The run's cache summary counts it as a
+provider hit with zero fetched bytes. A trusted hit is required: a hint hit
+restored status only is a miss, because it fetched no blob to warm. With a
+provider that does not echo the capability, every mode restores every hit
+with its files.
+
+A status-only hit leaves the task's output files in the workspace as they
+are, so they can be absent or stale. A fresh checkout has none of them, and a
+workspace that ran before can hold the bytes of another key: `bin/app` can
+still hold the binary an earlier run built from another commit. This covers
+the binaries and packages a task writes to the command output directory, such
+as `bin/` or `lib/`, the files it generates into the project, such as
+`.gen/`, and its command-output reports, such as `lcov.info`,
+`results.junit.xml`, `coverage.out`, and `coverage.html`. When a tool outside
+Putnami reads a task's outputs after the run, for example a CI step that ships
+a binary or uploads a coverage or JUnit report, run in `full` mode, or in
+`toplevel` mode with that task's project selected.
+
+The test tasks of the Go, TypeScript, and Python extensions declare the
+feature verification report, so their hits keep their files in every mode and
+still download all their reports.
+
+A result-only entry lives in the store at an address of its own and holds
+one record, never a file. A later run that needs no files either is served
+from it without a provider restore. A run that needs the files never reads
+it: it restores the full entry from the provider, and executes the task when
+that restore fails. A full local entry for the same key always wins over a
+result-only one, even when its restore fails: the run then falls back to the
+provider's full restore or to an execution, which rewrites every output.
+Negotiation counts a key that a local result-only entry serves, and whose
+files no job of the run reads, as a local hit, and does not ask the provider
+for it. A run that holds such a key still starts the provider, because whether
+a task's files are needed depends on the provider's echo, which arrives at
+`initialize`. Garbage collection evicts result-only entries like any other
+entry. [ADR 0058](adr/0058-a-hit-no-job-reads-is-restored-without-its-files.md)
+records the design.
 
 ### What is and isn't cached remotely
 

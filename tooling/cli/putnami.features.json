@@ -806,6 +806,22 @@
               "a-toolchain-pin-still-moves-the-key"
             ]
           }
+        },
+        {
+          "id": "result-only-remote-restore",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-hit-no-job-waits-for-moves-no-bytes",
+              "a-hit-a-planned-job-waits-for-keeps-its-files",
+              "a-run-that-reads-the-files-restores-them-or-executes",
+              "a-provider-without-the-capability-sees-no-new-field"
+            ]
+          }
         }
       ]
     },

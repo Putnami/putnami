@@ -132,6 +132,11 @@ type RemoteCache struct {
 	// (statusOnlyOptionalCaptureHit): a describe whose result reports no
 	// clients legitimately has zero files.
 	requiredInputs map[string]bool
+	// dependedOn holds the key of every job a planned job waits for
+	// (dependedOnJobs). Negotiate sets it before any job runs; nil means the
+	// plan was never seen, and then every task's files are needed
+	// (taskFilesNeeded).
+	dependedOn map[string]bool
 
 	// mu guards index. index records the provider hits restored so far (cache key
 	// -> result); Restore writes it from worker goroutines as restores land and
@@ -270,6 +275,7 @@ func (r *RemoteCache) Negotiate(
 	if r == nil || cm == nil {
 		return
 	}
+	r.dependedOn = dependedOnJobs(planned)
 
 	keys, err := PrecomputeKeys(ws, planned, commandParams, versions, cm, bypass, r.stats)
 	if err != nil {
@@ -280,6 +286,12 @@ func (r *RemoteCache) Negotiate(
 	r.localHits = make(map[string]bool)
 
 	var providerKeys []string
+	// declaredJobs maps each declared-capture provider key to the jobs that
+	// restore it, and declaredHashes maps it to its local cache key, so the
+	// result-only subset can be chosen once the provider has answered
+	// initialize.
+	declaredJobs := make(map[string][]*ScheduledJob)
+	declaredHashes := make(map[string]string)
 	// executesLocally records whether ANY planned job will run a process on this
 	// machine. It is not the same question as "is there a key to warm": a run of
 	// only side-effecting or uncacheable tasks warms nothing yet still spawns
@@ -308,7 +320,10 @@ func (r *RemoteCache) Negotiate(
 				r.localHits[hash] = true
 				continue
 			}
-			providerKeys = append(providerKeys, store.RemoteTaskEntryKey(hash))
+			providerKey := store.RemoteTaskEntryKey(hash)
+			providerKeys = append(providerKeys, providerKey)
+			declaredJobs[providerKey] = append(declaredJobs[providerKey], job)
+			declaredHashes[providerKey] = hash
 			executesLocally = true
 			continue
 		}
@@ -328,7 +343,9 @@ func (r *RemoteCache) Negotiate(
 
 	// Spawn the provider when there is something to warm, OR when a job will run
 	// here and could use the object cache. A fully warm rebuild still spins up
-	// nothing: every planned job is a local hit, so neither condition holds.
+	// nothing: every planned job is a local hit, so neither condition holds. A
+	// key a local result-only entry may serve still counts here, because the
+	// echo that decides it arrives with the session.
 	// --no-cache consults nothing remote, so it keeps the provider down too
 	// (PrecomputeKeys already omitted every key, which is why this flag has to be
 	// read explicitly rather than inferred from an empty key set).
@@ -340,17 +357,85 @@ func (r *RemoteCache) Negotiate(
 	if !ok {
 		return
 	}
+	// Only now is the provider's echo known, so only now can a local
+	// result-only entry count as a local hit. Before it, the rule answers that
+	// every task needs its files, and the key stays with the provider.
+	providerKeys = r.dropLocalResultOnlyHits(providerKeys, declaredJobs, declaredHashes, cm)
 	if len(providerKeys) == 0 {
-		// Object-cache-only spawn: nothing to prefetch, and no negotiation to
-		// record — recording a zero-key negotiate would report a round trip the
-		// run never made.
+		// Object-cache-only spawn, or every key a local result-only hit: nothing
+		// to prefetch, and no negotiation to record — recording a zero-key
+		// negotiate would report a round trip the run never made.
 		return
 	}
-	if _, err := sess.Prefetch(ctx, &cache.PrefetchParams{Keys: providerKeys}); err != nil {
+	prefetch := &cache.PrefetchParams{Keys: providerKeys, ResultOnlyKeys: r.resultOnlyKeys(providerKeys, declaredJobs)}
+	if _, err := sess.Prefetch(ctx, prefetch); err != nil {
 		slog.Warn("remote cache: provider prefetch failed; building locally", "error", err)
 	}
 	// Record the key set as misses; Restore promotes each served key to a hit.
 	r.stats.recordNegotiate(time.Since(start).Nanoseconds(), len(providerKeys), 0)
+}
+
+// resultOnlyKeys returns the declared-capture provider keys, in providerKeys
+// order and once each, whose files no job of this run reads. A key shared by
+// several jobs is result-only only when none of them needs the files.
+func (r *RemoteCache) resultOnlyKeys(providerKeys []string, declaredJobs map[string][]*ScheduledJob) []string {
+	var out []string
+	seen := make(map[string]bool, len(declaredJobs))
+	for _, key := range providerKeys {
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		if !r.filesNeededByAny(declaredJobs[key]) {
+			out = append(out, key)
+		}
+	}
+	return out
+}
+
+// dropLocalResultOnlyHits returns providerKeys without the declared-capture
+// keys a local result-only entry serves, and records each such key's local
+// hash as a local hit. A key qualifies only when no job sharing it reads its
+// files and no full local entry exists for it (Negotiate already counted those),
+// which is the condition under which lookupDeclaredEntry serves the result-only
+// entry. The result keeps providerKeys' order.
+func (r *RemoteCache) dropLocalResultOnlyHits(
+	providerKeys []string,
+	declaredJobs map[string][]*ScheduledJob,
+	declaredHashes map[string]string,
+	cm *store.CacheManager,
+) []string {
+	served := make(map[string]bool, len(declaredHashes))
+	kept := make([]string, 0, len(providerKeys))
+	for _, key := range providerKeys {
+		hit, decided := served[key]
+		if !decided {
+			hash, declared := declaredHashes[key]
+			hit = declared && !r.filesNeededByAny(declaredJobs[key]) && cm.LookupResultOnlyTaskEntry(hash) != nil
+			served[key] = hit
+			if hit {
+				r.localHits[hash] = true
+			}
+		}
+		if !hit {
+			kept = append(kept, key)
+		}
+	}
+	return kept
+}
+
+// filesNeededByAny reports whether any job restoring one key reads the key's
+// files. A key no declared-capture job restores needs its files.
+func (r *RemoteCache) filesNeededByAny(jobs []*ScheduledJob) bool {
+	if len(jobs) == 0 {
+		return true
+	}
+	for _, job := range jobs {
+		if r.taskFilesNeeded(job) {
+			return true
+		}
+	}
+	return false
 }
 
 // Restore attempts to satisfy a local miss from the provider cache. On a provider

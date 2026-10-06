@@ -567,8 +567,8 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "cache",
 		prefix: "internal/store/",
-		files:  33,
-		funcs:  276,
+		files:  34,
+		funcs:  282,
 		why: "internal/store: the content-addressed local cache — entries, task entries, CAS, " +
 			"leases, GC, generations and the remote bridge. Cache-key completeness and atomicity " +
 			"under concurrency are the two invariants this repository has been burned by most " +
@@ -725,7 +725,19 @@ var complexityCeilings = []complexityCeiling{
 			"life of the manager, a value its caller derives, error included: the installed-tree " +
 			"digest that names an installed extension in every key of its tasks. One run reads each " +
 			"installed tree once, and every key of the run names one identity per extension even if " +
-			"the tree changes mid-run. It reads no entry and writes none",
+			"the tree changes mid-run. It reads no entry and writes none. " +
+			"RAISED, from 33/276 to 34/282. task_result_only.go is the result-only entry: the " +
+			"result of a remote hit restored without its files, for a run that reads none of " +
+			"them. It IS a new way to reach the store, and that is the review. It is bounded the " +
+			"way task_failure.go is: it is addressed from its OWN domain constant, so no " +
+			"task-owned, legacy or remote reader can name it; it is one record with no manifest, " +
+			"no declared output and no CAS blob, so it can never materialize a tree and keeps no " +
+			"blob alive; it is published first-writer-wins through publishEntry; and every " +
+			"unreadable, foreign or statusless record is a MISS, so the worst outcome of a wrong " +
+			"read is one full restore or one re-execution. It is keyed by the task's own cache " +
+			"key, with no second key and no extra input. Six functions: four here (address, look " +
+			"up, publish, and the fail-closed load) and two thin CacheManager verbs in " +
+			"cache_task.go that add no rule of their own",
 	},
 	{
 		unit:   "output",

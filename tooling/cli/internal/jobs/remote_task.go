@@ -33,6 +33,10 @@
 // never return a green result), the source-mutation rejection, the break-even
 // upload guard, side-effecting task exclusion, and best-effort semantics — every
 // failure logs and degrades to local execution, never to a broken build.
+//
+// A hit whose files no job of the run reads takes the result-only path instead
+// (remote_result_only.go). That path writes nothing, so it cannot leave a reader
+// without an input: a task a planned job waits for always comes through here.
 package jobs
 
 import (

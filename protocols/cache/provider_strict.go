@@ -274,7 +274,8 @@ func ParsePrefetchParamsStrict(data []byte) (*PrefetchParams, []diag.Diagnostic)
 }
 
 // ValidatePrefetchParams checks a bounded, well-formed key set (an empty set is
-// valid — a no-op prefetch).
+// valid — a no-op prefetch) and a result-only subset in which every key is
+// well-formed, listed once, and also listed in Keys.
 func ValidatePrefetchParams(p *PrefetchParams) []diag.Diagnostic {
 	if p == nil {
 		return []diag.Diagnostic{diag.Errorf(CodeRequiredField, "", "params are nil")}
@@ -284,21 +285,40 @@ func ValidatePrefetchParams(p *PrefetchParams) []diag.Diagnostic {
 		diags = append(diags, diag.Errorf(CodeTooManyKeys, "keys",
 			"%d keys exceeds the per-request limit of %d", len(p.Keys), MaxKeysPerRequest))
 	}
+	keys := make(map[string]struct{}, len(p.Keys))
 	for i, k := range p.Keys {
 		if !ValidKey(k) {
 			diags = append(diags, diag.Errorf(CodeInvalidKey, fmt.Sprintf("keys[%d]", i),
 				"malformed cache key %q", k))
 		}
+		keys[k] = struct{}{}
+	}
+	seen := make(map[string]struct{}, len(p.ResultOnlyKeys))
+	for i, k := range p.ResultOnlyKeys {
+		field := fmt.Sprintf("resultOnlyKeys[%d]", i)
+		if !ValidKey(k) {
+			diags = append(diags, diag.Errorf(CodeInvalidKey, field, "malformed cache key %q", k))
+			continue
+		}
+		if _, listed := keys[k]; !listed {
+			diags = append(diags, diag.Errorf(CodeInvalidKey, field, "result-only key %q is not listed in keys", k))
+		}
+		if _, dup := seen[k]; dup {
+			diags = append(diags, diag.Errorf(CodeDuplicateKey, field, "duplicate result-only key %q", k))
+		}
+		seen[k] = struct{}{}
 	}
 	return diags
 }
 
-// NormalizePrefetchParams sorts the key set for deterministic output.
+// NormalizePrefetchParams sorts the key set and the result-only subset for
+// deterministic output.
 func NormalizePrefetchParams(p *PrefetchParams) *PrefetchParams {
 	if p == nil {
 		return nil
 	}
 	sort.Strings(p.Keys)
+	sort.Strings(p.ResultOnlyKeys)
 	return p
 }
 
@@ -315,7 +335,8 @@ func ParseRestoreParamsStrict(data []byte) (*RestoreParams, []diag.Diagnostic) {
 	return parseStrict[RestoreParams](data, "restore params")
 }
 
-// ValidateRestoreParams checks a well-formed cache key.
+// ValidateRestoreParams checks a well-formed cache key. ResultOnly has no
+// invariant of its own.
 func ValidateRestoreParams(p *RestoreParams) []diag.Diagnostic {
 	if p == nil {
 		return []diag.Diagnostic{diag.Errorf(CodeRequiredField, "", "params are nil")}

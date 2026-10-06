@@ -389,6 +389,20 @@ func (r *RemoteCache) objectCacheJobEnv() []string {
 	}
 }
 
+// restoresResultOnly reports whether a ready provider session echoed
+// cache.CapabilityRestoreResultOnly, so a restore can skip the entry's blobs.
+// It is false before the session starts and for a provider without the echo.
+// The session is the only record of the echo: the same session gates the wire
+// fields, so this answer and the request core sends never disagree.
+func (r *RemoteCache) restoresResultOnly() bool {
+	if !r.isProviderBacked() {
+		return false
+	}
+	r.provider.mu.Lock()
+	defer r.provider.mu.Unlock()
+	return r.provider.ready && r.provider.session.RestoreResultOnly()
+}
+
 func (r *RemoteCache) providerExchangeDir() string {
 	if !r.isProviderBacked() {
 		return ""

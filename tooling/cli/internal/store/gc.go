@@ -828,6 +828,9 @@ func blobMetaBytes(blobDir string) int64 {
 		// sidecar, so listing it here is what makes the record count against the
 		// store's byte budget like every other blob (task_failure.go).
 		taskFailureRecordFilename,
+		// A result-only entry is likewise one record plus its lastUsed sidecar,
+		// with no manifest and no files (task_result_only.go).
+		resultOnlyRecordFilename,
 	} {
 		if fi, err := os.Stat(filepath.Join(blobDir, name)); err == nil {
 			total += fi.Size()

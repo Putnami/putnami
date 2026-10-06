@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -100,6 +101,86 @@ func TestRunCredentialContract(t *testing.T) {
 		if got := ValidRunCredential(value); got != want {
 			t.Errorf("ValidRunCredential(%.24q) = %v, want %v", value, got, want)
 		}
+	}
+}
+
+// TestRestoreResultOnlyContract pins the result-only tokens a provider in
+// another repository reads, and the wire shape of both request fields: each
+// is absent when unset, so a request without them is byte-identical to the
+// one a provider without the capability already parses strictly.
+func TestRestoreResultOnlyContract(t *testing.T) {
+	if CapabilityRestoreResultOnly != "restore-result-only" {
+		t.Errorf("wire token = %q, want %q", CapabilityRestoreResultOnly, "restore-result-only")
+	}
+	key := validTestKey()
+	other := strings.Repeat("b", KeyLength)
+	for _, tc := range []struct {
+		value any
+		want  string
+	}{
+		{RestoreParams{Key: key}, `{"key":"` + key + `"}`},
+		{RestoreParams{Key: key, ResultOnly: true}, `{"key":"` + key + `","resultOnly":true}`},
+		{PrefetchParams{Keys: []string{key}}, `{"keys":["` + key + `"]}`},
+		{PrefetchParams{Keys: []string{key, other}, ResultOnlyKeys: []string{other}},
+			`{"keys":["` + key + `","` + other + `"],"resultOnlyKeys":["` + other + `"]}`},
+	} {
+		payload, err := MarshalPayload(tc.value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(payload) != tc.want {
+			t.Errorf("%T wire = %s, want %s", tc.value, payload, tc.want)
+		}
+	}
+
+	restore, diags := ParseAndValidateRestoreParams([]byte(`{"key":"` + key + `","resultOnly":true}`))
+	if restore == nil || diag.HasErrors(diags) || !restore.ResultOnly {
+		t.Fatalf("a result-only restore must parse: %+v / %v", restore, diags)
+	}
+	prefetch, diags := ParseAndValidatePrefetchParams([]byte(`{"keys":["` + other + `","` + key +
+		`"],"resultOnlyKeys":["` + other + `","` + key + `"]}`))
+	if prefetch == nil || diag.HasErrors(diags) {
+		t.Fatalf("a result-only prefetch must parse: %+v / %v", prefetch, diags)
+	}
+	if want := []string{key, other}; !slices.Equal(prefetch.ResultOnlyKeys, want) {
+		t.Errorf("normalized resultOnlyKeys = %v, want %v", prefetch.ResultOnlyKeys, want)
+	}
+}
+
+// TestPrefetchParams_ResultOnlyKeysValidation pins the subset rule: every
+// result-only key is well-formed, listed once, and also listed in Keys.
+func TestPrefetchParams_ResultOnlyKeysValidation(t *testing.T) {
+	key := validTestKey()
+	other := strings.Repeat("b", KeyLength)
+	for _, tc := range []struct {
+		name   string
+		params PrefetchParams
+		code   string
+		field  string
+	}{
+		{"not listed", PrefetchParams{Keys: []string{key}, ResultOnlyKeys: []string{other}}, CodeInvalidKey, "resultOnlyKeys[0]"},
+		{"duplicate", PrefetchParams{Keys: []string{key}, ResultOnlyKeys: []string{key, key}}, CodeDuplicateKey, "resultOnlyKeys[1]"},
+		{"malformed", PrefetchParams{Keys: []string{key}, ResultOnlyKeys: []string{"short"}}, CodeInvalidKey, "resultOnlyKeys[0]"},
+		{"without keys", PrefetchParams{ResultOnlyKeys: []string{key}}, CodeInvalidKey, "resultOnlyKeys[0]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			diags := ValidatePrefetchParams(&tc.params)
+			if !diag.HasErrors(diags) {
+				t.Fatalf("expected an error, got %v", diags)
+			}
+			found := false
+			for _, d := range diags {
+				if d.Code == tc.code && d.Field == tc.field && d.Severity == diag.Error {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("want error %s at %s, got %v", tc.code, tc.field, diags)
+			}
+		})
+	}
+	if diags := ValidatePrefetchParams(&PrefetchParams{Keys: []string{key, other}, ResultOnlyKeys: []string{key, other}}); len(diags) != 0 {
+		t.Errorf("a full result-only subset must be valid: %v", diags)
 	}
 }
 
