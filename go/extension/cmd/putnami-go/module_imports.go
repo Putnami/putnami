@@ -60,13 +60,23 @@ func (s moduleImportScan) importsModule(module string) bool {
 // scanModuleImports reads the module rooted at moduleDir and reports which of
 // wanted its sources import.
 //
+// An import is credited to the module that provides it, resolved against
+// wanted and known together, and counts only when that module is wanted. A
+// module nested under a wanted one therefore keeps its own packages even when
+// this go.mod requires the parent alone.
+//
 // The walk stops as soon as every wanted module has been seen: a healthy module
 // imports what it requires, so the common case reads a prefix of the tree.
-func scanModuleImports(moduleDir string, wanted []string) moduleImportScan {
+func scanModuleImports(moduleDir string, wanted, known []string) moduleImportScan {
 	scan := moduleImportScan{imported: make(map[string]bool, len(wanted)), complete: true}
 	if len(wanted) == 0 {
 		return scan
 	}
+	isWanted := make(map[string]bool, len(wanted))
+	for _, module := range wanted {
+		isWanted[module] = true
+	}
+	candidates := append(append([]string(nil), wanted...), known...)
 	fset := token.NewFileSet()
 	err := filepath.WalkDir(moduleDir, func(current string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -90,7 +100,7 @@ func scanModuleImports(moduleDir string, wanted []string) moduleImportScan {
 			if err != nil {
 				continue
 			}
-			if module := longestModuleMatch(imported, wanted); module != "" {
+			if module := longestModuleMatch(imported, candidates); isWanted[module] {
 				scan.imported[module] = true
 			}
 		}
@@ -119,12 +129,12 @@ func skipGoDirectory(current, moduleDir, name string) error {
 }
 
 // longestModuleMatch resolves an import path to the module that provides it:
-// the longest asked-about path that is the import path itself or a prefix of
-// it. Longest wins so a module nested under another — `.../cli/model` under
+// the longest of modules that is the import path itself or a prefix of it.
+// Longest wins so a module nested under another — `.../cli/model` under
 // `.../cli` — is credited alone for its own packages.
-func longestModuleMatch(imported string, wanted []string) string {
+func longestModuleMatch(imported string, modules []string) string {
 	best := ""
-	for _, module := range wanted {
+	for _, module := range modules {
 		if imported != module && !strings.HasPrefix(imported, module+"/") {
 			continue
 		}

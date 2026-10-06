@@ -246,6 +246,24 @@ func TestProbe_AttributesAnUnimportedRequireAsADeclaration(t *testing.T) {
 	}
 }
 
+// A require of a workspace module whose sources import only a module nested
+// inside it is a DECLARATION: the nested module provides those packages, so
+// the parent the go.mod requires is not read by the build.
+func TestProbe_AttributesARequireOfAParentOfAnImportedNestedModuleAsADeclaration(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "libs", "core", "client", "go.mod"), "module example.com/core/client\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"),
+		"package main\n\nimport \"example.com/core/client\"\n\nfunc main() { _ = client.Hello }\n")
+
+	svc := projectAt(t, probeAll(t, root, "apps/svc", "libs/core", "libs/core/client"), "apps/svc")
+	if !slices.Equal(svc.Dependencies, []string{"libs/core"}) {
+		t.Fatalf("dependencies = %v, want the edge the require still states", svc.Dependencies)
+	}
+	if got := svc.DependencySources["libs/core"]; got != wsproto.DependencySourceDeclared {
+		t.Errorf("dependencySources[libs/core] = %q, want %q", got, wsproto.DependencySourceDeclared)
+	}
+}
+
 // A test file counts exactly like a non-test file: a requirement a `_test.go`
 // alone imports is one `go mod tidy` keeps, so it is an import here too.
 func TestProbe_AttributesARequireATestFileAloneImports(t *testing.T) {
