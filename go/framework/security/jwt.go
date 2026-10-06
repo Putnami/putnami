@@ -8,9 +8,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"log/slog"
 	"math/big"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	phttp "go.putnami.dev/http"
@@ -292,6 +294,14 @@ type JWKSJWTConfig struct {
 // The JWKS is fetched lazily on first request and cached with TTL.
 // Unknown key IDs trigger a force-refresh (rate-limited).
 //
+// With Issuer set and JWKSURL empty, the first request discovers the JWKS URL,
+// and the resolver keeps a successful discovery for its lifetime. Concurrent
+// requests share one discovery. When discovery fails and SeedKeys is empty, the
+// failure is logged and every token is refused; the first request at least 5
+// seconds after the failure discovers again, and requests before then do no
+// network I/O. Without JWKSURL, Issuer, or SeedKeys there is no key source: the
+// resolver logs an error once and refuses every token.
+//
 // The "iss" claim is enforced when an expected issuer is known: the OIDC
 // Issuer used for key discovery doubles as the required "iss", and RequiredIssuer
 // can set or override it (e.g. for the JWKSURL path). Without an expected issuer
@@ -306,6 +316,15 @@ type JWKSJWTConfig struct {
 //	    Issuer: "https://accounts.google.com",
 //	}))
 func JWKSJWT(cfg JWKSJWTConfig) phttp.Middleware {
+	return jwksJWT(cfg, time.Now)
+}
+
+// jwksDiscoveryRetryInterval is the minimum time between a failed build of a
+// JWKSJWT resolver's key fetcher and the next build attempt.
+const jwksDiscoveryRetryInterval = 5 * time.Second
+
+// jwksJWT is JWKSJWT with the clock that times key-fetcher build retries.
+func jwksJWT(cfg JWKSJWTConfig, clock func() time.Time) phttp.Middleware {
 	// The OIDC issuer used for discovery doubles as the required "iss" unless
 	// RequiredIssuer overrides it. This closes the asymmetry with the HS256
 	// path (which always enforces iss) and prevents token confusion in
@@ -315,38 +334,17 @@ func JWKSJWT(cfg JWKSJWTConfig) phttp.Middleware {
 		expectedIssuer = cfg.Issuer
 	}
 
-	var (
-		fetcher     *JWKSFetcher
-		fetcherOnce sync.Once
-		fetcherErr  error
-	)
+	if cfg.JWKSURL == "" && cfg.Issuer == "" && len(cfg.SeedKeys) == 0 {
+		decisionLogger().Error("security.JWKSJWT configured without JWKSURL, Issuer, or SeedKeys — failing closed; all bearer tokens will be rejected", nil)
+		return IdentityResolver(func(*phttp.Context) *phttp.Claims {
+			return nil
+		})
+	}
 
-	initFetcher := func() {
-		url := cfg.JWKSURL
-		if url == "" && cfg.Issuer != "" {
-			discovered, derr := DiscoverJWKSURL(cfg.Issuer, cfg.AllowInsecure)
-			if derr != nil {
-				// With seed keys the verifier still validates offline; discovery
-				// only enables unknown-kid rotation refresh, so a discovery outage
-				// must not disable a seeded resolver. Without a seed, discovery is
-				// the only key source, so its failure is terminal as before.
-				if len(cfg.SeedKeys) == 0 {
-					fetcherErr = derr
-					return
-				}
-			} else {
-				url = discovered
-			}
-		}
-		if url == "" && len(cfg.SeedKeys) == 0 {
-			fetcherErr = errInvalidToken
-			return
-		}
-		if len(cfg.SeedKeys) > 0 {
-			fetcher = NewSeededJWKSFetcher(url, cfg.SeedKeys, cfg.CacheTTL, cfg.AllowInsecure)
-			return
-		}
-		fetcher = NewJWKSFetcher(url, cfg.CacheTTL, cfg.AllowInsecure)
+	keys := &lazyJWKSFetcher{
+		build:         func() (*JWKSFetcher, error) { return buildJWKSFetcher(cfg) },
+		clock:         clock,
+		retryInterval: jwksDiscoveryRetryInterval,
 	}
 
 	return IdentityResolver(func(ctx *phttp.Context) *phttp.Claims {
@@ -354,8 +352,8 @@ func JWKSJWT(cfg JWKSJWTConfig) phttp.Middleware {
 		if token == "" {
 			return nil
 		}
-		fetcherOnce.Do(initFetcher)
-		if fetcherErr != nil {
+		fetcher, err := keys.get()
+		if err != nil {
 			return nil
 		}
 		claims, err := validateJWKS(token, fetcher, cfg.Audience, expectedIssuer, !cfg.AllowMissingExpiration)
@@ -364,6 +362,75 @@ func JWKSJWT(cfg JWKSJWTConfig) phttp.Middleware {
 		}
 		return claims
 	})
+}
+
+// buildJWKSFetcher builds the key fetcher of a JWKSJWT resolver whose config
+// names at least one key source. With Issuer set and JWKSURL empty it discovers
+// the JWKS URL. A discovery failure is logged and returned when SeedKeys is
+// empty. With SeedKeys it still builds a seeded fetcher, without a URL to
+// refresh from, so seeded kids keep verifying offline.
+func buildJWKSFetcher(cfg JWKSJWTConfig) (*JWKSFetcher, error) {
+	url := cfg.JWKSURL
+	if url == "" && cfg.Issuer != "" {
+		discovered, err := DiscoverJWKSURL(cfg.Issuer, cfg.AllowInsecure)
+		switch {
+		case err == nil:
+			url = discovered
+		case len(cfg.SeedKeys) == 0:
+			decisionLogger().Error("security.JWKSJWT OIDC discovery failed — rejecting all bearer tokens until a later discovery succeeds", err,
+				slog.String("issuer", cfg.Issuer),
+				slog.Duration("retryAfter", jwksDiscoveryRetryInterval))
+			return nil, err
+		}
+	}
+	if len(cfg.SeedKeys) > 0 {
+		return NewSeededJWKSFetcher(url, cfg.SeedKeys, cfg.CacheTTL, cfg.AllowInsecure), nil
+	}
+	return NewJWKSFetcher(url, cfg.CacheTTL, cfg.AllowInsecure), nil
+}
+
+// lazyJWKSFetcher builds a key fetcher on first use and keeps the first one
+// built for its lifetime. A failed build is recorded with the time it failed:
+// until retryInterval has elapsed, get returns that error without calling
+// build, and the first call after that builds again. Concurrent calls share one
+// build: the build runs under mu, and every caller re-checks the state once it
+// holds mu.
+type lazyJWKSFetcher struct {
+	build         func() (*JWKSFetcher, error)
+	clock         func() time.Time
+	retryInterval time.Duration
+
+	// built is set once, under mu, and read without mu.
+	built atomic.Pointer[JWKSFetcher]
+
+	mu       sync.Mutex
+	err      error
+	failedAt time.Time
+}
+
+// get returns the built fetcher, building it when none is built and no failure
+// is recorded within retryInterval; otherwise it returns the recorded error.
+func (l *lazyJWKSFetcher) get() (*JWKSFetcher, error) {
+	if f := l.built.Load(); f != nil {
+		return f, nil
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if f := l.built.Load(); f != nil {
+		return f, nil
+	}
+	if l.err != nil && l.clock().Sub(l.failedAt) < l.retryInterval {
+		return nil, l.err
+	}
+	f, err := l.build()
+	if err != nil {
+		l.err = err
+		l.failedAt = l.clock()
+		return nil, err
+	}
+	l.err = nil
+	l.built.Store(f)
+	return f, nil
 }
 
 // validateJWKS validates a JWT using keys from the JWKS fetcher.
