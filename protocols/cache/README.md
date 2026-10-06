@@ -265,6 +265,20 @@ stream.
   not valid on the object-cache socket. Like the batched HTTP endpoints, it is
   a new op behind a capability, never a new field on an existing message, so a
   strict provider that ignores the capability keeps working.
+- **Result-only restore.** Core lists `restore-result-only` in the bootstrap
+  `InitializeParams.Capabilities`. A provider that echoes it may receive
+  `RestoreParams.resultOnly` and `PrefetchParams.resultOnlyKeys`; a provider
+  that does not echo it never receives either field, so its strict parser sees
+  the wire it already accepts. `resultOnly: true` means core reads the hit's
+  result and none of its files: the provider still answers `hit` with the
+  `Result`, the full `Manifest`, and the provenance fields, but it need not
+  place any blob in the exchange directory. `resultOnlyKeys` is the subset of
+  `keys` core will restore that way, so a prefetch need not download their
+  blobs; each one is a valid key, listed once, and also listed in `keys`.
+  Core does not verify a result-only hit's entry descriptor, because it reads
+  no blob: it cannot check that the entry records the requested key, as it does
+  on a full restore. The provider must answer with exactly the entry stored
+  under the requested key, or with a miss.
 - **Object cache (socket).** `object-get` / `object-put` are a generic,
   language-neutral object cache: small opaque payloads addressed by
   `(namespace, id)`, batched, with bytes travelling through the blob-exchange
@@ -303,6 +317,10 @@ drives this RPC is `internal/cacheprovider`; the full design is in the CLI docs
 | `minimal`  | none (status only)                  | CI gate        |
 | `toplevel` | requested deliverables              | targeted build |
 | `full`     | every output                        | local dev      |
+
+The table states each mode's intent. The CLI still downloads a hit's files in
+`minimal` and `toplevel` when a job of the run reads them; its exact rule is in
+`tooling/cli/doc/10-caching.md`.
 
 ## Remote eligibility policy
 

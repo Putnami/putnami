@@ -133,6 +133,10 @@ type Session struct {
 	// the provider, or "" when the object cache is not available for this
 	// session. It is deliberately the CHECKED value, not the advertised one.
 	objectCacheSocket string
+	// restoreResultOnly reports that the provider echoed
+	// cache.CapabilityRestoreResultOnly. Until it does, Prefetch and Restore
+	// strip the result-only fields from every request.
+	restoreResultOnly bool
 	pending           map[int64]chan *cache.ProviderResponse
 	dead              bool
 	deadErr           error
@@ -369,6 +373,10 @@ func (s *Session) do(ctx context.Context, op cache.ProviderOp, params any) (*cac
 // so before any other op; a failed authenticate fails Initialize. A malformed
 // run credential fails Initialize before anything is sent. Without the echo
 // nothing more is sent.
+//
+// The bootstrap always advertises cache.CapabilityRestoreResultOnly. Only a
+// provider that echoes it receives RestoreParams.ResultOnly and
+// PrefetchParams.ResultOnlyKeys; see RestoreResultOnly.
 func (s *Session) Initialize(ctx context.Context, p *cache.InitializeParams) (*cache.InitializeResult, error) {
 	if p == nil {
 		return nil, errors.New("provider initialize params are nil")
@@ -390,10 +398,13 @@ func (s *Session) Initialize(ctx context.Context, p *cache.InitializeParams) (*c
 	// must not answer with a socket.
 	bootstrap.Capabilities = appendCapability(bootstrap.Capabilities, cache.CapabilityObjectCache)
 	// Only a core that holds a run credential asks for it, so a local run's
-	// initialize stays byte-identical.
+	// initialize never lists it.
 	if s.runCredential != "" {
 		bootstrap.Capabilities = appendCapability(bootstrap.Capabilities, cache.CapabilityRunCredential)
 	}
+	// Result-only restores are an opt-in of the same kind: the request fields
+	// that carry them are sent only after the echo.
+	bootstrap.Capabilities = appendCapability(bootstrap.Capabilities, cache.CapabilityRestoreResultOnly)
 
 	resp, err := s.do(ctx, cache.OpInitialize, &bootstrap)
 	if err != nil {
@@ -407,6 +418,7 @@ func (s *Session) Initialize(ctx context.Context, p *cache.InitializeParams) (*c
 	s.mu.Lock()
 	s.protocolVersion = result.ProtocolVersion
 	s.objectCacheSocket = negotiatedObjectCacheSocket(result)
+	s.restoreResultOnly = containsCapability(result.Capabilities, cache.CapabilityRestoreResultOnly)
 	s.mu.Unlock()
 
 	if s.runCredential != "" && containsCapability(result.Capabilities, cache.CapabilityRunCredential) {
@@ -474,6 +486,19 @@ func negotiatedObjectCacheSocket(result *cache.InitializeResult) string {
 	return path
 }
 
+// RestoreResultOnly reports whether the provider echoed
+// cache.CapabilityRestoreResultOnly, so a result-only restore downloads no blob.
+// Without the echo, Prefetch and Restore send neither result-only field and
+// every restore hit places its blobs as before.
+func (s *Session) RestoreResultOnly() bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.restoreResultOnly
+}
+
 func containsCapability(capabilities []string, capability string) bool {
 	for _, got := range capabilities {
 		if got == capability {
@@ -484,7 +509,14 @@ func containsCapability(capabilities []string, capability string) bool {
 }
 
 // Prefetch asks the provider to speculatively pull the given keys into the CAS.
+// It sends PrefetchParams.ResultOnlyKeys only to a provider that echoed
+// cache.CapabilityRestoreResultOnly, and never modifies p.
 func (s *Session) Prefetch(ctx context.Context, p *cache.PrefetchParams) (*cache.PrefetchResult, error) {
+	if p != nil && p.ResultOnlyKeys != nil && !s.RestoreResultOnly() {
+		wire := *p
+		wire.ResultOnlyKeys = nil
+		p = &wire
+	}
 	resp, err := s.do(ctx, cache.OpPrefetch, p)
 	if err != nil {
 		return nil, err
@@ -493,8 +525,16 @@ func (s *Session) Prefetch(ctx context.Context, p *cache.PrefetchParams) (*cache
 }
 
 // Restore materializes one key's blobs into the CAS and returns the cached
-// result on a hit. A miss or an error status both mean "build locally".
+// result on a hit. A miss or an error status both mean "build locally". It
+// sends RestoreParams.ResultOnly only to a provider that echoed
+// cache.CapabilityRestoreResultOnly, and never modifies p: without the echo a
+// hit places its blobs as before.
 func (s *Session) Restore(ctx context.Context, p *cache.RestoreParams) (*cache.RestoreResult, error) {
+	if p != nil && p.ResultOnly && !s.RestoreResultOnly() {
+		wire := *p
+		wire.ResultOnly = false
+		p = &wire
+	}
 	resp, err := s.do(ctx, cache.OpRestore, p)
 	if err != nil {
 		return nil, err

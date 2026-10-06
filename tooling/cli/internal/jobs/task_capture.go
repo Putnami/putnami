@@ -857,7 +857,9 @@ func (s *Scheduler) stateForCommandOutput(job *ScheduledJob) *commandOutputState
 // key, task-owned lookup, remote restore, then claim-or-wait for a genuine
 // miss. The three ways an entry can arrive — already local, pulled from the provider,
 // published by a sibling while we waited — all reach the workspace through
-// restoreDeclaredCacheHit.
+// restoreDeclaredCacheHit. A run that reads none of the task's files is served
+// by a result-only entry instead, local or restored, and writes nothing to the
+// workspace (serveStatusOnlyHit).
 func (s *Scheduler) lookupDeclaredEntry(
 	ctx context.Context,
 	job *ScheduledJob,
@@ -883,16 +885,38 @@ func (s *Scheduler) lookupDeclaredEntry(
 			return hash, result, noop
 		}
 	}
+	// A run that reads none of this task's files may be served the result an
+	// earlier result-only restore recorded; a run that reads them never is, and
+	// restores the full entry below or executes (remote_result_only.go). The
+	// result-only path applies only when no full local entry exists: a full
+	// entry whose restore failed keeps the full fallback, so a partly restored
+	// tree is rewritten by the provider's restore or by the execution.
+	resultOnly := err == nil && entry == nil && !s.remote.taskFilesNeeded(job)
+	if resultOnly {
+		if recorded := s.cache.LookupResultOnlyTaskEntry(hash); recorded != nil {
+			if result := s.serveStatusOnlyHit(job, hash, recorded, ReuseLocalCache, mu, hashes); result != nil {
+				s.cacheStats.recordLocalRestoreVerify(restoreStarted, time.Now())
+				s.cacheStats.recordLocalHit()
+				return hash, result, noop
+			}
+		}
+	}
 	s.cacheStats.recordLocalRestoreVerify(restoreStarted, time.Now())
 	s.cacheStats.recordLocalMiss()
 
-	// The provider publishes into the local store, so what comes back here is an
-	// ordinary task-owned entry: recency is already stamped on its address by the
-	// materialize, and the restore below is the same one a local hit takes. Only the reported provenance
-	// differs — and the remote step reports it, because it is the step that knows
-	// whether the entry was fetched or published by the lease owner while it
-	// waited.
-	if remoteEntry, reuse := s.remote.RestoreTaskEntry(ctx, hash, job, s.cache); remoteEntry != nil {
+	if resultOnly {
+		if recorded, reuse := s.remote.RestoreTaskResult(ctx, hash, job, s.cache); recorded != nil {
+			if result := s.serveStatusOnlyHit(job, hash, recorded, reuse, mu, hashes); result != nil {
+				return hash, result, noop
+			}
+		}
+	} else if remoteEntry, reuse := s.remote.RestoreTaskEntry(ctx, hash, job, s.cache); remoteEntry != nil {
+		// The provider publishes into the local store, so what comes back here
+		// is an ordinary task-owned entry: recency is already stamped on its
+		// address by the materialize, and the restore below is the same one a
+		// local hit takes. Only the reported provenance differs — and the remote
+		// step reports it, because it is the step that knows whether the entry
+		// was fetched or published by the lease owner while it waited.
 		if result := s.restoreDeclaredCacheHit(ctx, job, hash, remoteEntry, mu, hashes); result != nil {
 			result.MarkReuse(reuse)
 			return hash, result, noop

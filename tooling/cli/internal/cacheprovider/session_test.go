@@ -17,6 +17,7 @@ import (
 
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/cache/objectcachetest"
+	"go.putnami.dev/protocol/features/spectest"
 	registry "go.putnami.dev/protocol/registry"
 )
 
@@ -64,6 +65,9 @@ type fakeProviderConfig struct {
 	// that quotes the credential.
 	runCredentialEcho  bool
 	refuseAuthenticate bool
+	// resultOnlyEcho echoes cache.CapabilityRestoreResultOnly when core lists
+	// it; the fake then places no blob for a result-only restore.
+	resultOnlyEcho bool
 }
 
 // The object-cache negotiation shapes a provider can present. Only the first is
@@ -183,6 +187,9 @@ func serveFakeProvider(stdin io.Reader, stdout io.Writer, cfg fakeProviderConfig
 			if cfg.runCredentialEcho && p != nil && hasCapability(p.Capabilities, cache.CapabilityRunCredential) {
 				capabilities = append(capabilities, cache.CapabilityRunCredential)
 			}
+			if cfg.resultOnlyEcho && p != nil && hasCapability(p.Capabilities, cache.CapabilityRestoreResultOnly) {
+				capabilities = append(capabilities, cache.CapabilityRestoreResultOnly)
+			}
 			ok(req.ProtocolVersion, req.ID, &cache.InitializeResult{
 				ProtocolVersion:   ver,
 				ProviderName:      "fake",
@@ -209,9 +216,11 @@ func serveFakeProvider(stdin io.Reader, stdout io.Writer, cfg fakeProviderConfig
 			ok(req.ProtocolVersion, req.ID, &cache.PrefetchResult{Started: n})
 		case cache.OpRestore:
 			// Hybrid blob path: write the hit's blob into the exchange dir (core
-			// would ingest it into its CAS) and return only the manifest over the pipe.
+			// would ingest it into its CAS) and return only the manifest over the
+			// pipe. A result-only restore places no blob.
 			digest := cache.DigestOf([]byte(fakeBlobContent))
-			if path, okp := cache.BlobExchangePath(exchangeDir, digest); okp {
+			p, _ := cache.ParseAndValidateRestoreParams(req.Payload)
+			if path, okp := cache.BlobExchangePath(exchangeDir, digest); okp && (p == nil || !p.ResultOnly) {
 				_ = os.MkdirAll(filepath.Dir(path), 0o755)
 				_ = os.WriteFile(path, []byte(fakeBlobContent), 0o644)
 			}
@@ -666,9 +675,9 @@ func initializeLine(t *testing.T, exchangeDir, capabilities string) string {
 }
 
 // TestInitialize_WithoutARunCredentialIsUnchanged pins the local path byte for
-// byte: without a run credential, or with an empty one, the bootstrap line is
-// the one core sent before run credentials existed, and nothing follows it
-// even when the provider would take a credential.
+// byte: without a run credential, or with an empty one, the bootstrap line
+// lists no run-credential capability, and nothing follows it even when the
+// provider would take a credential.
 func TestInitialize_WithoutARunCredentialIsUnchanged(t *testing.T) {
 	for name, opts := range map[string][]Option{"no option": nil, "empty credential": {WithRunCredential("")}} {
 		t.Run(name, func(t *testing.T) {
@@ -683,7 +692,7 @@ func TestInitialize_WithoutARunCredentialIsUnchanged(t *testing.T) {
 			if len(lines) != 2 || !strings.Contains(lines[1], `"op":"prefetch"`) {
 				t.Fatalf("requests = %q, want initialize then prefetch", lines)
 			}
-			if want := initializeLine(t, exchangeDir, `"provider-protocol-v2","object-cache"`); lines[0] != want {
+			if want := initializeLine(t, exchangeDir, `"provider-protocol-v2","object-cache","restore-result-only"`); lines[0] != want {
 				t.Fatalf("initialize line\n%s\nwant\n%s", lines[0], want)
 			}
 		})
@@ -710,7 +719,7 @@ func TestInitialize_AuthenticatesOnceAfterTheEcho(t *testing.T) {
 	if len(lines) != 3 {
 		t.Fatalf("requests = %q, want initialize, authenticate, prefetch", lines)
 	}
-	if want := initializeLine(t, exchangeDir, `"provider-protocol-v2","object-cache","run-credential"`); lines[0] != want {
+	if want := initializeLine(t, exchangeDir, `"provider-protocol-v2","object-cache","run-credential","restore-result-only"`); lines[0] != want {
 		t.Fatalf("initialize line\n%s\nwant\n%s", lines[0], want)
 	}
 	if want := `{"protocolVersion":2,"id":2,"op":"authenticate","payload":{"credential":"` + secret + `"}}`; lines[1] != want {
@@ -798,5 +807,106 @@ func TestRunCredentialRuleMatchesTheRegistry(t *testing.T) {
 		if got, want := cache.ValidRunCredential(value), registry.ValidRunCredential(value); got != want {
 			t.Errorf("%.24q: cache %v, registry %v", value, got, want)
 		}
+	}
+}
+
+// TestInitialize_AdvertisesRestoreResultOnly lists the result-only opt-in in
+// the forward-tolerant capabilities list, next to the v2 opt-in.
+func TestInitialize_AdvertisesRestoreResultOnly(t *testing.T) {
+	advertised := make(chan []string, 1)
+	s := connectFake(t, fakeProviderConfig{initCapabilities: advertised})
+	mustInit(t, s, t.TempDir())
+	select {
+	case got := <-advertised:
+		if !hasCapability(got, cache.CapabilityRestoreResultOnly) || !hasCapability(got, cache.CapabilityProviderProtocolV2) {
+			t.Fatalf("advertised capabilities = %v, want %q next to the v2 opt-in", got, cache.CapabilityRestoreResultOnly)
+		}
+	default:
+		t.Fatal("the provider never saw an initialize")
+	}
+	if s.RestoreResultOnly() {
+		t.Fatal("RestoreResultOnly() = true for a provider that did not echo the capability")
+	}
+	var nilSession *Session
+	if nilSession.RestoreResultOnly() {
+		t.Fatal("a nil session reports result-only restores")
+	}
+}
+
+// TestRestoreResultOnly_NoEchoSendsNoField pins the compatibility promise on
+// the raw wire: a provider that does not echo restore-result-only receives the
+// prefetch and restore lines it already parses strictly, byte for byte, even
+// when the caller asks for result-only. Its restore hit still places the blob,
+// and the caller's params are left untouched.
+func TestRestoreResultOnly_NoEchoSendsNoField(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "result-only-remote-restore",
+		"a-provider-without-the-capability-sees-no-new-field")
+	requests := make(chan string, 16)
+	s := connectFake(t, fakeProviderConfig{requests: requests})
+	exchangeDir := t.TempDir()
+	mustInit(t, s, exchangeDir)
+	key := strings.Repeat("a", cache.KeyLength)
+
+	prefetch := &cache.PrefetchParams{Keys: []string{key}, ResultOnlyKeys: []string{key}}
+	if _, err := s.Prefetch(context.Background(), prefetch); err != nil {
+		t.Fatalf("prefetch: %v", err)
+	}
+	restore := &cache.RestoreParams{Key: key, ResultOnly: true}
+	res, err := s.Restore(context.Background(), restore)
+	if err != nil || res.Status != cache.RestoreHit {
+		t.Fatalf("restore: %+v err=%v", res, err)
+	}
+	if len(prefetch.ResultOnlyKeys) != 1 || !restore.ResultOnly {
+		t.Fatalf("the session modified the caller's params: %+v %+v", prefetch, restore)
+	}
+
+	lines := drainRequests(requests)
+	if len(lines) != 3 {
+		t.Fatalf("requests = %q, want initialize, prefetch, restore", lines)
+	}
+	if want := `{"protocolVersion":2,"id":2,"op":"prefetch","payload":{"keys":["` + key + `"]}}`; lines[1] != want {
+		t.Fatalf("prefetch line\n%s\nwant\n%s", lines[1], want)
+	}
+	if want := `{"protocolVersion":2,"id":3,"op":"restore","payload":{"key":"` + key + `"}}`; lines[2] != want {
+		t.Fatalf("restore line\n%s\nwant\n%s", lines[2], want)
+	}
+	path, _ := cache.BlobExchangePath(exchangeDir, cache.DigestOf([]byte(fakeBlobContent)))
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("a provider without the capability must still place the blob: %v", err)
+	}
+}
+
+// TestRestoreResultOnly_EchoSendsTheFields sends both fields once the provider
+// echoed the capability, and a result-only hit still carries the result and
+// manifest without placing a blob.
+func TestRestoreResultOnly_EchoSendsTheFields(t *testing.T) {
+	requests := make(chan string, 16)
+	s := connectFake(t, fakeProviderConfig{requests: requests, resultOnlyEcho: true})
+	exchangeDir := t.TempDir()
+	mustInit(t, s, exchangeDir)
+	if !s.RestoreResultOnly() {
+		t.Fatal("RestoreResultOnly() = false after the echo")
+	}
+	key := strings.Repeat("a", cache.KeyLength)
+	if _, err := s.Prefetch(context.Background(), &cache.PrefetchParams{Keys: []string{key}, ResultOnlyKeys: []string{key}}); err != nil {
+		t.Fatalf("prefetch: %v", err)
+	}
+	res, err := s.Restore(context.Background(), &cache.RestoreParams{Key: key, ResultOnly: true})
+	if err != nil || res.Status != cache.RestoreHit || res.Result == nil || res.Manifest == nil {
+		t.Fatalf("result-only restore: %+v err=%v", res, err)
+	}
+	lines := drainRequests(requests)
+	if len(lines) != 3 {
+		t.Fatalf("requests = %q, want initialize, prefetch, restore", lines)
+	}
+	if want := `{"protocolVersion":2,"id":2,"op":"prefetch","payload":{"keys":["` + key + `"],"resultOnlyKeys":["` + key + `"]}}`; lines[1] != want {
+		t.Fatalf("prefetch line\n%s\nwant\n%s", lines[1], want)
+	}
+	if want := `{"protocolVersion":2,"id":3,"op":"restore","payload":{"key":"` + key + `","resultOnly":true}}`; lines[2] != want {
+		t.Fatalf("restore line\n%s\nwant\n%s", lines[2], want)
+	}
+	path, _ := cache.BlobExchangePath(exchangeDir, cache.DigestOf([]byte(fakeBlobContent)))
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("a result-only restore placed a blob: %v", err)
 	}
 }

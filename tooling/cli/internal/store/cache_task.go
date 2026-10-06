@@ -23,6 +23,20 @@ func (cm *CacheManager) LookupTaskEntry(hash string) (*TaskEntry, error) {
 	return cm.store.LookupTaskEntry(hash)
 }
 
+// LookupResultOnlyTaskEntry returns the result-only entry recorded for hash,
+// or nil for a miss. It is the result of a remote hit restored without its
+// files, so only a caller that does not need the task's files may serve it
+// (task_result_only.go).
+func (cm *CacheManager) LookupResultOnlyTaskEntry(hash string) *ResultOnlyTaskEntry {
+	return cm.store.LookupResultOnlyTaskEntry(hash)
+}
+
+// PublishResultOnlyTaskEntry records the result of a task-owned provider hit
+// restored without its files, or fails without publishing anything.
+func (cm *CacheManager) PublishResultOnlyTaskEntry(hit RemoteTaskEntryHit) (*ResultOnlyTaskEntry, error) {
+	return cm.store.PublishResultOnlyTaskEntry(hit)
+}
+
 // IngestTaskEntry publishes a task-owned entry from a staging root laid out by
 // TaskStagingPath, or fails without publishing anything.
 func (cm *CacheManager) IngestTaskEntry(stagingRoot string, spec TaskEntrySpec) (*TaskEntry, error) {

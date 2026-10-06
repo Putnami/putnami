@@ -40,6 +40,15 @@ type fakeCacheServer struct {
 	dropped map[string]bool
 	// channel is the provenance stamped on every hit (empty = legacy provider).
 	channel cache.Channel
+	// resultOnly makes initialize echo cache.CapabilityRestoreResultOnly when
+	// core lists it; a result-only restore then places no blob.
+	resultOnly bool
+	// requests holds every raw request line, in arrival order.
+	requests []string
+	// placed counts the blobs restores wrote to an exchange directory.
+	placed int
+	// resultOnlyPrefetch holds every key a prefetch named result-only.
+	resultOnlyPrefetch []string
 }
 
 type fakeCacheEntry struct {
@@ -72,6 +81,61 @@ func (f *fakeCacheServer) prefetched() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	out := append([]string{}, f.prefetch...)
+	sort.Strings(out)
+	return out
+}
+
+// echoResultOnly makes later sessions echo cache.CapabilityRestoreResultOnly.
+func (f *fakeCacheServer) echoResultOnly() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.resultOnly = true
+}
+
+func (f *fakeCacheServer) echoesResultOnly() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.resultOnly
+}
+
+func (f *fakeCacheServer) recordRequest(line []byte) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.requests = append(f.requests, string(line))
+}
+
+// requestLines returns every raw request line received, of any session.
+func (f *fakeCacheServer) requestLines() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string{}, f.requests...)
+}
+
+// requestCount counts the requests of one operation received so far.
+func (f *fakeCacheServer) requestCount(op cache.ProviderOp) int {
+	count := 0
+	for _, line := range f.requestLines() {
+		var envelope struct {
+			Op cache.ProviderOp `json:"op"`
+		}
+		if json.Unmarshal([]byte(line), &envelope) == nil && envelope.Op == op {
+			count++
+		}
+	}
+	return count
+}
+
+// placedBlobs counts the blobs restores wrote to an exchange directory.
+func (f *fakeCacheServer) placedBlobs() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.placed
+}
+
+func (f *fakeCacheServer) prefetchedResultOnly() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := append([]string{}, f.resultOnlyPrefetch...)
 	sort.Strings(out)
 	return out
 }
@@ -125,9 +189,18 @@ func (f *fakeCacheServer) restore(key, exchangeDir string) (fakeCacheEntry, bool
 		}
 		if path, ok := cache.BlobExchangePath(exchangeDir, file.Digest); ok {
 			writeExchangeBlobAtomically(path, content)
+			f.placed++
 		}
 	}
 	return entry, true
+}
+
+// lookup answers a result-only restore: the entry, and no blob placed.
+func (f *fakeCacheServer) lookup(key string) (fakeCacheEntry, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	entry, ok := f.entries[key]
+	return entry, ok
 }
 
 // useSharedFakeProvider routes every provider spawn in this test to a session
@@ -164,6 +237,7 @@ func serveSharedFakeProvider(stdin io.Reader, stdout io.Writer, server *fakeCach
 	}
 
 	for in.Scan() {
+		server.recordRequest(in.Bytes())
 		req, diags := cache.ParseAndValidateProviderRequest(in.Bytes())
 		if req == nil {
 			write(&cache.ProviderResponse{
@@ -177,10 +251,14 @@ func serveSharedFakeProvider(stdin io.Reader, stdout io.Writer, server *fakeCach
 		case cache.OpInitialize:
 			p, _ := cache.ParseAndValidateInitializeParams(req.Payload)
 			negotiated := req.ProtocolVersion
+			var capabilities []string
 			if p != nil {
 				exchangeDir = p.BlobExchangeDir
 				if containsString(p.Capabilities, cache.CapabilityProviderProtocolV2) {
 					negotiated = cache.ProviderProtocolVersion
+				}
+				if server.echoesResultOnly() && containsString(p.Capabilities, cache.CapabilityRestoreResultOnly) {
+					capabilities = append(capabilities, cache.CapabilityRestoreResultOnly)
 				}
 			}
 			ok(req.ProtocolVersion, req.ID, &cache.InitializeResult{
@@ -188,6 +266,7 @@ func serveSharedFakeProvider(stdin io.Reader, stdout io.Writer, server *fakeCach
 				ProviderName:    fakeProviderExtensionName,
 				ProviderVersion: fakeProviderVersion,
 				Ready:           true,
+				Capabilities:    capabilities,
 			})
 		case cache.OpPrefetch:
 			started := 0
@@ -195,6 +274,7 @@ func serveSharedFakeProvider(stdin io.Reader, stdout io.Writer, server *fakeCach
 				started = len(p.Keys)
 				server.mu.Lock()
 				server.prefetch = append(server.prefetch, p.Keys...)
+				server.resultOnlyPrefetch = append(server.resultOnlyPrefetch, p.ResultOnlyKeys...)
 				server.mu.Unlock()
 			}
 			ok(req.ProtocolVersion, req.ID, &cache.PrefetchResult{Started: started})
@@ -204,7 +284,13 @@ func serveSharedFakeProvider(stdin io.Reader, stdout io.Writer, server *fakeCach
 				ok(req.ProtocolVersion, req.ID, &cache.RestoreResult{Status: cache.RestoreMiss})
 				continue
 			}
-			entry, hit := server.restore(p.Key, exchangeDir)
+			var entry fakeCacheEntry
+			var hit bool
+			if p.ResultOnly {
+				entry, hit = server.lookup(p.Key)
+			} else {
+				entry, hit = server.restore(p.Key, exchangeDir)
+			}
 			if !hit {
 				ok(req.ProtocolVersion, req.ID, &cache.RestoreResult{Status: cache.RestoreMiss})
 				continue

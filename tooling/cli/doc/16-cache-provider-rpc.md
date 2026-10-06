@@ -107,8 +107,8 @@ single build of `@putnami/cloud` speaks both.
 |----|------------------|-------|
 | `initialize` | `InitializeParams` → `InitializeResult` | First op, once. Carries the blob-exchange dir, mode, workspace identity, capabilities, and the known-digests handshake; returns the provider protocol version, `@putnami/cloud` version, capabilities, and `ready`. |
 | `authenticate` | `AuthenticateParams` → `AuthenticateResult` | Hands the provider a hosted run's credential. Sent once, right after `initialize` and before any other op, only when the provider echoed `run-credential`. A refusal ends the session like a failed `initialize`. Not valid on the socket. |
-| `prefetch` | `PrefetchParams` → `PrefetchResult` | Speculatively pull keys' blobs into the exchange dir in the background. |
-| `restore` | `RestoreParams` → `RestoreResult` | `hit` (blobs in the exchange dir + manifest; core ingests them into its CAS), `miss`, or `error` — the **restore-failure signal**, distinct from a cold miss but both meaning "build locally". |
+| `prefetch` | `PrefetchParams` → `PrefetchResult` | Speculatively pull keys' blobs into the exchange dir in the background. `resultOnlyKeys` (only after a `restore-result-only` echo) names the keys whose blobs core will not read. |
+| `restore` | `RestoreParams` → `RestoreResult` | `hit` (blobs in the exchange dir + manifest; core ingests them into its CAS), `miss`, or `error` — the **restore-failure signal**, distinct from a cold miss but both meaning "build locally". A `resultOnly` restore (only after a `restore-result-only` echo) answers the same statuses without placing any blob. |
 | `upload` | `UploadParams` → `UploadResult` | Store a freshly built entry whose blobs core has exported to the exchange dir. |
 | `marker-lookup` | `MarkerLookupParams` → `MarkerLookupResult` | Read the last successful whole-target run marker. |
 | `marker-write` | `MarkerWriteParams` → `MarkerWriteResult` | Publish a run marker (compare-and-swap). |
@@ -176,7 +176,7 @@ arguments or files; it travels over the RPC.
 
 **Negotiation.** Core lists `run-credential` (`CapabilityRunCredential`) in the
 v1-bootstrap `InitializeParams.Capabilities` only when it holds a credential,
-so a local run's `initialize` is byte-identical to before. A provider that can
+so a local run's `initialize` never lists it. A provider that can
 take the credential echoes the capability in `InitializeResult.Capabilities`;
 it reports `ready` as it will be once authenticated.
 
@@ -191,6 +191,43 @@ malformed credential fails `initialize` before core writes a line.
 **Handling.** The provider keeps the credential in memory only. Every Go type
 that holds it (`AuthenticateParams`, `ProviderRequest`) formats as redacted,
 and core removes the credential from a refusal message before it logs it.
+
+## Result-only restore
+
+A run often reads no file of a cache hit: in `minimal` mode a hit that no job
+of the run waits for only reports a status, and in `toplevel` mode such a hit
+outside the requested projects does too. Downloading those blobs costs bytes
+no job reads.
+
+**Negotiation.** Core lists `restore-result-only`
+(`CapabilityRestoreResultOnly`) in the v1-bootstrap
+`InitializeParams.Capabilities` of every session. A provider that honors the
+two fields below echoes it in `InitializeResult.Capabilities`. Core sends
+either field only after the echo, so a provider that does not echo it receives
+the same `prefetch` and `restore` payloads as before and keeps parsing them
+strictly.
+
+**The fields.** `RestoreParams.resultOnly: true` means core reads the hit's
+result and none of its files. On a hit the provider still answers `hit` with
+`Result`, the full `Manifest`, and the provenance fields, but it need not place
+any blob in the exchange directory, and core ingests none. `miss` and `error`
+keep their meaning. `PrefetchParams.resultOnlyKeys` is the subset of `keys`
+that core will restore that way, so a prefetch need not download their blobs.
+Each one is a valid key, listed once, and also listed in `keys`.
+
+**What the provider guarantees.** Core does not verify a result-only hit's
+entry descriptor, because it reads no blob: it cannot check that the entry
+records the requested key, as a full restore does. The provider must answer
+with exactly the entry stored under the requested key, or with `miss`.
+
+**What core does with a result-only hit.** Core decides per task whether the
+run reads its files (the rule is in `10-caching.md`, "Materialization modes").
+When it does not, a trusted result-only hit records the task's result in a
+local result-only entry, which holds the result and its metadata but no file,
+and the task reports its cached status without writing to the workspace. A
+`hint` hit restored this way is a miss: there is no blob to warm. A later run
+that needs the files ignores the result-only entry and restores the full entry
+from the provider; if that fails, the task runs.
 
 ## Session lifecycle and fallback
 
