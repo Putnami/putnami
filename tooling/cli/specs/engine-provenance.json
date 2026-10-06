@@ -7,7 +7,8 @@
     "A workspace that produces the CLI needs no published pin and no activation commit: the engine that gates a commit is built from that commit",
     "The committed declaration survives every ordinary read, refresh, and write unchanged, so no unrelated command dirties it",
     "The from-source build is reused whenever the sources have not changed, and rebuilt whenever they have, without anyone remembering a flag",
-    "Concurrent work in one checkout is safe: running the wrapper never invalidates an engine another run is already executing, nor the children that engine spawns"
+    "Concurrent work in one checkout is safe: running the wrapper never invalidates an engine another run is already executing, nor the children that engine spawns",
+    "A launcher can build the engine without running it, then start that exact binary itself as the workspace's own engine"
   ],
   "nonGoals": [
     "Changing how a consumer workspace resolves, verifies, or escapes a published CLI pin",
@@ -26,6 +27,10 @@
     {
       "id": "content-keyed-source-build",
       "text": "The wrapper keys its from-source build on the content of the sources it compiles, not on timestamps. An unchanged tree reuses the cached build without invoking the compiler; a change anywhere in the keyed pathspec, including outside the CLI's own directory, rebuilds; two worktrees at the same tree state share one build; and a failed build stops the run instead of using a cached binary. Published blobs are immutable: a later run never rewrites one in use."
+    },
+    {
+      "id": "build-only-engine",
+      "text": "`./putnamiw --print-engine` builds or reuses the content-keyed store blob exactly as a normal run does, starts nothing, writes nothing under .putnami/bin, and prints one JSON line: the absolute blob path, the source key, and the absolute workspace root. That blob, started with PUTNAMI_FROM_SOURCE, PUTNAMI_FROM_SOURCE_KEY and the same PUTNAMI_HOME, is admitted as the workspace's own engine. Every failure or refusal exits non-zero with nothing on stdout."
     }
   ],
   "decisions": [
