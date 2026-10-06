@@ -7,7 +7,8 @@
     "Every request runs inside its own dependency scope whose transactional work is reconciled with the response the client actually receives",
     "A long-lived connection, a stalled reader, and a shutdown are each bounded by a timeout the framework owns",
     "A supervising tool learns the address the server actually bound from the record the server already logs",
-    "A health plugin added to an application answers on the application's server without a second wiring step"
+    "A health plugin added to an application answers on the application's server without a second wiring step",
+    "A proxy that pools connections to the server closes an idle connection before the server does"
   ],
   "nonGoals": [
     "Terminating TLS: the server listens in cleartext and expects a TLS-terminating proxy in front of it",
@@ -59,6 +60,10 @@
     {
       "id": "health-mounting",
       "text": "A health plugin added to an application registers GET /_/health on the application's single server when the application configures, in any plugin order, and registers it once however often the application configures. The route answers 503 until the application starts. An application that holds no server, or several, fails configure with an error that names RegisterOn. A plugin the caller mounted, through RegisterOn or by taking its handler, registers nothing more."
+    },
+    {
+      "id": "idle-connections",
+      "text": "An idle keep-alive connection, HTTP/1.1 or HTTP/2 including h2c, stays open for the server's IdleTimeout and never for its ReadTimeout. An unset IdleTimeout resolves to 620 seconds, above the 600-second idle timeout that Google Cloud application load balancers hold on their backend connections, so a proxy in front of the server closes an idle connection first. An explicit IdleTimeout still closes an idle connection when it expires."
     }
   ],
   "decisions": [
@@ -66,6 +71,7 @@
     "go/framework/http/doc/adr/0001-request-scope-follows-the-response.md",
     "go/framework/http/doc/adr/0002-framework-owned-bounds.md",
     "go/framework/http/doc/adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md",
+    "go/framework/http/doc/adr/0004-an-idle-connection-outlives-the-proxy-idle-timeout.md",
     "protocols/clientcontract/doc/adr/0010-a-provider-owned-websocket-wire-is-declared-not-inferred.md"
   ]
 }

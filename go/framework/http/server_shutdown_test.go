@@ -79,6 +79,7 @@ func TestServerConfigDefaultTagsMatchResolvedDefaults(t *testing.T) {
 	spectest.Proves(t, "go/http-services", "graceful-shutdown", "default-tags-match-the-resolved-defaults")
 	resolved := map[string]time.Duration{
 		"ShutdownTimeout":      defaultShutdownTimeout,
+		"IdleTimeout":          defaultIdleTimeout,
 		"WebSocketIdleTimeout": defaultWebSocketIdleTimeout,
 		"StreamWriteTimeout":   defaultStreamWriteTimeout,
 	}
