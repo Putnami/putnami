@@ -61,13 +61,13 @@ func (s moduleImportScan) importsModule(module string) bool {
 // wanted its sources import.
 //
 // An import is credited to the module that provides it, resolved against
-// wanted and known together, and counts only when that module is wanted. A
+// wanted and providers together, and counts only when that module is wanted. A
 // module nested under a wanted one therefore keeps its own packages even when
 // this go.mod requires the parent alone.
 //
 // The walk stops as soon as every wanted module has been seen: a healthy module
 // imports what it requires, so the common case reads a prefix of the tree.
-func scanModuleImports(moduleDir string, wanted, known []string) moduleImportScan {
+func scanModuleImports(moduleDir string, wanted, providers []string) moduleImportScan {
 	scan := moduleImportScan{imported: make(map[string]bool, len(wanted)), complete: true}
 	if len(wanted) == 0 {
 		return scan
@@ -76,7 +76,7 @@ func scanModuleImports(moduleDir string, wanted, known []string) moduleImportSca
 	for _, module := range wanted {
 		isWanted[module] = true
 	}
-	candidates := append(append([]string(nil), wanted...), known...)
+	candidates := append(append([]string(nil), wanted...), providers...)
 	fset := token.NewFileSet()
 	err := filepath.WalkDir(moduleDir, func(current string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {

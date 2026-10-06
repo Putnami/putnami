@@ -618,10 +618,13 @@ func goDependencySources(root string, c *goCandidate, dependencies []string,
 		return nil
 	}
 	moduleByPath := make(map[string]string, len(byModule))
-	known := make([]string, 0, len(byModule))
+	// providers is every module an import may resolve to: the workspace's and
+	// every module this go.mod requires, so a module nested under a wanted
+	// path answers for its own packages wherever it lives.
+	providers := append(make([]string, 0, len(byModule)+len(c.mod.Requires)), c.mod.Requires...)
 	for module, candidate := range byModule {
 		moduleByPath[candidate.path] = module
-		known = append(known, module)
+		providers = append(providers, module)
 	}
 	direct := directRequires(c)
 	wanted := make([]string, 0, len(dependencies))
@@ -630,7 +633,7 @@ func goDependencySources(root string, c *goCandidate, dependencies []string,
 			wanted = append(wanted, module)
 		}
 	}
-	scan := scanModuleImports(goModuleDirOf(root, c), wanted, known)
+	scan := scanModuleImports(goModuleDirOf(root, c), wanted, providers)
 
 	sources := make(map[string]wsproto.DependencySource, len(dependencies))
 	for _, dependency := range dependencies {

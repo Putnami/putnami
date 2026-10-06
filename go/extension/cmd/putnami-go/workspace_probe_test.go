@@ -264,6 +264,36 @@ func TestProbe_AttributesARequireOfAParentOfAnImportedNestedModuleAsADeclaration
 	}
 }
 
+// A module's import of its own packages reads none of its requires, even when
+// its module path sits under the path of a module it requires.
+func TestProbe_AttributesARequireOfAParentOfTheImportingModuleAsADeclaration(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"),
+		"module example.com/core/svc\n\ngo 1.25\n\nrequire example.com/core v0.0.0\n\nreplace example.com/core => ../../libs/core\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"),
+		"package main\n\nimport \"example.com/core/svc/internal/run\"\n\nfunc main() { run.Main() }\n")
+
+	svc := projectAt(t, probeAll(t, root, "apps/svc", "libs/core"), "apps/svc")
+	if got := svc.DependencySources["libs/core"]; got != wsproto.DependencySourceDeclared {
+		t.Errorf("dependencySources[libs/core] = %q, want %q", got, wsproto.DependencySourceDeclared)
+	}
+}
+
+// An external module whose path sits under a required workspace module's path
+// provides its own packages, so importing it reads none of the workspace one.
+func TestProbe_AttributesARequireOfAParentOfAnImportedExternalModuleAsADeclaration(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"),
+		"module example.com/svc\n\ngo 1.25\n\nrequire (\n\texample.com/core v0.0.0\n\texample.com/core/v2 v2.0.0\n)\n\nreplace example.com/core => ../../libs/core\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"),
+		"package main\n\nimport \"example.com/core/v2\"\n\nfunc main() { _ = core.Name }\n")
+
+	svc := projectAt(t, probeAll(t, root, "apps/svc", "libs/core"), "apps/svc")
+	if got := svc.DependencySources["libs/core"]; got != wsproto.DependencySourceDeclared {
+		t.Errorf("dependencySources[libs/core] = %q, want %q", got, wsproto.DependencySourceDeclared)
+	}
+}
+
 // A test file counts exactly like a non-test file: a requirement a `_test.go`
 // alone imports is one `go mod tidy` keeps, so it is an import here too.
 func TestProbe_AttributesARequireATestFileAloneImports(t *testing.T) {
