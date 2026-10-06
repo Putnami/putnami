@@ -7,6 +7,7 @@
 package bootstrap_test
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -1161,5 +1162,293 @@ func TestPutnamiwSourceKey_KeylessRunUnsetsAnInheritedPin(t *testing.T) {
 	}
 	if got := sentinelField(t, out, "SELF"); got != filepath.Join(wantRoot, ".putnami", "bin", "putnami") {
 		t.Errorf("a keyless build runs the per-worktree binary, got %q", got)
+	}
+}
+
+// ─── build-only mode ─────────────────────────────────────────────────────────
+//
+// `./putnamiw --print-engine` builds or reuses the keyed store blob, runs
+// nothing, and prints one JSON line naming it. A launcher then starts that blob
+// itself, in another process, with the environment it chooses. Nothing under
+// .putnami/bin moves, so the build has no side effect a later process could
+// read as its own.
+
+// printedEngine is the one JSON line --print-engine writes on stdout.
+type printedEngine struct {
+	Path string `json:"path"`
+	Key  string `json:"key"`
+	Root string `json:"root"`
+}
+
+// runSplit runs the wrapper in dir and returns stdout, stderr, and the exit
+// code separately: the mode's contract is about what reaches stdout.
+func runSplit(t *testing.T, dir string, env []string, args ...string) (stdout, stderr string, code int) {
+	t.Helper()
+	cmd := exec.Command("bash", append([]string{"./putnamiw"}, args...)...)
+	cmd.Dir = dir
+	cmd.Env = env
+	var out, errOut strings.Builder
+	cmd.Stdout = &out
+	cmd.Stderr = &errOut
+	err := cmd.Run()
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		code = exitErr.ExitCode()
+	} else if err != nil {
+		t.Fatalf("run putnamiw: %v\n%s", err, errOut.String())
+	}
+	return out.String(), errOut.String(), code
+}
+
+// decodeEngine parses stdout as exactly one JSON line with exactly the three
+// documented members.
+func decodeEngine(t *testing.T, stdout string) printedEngine {
+	t.Helper()
+	if !strings.HasSuffix(stdout, "\n") || strings.Count(stdout, "\n") != 1 {
+		t.Fatalf("stdout must be exactly one line, got %q", stdout)
+	}
+	dec := json.NewDecoder(strings.NewReader(stdout))
+	dec.DisallowUnknownFields()
+	var engine printedEngine
+	if err := dec.Decode(&engine); err != nil {
+		t.Fatalf("stdout is not the documented JSON object: %v\n%q", err, stdout)
+	}
+	return engine
+}
+
+// samePath compares two spellings of one path after resolving symlinks, since
+// the temporary directory has a /var and a /private/var spelling on macOS.
+func samePath(t *testing.T, got, want string) bool {
+	t.Helper()
+	g, err := filepath.EvalSymlinks(got)
+	if err != nil {
+		t.Fatalf("resolve %s: %v", got, err)
+	}
+	w, err := filepath.EvalSymlinks(want)
+	if err != nil {
+		t.Fatalf("resolve %s: %v", want, err)
+	}
+	return g == w
+}
+
+func assertNoWorkspaceBin(t *testing.T, repo string) {
+	t.Helper()
+	if _, err := os.Lstat(filepath.Join(repo, ".putnami", "bin")); !os.IsNotExist(err) {
+		t.Errorf("--print-engine wrote .putnami/bin: %v", err)
+	}
+}
+
+// The mode builds the blob once, prints its absolute path, key and root, starts
+// nothing, and leaves .putnami/bin absent. A second call at the same tree state
+// reuses the blob without compiling and prints the same line.
+func TestPutnamiwPrintEngine_PrintsTheBlobAndRunsNothing(t *testing.T) {
+	repo, home, env := gitSourceRepo(t)
+
+	stdout, stderr, code := runSplit(t, repo, env, "--print-engine")
+	if code != 0 {
+		t.Fatalf("--print-engine failed (%d):\n%s", code, stderr)
+	}
+	if strings.Contains(stdout+stderr, "RAN_BUILT") {
+		t.Errorf("--print-engine started the CLI:\nstdout=%s\nstderr=%s", stdout, stderr)
+	}
+	if !strings.Contains(stderr, "Building putnami CLI") {
+		t.Errorf("progress must go to stderr, got:\n%s", stderr)
+	}
+	engine := decodeEngine(t, stdout)
+
+	blobs := sourceBlobs(t, home)
+	if len(blobs) != 1 {
+		t.Fatalf("want one from-source blob, got %v", blobs)
+	}
+	if engine.Key != blobs[0] {
+		t.Errorf("key = %q, want the store key %q", engine.Key, blobs[0])
+	}
+	if !filepath.IsAbs(engine.Path) || !filepath.IsAbs(engine.Root) {
+		t.Errorf("path %q and root %q must be absolute", engine.Path, engine.Root)
+	}
+	if !samePath(t, engine.Path, filepath.Join(home, "artifacts", "cli-source", engine.Key, "putnami")) {
+		t.Errorf("path = %q, want the store blob of key %s", engine.Path, engine.Key)
+	}
+	if !samePath(t, engine.Root, repo) {
+		t.Errorf("root = %q, want the workspace %q", engine.Root, repo)
+	}
+	assertNoWorkspaceBin(t, repo)
+	if got := goBuildCount(t, env); got != 1 {
+		t.Fatalf("`go build` count %d, want 1", got)
+	}
+
+	again, stderr, code := runSplit(t, repo, env, "--print-engine")
+	if code != 0 {
+		t.Fatalf("second --print-engine failed (%d):\n%s", code, stderr)
+	}
+	if again != stdout {
+		t.Errorf("second call printed %q, want the same line %q", again, stdout)
+	}
+	if got := goBuildCount(t, env); got != 1 {
+		t.Errorf("second call rebuilt (`go build` count %d, want 1)", got)
+	}
+	assertNoWorkspaceBin(t, repo)
+
+	// The printed binary is the one a normal run executes for this key.
+	out, code := runIn(t, repo, env, "ping")
+	if code != 0 {
+		t.Fatalf("normal run after --print-engine failed (%d):\n%s", code, out)
+	}
+	if got := sentinelField(t, out, "SELF"); !samePath(t, got, engine.Path) {
+		t.Errorf("a normal run started %q, want the printed blob %q", got, engine.Path)
+	}
+	if got := sentinelField(t, out, "FROM_SOURCE_KEY"); got != engine.Key {
+		t.Errorf("a normal run pinned %q, want the printed key %q", got, engine.Key)
+	}
+	if got := goBuildCount(t, env); got != 1 {
+		t.Errorf("the normal run rebuilt (`go build` count %d, want 1)", got)
+	}
+	spectest.Proves(t, "cli/engine-provenance", "build-only-engine",
+		"print-engine-names-the-keyed-blob-and-runs-nothing")
+}
+
+// An existing workspace link and marker stay byte-identical when --print-engine
+// builds a blob for another tree state. --bootstrap rebuilds under the same key.
+func TestPutnamiwPrintEngine_LeavesTheWorkspaceLinkAlone(t *testing.T) {
+	repo, home, env := gitSourceRepo(t)
+	if out, code := runIn(t, repo, env, "ping"); code != 0 {
+		t.Fatalf("first run failed (%d):\n%s", code, out)
+	}
+	link := filepath.Join(repo, ".putnami", "bin", "putnami")
+	marker := filepath.Join(repo, ".putnami", "bin", ".from-source")
+	targetBefore, err := os.Readlink(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	markerBefore, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(repo, "protocols", "workspace", "lock.go"),
+		[]byte("package workspace\n\n// edited\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, code := runSplit(t, repo, env, "--print-engine")
+	if code != 0 {
+		t.Fatalf("--print-engine failed (%d):\n%s", code, stderr)
+	}
+	engine := decodeEngine(t, stdout)
+	if got := goBuildCount(t, env); got != 2 {
+		t.Fatalf("`go build` count %d, want 2: the edit must change the key", got)
+	}
+	if strings.HasSuffix(filepath.Dir(targetBefore), engine.Key) {
+		t.Fatalf("the edit did not move the key: %s", engine.Key)
+	}
+	if got, err := os.Readlink(link); err != nil || got != targetBefore {
+		t.Errorf("link = %q (%v), want it unchanged at %q", got, err, targetBefore)
+	}
+	if got, err := os.ReadFile(marker); err != nil || string(got) != string(markerBefore) {
+		t.Errorf("marker = %q (%v), want it unchanged at %q", got, err, markerBefore)
+	}
+
+	again, stderr, code := runSplit(t, repo, env, "--bootstrap", "--print-engine")
+	if code != 0 {
+		t.Fatalf("--bootstrap --print-engine failed (%d):\n%s", code, stderr)
+	}
+	if again != stdout {
+		t.Errorf("--bootstrap printed %q, want the same blob %q", again, stdout)
+	}
+	if got := goBuildCount(t, env); got != 3 {
+		t.Errorf("--bootstrap must rebuild: `go build` count %d, want 3", got)
+	}
+	if got := sourceBlobs(t, home); len(got) != 2 {
+		t.Errorf("blobs = %v, want two keys", got)
+	}
+	if got, err := os.Readlink(link); err != nil || got != targetBefore {
+		t.Errorf("after --bootstrap, link = %q (%v), want it unchanged at %q", got, err, targetBefore)
+	}
+}
+
+// A failed build exits non-zero with nothing on stdout, even when an older blob
+// is cached, and every refusal does the same before building anything.
+func TestPutnamiwPrintEngine_FailsWithNothingOnStdout(t *testing.T) {
+	t.Run("failed build", func(t *testing.T) {
+		repo, _, env := gitSourceRepo(t)
+		if _, _, code := runSplit(t, repo, env, "--print-engine"); code != 0 {
+			t.Fatalf("first --print-engine failed (%d)", code)
+		}
+		if err := os.WriteFile(filepath.Join(repo, "protocols", "workspace", "lock.go"),
+			[]byte("package workspace\n\n// broken\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(envValue(env, "GO_BUILD_FAIL"), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		stdout, stderr, code := runSplit(t, repo, env, "--print-engine")
+		if code == 0 || stdout != "" {
+			t.Fatalf("a failed build must exit non-zero with empty stdout: code=%d stdout=%q", code, stdout)
+		}
+		for _, want := range []string{"stub go: build refused", "Failed to build putnami CLI"} {
+			if !strings.Contains(stderr, want) {
+				t.Errorf("stderr must carry %q:\n%s", want, stderr)
+			}
+		}
+		assertNoWorkspaceBin(t, repo)
+	})
+
+	refusals := []struct {
+		name  string
+		setup func(t *testing.T, repo string)
+		args  []string
+		want  string
+	}{
+		{
+			name: "no CLI sources",
+			setup: func(t *testing.T, repo string) {
+				if err := os.RemoveAll(filepath.Join(repo, "tooling")); err != nil {
+					t.Fatal(err)
+				}
+			},
+			args: []string{"--print-engine"},
+			want: "needs the CLI sources under tooling/cli",
+		},
+		{
+			name: "no content key",
+			setup: func(t *testing.T, repo string) {
+				if err := os.RemoveAll(filepath.Join(repo, ".git")); err != nil {
+					t.Fatal(err)
+				}
+			},
+			args: []string{"--print-engine"},
+			want: "needs a content key",
+		},
+		{
+			name: "a command",
+			args: []string{"--print-engine", "build", "--all"},
+			want: "takes no command",
+		},
+		{
+			name: "--download",
+			args: []string{"--print-engine", "--download"},
+			want: "cannot be combined with --download",
+		},
+	}
+	for _, tc := range refusals {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, home, env := gitSourceRepo(t)
+			if tc.setup != nil {
+				tc.setup(t, repo)
+			}
+			stdout, stderr, code := runSplit(t, repo, env, tc.args...)
+			if code == 0 || stdout != "" {
+				t.Fatalf("want a non-zero exit with empty stdout: code=%d stdout=%q", code, stdout)
+			}
+			if !strings.Contains(stderr, tc.want) {
+				t.Errorf("stderr must say %q:\n%s", tc.want, stderr)
+			}
+			if got := goBuildCount(t, env); got != 0 {
+				t.Errorf("a refusal compiled (`go build` count %d)", got)
+			}
+			if got := sourceBlobs(t, home); len(got) != 0 {
+				t.Errorf("a refusal published %v", got)
+			}
+			assertNoWorkspaceBin(t, repo)
+		})
 	}
 }

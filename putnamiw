@@ -16,6 +16,27 @@
 #   ./putnamiw --download build --all  # consumer workspaces only: fetch a
 #                                      # pre-built binary instead of compiling.
 #                                      # Refused where tooling/cli is present.
+#   ./putnamiw --print-engine          # build or reuse the from-source CLI, run
+#                                      # nothing, and print one JSON line:
+#                                      # {"path":"…","key":"…","root":"…"}
+#
+# --print-engine is for a launcher that starts the engine itself. It writes
+# nothing under .putnami/bin, takes no command, and accepts --bootstrap. It is
+# refused where tooling/cli is absent, and where no content key can be computed
+# (no git work tree or no SHA-256 tool). Progress and errors go to stderr; on
+# failure it exits non-zero and prints nothing on stdout.
+#
+# A workspace whose lock records cli.source "workspace" admits the printed
+# binary when the process that starts it sets:
+#   PUTNAMI_FROM_SOURCE=<root>      the "root" field
+#   PUTNAMI_FROM_SOURCE_KEY=<key>   the "key" field
+#   PUTNAMI_HOME=<home>             the home this wrapper used, so that "path"
+#                                   is <home>/artifacts/cli-source/<key>/putnami
+# and runs it with its working directory inside <root>. Start "path" itself,
+# not a copy of it. PUTNAMI_NO_RELAUNCH has no effect in such a workspace. In a
+# workspace whose lock pins a published CLI version, also set
+# PUTNAMI_NO_RELAUNCH=1, as this wrapper does on its own from-source runs, or
+# the binary relaunches into the pinned release.
 
 set -euo pipefail
 
@@ -329,10 +350,39 @@ write_from_source_marker() {
   return 0
 }
 
-# --- Check for --bootstrap and --download flags ---
+# json_string prints $1 as a JSON string literal. It escapes the backslash and
+# the double quote, and refuses a control character rather than encode one, so
+# the line it builds is always a single valid JSON line.
+json_string() {
+  local s="$1"
+  case "$s" in
+    *[[:cntrl:]]*) return 1 ;;
+  esac
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '"%s"' "$s"
+}
+
+# print_engine writes the --print-engine result for the store blob of key $1:
+# one JSON line on stdout naming the absolute blob path, the source key, and the
+# absolute workspace root.
+print_engine() {
+  local key="$1" dir path key_json path_json root_json
+  dir="$(cd "$CLI_SOURCE_STORE/$key" 2>/dev/null && pwd)" ||
+    fail "The from-source putnami CLI for key $key is missing from $CLI_SOURCE_STORE"
+  path="$dir/putnami"
+  [ -x "$path" ] || fail "The from-source putnami CLI at $path is not executable"
+  key_json="$(json_string "$key")" || fail "The source key is not printable: $key"
+  path_json="$(json_string "$path")" || fail "The engine path contains a control character: $path"
+  root_json="$(json_string "$SCRIPT_DIR")" || fail "The workspace root contains a control character: $SCRIPT_DIR"
+  printf '{"path":%s,"key":%s,"root":%s}\n' "$path_json" "$key_json" "$root_json"
+}
+
+# --- Check for --bootstrap, --download and --print-engine flags ---
 
 BOOTSTRAP="false"
 DOWNLOAD="false"
+PRINT_ENGINE="false"
 SUPPRESS_RELAUNCH="false"
 PASSTHROUGH_ARGS=()
 
@@ -341,10 +391,29 @@ for arg in "$@"; do
     BOOTSTRAP="true"
   elif [ "$arg" = "--download" ]; then
     DOWNLOAD="true"
+  elif [ "$arg" = "--print-engine" ]; then
+    PRINT_ENGINE="true"
   else
     PASSTHROUGH_ARGS+=("$arg")
   fi
 done
+
+# --- Refuse --print-engine where there is no from-source engine to print ---
+#
+# --print-engine names the immutable store blob of a from-source build. A
+# workspace without tooling/cli has no such build, and --download produces a
+# published binary instead, so both are refused before any build or fetch.
+if [ "$PRINT_ENGINE" = "true" ]; then
+  if [ "$DOWNLOAD" = "true" ]; then
+    fail "--print-engine builds the CLI from this tree, so it cannot be combined with --download."
+  fi
+  if [ ! -d "$SCRIPT_DIR/tooling/cli" ]; then
+    fail "--print-engine needs the CLI sources under tooling/cli, and this workspace has none. A workspace without them runs a published CLI: install it, or run ./putnamiw --download <command>."
+  fi
+  if [ "${#PASSTHROUGH_ARGS[@]}" -gt 0 ]; then
+    fail "--print-engine runs nothing, so it takes no command: got ${PASSTHROUGH_ARGS[*]}. Run ./putnamiw --print-engine, then start the printed binary yourself."
+  fi
+fi
 
 # --- Reject --download where the workspace builds its own CLI ---
 #
@@ -617,8 +686,11 @@ publish_source_cli() {
   release_dir_lock "$publish_lock"
 
   touch_recency "$store_dir" # keep this blob warm against the artifact GC
-  link_cli "$store_dir/putnami"
-  write_from_source_marker "$key"
+  # --print-engine publishes the blob only: .putnami/bin stays as it was.
+  if [ "$PRINT_ENGINE" = "false" ]; then
+    link_cli "$store_dir/putnami"
+    write_from_source_marker "$key"
+  fi
 }
 
 # When the base `go` is older than the workspace pin, Go may already resolve a
@@ -884,7 +956,7 @@ build_cli_package() {
     /*) ;;
     *) out="$PWD/$out" ;;
   esac
-  (cd "$SCRIPT_DIR" && "$GO_BINARY" build -o "$out" -ldflags="$CLI_LDFLAGS" "$CLI_SOURCE" 2>&1)
+  (cd "$SCRIPT_DIR" && "$GO_BINARY" build -o "$out" -ldflags="$CLI_LDFLAGS" "$CLI_SOURCE") >&2
 }
 
 build_cli() {
@@ -902,7 +974,9 @@ build_cli() {
   export PATH="$go_root/bin:$PATH"
   export GOTOOLCHAIN=local
 
-  mkdir -p "$(dirname "$CLI_BINARY")"
+  if [ "$PRINT_ENGINE" = "false" ]; then
+    mkdir -p "$(dirname "$CLI_BINARY")"
+  fi
 
   # A FAILED BUILD IS A HARD FAILURE on every path below. There is deliberately
   # no fallback to a previously cached blob or to a downloaded binary: a gate
@@ -954,6 +1028,26 @@ build_cli() {
 SOURCE_KEY=""
 if [ "$DOWNLOAD" = "false" ] && [ -d "$SCRIPT_DIR/tooling/cli" ]; then
   compute_source_key || SOURCE_KEY=""
+fi
+
+# --- Build-only mode: build or reuse the store blob, print it, run nothing ---
+#
+# This path takes the same key, the same store and the same build as a normal
+# run, and stops before anything touches .putnami/bin or execs the CLI. Without
+# a key there is no immutable blob to name, only the per-worktree binary that
+# the next run may rewrite, so the mode refuses instead of printing it.
+if [ "$PRINT_ENGINE" = "true" ]; then
+  if [ -z "$SOURCE_KEY" ]; then
+    fail "--print-engine needs a content key for the CLI sources, and none could be computed: it needs git, a git work tree at $SCRIPT_DIR, and sha256sum or shasum."
+  fi
+  if [ "$BOOTSTRAP" = "true" ] || [ ! -x "$CLI_SOURCE_STORE/$SOURCE_KEY/putnami" ]; then
+    resolve_go
+    build_cli
+  else
+    touch_recency "$CLI_SOURCE_STORE/$SOURCE_KEY" # keep this blob warm against the artifact GC
+  fi
+  print_engine "$SOURCE_KEY"
+  exit 0
 fi
 
 # --- Fast path: binary exists, not stale, no bootstrap requested ---

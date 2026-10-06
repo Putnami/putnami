@@ -2135,6 +2135,19 @@
               "an-edit-anywhere-in-the-keyed-pathspec-rebuilds-and-an-unchanged-tree-reuses"
             ]
           }
+        },
+        {
+          "id": "build-only-engine",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "print-engine-names-the-keyed-blob-and-runs-nothing"
+            ]
+          }
         }
       ]
     },

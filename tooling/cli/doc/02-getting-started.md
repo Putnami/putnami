@@ -50,8 +50,41 @@ The repository includes a `putnamiw` wrapper script (similar to Gradle's `gradle
 | (none)          | Build from Go source if binary is missing or stale. Reuses cached binary otherwise.     |
 | `--bootstrap`   | Force rebuild from source, even if the binary is up to date.                            |
 | `--download`    | Download a pre-built binary from `putnami.dev` instead of compiling. No Go required.    |
+| `--print-engine` | Build or reuse the from-source CLI, run nothing, and print where it is. Workspaces with `tooling/cli` only. |
 
 The binary is cached at `.putnami/bin/putnami`. On subsequent runs, `putnamiw` skips the build/download if the binary is already present and up to date.
+
+#### Build the engine without running it
+
+A launcher that starts the CLI itself, for example a hosted CI launcher that hands credentials to the CLI process only, builds the engine first:
+
+```bash
+./putnamiw --print-engine
+```
+
+It prints one JSON line on stdout and nothing else:
+
+```json
+{"path":"/home/ci/.putnami/artifacts/cli-source/<key>/putnami","key":"<key>","root":"/work/repo"}
+```
+
+| Field  | Meaning                                                                        |
+|--------|--------------------------------------------------------------------------------|
+| `path` | Absolute path of the built binary: `$PUTNAMI_HOME/artifacts/cli-source/<key>/putnami`. |
+| `key`  | The content key of the sources it was built from.                              |
+| `root` | Absolute path of the workspace root.                                           |
+
+The mode uses the same key, cache, and build as a normal run. It reuses the cached binary when the sources have not changed, and `--bootstrap` forces a rebuild. It starts nothing and writes nothing under `.putnami/bin`. Progress and errors go to stderr. On any failure it exits non-zero and prints nothing on stdout. It refuses a workspace without `tooling/cli`, a checkout with no content key (no git work tree, or no `sha256sum` or `shasum`), a command after the flag, and `--download`.
+
+To start the printed binary as the workspace's own engine in a workspace whose lock records `cli.source: "workspace"`, run `path` itself, with its working directory inside `root`, and set:
+
+| Variable                  | Value                                                         |
+|---------------------------|---------------------------------------------------------------|
+| `PUTNAMI_FROM_SOURCE`     | `root`                                                        |
+| `PUTNAMI_FROM_SOURCE_KEY` | `key`                                                         |
+| `PUTNAMI_HOME`            | The `PUTNAMI_HOME` the wrapper used, so that `path` is under it. Without it, the CLI looks in `~/.putnami`. |
+
+The CLI admits itself only when it is the file at `$PUTNAMI_HOME/artifacts/cli-source/$PUTNAMI_FROM_SOURCE_KEY/putnami`, so start `path`, not a copy of it. `PUTNAMI_NO_RELAUNCH` has no effect in such a workspace. In a workspace whose lock pins a published CLI version, also set `PUTNAMI_NO_RELAUNCH=1`, or the binary relaunches into the pinned release.
 
 **CI usage**: In consumer repositories, use `--download` in jobs that don't need Go (e.g., TypeScript, Python) to avoid installing the Go toolchain:
 
