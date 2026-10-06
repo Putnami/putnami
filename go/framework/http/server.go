@@ -338,7 +338,9 @@ func (p *ServerPlugin) Start(_ context.Context, owner *app.Module) error {
 	mux.HandleFunc("/", p.buildHandler())
 
 	addr, server := p.buildServer(mux)
+	p.mu.Lock()
 	p.server = server
+	p.mu.Unlock()
 
 	// Start listening
 	ln, err := net.Listen("tcp", addr)
@@ -352,7 +354,7 @@ func (p *ServerPlugin) Start(_ context.Context, owner *app.Module) error {
 		slog.Any(runtimeproto.ReadyLogKey, readyMarker(ln, durationMs)))
 
 	go func() {
-		if err := p.server.Serve(ln); err != nil && err != http.ErrServerClosed {
+		if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
 			p.log.Error("server error", err)
 		}
 	}()
@@ -670,7 +672,10 @@ func (p *ServerPlugin) Stop(ctx context.Context, _ *app.Module) error {
 	// Hijacked WebSocket connections are not drained by http.Server.Shutdown,
 	// so they are told first and end their conversations themselves.
 	p.beginDrain()
-	if p.server == nil {
+	p.mu.RLock()
+	server := p.server
+	p.mu.RUnlock()
+	if server == nil {
 		return nil
 	}
 	p.log.Debug("shutting down HTTP server")
@@ -679,7 +684,7 @@ func (p *ServerPlugin) Stop(ctx context.Context, _ *app.Module) error {
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
-	return p.server.Shutdown(ctx)
+	return server.Shutdown(ctx)
 }
 
 // shutdownTimeout resolves the graceful-drain deadline. Zero — the value a
