@@ -19,6 +19,7 @@ func main() {
         Port:            8080,
         ReadTimeout:     30 * time.Second,
         WriteTimeout:    30 * time.Second,
+        IdleTimeout:     620 * time.Second,
         ShutdownTimeout: 10 * time.Second,
         MaxBodySize:     1 << 20, // 1 MiB
     })
@@ -34,6 +35,8 @@ func main() {
 ```
 
 All `ServerConfig` fields have sensible defaults. The `Port` field defaults to `8080` and can be overridden by the `PORT` environment variable at runtime.
+
+`IdleTimeout` is how long an idle keep-alive connection, HTTP/1.1 or HTTP/2 (h2c included), stays open while it waits for its next request. It defaults to 620 seconds and never falls back to `ReadTimeout`. A proxy or load balancer in front of the server pools connections to it. When the server closes an idle connection first, the proxy can send a request on a connection that is closing: the client gets an error from the proxy and your handler never runs. Keep `IdleTimeout` above the idle timeout of every proxy in front of the server, so the proxy always closes first. Google Cloud application load balancers hold idle backend connections for 600 seconds and [ask for a longer backend timeout](https://docs.cloud.google.com/load-balancing/docs/https/request-distribution#timeout-keepalive-backends), which the 620-second default meets.
 
 ## Routing
 

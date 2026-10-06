@@ -316,22 +316,32 @@ Before v1.0.0, a minor `0.x` release may still contain a breaking change; the
 documentation rather than strict compatibility between every pre-1.0 minor.
 
 The [HTTP services specification](specs/http-services.json) defines the contract,
-backed by three durable decisions: [the request scope follows the
+backed by four durable decisions: [the request scope follows the
 response](doc/adr/0001-request-scope-follows-the-response.md), [every long-lived
 resource carries a framework-owned bound](doc/adr/0002-framework-owned-bounds.md),
-and [a route plugin mounts itself on the application's single
-server](doc/adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md).
+[a route plugin mounts itself on the application's single
+server](doc/adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md),
+and [an idle connection outlives the proxy's idle
+timeout](doc/adr/0004-an-idle-connection-outlives-the-proxy-idle-timeout.md).
 
 `ServerConfig` resolves its own defaults, so a directly constructed config behaves
 exactly like one loaded through `go.putnami.dev/config`. In particular an unset
 `ShutdownTimeout` drains for ten seconds rather than expiring immediately; set a
 negative value to drain under the caller's context alone.
 
+An unset `IdleTimeout` keeps an idle keep-alive connection, HTTP/1.1 or HTTP/2,
+open for 620 seconds, never for `ReadTimeout`. A proxy in front of the server
+pools connections to it and must close an idle one before the server does, so
+keep `IdleTimeout` above the idle timeout of every proxy in front of the server.
+Google Cloud application load balancers hold idle backend connections for 600
+seconds.
+
 Regression evidence covers [routing, middleware, responses, negotiation, and the
 health plugin](http_test.go), [the health plugin mounting itself on the
 application's server](health_mount_test.go), [route registration and the OPTIONS
 fallback](server_test.go), [graceful shutdown and default
-resolution](server_shutdown_test.go), [the request-scope transaction
+resolution](server_shutdown_test.go), [idle keep-alive
+connections](server_idle_test.go), [the request-scope transaction
 boundary](scope_boundary_test.go), [dependency injection into
 handlers](inject_test.go), [streaming and WebSocket bounds](stream_test.go),
 [WebSocket subprotocol negotiation and RFC 6455 framing](websocket_test.go), [the

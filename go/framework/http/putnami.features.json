@@ -66,6 +66,19 @@
           }
         },
         {
+          "id": "idle-connections",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-explicit-idle-timeout-closes-an-idle-connection",
+              "an-idle-h2c-connection-outlives-the-read-timeout",
+              "an-idle-http1-connection-outlives-the-read-timeout"
+            ]
+          }
+        },
+        {
           "id": "method-fallbacks",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -79,6 +80,7 @@ func TestServerConfigDefaultTagsMatchResolvedDefaults(t *testing.T) {
 	spectest.Proves(t, "go/http-services", "graceful-shutdown", "default-tags-match-the-resolved-defaults")
 	resolved := map[string]time.Duration{
 		"ShutdownTimeout":      defaultShutdownTimeout,
+		"IdleTimeout":          defaultIdleTimeout,
 		"WebSocketIdleTimeout": defaultWebSocketIdleTimeout,
 		"StreamWriteTimeout":   defaultStreamWriteTimeout,
 	}
@@ -171,5 +173,25 @@ func TestServerPlugin_StopDrainsInFlightRequestWithUnsetTimeout(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("in-flight request never completed")
+	}
+}
+
+// TestServerPlugin_StopConcurrentWithStart runs Stop while Start may still be
+// building the server. Start and Stop reach the server field through the
+// plugin lock, so the race detector reports nothing in either order.
+func TestServerPlugin_StopConcurrentWithStart(t *testing.T) {
+	t.Setenv("PORT", "0")
+	plugin := NewServerPlugin(ServerConfig{})
+	plugin.log = logger.New("http", logger.LevelError, logger.NewJSONSinkWriter(io.Discard))
+	started := make(chan error, 1)
+	go func() { started <- plugin.Start(context.Background(), nil) }()
+	if err := plugin.Stop(context.Background(), nil); err != nil {
+		t.Errorf("stop during start: %v", err)
+	}
+	if err := <-started; err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if err := plugin.Stop(context.Background(), nil); err != nil {
+		t.Errorf("stop after start: %v", err)
 	}
 }

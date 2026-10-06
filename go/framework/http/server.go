@@ -29,6 +29,12 @@ import (
 // documented default so both construction paths behave identically.
 const defaultShutdownTimeout = 10 * time.Second
 
+// defaultIdleTimeout bounds an idle keep-alive connection when
+// ServerConfig.IdleTimeout is left unset. It exceeds the fixed 600-second
+// backend keepalive timeout of Google Cloud application load balancers, so a
+// proxy that pools connections to the server closes an idle one first.
+const defaultIdleTimeout = 620 * time.Second
+
 // ServerConfig holds HTTP server configuration.
 type ServerConfig struct {
 	// Port is the TCP port to listen on. Default: 8080. Overridden by PORT env var.
@@ -37,6 +43,13 @@ type ServerConfig struct {
 	ReadTimeout time.Duration `json:"readTimeout" default:"30s"`
 	// WriteTimeout is the maximum duration for writing the response. Default: 30s.
 	WriteTimeout time.Duration `json:"writeTimeout" default:"30s"`
+	// IdleTimeout is how long a keep-alive connection, HTTP/1.1 or HTTP/2 (h2c
+	// included), stays open while it waits for its next request. Keep it above
+	// the idle timeout of every proxy in front of the server, so the proxy
+	// closes an idle connection first. Zero means the documented 620s default:
+	// unlike net/http, an unset IdleTimeout never falls back to ReadTimeout.
+	// Default: 620s.
+	IdleTimeout time.Duration `json:"idleTimeout" default:"620s"`
 	// ShutdownTimeout is the maximum duration to wait for in-flight requests
 	// during graceful shutdown. Zero means the documented 10s default, so a
 	// directly constructed ServerConfig drains exactly like a config-loaded one.
@@ -325,7 +338,9 @@ func (p *ServerPlugin) Start(_ context.Context, owner *app.Module) error {
 	mux.HandleFunc("/", p.buildHandler())
 
 	addr, server := p.buildServer(mux)
+	p.mu.Lock()
 	p.server = server
+	p.mu.Unlock()
 
 	// Start listening
 	ln, err := net.Listen("tcp", addr)
@@ -339,7 +354,7 @@ func (p *ServerPlugin) Start(_ context.Context, owner *app.Module) error {
 		slog.Any(runtimeproto.ReadyLogKey, readyMarker(ln, durationMs)))
 
 	go func() {
-		if err := p.server.Serve(ln); err != nil && err != http.ErrServerClosed {
+		if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
 			p.log.Error("server error", err)
 		}
 	}()
@@ -640,6 +655,7 @@ func (p *ServerPlugin) buildServer(handler http.Handler) (string, *http.Server) 
 		Handler:        handler,
 		ReadTimeout:    readTimeout,
 		WriteTimeout:   writeTimeout,
+		IdleTimeout:    p.config.idleTimeout(),
 		MaxHeaderBytes: maxHeaderBytes,
 		Protocols:      &protos,
 	}
@@ -656,7 +672,10 @@ func (p *ServerPlugin) Stop(ctx context.Context, _ *app.Module) error {
 	// Hijacked WebSocket connections are not drained by http.Server.Shutdown,
 	// so they are told first and end their conversations themselves.
 	p.beginDrain()
-	if p.server == nil {
+	p.mu.RLock()
+	server := p.server
+	p.mu.RUnlock()
+	if server == nil {
 		return nil
 	}
 	p.log.Debug("shutting down HTTP server")
@@ -665,7 +684,7 @@ func (p *ServerPlugin) Stop(ctx context.Context, _ *app.Module) error {
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
-	return p.server.Shutdown(ctx)
+	return server.Shutdown(ctx)
 }
 
 // shutdownTimeout resolves the graceful-drain deadline. Zero — the value a
@@ -678,6 +697,18 @@ func (c ServerConfig) shutdownTimeout() time.Duration {
 		return defaultShutdownTimeout
 	}
 	return c.ShutdownTimeout
+}
+
+// idleTimeout resolves the keep-alive idle bound. Zero — the value a directly
+// constructed ServerConfig carries, because `default:"620s"` is only applied
+// by config loading — resolves to defaultIdleTimeout, never to ReadTimeout.
+// net/http copies the resolved value into its HTTP/2 server, so one bound
+// covers HTTP/1.1 and HTTP/2 connections alike.
+func (c ServerConfig) idleTimeout() time.Duration {
+	if c.IdleTimeout == 0 {
+		return defaultIdleTimeout
+	}
+	return c.IdleTimeout
 }
 
 // setContainerContext provides the DI container for per-request scoping.

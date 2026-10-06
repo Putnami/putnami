@@ -37,6 +37,7 @@ fhttp.NewServerPlugin(fhttp.ServerConfig{
     Port:            8080,           // Server port (env: PORT)
     ReadTimeout:     30 * time.Second,
     WriteTimeout:    30 * time.Second,
+    IdleTimeout:     620 * time.Second,
     ShutdownTimeout: 10 * time.Second,
     MaxBodySize:     1 << 20,        // 1 MiB
 })
@@ -47,8 +48,19 @@ fhttp.NewServerPlugin(fhttp.ServerConfig{
 | `Port` | `int` | `8080` | Server port (`PORT` env var) |
 | `ReadTimeout` | `time.Duration` | `30s` | Read timeout |
 | `WriteTimeout` | `time.Duration` | `30s` | Write timeout |
+| `IdleTimeout` | `time.Duration` | `620s` | Idle keep-alive timeout, HTTP/1.1 and HTTP/2 |
 | `ShutdownTimeout` | `time.Duration` | `10s` | Graceful shutdown timeout |
 | `MaxBodySize` | `int64` | `1048576` | Max request body size in bytes |
+
+`IdleTimeout` must exceed the idle timeout of every proxy in front of the
+server. A proxy pools connections to the server, and when the server closes an
+idle one first, the proxy can send a request on a connection that is closing:
+the client gets an error from the proxy and the handler never runs. Google
+Cloud application load balancers hold idle backend connections for 600 seconds
+and [ask for a longer backend
+timeout](https://docs.cloud.google.com/load-balancing/docs/https/request-distribution#timeout-keepalive-backends),
+hence the 620-second default. Unlike `net/http`, an unset `IdleTimeout` never
+falls back to `ReadTimeout`.
 
 ## Routing
 
@@ -471,6 +483,7 @@ behave identically:
 | `WebSocketIdleTimeout` | 60s idle deadline on hijacked connections | negative disables |
 | `StreamWriteTimeout` | 30s per server-sent-event write | negative disables |
 | `ReadTimeout` / `WriteTimeout` | 30s | — |
+| `IdleTimeout` | 620s idle keep-alive, HTTP/1.1 and HTTP/2, never `ReadTimeout` | — |
 | `MaxBodySize` | 1 MiB | — |
 | `MaxHeaderBytes` | 64 KiB | — |
 
