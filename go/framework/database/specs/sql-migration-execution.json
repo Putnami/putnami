@@ -24,7 +24,7 @@
     },
     {
       "id": "repeatability-and-drift",
-      "text": "Already-applied matching migrations are skipped, stored hashes remain comparable to current definitions, and changed, missing, or pending definitions appear in the drift report."
+      "text": "Already-applied matching migrations are skipped. Before any pending SQL in the selected Up or UpTo range runs, stored up hashes are compared to current definitions under the datasource lock; a mismatch fails without changing state. Changed, missing, or pending definitions also appear in the drift report."
     },
     {
       "id": "read-only-observation",

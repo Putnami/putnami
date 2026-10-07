@@ -651,6 +651,13 @@ roll back. Down SQL is persisted to `migration.migrations.down_sql` at
 apply time, so a rollback works even after the code that defined the
 migration has been removed.
 
+Keep applied up SQL byte-for-byte unchanged. Before `up` or `up to` runs any
+pending SQL, the runner compares stored hashes with the current definitions
+for that datasource, through the inclusive `up to` target. A mismatch returns
+`migration.drift_detected` with the stored and current hashes and leaves the
+state unchanged. Restore the original SQL bytes and add a new forward
+migration for the intended change.
+
 ### Direct Migrator Use (tests)
 
 For tests that want a single-purpose engine without going through the
@@ -687,6 +694,7 @@ The package uses structured error codes from `go.putnami.dev/errors`. Each error
 | `db.query` | `CodeQuery` | Query execution failure (find, delete, etc.) |
 | `db.transaction` | `CodeTransaction` | Transaction begin, commit, or rollback failure |
 | `migration.apply_failed` | `CodeMigrationApplyFailed` | A migration's up SQL or state-store insert failed |
+| `migration.drift_detected` | `CodeDriftDetected` | Applied up SQL differs from its stored hash |
 | `migration.rollback_failed` | `CodeMigrationRollbackFailed` | A migration's down SQL or state-store delete failed |
 | `migration.lock_failed` | `CodeMigrationLockFailed` | Could not acquire the advisory lock for the datasource |
 | `migration.state_store_failed` | `CodeMigrationStateStore` | The `migration.migrations` table could not be created or queried |

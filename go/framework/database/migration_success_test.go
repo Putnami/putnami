@@ -14,6 +14,8 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	perrors "go.putnami.dev/errors"
+	"go.putnami.dev/migration"
 )
 
 // --- Recording fake sql/driver for migration success paths -----------------
@@ -370,6 +372,90 @@ func TestMigrator_Up_AppliesAllInOrderThenIdempotent(t *testing.T) {
 	}
 	if bodies := store.bodyLog(); len(bodies) != 0 {
 		t.Errorf("second Up executed bodies %v, want none", bodies)
+	}
+}
+
+func TestMigrator_Up_RejectsHashDriftBeforePendingBodies(t *testing.T) {
+	spectest.Proves(t, "go/sql-migration-execution", "repeatability-and-drift", "applied-body-drift-fails-before-pending-sql")
+	for _, tc := range []struct {
+		name        string
+		driftName   string
+		pendingName string
+	}{
+		{name: "drift before pending", driftName: "iam/001", pendingName: "iam/002"},
+		{name: "pending before drift", driftName: "iam/002", pendingName: "iam/001"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, store := newFakeMigratorDB(t)
+			const originalSQL = "SELECT original"
+			const changedSQL = "SELECT changed"
+			seed := NewMigrator(db, MigrationConfig{Datasource: "primary", Definitions: []Definition{{Name: tc.driftName, SQL: originalSQL}}})
+			if _, err := seed.Up(context.Background()); err != nil {
+				t.Fatalf("seed Up: %v", err)
+			}
+			storedHash, currentHash := sha256Hex(originalSQL), sha256Hex(changedSQL)
+			store.resetLog()
+
+			m := NewMigrator(db, MigrationConfig{Datasource: "primary", Definitions: []Definition{
+				{Name: tc.pendingName, SQL: "SELECT pending"},
+				{Name: tc.driftName, SQL: changedSQL},
+			}})
+			applied, err := m.Up(context.Background())
+			if !perrors.Is(err, migration.CodeDriftDetected) {
+				t.Fatalf("Up error = %v, want migration drift code", err)
+			}
+			for _, detail := range []string{tc.driftName, "primary", storedHash, currentHash} {
+				if !strings.Contains(err.Error(), detail) {
+					t.Errorf("drift error %q does not name %q", err, detail)
+				}
+			}
+			if len(applied) != 0 || len(store.bodyLog()) != 0 || store.count() != 1 {
+				t.Errorf("drift applied %d records, executed %v, left %d rows; want no new work", len(applied), store.bodyLog(), store.count())
+			}
+			rows, statusErr := m.Status(context.Background())
+			if statusErr != nil || len(rows) != 1 || rows[0].Name != tc.driftName || rows[0].Hash != storedHash {
+				t.Errorf("persisted state after drift = %+v, %v; want unchanged hash %s", rows, statusErr, storedHash)
+			}
+		})
+	}
+}
+
+func TestMigrator_UpTo_PreflightsOnlyThroughTarget(t *testing.T) {
+	spectest.Proves(t, "go/sql-migration-execution", "repeatability-and-drift", "up-to-preflights-only-through-target")
+	db, store := newFakeMigratorDB(t)
+	const originalSQL = "SELECT original"
+	seed := NewMigrator(db, MigrationConfig{Datasource: "primary", Definitions: []Definition{{Name: "iam/002", SQL: originalSQL}}})
+	if _, err := seed.Up(context.Background()); err != nil {
+		t.Fatalf("seed Up: %v", err)
+	}
+	m := NewMigrator(db, MigrationConfig{Datasource: "primary", Definitions: []Definition{
+		{Name: "iam/001", SQL: "SELECT first"},
+		{Name: "iam/002", SQL: "SELECT changed"},
+		{Name: "iam/003", SQL: "SELECT last"},
+	}})
+	first, err := m.UpTo(context.Background(), "iam/001")
+	if err != nil || len(first) != 1 || first[0].Name != "iam/001" {
+		t.Fatalf("UpTo before drift = %+v, %v; want first migration only", first, err)
+	}
+	store.resetLog()
+
+	applied, err := m.UpTo(context.Background(), "iam/003")
+	if !perrors.Is(err, migration.CodeDriftDetected) {
+		t.Fatalf("UpTo through drift error = %v, want migration drift code", err)
+	}
+	if len(applied) != 0 || len(store.bodyLog()) != 0 || store.count() != 2 {
+		t.Errorf("UpTo drift applied %d records, executed %v, left %d rows; want no new work", len(applied), store.bodyLog(), store.count())
+	}
+	rows, statusErr := m.Status(context.Background())
+	var driftRowHash string
+	for _, row := range rows {
+		if row.Name == "iam/002" {
+			driftRowHash = row.Hash
+			break
+		}
+	}
+	if statusErr != nil || len(rows) != 2 || driftRowHash != sha256Hex(originalSQL) {
+		t.Errorf("persisted state after UpTo drift = %+v, %v; want original hash on iam/002", rows, statusErr)
 	}
 }
 

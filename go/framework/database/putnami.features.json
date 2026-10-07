@@ -228,7 +228,9 @@
             "checks": [
               "re-applying-a-matching-set-is-idempotent",
               "a-clean-up-reports-no-drift",
-              "changed-missing-and-pending-definitions-appear-in-the-report"
+              "changed-missing-and-pending-definitions-appear-in-the-report",
+              "applied-body-drift-fails-before-pending-sql",
+              "up-to-preflights-only-through-target"
             ]
           }
         },
