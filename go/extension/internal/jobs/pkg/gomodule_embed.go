@@ -4,17 +4,14 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
-	"go/parser"
-	"go/token"
 	"io"
-	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"go.putnami.dev/go/extension/internal/gosource"
+	"go.putnami.dev/sdk/extension/goembed"
 )
 
 // The staged-source allowlist in prepareGoModule only knows about fixed file
@@ -113,64 +110,13 @@ func goEmbedPatternsFromFile(path string) ([]string, error) {
 }
 
 func goEmbedPatterns(filename string, src []byte) ([]string, error) {
-	// A file the build never compiles (conventionally `//go:build ignore`
-	// generator scripts) may embed generator-only inputs that are absent from
-	// the module; go build succeeds regardless, so packaging must not fail on
-	// its directives.
-	if gosource.ExcludedByBuildConstraint(src) {
-		return nil, nil
-	}
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, filename, src, parser.ParseComments)
-	if err != nil {
-		return nil, fmt.Errorf("parse %s: %w", filename, err)
-	}
-	var patterns []string
-	for _, group := range f.Comments {
-		for _, c := range group.List {
-			rest, ok := strings.CutPrefix(c.Text, "//go:embed")
-			if !ok || (rest != "" && rest[0] != ' ' && rest[0] != '\t') {
-				continue
-			}
-			parsed, err := splitEmbedPatterns(rest)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", filename, err)
-			}
-			patterns = append(patterns, parsed...)
-		}
-	}
-	return patterns, nil
+	return goembed.Patterns(filename, src)
 }
 
 // splitEmbedPatterns tokenizes the argument list of a //go:embed directive:
 // space-separated patterns, individually quotable with " or `.
 func splitEmbedPatterns(args string) ([]string, error) {
-	var out []string
-	for i := 0; i < len(args); {
-		switch args[i] {
-		case ' ', '\t':
-			i++
-		case '"', '`':
-			quoted, err := strconv.QuotedPrefix(args[i:])
-			if err != nil {
-				return nil, fmt.Errorf("malformed go:embed quoted pattern in %q", args)
-			}
-			pattern, err := strconv.Unquote(quoted)
-			if err != nil {
-				return nil, fmt.Errorf("malformed go:embed quoted pattern in %q", args)
-			}
-			out = append(out, pattern)
-			i += len(quoted)
-		default:
-			j := i
-			for j < len(args) && args[j] != ' ' && args[j] != '\t' {
-				j++
-			}
-			out = append(out, args[i:j])
-			i = j
-		}
-	}
-	return out, nil
+	return goembed.Patterns("embed.go", []byte("package p\n//go:embed "+args+"\nvar x []byte\n"))
 }
 
 // resolveEmbedPattern returns the files under dir matched by a single pattern
@@ -179,64 +125,7 @@ func splitEmbedPatterns(args string) ([]string, error) {
 // is a directory embeds its whole subtree, skipping .- and _-prefixed entries
 // unless the pattern carries the all: prefix.
 func resolveEmbedPattern(dir, pattern string) ([]string, error) {
-	includeHidden := strings.HasPrefix(pattern, "all:")
-	pattern = strings.TrimPrefix(pattern, "all:")
-	// Only whole path elements of "." / ".." (or empty, covering leading and
-	// trailing slashes) are invalid — a name like report..json is legal.
-	if pattern == "" {
-		return nil, fmt.Errorf("unsupported go:embed pattern %q", pattern)
-	}
-	for _, element := range strings.Split(pattern, "/") {
-		if element == "" || element == "." || element == ".." {
-			return nil, fmt.Errorf("unsupported go:embed pattern %q", pattern)
-		}
-	}
-	matches, err := filepath.Glob(filepath.Join(dir, filepath.FromSlash(pattern)))
-	if err != nil {
-		return nil, err
-	}
-	var files []string
-	for _, match := range matches {
-		// Lstat, not Stat: go build rejects a symlink match ("cannot embed
-		// irregular file"), and following one here could stage content from
-		// outside the module under an in-module path.
-		info, err := os.Lstat(match)
-		if err != nil {
-			return nil, err
-		}
-		if !info.IsDir() {
-			if !info.Mode().IsRegular() {
-				return nil, fmt.Errorf("cannot embed irregular file %s", match)
-			}
-			files = append(files, match)
-			continue
-		}
-		err = filepath.WalkDir(match, func(p string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			name := d.Name()
-			if p != match && !includeHidden && (strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")) {
-				if d.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if d.IsDir() {
-				return nil
-			}
-			// Directory embedding skips non-regular files (symlinks, devices)
-			// silently, mirroring go build's directory-tree resolution.
-			if d.Type().IsRegular() {
-				files = append(files, p)
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-	return files, nil
+	return goembed.ResolvePattern(dir, pattern)
 }
 
 // insideNestedModule reports whether relTarget (slash- or OS-separated,

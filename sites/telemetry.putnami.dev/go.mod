@@ -15,6 +15,7 @@ require (
 	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
 	go.putnami.dev/protocol/http-routes v0.0.0
+	go.putnami.dev/protocol/migration v0.0.0
 	go.putnami.dev/protocol/telemetry v0.0.0
 	go.putnami.dev/security v0.0.1
 	go.putnami.dev/telemetry v0.0.0
@@ -46,7 +47,6 @@ require (
 	go.putnami.dev/protocol/identity v0.0.0 // indirect
 	go.putnami.dev/protocol/infra v0.0.0 // indirect
 	go.putnami.dev/protocol/keyring v0.0.0 // indirect
-	go.putnami.dev/protocol/migration v0.0.0 // indirect
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	go.putnami.dev/protocol/transaction v0.0.0 // indirect

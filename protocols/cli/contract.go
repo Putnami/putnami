@@ -53,6 +53,9 @@ package cli
 //	   representation for the field and would load the extension while
 //	   silently dropping its instructions, so it must refuse the stamp —
 //	   which it does, because 5 is above its latest contract.
+//	6: ADDITIVE — go-embed:build and go-embed:test task file selectors.
+//	   Older readers would silently treat them as unmatched globs and
+//	   restore outputs against changed embedded bytes.
 //	4: dependent commands may declare sessionPrerequisites. The planner must
 //	   execute those prerequisite commands in the same DAG, project their
 //	   selection and invocation-local parameters, and connect their declared
@@ -81,7 +84,11 @@ const CurrentContract = 4
 // instructions.
 const AgentContentContract = 5
 
+// GoEmbedInputsContract is required only by manifests declaring Go embed
+// selectors. Older readers refuse its stamp before considering a cache hit.
+const GoEmbedInputsContract = 6
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = AgentContentContract
+const LatestContract = GoEmbedInputsContract

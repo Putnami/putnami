@@ -50,6 +50,14 @@ the author's-eye version, with the CLI-side behavior, is
 | Workspace adapter | `workspace.markers`, `.inputs`, `.excludes`, `.syncTask` | `ServeProbe` in `go.putnami.dev/protocol/workspace` serves `__putnami workspace-probe`; project-level `watchedFiles` may include provider-owned workspace-root invalidation inputs without changing the v1 wire shape |
 | Invocation-scoped sensitive outputs | `declares.outputs` (`scope: "invocation"`, `sensitive`), `runOn: "finally"` + `finalizes` | `dbtestenv` is the reference implementation — provisioning, the non-secret lease, orphan reaping after `SIGKILL`, and the `sensitive` binding artifact a consumer reads with `BindingFrom` |
 
+The `goembed` package supplies the shared Go directive parser and target
+resolver used by Go module packaging and the CLI's `go-embed:build` /
+`go-embed:test` task input selectors. It scans potentially buildable source
+files across platforms, resolves quoted, directory and `all:` patterns to
+regular assets, and rejects missing, unsafe or cross-module targets. Callers
+hash those assets as raw bytes; the package itself has no cache or job side
+effects.
+
 Beside them, an extension that keeps a machine-global cache owns it end to end:
 core hands it `extension.cacheRoot` and dispatches the reserved hidden commands
 `cache-clean` and `cache-gc` to it. `cachepolicy` supplies the neutral half —

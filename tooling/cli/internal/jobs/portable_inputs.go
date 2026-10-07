@@ -59,24 +59,30 @@ type PortablePlanInputs struct {
 // and never hashes anything. One call memoizes its collector results, so a
 // project tree is walked once for a pattern set however many jobs share it —
 // the same reason the key path memoizes through the CacheManager.
-func PortableInputs(ws *workspace.Workspace, planned []*ScheduledJob, commandParams map[string]any) PortablePlanInputs {
+func PortableInputs(ws *workspace.Workspace, planned []*ScheduledJob, commandParams map[string]any) (PortablePlanInputs, error) {
 	inputs := PortablePlanInputs{Tasks: make([]PortableTaskInputs, 0, len(planned))}
 	if ws == nil {
-		return inputs
+		return inputs, nil
 	}
 	memo := keyFileMemo{}
 	for _, job := range planned {
 		if job == nil || job.JobDef == nil || job.Project == nil {
 			continue
 		}
+		if err := validateDeclaredGoEmbedSelectors(ws, job, commandParams); err != nil {
+			return PortablePlanInputs{}, err
+		}
 		files, workspaceFiles := keyFilePatterns(ws, job, commandParams)
-		declared, fallback := portableKeyFiles(memo, ws, job, files, workspaceFiles)
+		declared, fallback, err := portableKeyFiles(memo, ws, job, files, workspaceFiles)
+		if err != nil {
+			return PortablePlanInputs{}, err
+		}
 		inputs.Tasks = append(inputs.Tasks, PortableTaskInputs{
 			Key: job.Key(), Files: declared, FallbackFiles: fallback, Env: portableKeyEnv(ws, job),
 		})
 	}
 	inputs.Outputs = portableDeclaredOutputs(ws, planned)
-	return inputs
+	return inputs, nil
 }
 
 // keyFileMemo holds one PortableInputs call's collector results, keyed by the
@@ -86,14 +92,17 @@ func PortableInputs(ws *workspace.Workspace, planned []*ScheduledJob, commandPar
 // so two different pattern sets cannot share a key.
 type keyFileMemo map[string][]string
 
-func (m keyFileMemo) collect(root string, patterns []string) []string {
+func (m keyFileMemo) collect(root string, patterns []string) ([]string, error) {
 	key := root + "\x00" + strings.Join(patterns, "\x00")
 	if cached, found := m[key]; found {
-		return cached
+		return cached, nil
 	}
-	files, _ := store.CollectKeyFiles(root, patterns)
+	files, err := store.CollectKeyFiles(root, patterns)
+	if err != nil {
+		return nil, err
+	}
 	m[key] = files
-	return files
+	return files, nil
 }
 
 // portableKeyFiles resolves the file set computeJobCacheHash hashes for job
@@ -105,25 +114,36 @@ func (m keyFileMemo) collect(root string, patterns []string) []string {
 // The fallback is deliberately independent of the RUN's cache bypass: whether
 // --no-cache was typed does not change what a task reads, and the bound set
 // travels inside the request's identity, which must not move with a flag.
-func portableKeyFiles(memo keyFileMemo, ws *workspace.Workspace, job *ScheduledJob, files, workspaceFiles []string) (declared, fallback []string) {
+func portableKeyFiles(memo keyFileMemo, ws *workspace.Workspace, job *ScheduledJob, files, workspaceFiles []string) (declared, fallback []string, resultErr error) {
 	projectRoot := filepath.Join(ws.Root, job.Project.Path)
 	var absolute, fallbackAbsolute []string
+	collect := func(root string, patterns []string) []string {
+		if resultErr != nil {
+			return nil
+		}
+		var paths []string
+		paths, resultErr = memo.collect(root, patterns)
+		return paths
+	}
 	switch {
 	case len(files) > 0:
-		absolute = append(absolute, memo.collect(projectRoot, files)...)
+		absolute = append(absolute, collect(projectRoot, files)...)
 	case CanUseCache(job):
-		fallbackAbsolute = append(fallbackAbsolute, memo.collect(projectRoot, nil)...)
+		fallbackAbsolute = append(fallbackAbsolute, collect(projectRoot, nil)...)
 	}
 	if len(workspaceFiles) > 0 {
-		absolute = append(absolute, memo.collect(ws.Root, workspaceFiles)...)
+		absolute = append(absolute, collect(ws.Root, workspaceFiles)...)
 	}
 	if patterns := closureKeyPatterns(job); len(patterns) > 0 {
 		for _, root := range projectClosureRoots(ws, job.Project) {
-			absolute = append(absolute, memo.collect(root, patterns)...)
+			absolute = append(absolute, collect(root, patterns)...)
 		}
 	}
+	if resultErr != nil {
+		return nil, nil, resultErr
+	}
 	absolute = append(absolute, store.ExtraKeyFiles(generateAssetFiles(ws, job))...)
-	return workspaceRelativePaths(ws.Root, absolute), workspaceRelativePaths(ws.Root, fallbackAbsolute)
+	return workspaceRelativePaths(ws.Root, absolute), workspaceRelativePaths(ws.Root, fallbackAbsolute), nil
 }
 
 // portableKeyEnv returns the environment variable names a cacheable job's key

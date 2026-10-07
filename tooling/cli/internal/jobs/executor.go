@@ -669,6 +669,20 @@ func keyFilePatterns(
 	return files, workspaceFiles
 }
 
+// Go embed selectors are extension capabilities, not user-supplied globs.
+// A project option or CLI filePatterns flag has no negotiated manifest stamp;
+// accepting one there would let an older CLI silently drop that input.
+func validateDeclaredGoEmbedSelectors(ws *workspace.Workspace, job *ScheduledJob, params map[string]any) error {
+	for _, patterns := range [][]string{paramStrings(params, "filePatterns"), projectFilePatterns(ws, job)} {
+		for _, pattern := range patterns {
+			if strings.HasPrefix(pattern, "go-embed:") {
+				return fmt.Errorf("go embed selector %q requires an extension task input, not filePatterns", pattern)
+			}
+		}
+	}
+	return nil
+}
+
 // hostOSClass maps the OS class store.BuildCacheKey records for this host to
 // the one computeJobCacheHashWith keys with. It is the identity; tests replace
 // it to key a job the way another host would.
@@ -721,6 +735,9 @@ func computeJobCacheHashWith(
 	hashes map[string]string,
 	selection bool,
 ) (string, error) {
+	if err := validateDeclaredGoEmbedSelectors(ws, job, commandParams); err != nil {
+		return "", err
+	}
 	cacheParams := taskCacheParamsWith(ws, job, commandParams, selection)
 
 	// Build cache key policy from task cache config
@@ -798,7 +815,11 @@ func computeJobCacheHashWith(
 	// runtime walks the closure's infra/requirements.json — kept one key while
 	// the environment it provisions changed, and the consumer that folds its
 	// action digest served a stored verdict against a different world.
-	if digest := closureInputsDigest(ws, job, cache); digest != "" {
+	digest, err := closureInputsDigest(ws, job, cache)
+	if err != nil {
+		return "", err
+	}
+	if digest != "" {
 		upstreamHashes = append(upstreamHashes, digest)
 	}
 
@@ -919,14 +940,14 @@ func closureKeyPatterns(job *ScheduledJob) []string {
 // skipped, so ADDING a manifest to a dependency moves the key exactly as
 // editing one does. The per-member digests come from the CacheManager's memo, so
 // one closure walk costs one stat per (member, pattern set) per CLI invocation.
-func closureInputsDigest(ws *workspace.Workspace, job *ScheduledJob, cache *store.CacheManager) string {
+func closureInputsDigest(ws *workspace.Workspace, job *ScheduledJob, cache *store.CacheManager) (string, error) {
 	patterns := closureKeyPatterns(job)
 	if len(patterns) == 0 || ws == nil || cache == nil || job == nil || job.Project == nil {
-		return ""
+		return "", nil
 	}
 	members := projectDependencyClosure(ws, job.Project)
 	if len(members) == 0 {
-		return ""
+		return "", nil
 	}
 	// The closure is already in canonical project-id order, but sort the parts
 	// anyway: the digest must not depend on the graph walk's ordering.
@@ -934,13 +955,13 @@ func closureInputsDigest(ws *workspace.Workspace, job *ScheduledJob, cache *stor
 	for _, member := range members {
 		digest, err := cache.HashFiles(filepath.Join(ws.Root, member.Path), patterns, jobConfigScope(ws, job))
 		if err != nil {
-			continue
+			return "", fmt.Errorf("closure inputs for %s: %w", member.ID, err)
 		}
 		parts = append(parts, member.Path+"\x00"+digest)
 	}
 	sort.Strings(parts)
 	sum := sha256.Sum256([]byte(strings.Join(parts, "\x01")))
-	return "closureFiles:" + hex.EncodeToString(sum[:])
+	return "closureFiles:" + hex.EncodeToString(sum[:]), nil
 }
 
 // invocationProducerDigest returns the action digest of the producer whose

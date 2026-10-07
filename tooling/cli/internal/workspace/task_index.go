@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/goembed"
 	"go.putnami.dev/tooling/cli/internal/extension"
 
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -423,14 +424,14 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 	reading := make(map[string]bool)
 	for _, scope := range idx.every {
 		task := idx.tasks[scope]
-		if inProject && wsproto.SelectsPath(rel, task.files) {
+		if inProject && selectsTaskPath(filepath.Join(idx.ws.Root, project.Path), rel, task.files) {
 			reading[scope] = true
-			if wsproto.SelectsPath(rel, task.closureFiles) {
+			if selectsTaskPath(filepath.Join(idx.ws.Root, project.Path), rel, task.closureFiles) {
 				reading[closureScopePrefix+scope] = true
 			}
 			continue
 		}
-		if wsproto.SelectsPath(lookup, task.workspaceFiles) {
+		if selectsTaskPath(idx.ws.Root, lookup, task.workspaceFiles) {
 			reading[scope] = true
 		}
 	}
@@ -446,6 +447,25 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 		return nil
 	}
 	return idx.closureOf(sortedSet(reading))
+}
+
+// selectsTaskPath interprets semantic Go embed selectors alongside literal
+// globs. A deleted asset still matches its Go source directive. A scan error
+// widens impact rather than dropping a task; key computation later fails closed.
+func selectsTaskPath(root, relative string, patterns []string) bool {
+	if wsproto.SelectsPath(relative, patterns) {
+		return true
+	}
+	for _, pattern := range patterns {
+		if !goembed.IsSelector(pattern) {
+			continue
+		}
+		selected, err := goembed.SelectsPath(root, relative, pattern == goembed.TestSelector)
+		if err != nil || selected {
+			return true
+		}
+	}
+	return false
 }
 
 // TasksReachedFrom returns the tasks a dependent runs because the listed tasks

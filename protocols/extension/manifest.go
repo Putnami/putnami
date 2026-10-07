@@ -77,6 +77,9 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	if err := json.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("parse extension manifest %s: %w", path, err)
 	}
+	if err := validateGoEmbedSelectors(&m); err != nil {
+		return nil, fmt.Errorf("extension manifest %s: %w", path, err)
+	}
 	required := RequiredCLIContract(&m)
 	switch {
 	case m.CLIContract > protocolcli.LatestContract:
@@ -102,6 +105,43 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 				"re-package the extension with putnami %d (or run `putnami extensions update` to pull a build that has been)",
 			path, m.CLIContract, required, reason, required)
 	}
+}
+
+func validateGoEmbedSelectors(m *Manifest) error {
+	check := func(pattern, where string, allowed bool) error {
+		if !strings.HasPrefix(pattern, "go-embed:") {
+			return nil
+		}
+		if pattern != "go-embed:build" && pattern != "go-embed:test" {
+			return fmt.Errorf("unsupported go embed selector %q in %s", pattern, where)
+		}
+		if !allowed {
+			return fmt.Errorf("go embed selector %q is only valid in project task inputs, not %s", pattern, where)
+		}
+		return nil
+	}
+	for name, task := range m.Tasks {
+		for portName, port := range task.Inputs {
+			for _, pattern := range port.Files {
+				if err := check(pattern, name+"."+portName, port.From == TaskInputFromProject); err != nil {
+					return err
+				}
+			}
+		}
+		if task.Cache != nil && task.Cache.Key != nil {
+			for _, pattern := range task.Cache.Key.Files {
+				if err := check(pattern, name+".cache.key.files", true); err != nil {
+					return err
+				}
+			}
+			for _, pattern := range append(task.Cache.Key.ClosureFiles, task.Cache.Key.WorkspaceFiles...) {
+				if err := check(pattern, name+".cache.key closure/workspace", false); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func formatDiagnostics(diags []diag.Diagnostic) string {

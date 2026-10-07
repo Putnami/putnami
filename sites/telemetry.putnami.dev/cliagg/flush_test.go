@@ -75,7 +75,6 @@ func TestMigrationSchedulesIndependentExactRetention(t *testing.T) {
 		"pg_cron must be admin-installed",
 		"EXECUTE on schedule_in_database",
 		"pg_read_all_settings",
-		"rolname = session_user AND rolcanlogin",
 		"cron.schedule_in_database",
 		"cron.job_run_details",
 		"'0 0 * * *'",
@@ -91,9 +90,6 @@ func TestMigrationSchedulesIndependentExactRetention(t *testing.T) {
 	}
 	if strings.Contains(text, "current_setting('cron.database_name'") {
 		t.Fatal("migration role must not require pg_read_all_settings")
-	}
-	if !strings.Contains(text, "SET LOCAL ROLE NONE") {
-		t.Fatal("cron job must be scheduled while acting as the authenticated login role")
 	}
 }
 

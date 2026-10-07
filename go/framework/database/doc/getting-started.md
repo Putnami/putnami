@@ -685,7 +685,7 @@ A canonical worked example lives at `go/samples/migrations-feature/`.
 
 ## Error Handling
 
-The package uses structured error codes from `go.putnami.dev/errors`. Each error is wrapped with a code indicating the failure category:
+The package uses structured error codes from `go.putnami.dev/errors`. Each error is wrapped with a code indicating the failure category. Migration drift uses `migration.CodeDriftDetected` from `go.putnami.dev/migration`:
 
 | Code | Constant | Description |
 |------|----------|-------------|
@@ -694,7 +694,7 @@ The package uses structured error codes from `go.putnami.dev/errors`. Each error
 | `db.query` | `CodeQuery` | Query execution failure (find, delete, etc.) |
 | `db.transaction` | `CodeTransaction` | Transaction begin, commit, or rollback failure |
 | `migration.apply_failed` | `CodeMigrationApplyFailed` | A migration's up SQL or state-store insert failed |
-| `migration.drift_detected` | `CodeDriftDetected` | Applied up SQL differs from its stored hash |
+| `migration.drift_detected` | `migration.CodeDriftDetected` | Applied up SQL differs from its stored hash |
 | `migration.rollback_failed` | `CodeMigrationRollbackFailed` | A migration's down SQL or state-store delete failed |
 | `migration.lock_failed` | `CodeMigrationLockFailed` | Could not acquire the advisory lock for the datasource |
 | `migration.state_store_failed` | `CodeMigrationStateStore` | The `migration.migrations` table could not be created or queried |

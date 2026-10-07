@@ -16,6 +16,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/sdk/extension/goembed"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -60,6 +61,7 @@ type fileEntry struct {
 	path         string
 	info         os.FileInfo
 	gitCandidate bool
+	rawEmbed     bool
 	// sweptByGlob is set when a pattern whose last segment is a glob selected
 	// the file (`**/*.json`, `*.json`, `doc/**`). Such a pattern selects files by
 	// type or by directory, so the task reads what it selects as text, and a
@@ -128,9 +130,14 @@ func collectFiles(dir string, patterns []string) ([]fileEntry, error) {
 	var files []fileEntry
 	includes, excludes := wsproto.SplitFilePatterns(patterns)
 	var ordinaryPatterns, gitPatterns []string
+	var embedPatterns []string
 	for _, pattern := range includes {
 		if _, ok := wsproto.GitFilePattern(pattern); ok {
 			gitPatterns = append(gitPatterns, pattern)
+		} else if goembed.IsSelector(pattern) {
+			embedPatterns = append(embedPatterns, pattern)
+		} else if strings.HasPrefix(pattern, "go-embed:") {
+			return nil, fmt.Errorf("unsupported Go embed input selector %q", pattern)
 		} else {
 			ordinaryPatterns = append(ordinaryPatterns, pattern)
 		}
@@ -188,6 +195,19 @@ func collectFiles(dir string, patterns []string) ([]fileEntry, error) {
 		}
 		files = append(files, candidates...)
 	}
+	for _, selector := range embedPatterns {
+		targets, err := goembed.Resolve(dir, selector == goembed.TestSelector)
+		if err != nil {
+			return nil, fmt.Errorf("resolve %s inputs: %w", selector, err)
+		}
+		for _, target := range targets {
+			info, err := os.Lstat(target)
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, fileEntry{path: target, info: info, rawEmbed: true})
+		}
+	}
 
 	sort.Slice(files, func(i, j int) bool { return slashPathLess(files[i].path, files[j].path, filepath.Separator) })
 
@@ -205,6 +225,9 @@ func collectFiles(dir string, patterns []string) ([]fileEntry, error) {
 			} else if files[i].sweptByGlob {
 				// A raw reading wins over a decoded one the same way.
 				files[j].sweptByGlob = true
+			}
+			if files[i].rawEmbed {
+				files[j].rawEmbed = true
 			}
 		}
 		files = files[:j+1]
@@ -396,7 +419,8 @@ func SelectsPath(rel string, patterns []string) bool {
 // an empty root into a non-empty group could hide that project's failure.
 func HasMatchingFiles(dir string, patterns []string) (bool, error) {
 	for _, pattern := range patterns {
-		if _, candidate := wsproto.GitFilePattern(pattern); candidate {
+		_, gitCandidate := wsproto.GitFilePattern(pattern)
+		if gitCandidate || goembed.IsSelector(pattern) || strings.HasPrefix(pattern, "go-embed:") {
 			files, err := collectFiles(dir, patterns)
 			return len(files) > 0, err
 		}
@@ -491,6 +515,11 @@ func hashFiles(dir string, patterns []string, scope ProjectConfigScope) (string,
 	}
 
 	digests := hashFileContents(files, scope, projectDir)
+	for i, file := range files {
+		if file.rawEmbed && digests[i] == nil {
+			return "", fmt.Errorf("cannot read Go embedded input %s", file.path)
+		}
+	}
 
 	h := sha256.New()
 	for i, f := range files {
@@ -557,6 +586,17 @@ func hashFileContents(files []fileEntry, scope ProjectConfigScope, projectDir st
 			for i := range indexes {
 				if files[i].gitCandidate {
 					digests[i] = gitCandidateDigest(files[i], buf)
+				} else if files[i].rawEmbed {
+					file, err := os.Open(files[i].path)
+					if err != nil {
+						continue
+					}
+					h := sha256.New()
+					_, readErr := io.CopyBuffer(h, file, buf)
+					closeErr := file.Close()
+					if readErr == nil && closeErr == nil {
+						digests[i] = h.Sum(nil)
+					}
 				} else {
 					digests[i] = fileContentDigest(files[i].path, buf, scopeFor(files[i]))
 				}

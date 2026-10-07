@@ -21,13 +21,9 @@ func TestCurrentContract_OnlyMovesForward(t *testing.T) {
 	}
 }
 
-// TestAgentContentContract_IsTheAdditiveLatest pins the additive rung: the
-// agent-content contract sits exactly one above the base contract and is the
-// latest this CLI reads. A reader implementing only the base contract then sees
-// every content-bearing manifest as written for a newer putnami, which is the
-// whole compatibility mechanism — moving either constant must update this test,
-// the changelog on CurrentContract, and the loader ladder together.
-func TestAgentContentContract_IsTheAdditiveLatest(t *testing.T) {
+// The additive rungs leave the base stamp unchanged; a reader before each
+// rung rejects only manifests that declare that rung's vocabulary.
+func TestAdditiveContractsAreOrdered(t *testing.T) {
 	if AgentContentContract != 5 {
 		t.Fatalf("AgentContentContract = %d, want 5", AgentContentContract)
 	}
@@ -35,7 +31,7 @@ func TestAgentContentContract_IsTheAdditiveLatest(t *testing.T) {
 		t.Fatalf("AgentContentContract = %d, want CurrentContract+1 (%d): a base-contract reader must see it as newer",
 			AgentContentContract, CurrentContract+1)
 	}
-	if LatestContract != AgentContentContract {
-		t.Fatalf("LatestContract = %d, want AgentContentContract (%d)", LatestContract, AgentContentContract)
+	if GoEmbedInputsContract != AgentContentContract+1 || LatestContract != GoEmbedInputsContract {
+		t.Fatalf("additive contract ladder = base %d, agent %d, embed %d, latest %d", CurrentContract, AgentContentContract, GoEmbedInputsContract, LatestContract)
 	}
 }

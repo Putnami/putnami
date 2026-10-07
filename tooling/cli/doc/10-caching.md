@@ -188,6 +188,19 @@ File hashing algorithm:
 
 When no patterns are specified, all non-hidden, non-ignored files in the project are hashed (excluding `node_modules/`, `.putnami/`, `out/`, and dotfiles).
 
+An extension task may declare `go-embed:build` or `go-embed:test` in a
+`from: "project"` file input. The first resolves `//go:embed` directives in
+buildable non-test Go sources; the second also reads test sources. Every
+resolved payload contributes its relative path and exact bytes, including an
+ignored file or a payload named `*_test.go`. Source discovery excludes
+`testdata`, vendor, hidden, underscore-prefixed, generated and nested-module
+trees; an explicitly named hidden payload is still read. The selector scans
+every potentially buildable source across platforms and custom tags, so an
+unresolved target in an alternate-platform file is an error even on the
+current host. It cannot serve a stale cache entry or silently omit a portable
+input. The selector belongs to a negotiated extension manifest; project or
+CLI `filePatterns` cannot introduce it.
+
 A selected file that cannot be read — a permission-restricted source, or a file
 replaced mid-run by an editor's atomic save or a concurrent generator — still
 contributes its relative path plus an `__unreadable__` marker instead of its

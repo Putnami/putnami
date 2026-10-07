@@ -1,9 +1,11 @@
 package jobs
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -96,6 +98,118 @@ func (f *goSourceKeyFixture) keys(t *testing.T) (libKey, appKey string) {
 		t.Fatalf("compute dependent cache key: %v", err)
 	}
 	return libKey, appKey
+}
+
+// An embedded asset is Go source input even when no .go byte changes. This
+// specifically prevents a cached describe from restoring an old migration
+// bundle after its SQL changed, and pins the dependent's ^describe edge.
+func TestGoDescribeKeyIncludesEmbeddedAssetOnlyEdit(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "go-describe-key-includes-embedded-asset-only-edit")
+	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", true)
+	writeTestFile(t, filepath.Join(fixture.libDir, "embed.go"), "package lib\nimport _ \"embed\"\n//go:embed migration.sql\nvar SQL string\n")
+	writeTestFile(t, filepath.Join(fixture.libDir, "migration.sql"), "SELECT 1;\n")
+	baseLib, baseApp := fixture.keys(t)
+	writeTestFile(t, filepath.Join(fixture.libDir, "migration.sql"), "SELECT 2;\n")
+	changedLib, changedApp := fixture.keys(t)
+	if changedLib == baseLib || changedApp == baseApp {
+		t.Fatalf("embedded asset edit did not move describe and dependent keys: %s/%s -> %s/%s", baseLib, baseApp, changedLib, changedApp)
+	}
+	writeTestFile(t, filepath.Join(fixture.libDir, "lib_test.go"), "package lib\nfunc TestNoop() {}\n")
+	stableLib, stableApp := fixture.keys(t)
+	if stableLib != changedLib || stableApp != changedApp {
+		t.Fatal("non-test describe key moved on test-only edit")
+	}
+}
+
+func TestGoDescribeCachedOldBundleCannotRestoreAfterEmbeddedAssetEdit(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "go-describe-cached-old-bundle-cannot-restore-after-embedded-asset-edit")
+	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", false)
+	writeTestFile(t, filepath.Join(fixture.appDir, "embed.go"), "package main\nimport _ \"embed\"\n//go:embed migration.sql\nvar SQL string\n")
+	asset := filepath.Join(fixture.appDir, "migration.sql")
+	writeTestFile(t, asset, "SELECT 'A';\n")
+	// The app key is the one whose describe output owns the bundle.
+	_, keyA := fixture.keys(t)
+	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(fixture.ws.Root, "cache")))
+	output := filepath.Join(fixture.ws.Root, "describe-output")
+	writeTestFile(t, filepath.Join(output, "migration-bundle", "payload.sql"), "SELECT 'A';\n")
+	meta := &store.EntryMetadata{Extension: "@putnami/go", Task: "build-describe", Project: "app"}
+	if err := cache.Save(keyA, &store.EntryResult{Status: "success"}, meta, output); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, asset, "SELECT 'B';\n")
+	_, keyB := fixture.keys(t)
+	if keyA == keyB {
+		t.Fatal("asset-only edit reused old describe identity")
+	}
+	if old, err := cache.Lookup(keyB); err != nil || old != nil {
+		t.Fatalf("A entry answered B key: %v, %v", old, err)
+	}
+	writeTestFile(t, filepath.Join(output, "migration-bundle", "payload.sql"), "SELECT 'B';\n")
+	if err := cache.Save(keyB, &store.EntryResult{Status: "success"}, meta, output); err != nil {
+		t.Fatal(err)
+	}
+	entry, err := cache.Lookup(keyB)
+	if err != nil || entry == nil {
+		t.Fatalf("B bundle not stored: %v", err)
+	}
+	restored := filepath.Join(fixture.ws.Root, "restored")
+	if _, err := cache.RestoreFiles(entry, restored); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(restored, "migration-bundle", "payload.sql"))
+	if err != nil || string(got) != "SELECT 'B';\n" {
+		t.Fatalf("final described bundle = %q, %v", got, err)
+	}
+}
+
+func TestGoEmbedPortableInputsBindAssetAndFailOnDeletion(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "go-embed-portable-inputs-bind-asset-and-fail-on-deletion")
+	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", false)
+	writeTestFile(t, filepath.Join(fixture.appDir, "embed.go"), "package main\nimport _ \"embed\"\n//go:embed local.sql\nvar SQL string\n")
+	asset := filepath.Join(fixture.appDir, "local.sql")
+	writeTestFile(t, asset, "SELECT 1;\n")
+	projection, err := PortableInputs(fixture.ws, []*ScheduledJob{fixture.app}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, file := range projection.Tasks[0].Files {
+		if file == "app/local.sql" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("embedded asset missing from portable binding: %v", projection.Tasks[0].Files)
+	}
+	if err := os.Remove(asset); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := PortableInputs(fixture.ws, []*ScheduledJob{fixture.app}, nil); err == nil {
+		t.Fatal("deleted embedded asset silently omitted from portable projection")
+	}
+}
+
+func TestGoTestOnlyEmbedDoesNotMoveBuildKey(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "go-test-only-embed-does-not-move-build-key")
+	build := newGoSourceKeyFixture(t, "build-compile", "build~compile", false)
+	writeTestFile(t, filepath.Join(build.appDir, "payload_test.go"), "package main\nimport _ \"embed\"\n//go:embed fixture.txt\nvar fixture string\n")
+	writeTestFile(t, filepath.Join(build.appDir, "fixture.txt"), "A")
+	_, before := build.keys(t)
+	writeTestFile(t, filepath.Join(build.appDir, "fixture.txt"), "B")
+	_, after := build.keys(t)
+	if before != after {
+		t.Fatal("build key read a test-only embed")
+	}
+
+	test := newGoSourceKeyFixture(t, "test-exec", "test~test", false)
+	writeTestFile(t, filepath.Join(test.appDir, "payload_test.go"), "package main\nimport _ \"embed\"\n//go:embed fixture.txt\nvar fixture string\n")
+	writeTestFile(t, filepath.Join(test.appDir, "fixture.txt"), "A")
+	_, testBefore := test.keys(t)
+	writeTestFile(t, filepath.Join(test.appDir, "fixture.txt"), "B")
+	_, testAfter := test.keys(t)
+	if testBefore == testAfter {
+		t.Fatal("test key omitted a test-only embed")
+	}
 }
 
 // TestGoDescribeKeyIgnoresADependencyTestFile pins the cross-project half of the

@@ -42,7 +42,10 @@ func TestPortableInputsProjectTheKeyDeclarations(t *testing.T) {
 	unkeyed := job("unkeyed", false, extension.JobDefinition{TaskCachePolicy: &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{Env: []string{"IGNORED"}}}})
 	unkeyedPatterned := job("unkeyed", false, extension.JobDefinition{FilePatterns: []string{"conf/*.yaml"}})
 
-	inputs := PortableInputs(ws, []*ScheduledJob{patterned, wholeTree, unkeyed, unkeyedPatterned}, nil)
+	inputs, err := PortableInputs(ws, []*ScheduledJob{patterned, wholeTree, unkeyed, unkeyedPatterned}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(inputs.Tasks) != 4 {
 		t.Fatalf("tasks = %+v", inputs.Tasks)
 	}
@@ -79,7 +82,11 @@ func TestPortableInputsProjectTheKeyDeclarations(t *testing.T) {
 	if err := os.RemoveAll(filepath.Join(root, "app", "conf")); err != nil {
 		t.Fatal(err)
 	}
-	if got := PortableInputs(ws, []*ScheduledJob{patterned}, nil).Tasks[0].Files; strings.Join(got, ",") != "app/.gen/generated.txt,shared.lock" {
+	remaining, err := PortableInputs(ws, []*ScheduledJob{patterned}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := remaining.Tasks[0].Files; strings.Join(got, ",") != "app/.gen/generated.txt,shared.lock" {
 		t.Errorf("a deleted input stayed in the projection: %v", got)
 	}
 }
@@ -93,15 +100,18 @@ func TestPortableInputsMemoizesEachRootAndPatternSetOnce(t *testing.T) {
 	root := t.TempDir()
 	writeProjectFile(t, root, "app", "src/main.go", "package main")
 	memo := keyFileMemo{}
-	first := memo.collect(filepath.Join(root, "app"), []string{"src/*.go"})
+	first, err := memo.collect(filepath.Join(root, "app"), []string{"src/*.go"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeProjectFile(t, root, "app", "src/second.go", "package main")
-	if again := memo.collect(filepath.Join(root, "app"), []string{"src/*.go"}); len(again) != len(first) || len(again) != 1 {
+	if again, err := memo.collect(filepath.Join(root, "app"), []string{"src/*.go"}); err != nil || len(again) != len(first) || len(again) != 1 {
 		t.Fatalf("the second collect walked again: %v then %v", first, again)
 	}
-	if other := memo.collect(filepath.Join(root, "app"), []string{"src/**"}); len(other) != 2 {
+	if other, err := memo.collect(filepath.Join(root, "app"), []string{"src/**"}); err != nil || len(other) != 2 {
 		t.Fatalf("a different pattern set shared a memo entry: %v", other)
 	}
-	if fresh := (keyFileMemo{}).collect(filepath.Join(root, "app"), []string{"src/*.go"}); len(fresh) != 2 {
+	if fresh, err := (keyFileMemo{}).collect(filepath.Join(root, "app"), []string{"src/*.go"}); err != nil || len(fresh) != 2 {
 		t.Fatalf("the memo outlived its call: %v", fresh)
 	}
 }

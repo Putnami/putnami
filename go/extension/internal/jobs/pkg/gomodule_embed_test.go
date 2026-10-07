@@ -5,12 +5,71 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
+	extproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/goembed"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
+
+func TestGoBuildAndTestTaskInputsDeclareRespectiveEmbedSelectors(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "embedded-source-cache-inputs", "go-build-and-test-task-inputs-declare-respective-embed-selectors")
+	manifest, err := extproto.LoadManifest(filepath.Join(findRepoRoot(t), "go", "extension", "putnami.extension.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	buildTasks, testTasks := 0, 0
+	for name, task := range manifest.Tasks {
+		sources, ok := task.Inputs["sources"]
+		if !ok {
+			continue
+		}
+		if sources.From != extproto.TaskInputFromProject {
+			t.Fatalf("%s sources are not project inputs", name)
+		}
+		selected := goembed.TestSelector
+		if slices.Contains(sources.Files, "!**/*_test.go") {
+			selected = goembed.BuildSelector
+			buildTasks++
+		} else {
+			testTasks++
+		}
+		if !slices.Contains(sources.Files, selected) {
+			t.Errorf("%s misses %s", name, selected)
+		}
+	}
+	if buildTasks < 4 || testTasks == 0 {
+		t.Fatalf("unexpected task coverage: %d build, %d test", buildTasks, testTasks)
+	}
+}
+
+func TestGoModulePackagerSharesEmbedTargetResolutionWithTaskInputs(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "embedded-source-cache-inputs", "go-module-packager-shares-embed-target-resolution-with-task-inputs")
+	project := t.TempDir()
+	stage := t.TempDir()
+	source := "package example\nimport _ \"embed\"\n//go:embed \"assets/report one.json\"\nvar data []byte\n"
+	mustWrite(t, filepath.Join(project, "embed.go"), source)
+	mustWrite(t, filepath.Join(project, "assets", "report one.json"), `{"value":1}`)
+	mustWrite(t, filepath.Join(stage, "embed.go"), source)
+	inputs, err := goembed.Resolve(project, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inputs) != 1 {
+		t.Fatalf("resolved inputs = %v", inputs)
+	}
+	if err := stageEmbedTargets(project, stage); err != nil {
+		t.Fatal(err)
+	}
+	staged, err := os.ReadFile(filepath.Join(stage, "assets", "report one.json"))
+	if err != nil || string(staged) != `{"value":1}` {
+		t.Fatalf("staged input = %q, %v", staged, err)
+	}
+}
 
 // Every //go:embed target must ship in the staged module source and the
 // published zip, whatever its name or extension. A module that embeds

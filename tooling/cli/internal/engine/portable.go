@@ -198,7 +198,11 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 			iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
 			return SessionResult{ExitCode: ExitError, Plan: planned}, true
 		}
-		if err := runnerprovider.VerifyAdmission(req.WorkspaceRoot, req.Portable.Request.Source.Bound, jobs.PortableInputs(ws, planned, req.CommandParams)); err != nil {
+		inputs, err := jobs.PortableInputs(ws, planned, req.CommandParams)
+		if err == nil {
+			err = runnerprovider.VerifyAdmission(req.WorkspaceRoot, req.Portable.Request.Source.Bound, inputs)
+		}
+		if err != nil {
 			iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
 			return SessionResult{ExitCode: ExitError, Plan: planned}, true
 		}
@@ -213,7 +217,12 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 		iox.Fprintf(os.Stderr, "putnami: --where remote: %v\n", err)
 		return SessionResult{ExitCode: ExitUsage, Plan: planned}, true
 	}
-	admission, err := runnerprovider.AdmitInputs(ctx, req.WorkspaceRoot, jobs.PortableInputs(ws, planned, req.CommandParams))
+	inputs, err := jobs.PortableInputs(ws, planned, req.CommandParams)
+	if err != nil {
+		iox.Fprintf(os.Stderr, "putnami: --where remote: %v\n", err)
+		return SessionResult{ExitCode: ExitError, Plan: planned}, true
+	}
+	admission, err := runnerprovider.AdmitInputs(ctx, req.WorkspaceRoot, inputs)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: --where remote: %v\n", err)
 		if errors.Is(err, runnerprovider.ErrInadmissible) {

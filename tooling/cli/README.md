@@ -90,7 +90,7 @@ putnami build --impacted --plan
 - **[Extensions](doc/07-extensions.md)** — Manifest schema, pipelines, contracts, hooks
 - **[Output and Rendering](doc/08-output-and-rendering.md)** — Live TUI, text, JSONL, cloud logging renderers
 - **[Watch Mode](doc/09-watch-mode.md)** — File watching, change classification, serve mode
-- **[Caching](doc/10-caching.md)** — Cache key computation, stores, cache control
+- **[Caching](doc/10-caching.md)** — Cache key computation, including Go embedded asset inputs, stores, cache control
 - **[Session Recording](doc/11-session-recording.md)** — Audit trail, event streams, session management
 - **[Profiling and Telemetry](doc/12-profiling-and-telemetry.md)** — Chrome trace profiling, anonymous telemetry
 - **[Internals](doc/13-internals.md)** — Go patterns, concurrency, error handling, design decisions

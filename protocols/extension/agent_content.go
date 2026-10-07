@@ -88,6 +88,24 @@ func (c AgentContentContribution) Packaged() bool {
 // manifest stamped below it uses vocabulary its stamp does not cover; a
 // manifest stamped at or above it (up to LatestContract) loads.
 func RequiredCLIContract(m *Manifest) int {
+	if m != nil {
+		for _, task := range m.Tasks {
+			for _, input := range task.Inputs {
+				for _, file := range input.Files {
+					if file == "go-embed:build" || file == "go-embed:test" {
+						return protocolcli.GoEmbedInputsContract
+					}
+				}
+			}
+			if task.Cache != nil && task.Cache.Key != nil {
+				for _, file := range append(append([]string{}, task.Cache.Key.Files...), task.Cache.Key.ClosureFiles...) {
+					if file == "go-embed:build" || file == "go-embed:test" {
+						return protocolcli.GoEmbedInputsContract
+					}
+				}
+			}
+		}
+	}
 	if m.DeclaresAgentContent() {
 		return protocolcli.AgentContentContract
 	}
