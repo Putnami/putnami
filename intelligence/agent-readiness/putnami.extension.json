@@ -1,0 +1,75 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/agent-readiness",
+  "cliContract": 4,
+  "runtime": {
+    "executable": "compiled/putnami-agent-readiness",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          { "from": "environment", "environment": "GOROOT", "path": "bin/go" },
+          { "from": "path", "path": "go" },
+          { "from": "putnami-home", "path": "toolchains/go/go-{version}/go/bin/go" }
+        ],
+        "probe": {
+          "args": ["env", "GOVERSION"],
+          "expect": "go{version}",
+          "unset": ["GOROOT"],
+          "environment": { "GOTOOLCHAIN": "local" }
+        },
+        "environment": {
+          "GOROOT": { "from": "ancestor", "levels": 2 },
+          "GOTOOLCHAIN": { "from": "literal", "value": "local" }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": ["--output", "{runtimeOutput}"],
+      "inputs": ["bin/prepare", "cmd/**", "go.mod", "go.sum", "internal/**", "clients/**", "areas/**", "contract/**", "history/**", "inventory/**", "markers/**", "payload/**", "schema/**"],
+      "toolchains": ["runtimeCompiler"]
+    }
+  },
+  "commandGroups": {
+    "agent-readiness": {
+      "description": "Measure how far agents can work alone in this repository",
+      "default": "run",
+      "subcommands": {
+        "run": {
+          "description": "Collect privacy-checked repository history and submit it for a report",
+          "command": "agent-readiness",
+          "interactive": true,
+          "workspace": "optional",
+          "examples": [
+            { "command": "putnami agent-readiness", "description": "Print the report link for this repository" }
+          ]
+        }
+      }
+    }
+  },
+  "commands": {
+    "agent-readiness": {
+      "activationFiles": ["putnami.extension.json"],
+      "description": "Measure how far agents can work alone in this repository",
+      "flags": {
+        "print-payload": { "type": "boolean", "default": false, "description": "Print the payload as JSON and send nothing." },
+        "timeout": { "type": "number", "default": 120, "description": "Seconds allowed to collect and send the payload." }
+      },
+      "run": [{ "id": "agent-readiness", "task": "agent-readiness" }]
+    }
+  },
+  "tasks": {
+    "agent-readiness": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["agent-readiness"],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "declares": { "effects": ["network"] },
+      "description": "Collect and submit an agent-readiness payload",
+      "timeoutMs": 3600000
+    }
+  }
+}

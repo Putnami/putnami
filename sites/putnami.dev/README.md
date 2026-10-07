@@ -52,7 +52,7 @@ there:
 | `/docs/08-support` | `putnami.support.json` (workspace root) | `src/plugins/support-catalog.plugin.ts` |
 | `/docs/platform` | `cloud/doc-contents-platform` bundle (published by the Cloud workspace), pinned by `content.lock.json` | `src/plugins/content-bundle.plugin.ts` |
 | `/schemas/…` | `protocols/*/schemas/*.json` | `src/plugins/schemas.plugin.ts` |
-| `/schemas/agent-readiness/…` | `hosted-schemas/agent-readiness/*.json`, copies of the `@putnami/intelligence` schemas | `src/plugins/schemas.plugin.ts` |
+| `/schemas/agent-readiness/…` | `hosted-schemas/agent-readiness/*.json`, copies of the `@putnami/agent-readiness` schemas | `src/plugins/schemas.plugin.ts` |
 | `/install.sh`, `/install-commands.txt`, `/install.ps1`, `/LICENSE.md` | `tooling/cli/scripts/install.sh`, `tooling/cli/scripts/install-commands.txt`, `tooling/cli/scripts/install.ps1`, `LICENSE.md` | `putnami.json` `generate.assets` copy |
 
 A `generate.assets` source that no longer exists is not silently dropped. The
@@ -67,11 +67,11 @@ on it.
 
 `hosted-schemas/` holds schemas that a published Putnami product owns and
 this site serves at their `$id`. Today that is the `putnami agent-readiness`
-payload and report, owned by `@putnami/intelligence`. Each file must stay
-byte-identical to the schema the product ships. Nothing in this repository can
-read that source, so no check catches drift: when the product changes a
-schema, copy the new file here unchanged. `test/agent-readiness.test.ts`
-checks that each file sits at the path its `$id` names.
+payload and report. Their public copies live in
+`intelligence/agent-readiness/schema/`. Each hosted file must stay byte-identical to
+that source. `test/agent-readiness.test.ts` checks parity and each file's `$id`.
+When the service changes its contract, update the embedded and hosted schemas
+together.
 
 The support page is written from the reviewed catalog on every build, so a
 package or protocol status can only change by changing `putnami.support.json`.

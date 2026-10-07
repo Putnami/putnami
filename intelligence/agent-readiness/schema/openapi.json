@@ -1,0 +1,620 @@
+{
+  "info": {
+    "description": "Workspace-scoped intelligence tools and immutable portable audit attestations.",
+    "title": "Putnami Intelligence API",
+    "version": "dev"
+  },
+  "openapi": "3.0.3",
+  "x-putnami-client": {
+    "credentials": {
+      "service": {
+        "kind": "service-token"
+      },
+      "user": {
+        "kind": "forwarded-user-token"
+      }
+    },
+    "protocolVersion": 1,
+    "service": {
+      "audience": "intelligence-api",
+      "id": "intelligence-api"
+    }
+  },
+  "paths": {
+    "/v1/intelligence/agent-readiness/reports": {
+      "post": {
+        "description": "Submit an agent-readiness payload and receive the verdict and the report link. Anonymous: the payload carries counts, area names and repository-relative paths only. The body is bounded to 256 KiB and one source IP may submit 10 times a minute.",
+        "operationId": "postV1_Intelligence_Agent-readiness_Reports",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            },
+            "description": "The verdict the terminal prints and the report link, which opens after GitHub sign-in."
+          },
+          "400": {
+            "description": "The payload does not validate against schema v1, declares an unsupported method version, or carries a privacy violation."
+          },
+          "413": {
+            "description": "The payload exceeds 256 KiB."
+          },
+          "429": {
+            "description": "More than 10 submissions in a minute from this source IP."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "validation",
+              "status": 400
+            },
+            {
+              "code": "http.payload_too_large",
+              "status": 413
+            },
+            {
+              "code": "http.too_many_requests",
+              "status": 429
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "internal",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": []
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/intelligence/agent-readiness/reports",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentProbe": {
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "Area": {
+        "additionalProperties": false,
+        "properties": {
+          "authors90d": {
+            "description": "First 16 hex digits of SHA-256(salt + \":\" + lowercase author email), one per distinct author; the salt is random per run and never sent.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "commits90d": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "files": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "language": {
+            "maxLength": 64,
+            "type": "string"
+          },
+          "lines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "path": {
+            "description": "Repository-relative, slash-separated path; \".\" for the root.",
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "^(\\.|[^/\\\\~\\s][^\\\\]*)$",
+            "type": "string"
+          },
+          "role": {
+            "description": "code, tests (a test tree) or docs (a documentation site). Declared by method 0.2; absent reads as code.",
+            "enum": [
+              "code",
+              "tests",
+              "docs"
+            ],
+            "type": "string"
+          },
+          "shareOfChange": {
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "source": {
+            "enum": [
+              "manifest",
+              "inferred"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "authors90d",
+          "commits90d",
+          "files",
+          "lines",
+          "name",
+          "path",
+          "shareOfChange",
+          "source"
+        ],
+        "type": "object"
+      },
+      "Evidence": {
+        "additionalProperties": false,
+        "properties": {
+          "command": {
+            "maxLength": 300,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n]+$",
+            "type": "string"
+          },
+          "sample": {
+            "description": "Up to five repository-relative locations, each a path with an optional :line. Never file contents.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "command",
+          "sample"
+        ],
+        "type": "object"
+      },
+      "InstructionFile": {
+        "additionalProperties": false,
+        "properties": {
+          "ageDays": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "bytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "path": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "^[^/\\\\~\\s][^\\\\]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ageDays",
+          "bytes",
+          "path"
+        ],
+        "type": "object"
+      },
+      "Inventory": {
+        "additionalProperties": false,
+        "properties": {
+          "activeContributors90d": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "agentCommits90d": {
+            "description": "Commits of the last 90 days that credit an agent tool in a Co-Authored-By trailer or as author. Declared by method 0.3.",
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "nullable": true,
+            "type": "integer"
+          },
+          "agentCommitsReverted90d": {
+            "description": "Agent commits of the last 90 days that a later commit of the window reverted. Declared by method 0.3.",
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "nullable": true,
+            "type": "integer"
+          },
+          "agentTools": {
+            "items": {
+              "$ref": "#/components/schemas/Tool"
+            },
+            "type": "array"
+          },
+          "ciProviders": {
+            "items": {
+              "$ref": "#/components/schemas/Tool"
+            },
+            "type": "array"
+          },
+          "commits90d": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "commitsTotal": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "containers": {
+            "items": {
+              "$ref": "#/components/schemas/Tool"
+            },
+            "type": "array"
+          },
+          "databases": {
+            "items": {
+              "$ref": "#/components/schemas/Tool"
+            },
+            "type": "array"
+          },
+          "files": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "frameworks": {
+            "items": {
+              "$ref": "#/components/schemas/Tool"
+            },
+            "type": "array"
+          },
+          "iac": {
+            "items": {
+              "$ref": "#/components/schemas/Tool"
+            },
+            "type": "array"
+          },
+          "instructionFiles": {
+            "items": {
+              "$ref": "#/components/schemas/InstructionFile"
+            },
+            "type": "array"
+          },
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/LanguageShare"
+            },
+            "type": "array"
+          },
+          "lines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "monorepoTools": {
+            "items": {
+              "$ref": "#/components/schemas/Tool"
+            },
+            "type": "array"
+          },
+          "packageManagers": {
+            "items": {
+              "$ref": "#/components/schemas/Tool"
+            },
+            "type": "array"
+          },
+          "repoAgeDays": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "testFrameworks": {
+            "items": {
+              "$ref": "#/components/schemas/Tool"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "activeContributors90d",
+          "agentTools",
+          "ciProviders",
+          "commits90d",
+          "commitsTotal",
+          "containers",
+          "databases",
+          "files",
+          "frameworks",
+          "iac",
+          "instructionFiles",
+          "languages",
+          "lines",
+          "monorepoTools",
+          "packageManagers",
+          "repoAgeDays",
+          "testFrameworks"
+        ],
+        "type": "object"
+      },
+      "LanguageShare": {
+        "additionalProperties": false,
+        "properties": {
+          "files": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "lines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "files",
+          "lines",
+          "name"
+        ],
+        "type": "object"
+      },
+      "Marker": {
+        "additionalProperties": false,
+        "properties": {
+          "area": {
+            "description": "Area name; empty for a repository-wide marker.",
+            "maxLength": 128,
+            "type": "string"
+          },
+          "enforcedDays": {
+            "description": "Days the treatment that enforces the marker has been in place, for a marker whose value measures something else. Declared by method 0.2 for bound.cross-area-changes and by method 0.3 for every marker whose L4 needs it.",
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/Evidence"
+          },
+          "id": {
+            "description": "Marker id defined on the method page.",
+            "maxLength": 64,
+            "pattern": "^(understand|bound|verify|recover)\\.[a-z0-9-]+$",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "absent",
+              "exists",
+              "enforced"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "description": "The marker's 90-day measurement in the unit the method page declares; null when not measured.",
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "required": [
+          "evidence",
+          "id",
+          "state"
+        ],
+        "type": "object"
+      },
+      "Payload": {
+        "additionalProperties": false,
+        "properties": {
+          "agentProbe": {
+            "$ref": "#/components/schemas/AgentProbe",
+            "description": "Reserved for the opt-in agent probe. Always null in methods 0.1 to 0.3.",
+            "nullable": true
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/Area"
+            },
+            "type": "array"
+          },
+          "inventory": {
+            "$ref": "#/components/schemas/Inventory"
+          },
+          "markers": {
+            "items": {
+              "$ref": "#/components/schemas/Marker"
+            },
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PayloadMeta"
+          }
+        },
+        "required": [
+          "areas",
+          "inventory",
+          "markers",
+          "meta"
+        ],
+        "type": "object"
+      },
+      "PayloadMeta": {
+        "additionalProperties": false,
+        "properties": {
+          "collectedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "collectorVersion": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "headCommit": {
+            "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
+            "type": "string"
+          },
+          "methodVersion": {
+            "pattern": "^[0-9]+\\.[0-9]+$",
+            "type": "string"
+          },
+          "repoFingerprint": {
+            "description": "Lowercase hex SHA-256 of the lexically smallest root commit id.",
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "collectedAt",
+          "collectorVersion",
+          "headCommit",
+          "methodVersion",
+          "repoFingerprint"
+        ],
+        "type": "object"
+      },
+      "Submission": {
+        "additionalProperties": false,
+        "properties": {
+          "level": {
+            "enum": [
+              "L1",
+              "L2",
+              "L3",
+              "L4"
+            ],
+            "type": "string"
+          },
+          "methodVersion": {
+            "pattern": "^[0-9]+\\.[0-9]+$",
+            "type": "string"
+          },
+          "shareBlocked": {
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "token": {
+            "maxLength": 32,
+            "minLength": 6,
+            "pattern": "^[a-z0-9]+$",
+            "type": "string"
+          },
+          "url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "methodVersion",
+          "shareBlocked",
+          "token",
+          "url"
+        ],
+        "type": "object"
+      },
+      "Tool": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 64,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      }
+    }
+  }
+}

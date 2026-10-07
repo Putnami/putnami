@@ -59,7 +59,12 @@
       ]
     },
     "/typescript/extension": {
-      "filePatterns": ["doc/**/*", "content.lock.json", "../../putnami.support.json"]
+      "filePatterns": [
+        "doc/**/*",
+        "content.lock.json",
+        "../../putnami.support.json",
+        "../../intelligence/agent-readiness/schema/*.json"
+      ]
     },
     "@putnami/cloud": {
       "deploy": {

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "intelligence",
+  "features": [
+    {
+      "id": "intelligence/agent-readiness",
+      "type": "feature",
+      "name": "Agent-readiness CLI",
+      "outcome": "Anyone can install and inspect the public agent-readiness CLI and collector independently of hosted Intelligence, then inspect its private payload or obtain a scored report from the existing service.",
+      "owner": "intelligence",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "public-extension",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "standalone-runtime-uses-public-contract"
+            ]
+          }
+        },
+        {
+          "id": "private-payload",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "print-payload-is-private-and-read-only"
+            ]
+          }
+        },
+        {
+          "id": "anonymous-submit",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "submission-preserves-bytes-and-response"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

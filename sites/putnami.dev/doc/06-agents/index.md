@@ -284,6 +284,20 @@ the orientation document from going stale behind the code.
 
 ## Agent readiness, marker by marker
 
+The command and collector are [public source](https://github.com/Putnami/putnami/tree/main/intelligence/agent-readiness) in the separate
+`@putnami/agent-readiness` extension:
+
+```sh
+putnami extensions install --user --latest @putnami/agent-readiness
+putnami agent-readiness --print-payload
+putnami agent-readiness
+```
+
+In a Putnami workspace, declare the extension in that workspace's extensions.
+Print-only mode sends nothing; a normal run sends the validated payload to the
+existing anonymous scoring service and prints its verdict and report link.
+It needs Git history, and no account or cloud setup.
+
 `putnami agent-readiness` measures how far a repository lets an agent work
 safely. It reads twelve markers, grouped in four steps, and grades each one.
 The

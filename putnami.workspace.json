@@ -25,6 +25,7 @@
   ],
   "includes": [
     "go",
+    "intelligence",
     "protocols",
     "python",
     "sites",

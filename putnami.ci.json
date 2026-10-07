@@ -32,6 +32,7 @@
         "select": [
           "/protocols/...",
           "/tooling/...",
+          "/intelligence/...",
           "/go/...",
           "/python/...",
           "/typescript/..."

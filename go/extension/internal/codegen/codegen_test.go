@@ -51,8 +51,8 @@ func withVisitors(t *testing.T, visitors ...sdkcodegen.Visitor) {
 }
 
 // promoteToApp turns a fixture project into a framework application: a main
-// package (newTestContext already wrote one) requiring go.putnami.dev/app in the
-// block form usesPutnamiApp matches. That flips describeWillCommit -> true, so
+// package (newTestContext already wrote one) requiring and importing
+// go.putnami.dev/app. That flips describeWillCommit -> true, so
 // build-generate defers the committed sidecars to build-describe — and it is the
 // shape a project must have to opt out of committing generated schemas at all,
 // because describe is what owns and restores the ceded .gen/schema tree.
@@ -61,6 +61,9 @@ func promoteToApp(t *testing.T, ctx *pctx.Context) {
 	gomod := "module example.com/test\n\nrequire (\n\tgo.putnami.dev/app v0.1.0\n)\n"
 	if err := os.WriteFile(filepath.Join(ctx.Project.FullPath, "go.mod"), []byte(gomod), 0o644); err != nil {
 		t.Fatalf("writing go.mod: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(ctx.Project.FullPath, "main.go"), []byte("package main\nimport _ \"go.putnami.dev/app\"\n"), 0o644); err != nil {
+		t.Fatalf("writing main.go: %v", err)
 	}
 }
 
@@ -913,13 +916,8 @@ func TestRunSyncsCommittedInfraRequirements(t *testing.T) {
 func TestRunDefersCommittedSidecarsWhenDescribeWillRun(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "single-schema-committer", "generate-defers-the-committed-sidecar-when-describe-will-run")
 	ctx := newTestContext(t)
-	// Promote the fixture to a framework app: require go.putnami.dev/app in the
-	// block form usesPutnamiApp matches, on top of the main.go newTestContext
-	// already wrote. This flips describeWillCommit -> true.
-	gomod := "module example.com/test\n\nrequire (\n\tgo.putnami.dev/app v0.1.0\n)\n"
-	if err := os.WriteFile(filepath.Join(ctx.Project.FullPath, "go.mod"), []byte(gomod), 0o644); err != nil {
-		t.Fatalf("writing go.mod: %v", err)
-	}
+	// Promote the fixture to a framework app with an authored import.
+	promoteToApp(t, ctx)
 	// A sensitive config field would, absent deferral, sync a committed
 	// requirements.json (exactly what TestRunSyncsCommittedInfraRequirements
 	// asserts for a non-app project).
@@ -982,7 +980,7 @@ func newAppContext(t *testing.T) *pctx.Context {
 		t.Fatalf("writing go.mod: %v", err)
 	}
 	configSrc := "package main\n\n" +
-		"import \"go.putnami.dev/config\"\n\n" +
+		"import (\n_ \"go.putnami.dev/app\"\n\"go.putnami.dev/config\"\n)\n\n" +
 		"type ServerOptions struct {\n" +
 		"\tHost string `json:\"host\"`\n" +
 		"}\n\n" +
@@ -1137,7 +1135,7 @@ func TestConfigSchemaDescribeWritesNothingWhenNoConfigAtAll(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(projectPath, "go.mod"), []byte(gomod), 0o644); err != nil {
 		t.Fatalf("writing go.mod: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(projectPath, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(projectPath, "main.go"), []byte("package main\n\nimport _ \"go.putnami.dev/app\"\n\nfunc main() {}\n"), 0o644); err != nil {
 		t.Fatalf("writing main.go: %v", err)
 	}
 

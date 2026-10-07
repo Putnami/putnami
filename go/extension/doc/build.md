@@ -272,6 +272,8 @@ there would serve a stored verdict for a test the run never executed.
    - Writes generated schemas under `.gen/schema/`
    - Copies committed schemas to `schema/` unless `options.generate.schema=false`
 3. **Describe** (only for projects that import `go.putnami.dev/app`):
+   - Requires an app import in authored, non-test Go source; generated client
+     wiring alone does not make a CLI a describable framework application
    - Compiles the configured describe entrypoint for the host platform, with the
      compile step's build configuration (everything but `-ldflags`, which reaches
      the link action alone)

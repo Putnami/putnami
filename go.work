@@ -77,6 +77,7 @@ use (
 	./protocols/workspace
 	./python/extension
 	./sites/telemetry.putnami.dev
+	./intelligence/agent-readiness
 	./tooling/cli
 	./tooling/cli-documents
 	./tooling/cli-model
