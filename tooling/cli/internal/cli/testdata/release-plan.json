@@ -26,6 +26,7 @@
     ],
     "scopes": [
       "go",
+      "intelligence",
       "protocols",
       "python",
       "sites",
@@ -43,6 +44,7 @@
       "priority/p2",
       "priority/p3",
       "scope/go",
+      "scope/intelligence",
       "scope/protocols",
       "scope/python",
       "scope/sites",
@@ -146,6 +148,17 @@
       ],
       "rollbackPoint": "the previous extension archive channel pointer",
       "reversal": "Repoint the extension archive channel at the previous version. Installed workspaces are unaffected because the lock pins a resolved version, so the rollback only changes what a new resolve returns."
+    },
+    {
+      "id": "intelligence-extensions",
+      "channels": [
+        "archives"
+      ],
+      "artifacts": [
+        "@putnami/agent-readiness"
+      ],
+      "rollbackPoint": "the previous agent-readiness extension archive channel pointer",
+      "reversal": "Repoint the agent-readiness archive channel at the previous version. Installed workspaces keep their pinned archive digest, so the rollback changes only what a new resolve returns."
     },
     {
       "id": "cli",

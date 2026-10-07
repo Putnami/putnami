@@ -191,6 +191,10 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("typescript", "framework", "ui", ManifestFilename):          true,
 		filepath.Join("typescript", "framework", "web", ManifestFilename):         true,
 		filepath.Join("typescript", "framework", "spectest", ManifestFilename):    true,
+
+		// This extension declares executable acceptance criteria in its v2 manifest.
+		filepath.Join("intelligence", "agent-readiness", ManifestFilename): true,
+
 		// The two client-matrix samples author their checks in the verification
 		// block, which only exists from version 2.
 		filepath.Join("go", "samples", "service-to-service", ManifestFilename):            true,

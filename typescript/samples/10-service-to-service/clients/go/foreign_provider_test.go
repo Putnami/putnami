@@ -9,9 +9,9 @@ package itemsclient_test
 // marker (protocols/runtime/ready_marker.go) — no port file, no scan, no sleep.
 // It kills and reaps the process in its cleanup, so no child survives the task.
 //
-// Two deviations from D0.5 §3, both forced and both narrow:
+// One deviation from D0.5 §3 remains:
 //
-//  1. §3.1 asks for the artifact `build` produced. A TypeScript project's
+//  §3.1 asks for the artifact `build` produced. A TypeScript project's
 //     transpiled bundle is not runnable from the per-command output directory:
 //     workspace packages are installed into each project's own node_modules and
 //     Bun resolves them from the entry file upward. The test therefore launches
@@ -20,12 +20,10 @@ package itemsclient_test
 //     returns, which is what the TypeScript extension's toolchain.ResolveBun
 //     resolves too.
 //
-//  2. §3.3 asks for PORT=0. This provider is also its own consumer: `/proxy`
-//     calls the provider through the generated client, so its configuration must
-//     carry its own base URL before it starts, and PORT=0 cannot supply one. The
-//     test reserves a free port, passes it as PORT and inside CONFIG_DATA, and
-//     then asserts through the readiness marker that the provider bound exactly
-//     that port. Readiness still comes from the marker, never from a sleep.
+// The provider also consumes its own generated client through `/proxy`. A
+// loopback reverse proxy keeps its listener while Bun binds PORT=0 and forwards
+// to the endpoint announced by the ready marker. That supplies a live client
+// binding before provider startup without guessing or releasing Bun's port.
 
 import (
 	"bufio"
@@ -35,12 +33,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -124,13 +126,26 @@ func startForeignProviderInstance(t *testing.T) *foreignProvider {
 		t.Fatalf("provider entrypoint %s: %v", entrypoint, err)
 	}
 
-	port := reserveLoopbackPort(t)
-	baseURL := fmt.Sprintf("http://localhost:%d", port)
+	var forward atomic.Pointer[httputil.ReverseProxy]
+	selfClient := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		proxy := forward.Load()
+		if proxy == nil {
+			http.Error(response, "provider is not ready", http.StatusServiceUnavailable)
+			return
+		}
+		proxy.ServeHTTP(response, request)
+	}))
+	t.Cleanup(selfClient.Close)
 	configData, err := json.Marshal(map[string]any{
 		"clients": map[string]any{
 			"clientId": "cross-language-provider",
 			"services": map[string]any{
-				serviceID: map[string]any{"url": baseURL, "allowInsecure": true},
+				serviceID: map[string]any{
+					"url": selfClient.URL, "allowInsecure": true,
+					"credentials": map[string]any{
+						"catalog-key": map[string]any{"source": "static", "value": catalogAPIKey},
+					},
+				},
 			},
 		},
 	})
@@ -142,7 +157,7 @@ func startForeignProviderInstance(t *testing.T) *foreignProvider {
 	command := exec.CommandContext(ctx, bunBin, entrypoint)
 	command.Dir = filepath.Join(root, providerProject)
 	command.Env = append(os.Environ(),
-		fmt.Sprintf("PORT=%d", port),
+		"PORT=0",
 		"APP_ENV=test",
 		"CONFIG_DATA="+string(configData),
 		// The TypeScript runtime resolves the project root from
@@ -167,7 +182,7 @@ func startForeignProviderInstance(t *testing.T) *foreignProvider {
 	transcript := &syncBuffer{}
 	exited := make(chan struct{})
 	var waitErr error
-	found := make(chan int, 1)
+	found := make(chan runtimeprotocol.ReadyEndpoint, 1)
 	go func() {
 		scanner := bufio.NewScanner(io.TeeReader(stdout, transcript))
 		scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
@@ -176,9 +191,9 @@ func startForeignProviderInstance(t *testing.T) *foreignProvider {
 			if announced {
 				continue
 			}
-			if bound, ok := readyPort(scanner.Bytes()); ok {
+			if endpoint, ok := readyEndpoint(scanner.Bytes()); ok {
 				announced = true
-				found <- bound
+				found <- endpoint
 			}
 		}
 	}()
@@ -200,10 +215,13 @@ func startForeignProviderInstance(t *testing.T) *foreignProvider {
 	})
 
 	select {
-	case bound := <-found:
-		if bound != port {
-			t.Fatalf("provider bound port %d, want the port it was asked to bind (%d)", bound, port)
+	case endpoint := <-found:
+		baseURL := endpoint.URL()
+		target, err := url.Parse(baseURL)
+		if err != nil {
+			t.Fatalf("parse provider ready endpoint %q: %v", baseURL, err)
 		}
+		forward.Store(httputil.NewSingleHostReverseProxy(target))
 		return &foreignProvider{baseURL: baseURL, process: command.Process, exited: exited}
 	case <-exited:
 		t.Fatalf("provider exited before announcing readiness (%v); output:\n%s", waitErr, transcript.String())
@@ -234,33 +252,18 @@ func (buffer *syncBuffer) String() string {
 	return string(buffer.bytes)
 }
 
-// reserveLoopbackPort asks the kernel for a free port and releases it. See the
-// deviation note at the top of this file for why PORT=0 cannot be used here.
-func reserveLoopbackPort(t *testing.T) int {
-	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	port := listener.Addr().(*net.TCPAddr).Port
-	if err := listener.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return port
-}
-
-// readyPort extracts the bound port from one structured log line. It comes from
-// the LISTENER the provider actually bound, never from configuration.
-func readyPort(line []byte) (int, bool) {
+// readyEndpoint extracts the bound address from one structured log line. It
+// comes from the listener the provider actually bound, not configuration.
+func readyEndpoint(line []byte) (runtimeprotocol.ReadyEndpoint, bool) {
 	record := map[string]any{}
 	if err := json.Unmarshal(line, &record); err != nil {
-		return 0, false
+		return runtimeprotocol.ReadyEndpoint{}, false
 	}
 	ready, ok := runtimeprotocol.ReadyMarkerFromLogRecord(record)
 	if !ok || len(ready.Endpoints) == 0 {
-		return 0, false
+		return runtimeprotocol.ReadyEndpoint{}, false
 	}
-	return ready.Endpoints[0].Port, true
+	return ready.Endpoints[0], true
 }
 
 // boundClient resolves the generated client the way an application does. The
@@ -350,6 +353,36 @@ func TestTypeScriptProviderAnswersTheGeneratedGoClient(t *testing.T) {
 	}
 	if len(filtered.Items) != 1 || filtered.Items[0].Name != "Gadget" {
 		t.Fatalf("filtered items = %+v, want only Gadget", filtered.Items)
+	}
+}
+
+// The provider's generated self-client uses its live proxy binding after Bun
+// announces the actual ephemeral endpoint; no reserved port is handed to Bun.
+func TestTypeScriptProviderSelfClientUsesReadyEndpoint(t *testing.T) {
+	baseURL := startForeignProvider(t)
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, baseURL+"/proxy", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := (&http.Client{Timeout: 5 * time.Second}).Do(request)
+	if err != nil {
+		t.Fatalf("call provider self-client: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+		t.Fatalf("provider self-client status = %d, body = %s", response.StatusCode, body)
+	}
+	var body struct {
+		Message string            `json:"message"`
+		Tenant  string            `json:"tenant"`
+		Items   []json.RawMessage `json:"items"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode provider self-client response: %v", err)
+	}
+	if body.Message != "Fetched items through the generated service binding" || body.Tenant != "sample-tenant" || len(body.Items) < 3 {
+		t.Fatalf("provider self-client response = %+v", body)
 	}
 }
 

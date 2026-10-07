@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/agent-readiness",
+  "description": "Anonymous agent-readiness CLI and repository collector.",
+  "tags": [
+    "go",
+    "extension"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension",
+    "/tooling/clientgen-extension"
+  ],
+  "options": {
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-agent-readiness",
+      "version-var": "main.runtimeVersion"
+    },
+    "test": {
+      "filePatterns": [
+        "putnami.extension.json",
+        "schema/*.json"
+      ]
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true
+    }
+  }
+}

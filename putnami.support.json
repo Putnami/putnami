@@ -8,6 +8,11 @@
       "status": "stable"
     },
     {
+      "id": "@putnami/agent-readiness",
+      "kind": "package",
+      "status": "preview"
+    },
+    {
       "id": "@putnami/analytics",
       "kind": "package",
       "status": "preview",

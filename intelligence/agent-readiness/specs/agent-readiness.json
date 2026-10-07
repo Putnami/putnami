@@ -1,0 +1,29 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "intelligence/agent-readiness",
+  "outcomes": [
+    "Anyone can install and inspect the public agent-readiness CLI and collector independently of hosted Intelligence, then inspect its private payload or obtain a scored report from the existing service."
+  ],
+  "nonGoals": [
+    "Moving server-side scoring, report storage, report UI, hosted Intelligence commands or the published method.",
+    "Changing marker definitions, thresholds or public support status."
+  ],
+  "requirements": [
+    {
+      "id": "public-extension",
+      "text": "The separately installable extension runs without a workspace, account, cloud setup or private Go module; its runtime identifies @putnami/agent-readiness."
+    },
+    {
+      "id": "private-payload",
+      "text": "Collection reads committed Git history, emits schema v1 method 0.4 counts and repository-relative paths, checks privacy before output or submission, leaves the repository untouched, and print-payload performs no network request."
+    },
+    {
+      "id": "anonymous-submit",
+      "text": "Submission sends the exact collected payload bytes anonymously to the existing reports endpoint once, renders the returned verdict and link, and returns an API error for failed or invalid responses; timeout and structured output follow the shared CLI contract."
+    }
+  ],
+  "decisions": [
+    "intelligence/agent-readiness/doc/adr/0001-public-cli-extension.md"
+  ]
+}

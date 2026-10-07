@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"debug/buildinfo"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -12,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -391,26 +396,72 @@ func readConfigDepsFragment(genDir string) ([]protocfg.Block, error) {
 	return doc.Blocks, nil
 }
 
-// usesPutnamiApp reports whether the project's go.mod requires
-// go.putnami.dev/app. Describe mode only honors PUTNAMI_DESCRIBE on apps
-// built with the framework — running a generic Go binary with the env set
-// either does nothing or exits non-zero, so we gate on this signal.
-//
-// We parse go.mod textually rather than running `go list` to keep the
-// gate cheap (sub-millisecond) on the hot path of every Go test/build.
+// usesPutnamiApp requires an authored import of the framework app in this
+// module. A generated client also imports app for its optional DI registration,
+// but that does not make the project's executable a describable application.
+// Local helper packages count: a main package may delegate app construction.
 func usesPutnamiApp(projectPath string) bool {
 	data, err := os.ReadFile(filepath.Join(projectPath, "go.mod"))
 	if err != nil {
 		return false
 	}
+	requiresApp := false
 	for line := range strings.SplitSeq(string(data), "\n") {
-		trimmed := strings.TrimSpace(line)
-		// Match `go.putnami.dev/app vX.Y.Z` directly or inside `require ( … )` blocks.
-		if strings.HasPrefix(trimmed, "go.putnami.dev/app ") || strings.HasPrefix(trimmed, "go.putnami.dev/app\t") {
-			return true
+		fields := strings.Fields(line)
+		// Match both `require go.putnami.dev/app vX.Y.Z` and entries
+		// inside a `require ( … )` block.
+		if len(fields) >= 2 && fields[0] == "go.putnami.dev/app" ||
+			len(fields) >= 3 && fields[0] == "require" && fields[1] == "go.putnami.dev/app" {
+			requiresApp = true
+			break
 		}
 	}
-	return false
+	if !requiresApp {
+		return false
+	}
+	found := false
+	err = filepath.WalkDir(projectPath, func(filePath string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			if filePath != projectPath {
+				if _, statErr := os.Stat(filepath.Join(filePath, "go.mod")); statErr == nil {
+					return filepath.SkipDir
+				} else if !errors.Is(statErr, os.ErrNotExist) {
+					return statErr
+				}
+			}
+			if filePath != projectPath && (strings.HasPrefix(entry.Name(), ".") ||
+				entry.Name() == "vendor" || entry.Name() == "node_modules" || entry.Name() == "testdata") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(filePath, ".go") || strings.HasSuffix(filePath, "_test.go") {
+			return nil
+		}
+		parsed, parseErr := parser.ParseFile(token.NewFileSet(), filePath, nil, parser.ImportsOnly|parser.ParseComments)
+		if parseErr != nil {
+			return parseErr
+		}
+		if ast.IsGenerated(parsed) {
+			return nil
+		}
+		for _, imported := range parsed.Imports {
+			path, unquoteErr := strconv.Unquote(imported.Path.Value)
+			if unquoteErr != nil {
+				return unquoteErr
+			}
+			if path == "go.putnami.dev/app" {
+				found = true
+				return filepath.SkipAll
+			}
+		}
+		return nil
+	})
+	// An unreadable source tree must not silently suppress a required describe.
+	return found || err != nil
 }
 
 // describeWillCommit reports whether the describe phase will run for projectPath

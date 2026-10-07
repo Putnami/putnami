@@ -1,10 +1,12 @@
 package clientgen
 
 import (
-	"io/fs"
+	"bytes"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -112,35 +114,39 @@ func coveredByKey(input, projectRel string, projectGlobs, workspaceGlobs []strin
 	return false
 }
 
-// biomeConfiguredDirectories returns every directory of the real repository
-// that owns a biome.json, plus the workspace root itself. Walking rather than
-// listing keeps this test honest when a project gains its own configuration.
+// biomeConfiguredDirectories returns the root and every directory with a
+// Biome configuration in Git's tracked or non-ignored untracked candidate set.
+// That is the same source surface the CLI uses for Git-backed cache inputs.
 func biomeConfiguredDirectories(t *testing.T, workspaceRoot string) []string {
 	t.Helper()
 	seen := map[string]bool{".": true}
-	err := filepath.WalkDir(workspaceRoot, func(full string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
-			switch entry.Name() {
-			case "node_modules", ".git", ".putnami", "out", "dist", "vendor":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if entry.Name() != "biome.json" {
-			return nil
-		}
-		rel, relErr := filepath.Rel(workspaceRoot, filepath.Dir(full))
-		if relErr != nil {
-			return relErr
-		}
-		seen[filepath.ToSlash(rel)] = true
-		return nil
-	})
+	cmd := exec.Command("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+	cmd.Dir = workspaceRoot
+	paths, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("walk repository for Biome configurations: %v", err)
+		t.Fatalf("list Git candidate files for Biome configurations: %v", err)
+	}
+	if len(paths) > 0 && paths[len(paths)-1] != 0 {
+		t.Fatal("Git candidate paths are not NUL-terminated")
+	}
+	for _, candidate := range bytes.Split(paths, []byte{0}) {
+		if len(candidate) == 0 {
+			continue
+		}
+		rel := filepath.FromSlash(string(candidate))
+		if filepath.Base(rel) != "biome.json" {
+			continue
+		}
+		info, statErr := os.Stat(filepath.Join(workspaceRoot, rel))
+		if os.IsNotExist(statErr) {
+			continue // Git also lists tracked files deleted from the worktree.
+		}
+		if statErr != nil {
+			t.Fatalf("inspect Biome configuration %q: %v", rel, statErr)
+		}
+		if info.Mode().IsRegular() {
+			seen[filepath.ToSlash(filepath.Dir(rel))] = true
+		}
 	}
 	directories := make([]string, 0, len(seen))
 	for directory := range seen {
@@ -148,6 +154,38 @@ func biomeConfiguredDirectories(t *testing.T, workspaceRoot string) []string {
 	}
 	sort.Strings(directories)
 	return directories
+}
+
+func TestBiomeConfiguredDirectoriesFollowGitCandidates(t *testing.T) {
+	root := t.TempDir()
+	write := func(rel, contents string) {
+		t.Helper()
+		full := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = root
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, output)
+		}
+	}
+	runGit("init", "--quiet")
+	write(".gitignore", "ignored/\n")
+	write("tracked/biome.json", "{}")
+	write("untracked/biome.json", "{}")
+	write("ignored/nested/biome.json", "{}")
+	runGit("add", ".gitignore", "tracked/biome.json")
+
+	if got, want := biomeConfiguredDirectories(t, root), []string{".", "tracked", "untracked"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Biome configuration directories = %v, want %v", got, want)
+	}
 }
 
 // repositoryRoot resolves the workspace this project lives in, so the test

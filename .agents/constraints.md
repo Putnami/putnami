@@ -28,6 +28,7 @@ Framework reference is served live by the `putnami` MCP server's versioned `putn
 The repo is organized by ownership — each language ecosystem is self-contained. Full rules live in CONTRIBUTING.md (Repository Layout); the short map:
 
 - `tooling/` — workspace-wide machinery: the CLI (`tooling/cli`, Go), extension SDK, scaffold, client generator, SDD extension, agent workflows, hooks, and tooling samples.
+- `intelligence/` — public Intelligence extensions, including the agent-readiness CLI and repository collector.
 - `protocols/` — cross-pillar wire contracts (JSON schemas + fixture corpora) shared by frameworks, tooling, and platform. Structured CLI output, workspace/project config, extension manifests, features, support status, and the other contracts are defined here.
 - `typescript/`, `go/`, `python/` — each language root follows the same shape: `extension/` (owns the generic lifecycle jobs: build, test, lint, serve, package), `framework/` (runtime APIs — Go modules publish as `go.putnami.dev/*`), `templates/`, `samples/`. Framework packages must not compete with the language extension for generic lifecycle command names; extension identity is manifest- and package-driven, not path-driven.
 - `sites/` — deployed sites: `sites/putnami.dev` (documentation) and `sites/telemetry.putnami.dev` (CLI-usage receiver).
@@ -69,12 +70,12 @@ Docs live next to the thing they describe, in each package's `doc/` folder; `sit
 ## Repository Conventions
 
 - Put persistent project-specific instructions in this file. Nothing regenerates it.
-- Keep product-code changes inside the owning domain (tooling/, protocols/, go/, typescript/, python/, sites/). Agent guidance and host configuration belong in the established .agents/, .claude/, and .codex/ roots.
+- Keep product-code changes inside the owning domain (tooling/, intelligence/, protocols/, go/, typescript/, python/, sites/). Agent guidance and host configuration belong in the established .agents/, .claude/, and .codex/ roots.
 - Do not add tracked files under retired roots such as apps/, core/, extensions/, framework/, packages/, web/, samples/, scripts/, or docs/.
 - For user-facing changes, update adjacent docs in the same owning domain, in the same PR.
 - A change that adds or alters user-visible behavior also carries its product intent: a feature declaration in the owning project's `putnami.features.json`, one spec under `specs/`, and — when the change rests on a durable choice — a decision record under `<project>/doc/adr/`. Never hand-write feature evidence; build and test producers emit it.
 - A public support status is a separate, reviewed decision recorded only in `putnami.support.json` (rules in `protocols/support`). Do not claim one in prose, and do not add an entry without that review.
-- A domain is a top-level scope: a root directory whose `putnami.json` is a scope manifest (`tooling/`, `protocols/`, `go/`, `typescript/`, `python/`, `sites/`). Its projects are that scope's `includes`.
+- A domain is a top-level scope: a root directory whose `putnami.json` is a scope manifest (`tooling/`, `intelligence/`, `protocols/`, `go/`, `typescript/`, `python/`, `sites/`). Its projects are that scope's `includes`.
 - Write every GitHub artifact (issue, pull request, comment, commit message) and every code comment and doc in English, whatever the language of the conversation. The only exceptions are UTF-8 test fixtures and proper nouns such as RGPD or CNIL. `bash .agents/skills/check/scripts/english-only.sh` is the shared detector: the fix finalizer refuses a non-English PR, `/check` runs it on the branch, and `/audit` files the remaining debt under `prop/language`.
 - A code comment states the contract of the code next to it, never its history. Do not write why a guard exists, which incident motivated it, which issue or PR introduced it, or what would break without it: state the rule in the present tense, or say nothing. A lint escape (`//nolint`, `as any`, `@ts-ignore`, `biome-ignore`) is a change to the code or to the lint rule, not a comment to justify; `/audit --prune` removes both classes.
 - Use Conventional Commit style for both commit messages and PR titles: `type(scope): summary` when a useful scope exists, otherwise `type: summary`.

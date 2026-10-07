@@ -47,6 +47,13 @@ describe('agent-readiness method link', () => {
 });
 
 describe('agent-readiness hosted schemas', () => {
+  it('keeps hosted schemas identical to the public collector contract', () => {
+    const collectorRoot = join(WORKSPACE_ROOT, 'intelligence', 'agent-readiness', 'schema');
+    for (const name of readdirSync(HOSTED_ROOT)) {
+      expect(readFileSync(join(HOSTED_ROOT, name), 'utf8')).toBe(readFileSync(join(collectorRoot, name), 'utf8'));
+    }
+  });
+
   it('publishes the payload and report schemas at their $id', () => {
     const plan = planSchemaPublications(discoverSchemaSources(WORKSPACE_ROOT, { sources: [HOSTED_SCHEMAS] }));
     expect(plan.map((p) => p.urlPath).sort()).toEqual([

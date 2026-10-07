@@ -215,6 +215,7 @@ holds nothing you do not.
 The repo is organized by ownership — each language ecosystem is self-contained:
 
 - `tooling/` — workspace-wide machinery: CLI, extension SDK, scaffold, client generator, tooling samples
+- `intelligence/` — public Intelligence extensions, including the agent-readiness CLI and repository collector
 - `protocols/` — cross-pillar wire contracts (schemas + fixtures) shared by frameworks, tooling, and platform
 - `typescript/` — TypeScript extension, frameworks, templates, samples
 - `go/` — Go extension, frameworks, templates, and samples (`go.putnami.dev/*`)

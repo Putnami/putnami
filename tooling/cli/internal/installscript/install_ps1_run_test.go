@@ -931,17 +931,23 @@ func TestInstallPS1RunRefusesACommandTheMapDoesNotList(t *testing.T) {
 	}
 }
 
-// The shipped map lists nothing, and install.ps1 reads it as such, not as a
-// malformed map.
-func TestInstallPS1RunReadsTheShippedMapAsEmpty(t *testing.T) {
+// The shipped map resolves agent-readiness through its public extension.
+func TestInstallPS1RunReadsTheShippedMap(t *testing.T) {
 	t.Parallel()
 	shipped := readFile(t, filepath.Join(filepath.Dir(installScriptPath(t)), "install-commands.txt"))
 	r := newPS1RunEnv(t, string(shipped), 0)
-	res := r.run(t, "--run", "deploy")
-	r.assertRefusedBeforeInstalling(t, res)
-	if !strings.Contains(res.stderr, "does not list it") {
-		t.Fatalf("the shipped map was not read as an empty map:\n%s", res.output())
+	res := r.run(t, "--run", "agent-readiness")
+	if res.exitCode != 0 {
+		t.Fatalf("run failed (exit %d):\n%s", res.exitCode, res.output())
 	}
+	want := []string{
+		"pin argv=extensions install --user --latest @putnami/agent-readiness",
+		"run argv=agent-readiness",
+	}
+	if got := r.cliCalls(t); len(got) < 2 || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("CLI calls = %q, want %q first\n%s", got, want, res.output())
+	}
+	assertGitDirUntouched(t, r.callerDir)
 }
 
 func TestInstallPS1RunIgnoresBlankAndIndentedCommentLines(t *testing.T) {

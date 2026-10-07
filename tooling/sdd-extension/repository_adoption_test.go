@@ -61,6 +61,9 @@ var declaredDomains = []string{
 // mapping them would inflate the coverage number without authorizing anything
 // real. A sample that grows into a first-party workload stops being a
 // sample — the fix is to map it, not to widen this reason.
+// The standalone Intelligence collector is excluded separately: no repository
+// project consumes its anonymous payload, and no existing domain owns the
+// external report's assessment semantics.
 var excludedProjects = map[string]string{
 	"/go/samples/application":                              reasonSample,
 	"/go/samples/capabilities-proof":                       reasonSample,
@@ -75,6 +78,7 @@ var excludedProjects = map[string]string{
 	"/go/templates/go-library":                             reasonTemplate,
 	"/go/templates/go-server":                              reasonTemplate,
 	"/go/templates/proof":                                  reasonTemplateProof,
+	"/intelligence/agent-readiness":                        reasonAgentReadinessCollector,
 	"/python/samples/application":                          reasonSample,
 	"/python/samples/library":                              reasonSample,
 	"/python/templates/python-library":                     reasonTemplate,
@@ -102,10 +106,11 @@ var excludedProjects = map[string]string{
 }
 
 const (
-	reasonSample          = "sample: an executable proof of the public API, owned by the language vertical it demonstrates"
-	reasonTemplate        = "template: scaffold input packaged by @putnami/scaffold, owned by the language vertical"
-	reasonGeneratedClient = "generated client: produced by @putnami/clientgen inside a sample, owned by the sample"
-	reasonTemplateProof   = "template proof: renders the templates beside it against the workspace framework and runs their tests, owned by the language vertical"
+	reasonSample                  = "sample: an executable proof of the public API, owned by the language vertical it demonstrates"
+	reasonTemplate                = "template: scaffold input packaged by @putnami/scaffold, owned by the language vertical"
+	reasonGeneratedClient         = "generated client: produced by @putnami/clientgen inside a sample, owned by the sample"
+	reasonTemplateProof           = "template proof: renders the templates beside it against the workspace framework and runs their tests, owned by the language vertical"
+	reasonAgentReadinessCollector = "standalone Intelligence repository collector: no repository project consumes its anonymous payload or owns the external report's assessment semantics, owned by intelligence"
 )
 
 // expectedEvidenceRows is every DARC evidence row this repository commits, as the

@@ -20,4 +20,4 @@ putnami.install-commands.v1
 # An extension owner adds its entry by pull request. The command must declare
 # that it runs without a workspace.
 
-agent-readiness @putnami/intelligence
+agent-readiness @putnami/agent-readiness

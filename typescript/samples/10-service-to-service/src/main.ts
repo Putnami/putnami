@@ -15,14 +15,14 @@ const DEFAULT_PORT = 3910;
 /**
  * The port this instance serves: the caller's, else `PORT`, else the sample's
  * declared one. `PORT=0` asks for an ephemeral port — what `putnami compose`
- * and `putnami qualify` pass so two instances never collide — and this
- * provider binds its own client before it listens, so it reserves the port now
- * rather than learning it at listen time. The ready marker still reports the
- * port the server bound.
+ * and `putnami qualify` pass so two instances never collide. With an explicit
+ * client binding, Bun can bind port zero atomically and announce its actual
+ * port in the ready marker. Otherwise the provider binds its own client before
+ * listening and must resolve a port for that binding first.
  */
 function resolvePort(requested?: number): number {
   const port = requested ?? Number(process.env['PORT'] ?? DEFAULT_PORT);
-  if (Number.isInteger(port) && port > 0) return port;
+  if (Number.isInteger(port) && (port > 0 || (port === 0 && hasConfiguredServiceBinding()))) return port;
   const reservation = Bun.serve({ port: 0, fetch: () => new Response(null, { status: 503 }) });
   const reserved: number = reservation.port ?? DEFAULT_PORT;
   reservation.stop(true);
@@ -37,9 +37,13 @@ function resolvePort(requested?: number): number {
  * provider binds itself to the port it serves, with the key it accepts; no
  * consumer wrote a URL, and no other instance is reached.
  */
-function selfBinding(port: number): ServiceBinding | undefined {
+function hasConfiguredServiceBinding(): boolean {
   const services = useRawConfigSection('clients')?.['services'];
-  if (services && typeof services === 'object' && SERVICE_ID in services) return undefined;
+  return services !== null && typeof services === 'object' && SERVICE_ID in services;
+}
+
+function selfBinding(port: number): ServiceBinding | undefined {
+  if (hasConfiguredServiceBinding()) return undefined;
   return {
     url: `http://localhost:${port}`,
     clientId: 'service-to-service-sample',

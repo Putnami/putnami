@@ -236,7 +236,7 @@ The map the framework ships lists these commands:
 
 | Command | Extension | One line |
 |---|---|---|
-| `agent-readiness` | `@putnami/intelligence` | `curl -fsSL "https://putnami.dev/install.sh?run=agent-readiness" \| bash` |
+| `agent-readiness` | `@putnami/agent-readiness` | `curl -fsSL "https://putnami.dev/install.sh?run=agent-readiness" \| bash` |
 
 An extension owner adds an entry by pull request against
 `tooling/cli/scripts/install-commands.txt`, and adds the command to the table
@@ -1031,7 +1031,7 @@ map is served the same way: removing an entry is a pull request against
 | `?run=` sets the command in one placeholder line, and `--run` and `PUTNAMI_RUN` win over it | `TestInstallScriptCarriesExactlyOneRunPlaceholder`, `TestRunUsesTheCommandTheSiteBakedIn` |
 | An invalid command name refuses before any network call, whether from `--run`, `PUTNAMI_RUN`, or the script | `TestRunRejectsAnInvalidCommandBeforeAnyNetworkCall` |
 | A command the map does not list, and a map that is malformed, lists a command twice, is missing, or is announced as over 1 MiB, all refuse before the CLI is downloaded or installed | `TestRunRefusesACommandTheMapDoesNotList`, `TestRunFailsClosedOnAMalformedCommandMap` |
-| The shipped map is well formed and empty | `TestShippedCommandMapIsWellFormedAndEmpty` |
+| The shipped map is well formed and pins each listed extension | `TestShippedCommandMapResolvesEveryListedCommand`, `TestInstallPS1RunReadsTheShippedMap` |
 | The map URL follows the registry's https-or-loopback rule | `TestRunRefusesAnInsecureCommandMapURL` |
 | `--no-agent-hosts` and `PUTNAMI_NO_AGENT_HOSTS` still apply with a command to run | `TestRunHonorsNoAgentHosts` |
 | The served `/install.sh` still contains the verification behavior | `sites/putnami.dev/test/app.test.ts` |

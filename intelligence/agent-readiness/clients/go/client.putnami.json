@@ -1,0 +1,41 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "intelligence-api",
+    "audience": "intelligence-api"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/intelligence/agent-readiness/clients/go",
+    "clients": [
+      {
+        "service": "intelligence-api",
+        "clientSymbol": "IntelligenceClient",
+        "bindingSymbol": "RegisterIntelligenceClient"
+      }
+    ]
+  },
+  "contractSha256": "399707e2b15b59528e4f37bab43dd186b5e1a702ab129aa921340fd55de2dc3a",
+  "operations": [
+    {
+      "operationId": "postV1_Intelligence_Agent-readiness_Reports",
+      "service": "intelligence-api",
+      "methodSymbol": "CreateV1IntelligenceAgentReadinessReports",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/intelligence/agent-readiness/reports",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "1c303520257189385030087e0f1d80cc5bba977bfa31de88dd1631bdac9f87be"
+    }
+  ]
+}

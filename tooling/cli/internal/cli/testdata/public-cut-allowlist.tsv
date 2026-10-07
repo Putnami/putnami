@@ -10,3 +10,11 @@ high-confidence-secret	go/framework/storage/s3_sign_test.go	aws-access-key-id	sh
 high-confidence-secret	tooling/cli/internal/jobs/invocation_test.go	private-key-block	sha256:3021d90eb9437b2d	1	Synthetic private-key-shaped scratch artifact used to prove invocation secret scrubbing.
 orphaned-history	.github/PULL_REQUEST_TEMPLATE.md	bare-tracker-reference	#123	1	Placeholder in the pull request template that shows contributors how to link an issue.
 orphaned-history	.github/PULL_REQUEST_TEMPLATE.md	bare-tracker-reference	#456	1	Placeholder in the pull request template that shows contributors how to link an issue.
+orphaned-history	intelligence/agent-readiness/history/agents_test.go	bare-tracker-reference	#11	2	Synthetic nested squash suffix proves a revert retains the quoted subject.
+orphaned-history	intelligence/agent-readiness/history/agents_test.go	bare-tracker-reference	#12	1	Synthetic squash suffix proves a revert with surrounding whitespace is read.
+orphaned-history	intelligence/agent-readiness/history/agents_test.go	bare-tracker-reference	#13	1	Synthetic outer squash suffix proves a revert with a numbered quoted subject is read.
+orphaned-history	intelligence/agent-readiness/history/history_test.go	bare-tracker-reference	#12	2	Synthetic non-prefix references prove a commit subject is not classified as a pull request.
+orphaned-history	intelligence/agent-readiness/history/history_test.go	bare-tracker-reference	#3691	1	Synthetic squash subject proves a pull request is recognized by its numbered suffix.
+orphaned-history	intelligence/agent-readiness/history/history_test.go	tracker-reference-word	pr 381	1	Synthetic Azure-style merge subject proves pull request recognition.
+orphaned-history	intelligence/agent-readiness/history/history_test.go	tracker-reference-word	pull request #12	1	Synthetic GitHub merge subject proves pull request recognition.
+orphaned-history	intelligence/agent-readiness/history/read_test.go	bare-tracker-reference	#12	2	Synthetic subject and title prove a revert matches a squashed change without its numbered suffix.

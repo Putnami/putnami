@@ -574,7 +574,7 @@ func TestRunRefusesACommandTheMapDoesNotList(t *testing.T) {
 // extension reference on its line. A change to install-commands.txt updates
 // this list in the same change.
 var shippedCommands = map[string]string{
-	"agent-readiness": "@putnami/intelligence",
+	"agent-readiness": "@putnami/agent-readiness",
 }
 
 // The shipped map is well-formed, lists exactly shippedCommands, and the
