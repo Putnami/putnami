@@ -17,7 +17,7 @@ import (
 // subject or title that is not newer than itself. A revert older than the
 // change it names, made on the branch before the change landed, undoes
 // nothing. The comparison leaves out
-// the "(#123)" a forge appends when it squashes a pull request: GitHub's
+// a forge's numbered squash suffix: GitHub's
 // revert quotes the title without it.
 func MarkChangesReverted(changes []Change, reverts []Revert, landing func(hash string) string) {
 	mark := func(i int, at int64) {

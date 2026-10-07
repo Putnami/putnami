@@ -1,9 +1,9 @@
 # Repository adoption matrix
 
-This repository maps **94 of its 131 projects** to **10 architecture domains**.
-The other **37 are excluded on purpose**: 28 samples, 7 templates and 2 template
-proofs. Every one of the 131 appears in a table below, mapped or excluded, with a
-reason.
+This repository maps **94 of its 132 projects** to **10 architecture domains**.
+The other **38 are excluded on purpose**: 28 samples, 7 templates, 2 template
+proofs, and the standalone agent-readiness CLI. Every one of the 132 appears in
+a table below, mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
 `putnami architecture validate` proves that every mapped project's cross-domain
@@ -234,13 +234,30 @@ owning none of their content.
 
 ## Excluded projects
 
-Three classes are excluded, for one shared reason: **a sample, a template and a
-template proof consume the public API; none of them owns a fact another project
-depends on.** A domain exists to hold an authority. These projects hold none, so
-mapping one would create a domain with nothing to decide, and 37 memberships
-nobody could review meaningfully.
+Samples, templates, and template proofs consume the public API without owning a
+fact another repository project depends on. The standalone agent-readiness CLI
+is also outside the current architecture frontier: it collects an anonymous
+repository payload, but no project in this repository consumes or depends on
+that payload. None of the existing domains owns its assessment semantics.
+Mapping it to one of them would imply authority that domain does not hold.
+Each exclusion has an owner and a condition for joining a domain.
 
-The three classes differ in what they *are*, so the exit condition differs too.
+### Standalone Intelligence CLI — 1 project
+
+**Why excluded:** the agent-readiness extension collects a repository-local
+payload for an optional external report. It does not decide workspace planning,
+ecosystem lifecycle results, or framework behavior, and no repository project
+depends on its payload. Its extension packaging alone does not make it an
+`extension-providers` member.
+
+**What would change it:** if a public project consumes its payload as an
+authoritative contract, or this repository starts owning the report's
+assessment semantics, review a matching Intelligence domain and the exact
+cross-domain permissions before adding it to the frontier.
+
+| Project | Class | Owner |
+|---|---|---|
+| `/intelligence/agent-readiness` | Standalone repository collector | `intelligence` |
 
 ### Samples — 28 projects
 

@@ -17,12 +17,12 @@ func TestGuardedSkipsLeaveTheReliableSignal(t *testing.T) {
 		lines []string
 		want  bool
 	}{
-		{"putnami-cloud database binding", []string{
+		{"database binding", []string{
 			"\tres, err := testprovider.Provision(ctx, opts)",
 			"\tif errors.Is(err, testprovider.ErrSkip) {",
 			"\t\tt.Skip(\"no usable test database binding (mode=skip)\")",
 		}, true},
-		{"putnami-cloud missing shell", []string{
+		{"missing shell", []string{
 			"\tif _, err := exec.LookPath(\"/bin/sh\"); err != nil {",
 			"\t\tt.Skip(\"/bin/sh unavailable on this platform\")",
 		}, true},
@@ -51,7 +51,7 @@ func TestGuardedSkipsLeaveTheReliableSignal(t *testing.T) {
 		{"blank line ends the search", []string{"\tif runtime.GOOS == \"windows\" {", "", "\tt.Skip(\"not written yet\")"}, false},
 		{"retries always count", []string{"\tif process.platform === 'win32' {", "  retries: 2,"}, false},
 		{"focused tests always count", []string{"if (process.platform === 'win32') {", "  it.only('works', () => {})"}, false},
-		{"junit unconditional", []string{"    @Disabled(\"until #12 lands\")"}, false},
+		{"junit unconditional", []string{"    @Disabled(\"until the dependency lands\")"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := GuardedSkip(tc.lines, len(tc.lines)-1-trailing(tc.lines)); got != tc.want {

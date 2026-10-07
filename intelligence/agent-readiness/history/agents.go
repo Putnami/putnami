@@ -77,7 +77,7 @@ func coAuthor(identity string) string {
 var revertedHash = regexp.MustCompile(`This reverts commit ([0-9a-f]{7,64})`)
 
 // revertedSubject matches the subject git and the forges write for a revert:
-// Revert "<subject>", with the squash suffix " (#123)" a forge may append.
+// Revert "<subject>", with an optional forge squash suffix.
 var revertedSubject = regexp.MustCompile(`^Revert "(.+)"(?:\s*\(#\d+\))?$`)
 
 // Revert is one revert commit of the window and what its message undoes.

@@ -197,8 +197,8 @@ Published schemas:
 
 ## Current repository adoption
 
-The Putnami repository maps **94 of its 131 projects to 10 domains** and
-excludes the other 37 with a reason and an owner each. There is no workspace-root
+The Putnami repository maps **94 of its 132 projects to 10 domains** and
+excludes the other 38 with a reason and an owner each. There is no workspace-root
 baseline and no waiver file: adoption started clean and every wave landed with
 its declarations complete, so there has never been debt to record.
 
@@ -228,11 +228,12 @@ its declarations complete, so there has never been debt to record.
 | `observability` | observability | 1 | Anonymous CLI-usage aggregates |
 | `public-docs` | public-docs | 1 | What the public documentation site publishes |
 
-The excluded 37 are the 28 samples, 7 templates and 2 template proofs. A sample
-is an executable proof of the public API, a template is a scaffold input and a
-template proof runs those inputs against the framework; none of them owns a
-fact, so mapping them would raise the coverage number without authorizing
-anything.
+The excluded 38 are the 28 samples, 7 templates, 2 template proofs, and the
+standalone agent-readiness repository collector. Samples and templates prove or
+seed the public API without owning a fact another repository project consumes.
+The collector produces an optional anonymous payload for an external report;
+no repository project consumes it, and no existing domain owns the assessment
+semantics. Mapping it now would imply an authority that domain does not hold.
 The full inventory, the reason for every exclusion, and the completion rule live
 in [`doc/repository-adoption-matrix.md`](doc/repository-adoption-matrix.md), and
 `TestEveryWorkspaceProjectIsClassified` in
