@@ -314,6 +314,47 @@ fanout := events.NewRedisPubSubTransport(events.RedisPubSubTransportConfig{
 
 `GooglePubSubTransport` and `RedisStreamTransport` are reliable handler transports. `RedisPubSubTransport` is live-only fanout and intentionally does not provide replay, competing consumers, retry, or DLQ.
 
+## Publishing to Google Cloud Pub/Sub
+
+To publish to Google Cloud Pub/Sub, you need no other module and no client
+code. Select the built-in transport in the workload's config:
+
+```yaml
+events:
+  transport: pubsub
+  delivery: push
+  pubsub:
+    projectId: my-project
+    topicTemplate: events-{topic}
+```
+
+Publishing `order.placed` then sends one message to
+`projects/my-project/topics/events-order.placed`. The transport authenticates
+with Application Default Credentials. On Google Cloud, that is the runtime
+service account, which needs `roles/pubsub.publisher` on the topic. On a laptop,
+run `gcloud auth application-default login` or set
+`GOOGLE_APPLICATION_CREDENTIALS`.
+
+The transport is publish-only, so set `events.delivery: push`: under pull
+delivery, subscribing a handler fails. To publish one channel to Pub/Sub while
+`events.transport` selects another transport, build it in code:
+
+```go
+transport, err := events.NewDirectPubSubTransport(events.PubSubBinding{
+    ProjectID:     "my-project",
+    TopicTemplate: "events-{topic}",
+})
+if err != nil {
+    return err
+}
+publisher := events.NewPublisher(OrderPlacedTopic, transport)
+```
+
+A transactional outbox relay can type-assert the transport to
+`events.DurablePublishTransport`. `ClassifyPublishError` tells it whether a
+failed publish is `permanent`, `retryable` or `ambiguous`; never publish an
+ambiguous message again automatically, because Pub/Sub may have accepted it.
+
 ## Managed Event Server Publishing
 
 Use `EventServerTransport` for managed workload publishing through the canonical

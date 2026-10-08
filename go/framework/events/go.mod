@@ -15,9 +15,11 @@ require (
 	go.putnami.dev/protocol/features v0.0.0
 	go.putnami.dev/protocol/infra v0.0.0
 	go.putnami.dev/security v0.0.1
+	golang.org/x/oauth2 v0.36.0
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	go.putnami.dev/cache v0.0.1 // indirect
 	go.putnami.dev/ctxutil v0.0.0 // indirect
 	go.putnami.dev/migration v0.0.0 // indirect

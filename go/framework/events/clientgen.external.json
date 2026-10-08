@@ -1,0 +1,28 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "Google Cloud Pub/Sub REST API v1 projects.topics.publish (cloud.google.com/pubsub/docs/reference/rest/v1/projects.topics/publish)",
+      "adapter": "go/framework/events/google_pubsub_direct.go",
+      "callsites": [
+        {
+          "path": "go/framework/events/google_pubsub_direct.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "467b483f0323661fdb841df6a38176240f396cac0d0e40a298f6381ff546bd20"
+        },
+        {
+          "path": "go/framework/events/google_pubsub_direct.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "0ff2f8401cb977dd4dc7e0e68c731ac68ea0afa351fae274ae6c896805c73bbd"
+        }
+      ],
+      "owner": "go.putnami.dev/events",
+      "tests": [
+        "go/framework/events/google_pubsub_direct_test.go"
+      ],
+      "reason": "Publishes events to Google Cloud Pub/Sub with an Application Default Credentials client."
+    }
+  ]
+}
