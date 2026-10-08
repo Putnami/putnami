@@ -303,9 +303,10 @@ type CacheKey struct {
 	// empty. Including it in the key prevents serving cached bytes that embed a
 	// stale version.
 	//
-	// It is the only field through which the commit reaches a key. Every other
-	// field describes the tree, so a task that leaves it empty keys the same at
-	// two commits that share one tree.
+	// It is the only field through which the commit reaches a key, apart from
+	// a build stamp a generate asset copies into the output (ExtraFiles). Every
+	// other field describes the tree, so a task that leaves it empty keys the
+	// same at two commits that share one tree.
 	EmbeddedVersion string
 
 	// SelectedProjects identifies the resolved command selection for a
@@ -344,6 +345,8 @@ type CacheKey struct {
 	// cross-project generate assets). A path under WorkspaceRoot contributes
 	// under its workspace-relative slash form, so the key does not depend on the
 	// checkout directory; any other path contributes as given (hashExtraFiles).
+	// A build stamp inside an asset keeps its commit fields, because the asset
+	// copies it into the output.
 	ExtraFiles []string
 
 	// UpstreamHashes are hashes from upstream task outputs that this
@@ -352,9 +355,10 @@ type CacheKey struct {
 }
 
 // cacheKeyVersion prefixes every computed key, so an entry written under one
-// key format is never served as a hit under another. It changes whenever a
-// field is added or what a field covers changes, and each change is a
-// deliberate one-time whole-cache miss.
+// key format is never served as a hit under another. It changes when a key
+// computation change could serve an existing address under a different
+// meaning. It stays when the change only moves keys to addresses no earlier
+// entry occupies (ADR 0059). Each change is a one-time whole-cache miss.
 const cacheKeyVersion = "v8"
 
 // ComputeHashUsing computes a SHA-256 cache key from all CacheKey fields,

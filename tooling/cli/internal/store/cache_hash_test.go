@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -838,8 +839,73 @@ func TestHashExtraFiles_NamesAPathUnderTheRootRelativeToIt(t *testing.T) {
 	})
 }
 
-// The .gen/version.json stamp describes the tree to a cache key. Its build time
-// names the invocation and its commit fields name the commit, so two stamps that
+// versionStampTestDocument is a build stamp as its writers leave it: the
+// scheduler's fields, the contentHash a TypeScript build merges in, and the
+// publication fields a Docker publish merges in.
+type versionStampTestDocument struct {
+	Name               string          `json:"name"`
+	Version            string          `json:"version"`
+	Suffix             string          `json:"suffix,omitempty"`
+	SHA                string          `json:"sha"`
+	Branch             string          `json:"branch"`
+	IsDirty            bool            `json:"isDirty"`
+	BuildTime          string          `json:"buildTime"`
+	CapabilityRoot     string          `json:"capabilityRoot"`
+	CapabilityPackages json.RawMessage `json:"capabilityPackages"`
+	ContentHash        string          `json:"contentHash"`
+	Image              string          `json:"image,omitempty"`
+	ImageDigest        string          `json:"image_digest,omitempty"`
+	Publish            json.RawMessage `json:"publish,omitempty"`
+}
+
+// versionStampTestPublished is the stamp of a tree after a run and a publish at
+// one pull request commit.
+var versionStampTestPublished = versionStampTestDocument{
+	Name:               "proj",
+	Version:            "0.3.1-20261003152506-4da6833",
+	Suffix:             "20261003152506-4da6833",
+	SHA:                "4da6833",
+	Branch:             "feature/x",
+	IsDirty:            true,
+	BuildTime:          "2026-10-03T15:25:06Z",
+	CapabilityRoot:     "../..",
+	CapabilityPackages: json.RawMessage(`[{"package":"proj","version":"0.3.1"}]`),
+	ContentHash:        "0123456789abcdef",
+	Image:              "registry.example/proj:0.3.1-20261003152506-4da6833",
+	ImageDigest:        "sha256:4da68334da68334da68334da68334da68334da68334da68334da68334da68334",
+	Publish:            json.RawMessage(`{"version":"0.3.1-20261003152506-4da6833"}`),
+}
+
+// versionStampTestChanges edit each top-level field of versionStampTestPublished
+// once, to the value another commit, run or tree gives it.
+var versionStampTestChanges = []struct {
+	field string
+	apply func(*versionStampTestDocument)
+}{
+	{"name", func(d *versionStampTestDocument) { d.Name = "renamed" }},
+	{"version", func(d *versionStampTestDocument) { d.Version = "0.3.1-20261004094924-a389c95" }},
+	{"suffix", func(d *versionStampTestDocument) { d.Suffix = "20261004094924-a389c95" }},
+	{"sha", func(d *versionStampTestDocument) { d.SHA = "a389c95" }},
+	{"branch", func(d *versionStampTestDocument) { d.Branch = "main" }},
+	{"isDirty", func(d *versionStampTestDocument) { d.IsDirty = false }},
+	{"buildTime", func(d *versionStampTestDocument) { d.BuildTime = "2026-10-04T09:49:24Z" }},
+	{"capabilityRoot", func(d *versionStampTestDocument) { d.CapabilityRoot = ".." }},
+	{"capabilityPackages", func(d *versionStampTestDocument) {
+		d.CapabilityPackages = json.RawMessage(`[{"package":"proj","version":"0.3.1"},{"package":"dep","version":"0.3.1"}]`)
+	}},
+	{"contentHash", func(d *versionStampTestDocument) { d.ContentHash = "fedcba9876543210" }},
+	{"image", func(d *versionStampTestDocument) { d.Image = "registry.example/proj:0.3.1-20261004094924-a389c95" }},
+	{"image_digest", func(d *versionStampTestDocument) {
+		d.ImageDigest = "sha256:a389c95a389c95a389c95a389c95a389c95a389c95a389c95a389c95a389c9"
+	}},
+	{"publish", func(d *versionStampTestDocument) {
+		d.Publish = json.RawMessage(`{"version":"0.3.1-20261004094924-a389c95"}`)
+	}},
+}
+
+// The .gen/version.json stamp describes the tree to a file-pattern input. Its
+// build time names the invocation, its commit fields name the commit, and its
+// publication fields name a publication of that commit, so two stamps that
 // differ only in those fields give one digest: a task whose globs reach the
 // stamp keys the same at two commits that share one tree. Every other field
 // describes the tree and still moves the digest.
@@ -847,20 +913,28 @@ func TestHashFiles_VersionStampKeysTheTreeNotTheCommit(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "tree-keyed-task-cache",
 		"the-build-stamp-keys-without-its-commit-fields")
 
-	// stampDocument is the stamp as its writers leave it: the scheduler's
-	// fields, then the two other writers merge into the document.
-	type stampDocument struct {
-		Name               string          `json:"name"`
-		Version            string          `json:"version"`
-		Suffix             string          `json:"suffix,omitempty"`
-		SHA                string          `json:"sha"`
-		Branch             string          `json:"branch"`
-		IsDirty            bool            `json:"isDirty"`
-		BuildTime          string          `json:"buildTime"`
-		CapabilityRoot     string          `json:"capabilityRoot"`
-		CapabilityPackages json.RawMessage `json:"capabilityPackages"`
-		ContentHash        string          `json:"contentHash"`
-		Publish            json.RawMessage `json:"publish"`
+	// The change table and the excluded set both cover every field the stamp's
+	// writers leave, so a new field fails here until it is classified.
+	var fields map[string]json.RawMessage
+	encoded, err := json.Marshal(versionStampTestPublished)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(encoded, &fields); err != nil {
+		t.Fatal(err)
+	}
+	if len(versionStampTestChanges) != len(fields) {
+		t.Fatalf("the change table edits %d fields, the stamp has %d", len(versionStampTestChanges), len(fields))
+	}
+	for _, change := range versionStampTestChanges {
+		if _, ok := fields[change.field]; !ok {
+			t.Fatalf("the change table edits %q, which the stamp does not carry", change.field)
+		}
+	}
+	for _, field := range versionStampNonTreeFields {
+		if _, ok := fields[field]; !ok {
+			t.Errorf("the excluded field %q is not a field any stamp writer leaves", field)
+		}
 	}
 
 	dir := t.TempDir()
@@ -869,7 +943,7 @@ func TestHashFiles_VersionStampKeysTheTreeNotTheCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	// hash writes the stamp and returns the digest of a pattern that reaches it.
-	hash := func(document stampDocument) string {
+	hash := func(document versionStampTestDocument) string {
 		t.Helper()
 		content, err := json.Marshal(document)
 		if err != nil {
@@ -884,31 +958,27 @@ func TestHashFiles_VersionStampKeysTheTreeNotTheCommit(t *testing.T) {
 		}
 		return got
 	}
-	// pullRequest returns the stamp of the tree as a run at one commit writes it.
-	pullRequest := func() stampDocument {
-		return stampDocument{
-			Name:               "proj",
-			Version:            "0.3.1-20261003152506-4da6833",
-			Suffix:             "20261003152506-4da6833",
-			SHA:                "4da6833",
-			Branch:             "feature/x",
-			IsDirty:            true,
-			BuildTime:          "2026-10-03T15:25:06Z",
-			CapabilityRoot:     "../..",
-			CapabilityPackages: json.RawMessage(`[{"package":"proj","version":"0.3.1"}]`),
-			ContentHash:        "0123456789abcdef",
-			Publish:            json.RawMessage(`{"registry":"npm"}`),
+	base := hash(versionStampTestPublished)
+
+	for _, change := range versionStampTestChanges {
+		changed := versionStampTestPublished
+		change.apply(&changed)
+		kept := hash(changed) == base
+		if excluded := slices.Contains(versionStampNonTreeFields, change.field); kept != excluded {
+			t.Errorf("a change to the stamp field %q kept the digest = %t, want %t", change.field, kept, excluded)
 		}
 	}
-	base := hash(pullRequest())
 
-	squashMerge := pullRequest()
+	// A fresh checkout of the squash commit stamps the same tree at another
+	// commit and carries no publication fields.
+	squashMerge := versionStampTestPublished
 	squashMerge.Version = "0.3.1-20261004094924-a389c95"
 	squashMerge.Suffix = "20261004094924-a389c95"
 	squashMerge.SHA = "a389c95"
 	squashMerge.Branch = "main"
 	squashMerge.IsDirty = false
 	squashMerge.BuildTime = "2026-10-04T09:49:24Z"
+	squashMerge.Image, squashMerge.ImageDigest, squashMerge.Publish = "", "", nil
 	if got := hash(squashMerge); got != base {
 		t.Errorf("two commits on one tree gave two stamp digests: %s != %s", base, got)
 	}
@@ -921,24 +991,53 @@ func TestHashFiles_VersionStampKeysTheTreeNotTheCommit(t *testing.T) {
 	if got := hash(release); got != base {
 		t.Errorf("a stamp without a suffix moved the digest: %s != %s", base, got)
 	}
+}
 
-	for _, change := range []struct {
-		field string
-		apply func(*stampDocument)
-	}{
-		{"name", func(d *stampDocument) { d.Name = "renamed" }},
-		{"capabilityRoot", func(d *stampDocument) { d.CapabilityRoot = ".." }},
-		{"capabilityPackages", func(d *stampDocument) {
-			d.CapabilityPackages = json.RawMessage(`[{"package":"proj","version":"0.3.1"},{"package":"dep","version":"0.3.1"}]`)
-		}},
-		{"contentHash", func(d *stampDocument) { d.ContentHash = "fedcba9876543210" }},
-		{"publish", func(d *stampDocument) { d.Publish = json.RawMessage(`{"registry":"jsr"}`) }},
-	} {
-		changed := pullRequest()
-		change.apply(&changed)
-		if got := hash(changed); got == base {
-			t.Errorf("a change to the stamp field %q kept the digest", change.field)
+// A generate asset copies its files into the task's output, so a build stamp
+// inside an asset directory is hashed as the output carries it: only its build
+// time stays out of the key, and its commit and publication fields move it. A
+// hit then never restores a copy that names another commit.
+func TestHashExtraFiles_AStampInsideAnAssetKeepsItsCommit(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "tree-keyed-task-cache",
+		"a-stamp-inside-a-generate-asset-keeps-its-commit")
+
+	root := t.TempDir()
+	asset := filepath.Join(root, "app")
+	stamp := filepath.Join(asset, ".gen", "version.json")
+	if err := os.MkdirAll(filepath.Dir(stamp), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(asset, "index.html"), []byte("<p>app</p>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// hash writes the stamp and returns the digest of the directory asset.
+	hash := func(document versionStampTestDocument) string {
+		t.Helper()
+		content, err := json.Marshal(document)
+		if err != nil {
+			t.Fatal(err)
 		}
+		if err := os.WriteFile(stamp, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return hashExtraFiles(root, []string{asset})
+	}
+	base := hash(versionStampTestPublished)
+
+	for _, change := range versionStampTestChanges {
+		changed := versionStampTestPublished
+		change.apply(&changed)
+		kept := hash(changed) == base
+		if want := change.field == versionStampFieldBuildTime; kept != want {
+			t.Errorf("a change to the asset stamp field %q kept the digest = %t, want %t", change.field, kept, want)
+		}
+	}
+
+	squashMerge := versionStampTestPublished
+	squashMerge.SHA = "a389c95"
+	squashMerge.Image, squashMerge.ImageDigest, squashMerge.Publish = "", "", nil
+	if hash(squashMerge) == base {
+		t.Error("an asset stamp that names another commit kept the digest")
 	}
 }
 

@@ -849,6 +849,7 @@
             "checks": [
               "the-build-stamp-keys-without-its-commit-fields",
               "a-generate-asset-keys-by-its-workspace-relative-path",
+              "a-stamp-inside-a-generate-asset-keeps-its-commit",
               "one-tree-in-two-checkouts-at-two-commits-shares-its-keys",
               "a-version-aware-task-still-keys-on-the-commit"
             ]

@@ -4,14 +4,18 @@
 package jobs
 
 import (
-	"encoding/json"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -32,231 +36,354 @@ const treeKeyedSiteConfig = `{
 }
 `
 
-// treeKeyedFiles is the fixture tree, as workspace-relative path to content: a
-// library, a site that depends on it, and the two paths the site declares as
-// generate assets.
+// treeKeyedFiles is the tree both lanes build, as workspace-relative path to
+// content: a Go library, a TypeScript library that carries a feature manifest
+// and a spec, a TypeScript site that depends on it, and the two paths the site
+// declares as generate assets. Git ignores what a run writes.
 func treeKeyedFiles() map[string]string {
 	return map[string]string{
-		"docs/guide/intro.md":  "# Intro\n",
-		"docs/index.md":        "# Docs\n",
-		"library/README.md":    "# Library\n",
-		"library/package.json": `{"name":"library"}` + "\n",
-		"library/src/index.ts": "export const a = 1\n",
-		"site/package.json":    `{"name":"site"}` + "\n",
-		"site/putnami.json":    treeKeyedSiteConfig,
-		"site/src/page.ts":     "export const page = 'home'\n",
+		".gitignore":                    ".gen/\n.putnami/\nnode_modules/\n",
+		"api/api.go":                    "package api\n\nconst A = 1\n",
+		"api/api_test.go":               "package api\n\nimport \"testing\"\n\nfunc TestA(t *testing.T) {}\n",
+		"api/go.mod":                    "module example.com/api\n\ngo 1.25\n",
+		"docs/guide/intro.md":           "# Intro\n",
+		"docs/index.md":                 "# Docs\n",
+		"library/README.md":             "# Library\n",
+		"library/package.json":          `{"name":"library"}` + "\n",
+		"library/putnami.features.json": `{"features":[]}` + "\n",
+		"library/specs/library.json":    `{"requirements":[]}` + "\n",
+		"library/src/index.test.ts":     "import { a } from './index'\n",
+		"library/src/index.ts":          "export const a = 1\n",
+		"site/package.json":             `{"name":"site"}` + "\n",
+		"site/putnami.json":             treeKeyedSiteConfig,
+		"site/src/page.test.ts":         "import { page } from './page'\n",
+		"site/src/page.ts":              "export const page = 'home'\n",
 	}
 }
 
-// treeKeyedCommands are the four commands of the gate. Each is planned as one
-// job per project, on patterns that reach the project's build stamp the way the
-// TypeScript lint's **/*.json does.
+// treeKeyedCommands are the four commands of the gate.
 var treeKeyedCommands = []string{"test", "lint", "build", "validate"}
 
-// treeKeyedPackageJob is the name of the fixture's version-aware job: a package
-// step whose artifact carries the publish version.
-const treeKeyedPackageJob = "package"
+// treeKeyedPullRequestBuildTime and treeKeyedMainBuildTime are the build times
+// of the two lanes' runs.
+const (
+	treeKeyedPullRequestBuildTime = "2026-10-03T15:25:06Z"
+	treeKeyedMainBuildTime        = "2026-10-04T09:49:24Z"
+)
 
-// treeKeyedLane is one checkout of the fixture tree: a workspace root, the plan
-// a run builds over it, and the commit the run builds it at.
+// treeKeyedGit runs git in dir with a fixed identity and fixed dates, and
+// returns its trimmed output.
+func treeKeyedGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{
+		"-c", "user.name=T", "-c", "user.email=t@t.com",
+		"-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false",
+	}, args...)...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// treeKeyedSquashMerge builds the history of a squash merge in a repository
+// under parent, and returns the checkout of its pull request:
+//   - The base commit carries the line tag v0.3.0.
+//   - The pull request branch, feature/tree-keys, adds one fix.
+//   - main adds an empty commit, then the squash commit: the pull request's tree
+//     on another parent, with another message.
+//
+// Both heads add one fix since the tag, so both resolve the base version 0.3.1.
+func treeKeyedSquashMerge(t *testing.T, parent string) string {
+	t.Helper()
+	root := filepath.Join(parent, "pull-request")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	treeKeyedGit(t, root, "init", "-q", "-b", "main")
+	for rel, content := range treeKeyedFiles() {
+		writeFileAt(t, filepath.Join(root, filepath.FromSlash(rel)), content)
+	}
+	treeKeyedGit(t, root, "add", "-A")
+	treeKeyedGit(t, root, "commit", "-q", "-m", "feat: the workspace")
+	treeKeyedGit(t, root, "tag", "-a", "v0.3.0", "-m", "release 0.3.0")
+
+	treeKeyedGit(t, root, "checkout", "-q", "-b", "feature/tree-keys")
+	writeFileAt(t, filepath.Join(root, "library", "src", "index.ts"), "export const a = 2\n")
+	treeKeyedGit(t, root, "commit", "-q", "-am", "fix(library): raise a")
+
+	other := treeKeyedGit(t, root, "commit-tree", "main^{tree}", "-p", "main", "-m", "chore: an unrelated merge")
+	squash := treeKeyedGit(t, root, "commit-tree", "HEAD^{tree}", "-p", other,
+		"-m", "fix(library): raise a, squashed")
+	treeKeyedGit(t, root, "update-ref", "refs/heads/main", squash)
+	return root
+}
+
+// treeKeyedCloneMain clones the main branch of the repository at origin into a
+// new checkout directory under parent.
+func treeKeyedCloneMain(t *testing.T, origin, parent, name string) string {
+	t.Helper()
+	root := filepath.Join(parent, name, "checkout")
+	treeKeyedGit(t, parent, "clone", "-q", "--branch", "main", origin, root)
+	return root
+}
+
+// treeKeyedExtensions loads the shipped Go, TypeScript and SDD extensions:
+// their tasks are what a run plans for lint, test, build, validate and package.
+// A run records each extension's runtime digest when it prepares the runtime,
+// before any key. One preparation serves both lanes, so each extension gets one
+// fixed digest here, and the comparison does not read the extension's sources,
+// which a concurrent build may rewrite.
+func treeKeyedExtensions(t *testing.T) []*extension.ExtensionDescription {
+	t.Helper()
+	repoRoot := findJobsRepoRoot(t)
+	var exts []*extension.ExtensionDescription
+	for _, entry := range []struct{ name, dir string }{
+		{"@putnami/go", "go/extension"},
+		{"@putnami/typescript", "typescript/extension"},
+		{"@putnami/sdd", "tooling/sdd-extension"},
+	} {
+		ext := extension.LoadExtensionFromDir(filepath.Join(repoRoot, filepath.FromSlash(entry.dir)), entry.name)
+		if ext == nil {
+			t.Fatalf("load the %s extension from %s", entry.name, entry.dir)
+		}
+		ext.RuntimeDigest = "prepared " + entry.name
+		exts = append(exts, ext)
+	}
+	return exts
+}
+
+// treeKeyedLane is a run over one checkout: its workspace and the versions Git
+// gives each line at the checkout's head.
 type treeKeyedLane struct {
 	ws       *workspace.Workspace
-	planned  []*ScheduledJob
 	versions RunVersions
 }
 
-// checkOutTreeKeyedLane writes files under root and plans the lane's jobs: the
-// four gate commands for the library and for the site, the site's after the
-// library's build, and the library's version-aware package job.
-func checkOutTreeKeyedLane(t *testing.T, root string, files map[string]string, versions RunVersions) *treeKeyedLane {
+// openTreeKeyedLane starts a run in the checkout at root: it reads the three
+// projects, captures the tree state and derives the run versions from Git.
+// Every project uses the SDD extension, whose validate command activates only
+// where a feature manifest or a spec exists.
+func openTreeKeyedLane(t *testing.T, root string) *treeKeyedLane {
 	t.Helper()
-	for rel, content := range files {
-		writeFileAt(t, filepath.Join(root, filepath.FromSlash(rel)), content)
-	}
-
-	siteConfig := &wsproto.ProjectConfig{}
-	if err := json.Unmarshal([]byte(files["site/putnami.json"]), siteConfig); err != nil {
-		t.Fatalf("decode the site's project config: %v", err)
-	}
-	library := &workspace.Project{ID: "/library", Name: "library", Path: "library"}
-	site := &workspace.Project{
-		ID: "/site", Name: "site", Path: "site",
-		Dependencies: []string{"library"},
-		Config:       siteConfig,
-	}
-	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "fixture"}, []*workspace.Project{library, site})
-
-	ext := &extension.ExtensionDescription{
-		Name:  "@test/ext",
-		Path:  t.TempDir(),
-		Tasks: map[string]extension.TaskDefinition{},
-	}
-	newJob := func(project *workspace.Project, name string, policy *extension.TaskCachePolicy, deps ...string) *ScheduledJob {
-		ext.Tasks[name] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{}}
-		return &ScheduledJob{
-			Project:   project,
-			Extension: ext,
-			Step:      &extension.PipelineStep{Task: name},
-			JobDef: &extension.JobDefinition{
-				Name:            name,
-				CommandName:     name,
-				ExtensionName:   "@test/ext",
-				Cache:           true,
-				FilePatterns:    []string{"**/*.ts", "**/*.json"},
-				TaskCachePolicy: policy,
-			},
-			DependsOn: deps,
+	project := func(name, projectType, language string, dependencies ...string) *workspace.Project {
+		return &workspace.Project{
+			ID: "/" + name, Name: name, Path: name, Type: projectType,
+			Extensions:   []string{language, "@putnami/sdd"},
+			Dependencies: dependencies,
+			Config:       wsproto.LoadProjectConfig(filepath.Join(root, name)),
 		}
 	}
-
-	lane := &treeKeyedLane{ws: ws, versions: versions}
-	var libraryBuild string
-	for _, command := range treeKeyedCommands {
-		job := newJob(library, command, nil)
-		if command == "build" {
-			libraryBuild = job.Key()
-		}
-		lane.planned = append(lane.planned, job)
+	ws := testWorkspace(root,
+		project("api", "library", "@putnami/go"),
+		project("library", "", "@putnami/typescript"),
+		project("site", "", "@putnami/typescript", "library"))
+	snapshot, err := putnamigit.TreeState(root)
+	if err != nil {
+		t.Fatalf("capture the tree state of %s: %v", root, err)
 	}
-	for _, command := range treeKeyedCommands {
-		lane.planned = append(lane.planned, newJob(site, command, nil, libraryBuild))
+	versions, err := BuildRunVersions(ws, snapshot)
+	if err != nil {
+		t.Fatalf("a full clone degraded a version line: %v", err)
 	}
-	lane.planned = append(lane.planned,
-		newJob(library, treeKeyedPackageJob, &extension.TaskCachePolicy{VersionAware: true}, libraryBuild))
-	return lane
+	return &treeKeyedLane{ws: ws, versions: versions}
 }
 
-// keys computes the key of every planned job the way a run does: it seeds each
-// project's build stamp for the lane's commit, then keys the plan in one pass. A
-// fresh CacheManager per call stands for a new process.
-func (l *treeKeyedLane) keys(t *testing.T, buildTime string) map[string]string {
+// keys plans commands over the lane, then keys the plan the way a run does: it
+// seeds each project's build stamp for the lane's commit, then keys every
+// cacheable job in one pass. A fresh CacheManager stands for a new process.
+func (l *treeKeyedLane) keys(
+	t *testing.T,
+	exts []*extension.ExtensionDescription,
+	commands []string,
+	params extension.ParamMap,
+	buildTime string,
+) ([]*ScheduledJob, map[string]string) {
 	t.Helper()
-	preserveMatchingVersionFiles(l.ws, l.planned, l.versions, buildTime)
+	planned, err := Plan(l.ws, commands, l.ws.Projects, exts, params, nil, nil)
+	if err != nil {
+		t.Fatalf("plan %v: %v", commands, err)
+	}
+	preserveMatchingVersionFiles(l.ws, planned, l.versions, buildTime)
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(l.ws.Root, ".putnami", "store")))
-	keys, err := PrecomputeKeys(l.ws, l.planned, nil, l.versions, cache, CacheBypass{})
+	keys, err := PrecomputeKeys(l.ws, planned, params, l.versions, cache, CacheBypass{})
 	if err != nil {
 		t.Fatalf("precompute keys: %v", err)
 	}
-	if len(keys) != len(l.planned) {
-		t.Fatalf("keyed %d of %d planned jobs", len(keys), len(l.planned))
+	return planned, keys
+}
+
+// sortedKeyNames returns the job keys of keys in order, for a failure message.
+func sortedKeyNames(keys map[string]string) []string {
+	names := make([]string, 0, len(keys))
+	for name := range keys {
+		names = append(names, name)
 	}
-	return keys
-}
-
-// treeKeyedPullRequest and treeKeyedMain are the two commits of the squash
-// merge: one tree, one line base version, and a different sha, suffix, publish
-// version and branch.
-func treeKeyedPullRequest() RunVersions {
-	return rootLineVersions(&JobContextVersion{
-		Base: "0.3.1", Full: "0.3.1-20261003152506-4da6833", Suffix: "20261003152506-4da6833",
-		SHA: "4da6833c0ffee0123456789abcdef0123456789a", Branch: "feature/tree-keys",
-	})
-}
-
-func treeKeyedMain() RunVersions {
-	return rootLineVersions(&JobContextVersion{
-		Base: "0.3.1", Full: "0.3.1-20261004094924-a389c95", Suffix: "20261004094924-a389c95",
-		SHA: "a389c95f00dfeed0123456789abcdef012345678", Branch: "main",
-	})
+	sort.Strings(names)
+	return names
 }
 
 // A pull request lane and the main lane that follows its squash merge build the
-// same tree at two commits, on two branches, in two checkout directories. Every
-// test, lint, build and validate key is the same in both, so the second lane
-// reuses what the first stored. The task that declares its output embeds the
-// publish version keeps one key per commit.
+// same tree at two commits, on two branches, in two checkout directories. Both
+// lanes are Git checkouts, derive their versions from Git, and plan the shipped
+// Go, TypeScript and SDD task declarations. Every cacheable test, lint, build
+// and validate key is the same in both, so the second lane reuses what the
+// first stored. The npm package task, which declares that its output embeds the
+// publish version, keeps one key per commit.
+//
+// The test builds the projects in place of workspace discovery, gives each
+// extension one fixed runtime digest, and resolves no runtime toolchain: one
+// installation on one machine gives both lanes the same value for each.
 func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "tree-keyed-task-cache",
 		"one-tree-in-two-checkouts-at-two-commits-shares-its-keys")
 	spectest.Proves(t, "cli/job-planning-execution", "tree-keyed-task-cache",
 		"a-version-aware-task-still-keys-on-the-commit")
-	// Both lanes are repository checkouts. The fixture directories are not, so
-	// the source state is pinned and Git discovery stops below their parent.
-	keyAsSourceState(t, "")
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	exts := treeKeyedExtensions(t)
 	parent := t.TempDir()
-	t.Setenv("GIT_CEILING_DIRECTORIES", parent)
+	origin := treeKeyedSquashMerge(t, parent)
+	pullRequest := openTreeKeyedLane(t, origin)
+	trunk := openTreeKeyedLane(t, treeKeyedCloneMain(t, origin, parent, "main"))
 
-	pullRequest := checkOutTreeKeyedLane(t,
-		filepath.Join(parent, "pull-request", "workspace"), treeKeyedFiles(), treeKeyedPullRequest())
-	trunk := checkOutTreeKeyedLane(t,
-		filepath.Join(parent, "main", "checkout"), treeKeyedFiles(), treeKeyedMain())
+	// The lanes differ in everything a key must not read, at one base version.
+	head, squash := pullRequest.versions[""], trunk.versions[""]
+	if head == nil || squash == nil {
+		t.Fatalf("versions = %+v and %+v, want the root line in both", pullRequest.versions, trunk.versions)
+	}
+	if head.Base != "0.3.1" || squash.Base != head.Base {
+		t.Fatalf("base versions = %q and %q, want 0.3.1 in both", head.Base, squash.Base)
+	}
+	if head.SHA == squash.SHA || head.Branch == squash.Branch || head.Full == squash.Full {
+		t.Fatalf("the two lanes resolved one commit (%+v, %+v); the comparison would prove nothing", head, squash)
+	}
 
-	first := pullRequest.keys(t, "2026-10-03T15:25:06Z")
-	second := trunk.keys(t, "2026-10-04T09:49:24Z")
+	planned, first := pullRequest.keys(t, exts, treeKeyedCommands, nil, treeKeyedPullRequestBuildTime)
+	_, second := trunk.keys(t, exts, treeKeyedCommands, nil, treeKeyedMainBuildTime)
+	plannedProjects := map[string]bool{}
+	for _, job := range planned {
+		plannedProjects[job.Project.ID] = true
+	}
+	if !plannedProjects["/api"] || !plannedProjects["/library"] || !plannedProjects["/site"] {
+		t.Fatalf("planned %d jobs over %v, want jobs for every project; keyed %v",
+			len(planned), plannedProjects, sortedKeyNames(first))
+	}
 
-	// The lanes really differ in everything a key must not read.
-	for _, project := range []string{"library", "site"} {
+	for _, project := range []string{"api", "library", "site"} {
 		before := readVersionStamp(t, filepath.Join(pullRequest.ws.Root, project))
 		after := readVersionStamp(t, filepath.Join(trunk.ws.Root, project))
 		if before.SHA == after.SHA || before.Suffix == after.Suffix || before.Version == after.Version ||
 			before.Branch == after.Branch || before.BuildTime == after.BuildTime {
 			t.Fatalf("%s: the two lanes stamped one identity (%+v, %+v); the comparison would prove nothing", project, before, after)
 		}
+		// Git computes each package's source binding from the checkout, and
+		// the two checkouts hold one tree.
+		for _, pkg := range before.CapabilityPackages {
+			if pkg.SourceBinding == "" || pkg.SourceBindingUnavailable {
+				t.Fatalf("%s: package %s carries no source binding; Git did not read the checkout", project, pkg.Package)
+			}
+		}
+		if len(before.CapabilityPackages) == 0 || !reflect.DeepEqual(before.CapabilityPackages, after.CapabilityPackages) {
+			t.Errorf("%s: the two checkouts stamped different packages (%+v, %+v)",
+				project, before.CapabilityPackages, after.CapabilityPackages)
+		}
 	}
 
-	var compared []string
-	for _, job := range pullRequest.planned {
+	if !reflect.DeepEqual(sortedKeyNames(first), sortedKeyNames(second)) {
+		t.Fatalf("the two lanes keyed different jobs:\n%v\n%v", sortedKeyNames(first), sortedKeyNames(second))
+	}
+	keyedCommands, keyedProjects := map[string]int{}, map[string]int{}
+	for _, job := range planned {
 		key := job.Key()
-		if job.JobDef.Name == treeKeyedPackageJob {
-			if first[key] == second[key] {
-				t.Errorf("%s: a version-aware task kept one key at two commits; it would serve an artifact that embeds the other commit's version", key)
-			}
+		hash, keyed := first[key]
+		if !keyed {
 			continue
 		}
-		compared = append(compared, key)
-		if first[key] != second[key] {
-			t.Errorf("%s: the two lanes keyed one tree differently (%s != %s)", key, first[key], second[key])
+		command, _ := jobCommandAndStep(job.JobDef.Name)
+		keyedCommands[command]++
+		keyedProjects[job.Project.ID]++
+		if second[key] != hash {
+			t.Errorf("%s: the two lanes keyed one tree differently (%s != %s)", key, hash, second[key])
 		}
 	}
-	sort.Strings(compared)
-	want := []string{
-		"/library:build", "/library:lint", "/library:test", "/library:validate",
-		"/site:build", "/site:lint", "/site:test", "/site:validate",
+	for _, command := range treeKeyedCommands {
+		if keyedCommands[command] == 0 {
+			t.Errorf("no %s task was keyed in %v; the comparison does not cover the command", command, sortedKeyNames(first))
+		}
 	}
-	if len(compared) != len(want) {
-		t.Fatalf("compared %v, want %v", compared, want)
-	}
-	for i := range want {
-		if compared[i] != want[i] {
-			t.Fatalf("compared %v, want %v", compared, want)
+	for _, project := range []string{"/api", "/library", "/site"} {
+		if keyedProjects[project] == 0 {
+			t.Errorf("no task of %s was keyed in %v; the comparison does not cover the project", project, sortedKeyNames(first))
 		}
 	}
 
-	// The controls. Each lane below is a fresh checkout of a tree that differs
-	// from the fixture in one place, at the main commit: equal keys above mean
-	// nothing unless a key still reads the stamp and the asset content.
-	controlKeys := func(name string, files map[string]string, prepare func(lane *treeKeyedLane)) map[string]string {
-		t.Helper()
-		lane := checkOutTreeKeyedLane(t, filepath.Join(parent, name, "checkout"), files, treeKeyedMain())
-		// A run seeds the stamp before anything merges into it.
-		preserveMatchingVersionFiles(lane.ws, lane.planned, lane.versions, "2026-10-04T09:49:24Z")
-		if prepare != nil {
-			prepare(lane)
+	t.Run("a version-aware task keys on the commit", func(t *testing.T) {
+		packageParams := extension.ParamMap{"npm": true}
+		packaged, atHead := pullRequest.keys(t, exts, []string{"package"}, packageParams, treeKeyedPullRequestBuildTime)
+		_, atSquash := trunk.keys(t, exts, []string{"package"}, packageParams, treeKeyedMainBuildTime)
+		versionAware := 0
+		for _, job := range packaged {
+			key := job.Key()
+			hash, keyed := atHead[key]
+			if !keyed {
+				continue
+			}
+			if !taskIsVersionAware(job) {
+				if atSquash[key] != hash {
+					t.Errorf("%s: the two lanes keyed one tree differently (%s != %s)", key, hash, atSquash[key])
+				}
+				continue
+			}
+			versionAware++
+			if atSquash[key] == hash {
+				t.Errorf("%s: a version-aware task kept one key at two commits; it would serve an artifact that embeds the other commit's version", key)
+			}
 		}
-		return lane.keys(t, "2026-10-04T09:49:24Z")
-	}
+		if versionAware == 0 {
+			t.Fatalf("no version-aware task was keyed in %v", sortedKeyNames(atHead))
+		}
+	})
 
-	t.Run("a tree-describing stamp field moves every key that reads the stamp", func(t *testing.T) {
-		keys := controlKeys("stamp", treeKeyedFiles(), func(lane *treeKeyedLane) {
-			mergeStampField(t, filepath.Join(lane.ws.Root, "library"), "contentHash", producedContentHash)
-			mergeStampField(t, filepath.Join(lane.ws.Root, "site"), "contentHash", producedContentHash)
-		})
-		for _, key := range want {
-			if keys[key] == second[key] {
-				t.Errorf("%s: a new contentHash in the build stamp kept the key; the job's patterns do not reach the stamp", key)
+	// The controls. Each one keys a fresh clone of main, changes one thing in
+	// it, and keys it again: equal keys above mean nothing unless a key still
+	// reads the stamp and the asset content.
+	t.Run("a tree-describing stamp field moves the keys that read the stamp", func(t *testing.T) {
+		lane := openTreeKeyedLane(t, treeKeyedCloneMain(t, origin, parent, "stamp"))
+		_, unmerged := lane.keys(t, exts, treeKeyedCommands, nil, treeKeyedMainBuildTime)
+		for _, project := range []string{"library", "site"} {
+			mergeStampField(t, filepath.Join(lane.ws.Root, project), "contentHash", producedContentHash)
+		}
+		_, merged := lane.keys(t, exts, treeKeyedCommands, nil, treeKeyedMainBuildTime)
+		for _, key := range []string{"/library:lint~format", "/library:lint~check", "/site:lint~format", "/site:lint~check"} {
+			if _, keyed := unmerged[key]; !keyed {
+				t.Fatalf("%s is not keyed in %v; the control reads no stamp", key, sortedKeyNames(unmerged))
+			}
+			if merged[key] == unmerged[key] {
+				t.Errorf("%s: a new contentHash in the build stamp kept the key; the task's patterns do not reach the stamp", key)
 			}
 		}
 	})
 
 	t.Run("an edit under a generate asset moves the keys of the project that declares it", func(t *testing.T) {
-		files := treeKeyedFiles()
-		files["docs/guide/intro.md"] = "# Intro, edited\n"
-		keys := controlKeys("asset-content", files, nil)
-		for _, command := range treeKeyedCommands {
-			if key := "/site:" + command; keys[key] == second[key] {
+		root := treeKeyedCloneMain(t, origin, parent, "asset-content")
+		_, clean := openTreeKeyedLane(t, root).keys(t, exts, treeKeyedCommands, nil, treeKeyedMainBuildTime)
+		writeFileAt(t, filepath.Join(root, "docs", "guide", "intro.md"), "# Intro, edited\n")
+		// The edit leaves the checkout dirty, so the run stamps another
+		// identity; only the edited content may move a key.
+		dirty := openTreeKeyedLane(t, root)
+		if version := dirty.versions[""]; version == nil || !version.IsDirty {
+			t.Fatalf("version after the edit = %+v, want a dirty checkout", version)
+		}
+		_, edited := dirty.keys(t, exts, treeKeyedCommands, nil, treeKeyedMainBuildTime)
+		for _, key := range sortedKeyNames(clean) {
+			switch {
+			case strings.HasPrefix(key, "/site:") && edited[key] == clean[key]:
 				t.Errorf("%s: an edited generate asset kept the key", key)
-			}
-			if key := "/library:" + command; keys[key] != second[key] {
+			case (strings.HasPrefix(key, "/api:") || strings.HasPrefix(key, "/library:")) && edited[key] != clean[key]:
 				t.Errorf("%s: another project's generate asset moved the key", key)
 			}
 		}
@@ -306,7 +433,11 @@ func TestStampFieldsThatReachACacheKey(t *testing.T) {
 	projectRoot := filepath.Join(ws.Root, "proj")
 	stampPath := filepath.Join(projectRoot, filepath.FromSlash(versionStampRelPath))
 	job := cacheableJob("lint", "/proj", "proj", "proj")
-	generateVersionFilesAt(ws, []*ScheduledJob{job}, treeKeyedPullRequest(), "2026-10-03T15:25:06Z", false)
+	versions := rootLineVersions(&JobContextVersion{
+		Base: "0.3.1", Full: "0.3.1-20261003152506-4da6833", Suffix: "20261003152506-4da6833",
+		SHA: "4da6833c0ffee0123456789abcdef0123456789a", Branch: "feature/tree-keys",
+	})
+	generateVersionFilesAt(ws, []*ScheduledJob{job}, versions, treeKeyedPullRequestBuildTime, false)
 	base := stampKeyInput(t, ws, "proj")
 
 	original := readFileAt(t, stampPath)

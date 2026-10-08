@@ -103,7 +103,7 @@
     },
     {
       "id": "tree-keyed-task-cache",
-      "text": "Two runs on one tree, at one base version of the release line, compute the same task cache key, whatever the commit, the branch or the checkout directory. A file-content input describes the tree: the build stamp contributes without its commit and build-time fields, and a generate asset under the workspace root contributes its workspace-relative path and its content. The commit reaches a key only through the publish version of a task that declares cache.versionAware or receives a version-var parameter."
+      "text": "Two runs on one tree, at one base version of its release line, compute the same task cache key, whatever the commit, the branch or the checkout directory. A file pattern reads the build stamp without its build-time, commit and publication fields. A generate asset under the workspace root contributes its workspace-relative path and content; a stamp inside it keeps all but its build time. Otherwise, the commit reaches a key only through the publish version of a task with cache.versionAware or version-var."
     }
   ],
   "decisions": [

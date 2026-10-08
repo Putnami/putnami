@@ -423,10 +423,9 @@ func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, erro
 	return files, nil
 }
 
-// Candidate readers inspect raw bytes: project-config task tuning and the
-// version stamp's build time and commit fields are visible too. Domain-separate
-// types so replacing a file with a symlink holding the same bytes also
-// invalidates its verdict.
+// Candidate readers inspect raw bytes: project-config task tuning and every
+// field of the version stamp are visible too. Domain-separate types so replacing
+// a file with a symlink holding the same bytes also invalidates its verdict.
 func gitCandidateDigest(file fileEntry, buf []byte) []byte {
 	h := sha256.New()
 	if file.info.Mode()&os.ModeSymlink != 0 {
@@ -757,7 +756,7 @@ func hashFileContents(files []fileEntry, scope ProjectConfigScope, projectDir st
 // cut the syscall count relative to io.Copy's default chunking.
 func fileContentDigest(path string, buf []byte, scope ProjectConfigScope) []byte {
 	if isVersionStamp(path) {
-		return versionStampDigest(path)
+		return versionStampDigest(path, versionStampNonTreeFields)
 	}
 	if isProjectConfig(path) {
 		return projectConfigDigest(path, scope)
@@ -780,10 +779,22 @@ func fileContentDigest(path string, buf []byte, scope ProjectConfigScope) []byte
 // describes the invocation rather than the tree it was taken from.
 const versionStampFieldBuildTime = "buildTime"
 
-// versionStampCommitFields are the fields of the .gen/version.json stamp that
-// name the commit a tree is built at rather than the tree: two commits that
-// share one tree differ in these fields and in no other.
-var versionStampCommitFields = []string{"sha", "suffix", "version", "branch", "isDirty"}
+// versionStampInvocationFields are the stamp fields that change between two
+// invocations over one commit. Both stamp digests leave them out.
+var versionStampInvocationFields = []string{versionStampFieldBuildTime}
+
+// versionStampNonTreeFields are every top-level stamp field a file-pattern input
+// leaves out of its digest, because none of them describes the tree:
+//   - buildTime changes with each invocation that executes a job.
+//   - sha, suffix, version, branch and isDirty name the commit.
+//   - image, image_digest and publish name a publication of that commit. A
+//     publish merges them into the stamp, and the scheduler carries them into
+//     the stamp of the next commit.
+var versionStampNonTreeFields = []string{
+	versionStampFieldBuildTime,
+	"sha", "suffix", "version", "branch", "isDirty",
+	"image", "image_digest", "publish",
+}
 
 // isVersionStamp reports whether path is a project's .gen/version.json — the
 // build stamp the CLI writes for every planned project before jobs run.
@@ -795,21 +806,22 @@ func isVersionStamp(p string) bool {
 	return filepath.Base(filepath.Clean(dir)) == ".gen"
 }
 
-// versionStampDigest hashes .gen/version.json as a description of the tree: the
-// document without its build time (versionStampFieldBuildTime) and without its
-// commit fields (versionStampCommitFields). Two stamps that differ only in those
-// fields contribute the same digest, so a task whose input globs reach the stamp
-// keys the same at two commits that share one tree, and at two invocations over
-// one commit.
+// versionStampDigest hashes the .gen/version.json stamp at path without its
+// top-level fields named in dropped. Two stamps that differ only in those fields
+// contribute the same digest.
 //
-// A file-content input describes the tree. The commit reaches a cache key only
-// through CacheKey.EmbeddedVersion, which a task opts into with
-// cache.versionAware or a version-var parameter.
+// A file-pattern input drops versionStampNonTreeFields (fileContentDigest), so a
+// task whose input globs reach the stamp keys the same at two commits that share
+// one tree, and at two invocations over one commit. The commit reaches such a
+// key only through CacheKey.EmbeddedVersion, which a task opts into with
+// cache.versionAware or a version-var parameter. Every other field stays hashed,
+// whoever wrote it: name, capabilityRoot, capabilityPackages, contentHash, and
+// any field another writer merges into the document.
 //
-// Every other field stays hashed, whoever wrote it: the project name, the
-// capability root and package inventory, and the fields other writers merge
-// into the document, such as contentHash and publish.
-func versionStampDigest(path string) []byte {
+// A generate asset drops versionStampInvocationFields only (hashFileBytes). The
+// asset copies the stamp into the task's output, so its key keeps the commit and
+// publication fields that copy carries.
+func versionStampDigest(path string, dropped []string) []byte {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
@@ -820,8 +832,7 @@ func versionStampDigest(path string) []byte {
 	if json.Unmarshal(data, &stamp) != nil {
 		return sum256(data)
 	}
-	delete(stamp, versionStampFieldBuildTime)
-	for _, field := range versionStampCommitFields {
+	for _, field := range dropped {
 		delete(stamp, field)
 	}
 	// json.Marshal sorts map keys, so the normalized form is deterministic.
@@ -1059,10 +1070,11 @@ func hashPathContent(h io.Writer, p string) {
 // stat) but cannot be opened contributes the stable unreadableSentinel so the
 // hash stays defined rather than silently treating it as empty.
 func hashFileBytes(h io.Writer, p string) {
-	// A declared asset directory can carry another project's build stamp; it
-	// contributes the same tree-only digest fileContentDigest gives it.
+	// A declared asset directory can carry another project's build stamp. The
+	// asset copies it into the task's output, so it contributes everything but
+	// the fields that change between invocations over one commit.
 	if isVersionStamp(p) {
-		digest := versionStampDigest(p)
+		digest := versionStampDigest(p, versionStampInvocationFields)
 		if digest == nil {
 			h.Write([]byte(unreadableSentinel)) //nolint:errcheck // hash.Hash.Write never errors
 			return
