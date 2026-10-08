@@ -837,6 +837,22 @@
               "a-provider-without-the-capability-sees-no-new-field"
             ]
           }
+        },
+        {
+          "id": "tree-keyed-task-cache",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-build-stamp-keys-without-its-commit-fields",
+              "a-generate-asset-keys-by-its-workspace-relative-path",
+              "one-tree-in-two-checkouts-at-two-commits-shares-its-keys",
+              "a-version-aware-task-still-keys-on-the-commit"
+            ]
+          }
         }
       ]
     },

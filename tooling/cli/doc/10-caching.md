@@ -86,13 +86,22 @@ v8                          ← format version (for compatibility)
 + task contract digest      ← the task's declaration in the manifest
 + project name              ← e.g., "my-app"
 + project metadata digest   ← provider-owned project metadata
-+ workspace version         ← from putnami.workspace.json
++ workspace version         ← base version of the project's release line, without the commit suffix
 + publish version           ← full version incl. commit suffix, only for version-bearing tasks (see Version-Aware Tasks)
 + task params hash          ← resolved task inputs plus owning-command flags
 + file content hash         ← SHA-256 of source files matching patterns
++ generate assets hash      ← path and content of each generate asset the project declares, absent when none
 + env vars hash             ← values of declared environment variables
 + upstream hashes           ← cache hashes from dependency tasks
 ```
+
+No input names the commit, the branch or the checkout directory. Two runs on
+one tree, at one base version, compute the same key. A pull request and the
+commit its squash merge puts on the main branch share their entries, and so do
+two checkouts of one commit in two directories. The commit reaches a key only
+through the publish version, for a task that opts in (see
+[Version-Aware Tasks](#version-aware-tasks)). See
+[ADR 0059](adr/0059-a-cache-key-describes-the-tree-not-the-commit.md).
 
 ### Extension Implementation
 
@@ -237,6 +246,14 @@ it. A file that is intermittently unreadable produces a miss on the runs where
 it cannot be read, which is the correct answer: those runs are not the same
 input.
 
+A generate asset (`options.generate.assets[].from`) is an input of every task
+of the project that declares it. A file asset contributes its bytes. A
+directory asset contributes every file beneath it, each under its
+directory-relative path. An asset under the workspace root is named by its
+workspace-relative path, so the checkout directory does not reach the key. An
+asset outside the workspace root is named by its absolute path, so its key is
+specific to the machine layout.
+
 ### A project config is hashed through the reading task's scope
 
 `putnami.json` (and its `.putnamirc.json` spelling) is one file addressed to
@@ -318,11 +335,12 @@ edits, renames and deletions change the key. Staging unchanged bytes does not.
 
 Candidate inputs hash raw file bytes and symlink target text, with separate
 file-type markers. They do not follow symlinks or normalize project-config
-task tuning or version-stamp timestamps: a repository scanner can read those
-bytes. When ordinary and Git patterns select the same file, the raw candidate
-digest wins. Git enumeration errors and unsupported non-regular candidate
-files prevent key computation. Ordinary patterns keep their existing behavior;
-adding `git:**` does not filter files an ordinary pattern separately selects.
+task tuning or the version stamp's build time and commit fields: a repository
+scanner can read those bytes. When ordinary and Git patterns select the same
+file, the raw candidate digest wins. Git enumeration errors and unsupported
+non-regular candidate files prevent key computation. Ordinary patterns keep
+their existing behavior; adding `git:**` does not filter files an ordinary
+pattern separately selects.
 
 The document gates declare `git:**` instead of a fixed list of repository
 documents, so the public-cut scanner and its cache key cover the same tree.
@@ -1367,9 +1385,20 @@ turning every commit into a cold build:
   run keeps the build time of the run that produced its artifacts.
 
 When a task's own input globs reach the stamp (TypeScript lint's `**/*.json`
-does), it is hashed with `buildTime` blanked: the build time describes the
-invocation, not the tree, and hashing it would let a run invalidate the very key
-it was computed under.
+does), the stamp is hashed as a description of the tree. Two groups of fields
+are left out:
+
+- `buildTime` describes the invocation. Hashing it would let a run invalidate
+  the very key it was computed under.
+- `version`, `suffix`, `sha`, `branch` and `isDirty` name the commit. Hashing
+  them would give one tree a different key at every commit.
+
+Every other field stays in the key: `name`, `capabilityRoot`,
+`capabilityPackages`, and the fields other writers merge into the document,
+such as `contentHash` and `publish`. A task whose output embeds the commit does
+not list the stamp as an input to follow it. It declares `versionAware`, or
+receives a `version-var` parameter (see
+[Version-Aware Tasks](#version-aware-tasks)).
 
 A workspace root Git does not manage has no source binding: no `git` program is
 on `PATH`, or the root is outside every repository. The scheduler stamps each

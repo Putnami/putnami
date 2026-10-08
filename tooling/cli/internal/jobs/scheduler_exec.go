@@ -996,7 +996,7 @@ func (s *Scheduler) refreshVersionFile(job *ScheduledJob) {
 // — the restored file is left byte-for-byte alone, so buildTime does not churn.
 // When it differs, the rewrite lands on exactly the identity
 // preserveMatchingVersionFiles seeded before ANY key was computed. Either way the
-// run ends holding the same buildTime-free digest (store.versionStampDigest) that
+// run ends holding the same tree-only digest (store.versionStampDigest) that
 // every key computed in this run hashed, so this write cannot invalidate a key it
 // was itself an input to.
 //

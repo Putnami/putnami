@@ -3,6 +3,7 @@ package store
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -691,7 +693,7 @@ func TestHashFiles_ProjectConfigIgnoresTaskTuning(t *testing.T) {
 
 func TestHashExtraFiles_MissingFile(t *testing.T) {
 	// Missing files should produce a deterministic hash (not panic)
-	h := hashExtraFiles([]string{"/nonexistent/file.txt"})
+	h := hashExtraFiles("", []string{"/nonexistent/file.txt"})
 	if h == "" {
 		t.Error("hashExtraFiles should return a hash even for missing files")
 	}
@@ -702,8 +704,8 @@ func TestHashExtraFiles_Deterministic(t *testing.T) {
 	path := filepath.Join(dir, "asset.txt")
 	os.WriteFile(path, []byte("data"), 0o644)
 
-	h1 := hashExtraFiles([]string{path})
-	h2 := hashExtraFiles([]string{path})
+	h1 := hashExtraFiles("", []string{path})
+	h2 := hashExtraFiles("", []string{path})
 	if h1 != h2 {
 		t.Error("hashExtraFiles should be deterministic")
 	}
@@ -716,8 +718,8 @@ func TestHashExtraFiles_OrderIndependent(t *testing.T) {
 	os.WriteFile(a, []byte("aaa"), 0o644)
 	os.WriteFile(b, []byte("bbb"), 0o644)
 
-	h1 := hashExtraFiles([]string{a, b})
-	h2 := hashExtraFiles([]string{b, a})
+	h1 := hashExtraFiles("", []string{a, b})
+	h2 := hashExtraFiles("", []string{b, a})
 	if h1 != h2 {
 		t.Error("hashExtraFiles should be order-independent")
 	}
@@ -736,18 +738,18 @@ func TestHashExtraFiles_DirectoryContentInvalidatesKey(t *testing.T) {
 	os.WriteFile(filepath.Join(docDir, "a.md"), []byte("one"), 0o644)
 	os.WriteFile(filepath.Join(docDir, "sub", "b.md"), []byte("two"), 0o644)
 
-	before := hashExtraFiles([]string{docDir})
+	before := hashExtraFiles("", []string{docDir})
 
 	// Editing a nested file must flip the key.
 	os.WriteFile(filepath.Join(docDir, "sub", "b.md"), []byte("two-edited"), 0o644)
-	afterEdit := hashExtraFiles([]string{docDir})
+	afterEdit := hashExtraFiles("", []string{docDir})
 	if before == afterEdit {
 		t.Error("editing a file under a directory asset did not change the hash")
 	}
 
 	// Adding a file must flip the key too (path is folded in, not just content).
 	os.WriteFile(filepath.Join(docDir, "c.md"), []byte("three"), 0o644)
-	afterAdd := hashExtraFiles([]string{docDir})
+	afterAdd := hashExtraFiles("", []string{docDir})
 	if afterEdit == afterAdd {
 		t.Error("adding a file under a directory asset did not change the hash")
 	}
@@ -760,54 +762,183 @@ func TestHashExtraFiles_DirectoryDeterministic(t *testing.T) {
 	os.WriteFile(filepath.Join(docDir, "a.md"), []byte("a"), 0o644)
 	os.WriteFile(filepath.Join(docDir, "sub", "b.md"), []byte("b"), 0o644)
 
-	h1 := hashExtraFiles([]string{docDir})
-	h2 := hashExtraFiles([]string{docDir})
+	h1 := hashExtraFiles("", []string{docDir})
+	h2 := hashExtraFiles("", []string{docDir})
 	if h1 != h2 {
 		t.Error("directory hashing should be deterministic")
 	}
 }
 
-// The .gen/version.json stamp carries a buildTime that the scheduler refreshes
-// after a job's key is computed. Hashing it verbatim makes a project that took
-// one genuine miss miss forever: the entry lands under the pre-refresh key while
-// the tree holds the post-refresh stamp. Everything else in the stamp still has
-// to invalidate — a HEAD change must reach the key.
-func TestHashFiles_VersionStampBuildTimeDoesNotChangeHash(t *testing.T) {
-	dir := t.TempDir()
-	genDir := filepath.Join(dir, ".gen")
-	os.MkdirAll(genDir, 0o755)
-	stamp := filepath.Join(genDir, "version.json")
+// A path under the workspace root is named by its workspace-relative slash
+// form: the checkout directory does not reach the hash, and the relative path
+// and the content both do. A path outside the root, and every path when no root
+// is known, is named as given.
+func TestHashExtraFiles_NamesAPathUnderTheRootRelativeToIt(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "tree-keyed-task-cache",
+		"a-generate-asset-keys-by-its-workspace-relative-path")
 
-	write := func(buildTime, sha string) {
+	// The two checkouts sit beside a directory whose name extends the first
+	// root's, so a prefix match on the root string would claim it.
+	parent := t.TempDir()
+	rootA := filepath.Join(parent, "ws")
+	rootB := filepath.Join(t.TempDir(), "elsewhere")
+	beside := filepath.Join(parent, "ws-other")
+	write := func(path, content string) string {
 		t.Helper()
-		content := fmt.Sprintf(
-			`{"name":"proj","version":"0.1.0-%s","sha":%q,"branch":"main","isDirty":false,"buildTime":%q}`,
-			sha, sha, buildTime,
-		)
-		if err := os.WriteFile(stamp, []byte(content), 0o644); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)
 		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
 	}
-	hash := func() string {
+	assets := func(root string) []string {
 		t.Helper()
+		write(filepath.Join(root, "docs", "guide", "intro.md"), "intro")
+		write(filepath.Join(root, "docs", "index.md"), "index")
+		return []string{filepath.Join(root, "docs"), write(filepath.Join(root, "README.md"), "readme")}
+	}
+	pathsA, pathsB := assets(rootA), assets(rootB)
+
+	inA := hashExtraFiles(rootA, pathsA)
+	if inB := hashExtraFiles(rootB, pathsB); inB != inA {
+		t.Errorf("one asset tree under two workspace roots hashed differently: %s != %s", inA, inB)
+	}
+	if reordered := hashExtraFiles(rootA, []string{pathsA[1], pathsA[0]}); reordered != inA {
+		t.Error("the order of the paths reached the hash")
+	}
+	if hashExtraFiles("", pathsA) == hashExtraFiles("", pathsB) {
+		t.Error("without a workspace root, two absolute paths hashed under one name")
+	}
+
+	t.Run("the relative path reaches the hash", func(t *testing.T) {
+		moved := []string{pathsB[0], write(filepath.Join(rootB, "notes", "README.md"), "readme")}
+		if hashExtraFiles(rootB, moved) == inA {
+			t.Error("an asset with the same content at another workspace-relative path kept the hash")
+		}
+	})
+
+	t.Run("the content reaches the hash", func(t *testing.T) {
+		write(filepath.Join(rootB, "docs", "guide", "intro.md"), "intro, edited")
+		if hashExtraFiles(rootB, pathsB) == inA {
+			t.Error("an edit under a directory asset kept the hash")
+		}
+	})
+
+	t.Run("a path outside the root is named as given", func(t *testing.T) {
+		outside := write(filepath.Join(beside, "asset.txt"), "data")
+		asGiven := hashExtraFiles("", []string{outside})
+		if got := hashExtraFiles(rootA, []string{outside}); got != asGiven {
+			t.Errorf("a path beside the workspace root was renamed against it: %s != %s", got, asGiven)
+		}
+		if got := hashExtraFiles(rootB, []string{outside}); got != asGiven {
+			t.Errorf("a path outside the workspace root was renamed against it: %s != %s", got, asGiven)
+		}
+	})
+}
+
+// The .gen/version.json stamp describes the tree to a cache key. Its build time
+// names the invocation and its commit fields name the commit, so two stamps that
+// differ only in those fields give one digest: a task whose globs reach the
+// stamp keys the same at two commits that share one tree. Every other field
+// describes the tree and still moves the digest.
+func TestHashFiles_VersionStampKeysTheTreeNotTheCommit(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "tree-keyed-task-cache",
+		"the-build-stamp-keys-without-its-commit-fields")
+
+	// stampDocument is the stamp as its writers leave it: the scheduler's
+	// fields, then the two other writers merge into the document.
+	type stampDocument struct {
+		Name               string          `json:"name"`
+		Version            string          `json:"version"`
+		Suffix             string          `json:"suffix,omitempty"`
+		SHA                string          `json:"sha"`
+		Branch             string          `json:"branch"`
+		IsDirty            bool            `json:"isDirty"`
+		BuildTime          string          `json:"buildTime"`
+		CapabilityRoot     string          `json:"capabilityRoot"`
+		CapabilityPackages json.RawMessage `json:"capabilityPackages"`
+		ContentHash        string          `json:"contentHash"`
+		Publish            json.RawMessage `json:"publish"`
+	}
+
+	dir := t.TempDir()
+	stamp := filepath.Join(dir, ".gen", "version.json")
+	if err := os.MkdirAll(filepath.Dir(stamp), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// hash writes the stamp and returns the digest of a pattern that reaches it.
+	hash := func(document stampDocument) string {
+		t.Helper()
+		content, err := json.Marshal(document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(stamp, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
 		got, err := hashFiles(dir, []string{"**/*.json"}, ProjectConfigScope{})
 		if err != nil {
 			t.Fatalf("hashFiles: %v", err)
 		}
 		return got
 	}
+	// pullRequest returns the stamp of the tree as a run at one commit writes it.
+	pullRequest := func() stampDocument {
+		return stampDocument{
+			Name:               "proj",
+			Version:            "0.3.1-20261003152506-4da6833",
+			Suffix:             "20261003152506-4da6833",
+			SHA:                "4da6833",
+			Branch:             "feature/x",
+			IsDirty:            true,
+			BuildTime:          "2026-10-03T15:25:06Z",
+			CapabilityRoot:     "../..",
+			CapabilityPackages: json.RawMessage(`[{"package":"proj","version":"0.3.1"}]`),
+			ContentHash:        "0123456789abcdef",
+			Publish:            json.RawMessage(`{"registry":"npm"}`),
+		}
+	}
+	base := hash(pullRequest())
 
-	write("2026-07-26T16:10:39Z", "abc1234")
-	before := hash()
-
-	write("2026-07-26T16:13:04Z", "abc1234")
-	if after := hash(); after != before {
-		t.Errorf("a fresh buildTime changed the cache key (%s → %s); the next run can never hit", before, after)
+	squashMerge := pullRequest()
+	squashMerge.Version = "0.3.1-20261004094924-a389c95"
+	squashMerge.Suffix = "20261004094924-a389c95"
+	squashMerge.SHA = "a389c95"
+	squashMerge.Branch = "main"
+	squashMerge.IsDirty = false
+	squashMerge.BuildTime = "2026-10-04T09:49:24Z"
+	if got := hash(squashMerge); got != base {
+		t.Errorf("two commits on one tree gave two stamp digests: %s != %s", base, got)
 	}
 
-	write("2026-07-26T16:13:04Z", "def5678")
-	if after := hash(); after == before {
-		t.Error("a new commit sha must still invalidate the cache key")
+	// A release stamp carries no suffix at all; the field's absence is a commit
+	// difference like any of its values.
+	release := squashMerge
+	release.Version = "0.3.1"
+	release.Suffix = ""
+	if got := hash(release); got != base {
+		t.Errorf("a stamp without a suffix moved the digest: %s != %s", base, got)
+	}
+
+	for _, change := range []struct {
+		field string
+		apply func(*stampDocument)
+	}{
+		{"name", func(d *stampDocument) { d.Name = "renamed" }},
+		{"capabilityRoot", func(d *stampDocument) { d.CapabilityRoot = ".." }},
+		{"capabilityPackages", func(d *stampDocument) {
+			d.CapabilityPackages = json.RawMessage(`[{"package":"proj","version":"0.3.1"},{"package":"dep","version":"0.3.1"}]`)
+		}},
+		{"contentHash", func(d *stampDocument) { d.ContentHash = "fedcba9876543210" }},
+		{"publish", func(d *stampDocument) { d.Publish = json.RawMessage(`{"registry":"jsr"}`) }},
+	} {
+		changed := pullRequest()
+		change.apply(&changed)
+		if got := hash(changed); got == base {
+			t.Errorf("a change to the stamp field %q kept the digest", change.field)
+		}
 	}
 }
 

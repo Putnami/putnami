@@ -257,8 +257,9 @@ func RequireFullClone(repoRoot string) error {
 // writes.
 //
 // Against store.versionStampDigest, which is how the file reaches a cache key:
-// that digest re-marshals the document as a MAP with only `buildTime` deleted, so
-// it is already key-order independent and the reordering here cannot move it.
+// that digest re-marshals the document as a MAP without its build time and its
+// commit fields, so it is already key-order independent and the reordering here
+// cannot move it.
 // What the merge does change is that a carried field now contributes to the
 // digest instead of being deleted on the next scheduler write — which is correct
 // (it is real content) and strictly MORE stable than before, because the lossy

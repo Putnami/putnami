@@ -358,9 +358,9 @@ func TestGenerateVersionFiles_NoGitMetadata(t *testing.T) {
 // This models the exact ordering the scheduler uses (scheduler.go:197 seeds the
 // stamps, scheduler_exec.go computes the key, and only then refreshes the stamp
 // of a project that is about to execute), starting from a project that already
-// carries an earlier run's stamp. Hashing buildTime made every run key on the
-// previous run's stamp while leaving the current one on disk, so a project that
-// missed once missed forever.
+// carries an earlier run's stamp. The stamp reaches the key as a description of
+// the tree: neither the refreshed build time nor a new commit moves the key, and
+// a field that describes the tree does.
 func TestCacheKeyStableAcrossVersionFileRefresh(t *testing.T) {
 	t.Parallel()
 	ws := makeExecutorTestWorkspace(t)
@@ -413,16 +413,31 @@ func TestCacheKeyStableAcrossVersionFileRefresh(t *testing.T) {
 		t.Fatalf("cache key moved between runs of an unchanged tree (%s → %s): the entry run A stored can never be hit", keyA, keyB)
 	}
 
-	// The stamp must still carry real invalidation: a new commit changes the key.
-	newVersion := rootLineVersions(&JobContextVersion{SHA: "c51ac7e", Branch: "main", Suffix: "c51ac7e"})
+	// Run C: the same tree at a new commit. The stamp now names that commit, and
+	// the key is the one run A stored.
+	newVersion := rootLineVersions(&JobContextVersion{SHA: "c51ac7e", Branch: "release", Suffix: "c51ac7e"})
 	jobC := mkJob()
 	preserveMatchingVersionFiles(ws, []*ScheduledJob{jobC}, newVersion, "2026-07-20T13:00:00Z")
-	hash, err := computeJobCacheHash(ws, jobC, nil, newVersion, store.NewCacheManager(localStore), nil)
+	if stamp := readVersionStamp(t, filepath.Join(ws.Root, "proj")); stamp.SHA != "c51ac7e" {
+		t.Fatalf("stamp sha = %q, want the new commit seeded before the key is computed", stamp.SHA)
+	}
+	keyC, err := computeJobCacheHash(ws, jobC, nil, newVersion, store.NewCacheManager(localStore), nil)
 	if err != nil {
 		t.Fatalf("compute cache key: %v", err)
 	}
-	if hash == keyA {
-		t.Error("a new commit sha must still invalidate a task keyed on the version stamp")
+	if keyC != keyA {
+		t.Errorf("a new commit on an unchanged tree moved the key of a task that does not embed the version (%s → %s)", keyA, keyC)
+	}
+
+	// The stamp still carries real invalidation: a field that describes the tree
+	// changes the key.
+	mergeStampField(t, filepath.Join(ws.Root, "proj"), "contentHash", producedContentHash)
+	keyD, err := computeJobCacheHash(ws, mkJob(), nil, newVersion, store.NewCacheManager(localStore), nil)
+	if err != nil {
+		t.Fatalf("compute cache key: %v", err)
+	}
+	if keyD == keyA {
+		t.Error("a new contentHash in the stamp kept the key; the task no longer reads the stamp")
 	}
 }
 
