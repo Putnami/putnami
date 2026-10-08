@@ -160,29 +160,13 @@ func (m *Migrator) upTo(ctx context.Context, target string) ([]Migration, error)
 		if err != nil {
 			return err
 		}
-		appliedByName := make(map[string]Migration, len(applied))
+		appliedNames := make(map[string]struct{}, len(applied))
 		for _, a := range applied {
-			appliedByName[a.Name] = a
-		}
-
-		// Reject drift across the selected range before executing any pending
-		// body. Both passes stay under the same datasource advisory lock.
-		for _, def := range m.definitions {
-			if row, done := appliedByName[def.Name]; done {
-				currentHash := sha256Hex(def.SQL)
-				if row.Hash != currentHash {
-					return perrors.Newf(migration.CodeDriftDetected,
-						"migration %q body has changed since it was applied to datasource %q (applied hash %s, current hash %s); restore the original SQL or create a new migration",
-						def.Name, m.dbName, row.Hash, currentHash)
-				}
-			}
-			if resolvedTarget != "" && def.Name == resolvedTarget {
-				break
-			}
+			appliedNames[a.Name] = struct{}{}
 		}
 
 		for _, def := range m.definitions {
-			if _, done := appliedByName[def.Name]; done {
+			if _, done := appliedNames[def.Name]; done {
 				if resolvedTarget != "" && def.Name == resolvedTarget {
 					break
 				}

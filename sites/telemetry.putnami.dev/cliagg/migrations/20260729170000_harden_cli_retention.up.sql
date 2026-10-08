@@ -178,6 +178,14 @@ BEGIN
             'pg_cron must be admin-installed in the telemetry database'
             USING ERRCODE = '55000';
     END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_roles
+        WHERE rolname = session_user AND rolcanlogin
+    ) THEN
+        RAISE EXCEPTION
+            'pg_cron session user % must be a login role', session_user
+            USING ERRCODE = '55000';
+    END IF;
 END
 $$;
 
@@ -202,6 +210,11 @@ DELETE FROM cli_cardinality_admission
 WHERE day < (now() AT TIME ZONE 'UTC')::date - 34
    OR day > (now() AT TIME ZONE 'UTC')::date
 $$;
+
+-- The managed migration login assumes the non-login database owner role.
+-- Return to the authenticated login for scheduling so pg_cron can start its
+-- background worker without granting LOGIN to the owner.
+SET LOCAL ROLE NONE;
 
 SELECT cron.schedule_in_database(
     'cliagg-retention-' || current_database(),
