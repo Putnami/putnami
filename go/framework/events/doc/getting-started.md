@@ -335,9 +335,9 @@ service account, which needs `roles/pubsub.publisher` on the topic. On a laptop,
 run `gcloud auth application-default login` or set
 `GOOGLE_APPLICATION_CREDENTIALS`.
 
-The transport is publish-only, so handlers receive through push delivery. To
-publish one channel to Pub/Sub while `events.transport` selects another
-transport, build it in code:
+The transport is publish-only, so set `events.delivery: push`: under pull
+delivery, subscribing a handler fails. To publish one channel to Pub/Sub while
+`events.transport` selects another transport, build it in code:
 
 ```go
 transport, err := events.NewDirectPubSubTransport(events.PubSubBinding{

@@ -18,8 +18,8 @@ const (
 	// PublishOutcomePermanent means the provider rejected the publish and a
 	// retry of the same bytes fails the same way.
 	PublishOutcomePermanent = "permanent"
-	// PublishOutcomeRetryable means the provider did not accept the publish and
-	// a later retry may succeed.
+	// PublishOutcomeRetryable means the publish was not accepted, because the
+	// provider refused it or nothing was sent, and a later retry may succeed.
 	PublishOutcomeRetryable = "retryable"
 	// PublishOutcomeAmbiguous means the provider may have accepted the publish.
 	// A relay must not publish it again automatically or through another route.

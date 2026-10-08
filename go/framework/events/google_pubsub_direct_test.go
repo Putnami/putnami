@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"golang.org/x/oauth2"
 )
 
 // writeFakeADC writes a syntactically valid service_account credentials file (a
@@ -96,7 +97,9 @@ func newPubSubRecorder(t *testing.T, respond func(http.ResponseWriter)) *pubSubR
 }
 
 func (r *pubSubRecorder) transport(binding PubSubBinding) *DirectPubSubTransport {
-	return newDirectPubSubTransport(binding, r.server.Client(), r.server.URL+"/")
+	return newDirectPubSubTransport(binding, &googlePubSubRESTClient{
+		client: r.server.Client(), endpoint: r.server.URL + "/", projectID: binding.ProjectID,
+	})
 }
 
 func (r *pubSubRecorder) topic(name string) *googlePubSubRESTTopic {
@@ -118,9 +121,12 @@ func TestPubSubTopicNamer(t *testing.T) {
 	if got := PubSubTopicNamer("{topic}")("9lives"); got != "e-9lives" {
 		t.Errorf("PubSubTopicNamer = %q, want e-9lives", got)
 	}
-	// An empty template passes the logical name through.
+	// An empty template stands for the logical name, still sanitized.
 	if got := PubSubTopicNamer("")("order.created"); got != "order.created" {
-		t.Errorf("empty template = %q, want passthrough", got)
+		t.Errorf("empty template = %q, want order.created", got)
+	}
+	if got := PubSubTopicNamer("")("Order Created"); got != "order-created" {
+		t.Errorf("empty template = %q, want order-created", got)
 	}
 }
 
@@ -133,7 +139,14 @@ func TestPubSubResourceID(t *testing.T) {
 		{"passthrough valid id", "events-order.created", "events-order.created"},
 		{"invalid chars become dashes", "Order Created", "order-created"},
 		{"leading digit gets e- prefix", "123-topic", "e-123-topic"},
-		{"all-invalid trims empty then e- prefix", "@@@", "e-"},
+		{"all-invalid trims empty then pads to 3 chars", "@@@", "e-e"},
+		{"empty pads to 3 chars", "", "e-e"},
+		{"one char gets e- prefix", "a", "e-a"},
+		{"two chars get e- prefix", "ab", "e-ab"},
+		{"three chars stay", "abc", "abc"},
+		{"goog prefix is reserved", "goog-topic", "e-goog-topic"},
+		{"goog prefix in any case", "GOOGtopic", "e-googtopic"},
+		{"prefixed over-long id stays at 255", "9" + strings.Repeat("a", 300), "e-9" + strings.Repeat("a", 252)},
 		{"leading separators trimmed away", "--_.trim", "trim"},
 		{"over-long id truncated to 255", strings.Repeat("a", 300), strings.Repeat("a", 255)},
 		{"truncation trims trailing separators", strings.Repeat("a", 253) + "--" + strings.Repeat("b", 40), strings.Repeat("a", 253)},
@@ -185,7 +198,7 @@ func TestNewDirectPubSubTransportFailsWithoutCredentials(t *testing.T) {
 
 func TestNewDirectPubSubTransportWithADC(t *testing.T) {
 	writeFakeADC(t, nil)
-	transport, err := NewDirectPubSubTransport(PubSubBinding{ProjectID: "control-project", TopicTemplate: "events-{topic}"})
+	transport, err := NewDirectPubSubTransport(PubSubBinding{ProjectID: "my-project", TopicTemplate: "events-{topic}"})
 	if err != nil {
 		t.Fatalf("NewDirectPubSubTransport: %v", err)
 	}
@@ -198,6 +211,7 @@ func TestPubSubTransportIsBuiltIn(t *testing.T) {
 	spectest.Proves(t, "go/event-delivery", "provider-publish", "pubsub-transport-is-built-in")
 	resetTransportFactories(t)
 	writeFakeADC(t, nil)
+	t.Cleanup(func() { SetTransport(nil) })
 
 	// events.transport: pubsub needs no provider module.
 	p := Events(PluginConfig{
@@ -314,7 +328,30 @@ func TestGooglePubSubRESTTopicPublishErrors(t *testing.T) {
 				w.WriteHeader(http.StatusInternalServerError)
 				_, _ = w.Write([]byte(`{"error":{"code":500,"message":"boom","status":"INTERNAL"}}`))
 			},
-			code: 500, message: "boom", outcome: PublishOutcomeRetryable,
+			code: 500, message: "boom", outcome: PublishOutcomeAmbiguous,
+		},
+		{
+			name: "unavailable",
+			respond: func(w http.ResponseWriter) {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write([]byte(`{"error":{"code":503,"message":"try later","status":"UNAVAILABLE"}}`))
+			},
+			code: 503, message: "try later", outcome: PublishOutcomeRetryable,
+		},
+		{
+			name: "canceled body code",
+			respond: func(w http.ResponseWriter) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"error":{"code":499,"message":"canceled","status":"CANCELED"}}`))
+			},
+			code: 499, message: "canceled", outcome: PublishOutcomeAmbiguous,
+		},
+		{
+			name: "long body is capped",
+			respond: func(w http.ResponseWriter) {
+				http.Error(w, strings.Repeat("x", 5000), http.StatusBadRequest)
+			},
+			code: 400, message: strings.Repeat("x", 1024) + "…", outcome: PublishOutcomePermanent,
 		},
 		{
 			name: "body code wins over HTTP status",
@@ -368,6 +405,15 @@ func TestGooglePubSubRESTTopicUnknownDeliveryStateIsAmbiguous(t *testing.T) {
 		t.Fatalf("unreadable answer = %v, want an ambiguous error", err)
 	}
 
+	// A 2xx answer must name exactly the one message sent.
+	for _, answer := range []string{`{}`, `{"messageIds":[]}`, `{"messageIds":["a","b"]}`, `{"messageIds":[""]}`} {
+		rec := newPubSubRecorder(t, func(w http.ResponseWriter) { _, _ = w.Write([]byte(answer)) })
+		err := rec.topic("t").Publish(context.Background(), GooglePubSubPublishMessage{Data: []byte("x")})
+		if err == nil || classifyDirectPubSubPublishError(err) != PublishOutcomeAmbiguous {
+			t.Fatalf("answer %s = %v, want an ambiguous error", answer, err)
+		}
+	}
+
 	// A request that reaches no server has no answer.
 	closed := newPubSubRecorder(t, nil)
 	topic := closed.topic("t")
@@ -403,10 +449,18 @@ func TestDirectPubSubOutcomeClassification(t *testing.T) {
 		{name: "success", want: ""},
 		{name: "invalid", err: status(http.StatusBadRequest), want: PublishOutcomePermanent},
 		{name: "unauthorized", err: status(http.StatusUnauthorized), want: PublishOutcomePermanent},
-		{name: "timeout", err: status(http.StatusRequestTimeout), want: PublishOutcomeRetryable},
-		{name: "conflict", err: status(http.StatusConflict), want: PublishOutcomeRetryable},
+		{name: "not found", err: status(http.StatusNotFound), want: PublishOutcomePermanent},
+		{name: "request timeout", err: status(http.StatusRequestTimeout), want: PublishOutcomeAmbiguous},
+		{name: "conflict", err: status(http.StatusConflict), want: PublishOutcomeAmbiguous},
+		{name: "canceled", err: status(499), want: PublishOutcomeAmbiguous},
 		{name: "throttled", err: status(http.StatusTooManyRequests), want: PublishOutcomeRetryable},
-		{name: "server", err: status(http.StatusBadGateway), want: PublishOutcomeRetryable},
+		{name: "unavailable", err: status(http.StatusServiceUnavailable), want: PublishOutcomeRetryable},
+		{name: "internal", err: status(http.StatusInternalServerError), want: PublishOutcomeAmbiguous},
+		{name: "bad gateway", err: status(http.StatusBadGateway), want: PublishOutcomeAmbiguous},
+		{name: "gateway timeout", err: status(http.StatusGatewayTimeout), want: PublishOutcomeAmbiguous},
+		{name: "no token", err: &GooglePubSubCredentialError{Topic: "t"}, want: PublishOutcomeRetryable},
+		{name: "invalid token", err: &GooglePubSubCredentialError{Topic: "t", Invalid: true}, want: PublishOutcomePermanent},
+		{name: "deadline", err: context.DeadlineExceeded, want: PublishOutcomeAmbiguous},
 		{name: "unknown status", err: status(http.StatusContinue), want: PublishOutcomeAmbiguous},
 		{name: "network unknown", err: stderrors.New("connection reset after write"), want: PublishOutcomeAmbiguous},
 		{name: "stale route", err: ErrStalePublishRoute, want: PublishOutcomeAmbiguous},
@@ -445,8 +499,10 @@ func TestDirectPubSubDurablePublishContract(t *testing.T) {
 	if err := transport.Publish(ctx, Envelope{ID: "e", Topic: "t"}); err != nil || len(rec.requests) != 1 {
 		t.Fatalf("publish = (%d requests, %v)", len(rec.requests), err)
 	}
-	if err := transport.Subscribe(Handle(NewTopic[string]("t"), func(context.Context, *Message[string]) error { return nil })); err != nil {
-		t.Fatalf("subscribe: %v", err)
+	// Pull delivery cannot work on a publish-only transport, so it fails loudly.
+	err = transport.Subscribe(Handle(NewTopic[string]("t"), func(context.Context, *Message[string]) error { return nil }))
+	if err == nil || !strings.Contains(err.Error(), "pubsub transport is publish-only; set events.delivery: push") {
+		t.Fatalf("subscribe = %v, want the publish-only configuration error", err)
 	}
 	if err := transport.Start(ctx); err != nil {
 		t.Fatalf("start: %v", err)
@@ -456,27 +512,142 @@ func TestDirectPubSubDurablePublishContract(t *testing.T) {
 	}
 }
 
-func TestQuotaProjectTransport(t *testing.T) {
-	if quotaProjectTransport(nil) != http.DefaultTransport {
-		t.Error("credentials without a quota project should use the default transport")
+func TestQuotaProjectOf(t *testing.T) {
+	if got := quotaProjectOf(nil); got != "" {
+		t.Errorf("no credentials file = %q, want empty", got)
 	}
-	if quotaProjectTransport([]byte(`{"type":"service_account"}`)) != http.DefaultTransport {
-		t.Error("credentials without quota_project_id should use the default transport")
+	if got := quotaProjectOf([]byte(`not json`)); got != "" {
+		t.Errorf("unreadable credentials file = %q, want empty", got)
 	}
+	if got := quotaProjectOf([]byte(`{"quota_project_id":"billing-project"}`)); got != "billing-project" {
+		t.Errorf("quota project = %q, want billing-project", got)
+	}
+}
 
-	var got string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got = r.Header.Get("X-Goog-User-Project")
+// TestNewDirectPubSubTransportAuthorizesEachPublish runs the production client:
+// Application Default Credentials from a service account file whose token URI
+// is an in-memory token server.
+func TestNewDirectPubSubTransportAuthorizesEachPublish(t *testing.T) {
+	tokens := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"access-1","token_type":"Bearer","expires_in":3600}`))
 	}))
-	defer server.Close()
-	client := &http.Client{Transport: quotaProjectTransport([]byte(`{"quota_project_id":"billing-project"}`))}
-	resp, err := client.Get(server.URL)
+	t.Cleanup(tokens.Close)
+	writeFakeADC(t, map[string]string{"token_uri": tokens.URL + "/token", "quota_project_id": "billing-project"})
+	rec := newPubSubRecorder(t, nil)
+	previous := googlePubSubEndpoint
+	googlePubSubEndpoint = rec.server.URL + "/"
+	t.Cleanup(func() { googlePubSubEndpoint = previous })
+
+	transport, err := NewDirectPubSubTransport(PubSubBinding{ProjectID: "my-project", TopicTemplate: "events-{topic}"})
 	if err != nil {
-		t.Fatalf("get: %v", err)
+		t.Fatalf("NewDirectPubSubTransport: %v", err)
 	}
-	_ = resp.Body.Close()
-	if got != "billing-project" {
+	if err := transport.Publish(context.Background(), Envelope{ID: "e", Topic: "order.created"}); err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	if got := rec.header.Get("Authorization"); got != "Bearer access-1" {
+		t.Errorf("Authorization = %q, want Bearer access-1", got)
+	}
+	if got := rec.header.Get("X-Goog-User-Project"); got != "billing-project" {
 		t.Errorf("X-Goog-User-Project = %q, want billing-project", got)
+	}
+	if want := "/v1/projects/my-project/topics/events-order.created:publish"; rec.path != want {
+		t.Errorf("publish path = %q, want %q", rec.path, want)
+	}
+}
+
+type fakeTokenSource struct {
+	token *oauth2.Token
+	err   error
+	block chan struct{}
+}
+
+func (s *fakeTokenSource) Token() (*oauth2.Token, error) {
+	if s.block != nil {
+		<-s.block
+	}
+	return s.token, s.err
+}
+
+func TestGooglePubSubRESTTopicCredentialFailuresSendNothing(t *testing.T) {
+	const secret = "refresh-token-secret"
+	block := make(chan struct{})
+	t.Cleanup(func() { close(block) })
+	expired, cancel := context.WithCancel(context.Background())
+	cancel()
+	tests := []struct {
+		name    string
+		ctx     context.Context
+		tokens  oauth2.TokenSource
+		outcome string
+	}{
+		{"token source fails", context.Background(), &fakeTokenSource{err: stderrors.New("oauth2: " + secret)}, PublishOutcomeRetryable},
+		{"no token", context.Background(), &fakeTokenSource{}, PublishOutcomeRetryable},
+		{"token lookup outlives the publish", expired, &fakeTokenSource{block: block}, PublishOutcomeRetryable},
+		{"empty token", context.Background(), &fakeTokenSource{token: &oauth2.Token{}}, PublishOutcomePermanent},
+		{"token with a line break", context.Background(), &fakeTokenSource{token: &oauth2.Token{AccessToken: "a\r\nX-Injected: 1"}}, PublishOutcomePermanent},
+		{"token with spaces", context.Background(), &fakeTokenSource{token: &oauth2.Token{AccessToken: " a "}}, PublishOutcomePermanent},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := newPubSubRecorder(t, nil)
+			client := &googlePubSubRESTClient{client: rec.server.Client(), endpoint: rec.server.URL + "/", projectID: "my-project", tokens: tc.tokens}
+			err := client.Topic("t").Publish(tc.ctx, GooglePubSubPublishMessage{Data: []byte("x")})
+			var credentialErr *GooglePubSubCredentialError
+			if !stderrors.As(err, &credentialErr) {
+				t.Fatalf("error = %v, want *GooglePubSubCredentialError", err)
+			}
+			if len(rec.requests) != 0 {
+				t.Errorf("sent %d requests, want none", len(rec.requests))
+			}
+			if strings.Contains(err.Error(), secret) {
+				t.Errorf("error %q carries the credential provider's text", err.Error())
+			}
+			if got := classifyDirectPubSubPublishError(err); got != tc.outcome {
+				t.Errorf("outcome = %q, want %q", got, tc.outcome)
+			}
+		})
+	}
+}
+
+type deadlineDoer struct{ deadline time.Duration }
+
+func (d *deadlineDoer) Do(req *http.Request) (*http.Response, error) {
+	if deadline, ok := req.Context().Deadline(); ok {
+		d.deadline = time.Until(deadline)
+	}
+	return nil, stderrors.New("no network in this test")
+}
+
+func TestGooglePubSubRESTTopicBoundsEachPublish(t *testing.T) {
+	doer := &deadlineDoer{}
+	client := &googlePubSubRESTClient{client: doer, endpoint: "http://pubsub.example.invalid/", projectID: "my-project"}
+	_ = client.Topic("t").Publish(context.Background(), GooglePubSubPublishMessage{Data: []byte("x")})
+	if doer.deadline <= 0 || doer.deadline > googlePubSubPublishTimeout {
+		t.Fatalf("publish deadline = %v, want at most %v", doer.deadline, googlePubSubPublishTimeout)
+	}
+	if googlePubSubPublishTimeout != 10*time.Second {
+		t.Fatalf("publish timeout = %v, want 10s", googlePubSubPublishTimeout)
+	}
+}
+
+func TestGooglePubSubCredentialErrorMessage(t *testing.T) {
+	missing := &GooglePubSubCredentialError{Topic: "projects/p/topics/t"}
+	if want := "events.google_pubsub: publish to projects/p/topics/t: no access token from the credentials"; missing.Error() != want {
+		t.Errorf("Error() = %q, want %q", missing.Error(), want)
+	}
+	invalid := &GooglePubSubCredentialError{Topic: "projects/p/topics/t", Invalid: true}
+	if !strings.Contains(invalid.Error(), "invalid access token") {
+		t.Errorf("Error() = %q, want it to name the invalid token", invalid.Error())
+	}
+}
+
+func TestTruncateErrorTextKeepsRunes(t *testing.T) {
+	// A cut inside a multi-byte rune moves back to the rune start.
+	in := strings.Repeat("a", 1023) + "é" + "tail"
+	if got := truncateErrorText(in); got != strings.Repeat("a", 1023)+"…" {
+		t.Errorf("truncateErrorText cut %q", got[len(got)-8:])
 	}
 }
 

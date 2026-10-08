@@ -9,7 +9,7 @@
           "path": "go/framework/events/google_pubsub_direct.go",
           "transport": "http",
           "symbol": "http.Client",
-          "fingerprint": "0a082ad887583b3585996fb6537c20649c06fe6b499c99382b3c3c96d17c8700"
+          "fingerprint": "467b483f0323661fdb841df6a38176240f396cac0d0e40a298f6381ff546bd20"
         },
         {
           "path": "go/framework/events/google_pubsub_direct.go",

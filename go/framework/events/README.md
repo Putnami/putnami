@@ -241,20 +241,29 @@ transport, err := events.NewDirectPubSubTransport(events.PubSubBinding{
 - **Message.** Each envelope becomes one message on
   `projects/{projectId}/topics/{topic id}`: the JSON envelope as data, the
   envelope attributes as message attributes, and the envelope key as the
-  ordering key. Publish sends one REST request and does not retry.
+  ordering key. Publish fetches an access token, then sends one REST request,
+  and does not retry. One publish takes at most 10 seconds.
 - **Topic id.** `topicTemplate` replaces `{topic}` with the logical topic name,
   then `PubSubResourceID` sanitizes the result. A provisioner that applies the
   same sanitizer creates the topic the transport publishes to. An empty template
-  publishes to the logical name unchanged.
+  stands for the logical name, which is sanitized the same way. A topic id has 3
+  to 255 characters and never starts with `goog`.
 - **Publish-only.** Handlers receive through push delivery. Under pull delivery
-  the transport accepts subscriptions but delivers nothing.
+  `Subscribe` fails with `pubsub transport is publish-only; set events.delivery:
+  push`, so a service with handlers fails to configure instead of receiving
+  nothing.
 - **Durable publish.** The transport implements `DurablePublishTransport` on the
   `direct-pubsub` route, for a transactional outbox relay.
-  `ClassifyPublishError` returns `retryable` for 408, 409, 429 and 5xx answers,
-  `permanent` for other 4xx answers, and `ambiguous` for everything else: a
-  network or credential failure, an unreadable answer, or a persisted route that
-  no longer matches (`ErrStalePublishRoute`). An ambiguous message may have been
-  published, so never publish it again automatically.
+  `ClassifyPublishError` returns:
+
+  | Outcome | When |
+  | ------- | ---- |
+  | `retryable` | Pub/Sub answered 429 or 503, or the credentials gave no access token, so nothing was sent. |
+  | `permanent` | Pub/Sub answered another 4xx except 408, 409 and 499, or the credentials gave a malformed token. |
+  | `ambiguous` | Everything else: 408, 409, 499 and 5xx answers, a network failure, a timeout, an answer without exactly one message id, or a persisted route that no longer matches (`ErrStalePublishRoute`). |
+
+  An ambiguous message may have been published, so never publish it again
+  automatically.
 
 A provider module that registers its own factory for `pubsub` with
 `RegisterBindingTransportFactory` replaces the built-in transport.
