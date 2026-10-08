@@ -98,13 +98,18 @@ func newPubSubRecorder(t *testing.T, respond func(http.ResponseWriter)) *pubSubR
 
 func (r *pubSubRecorder) transport(binding PubSubBinding) *DirectPubSubTransport {
 	return newDirectPubSubTransport(binding, &googlePubSubRESTClient{
-		client: r.server.Client(), endpoint: r.server.URL + "/", projectID: binding.ProjectID,
+		client: r.server.Client(), endpoint: r.server.URL + "/", projectID: binding.ProjectID, retry: noWaitRetry(),
 	})
 }
 
 func (r *pubSubRecorder) topic(name string) *googlePubSubRESTTopic {
-	client := &googlePubSubRESTClient{client: r.server.Client(), endpoint: r.server.URL + "/", projectID: "my-project"}
+	client := &googlePubSubRESTClient{client: r.server.Client(), endpoint: r.server.URL + "/", projectID: "my-project", retry: noWaitRetry()}
 	return client.Topic(name).(*googlePubSubRESTTopic)
+}
+
+// noWaitRetry is the default retry policy without the waits between attempts.
+func noWaitRetry() googlePubSubRetryPolicy {
+	return googlePubSubRetryPolicy{sleep: func(ctx context.Context, _ time.Duration) error { return ctx.Err() }}
 }
 
 func TestPubSubTopicNamer(t *testing.T) {
@@ -592,7 +597,7 @@ func TestGooglePubSubRESTTopicCredentialFailuresSendNothing(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := newPubSubRecorder(t, nil)
-			client := &googlePubSubRESTClient{client: rec.server.Client(), endpoint: rec.server.URL + "/", projectID: "my-project", tokens: tc.tokens}
+			client := &googlePubSubRESTClient{client: rec.server.Client(), endpoint: rec.server.URL + "/", projectID: "my-project", tokens: tc.tokens, retry: noWaitRetry()}
 			err := client.Topic("t").Publish(tc.ctx, GooglePubSubPublishMessage{Data: []byte("x")})
 			var credentialErr *GooglePubSubCredentialError
 			if !stderrors.As(err, &credentialErr) {
@@ -611,9 +616,13 @@ func TestGooglePubSubRESTTopicCredentialFailuresSendNothing(t *testing.T) {
 	}
 }
 
-type deadlineDoer struct{ deadline time.Duration }
+type deadlineDoer struct {
+	deadline time.Duration
+	calls    int
+}
 
 func (d *deadlineDoer) Do(req *http.Request) (*http.Response, error) {
+	d.calls++
 	if deadline, ok := req.Context().Deadline(); ok {
 		d.deadline = time.Until(deadline)
 	}
@@ -622,13 +631,17 @@ func (d *deadlineDoer) Do(req *http.Request) (*http.Response, error) {
 
 func TestGooglePubSubRESTTopicBoundsEachPublish(t *testing.T) {
 	doer := &deadlineDoer{}
-	client := &googlePubSubRESTClient{client: doer, endpoint: "http://pubsub.example.invalid/", projectID: "my-project"}
+	client := &googlePubSubRESTClient{client: doer, endpoint: "http://pubsub.example.invalid/", projectID: "my-project", retry: noWaitRetry()}
 	_ = client.Topic("t").Publish(context.Background(), GooglePubSubPublishMessage{Data: []byte("x")})
-	if doer.deadline <= 0 || doer.deadline > googlePubSubPublishTimeout {
-		t.Fatalf("publish deadline = %v, want at most %v", doer.deadline, googlePubSubPublishTimeout)
+	if doer.deadline <= 0 || doer.deadline > googlePubSubAttemptTimeout {
+		t.Fatalf("attempt deadline = %v, want at most %v", doer.deadline, googlePubSubAttemptTimeout)
 	}
-	if googlePubSubPublishTimeout != 10*time.Second {
-		t.Fatalf("publish timeout = %v, want 10s", googlePubSubPublishTimeout)
+	if doer.calls != googlePubSubMaxAttempts {
+		t.Fatalf("attempts = %d, want %d", doer.calls, googlePubSubMaxAttempts)
+	}
+	if googlePubSubPublishTimeout != 10*time.Second || googlePubSubAttemptTimeout != 5*time.Second || googlePubSubMaxAttempts != 4 {
+		t.Fatalf("limits = %v per publish, %v per attempt, %d attempts; want 10s, 5s, 4",
+			googlePubSubPublishTimeout, googlePubSubAttemptTimeout, googlePubSubMaxAttempts)
 	}
 }
 
