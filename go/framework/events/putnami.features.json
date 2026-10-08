@@ -43,6 +43,20 @@
           }
         },
         {
+          "id": "provider-publish",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stale-publish-route-is-ambiguous",
+              "pubsub-publish-carries-the-envelope",
+              "pubsub-publish-failures-are-classified",
+              "pubsub-transport-is-built-in"
+            ]
+          }
+        },
+        {
           "id": "push-receiver-mounting",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

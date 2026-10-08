@@ -208,6 +208,57 @@ fanout := events.NewRedisPubSubTransport(events.RedisPubSubTransportConfig{
 - `RedisStreamTransport` is a reliable handler transport using Redis Streams consumer groups.
 - `RedisPubSubTransport` is live-only fanout; it does not provide replay, competing consumers, retry, or DLQ.
 
+## Google Cloud Pub/Sub Publisher
+
+A workload publishes to Google Cloud Pub/Sub with this module alone. Select the
+built-in transport in the resolved config:
+
+```yaml
+events:
+  transport: pubsub
+  delivery: push            # handlers receive through the push receiver
+  pubsub:
+    projectId: my-project
+    topicTemplate: events-{topic}
+```
+
+The plugin then builds a `DirectPubSubTransport`. You can also build one in
+code, for a channel that must publish to Pub/Sub whatever `events.transport`
+selects:
+
+```go
+transport, err := events.NewDirectPubSubTransport(events.PubSubBinding{
+    ProjectID:     "my-project",
+    TopicTemplate: "events-{topic}",
+})
+```
+
+- **Credentials.** The transport uses Application Default Credentials: the
+  `GOOGLE_APPLICATION_CREDENTIALS` file, the gcloud credentials, or, on Google
+  Cloud, the runtime service account from the metadata server. It looks for them
+  when it is built and fails when there are none. The service account needs
+  `roles/pubsub.publisher` on each topic.
+- **Message.** Each envelope becomes one message on
+  `projects/{projectId}/topics/{topic id}`: the JSON envelope as data, the
+  envelope attributes as message attributes, and the envelope key as the
+  ordering key. Publish sends one REST request and does not retry.
+- **Topic id.** `topicTemplate` replaces `{topic}` with the logical topic name,
+  then `PubSubResourceID` sanitizes the result. A provisioner that applies the
+  same sanitizer creates the topic the transport publishes to. An empty template
+  publishes to the logical name unchanged.
+- **Publish-only.** Handlers receive through push delivery. Under pull delivery
+  the transport accepts subscriptions but delivers nothing.
+- **Durable publish.** The transport implements `DurablePublishTransport` on the
+  `direct-pubsub` route, for a transactional outbox relay.
+  `ClassifyPublishError` returns `retryable` for 408, 409, 429 and 5xx answers,
+  `permanent` for other 4xx answers, and `ambiguous` for everything else: a
+  network or credential failure, an unreadable answer, or a persisted route that
+  no longer matches (`ErrStalePublishRoute`). An ambiguous message may have been
+  published, so never publish it again automatically.
+
+A provider module that registers its own factory for `pubsub` with
+`RegisterBindingTransportFactory` replaces the built-in transport.
+
 ## Managed Event Server Publisher
 
 `EventServerTransport` is the provider-neutral, publish-only transport for the
@@ -283,7 +334,9 @@ The durable delivery contract is [`go/event-delivery`](specs/event-delivery.json
 At-least-once retry and terminal outcomes are recorded in
 [ADR 0001](doc/adr/0001-at-least-once-retry-and-terminal-outcomes.md) and protected
 by [`events_test.go`](events_test.go), [`adapter_transports_test.go`](adapter_transports_test.go),
-and [`push_receiver_test.go`](push_receiver_test.go). Under push delivery the
+and [`push_receiver_test.go`](push_receiver_test.go). The built-in Google Cloud
+Pub/Sub publisher is protected by
+[`google_pubsub_direct_test.go`](google_pubsub_direct_test.go). Under push delivery the
 plugin mounts its receiver on the application's single HTTP server, as the
 [route plugin ADR](../http/doc/adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md)
 records; [`push_mount_test.go`](push_mount_test.go) protects it.

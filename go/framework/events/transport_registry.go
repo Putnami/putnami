@@ -16,8 +16,9 @@ type TransportBinding struct {
 
 // BindingTransportFactory builds a Transport from the complete, neutral events
 // binding. New transports should use this extension point. In particular, a
-// cloud integration may register an eventserver factory that supplies its own
-// workload-identity CredentialSource without importing provider SDKs here.
+// provider integration may register an eventserver factory that supplies its
+// own workload-identity CredentialSource. A factory registered for the
+// eventserver or pubsub kind replaces the built-in transport of that kind.
 type BindingTransportFactory func(TransportBinding) (Transport, error)
 
 var (
@@ -44,9 +45,10 @@ func lookupBindingTransportFactory(kind string) (BindingTransportFactory, bool) 
 }
 
 // buildRegisteredTransport resolves the factory for kind and builds the
-// transport from binding. It fails closed when no factory is registered — a
-// workload configured for a transport whose provider module was not imported
-// must not silently fall back to the in-process broker.
+// transport from binding. A registered factory wins. Without one, the built-in
+// eventserver and pubsub transports serve their kinds, and any other kind fails
+// closed — a workload configured for a transport whose provider module was not
+// imported must not silently fall back to the in-process broker.
 func buildRegisteredTransport(kind string, binding TransportBinding) (Transport, error) {
 	if factory, ok := lookupBindingTransportFactory(kind); ok {
 		transport, err := factory(binding)
@@ -57,6 +59,13 @@ func buildRegisteredTransport(kind string, binding TransportBinding) (Transport,
 	}
 	if kind == TransportKindEventServer {
 		transport, err := NewEventServerTransport(EventServerTransportConfigFromBinding(binding.EventServer))
+		if err != nil {
+			return nil, errors.Wrapf(err, codeEventsConfig, "build events transport", errors.String("transport", kind))
+		}
+		return transport, nil
+	}
+	if kind == TransportKindPubSub {
+		transport, err := NewDirectPubSubTransport(binding.PubSub)
 		if err != nil {
 			return nil, errors.Wrapf(err, codeEventsConfig, "build events transport", errors.String("transport", kind))
 		}

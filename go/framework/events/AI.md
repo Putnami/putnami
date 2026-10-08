@@ -101,6 +101,10 @@ transport := events.NewLocalServerTransport("http://127.0.0.1:4222", token)
 
 // Reliable provider adapters:
 google := events.NewGooglePubSubTransport(events.GooglePubSubTransportConfig{Client: pubsubClient})
+
+// Built-in Google Cloud Pub/Sub publisher (REST API + Application Default
+// Credentials); also selected by events.transport: pubsub + events.pubsub.
+direct, err := events.NewDirectPubSubTransport(events.PubSubBinding{ProjectID: "my-project", TopicTemplate: "events-{topic}"})
 redis := events.NewRedisStreamTransport(events.RedisStreamTransportConfig{Client: redisClient})
 
 // Provider-neutral managed publisher. A cloud integration supplies the token
@@ -121,6 +125,15 @@ fanout := events.NewRedisPubSubTransport(events.RedisPubSubTransportConfig{Clien
 // Route by channel/topic across named transports:
 router := events.NewRoutingTransport(events.RoutingTransportConfig{...})
 ```
+
+`events.transport: pubsub` reads `events.pubsub` (`projectId`, `topicTemplate`)
+and builds `DirectPubSubTransport` with no provider module. It is publish-only
+(receive through push delivery), publishes the JSON envelope as data with its
+attributes and its key as ordering key, and implements
+`DurablePublishTransport` on route `direct-pubsub`: `ClassifyPublishError`
+returns `retryable` (408, 409, 429, 5xx), `permanent` (other 4xx) or
+`ambiguous` (anything else, including `ErrStalePublishRoute`). A factory
+registered for `pubsub` replaces it.
 
 `events.transport: eventserver` reads `events.eventServer` (`contractVersion`,
 `endpoint`, `audience`, `protocol`, and local topology hints). Provider modules
