@@ -568,7 +568,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "cache",
 		prefix: "internal/store/",
 		files:  34,
-		funcs:  282,
+		funcs:  289,
 		why: "internal/store: the content-addressed local cache — entries, task entries, CAS, " +
 			"leases, GC, generations and the remote bridge. Cache-key completeness and atomicity " +
 			"under concurrency are the two invariants this repository has been burned by most " +
@@ -737,7 +737,16 @@ var complexityCeilings = []complexityCeiling{
 			"read is one full restore or one re-execution. It is keyed by the task's own cache " +
 			"key, with no second key and no extra input. Six functions: four here (address, look " +
 			"up, publish, and the fail-closed load) and two thin CacheManager verbs in " +
-			"cache_task.go that add no rule of their own",
+			"cache_task.go that add no rule of their own. " +
+			"RAISED, from 34/282 to 34/289, with no new file. CollectKeyFileSelection " +
+			"projects semantic Go embed provenance from the existing key-file collector " +
+			"for portable admission; CollectKeyFiles uses that same selection. Six " +
+			"helpers divide the existing collectFiles path into default and ordinary " +
+			"selection, ordinary-file admission, selected Go source referents, Go embed " +
+			"inputs, and slash-ordered deduplication. They preserve exclusions before " +
+			"source-link validation, raw identity for the lexical link, referent and " +
+			"embedded asset, and Git-candidate precedence. They add no second " +
+			"collector, CAS entry path, write or eviction rule",
 	},
 	{
 		unit:   "output",
