@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	distribution "go.putnami.dev/protocol/distribution"
@@ -145,6 +144,7 @@ func TestInvocationProducerGoEmbedFailureReachesConsumerKeys(t *testing.T) {
 	producer.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{Files: []string{"go-embed:build"}}}
 	consumer := cacheableJob("consume", "/test-proj", "test-proj", "test-proj", producer.Key())
 	consumer.InvocationProducer = producer
+	ws = workspace.NewWorkspace(ws.Root, nil, []*workspace.Project{producer.Project, consumer.Project})
 	cache := func() *store.CacheManager {
 		return store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
 	}
@@ -166,6 +166,9 @@ func TestInvocationProducerGoEmbedFailureReachesConsumerKeys(t *testing.T) {
 			}
 		})
 	}
+	// The producer contributes to the identity through InvocationProducer. It
+	// need not be a scheduled dependency to exercise task opening below.
+	consumer.DependsOn = nil
 	for _, tc := range []struct {
 		name      string
 		withCache bool
@@ -183,12 +186,10 @@ func TestInvocationProducerGoEmbedFailureReachesConsumerKeys(t *testing.T) {
 			if tc.withCache {
 				manager = cache()
 			}
-			scheduler := newScheduler(ws, []*ScheduledJob{consumer}, nil, SchedulerConfig{NoCache: tc.bypass}, &mockRenderer{}, manager)
-			var mu sync.Mutex
-			key, row, release := scheduler.lookupRestoreOrClaim(context.Background(), consumer, tc.cacheable && !tc.bypass, &mu, map[string]string{})
-			release()
-			if key != "" || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "missing.sql") {
-				t.Fatalf("consumer reached execution despite invalid producer: key=%q row=%+v", key, row)
+			result := runSharedScheduler(context.Background(), ws, []*ScheduledJob{consumer}, SchedulerConfig{NoCache: tc.bypass}, manager)
+			row := result.Results[consumer.Key()]
+			if result.Success || row == nil || row.CacheKey != "" || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "missing.sql") {
+				t.Fatalf("consumer reached execution despite invalid producer: row=%+v", row)
 			}
 		})
 	}
@@ -235,12 +236,10 @@ func TestClosureGoEmbedFailureTerminatesConsumerBeforeExecution(t *testing.T) {
 			if tc.withCache {
 				manager = cache()
 			}
-			scheduler := newScheduler(ws, []*ScheduledJob{job}, nil, SchedulerConfig{NoCache: tc.bypass}, &mockRenderer{}, manager)
-			var mu sync.Mutex
-			key, row, release := scheduler.lookupRestoreOrClaim(context.Background(), job, tc.cacheable && !tc.bypass, &mu, map[string]string{})
-			release()
-			if key != "" || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "missing.sql") {
-				t.Fatalf("closure failure reached execution: key=%q row=%+v", key, row)
+			result := runSharedScheduler(context.Background(), ws, []*ScheduledJob{job}, SchedulerConfig{NoCache: tc.bypass}, manager)
+			row := result.Results[job.Key()]
+			if result.Success || row == nil || row.CacheKey != "" || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "missing.sql") {
+				t.Fatalf("closure failure reached execution: row=%+v", row)
 			}
 		})
 	}

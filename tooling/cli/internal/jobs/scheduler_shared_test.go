@@ -239,7 +239,9 @@ func TestGenericProducerKeyErrorCannotHideConsumerGoInputFailure(t *testing.T) {
 			consumer.InvocationProducer = producer
 			hookPath := filepath.Join(ws.Root, "prebuild.sh")
 			writeExecutable(t, hookPath, "#!/bin/sh\nprintf 'hook\\n' >> "+shellQuote(hookLog)+"\n")
-			withPreBuildHook(consumer, hookPath)
+			consumer.Extension.Hooks = &extension.ManifestHooks{PreBuild: &extension.HookDefinition{
+				Kind: "command", Command: hookPath,
+			}}
 			cache := sharedRuntimeCache(t)
 			if _, err := computeJobCacheHash(ws, consumer, nil, nil, cache, nil); err == nil || errors.Is(err, store.ErrGoEmbedInput) || !strings.Contains(err.Error(), "resolve Git input repository") {
 				t.Fatalf("fixture must fail generically in producer before consumer Go hashing: %v", err)
@@ -328,8 +330,8 @@ func TestGoEmbedUserSelectorFailsBeforeTaskExecutionWithoutCache(t *testing.T) {
 		if withCache {
 			cache = sharedRuntimeCache(t)
 		}
-		params := map[string]any{"filePatterns": []string{"go-embed:build"}}
-		result := newScheduler(ws, planned[:1], params, SchedulerConfig{MaxParallel: 1}, &mockRenderer{}, cache).Run(context.Background())
+		params := extension.ParamMap{"filePatterns": []any{"go-embed:build"}}
+		result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, cache, params)
 		row := result.Results[job.Key()]
 		if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "requires an extension task input") {
 			t.Fatalf("user selector with cache=%v must fail before execution: %+v", withCache, row)
@@ -367,8 +369,13 @@ func runSharedScheduler(
 	planned []*ScheduledJob,
 	cfg SchedulerConfig,
 	cache *store.CacheManager,
+	params ...extension.ParamMap,
 ) *SchedulerResult {
-	return newScheduler(ws, planned, nil, cfg, &mockRenderer{}, cache).Run(ctx)
+	var commandParams extension.ParamMap
+	if len(params) > 0 {
+		commandParams = params[0]
+	}
+	return newScheduler(ws, planned, commandParams, cfg, &mockRenderer{}, cache).Run(ctx)
 }
 
 func requireShell(t *testing.T) {

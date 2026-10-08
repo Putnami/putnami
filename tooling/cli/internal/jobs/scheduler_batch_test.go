@@ -31,7 +31,7 @@ func TestGoEmbedInvalidBatchMemberNeverReachesSharedProcess(t *testing.T) {
 		job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
 	}
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(t.TempDir(), "store")))
-	result := newScheduler(ws, jobs, nil, SchedulerConfig{MaxParallel: 2, ContinueOnError: true}, &mockRenderer{}, cache).Run(context.Background())
+	result := runSharedScheduler(context.Background(), ws, jobs, SchedulerConfig{MaxParallel: 2, ContinueOnError: true}, cache)
 	a, b := result.Results[jobs[0].Key()], result.Results[jobs[1].Key()]
 	if a == nil || a.Status != string(TaskStatusFailed) || a.Error == nil || !strings.Contains(a.Error.Message, "missing.txt") {
 		t.Fatalf("invalid batch member did not fail before execution: %+v", a)
