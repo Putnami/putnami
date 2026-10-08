@@ -71,6 +71,22 @@ const (
 	treeKeyedMainBuildTime        = "2026-10-04T09:49:24Z"
 )
 
+// isolateTreeKeyedGit keeps the machine's Git configuration and repository
+// variables away from every git process of the test, its own and the ones the
+// code under test starts: no global or system config, and no GIT_DIR,
+// GIT_WORK_TREE or GIT_INDEX_FILE.
+func isolateTreeKeyedGit(t *testing.T) {
+	t.Helper()
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	for _, name := range []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"} {
+		t.Setenv(name, "")
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 // treeKeyedGit runs git in dir with a fixed identity and fixed dates, and
 // returns its trimmed output.
 func treeKeyedGit(t *testing.T, dir string, args ...string) string {
@@ -244,6 +260,7 @@ func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
+	isolateTreeKeyedGit(t)
 	exts := treeKeyedExtensions(t)
 	parent := t.TempDir()
 	origin := treeKeyedSquashMerge(t, parent)

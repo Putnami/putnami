@@ -913,8 +913,9 @@ func TestHashFiles_VersionStampKeysTheTreeNotTheCommit(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "tree-keyed-task-cache",
 		"the-build-stamp-keys-without-its-commit-fields")
 
-	// The change table and the excluded set both cover every field the stamp's
-	// writers leave, so a new field fails here until it is classified.
+	// The change table and the excluded set both cover every field of
+	// versionStampTestPublished, so a field added to that document fails here
+	// until it is classified.
 	var fields map[string]json.RawMessage
 	encoded, err := json.Marshal(versionStampTestPublished)
 	if err != nil {
