@@ -8,6 +8,10 @@ Putnami ships multiple frameworks that share the same architectural principles b
 | [Go](/docs/frameworks/go) | [Getting Started](/docs/frameworks/go/getting-started) | Backend services, workers, Go libraries |
 | [Python (experimental)](/docs/frameworks/python) | [Getting Started](/docs/frameworks/python/getting-started) | Explicit opt-in FastAPI services, Python packages, and data experiments; no Go/TypeScript parity |
 
+Go build, test, and lint cache keys also include the exact bytes selected by
+`//go:embed`. See [Go extension caching and dependencies](/docs/frameworks/go/extension/caching-and-dependencies)
+for the source and asset inputs that make an asset-only change rerun a job.
+
 The Python surface is the extension and its templates. No Putnami Python
 framework package family ships today, it is never enabled by default, and it
 carries no parity promise with Go or TypeScript. The reviewed status of every

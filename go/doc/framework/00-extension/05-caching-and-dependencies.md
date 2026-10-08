@@ -4,12 +4,18 @@ Go jobs are cache-aware and keep Go module metadata aligned with workspace depen
 
 ## Cache inputs
 
-| Job | Inputs |
+| Job | Selected file inputs |
 |-----|--------|
-| `build` | `**/*.go`, `go.mod`, `go.sum`, `go.work`, `package.json` |
-| `test` | `**/*.go`, `go.mod`, `go.sum`, `go.work`, `package.json` |
-| `lint` | `**/*.go`, `go.mod`, `go.work`, `.golangci.yml`, `.golangci.yaml`, `package.json` |
+| `build` | `**/*.go`, `!**/*_test.go`, `go-embed:build` (source links, referents, and embedded assets), `go.mod`, `go.sum`, `go.work`, `go.work.sum` |
+| `test` | `**/*.go`, `go-embed:test` (including test-source links, referents, and embedded assets), `go.mod`, `go.sum`, `go.work`, `go.work.sum` |
+| `lint` | `**/*.go`, `go-embed:test` (source links, referents, and embedded assets), `go.mod`, `go.work`, `go.work.sum`; `golangci-lint` also reads `.golangci.yml` and `.golangci.yaml` |
 | `serve` | depends on build, never cached |
+
+The Go embed selectors read actual `//go:embed` directives in potentially
+buildable sources. An asset-only edit changes the job key even when no `.go`
+file changes. A missing or unsafe embedded input fails before an old cached
+result can be restored. Tasks also declare other configuration, parameters,
+and runtime inputs; the table focuses on Go sources, modules, and lint config.
 
 ## Go build cache
 
