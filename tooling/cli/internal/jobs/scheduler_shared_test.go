@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -108,6 +109,77 @@ func requireShell(t *testing.T) {
 	t.Helper()
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh unavailable")
+	}
+}
+
+func TestGoEmbedMixedBuildTestKeepsEditedOwnedOutput(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "go-describe-cached-old-bundle-cannot-restore-after-embedded-asset-edit")
+	requireShell(t)
+	logPath := filepath.Join(t.TempDir(), "invocations")
+	ws, planned := sharedRuntimeFixture(t, logPath, "0")
+	project := filepath.Join(ws.Root, "app")
+	writeTestFile(t, filepath.Join(project, "embed.go"), "package main\nimport _ \"embed\"\n//go:embed migration.sql\nvar migration string\n")
+	asset := filepath.Join(project, "migration.sql")
+	writeTestFile(t, asset, "SELECT 'A';\n")
+	writeExecutable(t, filepath.Join(ws.Root, "describe.sh"),
+		"#!/bin/sh\nmkdir -p .gen\ncat migration.sql > .gen/bundle.sql\n"+
+			"printf 'run:%s\\n' \"$PUTNAMI_JOB_NAME\" >> "+shellQuote(logPath)+"\n"+
+			"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"success\"}}'\n")
+	for _, job := range planned {
+		job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
+		job.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{Deterministic: true}
+		job.Extension.Tasks["probe-describe"] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
+			"bundle": dirDeclaration(extension.OutputRootProject, ".gen", false),
+		}}}
+	}
+	storeRoot := filepath.Join(t.TempDir(), "store")
+	cache := func() *store.CacheManager {
+		// The on-disk entries persist across invocations; only the per-run
+		// file-hash memo is new after the asset changes.
+		return store.NewCacheManager(store.NewLocalStore(storeRoot))
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	seed := runSharedScheduler(ctx, ws, planned, SchedulerConfig{MaxParallel: 2}, cache())
+	if !seed.Success {
+		t.Fatalf("seed A failed: %+v", seed.Results)
+	}
+	for _, job := range planned {
+		if result := seed.Results[job.Key()]; result == nil || result.Status != "success" || result.ReuseKind() == ReuseLocalCache {
+			t.Fatalf("%s did not seed its A entry: %+v", job.Key(), result)
+		}
+	}
+	output := filepath.Join(project, ".gen", "bundle.sql")
+	if got := readFileAt(t, output); got != "SELECT 'A';\n" {
+		t.Fatalf("seed output = %q", got)
+	}
+	writeTestFile(t, asset, "SELECT 'B';\n")
+	mixed := runSharedScheduler(ctx, ws, planned, SchedulerConfig{MaxParallel: 2}, cache())
+	if !mixed.Success {
+		t.Fatalf("mixed B run failed: %+v", mixed.Results)
+	}
+	for _, job := range planned {
+		if result := mixed.Results[job.Key()]; result == nil || result.Status != "success" || result.ReuseKind() == ReuseLocalCache {
+			t.Fatalf("%s reused the old A bundle: %+v", job.Key(), result)
+		}
+	}
+	if got := readFileAt(t, output); got != "SELECT 'B';\n" {
+		t.Fatalf("mixed B output = %q", got)
+	}
+	warm := runSharedScheduler(ctx, ws, planned, SchedulerConfig{MaxParallel: 2}, cache())
+	if !warm.Success {
+		t.Fatalf("warm B run failed: %+v", warm.Results)
+	}
+	for _, job := range planned {
+		if got := warm.Results[job.Key()].ReuseKind(); got != ReuseLocalCache {
+			t.Fatalf("%s warm B reuse = %q, want owned-output restoration", job.Key(), got)
+		}
+	}
+	if got := readFileAt(t, output); got != "SELECT 'B';\n" {
+		t.Fatalf("restored B output = %q", got)
+	}
+	if got := invocationLog(t, logPath); len(got) != 2 {
+		t.Fatalf("invocations = %v, want seed A and edited B only", got)
 	}
 }
 

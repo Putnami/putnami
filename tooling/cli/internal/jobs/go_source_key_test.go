@@ -3,6 +3,7 @@ package jobs
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
@@ -121,6 +122,70 @@ func TestGoDescribeKeyIncludesEmbeddedAssetOnlyEdit(t *testing.T) {
 	}
 }
 
+func TestGoDescribeKeyIncludesBuildableSubpackageEmbedBehindBlockComment(t *testing.T) {
+	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", true)
+	writeTestFile(t, filepath.Join(fixture.libDir, "out", "p", "embed.go"), "/*\n//go:build ignore\n*/\npackage p\nimport _ \"embed\"\n//go:embed payload.txt\nvar payload string\n")
+	asset := filepath.Join(fixture.libDir, "out", "p", "payload.txt")
+	writeTestFile(t, asset, "A")
+	beforeLib, beforeApp := fixture.keys(t)
+	writeTestFile(t, asset, "B")
+	afterLib, afterApp := fixture.keys(t)
+	if beforeLib == afterLib || beforeApp == afterApp {
+		t.Fatalf("buildable out/p embed asset edit did not move library and dependent keys: %s/%s -> %s/%s", beforeLib, beforeApp, afterLib, afterApp)
+	}
+}
+
+func TestGoDescribeKeyIncludesLexicalSourceInOutSubpackage(t *testing.T) {
+	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", true)
+	source := filepath.Join(fixture.libDir, "out", "p", "source.go")
+	writeTestFile(t, source, "package p\nconst Value = 1\n")
+	beforeLib, beforeApp := fixture.keys(t)
+	writeTestFile(t, source, "package p\nconst Value = 2\n")
+	afterLib, afterApp := fixture.keys(t)
+	if beforeLib == afterLib || beforeApp == afterApp {
+		t.Fatalf("out/p lexical source edit did not move library/dependent keys: %s/%s -> %s/%s", beforeLib, beforeApp, afterLib, afterApp)
+	}
+}
+
+func TestGoDescribeSourceSymlinkAssetEditMovesLibraryAndDependentKeys(t *testing.T) {
+	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", true)
+	writeTestFile(t, filepath.Join(fixture.libDir, ".source.txt"), "package lib\nimport _ \"embed\"\n//go:embed migration.sql\nvar SQL string\n")
+	if err := os.Symlink(".source.txt", filepath.Join(fixture.libDir, "embed.go")); err != nil {
+		t.Skipf("source-file symlinks unavailable: %v", err)
+	}
+	asset := filepath.Join(fixture.libDir, "migration.sql")
+	writeTestFile(t, asset, "SELECT 1;\n")
+	initialLib, initialApp := fixture.keys(t)
+	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(fixture.ws.Root, "source-link-cache")))
+	output := filepath.Join(fixture.ws.Root, "described")
+	writeTestFile(t, filepath.Join(output, "bundle.sql"), "SELECT 1;\n")
+	meta := &store.EntryMetadata{Extension: "@putnami/go", Task: "build-describe", Project: "lib"}
+	if err := cache.Save(initialLib, &store.EntryResult{Status: "success"}, meta, output); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, asset, "SELECT 2;\n")
+	changedLib, changedApp := fixture.keys(t)
+	if changedLib == initialLib || changedApp == initialApp {
+		t.Fatalf("source-link asset edit left cache keys unchanged: lib %s/%s, app %s/%s", initialLib, changedLib, initialApp, changedApp)
+	}
+	if old, err := cache.Lookup(changedLib); err != nil || old != nil {
+		t.Fatalf("old bundle answered new key: %v, %v", old, err)
+	}
+	projection, err := PortableInputs(fixture.ws, []*ScheduledJob{fixture.lib}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(projection.Tasks[0].Files, "lib/migration.sql") {
+		t.Fatalf("source-link asset absent from portable inputs: %v", projection.Tasks[0].Files)
+	}
+	if !slices.Contains(projection.Tasks[0].Files, "lib/.source.txt") {
+		t.Fatalf("source-link target absent from portable inputs: %v", projection.Tasks[0].Files)
+	}
+	if !slices.Contains(projection.Tasks[0].GoEmbedFiles, "lib/.source.txt") {
+		t.Fatalf("source-link target lost semantic provenance: %v", projection.Tasks[0].GoEmbedFiles)
+	}
+}
+
 func TestGoDescribeCachedOldBundleCannotRestoreAfterEmbeddedAssetEdit(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "go-describe-cached-old-bundle-cannot-restore-after-embedded-asset-edit")
 	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", false)
@@ -180,6 +245,9 @@ func TestGoEmbedPortableInputsBindAssetAndFailOnDeletion(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("embedded asset missing from portable binding: %v", projection.Tasks[0].Files)
+	}
+	if !slices.Contains(projection.Tasks[0].GoEmbedFiles, "app/local.sql") {
+		t.Fatalf("embedded asset lost semantic provenance: %v", projection.Tasks[0].GoEmbedFiles)
 	}
 	if err := os.Remove(asset); err != nil {
 		t.Fatal(err)

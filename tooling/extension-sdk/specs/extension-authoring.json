@@ -6,7 +6,8 @@
     "An extension author writes only what their ecosystem knows, and inherits the orchestrator handshake — events, context, flags, subprocesses, manifest — from the SDK",
     "A manifest that the CLI would reject is rejected while the extension is being built, in the extension's own test run, rather than in a consumer's workspace at plan time",
     "The lifecycle primitives an extension may own — runtime preparation, workspace adaptation, machine caches, invocation-scoped sensitive outputs, infra aggregation — have one neutral implementation, so every extension behaves the same way in the parts that are not language-specific",
-    "A credential an extension provisions never reaches the event stream, the process argv, or a cached artifact"
+    "A credential an extension provisions never reaches the event stream, the process argv, or a cached artifact",
+    "Go embed task inputs bind potentially buildable source, source-link referent, and embedded asset bytes using the same rules as extension packaging"
   ],
   "nonGoals": [
     "Defining the wire contracts themselves — those belong to protocols/extension, protocols/job and protocols/runtime; this module is the authoring library over them",
@@ -30,6 +31,10 @@
     {
       "id": "manifest-validated-at-build-time",
       "text": "Building a manifest runs the same protocol validation the CLI runs and refuses to produce one that violates the task contract or is structurally defective; writing one emits canonical JSON and refuses to write an invalid manifest."
+    },
+    {
+      "id": "go-embed-source-inputs",
+      "text": "Go embed input selection parses actual directives and Go build headers across build and test sources, includes ordinary Go package directories and lexical source identity, binds direct relative source-link referents and payloads under the lexical package path, and rejects unsafe source links before caching or packaging."
     },
     {
       "id": "builder-does-not-alias",

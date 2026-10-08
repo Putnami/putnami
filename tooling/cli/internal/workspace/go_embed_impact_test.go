@@ -24,3 +24,19 @@ func TestGoEmbedSelectorSelectsChangedAndDeletedTargets(t *testing.T) {
 		t.Fatal("plain Go glob claimed SQL")
 	}
 }
+
+func TestGoEmbedSelectorSelectsSourceSymlinkTarget(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".source.txt"), []byte("package p\n//go:embed assets/*.sql\nvar sql []byte\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(".source.txt", filepath.Join(root, "embed.go")); err != nil {
+		t.Skipf("source-file symlinks unavailable: %v", err)
+	}
+	if !selectsTaskPath(root, "assets/removed.sql", []string{"**/*.go", "go-embed:build"}) {
+		t.Fatal("deleted embedded asset lost its source-link owner")
+	}
+	if !selectsTaskPath(root, ".source.txt", []string{"**/*.go", "go-embed:build"}) {
+		t.Fatal("source-link target edit did not select its owner")
+	}
+}

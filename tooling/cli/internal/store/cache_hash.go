@@ -175,8 +175,27 @@ func collectFiles(dir string, patterns []string) ([]fileEntry, error) {
 			}
 			for _, m := range matches {
 				info, err := os.Stat(m)
-				if err != nil || info.IsDir() {
-					continue
+				if err != nil {
+					// A selected Go source link with a broken target must reach
+					// the shared validator below. Ordinary inputs keep their
+					// previous missing-match behavior.
+					if len(embedPatterns) == 0 || filepath.Ext(m) != ".go" {
+						continue
+					}
+					info, err = os.Lstat(m)
+					if err != nil || info.Mode()&os.ModeSymlink == 0 {
+						continue
+					}
+				}
+				if info.IsDir() {
+					if len(embedPatterns) == 0 || filepath.Ext(m) != ".go" {
+						continue
+					}
+					linkInfo, linkErr := os.Lstat(m)
+					if linkErr != nil || linkInfo.Mode()&os.ModeSymlink == 0 {
+						continue
+					}
+					info = linkInfo
 				}
 				if len(excludes) > 0 {
 					rel, _ := filepath.Rel(dir, m)
@@ -195,8 +214,38 @@ func collectFiles(dir string, patterns []string) ([]fileEntry, error) {
 		}
 		files = append(files, candidates...)
 	}
+	if len(embedPatterns) > 0 {
+		// Ordinary Go globs also select source links in directories Go itself
+		// ignores (for example testdata). Their existing key reader follows
+		// those links, so the referent bytes must be keyed and portable too.
+		// The Go selector does not need to traverse those directories; it only
+		// validates links the ordinary declaration already selected.
+		for index := range files {
+			file := files[index]
+			if filepath.Ext(file.path) != ".go" {
+				continue
+			}
+			info, err := os.Lstat(file.path)
+			if err != nil {
+				return nil, err
+			}
+			if info.Mode()&os.ModeSymlink == 0 {
+				continue
+			}
+			referent, err := goembed.SourceReferent(dir, file.path)
+			if err != nil {
+				return nil, fmt.Errorf("resolve selected Go source link %s: %w", file.path, err)
+			}
+			referentInfo, err := os.Lstat(referent)
+			if err != nil {
+				return nil, err
+			}
+			files[index].rawEmbed = true
+			files = append(files, fileEntry{path: referent, info: referentInfo, rawEmbed: true})
+		}
+	}
 	for _, selector := range embedPatterns {
-		targets, err := goembed.Resolve(dir, selector == goembed.TestSelector)
+		targets, err := goembed.ResolveInputs(dir, selector == goembed.TestSelector)
 		if err != nil {
 			return nil, fmt.Errorf("resolve %s inputs: %w", selector, err)
 		}
@@ -218,16 +267,17 @@ func collectFiles(dir string, patterns []string) ([]fileEntry, error) {
 			if files[i].path != files[j].path {
 				j++
 				files[j] = files[i]
-			} else if files[i].gitCandidate {
-				// Raw Git bytes win over a normal pattern's semantic digest,
-				// independent of declaration and sort order.
-				files[j] = files[i]
-			} else if files[i].sweptByGlob {
-				// A raw reading wins over a decoded one the same way.
-				files[j].sweptByGlob = true
-			}
-			if files[i].rawEmbed {
-				files[j].rawEmbed = true
+			} else {
+				rawEmbed := files[j].rawEmbed || files[i].rawEmbed
+				if files[i].gitCandidate {
+					// Raw Git bytes win over a normal pattern's semantic digest,
+					// independent of declaration and sort order.
+					files[j] = files[i]
+				} else if files[i].sweptByGlob {
+					// A raw reading wins over a decoded one the same way.
+					files[j].sweptByGlob = true
+				}
+				files[j].rawEmbed = rawEmbed
 			}
 		}
 		files = files[:j+1]
@@ -357,16 +407,33 @@ func gitCandidateDigest(file fileEntry, buf []byte) []byte {
 // to know WHICH files a key reads (the portable admission binding required
 // ignored inputs) cannot disagree with the key about it. An empty pattern set
 // keeps its key meaning: the whole non-hidden project tree.
-func CollectKeyFiles(dir string, patterns []string) ([]string, error) {
+// KeyFileSelection carries the collector's semantic Go embed provenance into
+// portable admission without re-resolving directives under a second policy.
+type KeyFileSelection struct {
+	Files   []string
+	GoEmbed []string
+}
+
+// CollectKeyFileSelection returns the key's paths and the subset whose raw
+// bytes were selected by a Go embed selector.
+func CollectKeyFileSelection(dir string, patterns []string) (KeyFileSelection, error) {
 	files, err := collectFiles(dir, patterns)
 	if err != nil {
-		return nil, err
+		return KeyFileSelection{}, err
 	}
-	paths := make([]string, 0, len(files))
+	selection := KeyFileSelection{Files: make([]string, 0, len(files))}
 	for _, file := range files {
-		paths = append(paths, file.path)
+		selection.Files = append(selection.Files, file.path)
+		if file.rawEmbed {
+			selection.GoEmbed = append(selection.GoEmbed, file.path)
+		}
 	}
-	return paths, nil
+	return selection, nil
+}
+
+func CollectKeyFiles(dir string, patterns []string) ([]string, error) {
+	selection, err := CollectKeyFileSelection(dir, patterns)
+	return selection.Files, err
 }
 
 // ExtraKeyFiles returns the sorted absolute paths of every regular file an
@@ -584,9 +651,7 @@ func hashFileContents(files []fileEntry, scope ProjectConfigScope, projectDir st
 			defer wg.Done()
 			buf := make([]byte, 128*1024)
 			for i := range indexes {
-				if files[i].gitCandidate {
-					digests[i] = gitCandidateDigest(files[i], buf)
-				} else if files[i].rawEmbed {
+				if files[i].rawEmbed {
 					file, err := os.Open(files[i].path)
 					if err != nil {
 						continue
@@ -597,6 +662,8 @@ func hashFileContents(files []fileEntry, scope ProjectConfigScope, projectDir st
 					if readErr == nil && closeErr == nil {
 						digests[i] = h.Sum(nil)
 					}
+				} else if files[i].gitCandidate {
+					digests[i] = gitCandidateDigest(files[i], buf)
 				} else {
 					digests[i] = fileContentDigest(files[i].path, buf, scopeFor(files[i]))
 				}

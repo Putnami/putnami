@@ -225,7 +225,7 @@ func TestChannelQueryRefusesARedirectOffHTTPS(t *testing.T) {
 func TestGoCommandAuthReadsTheGoEnvFile(t *testing.T) {
 	goBinary := jobtest.RequireGo(t)
 	envFile := jobtest.WriteFile(t, t.TempDir(), "go.env", "GOAUTH=off\n")
-	j, _ := optionsJob(t, "PATH="+filepath.Dir(goBinary), homeVariable()+"="+t.TempDir(), "GOENV="+envFile)
+	j, _ := optionsJob(t, "PATH="+filepath.Dir(goBinary), "GOENV="+envFile)
 	j.GoBinary = goBinary
 	if got := goCommandAuth(j); got != "off" {
 		t.Errorf("goCommandAuth = %q, want the env file's %q", got, "off")

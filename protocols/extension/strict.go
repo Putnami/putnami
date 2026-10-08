@@ -1017,6 +1017,9 @@ func isExternalRef(ref string) bool {
 // build-time gate) and the package-time gate, not the tolerant load path.
 func FullValidateManifest(m *Manifest) []diag.Diagnostic {
 	diags := ValidateManifest(m)
+	if m != nil {
+		diags = append(diags, validateGoEmbedSelectors(m)...)
+	}
 	if diag.HasErrors(diags) {
 		return diags
 	}

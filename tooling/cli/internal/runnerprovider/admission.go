@@ -91,12 +91,24 @@ func AdmitInputs(ctx context.Context, wsRoot string, inputs jobs.PortablePlanInp
 		return admission, err
 	}
 	declared, fallback, names := admissionCandidates(inputs)
+	semanticGoEmbed := make(map[string]string)
+	for _, task := range inputs.Tasks {
+		for _, name := range task.GoEmbedFiles {
+			semanticGoEmbed[name] = task.Key
+		}
+	}
 	ignored, err := runnersource.IgnoredPaths(ctx, wsRoot, names)
 	if err != nil {
 		return admission, err
 	}
 	for _, name := range names {
-		if !ignored[name] || recreatedByLifecycle(name, inputs.Outputs) {
+		if !ignored[name] {
+			continue
+		}
+		if recreatedByLifecycle(name, inputs.Outputs) {
+			if task, required := semanticGoEmbed[name]; required {
+				return Admission{}, fmt.Errorf("%w: task %s requires ignored Go embed input %q, which the source snapshot omits as lifecycle-owned output", ErrInadmissible, task, name)
+			}
 			continue
 		}
 		if tasks := declared[name]; len(tasks) > 0 {

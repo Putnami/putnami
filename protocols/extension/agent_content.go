@@ -81,8 +81,8 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: AgentContentContract when it declares an agent-content
-// contribution, CurrentContract otherwise.
+// the manifest: GoEmbedInputsContract for Go embed task inputs/cache-key files,
+// AgentContentContract for an agent-content contribution, CurrentContract otherwise.
 //
 // It is the stamp a packager writes, and the floor LoadManifest enforces. A
 // manifest stamped below it uses vocabulary its stamp does not cover; a

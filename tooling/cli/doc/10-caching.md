@@ -189,17 +189,34 @@ File hashing algorithm:
 When no patterns are specified, all non-hidden, non-ignored files in the project are hashed (excluding `node_modules/`, `.putnami/`, `out/`, and dotfiles).
 
 An extension task may declare `go-embed:build` or `go-embed:test` in a
-`from: "project"` file input. The first resolves `//go:embed` directives in
-buildable non-test Go sources; the second also reads test sources. Every
-resolved payload contributes its relative path and exact bytes, including an
+`from: "project"` file input. The first reads non-test Go sources and their
+`//go:embed` directives; the second also reads test sources. Every lexical
+source and resolved payload contributes its relative path and exact bytes, including an
 ignored file or a payload named `*_test.go`. Source discovery excludes
-`testdata`, vendor, hidden, underscore-prefixed, generated and nested-module
+`testdata`, vendor, hidden, underscore-prefixed and nested-module
 trees; an explicitly named hidden payload is still read. The selector scans
 every potentially buildable source across platforms and custom tags, so an
 unresolved target in an alternate-platform file is an error even on the
 current host. It cannot serve a stale cache entry or silently omit a portable
 input. The selector belongs to a negotiated extension manifest; project or
-CLI `filePatterns` cannot introduce it.
+CLI `filePatterns` cannot introduce it. A `.go` source-file symlink is read if
+a relative link points directly to a regular file inside the same Go module; embed paths
+remain relative to the link's package directory. Its target is also hashed and
+bound as an input when Git ignores it. Absolute, broken, chained, escaping or irregular
+source links fail instead of omitting their payloads. Directory symlinks are
+not traversed, and symlinked embed targets remain invalid.
+When an ordinary declared `.go` glob already selects an alias in an excluded
+source directory, the selector also validates that alias and keys its regular
+referent bytes. This keeps a locally followed alias and a portable snapshot on
+the same input identity without scanning ignored Go source directories.
+Build constraints are read from actual leading Go comments: a `//go:build`
+line inside `/* ... */` does not exclude a source, and legacy `// +build`
+lines require the blank separator before the package clause. Plain `out`, `dist`
+and `node_modules` directory names do not hide a Go subpackage from the selector.
+For a portable run, an ignored embedded payload or source-link referent beneath
+`.gen`, `node_modules`, `.putnami` or a declared generated output is refused
+with its task and path: the source snapshot would omit those required bytes.
+Tracked and non-ignored inputs at those paths still travel normally.
 
 A selected file that cannot be read — a permission-restricted source, or a file
 replaced mid-run by an editor's atomic save or a concurrent generator — still

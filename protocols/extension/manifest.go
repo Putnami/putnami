@@ -77,8 +77,8 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	if err := json.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("parse extension manifest %s: %w", path, err)
 	}
-	if err := validateGoEmbedSelectors(&m); err != nil {
-		return nil, fmt.Errorf("extension manifest %s: %w", path, err)
+	if diags := validateGoEmbedSelectors(&m); diag.HasErrors(diags) {
+		return nil, fmt.Errorf("extension manifest %s: %s", path, formatDiagnostics(diags))
 	}
 	required := RequiredCLIContract(&m)
 	switch {
@@ -107,41 +107,43 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	}
 }
 
-func validateGoEmbedSelectors(m *Manifest) error {
-	check := func(pattern, where string, allowed bool) error {
+// validateGoEmbedSelectors is shared by the early negotiated loader and the
+// full authoring validator. Both must reject a selector the CLI cannot read.
+func validateGoEmbedSelectors(m *Manifest) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	check := func(pattern, where string, allowed bool) {
 		if !strings.HasPrefix(pattern, "go-embed:") {
-			return nil
+			return
 		}
 		if pattern != "go-embed:build" && pattern != "go-embed:test" {
-			return fmt.Errorf("unsupported go embed selector %q in %s", pattern, where)
+			diags = append(diags, diag.Errorf("invalid-value", where, "unsupported go embed selector %q", pattern))
+			return
 		}
 		if !allowed {
-			return fmt.Errorf("go embed selector %q is only valid in project task inputs, not %s", pattern, where)
+			diags = append(diags, diag.Errorf("invalid-value", where, "go embed selector %q is only valid in project task inputs", pattern))
 		}
-		return nil
 	}
-	for name, task := range m.Tasks {
-		for portName, port := range task.Inputs {
-			for _, pattern := range port.Files {
-				if err := check(pattern, name+"."+portName, port.From == TaskInputFromProject); err != nil {
-					return err
-				}
+	for _, name := range sortedKeys(m.Tasks) {
+		task := m.Tasks[name]
+		for _, portName := range sortedKeys(task.Inputs) {
+			port := task.Inputs[portName]
+			for index, pattern := range port.Files {
+				check(pattern, fmt.Sprintf("tasks.%s.inputs.%s.files[%d]", name, portName, index), port.From == TaskInputFromProject)
 			}
 		}
 		if task.Cache != nil && task.Cache.Key != nil {
-			for _, pattern := range task.Cache.Key.Files {
-				if err := check(pattern, name+".cache.key.files", true); err != nil {
-					return err
-				}
+			for index, pattern := range task.Cache.Key.Files {
+				check(pattern, fmt.Sprintf("tasks.%s.cache.key.files[%d]", name, index), true)
 			}
-			for _, pattern := range append(task.Cache.Key.ClosureFiles, task.Cache.Key.WorkspaceFiles...) {
-				if err := check(pattern, name+".cache.key closure/workspace", false); err != nil {
-					return err
-				}
+			for index, pattern := range task.Cache.Key.ClosureFiles {
+				check(pattern, fmt.Sprintf("tasks.%s.cache.key.closureFiles[%d]", name, index), false)
+			}
+			for index, pattern := range task.Cache.Key.WorkspaceFiles {
+				check(pattern, fmt.Sprintf("tasks.%s.cache.key.workspaceFiles[%d]", name, index), false)
 			}
 		}
 	}
-	return nil
+	return diags
 }
 
 func formatDiagnostics(diags []diag.Diagnostic) string {

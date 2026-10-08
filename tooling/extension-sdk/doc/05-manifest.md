@@ -16,6 +16,9 @@ Building the manifest through this package moves that verdict to the extension's
 | COMMITTED DRIFT | A drift policy rides only on a durable, non-sensitive file or directory under the project or workspace root; a `pathFrom` output carries it under the project root only | `invalid-output-drift`, `invalid-enum` |
 
 The rules themselves live in `protocols/extension` and are the same ones the planner applies, so the SDK and the CLI cannot drift apart.
+This includes Go embed selectors: `go-embed:build` and `go-embed:test` are
+valid in project task inputs, while unknown selectors and workspace or closure
+origins fail during `Builder.Build`, before a manifest is emitted.
 
 ## Usage
 
@@ -170,7 +173,7 @@ if errors.As(err, &verr) {
 
 ## The `cliContract` stamp
 
-A manifest that passes `Build` is stamped `cliContract` at the SDK's current CLI contract, provided it declares a contract surface at all (commands, command groups, or tools). The stamp stays **earned rather than claimed**: it is written only after the same verdict the package-time gate applies, run by the same code, so passing `Build` is exactly what the field asserts. A hook-only manifest — no commands, no groups, no tools — is deliberately left unstamped, because there is nothing for the contract to govern.
+A manifest that passes `Build` is stamped `cliContract` at the lowest contract required by its vocabulary: base command/tool surfaces require 4, agent content requires 5, and Go embed task inputs or cache-key files require 6. The stamp stays **earned rather than claimed**: it is written only after the same verdict the package-time gate applies, run by the same code, so passing `Build` is exactly what the field asserts. A hook-only manifest — no commands, command groups, tools, or agent content — is deliberately left unstamped, because there is nothing for the contract to govern.
 
 Stamping here is what makes an SDK-authored manifest loadable at all: since CLI contract 3 a manifest that declares a contract surface without a matching stamp is rejected by the loader rather than adapted. It costs nothing at package time, where the gate re-validates and re-stamps the staged copy anyway.
 

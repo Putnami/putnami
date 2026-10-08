@@ -102,6 +102,31 @@ func TestBuild_ValidManifest(t *testing.T) {
 	}
 }
 
+func TestBuild_GoEmbedSelectorsMatchLoaderValidation(t *testing.T) {
+	build := func(origin, selector string) (*proto.Manifest, error) {
+		return New("sample/go-embed", "1.0.0").
+			Command("build", proto.CommandDefinition{Run: []proto.PipelineStep{{ID: "build", Task: "build"}}}).
+			Task("build", proto.TaskDefinition{Kind: "command", Command: "echo", Inputs: map[string]proto.TaskInputPort{
+				"sources": {From: origin, Files: []string{"**/*.go", selector}},
+			}}).Build()
+	}
+	if _, err := build(proto.TaskInputFromProject, "go-embed:build"); err != nil {
+		t.Fatalf("valid project selector rejected: %v", err)
+	}
+	for _, test := range []struct {
+		name, origin, selector, want string
+	}{
+		{"workspace", proto.TaskInputFromWorkspace, "go-embed:test", "only valid in project task inputs"},
+		{"unknown", proto.TaskInputFromProject, "go-embed:unknown", "unsupported go embed selector"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := build(test.origin, test.selector); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("builder accepted %s selector: %v", test.name, err)
+			}
+		})
+	}
+}
+
 // TestBuild_DeclarationFeatures pins what the constructors actually produce, so
 // an option that silently stopped applying could not hide behind a manifest
 // that still validates.

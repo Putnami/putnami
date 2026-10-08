@@ -76,6 +76,24 @@
           }
         },
         {
+          "id": "go-embed-source-inputs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "directives-bind-build-and-test-assets",
+              "only-active-header-constraints-exclude-sources",
+              "ordinary-package-directories-contribute-sources-and-assets",
+              "lexical-go-sources-contribute-input-identity",
+              "direct-source-links-bind-referents-and-lexical-assets",
+              "unsafe-source-links-fail-before-selection"
+            ]
+          }
+        },
+        {
           "id": "builder-does-not-alias",
           "stage": "coded",
           "evidenceKinds": [

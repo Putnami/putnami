@@ -800,8 +800,12 @@ func computeJobCacheHashWith(
 	// a re-provisioned server on a new ephemeral port produced a different key
 	// for identical inputs — and it needed a process-global side effect
 	// sequenced before every key computation to work at all.
-	if digest := invocationProducerDigest(ws, job, commandParams, versions, cache, hashes, selection); digest != "" {
-		upstreamHashes = append(upstreamHashes, digest)
+	producerDigest, err := invocationProducerDigest(ws, job, commandParams, versions, cache, hashes, selection)
+	if err != nil {
+		return "", fmt.Errorf("invocation producer for %s: %w", job.Key(), err)
+	}
+	if producerDigest != "" {
+		upstreamHashes = append(upstreamHashes, producerDigest)
 	}
 
 	// A task that declares a `closure` input reads its DEPENDENCIES' committed
@@ -979,15 +983,15 @@ func invocationProducerDigest(
 	cache *store.CacheManager,
 	hashes map[string]string,
 	selection bool,
-) string {
+) (string, error) {
 	if job == nil || job.InvocationProducer == nil {
-		return ""
+		return "", nil
 	}
 	digest, err := computeJobCacheHashWith(ws, job.InvocationProducer, commandParams, versions, cache, hashes, selection)
 	if err != nil {
-		return ""
+		return "", err
 	}
-	return digest
+	return digest, nil
 }
 
 // cacheKeyDependencies names every plan key whose cache hash contributes to
