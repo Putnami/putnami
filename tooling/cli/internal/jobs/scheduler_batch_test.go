@@ -21,6 +21,29 @@ type batchCompletenessRenderer struct {
 	batchEvents []RawJobEvent
 }
 
+func TestGoEmbedInvalidBatchMemberNeverReachesSharedProcess(t *testing.T) {
+	requireShell(t)
+	logPath := filepath.Join(t.TempDir(), "batch-invocations")
+	ws, jobs := makeBatchSchedulerFixture(t, logPath)
+	writeTestFile(t, filepath.Join(ws.Root, "a", "main.go"), "package a\nimport _ \"embed\"\n//go:embed missing.txt\nvar payload string\n")
+	writeTestFile(t, filepath.Join(ws.Root, "b", "main.go"), "package b\n")
+	for _, job := range jobs {
+		job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
+	}
+	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(t.TempDir(), "store")))
+	result := newScheduler(ws, jobs, nil, SchedulerConfig{MaxParallel: 2, ContinueOnError: true}, &mockRenderer{}, cache).Run(context.Background())
+	a, b := result.Results[jobs[0].Key()], result.Results[jobs[1].Key()]
+	if a == nil || a.Status != string(TaskStatusFailed) || a.Error == nil || !strings.Contains(a.Error.Message, "missing.txt") {
+		t.Fatalf("invalid batch member did not fail before execution: %+v", a)
+	}
+	if b == nil || b.Status != "success" {
+		t.Fatalf("valid batch member did not execute: %+v", b)
+	}
+	if got := invocationCount(t, logPath); got != 1 {
+		t.Fatalf("shared process ran %d times; invalid member must not execute", got)
+	}
+}
+
 func (r *batchCompletenessRenderer) BatchJobEvent(_ *ScheduledJob, event RawJobEvent) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -1,9 +1,12 @@
 package jobs
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	distribution "go.putnami.dev/protocol/distribution"
@@ -158,8 +161,86 @@ func TestInvocationProducerGoEmbedFailureReachesConsumerKeys(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			key, err := test.key()
-			if err == nil || key != "" || !strings.Contains(err.Error(), "missing.sql") {
+			if !errors.Is(err, store.ErrGoEmbedInput) || key != "" || !strings.Contains(err.Error(), "missing.sql") {
 				t.Fatalf("invalid invocation producer yielded consumer key %q, %v", key, err)
+			}
+		})
+	}
+	for _, tc := range []struct {
+		name      string
+		withCache bool
+		bypass    bool
+		cacheable bool
+	}{
+		{"declared", true, false, true},
+		{"bypass", true, true, true},
+		{"nil cache", false, false, true},
+		{"uncacheable consumer", true, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			consumer.JobDef.Cache = tc.cacheable
+			var manager *store.CacheManager
+			if tc.withCache {
+				manager = cache()
+			}
+			scheduler := newScheduler(ws, []*ScheduledJob{consumer}, nil, SchedulerConfig{NoCache: tc.bypass}, &mockRenderer{}, manager)
+			var mu sync.Mutex
+			key, row, release := scheduler.lookupRestoreOrClaim(context.Background(), consumer, tc.cacheable && !tc.bypass, &mu, map[string]string{})
+			release()
+			if key != "" || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "missing.sql") {
+				t.Fatalf("consumer reached execution despite invalid producer: key=%q row=%+v", key, row)
+			}
+		})
+	}
+}
+
+func TestClosureGoEmbedFailureTerminatesConsumerBeforeExecution(t *testing.T) {
+	root := t.TempDir()
+	lib := &workspace.Project{ID: "/lib", Name: "lib", Path: "lib"}
+	app := &workspace.Project{ID: "/app", Name: "app", Path: "app", Dependencies: []string{"lib"}}
+	ws := workspace.NewWorkspace(root, nil, []*workspace.Project{lib, app})
+	ws.Graph = workspace.BuildGraph(ws.Projects)
+	if err := os.MkdirAll(filepath.Join(root, "lib"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "app"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "lib", "embed.go"), []byte("package lib\nimport _ \"embed\"\n//go:embed missing.sql\nvar payload string\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	job := cacheableJob("consume", app.ID, app.Name, app.Path)
+	job.Project = app
+	job.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{ClosureFiles: []string{"go-embed:build"}}}
+	cache := func() *store.CacheManager {
+		return store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
+	}
+	if _, err := computeJobCacheHash(ws, job, nil, nil, cache(), nil); !errors.Is(err, store.ErrGoEmbedInput) {
+		t.Fatalf("closure member failure lost typed semantic category: %v", err)
+	}
+	for _, tc := range []struct {
+		name      string
+		withCache bool
+		bypass    bool
+		cacheable bool
+	}{
+		{"declared", true, false, true},
+		{"bypass", true, true, true},
+		{"nil cache", false, false, true},
+		{"uncacheable", true, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			job.JobDef.Cache = tc.cacheable
+			var manager *store.CacheManager
+			if tc.withCache {
+				manager = cache()
+			}
+			scheduler := newScheduler(ws, []*ScheduledJob{job}, nil, SchedulerConfig{NoCache: tc.bypass}, &mockRenderer{}, manager)
+			var mu sync.Mutex
+			key, row, release := scheduler.lookupRestoreOrClaim(context.Background(), job, tc.cacheable && !tc.bypass, &mu, map[string]string{})
+			release()
+			if key != "" || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "missing.sql") {
+				t.Fatalf("closure failure reached execution: key=%q row=%+v", key, row)
 			}
 		})
 	}

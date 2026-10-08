@@ -91,6 +91,7 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -873,6 +874,10 @@ func (s *Scheduler) lookupDeclaredEntry(
 	hash, err := computeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
 	s.cacheStats.recordLocalKeys(keyStarted, time.Now())
 	if err != nil || hash == "" {
+		if errors.Is(err, store.ErrGoEmbedInput) {
+			s.renderer.JobStart(job)
+			return "", &JobResult{Status: string(TaskStatusFailed), Error: &JobError{Message: err.Error()}}, noop
+		}
 		return "", nil, noop
 	}
 

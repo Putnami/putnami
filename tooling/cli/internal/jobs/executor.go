@@ -3,6 +3,7 @@ package jobs
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -676,8 +677,56 @@ func validateDeclaredGoEmbedSelectors(ws *workspace.Workspace, job *ScheduledJob
 	for _, patterns := range [][]string{paramStrings(params, "filePatterns"), projectFilePatterns(ws, job)} {
 		for _, pattern := range patterns {
 			if strings.HasPrefix(pattern, "go-embed:") {
-				return fmt.Errorf("go embed selector %q requires an extension task input, not filePatterns", pattern)
+				return fmt.Errorf("%w: selector %q requires an extension task input, not filePatterns", store.ErrGoEmbedInput, pattern)
 			}
+		}
+	}
+	return nil
+}
+
+// validateUnkeyedGoEmbedInputs keeps required selector inputs fail-closed for
+// tasks without a cache identity. Keyed tasks validate these same declarations
+// through ComputeHashUsing; this path runs only when key computation is skipped.
+func validateUnkeyedGoEmbedInputs(ws *workspace.Workspace, job *ScheduledJob, params map[string]any) error {
+	if err := validateDeclaredGoEmbedSelectors(ws, job, params); err != nil {
+		return err
+	}
+	files, workspaceFiles := keyFilePatterns(ws, job, params)
+	hasSelector := func(patterns []string) bool {
+		for _, pattern := range patterns {
+			if strings.HasPrefix(pattern, "go-embed:") {
+				return true
+			}
+		}
+		return false
+	}
+	cache := store.NewCacheManager(nil)
+	validatePatterns := func(root string, patterns []string, scope store.ProjectConfigScope) error {
+		if !hasSelector(patterns) {
+			return nil
+		}
+		_, err := cache.HashFiles(root, patterns, scope)
+		if errors.Is(err, store.ErrGoEmbedInput) {
+			return err
+		}
+		return nil
+	}
+	if err := validatePatterns(filepath.Join(ws.Root, job.Project.Path), files, jobConfigScope(ws, job)); err != nil {
+		return fmt.Errorf("validate unkeyed project inputs: %w", err)
+	}
+	if err := validatePatterns(ws.Root, workspaceFiles, store.ProjectConfigScope{Verbatim: true}); err != nil {
+		return fmt.Errorf("validate unkeyed workspace inputs: %w", err)
+	}
+	if hasSelector(closureKeyPatterns(job)) {
+		for _, member := range projectDependencyClosure(ws, job.Project) {
+			if err := validatePatterns(filepath.Join(ws.Root, member.Path), closureKeyPatterns(job), jobConfigScope(ws, job)); err != nil {
+				return fmt.Errorf("closure inputs for %s: %w", member.ID, err)
+			}
+		}
+	}
+	if job.InvocationProducer != nil {
+		if err := validateUnkeyedGoEmbedInputs(ws, job.InvocationProducer, params); err != nil {
+			return fmt.Errorf("invocation producer for %s: %w", job.Key(), err)
 		}
 	}
 	return nil

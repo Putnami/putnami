@@ -218,7 +218,16 @@ For a portable run, an ignored embedded payload or source-link referent beneath
 with its task and path: the source snapshot would omit those required bytes.
 Tracked and non-ignored inputs at those paths still travel normally.
 
-A selected file that cannot be read — a permission-restricted source, or a file
+Task grouping uses a fast, stateless ordinary-file existence probe. Go input
+selections are validated before restoring cached outputs or starting the task,
+including when caching is disabled. If a selection combines Go selectors with
+`git:` patterns and Git cannot enumerate its candidates, the task fails because
+those Go inputs cannot be validated. Cache errors unrelated to Go input
+selection retain the normal unkeyed fallback.
+
+If a Go selector requires a source, referent or embedded payload whose bytes
+cannot be read, the task fails. For other declared inputs, a selected file that
+cannot be read — a permission-restricted source, or a file
 replaced mid-run by an editor's atomic save or a concurrent generator — still
 contributes its relative path plus an `__unreadable__` marker instead of its
 contents. Its key therefore differs both from the key for the same tree with the

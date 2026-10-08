@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -89,6 +90,210 @@ func sharedRuntimeFixture(t *testing.T, logPath, exitCode string) (*workspace.Wo
 func sharedRuntimeCache(t *testing.T) *store.CacheManager {
 	t.Helper()
 	return store.NewCacheManager(store.NewLocalStore(filepath.Join(t.TempDir(), "store")))
+}
+
+func TestGoEmbedInvalidInputFailsBeforeTaskExecutionAcrossCacheModes(t *testing.T) {
+	requireShell(t)
+	for _, tc := range []struct {
+		name      string
+		withCache bool
+		bypass    bool
+		cacheable bool
+	}{
+		{name: "declared cache", withCache: true, cacheable: true},
+		{name: "cache bypass", withCache: true, bypass: true, cacheable: true},
+		{name: "nil cache", cacheable: true},
+		{name: "uncacheable task", withCache: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logPath := filepath.Join(t.TempDir(), "invocations")
+			ws, planned := sharedRuntimeFixture(t, logPath, "0")
+			job := planned[0]
+			job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
+			job.JobDef.Cache = tc.cacheable
+			writeTestFile(t, filepath.Join(ws.Root, "app", "embed.go"), "package main\nimport _ \"embed\"\n//go:embed missing.txt\nvar text string\n")
+			var cache *store.CacheManager
+			if tc.withCache {
+				cache = sharedRuntimeCache(t)
+			}
+			result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1, NoCache: tc.bypass}, cache)
+			row := result.Results[job.Key()]
+			if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "missing.txt") {
+				t.Fatalf("invalid input must fail before task opens: %+v", row)
+			}
+			if got := invocationCount(t, logPath); got != 0 {
+				t.Fatalf("invalid input spawned %d subprocesses", got)
+			}
+		})
+	}
+}
+
+func TestGoEmbedUnsafeAliasFailsBeforeTaskExecution(t *testing.T) {
+	requireShell(t)
+	logPath := filepath.Join(t.TempDir(), "invocations")
+	ws, planned := sharedRuntimeFixture(t, logPath, "0")
+	job := planned[0]
+	job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
+	writeTestFile(t, filepath.Join(ws.Root, "outside.src"), "package main\n")
+	if err := os.Symlink("../outside.src", filepath.Join(ws.Root, "app", "alias.go")); err != nil {
+		t.Skipf("source symlink unavailable: %v", err)
+	}
+	if matched, err := store.HasMatchingFiles(filepath.Join(ws.Root, "app"), job.JobDef.FilePatterns); err != nil || !matched {
+		t.Fatalf("ordinary batch probe should reach task-opening alias validation: matched=%v err=%v", matched, err)
+	}
+	result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, sharedRuntimeCache(t))
+	row := result.Results[job.Key()]
+	if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "alias.go") {
+		t.Fatalf("escaping source alias must fail before execution: %+v", row)
+	}
+	if got := invocationCount(t, logPath); got != 0 {
+		t.Fatalf("unsafe alias spawned %d subprocesses", got)
+	}
+}
+
+func TestGoEmbedValidUncacheableTaskExecutes(t *testing.T) {
+	requireShell(t)
+	for _, withCache := range []bool{false, true} {
+		logPath := filepath.Join(t.TempDir(), "invocations")
+		ws, planned := sharedRuntimeFixture(t, logPath, "0")
+		job := planned[0]
+		job.JobDef.Cache = false
+		job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
+		writeTestFile(t, filepath.Join(ws.Root, "app", "embed.go"), "package main\nimport _ \"embed\"\n//go:embed payload.txt\nvar payload string\n")
+		writeTestFile(t, filepath.Join(ws.Root, "app", "payload.txt"), "valid")
+		var cache *store.CacheManager
+		if withCache {
+			cache = sharedRuntimeCache(t)
+		}
+		result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, cache)
+		if !result.Success || result.Results[job.Key()] == nil || result.Results[job.Key()].Status != "success" {
+			t.Fatalf("valid uncacheable selector with cache=%v: %+v", withCache, result.Results[job.Key()])
+		}
+		if got := invocationCount(t, logPath); got != 1 {
+			t.Fatalf("valid uncacheable task spawned %d subprocesses", got)
+		}
+	}
+}
+
+func TestMixedGitGoInputUnavailableFailsAcrossCacheModes(t *testing.T) {
+	requireShell(t)
+	for _, tc := range []struct {
+		name      string
+		withCache bool
+		bypass    bool
+		cacheable bool
+	}{
+		{"declared", true, false, true},
+		{"bypass", true, true, true},
+		{"nil cache", false, false, true},
+		{"uncacheable", true, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logPath := filepath.Join(t.TempDir(), "invocations")
+			ws, planned := sharedRuntimeFixture(t, logPath, "0")
+			job := planned[0]
+			job.JobDef.FilePatterns = []string{"git:**", "**/*.go", "go-embed:build"}
+			job.JobDef.Cache = tc.cacheable
+			var cache *store.CacheManager
+			if tc.withCache {
+				cache = sharedRuntimeCache(t)
+			}
+			result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1, NoCache: tc.bypass}, cache)
+			row := result.Results[job.Key()]
+			if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "go input selection unavailable") {
+				t.Fatalf("unknown Git candidate inventory must fail closed: %+v", row)
+			}
+			if got := invocationCount(t, logPath); got != 0 {
+				t.Fatalf("unknown inventory spawned %d subprocesses", got)
+			}
+		})
+	}
+}
+
+func TestGoEmbedMissingAssetCannotRestoreOwnedOutput(t *testing.T) {
+	requireShell(t)
+	logPath := filepath.Join(t.TempDir(), "invocations")
+	ws, planned := sharedRuntimeFixture(t, logPath, "0")
+	job := planned[0]
+	job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
+	project := filepath.Join(ws.Root, "app")
+	writeTestFile(t, filepath.Join(project, "embed.go"), "package main\nimport _ \"embed\"\n//go:embed payload.txt\nvar payload string\n")
+	asset := filepath.Join(project, "payload.txt")
+	writeTestFile(t, asset, "A")
+	output := filepath.Join(project, ".gen", "bundle.txt")
+	writeExecutable(t, filepath.Join(ws.Root, "describe.sh"),
+		"#!/bin/sh\nmkdir -p .gen\ncat payload.txt > .gen/bundle.txt\n"+
+			"printf 'run\\n' >> "+shellQuote(logPath)+"\n"+
+			"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"success\"}}'\n")
+	job.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{Deterministic: true}
+	job.Extension.Tasks["probe-describe"] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
+		"bundle": dirDeclaration(extension.OutputRootProject, ".gen", false),
+	}}}
+	storeRoot := filepath.Join(t.TempDir(), "store")
+	cache := func() *store.CacheManager { return store.NewCacheManager(store.NewLocalStore(storeRoot)) }
+	if seed := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, cache()); !seed.Success {
+		t.Fatalf("seed failed: %+v", seed.Results)
+	}
+	if got := readFileAt(t, output); got != "A" {
+		t.Fatalf("seed output = %q", got)
+	}
+	if err := os.Remove(asset); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Dir(output)); err != nil {
+		t.Fatal(err)
+	}
+	result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, cache())
+	row := result.Results[job.Key()]
+	if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "payload.txt") {
+		t.Fatalf("missing embedded asset must reject restore and execution: %+v", row)
+	}
+	if got := invocationCount(t, logPath); got != 1 {
+		t.Fatalf("invalid run spawned task, invocations=%d", got)
+	}
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Fatalf("invalid run restored owned output: %v", err)
+	}
+}
+
+func TestGoEmbedUserSelectorFailsBeforeTaskExecutionWithoutCache(t *testing.T) {
+	requireShell(t)
+	for _, withCache := range []bool{false, true} {
+		logPath := filepath.Join(t.TempDir(), "invocations")
+		ws, planned := sharedRuntimeFixture(t, logPath, "0")
+		job := planned[0]
+		job.JobDef.Cache = false
+		var cache *store.CacheManager
+		if withCache {
+			cache = sharedRuntimeCache(t)
+		}
+		params := map[string]any{"filePatterns": []string{"go-embed:build"}}
+		result := newScheduler(ws, planned[:1], params, SchedulerConfig{MaxParallel: 1}, &mockRenderer{}, cache).Run(context.Background())
+		row := result.Results[job.Key()]
+		if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "requires an extension task input") {
+			t.Fatalf("user selector with cache=%v must fail before execution: %+v", withCache, row)
+		}
+		if got := invocationCount(t, logPath); got != 0 {
+			t.Fatalf("user selector with cache=%v spawned %d subprocesses", withCache, got)
+		}
+	}
+}
+
+func TestNonSemanticCacheKeyFailureStillExecutesTask(t *testing.T) {
+	requireShell(t)
+	logPath := filepath.Join(t.TempDir(), "invocations")
+	ws, planned := sharedRuntimeFixture(t, logPath, "0")
+	job := planned[0]
+	// The fixture is outside a Git repository, so this ordinary Git candidate
+	// key cannot be read. Cache backend/key errors keep the execution fallback.
+	job.JobDef.FilePatterns = []string{"git:**"}
+	result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, sharedRuntimeCache(t))
+	if !result.Success || result.Results[job.Key()] == nil || result.Results[job.Key()].Status != "success" {
+		t.Fatalf("non-semantic cache-key error must retain execution fallback: %+v", result.Results[job.Key()])
+	}
+	if got := invocationCount(t, logPath); got != 1 {
+		t.Fatalf("non-semantic cache-key error spawned %d subprocesses, want one", got)
+	}
 }
 
 // runSharedScheduler is the ONE scheduler construction these tests share, for

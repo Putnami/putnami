@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,6 +20,11 @@ import (
 	"go.putnami.dev/sdk/extension/goembed"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
+
+// ErrGoEmbedInput identifies invalid required Go source or embed inputs. A
+// scheduler must fail such a task before cache restoration or execution; an
+// unrelated cache-store failure may still fall back to execution.
+var ErrGoEmbedInput = errors.New("invalid Go embed input")
 
 // --- hash helpers ---
 
@@ -137,7 +143,7 @@ func collectFiles(dir string, patterns []string) ([]fileEntry, error) {
 		} else if goembed.IsSelector(pattern) {
 			embedPatterns = append(embedPatterns, pattern)
 		} else if strings.HasPrefix(pattern, "go-embed:") {
-			return nil, fmt.Errorf("unsupported Go embed input selector %q", pattern)
+			return nil, fmt.Errorf("%w: unsupported selector %q", ErrGoEmbedInput, pattern)
 		} else {
 			ordinaryPatterns = append(ordinaryPatterns, pattern)
 		}
@@ -154,6 +160,9 @@ func collectFiles(dir string, patterns []string) ([]fileEntry, error) {
 	if len(gitPatterns) > 0 {
 		candidates, err := collectGitFiles(dir, gitPatterns, excludes)
 		if err != nil {
+			if len(embedPatterns) > 0 {
+				return nil, fmt.Errorf("%w: go input selection unavailable: %w", ErrGoEmbedInput, err)
+			}
 			return nil, err
 		}
 		files = append(files, candidates...)
@@ -161,7 +170,7 @@ func collectFiles(dir string, patterns []string) ([]fileEntry, error) {
 	if len(embedPatterns) > 0 {
 		files, err = appendSelectedGoReferents(dir, files)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: selected Go source: %w", ErrGoEmbedInput, err)
 		}
 	}
 	files, err = appendGoEmbedInputs(dir, files, embedPatterns)
@@ -262,11 +271,11 @@ func appendSelectedGoReferents(dir string, files []fileEntry) ([]fileEntry, erro
 		}
 		referent, err := goembed.SourceReferent(dir, file.path)
 		if err != nil {
-			return nil, fmt.Errorf("resolve selected Go source link %s: %w", file.path, err)
+			return nil, fmt.Errorf("%w: resolve selected Go source link %s: %w", ErrGoEmbedInput, file.path, err)
 		}
 		referentInfo, err := os.Lstat(referent)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: stat Go source referent %s: %w", ErrGoEmbedInput, referent, err)
 		}
 		files[index].rawEmbed = true
 		files = append(files, fileEntry{path: referent, info: referentInfo, rawEmbed: true})
@@ -278,12 +287,12 @@ func appendGoEmbedInputs(dir string, files []fileEntry, selectors []string) ([]f
 	for _, selector := range selectors {
 		targets, err := goembed.ResolveInputs(dir, selector == goembed.TestSelector)
 		if err != nil {
-			return nil, fmt.Errorf("resolve %s inputs: %w", selector, err)
+			return nil, fmt.Errorf("%w: resolve %s inputs: %w", ErrGoEmbedInput, selector, err)
 		}
 		for _, target := range targets {
 			info, err := os.Lstat(target)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("%w: stat resolved input %s: %w", ErrGoEmbedInput, target, err)
 			}
 			files = append(files, fileEntry{path: target, info: info, rawEmbed: true})
 		}
@@ -361,7 +370,15 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return dirlink.Resolve(absolute)
+		resolved, err := dirlink.Resolve(absolute)
+		if err != nil {
+			for _, selected := range patterns {
+				if goembed.IsSelector(selected) {
+					return "", fmt.Errorf("%w: go input selection unavailable: %w", ErrGoEmbedInput, err)
+				}
+			}
+		}
+		return resolved, err
 	}
 	return dir, nil
 }
@@ -516,14 +533,34 @@ func SelectsPath(rel string, patterns []string) bool {
 // many tools report an unmatched project only when it runs alone, so folding
 // an empty root into a non-empty group could hide that project's failure.
 func HasMatchingFiles(dir string, patterns []string) (bool, error) {
+	hasGoEmbed := false
 	for _, pattern := range patterns {
 		_, gitCandidate := wsproto.GitFilePattern(pattern)
-		if gitCandidate || goembed.IsSelector(pattern) || strings.HasPrefix(pattern, "go-embed:") {
+		if gitCandidate {
+			files, err := collectFiles(dir, patterns)
+			return len(files) > 0, err
+		}
+		if strings.HasPrefix(pattern, "go-embed:") {
+			if !goembed.IsSelector(pattern) {
+				return false, fmt.Errorf("%w: unsupported selector %q", ErrGoEmbedInput, pattern)
+			}
+			hasGoEmbed = true
+		}
+	}
+	includes, excludes := wsproto.SplitFilePatterns(patterns)
+	if hasGoEmbed {
+		ordinary := includes[:0:0]
+		for _, pattern := range includes {
+			if !goembed.IsSelector(pattern) {
+				ordinary = append(ordinary, pattern)
+			}
+		}
+		includes = ordinary
+		if len(includes) == 0 {
 			files, err := collectFiles(dir, patterns)
 			return len(files) > 0, err
 		}
 	}
-	includes, excludes := wsproto.SplitFilePatterns(patterns)
 	matched := false
 	err := filepath.WalkDir(dir, func(filePath string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -561,6 +598,10 @@ func HasMatchingFiles(dir string, patterns []string) (bool, error) {
 	})
 	if err != nil {
 		return false, err
+	}
+	if hasGoEmbed && !matched {
+		files, collectErr := collectFiles(dir, patterns)
+		return len(files) > 0, collectErr
 	}
 	return matched, nil
 }
@@ -615,7 +656,7 @@ func hashFiles(dir string, patterns []string, scope ProjectConfigScope) (string,
 	digests := hashFileContents(files, scope, projectDir)
 	for i, file := range files {
 		if file.rawEmbed && digests[i] == nil {
-			return "", fmt.Errorf("cannot read Go embedded input %s", file.path)
+			return "", fmt.Errorf("%w: cannot read %s", ErrGoEmbedInput, file.path)
 		}
 	}
 
