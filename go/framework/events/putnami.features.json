@@ -57,6 +57,19 @@
           }
         },
         {
+          "id": "provider-publish-retry",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "pubsub-publish-keeps-an-unknown-outcome-ambiguous",
+              "pubsub-publish-retries-a-transient-failure",
+              "pubsub-publish-stops-after-four-attempts"
+            ]
+          }
+        },
+        {
           "id": "push-receiver-mounting",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

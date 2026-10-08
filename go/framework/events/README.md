@@ -241,8 +241,28 @@ transport, err := events.NewDirectPubSubTransport(events.PubSubBinding{
 - **Message.** Each envelope becomes one message on
   `projects/{projectId}/topics/{topic id}`: the JSON envelope as data, the
   envelope attributes as message attributes, and the envelope key as the
-  ordering key. Publish fetches an access token, then sends one REST request,
-  and does not retry. One publish takes at most 10 seconds.
+  ordering key. Publish fetches an access token, then sends one REST request.
+  One publish takes at most 10 seconds, retries included.
+- **Retries.** Publish retries a transient failure and returns the error of the
+  last attempt:
+
+  | Rule | Value |
+  | ---- | ----- |
+  | Retried | 408, 429, 500, 502, 503 and 504 answers; a network failure (connection refused or reset, end of stream); an attempt that exceeds its limit; an access token lookup that fails, unless the token endpoint answered another status |
+  | Never retried | Other 4xx answers; a malformed access token; a 2xx answer the transport cannot read; a publish whose context ended |
+  | Attempts | At most 4 |
+  | Wait before a retry | 100 ms, then 200 ms, then 400 ms (doubling, at most 2 s), plus 0 to 25% of jitter |
+  | `Retry-After` | On a 429 or 503 answer, the wait is at least the `Retry-After` value |
+  | Limit of one attempt | 5 seconds |
+  | Limit of one publish | 10 seconds. A wait that does not fit in what is left ends the publish. |
+
+  A retry after an attempt of unknown outcome (a timeout, a connection reset, a
+  5xx answer) can publish the same message twice. Both copies carry the same
+  envelope `id` in their JSON data; the id is not a message attribute. Pub/Sub
+  delivers at least once anyway, so deduplicate on the envelope `id`. The
+  attempts of one `Publish` call run one after the other, so a retry does not
+  reorder that message against a later call with the same ordering key. A
+  duplicate can still arrive after the message of a later call.
 - **Topic id.** `topicTemplate` replaces `{topic}` with the logical topic name,
   then `PubSubResourceID` sanitizes the result. A provisioner that applies the
   same sanitizer creates the topic the transport publishes to. An empty template
@@ -254,16 +274,17 @@ transport, err := events.NewDirectPubSubTransport(events.PubSubBinding{
   nothing.
 - **Durable publish.** The transport implements `DurablePublishTransport` on the
   `direct-pubsub` route, for a transactional outbox relay.
-  `ClassifyPublishError` returns:
+  `ClassifyPublishError` reads the error of the last attempt, after the
+  retries, and returns:
 
   | Outcome | When |
   | ------- | ---- |
   | `retryable` | Pub/Sub answered 429 or 503, or the credentials gave no access token, so nothing was sent. |
   | `permanent` | Pub/Sub answered another 4xx except 408, 409 and 499, or the credentials gave a malformed token. |
-  | `ambiguous` | Everything else: 408, 409, 499 and 5xx answers, a network failure, a timeout, an answer without exactly one message id, or a persisted route that no longer matches (`ErrStalePublishRoute`). |
+  | `ambiguous` | Everything else: 408, 409, 499 and 5xx answers, a network failure, a timeout, an answer without exactly one message id, a persisted route that no longer matches (`ErrStalePublishRoute`), or a last attempt that was refused after an earlier attempt of unknown outcome. |
 
-  An ambiguous message may have been published, so never publish it again
-  automatically.
+  An ambiguous message may have been published, and Publish has already
+  retried it within its limits, so never publish it again automatically.
 
 A provider module that registers its own factory for `pubsub` with
 `RegisterBindingTransportFactory` replaces the built-in transport.
@@ -345,7 +366,8 @@ At-least-once retry and terminal outcomes are recorded in
 by [`events_test.go`](events_test.go), [`adapter_transports_test.go`](adapter_transports_test.go),
 and [`push_receiver_test.go`](push_receiver_test.go). The built-in Google Cloud
 Pub/Sub publisher is protected by
-[`google_pubsub_direct_test.go`](google_pubsub_direct_test.go). Under push delivery the
+[`google_pubsub_direct_test.go`](google_pubsub_direct_test.go) and
+[`google_pubsub_direct_retry_test.go`](google_pubsub_direct_retry_test.go). Under push delivery the
 plugin mounts its receiver on the application's single HTTP server, as the
 [route plugin ADR](../http/doc/adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md)
 records; [`push_mount_test.go`](push_mount_test.go) protects it.

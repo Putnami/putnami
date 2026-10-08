@@ -335,6 +335,11 @@ service account, which needs `roles/pubsub.publisher` on the topic. On a laptop,
 run `gcloud auth application-default login` or set
 `GOOGLE_APPLICATION_CREDENTIALS`.
 
+A publish that fails with a transient error (a 408, 429, 500, 502, 503 or 504
+answer, a network failure, a timeout) is sent again: at most 4 attempts within
+10 seconds, with a short growing wait between them. A retry can publish the
+same message twice, so a handler deduplicates on the envelope `id`.
+
 The transport is publish-only, so set `events.delivery: push`: under pull
 delivery, subscribing a handler fails. To publish one channel to Pub/Sub while
 `events.transport` selects another transport, build it in code:

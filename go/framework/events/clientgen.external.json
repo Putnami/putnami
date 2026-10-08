@@ -15,11 +15,12 @@
           "path": "go/framework/events/google_pubsub_direct.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "0ff2f8401cb977dd4dc7e0e68c731ac68ea0afa351fae274ae6c896805c73bbd"
+          "fingerprint": "a44157f4392dde1dad3fcfeb6f4cb871000c0cb148ed0819657cdb7b38dc0ddb"
         }
       ],
       "owner": "go.putnami.dev/events",
       "tests": [
+        "go/framework/events/google_pubsub_direct_retry_test.go",
         "go/framework/events/google_pubsub_direct_test.go"
       ],
       "reason": "Publishes events to Google Cloud Pub/Sub with an Application Default Credentials client."
