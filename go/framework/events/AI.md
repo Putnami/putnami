@@ -101,9 +101,13 @@ transport := events.NewLocalServerTransport("http://127.0.0.1:4222", token)
 
 // Reliable provider adapters:
 google := events.NewGooglePubSubTransport(events.GooglePubSubTransportConfig{Client: pubsubClient})
+
+// Built-in Google Cloud Pub/Sub publisher (REST API + Application Default
+// Credentials); also selected by events.transport: pubsub + events.pubsub.
+direct, err := events.NewDirectPubSubTransport(events.PubSubBinding{ProjectID: "my-project", TopicTemplate: "events-{topic}"})
 redis := events.NewRedisStreamTransport(events.RedisStreamTransportConfig{Client: redisClient})
 
-// Provider-neutral managed publisher. A cloud integration supplies the token
+// Provider-neutral managed publisher. A provider integration supplies the token
 // source; Google metadata/ID-token acquisition is intentionally not in events.
 managed, err := events.NewEventServerTransport(events.EventServerTransportConfig{
     ContractVersion: events.EventServerContractVersionV1,
@@ -121,6 +125,24 @@ fanout := events.NewRedisPubSubTransport(events.RedisPubSubTransportConfig{Clien
 // Route by channel/topic across named transports:
 router := events.NewRoutingTransport(events.RoutingTransportConfig{...})
 ```
+
+`events.transport: pubsub` reads `events.pubsub` (`projectId`, `topicTemplate`)
+and builds `DirectPubSubTransport` with no provider module. It is publish-only:
+`Subscribe` fails, so set `events.delivery: push`. It publishes the JSON
+envelope as data with its attributes and its key as ordering key, fetches the
+access token before each request, and bounds each publish to 10 s. It retries
+a transient failure (408, 429, 500, 502, 503, 504, a network failure, a 5 s
+attempt timeout, a transient token failure): at most 4 attempts, waits of
+100 ms doubling up to 2 s plus 0 to 25% of jitter, `Retry-After` honoured on
+429 and 503, and no retry once the caller's context ends. A retry can publish
+a duplicate with the same envelope `id` in its data, so handlers deduplicate
+on that id. It implements `DurablePublishTransport` on route `direct-pubsub`:
+`ClassifyPublishError` reads the error of the last attempt and returns
+`retryable` (429, 503, or no access token, so nothing was sent), `permanent`
+(other 4xx except 408, 409 and 499, or a malformed token) or `ambiguous`
+(anything else, including 5xx answers, a timeout, `ErrStalePublishRoute`, and
+any publish with an earlier attempt of unknown outcome). A factory registered
+for `pubsub` replaces it.
 
 `events.transport: eventserver` reads `events.eventServer` (`contractVersion`,
 `endpoint`, `audience`, `protocol`, and local topology hints). Provider modules

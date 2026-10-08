@@ -14,8 +14,10 @@ import (
 const codeEventsGooglePubSub errors.Code = "events.google_pubsub"
 
 // GooglePubSubClient is the minimal client surface needed by
-// GooglePubSubTransport. Production code can wrap cloud.google.com/go/pubsub or
-// another compatible Pub/Sub client without adding that SDK to this module.
+// GooglePubSubTransport. Code that needs pull subscriptions can wrap
+// cloud.google.com/go/pubsub or another compatible Pub/Sub client without adding
+// that SDK to this module. To publish only, use DirectPubSubTransport, which
+// implements this surface over the Pub/Sub REST API.
 type GooglePubSubClient interface {
 	Topic(name string) GooglePubSubTopic
 	Subscription(name string) GooglePubSubSubscription

@@ -43,6 +43,33 @@
           }
         },
         {
+          "id": "provider-publish",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stale-publish-route-is-ambiguous",
+              "pubsub-publish-carries-the-envelope",
+              "pubsub-publish-failures-are-classified",
+              "pubsub-transport-is-built-in"
+            ]
+          }
+        },
+        {
+          "id": "provider-publish-retry",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "pubsub-publish-keeps-an-unknown-outcome-ambiguous",
+              "pubsub-publish-retries-a-transient-failure",
+              "pubsub-publish-stops-after-four-attempts"
+            ]
+          }
+        },
+        {
           "id": "push-receiver-mounting",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

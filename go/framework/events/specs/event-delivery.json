@@ -35,6 +35,14 @@
       "text": "Provider ingress strips caller-supplied auth attributes and push delivery authenticates and allowlists the pusher before invoking a handler."
     },
     {
+      "id": "provider-publish",
+      "text": "With events.transport set to pubsub and no factory registered for it, the plugin publishes through the built-in Google Cloud Pub/Sub transport with Application Default Credentials. Each envelope becomes one message: the JSON envelope as data, its attributes, and its key as ordering key. A failed publish is retryable for 429 and 503 answers or a missing access token, permanent for other 4xx answers except 408, 409 and 499 or a malformed token, and ambiguous otherwise."
+    },
+    {
+      "id": "provider-publish-retry",
+      "text": "The built-in Google Cloud Pub/Sub transport retries a transient publish failure (a 408, 429, 500, 502, 503 or 504 answer, a network failure, an attempt timeout, a transient access token failure) with exponential backoff and jitter, for at most 4 attempts within 10 seconds, and stops when the caller's context ends. The failed publish is classified on its last attempt, and stays ambiguous when an earlier attempt may have published the message."
+    },
+    {
       "id": "push-receiver-mounting",
       "text": "Under push delivery the plugin mounts its receiver on the application's single server when the application configures, after it resolves the events config, and mounts it once however often the application configures. A push application that holds no server, or several, fails configure with an error that names RegisterOn. RegisterOn chooses the server and is never repeated. Pull and stream delivery need no server and mount no receiver."
     }
