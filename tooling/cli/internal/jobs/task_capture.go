@@ -874,6 +874,11 @@ func (s *Scheduler) lookupDeclaredEntry(
 	hash, err := computeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
 	s.cacheStats.recordLocalKeys(keyStarted, time.Now())
 	if err != nil || hash == "" {
+		if err != nil && !errors.Is(err, store.ErrGoEmbedInput) {
+			if semanticErr := validateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams); semanticErr != nil {
+				err = semanticErr
+			}
+		}
 		if errors.Is(err, store.ErrGoEmbedInput) {
 			s.renderer.JobStart(job)
 			return "", &JobResult{Status: string(TaskStatusFailed), Error: &JobError{Message: err.Error()}}, noop

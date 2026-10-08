@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -205,6 +206,66 @@ func TestMixedGitGoInputUnavailableFailsAcrossCacheModes(t *testing.T) {
 			}
 			if got := invocationCount(t, logPath); got != 0 {
 				t.Fatalf("unknown inventory spawned %d subprocesses", got)
+			}
+		})
+	}
+}
+
+func TestGenericProducerKeyErrorCannotHideConsumerGoInputFailure(t *testing.T) {
+	requireShell(t)
+	for _, tc := range []struct {
+		name    string
+		bypass  bool
+		missing bool
+	}{
+		{"cached missing payload", false, true},
+		{"bypassed missing payload", true, true},
+		{"cached valid payload", false, false},
+		{"bypassed valid payload", true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logPath := filepath.Join(t.TempDir(), "invocations")
+			hookLog := filepath.Join(t.TempDir(), "hooks")
+			ws, planned := sharedRuntimeFixture(t, logPath, "0")
+			consumer := planned[0]
+			consumer.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
+			writeTestFile(t, filepath.Join(ws.Root, "app", "embed.go"), "package main\nimport _ \"embed\"\n//go:embed payload.txt\nvar payload string\n")
+			if !tc.missing {
+				writeTestFile(t, filepath.Join(ws.Root, "app", "payload.txt"), "valid")
+			}
+			producer := cacheableJob("prepare", "/app", "app", "app")
+			producer.JobDef.Cache = false
+			producer.JobDef.FilePatterns = []string{"git:**"}
+			consumer.InvocationProducer = producer
+			hookPath := filepath.Join(ws.Root, "prebuild.sh")
+			writeExecutable(t, hookPath, "#!/bin/sh\nprintf 'hook\\n' >> "+shellQuote(hookLog)+"\n")
+			withPreBuildHook(consumer, hookPath)
+			cache := sharedRuntimeCache(t)
+			if _, err := computeJobCacheHash(ws, consumer, nil, nil, cache, nil); err == nil || errors.Is(err, store.ErrGoEmbedInput) || !strings.Contains(err.Error(), "resolve Git input repository") {
+				t.Fatalf("fixture must fail generically in producer before consumer Go hashing: %v", err)
+			}
+			result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1, NoCache: tc.bypass}, cache)
+			row := result.Results[consumer.Key()]
+			if tc.missing {
+				if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "payload.txt") {
+					t.Fatalf("generic producer error hid invalid consumer Go input: %+v", row)
+				}
+				if got := invocationCount(t, logPath); got != 0 {
+					t.Fatalf("invalid consumer spawned %d tasks", got)
+				}
+				if got := invocationCount(t, hookLog); got != 0 {
+					t.Fatalf("invalid consumer ran %d preBuild hooks", got)
+				}
+				return
+			}
+			if !result.Success || row == nil || row.Status != "success" {
+				t.Fatalf("valid Go input lost generic cache fallback: %+v", row)
+			}
+			if got := invocationCount(t, logPath); got != 1 {
+				t.Fatalf("valid fallback spawned %d tasks", got)
+			}
+			if got := invocationCount(t, hookLog); got != 1 {
+				t.Fatalf("valid fallback ran %d preBuild hooks", got)
 			}
 		})
 	}

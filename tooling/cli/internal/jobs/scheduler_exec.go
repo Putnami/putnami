@@ -818,6 +818,11 @@ func (s *Scheduler) lookupRestoreOrClaim(
 		}
 		hash, err := computeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
 		if err != nil {
+			if !errors.Is(err, store.ErrGoEmbedInput) {
+				if semanticErr := validateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams); semanticErr != nil {
+					err = semanticErr
+				}
+			}
 			if errors.Is(err, store.ErrGoEmbedInput) {
 				s.renderer.JobStart(job)
 				return "", &JobResult{Status: string(TaskStatusFailed), Error: &JobError{Message: err.Error()}}, noop
