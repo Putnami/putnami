@@ -435,6 +435,8 @@ type googlePubSubAttempt struct {
 // Publish sends the message and retries a transient failure within the retry
 // policy. It returns the error of the last attempt, wrapped in
 // googlePubSubUnknownOutcomeError when an earlier attempt may have published.
+// When the caller's context ends during a wait, the error also matches the
+// context error with errors.Is.
 func (t *googlePubSubRESTTopic) Publish(ctx context.Context, message GooglePubSubPublishMessage) error {
 	// The REST API carries the payload base64-encoded.
 	body, err := json.Marshal(googlePubSubRESTPublishRequest{Messages: []googlePubSubRESTMessage{{
@@ -478,7 +480,9 @@ func (t *googlePubSubRESTTopic) Publish(ctx context.Context, message GooglePubSu
 			return fail(result.err)
 		}
 		if policy.sleep(ctx, wait) != nil {
-			return fail(result.err)
+			// The caller ended the wait: the error carries both the last answer
+			// and the context error.
+			return stderrors.Join(fail(result.err), ctx.Err())
 		}
 		unknown = unknown || classifyDirectPubSubPublishError(result.err) == PublishOutcomeAmbiguous
 	}
@@ -563,6 +567,10 @@ func transientPubSubStatus(code int) bool {
 	}
 }
 
+// googlePubSubMaxRetryAfterSeconds caps a Retry-After given in seconds at one
+// day, so a huge value stays a long wait and does not overflow.
+const googlePubSubMaxRetryAfterSeconds = 24 * 60 * 60
+
 // parseRetryAfter reads a Retry-After header: a number of seconds or an HTTP
 // date. It returns 0 for an empty, unreadable or past value.
 func parseRetryAfter(value string, now time.Time) time.Duration {
@@ -570,8 +578,8 @@ func parseRetryAfter(value string, now time.Time) time.Duration {
 	if value == "" {
 		return 0
 	}
-	if seconds, err := strconv.ParseInt(value, 10, 32); err == nil {
-		return max(time.Duration(seconds)*time.Second, 0)
+	if seconds, err := strconv.ParseInt(value, 10, 64); err == nil {
+		return time.Duration(min(max(seconds, 0), googlePubSubMaxRetryAfterSeconds)) * time.Second
 	}
 	if at, err := http.ParseTime(value); err == nil {
 		return max(at.Sub(now), 0)

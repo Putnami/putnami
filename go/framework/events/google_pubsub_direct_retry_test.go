@@ -201,6 +201,12 @@ func TestDirectPubSubPublishStopsWhenTheCallerContextEnds(t *testing.T) {
 	if !stderrors.As(err, &publishErr) || publishErr.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("Publish = %v, want the 503 answer of the only attempt", err)
 	}
+	if !stderrors.Is(err, context.Canceled) {
+		t.Fatalf("Publish = %v, want an error that matches context.Canceled", err)
+	}
+	if got := classifyDirectPubSubPublishError(err); got != PublishOutcomeRetryable {
+		t.Fatalf("outcome = %q, want retryable", got)
+	}
 	if got := server.attempts.Load(); got != 1 {
 		t.Fatalf("%d attempts, want 1", got)
 	}
@@ -260,6 +266,7 @@ func TestParseRetryAfter(t *testing.T) {
 		{"3", 3 * time.Second},
 		{" 7 ", 7 * time.Second},
 		{"-1", 0},
+		{"99999999999", 24 * time.Hour},
 		{"soon", 0},
 		{now.Add(4 * time.Second).Format(http.TimeFormat), 4 * time.Second},
 		{now.Add(-time.Minute).Format(http.TimeFormat), 0},
