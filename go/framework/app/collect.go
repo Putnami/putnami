@@ -16,6 +16,26 @@ type collectedValue[T any] struct {
 	Owner *Module
 }
 
+// identity is the de-duplication key of a pointer capability: its dynamic type
+// and its address. The address alone does not identify a value. Go may give
+// every zero-size value the same address, and a struct shares its address with
+// its first field, so two different plugins can share one address. Two
+// pointers with the same type and the same address name the same value.
+type identity struct {
+	typ reflect.Type
+	ptr uintptr
+}
+
+// identityOf returns the de-duplication key of v. It reports false when v is
+// not a non-nil pointer: such values are never de-duplicated.
+func identityOf(v any) (identity, bool) {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Pointer || rv.IsNil() {
+		return identity{}, false
+	}
+	return identity{typ: rv.Type(), ptr: rv.Pointer()}, true
+}
+
 func collectTarget[T any]() reflect.Type {
 	var zero T
 	return reflect.TypeOf(&zero).Elem()
@@ -56,9 +76,11 @@ func Contribute[T any](owner *Module, v T) {
 // Results are returned in a deterministic order: modules in depth-first
 // pre-order (root before descendants), and within each module its plugins
 // before its contributions, each in registration order. Pointer values are
-// de-duplicated by pointer identity, so contributing a plugin that is also
-// registered via Use does not yield it twice; non-pointer values are never
-// de-duplicated (two distinct but equal values are both returned).
+// de-duplicated by dynamic type and address, so contributing a plugin that is
+// also registered via Use does not yield it twice, and two plugins of
+// different types are never merged even when they share an address (as
+// zero-size values may). Non-pointer values are never de-duplicated (two
+// distinct but equal values are both returned).
 //
 // Collect replaces the hand-written "walk CollectPlugins, type-assert against
 // one capability" loops: a new capability needs only its interface and a
@@ -73,20 +95,19 @@ func Collect[T any](root *Module) []T {
 }
 
 // collectWithOwner retains the module that supplied each value while matching
-// Collect's ordering, contribution support, and pointer de-duplication exactly.
+// Collect's ordering, contribution support, and de-duplication exactly.
 // Build-time projections use the owner to attribute native facts to the right
 // feature scope without changing the public Collect API.
 func collectWithOwner[T any](root *Module) []collectedValue[T] {
 	var result []collectedValue[T]
-	seen := make(map[uintptr]struct{})
+	seen := make(map[identity]struct{})
 	target := collectTarget[T]()
 	add := func(owner *Module, v T) {
-		if rv := reflect.ValueOf(v); rv.Kind() == reflect.Pointer && !rv.IsNil() {
-			ptr := rv.Pointer()
-			if _, dup := seen[ptr]; dup {
+		if id, ok := identityOf(v); ok {
+			if _, dup := seen[id]; dup {
 				return
 			}
-			seen[ptr] = struct{}{}
+			seen[id] = struct{}{}
 		}
 		result = append(result, collectedValue[T]{Value: v, Owner: owner})
 	}

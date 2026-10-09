@@ -170,3 +170,32 @@ func TestUseForDescribeNilIsNoop(t *testing.T) {
 		t.Fatalf("Describe: %v", err)
 	}
 }
+
+type emptyDescriberA struct{}
+
+func (*emptyDescriberA) Name() string                    { return "a" }
+func (*emptyDescriberA) Describe(*DescribeContext) error { return nil }
+
+type emptyDescriberB struct{}
+
+func (*emptyDescriberB) Name() string                    { return "b" }
+func (*emptyDescriberB) Describe(*DescribeContext) error { return nil }
+
+func TestDescribersKeepDistinctZeroSizeDescribers(t *testing.T) {
+	a, b := &emptyDescriberA{}, &emptyDescriberB{}
+	if !sameAddress(a, b) {
+		t.Skip("the runtime gave the two zero-size values distinct addresses; the shared-address case does not arise")
+	}
+	application := New("test")
+	application.Use(a)
+	application.UseForDescribe(b)
+
+	got := application.describers()
+	if len(got) != 2 || got[0].Name() != "a" || got[1].Name() != "b" {
+		names := make([]string, len(got))
+		for i, d := range got {
+			names[i] = d.Name()
+		}
+		t.Errorf("describers() = %v, want [a b]: a describe-only describer that shares an address with a runtime describer was dropped", names)
+	}
+}
