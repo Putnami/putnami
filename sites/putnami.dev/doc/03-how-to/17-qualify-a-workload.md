@@ -37,7 +37,7 @@ When the change is ready, run the local proof:
 putnami qualify @example/go-items-consumer --target local
 ```
 
-One invocation composes the workload production-mode, waits for each member's typed ready event, sends the smoke contract, and tears everything down, whatever happened. The contract is derived from the workload's route inventory: every exact, public `GET` or `HEAD` route except the platform endpoints, each expected to answer below `500`. Print it without running anything:
+One invocation composes the workload production-mode, waits for each member's typed ready event, waits for the workload's application to report that its whole startup completed, sends the smoke contract, and tears everything down, whatever happened. A workload whose route inventory declares `GET /readyz` is polled there instead. The contract is derived from the workload's route inventory: every exact, public `GET` or `HEAD` route except the platform endpoints, each expected to answer below `500`. Print it without running anything:
 
 ```bash
 putnami qualify @example/go-items-consumer --print-contract

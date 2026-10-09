@@ -116,6 +116,19 @@
           }
         },
         {
+          "id": "completed-startup-readiness",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-ready-record-follows-every-plugin-start",
+              "a-delayed-plugin-start-delays-the-ready-record",
+              "a-rejected-plugin-start-writes-no-ready-record"
+            ]
+          }
+        },
+        {
           "id": "no-source-claim",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

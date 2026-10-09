@@ -30,6 +30,11 @@ const (
 type Options struct {
 	// PlatformPrefix is where /readyz and /version are mounted; "" is the root.
 	PlatformPrefix string
+	// ReadinessRoute reports that the workload serves GET
+	// <PlatformPrefix>/readyz (Platform.ReadinessRoute). Readiness polls it
+	// then, and always on a target that is not a StartupTarget; otherwise
+	// readiness is the target's completed-startup report.
+	ReadinessRoute bool
 	// ReadyTimeout bounds the readiness phase; zero means DefaultReadyTimeout.
 	ReadyTimeout time.Duration
 	// RequestTimeout bounds each request; zero means DefaultRequestTimeout.
@@ -110,7 +115,7 @@ func Execute(ctx context.Context, contract *qualifyproto.Contract, target Target
 	}
 
 	if run.phase(qualifyproto.PhaseResolveTarget, func(p *qualifyproto.Phase) { run.resolve(ctx, target, p) }) {
-		if run.phase(qualifyproto.PhaseReadiness, func(p *qualifyproto.Phase) { run.readiness(ctx, p) }) &&
+		if run.phase(qualifyproto.PhaseReadiness, func(p *qualifyproto.Phase) { run.readiness(ctx, target, p) }) &&
 			run.phase(qualifyproto.PhaseVersionBinding, func(p *qualifyproto.Phase) { run.versionBinding(ctx, target, p) }) {
 			run.phase(qualifyproto.PhaseSmoke, func(p *qualifyproto.Phase) { run.smoke(ctx, p) })
 		}
@@ -220,7 +225,52 @@ func (r *execution) endpoint(routePath string, platform bool) string {
 	return r.base.Scheme + "://" + r.base.Host + joinURLPath(r.base.EscapedPath(), prefix, routePath)
 }
 
-func (r *execution) readiness(ctx context.Context, phase *qualifyproto.Phase) {
+// readiness waits, within ReadyTimeout, until the target can be smoked. A
+// workload that serves a readiness route proves it there. A StartupTarget whose
+// workload declares none proves it with its application's completed-startup
+// report instead: an answer from any other route proves only that a listener is
+// bound (an auth denial or a 404 answers long before every starter and start
+// hook returned), so it is never taken for readiness.
+func (r *execution) readiness(ctx context.Context, target Target, phase *qualifyproto.Phase) {
+	if startup, ok := target.(StartupTarget); ok && !r.opts.ReadinessRoute {
+		r.awaitStartup(ctx, startup, phase)
+		return
+	}
+	r.pollReadiness(ctx, phase)
+}
+
+// awaitStartup is the readiness of a StartupTarget whose workload declares no
+// readiness route.
+func (r *execution) awaitStartup(ctx context.Context, target StartupTarget, phase *qualifyproto.Phase) {
+	if interrupted(ctx, phase) {
+		return
+	}
+	startupCtx, cancel := context.WithTimeout(ctx, r.opts.ReadyTimeout)
+	defer cancel()
+	err := target.AwaitStartup(startupCtx)
+	if err == nil {
+		phase.State = qualifyproto.StatePassed
+		return
+	}
+	if interrupted(ctx, phase) {
+		return
+	}
+	var targetErr *TargetError
+	switch {
+	case errors.As(err, &targetErr):
+		fail(phase, targetErr.State, targetErr.Code, "%v", targetErr.Err)
+	case startupCtx.Err() != nil:
+		fail(phase, qualifyproto.StateTimedOut, qualifyproto.PhaseCodeNotReady,
+			"the application never reported completed startup (a typed ready event with target workload) within %s; the route inventory declares no GET %s to poll instead",
+			r.opts.ReadyTimeout, protocolplatform.JoinPrefix(r.opts.PlatformPrefix, protocolplatform.PathReadyz))
+	default:
+		fail(phase, qualifyproto.StateFailed, qualifyproto.PhaseCodeNotReady,
+			"waiting for the application to report completed startup failed: %v", err)
+	}
+}
+
+// pollReadiness polls GET <prefix>/readyz until it answers 200 with status ok.
+func (r *execution) pollReadiness(ctx context.Context, phase *qualifyproto.Phase) {
 	readyCtx, cancel := context.WithTimeout(ctx, r.opts.ReadyTimeout)
 	defer cancel()
 	endpoint := r.endpoint(protocolplatform.PathReadyz, true)

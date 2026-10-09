@@ -586,3 +586,166 @@ func TestRender(t *testing.T) {
 		}
 	}
 }
+
+// startupTarget is a fakeTarget that observes its workload's process: it
+// reports completed startup once started closes, or fails with err.
+type startupTarget struct {
+	*fakeTarget
+	started chan struct{}
+	err     error
+	awaited atomic.Int32
+}
+
+func (s *startupTarget) AwaitStartup(ctx context.Context) error {
+	s.awaited.Add(1)
+	if s.err != nil {
+		return s.err
+	}
+	select {
+	case <-s.started:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func newStartupTarget(t *testing.T, baseURL string) *startupTarget {
+	t.Helper()
+	return &startupTarget{
+		fakeTarget: &fakeTarget{
+			baseURL: baseURL,
+			binding: qualifyproto.Binding{Kind: qualifyproto.BindingTree, Fingerprint: strings.Repeat("a", 64), HeadSHA: deployedSHA},
+			cleanup: &qualifyproto.Cleanup{State: qualifyproto.CleanupClean},
+		},
+		started: make(chan struct{}),
+	}
+}
+
+func TestExecute_LocalReadinessWithoutARouteIsCompletedStartup(t *testing.T) {
+	spectest.Proves(t, "cli/workload-qualification", "local-readiness-is-completed-startup",
+		"a-local-target-without-a-readiness-route-passes-on-completed-startup")
+	// /readyz never answers ok: only the startup report can make this target ready.
+	d := &deployment{sha: deployedSHA, notReadyFor: 1 << 30}
+	server := newDeployment(t, d)
+	target := newStartupTarget(t, server.URL)
+	go func() {
+		deadline := time.Now().Add(hangDetector)
+		for target.awaited.Load() == 0 && time.Now().Before(deadline) {
+			time.Sleep(5 * time.Millisecond)
+		}
+		if paths := d.paths(); paths != "" {
+			t.Errorf("requests %q were sent before the application reported completed startup", paths)
+		}
+		close(target.started)
+	}()
+
+	verdict := execute(t, context.Background(), contractFor(t, "/app", "GET /items", "GET /private"), target, fastOptions())
+
+	if verdict.State != qualifyproto.StatePassed {
+		t.Fatalf("state = %s (%s)", verdict.State, phaseStates(verdict))
+	}
+	if target.awaited.Load() != 1 || d.readyCalls.Load() != 0 {
+		t.Errorf("awaited startup %d times and polled /readyz %d times, want 1 and 0", target.awaited.Load(), d.readyCalls.Load())
+	}
+	if got := d.paths(); got != "GET /items,GET /private" {
+		t.Errorf("requests = %q", got)
+	}
+}
+
+func TestExecute_CompletedStartupThatNeverArrivesIsTimedOut(t *testing.T) {
+	spectest.Proves(t, "cli/workload-qualification", "local-readiness-is-completed-startup",
+		"completed-startup-that-never-arrives-times-out-without-smoke")
+	// /readyz answers ok and a business route answers 401: neither is a startup report.
+	d := &deployment{sha: deployedSHA}
+	server := newDeployment(t, d)
+	opts := fastOptions()
+	opts.ReadyTimeout = 100 * time.Millisecond
+	opts.PlatformPrefix = "/_"
+
+	verdict := execute(t, context.Background(), contractFor(t, "/app", "GET /private"), newStartupTarget(t, server.URL), opts)
+
+	if verdict.State != qualifyproto.StateTimedOut {
+		t.Fatalf("state = %s (%s)", verdict.State, phaseStates(verdict))
+	}
+	if got := phaseStates(verdict); got != "resolve-target=passed readiness=timed_out version-binding=not_run smoke=not_run teardown=passed" {
+		t.Errorf("phases = %s", got)
+	}
+	diagnostics := verdict.Phases[1].Diagnostics
+	if len(diagnostics) != 1 || diagnostics[0].Code != qualifyproto.PhaseCodeNotReady ||
+		!strings.Contains(diagnostics[0].Message, "never reported completed startup") || !strings.Contains(diagnostics[0].Message, "GET /_/readyz") {
+		t.Errorf("readiness diagnostics = %+v, want not_ready naming the missing startup report and the undeclared route", diagnostics)
+	}
+	if verdict.Requests[0].State != qualifyproto.StateNotRun || d.paths() != "" || d.readyCalls.Load() != 0 {
+		t.Errorf("request %+v, paths %q, readiness polls %d: nothing may reach the workload", verdict.Requests[0], d.paths(), d.readyCalls.Load())
+	}
+
+	// A workload that exits before its startup report fails as the target says.
+	exited := newStartupTarget(t, server.URL)
+	exited.err = &TargetError{State: qualifyproto.StateCompositionFailed, Code: qualifyproto.PhaseCodeCompositionFailed,
+		Err: errors.New("compose.member_exited: /app: the serve step exited before its application reported completed startup (phase readiness)")}
+	failed := execute(t, context.Background(), contractFor(t, "/app", "GET /items"), exited, fastOptions())
+	if got := phaseStates(failed); got != "resolve-target=passed readiness=composition_failed version-binding=not_run smoke=not_run teardown=passed" {
+		t.Errorf("exited: phases = %s", got)
+	}
+	if code := phaseCode(failed, qualifyproto.PhaseReadiness); code != qualifyproto.PhaseCodeCompositionFailed || exited.closed.Load() != 1 {
+		t.Errorf("exited: code %s, closed %d", code, exited.closed.Load())
+	}
+
+	// Any other failure to observe the report is a failed readiness, never a pass.
+	lost := newStartupTarget(t, server.URL)
+	lost.err = errors.New("the event stream closed")
+	unobserved := execute(t, context.Background(), contractFor(t, "/app", "GET /items"), lost, fastOptions())
+	if got := phaseStates(unobserved); got != "resolve-target=passed readiness=failed version-binding=not_run smoke=not_run teardown=passed" {
+		t.Errorf("unobserved: phases = %s", got)
+	}
+
+	// Canceling the run while it waits is canceled, and the target is still closed.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	waiting := newStartupTarget(t, server.URL)
+	go func() {
+		deadline := time.Now().Add(hangDetector)
+		for waiting.awaited.Load() == 0 && time.Now().Before(deadline) {
+			time.Sleep(5 * time.Millisecond)
+		}
+		cancel()
+	}()
+	canceled := execute(t, ctx, contractFor(t, "/app", "GET /items"), waiting, fastOptions())
+	if got := phaseStates(canceled); got != "resolve-target=passed readiness=canceled version-binding=not_run smoke=not_run teardown=passed" {
+		t.Errorf("canceled: phases = %s", got)
+	}
+	if waiting.closed.Load() != 1 {
+		t.Errorf("canceled: closed %d times", waiting.closed.Load())
+	}
+}
+
+func TestExecute_ADeclaredReadinessRouteIsStillPolled(t *testing.T) {
+	spectest.Proves(t, "cli/workload-qualification", "local-readiness-is-completed-startup",
+		"a-declared-readiness-route-is-polled")
+	d := &deployment{sha: deployedSHA, notReadyFor: 2}
+	server := newDeployment(t, d)
+	// The startup report never arrives: only the declared route can make it ready.
+	target := newStartupTarget(t, server.URL)
+	opts := fastOptions()
+	opts.ReadinessRoute = true
+
+	verdict := execute(t, context.Background(), contractFor(t, "/app", "GET /items"), target, opts)
+
+	if verdict.State != qualifyproto.StatePassed {
+		t.Fatalf("state = %s (%s)", verdict.State, phaseStates(verdict))
+	}
+	if target.awaited.Load() != 0 || d.readyCalls.Load() < 3 {
+		t.Errorf("awaited startup %d times and polled /readyz %d times, want 0 and the two 503s waited through", target.awaited.Load(), d.readyCalls.Load())
+	}
+
+	// A URL target cannot observe a process: it polls the route whatever the inventory says.
+	remoteTarget := urlTargetFor(t, server.URL, deployedSHA[:7])
+	if _, ok := remoteTarget.(StartupTarget); ok {
+		t.Fatal("a URL target reports a startup it cannot observe")
+	}
+	before := d.readyCalls.Load()
+	remote := execute(t, context.Background(), contractFor(t, "/app", "GET /items"), remoteTarget, fastOptions())
+	if remote.State != qualifyproto.StatePassed || d.readyCalls.Load() == before {
+		t.Errorf("URL target: state %s, readiness polls %d, want passed through /readyz", remote.State, d.readyCalls.Load()-before)
+	}
+}

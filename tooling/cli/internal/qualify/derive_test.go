@@ -260,9 +260,11 @@ func TestJoinURLPath(t *testing.T) {
 // /readyz and /version without being told. The flag still wins, and an
 // inventory that declares the pair under two prefixes is refused rather than
 // guessed.
-func TestResolvePlatformPrefix_ReadsTheInventory(t *testing.T) {
+func TestResolvePlatform_ReadsTheInventory(t *testing.T) {
 	spectest.Proves(t, "cli/workload-qualification", "smoke-is-derived-from-the-route-inventory",
 		"the-platform-prefix-is-read-from-the-inventory")
+	spectest.Proves(t, "cli/workload-qualification", "local-readiness-is-completed-startup",
+		"a-declared-readiness-route-is-polled")
 	platformUnder := func(prefix string) []httproutes.Route {
 		return []httproutes.Route{
 			route(httproutes.MatchExact, prefix+"/livez", false, "GET"),
@@ -275,34 +277,37 @@ func TestResolvePlatformPrefix_ReadsTheInventory(t *testing.T) {
 	for name, tc := range map[string]struct {
 		routes   []httproutes.Route
 		explicit string
-		want     string
+		want     Platform
 	}{
-		"prefixed pair":             {routes: append(platformUnder("/_"), app), want: "/_"},
-		"root pair":                 {routes: append(platformUnder(""), app), want: ""},
-		"explicit flag wins":        {routes: append(platformUnder("/_"), app), explicit: "/ops", want: "/ops"},
-		"explicit root wins":        {routes: append(platformUnder("/_"), app), explicit: "/", want: "/"},
-		"readiness without version": {routes: []httproutes.Route{route(httproutes.MatchExact, "/_/readyz", false, "GET"), app}, want: ""},
-		"head only is not a mount":  {routes: []httproutes.Route{route(httproutes.MatchExact, "/_/readyz", false, "HEAD"), route(httproutes.MatchExact, "/_/version", false, "HEAD"), app}, want: ""},
-		"no platform route":         {routes: []httproutes.Route{app}, want: ""},
+		"prefixed pair":                  {routes: append(platformUnder("/_"), app), want: Platform{Prefix: "/_", ReadinessRoute: true}},
+		"root pair":                      {routes: append(platformUnder(""), app), want: Platform{Prefix: "", ReadinessRoute: true}},
+		"explicit flag wins":             {routes: append(platformUnder("/_"), app), explicit: "/ops", want: Platform{Prefix: "/ops", ReadinessRoute: true}},
+		"explicit root wins":             {routes: append(platformUnder("/_"), app), explicit: "/", want: Platform{Prefix: "/", ReadinessRoute: true}},
+		"explicit flag without platform": {routes: []httproutes.Route{app}, explicit: "/ops", want: Platform{Prefix: "/ops", ReadinessRoute: true}},
+		"readiness without version":      {routes: []httproutes.Route{route(httproutes.MatchExact, "/_/readyz", false, "GET"), app}, want: Platform{}},
+		"root readiness without version": {routes: []httproutes.Route{route(httproutes.MatchExact, "/readyz", false, "GET"), app}, want: Platform{ReadinessRoute: true}},
+		"head only is not a mount":       {routes: []httproutes.Route{route(httproutes.MatchExact, "/_/readyz", false, "HEAD"), route(httproutes.MatchExact, "/_/version", false, "HEAD"), app}, want: Platform{}},
+		"no platform route":              {routes: []httproutes.Route{app}, want: Platform{}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			ws, project := fixtureProject(t, ".gen/schema", tc.routes)
-			got, err := ResolvePlatformPrefix(ws, project, tc.explicit)
+			got, err := ResolvePlatform(ws, project, tc.explicit)
 			if err != nil || got != tc.want {
-				t.Fatalf("ResolvePlatformPrefix = %q, %v; want %q", got, err, tc.want)
+				t.Fatalf("ResolvePlatform = %+v, %v; want %+v", got, err, tc.want)
 			}
 		})
 	}
 
-	// No inventory: the root, and Derive reports the missing inventory.
+	// No inventory: the root without a readiness route, and Derive reports the
+	// missing inventory.
 	ws, project := fixtureProject(t, "schema", nil)
-	if got, err := ResolvePlatformPrefix(ws, project, ""); err != nil || got != "" {
-		t.Fatalf("no inventory = %q, %v; want the root", got, err)
+	if got, err := ResolvePlatform(ws, project, ""); err != nil || got != (Platform{}) {
+		t.Fatalf("no inventory = %+v, %v; want the root without a readiness route", got, err)
 	}
 
 	// The pair under two prefixes is a guess qualification refuses to make.
 	ws, project = fixtureProject(t, "schema", append(append(platformUnder(""), platformUnder("/_")...), app))
-	_, err := ResolvePlatformPrefix(ws, project, "")
+	_, err := ResolvePlatform(ws, project, "")
 	var ambiguous *AmbiguousPlatformPrefixError
 	if !errors.As(err, &ambiguous) || strings.Join(ambiguous.Prefixes, ",") != ",/_" {
 		t.Fatalf("error = %v, want an AmbiguousPlatformPrefixError naming the root and /_", err)
@@ -310,7 +315,7 @@ func TestResolvePlatformPrefix_ReadsTheInventory(t *testing.T) {
 	if !strings.Contains(err.Error(), "(/, /_)") || !strings.Contains(err.Error(), "--platform-prefix") {
 		t.Fatalf("error %q must name both prefixes and the flag", err)
 	}
-	if got, err := ResolvePlatformPrefix(ws, project, "/_"); err != nil || got != "/_" {
-		t.Fatalf("the flag must resolve an ambiguous inventory: %q, %v", got, err)
+	if got, err := ResolvePlatform(ws, project, "/_"); err != nil || got != (Platform{Prefix: "/_", ReadinessRoute: true}) {
+		t.Fatalf("the flag must resolve an ambiguous inventory: %+v, %v", got, err)
 	}
 }

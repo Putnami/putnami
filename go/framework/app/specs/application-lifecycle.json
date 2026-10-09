@@ -33,6 +33,10 @@
       "text": "Concurrent plugin start failures are aggregated before cleanup; a start timeout cancels sibling startup, waits a bounded interval for starters to drain, and avoids racing cleanup with a cooperative starter."
     },
     {
+      "id": "completed-startup-readiness",
+      "text": "Start writes its ready record, which carries a runtime-protocol workload readiness claim under the reserved putnami.ready key, only after every plugin Starter and every module OnStart hook returned without an error. A starter or hook that is still running delays the record, and a failed or timed-out start writes none."
+    },
+    {
       "id": "darc-runtime-evidence",
       "text": "A reference refuses a fact its import does not name, and a registered darc component contributes exactly one describe-owned capability row per import and mode, carrying the declared contract verbatim in deterministic bytes. The row is evidence and never authority: emitting it cannot create a cross-domain permission."
     },

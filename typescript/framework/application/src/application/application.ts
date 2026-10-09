@@ -16,6 +16,7 @@ import {
   registerContributedConfig,
   useLogger,
 } from '@putnami/runtime';
+import { READY_LOG_KEY, readyMarker } from '@putnami/runtime/jobs';
 import { getProjectRoot } from '@putnami/utils';
 import { markStartupFailureLogged } from './app-bootstrap';
 import { emitDesignGraph } from '../features/design-graph';
@@ -365,7 +366,8 @@ export class Application extends Module {
    * 2. Migrate phase: invoke plugin.migrate hooks, then registry.applyAll
    *    (source-only metadata is tolerated; runners no-op unless their
    *    AutoApply is set or Force is passed)
-   * 3. Start all plugins (in parallel)
+   * 3. Start all plugins (in parallel), then log the ready record with its
+   *    workload readiness marker
    * 4. Execute the runner (if defined)
    */
   async start(): Promise<void> {
@@ -417,7 +419,12 @@ export class Application extends Module {
         }
         throw firstFailure.reason;
       }
-      logger.info(`🤖 ready`, { durationMs: Date.now() - startedAt });
+      // The ready record carries a workload readiness claim: every plugin
+      // start() has resolved, so the whole application finished startup. A
+      // listening HTTP server announces only itself (a server claim), so a
+      // consumer that needs the application started waits for this one.
+      const durationMs = Date.now() - startedAt;
+      logger.info(`🤖 ready`, { durationMs, [READY_LOG_KEY]: readyMarker({ target: 'workload', durationMs }) });
 
       // Install global exception handlers so uncaught errors include context
       this._removeExceptionHandler = installExceptionHandler(logger);

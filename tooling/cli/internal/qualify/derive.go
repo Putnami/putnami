@@ -149,48 +149,69 @@ func (e *AmbiguousPlatformPrefixError) Error() string {
 		e.Path, protocolplatform.PathReadyz, protocolplatform.PathVersion, strings.Join(shown, ", "))
 }
 
-// ResolvePlatformPrefix returns the prefix p mounts its platform endpoints
-// under. An explicit prefix, the --platform-prefix value, wins. Otherwise the
-// route inventory Derive reads decides: the prefix is the one under which the
-// inventory declares both GET <prefix>/readyz and GET <prefix>/version as exact
-// routes, the two endpoints qualification calls. A workload that mounts its
-// platform endpoints under "/_" already declares them there, so nobody has to
-// repeat the prefix on the command line.
+// Platform is where a workload serves the platform endpoints qualification
+// calls.
+type Platform struct {
+	// Prefix is where /readyz and /version are mounted; "" is the root.
+	Prefix string
+	// ReadinessRoute reports that GET <Prefix>/readyz is known to be served:
+	// the route inventory declares it as an exact route, or --platform-prefix
+	// stated where the platform endpoints are. Without it, a local target's
+	// readiness is its application's own completed-startup report, never a
+	// poll of a route the workload may not serve.
+	ReadinessRoute bool
+}
+
+// ResolvePlatform returns where p serves its platform endpoints. An explicit
+// prefix, the --platform-prefix value, wins and states that the readiness route
+// is served there. Otherwise the route inventory Derive reads decides: the
+// prefix is the one under which the inventory declares both GET
+// <prefix>/readyz and GET <prefix>/version as exact routes, the two endpoints
+// qualification calls. A workload that mounts its platform endpoints under "/_"
+// already declares them there, so nobody has to repeat the prefix on the
+// command line. Without such a pair the prefix is the root, and the readiness
+// route is known only when the inventory declares GET /readyz.
 //
-// No inventory, an invalid one, or no such pair is the root; Derive reports the
-// first two. Pairs under two or more prefixes are an
+// No inventory or an invalid one is the root without a readiness route; Derive
+// reports both. Pairs under two or more prefixes are an
 // AmbiguousPlatformPrefixError.
-func ResolvePlatformPrefix(ws *workspace.Workspace, p *workspace.Project, explicit string) (string, error) {
+func ResolvePlatform(ws *workspace.Workspace, p *workspace.Project, explicit string) (Platform, error) {
 	if strings.TrimSpace(explicit) != "" {
-		return explicit, nil
+		return Platform{Prefix: explicit, ReadinessRoute: true}, nil
 	}
 	relative, data, err := readInventory(ws.Root, p.Path)
 	if err != nil || data == nil {
-		return "", err
+		return Platform{}, err
 	}
 	manifest, diags := httproutes.ParseAndValidateManifest(data)
 	if diag.HasErrors(diags) {
-		return "", nil
+		return Platform{}, nil
 	}
-	prefixes := inventoryPlatformPrefixes(manifest.Routes)
+	gets := exactGETPaths(manifest.Routes)
+	prefixes := inventoryPlatformPrefixes(gets)
 	switch len(prefixes) {
 	case 0:
-		return "", nil
+		return Platform{ReadinessRoute: gets[protocolplatform.PathReadyz]}, nil
 	case 1:
-		return prefixes[0], nil
+		return Platform{Prefix: prefixes[0], ReadinessRoute: true}, nil
 	}
-	return "", &AmbiguousPlatformPrefixError{Path: relative, Prefixes: prefixes}
+	return Platform{}, &AmbiguousPlatformPrefixError{Path: relative, Prefixes: prefixes}
 }
 
-// inventoryPlatformPrefixes lists, sorted, every normalized prefix under which
-// the routes declare both readiness and version as exact GET routes.
-func inventoryPlatformPrefixes(routes []httproutes.Route) []string {
+// exactGETPaths is the set of paths the routes declare as exact GET routes.
+func exactGETPaths(routes []httproutes.Route) map[string]bool {
 	gets := map[string]bool{}
 	for _, route := range routes {
 		if route.Match == httproutes.MatchExact && readOnlyMethod(route.Methods) == "GET" {
 			gets[route.Path] = true
 		}
 	}
+	return gets
+}
+
+// inventoryPlatformPrefixes lists, sorted, every normalized prefix under which
+// gets holds both readiness and version.
+func inventoryPlatformPrefixes(gets map[string]bool) []string {
 	prefixes := []string{}
 	for routePath := range gets {
 		prefix, ok := strings.CutSuffix(routePath, protocolplatform.PathReadyz)

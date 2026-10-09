@@ -215,6 +215,30 @@ prints. Because the forwarder is shared, all three first-party serve wrappers
 gain the capability from one place, including Python's, which has no framework
 of its own.
 
+The Go and TypeScript application frameworks also announce that the whole
+application finished startup. Their `🤖 ready` log record carries a `workload`
+claim, written only after every plugin starter and every module start hook
+returned, and never when one of them failed:
+
+```json
+{
+  "severity": "INFO",
+  "message": "🤖 ready",
+  "durationMs": 41,
+  "putnami.ready": { "target": "workload", "durationMs": 41 }
+}
+```
+
+An HTTP application therefore emits two `ready` events per start: the `server`
+claim when its listener binds, then the `workload` claim once startup completed.
+A consumer that needs an address arms on the first; the watcher still arms on the
+first event of an iteration and ignores the rest. A consumer that needs the
+application started waits for the `workload` claim:
+`putnami qualify --target local` does, when the workload's route inventory
+declares no readiness route, because a listener answers (an auth denial, a
+`404`) long before the application finished starting. A `workload` claim carries
+no address, so it never changes the address an earlier `server` claim announced.
+
 A marker that would produce an invalid `ready` event yields **no** readiness
 rather than an invalid line: losing one signal costs a watcher its fast path,
 while an invalid line costs the consumer the whole stream.

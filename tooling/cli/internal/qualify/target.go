@@ -44,6 +44,19 @@ type WorktreeTarget interface {
 	Worktree(ctx context.Context) (qualifyproto.Binding, error)
 }
 
+// StartupTarget is a Target that observes its workload's process, and so can
+// report when the workload's application completed its startup. The readiness
+// phase waits for that report when the workload declares no readiness route
+// (Options.ReadinessRoute is false), instead of polling a route the workload
+// may not serve.
+type StartupTarget interface {
+	Target
+	// AwaitStartup returns once the application reported completed startup. It
+	// returns ctx's error when ctx is done first, and a *TargetError when the
+	// workload can no longer report it (its process exited).
+	AwaitStartup(ctx context.Context) error
+}
+
 // TargetError classifies a failed Open into a verdict state and a phase code.
 type TargetError struct {
 	// State is the resolve-target phase state.

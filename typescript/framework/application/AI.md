@@ -20,6 +20,8 @@ export const app = () =>
 
 Lifecycle: `generate()` -> `postGenerate()` -> `warmup()` -> `migrate()` -> `start()` -> `stop()`
 
+Once every plugin `start()` resolved, `start()` logs `🤖 ready` with a `workload` readiness claim under `putnami.ready`, then runs the runner. A rejected `start()` writes no such record.
+
 ## Endpoint Builder
 
 The `endpoint()` builder defines type-safe API route handlers. Chain methods for progressive disclosure — only declare what you need:

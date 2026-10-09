@@ -141,6 +141,7 @@
     "cli/workload-qualification#ephemeral-databases-per-composition",
     "cli/workload-qualification#every-non-pass-state-exits-non-zero",
     "cli/workload-qualification#injected-configuration-never-reaches-output",
+    "cli/workload-qualification#local-readiness-is-completed-startup",
     "cli/workload-qualification#local-verdict-binds-to-the-exact-worktree",
     "cli/workload-qualification#no-derivable-request-is-unsupported-not-success",
     "cli/workload-qualification#remote-verdict-binds-to-the-deployed-sha",

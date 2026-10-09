@@ -4,7 +4,7 @@
   "visibility": "public",
   "tags": ["go"],
   "extensions": ["/go/extension", "/tooling/sdd-extension"],
-  "dependencies": ["/go/framework/errors", "/go/framework/inject", "/go/framework/logger", "/go/framework/migration", "/protocols/capabilities", "/protocols/features", "/protocols/infra"],
+  "dependencies": ["/go/framework/errors", "/go/framework/inject", "/go/framework/logger", "/go/framework/migration", "/protocols/capabilities", "/protocols/features", "/protocols/infra", "/protocols/runtime"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]

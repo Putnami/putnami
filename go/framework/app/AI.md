@@ -30,6 +30,7 @@ the plugin phases. All take `context.Context`.
 | **Invoke** | (automatic) | — | Run `InvokeFunc` callbacks |
 | **Plugins.Start** | `Starter` | parallel | Start servers, open connections |
 | **Modules.OnStart** | `OnStart` | top-down | Startup that depends on a module's plugins running |
+| **Ready** | (automatic) | — | Log `🤖 ready` with a `workload` readiness claim under `putnami.ready`; only after every `Starter` and `OnStart` returned without an error |
 | **Modules.OnStop** | `OnStop` | bottom-up | Cleanup before the module's plugins stop |
 | **Plugins.Stop** | `Stopper` | reverse | Graceful shutdown |
 

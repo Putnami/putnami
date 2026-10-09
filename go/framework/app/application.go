@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/inject"
 	"go.putnami.dev/logger"
 	"go.putnami.dev/migration"
+	runtimeproto "go.putnami.dev/protocol/runtime"
 )
 
 // DefaultStartTimeout is the maximum time allowed for the plugin start phase.
@@ -270,7 +271,10 @@ func (a *Application) Start(ctx context.Context) error {
 		return err
 	}
 
-	a.log.Info("🤖 ready", slog.Int64("durationMs", time.Since(startedAt).Milliseconds()))
+	durationMs := time.Since(startedAt).Milliseconds()
+	a.log.Info("🤖 ready",
+		slog.Int64("durationMs", durationMs),
+		slog.Any(runtimeproto.ReadyLogKey, startedMarker(durationMs)))
 
 	if a.runner != nil {
 		if err := a.runner(ctx); err != nil && ctx.Err() == nil {
@@ -281,6 +285,17 @@ func (a *Application) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// startedMarker is the readiness payload the ready record carries under the
+// reserved key runtimeproto.ReadyLogKey: a workload claim, which states that
+// the whole application finished startup. Start writes that record only after
+// every Starter and every module OnStart hook returned without an error, so a
+// consumer that needs more than a listening port (a server claim) waits for
+// this one. The serve extension's forwarder turns it into the typed `ready`
+// event (protocols/runtime/ready_marker.go).
+func startedMarker(durationMs int64) runtimeproto.ReadyData {
+	return runtimeproto.ReadyMarker(runtimeproto.ReadyData{Target: runtimeproto.ReadyTargetWorkload, DurationMs: durationMs})
 }
 
 // buildContainer always creates the DI container, propagates it to modules,

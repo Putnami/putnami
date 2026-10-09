@@ -179,6 +179,35 @@ func (t *localTarget) Worktree(context.Context) (qualifyproto.Binding, error) {
 	return treeBindingOf(tree), nil
 }
 
+// AwaitStartup waits for the target member's application to report completed
+// startup: the typed ready event with target workload that compose records
+// (compose.Composition.WaitStartup). The composition's own readiness is only
+// the member's first claim, a listening port, which an application announces
+// before its remaining starters and start hooks ran. A member that exits first
+// is composition_failed, naming the member and the phase.
+func (t *localTarget) AwaitStartup(ctx context.Context) error {
+	t.mu.Lock()
+	composition := t.composition
+	t.mu.Unlock()
+	if composition == nil {
+		return &TargetError{
+			State: qualifyproto.StateCompositionFailed,
+			Code:  qualifyproto.PhaseCodeCompositionFailed,
+			Err:   fmt.Errorf("no composition serves %s", t.project),
+		}
+	}
+	err := composition.WaitStartup(ctx, t.project)
+	var composeErr *compose.Error
+	if errors.As(err, &composeErr) {
+		return &TargetError{
+			State: qualifyproto.StateCompositionFailed,
+			Code:  qualifyproto.PhaseCodeCompositionFailed,
+			Err:   err,
+		}
+	}
+	return err
+}
+
 // Close stops the composition: its members, proxies and databases. What survives
 // is named in the cleanup, which makes the verdict a non-pass — a run that
 // leaked a process or a database proved what it did at the cost of the next one.

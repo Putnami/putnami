@@ -42,7 +42,7 @@ type Options struct {
 	// ExpectSHA is the sha a URL target must report on /version.
 	ExpectSHA string
 	// PlatformPrefix is where /readyz and /version are mounted. Empty reads it
-	// from the route inventory (qualify.ResolvePlatformPrefix).
+	// from the route inventory (qualify.ResolvePlatform).
 	PlatformPrefix string
 	// ReadyTimeout bounds readiness; zero means the default.
 	ReadyTimeout time.Duration
@@ -86,8 +86,9 @@ func Run(ctx context.Context, opts Options) error {
 		return cmderr.NotFoundf("project not found: %s", opts.Selector)
 	}
 	// Without --platform-prefix, the route inventory names where /readyz and
-	// /version are mounted: the same file the contract is derived from.
-	prefix, err := qualify.ResolvePlatformPrefix(ws, project, opts.PlatformPrefix)
+	// /version are mounted, and whether /readyz is served at all: the same file
+	// the contract is derived from.
+	platform, err := qualify.ResolvePlatform(ws, project, opts.PlatformPrefix)
 	if err != nil {
 		var ambiguous *qualify.AmbiguousPlatformPrefixError
 		if errors.As(err, &ambiguous) {
@@ -95,7 +96,7 @@ func Run(ctx context.Context, opts Options) error {
 		}
 		return err
 	}
-	contract, unsupported, err := qualify.Derive(ws, project, prefix)
+	contract, unsupported, err := qualify.Derive(ws, project, platform.Prefix)
 	if err != nil {
 		var invalid *qualify.InvalidInventoryError
 		if errors.As(err, &invalid) {
@@ -116,7 +117,8 @@ func Run(ctx context.Context, opts Options) error {
 		return err
 	}
 	verdict := qualify.Execute(ctx, contract, target, qualify.Options{
-		PlatformPrefix: prefix,
+		PlatformPrefix: platform.Prefix,
+		ReadinessRoute: platform.ReadinessRoute,
 		ReadyTimeout:   opts.ReadyTimeout,
 		RequestTimeout: opts.RequestTimeout,
 		Unsupported:    unsupported,

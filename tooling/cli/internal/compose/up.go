@@ -347,6 +347,23 @@ func (c *Composition) Wait(ctx context.Context) error {
 	}
 }
 
+// WaitStartup returns once a member's application reported completed startup:
+// a typed ready event whose target is workload, which the Go and TypeScript
+// application frameworks emit only after every plugin starter and module start
+// hook returned. The member's readiness (its first claim, which is all Up
+// waits for) is not that report: a server claim states only that a listener is
+// bound. WaitStartup fails with CodeMemberExited when the member's serve step
+// ends first, returns ctx's error when ctx is done first, and fails with
+// CodeUnknownMember for a project that is not a member.
+func (c *Composition) WaitStartup(ctx context.Context, projectID string) error {
+	for _, rt := range c.runtimes {
+		if rt.member.Project.ID == projectID {
+			return rt.waitStartup(ctx)
+		}
+	}
+	return newError(CodeUnknownMember, projectID, PhaseReadiness, "the project is not a member of this composition")
+}
+
 // MemberStatus is one member as a composition reports it. It carries no
 // configuration value, connection string or password.
 type MemberStatus struct {

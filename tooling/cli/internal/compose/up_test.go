@@ -238,3 +238,89 @@ func TestUp_ReportsOrphansReapedBeforeAFailure(t *testing.T) {
 		t.Fatalf("reaped on failure = %+v, want the orphan %s", composeErr.Reaped, orphan)
 	}
 }
+
+func TestUp_AWorkloadClaimRecordsCompletedStartupAndKeepsTheBackend(t *testing.T) {
+	spectest.Proves(t, "cli/workload-qualification", "typed-readiness-bounds-every-member",
+		"a-claim-without-an-endpoint-keeps-the-backend")
+	spectest.Proves(t, "cli/workload-qualification", "local-readiness-is-completed-startup",
+		"a-member-records-completed-startup-from-a-workload-claim-alone")
+	fixture := newCompositionFixture(t,
+		fixtureProject{id: "/provider", name: "provider"},
+		fixtureProject{id: "/app", name: "app", runsWith: []string{"provider"}, mode: fixtureStarted},
+	)
+	ctx, cancel := context.WithTimeout(context.Background(), hangDetector)
+	defer cancel()
+	comp, err := up(ctx, Options{
+		WorkspaceRoot: fixture.root,
+		Target:        fixture.projects["/app"],
+		ReadyTimeout:  hangDetector,
+	}, fixture.deps(nil))
+	if err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+	defer comp.Close(context.Background())
+
+	if err := comp.WaitStartup(ctx, "/app"); err != nil {
+		t.Fatalf("WaitStartup(/app) = %v, want the workload claim recorded", err)
+	}
+	// The workload claim carries no endpoint, so the proxy still forwards to the
+	// port the server claim before it announced.
+	endpoint, _ := comp.Endpoint("/app")
+	if code, body := get(t, endpoint+"/whoami"); code != http.StatusOK || !strings.HasPrefix(body, "/app host=") {
+		t.Errorf("after the workload claim the proxy answered %d %q, want the member", code, body)
+	}
+	if status := comp.Status(); status.Members[1].BackendPort == 0 {
+		t.Errorf("status = %+v: the workload claim cleared the backend port", status.Members)
+	}
+
+	// A server claim alone states that a listener is bound, not that the
+	// application completed its startup.
+	short, stop := context.WithTimeout(ctx, 300*time.Millisecond)
+	defer stop()
+	if err := comp.WaitStartup(short, "/provider"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("WaitStartup(/provider) = %v, want the deadline: its server claim is not completed startup", err)
+	}
+	if composeErr := composeError(t, comp.WaitStartup(ctx, "/absent")); composeErr.Code != CodeUnknownMember {
+		t.Errorf("WaitStartup(/absent) = %v, want compose.unknown_member", composeErr)
+	}
+}
+
+func TestUp_WaitStartupFailsWhenTheMemberExitsFirst(t *testing.T) {
+	spectest.Proves(t, "cli/workload-qualification", "local-readiness-is-completed-startup",
+		"a-member-that-exits-before-completed-startup-fails-the-wait")
+	fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app", mode: fixtureListenThenExit})
+	for _, watchTarget := range []bool{false, true} {
+		t.Run(map[bool]string{false: "once", true: "watch"}[watchTarget], func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), hangDetector)
+			defer cancel()
+			comp, err := up(ctx, Options{
+				WorkspaceRoot: fixture.root,
+				Target:        fixture.projects["/app"],
+				WatchTarget:   watchTarget,
+				ReadyTimeout:  hangDetector,
+			}, fixture.deps(nil))
+			if err != nil {
+				t.Fatalf("Up: %v", err)
+			}
+			defer comp.Close(context.Background())
+
+			waited := make(chan error, 1)
+			go func() { waited <- comp.WaitStartup(ctx, "/app") }()
+			endpoint, _ := comp.Endpoint("/app")
+			if code, _ := get(t, endpoint+"/exit"); code != http.StatusOK {
+				t.Fatalf("GET /exit answered %d", code)
+			}
+			// Only the exit can end this wait before the hang detector.
+			composeErr := composeError(t, <-waited)
+			if composeErr.Code != CodeMemberExited || composeErr.Member != "/app" || composeErr.Phase != PhaseReadiness {
+				t.Fatalf("error = %v, want compose.member_exited for /app in readiness", composeErr)
+			}
+			if !strings.Contains(composeErr.Message, "completed startup") || !strings.Contains(composeErr.Message, "exit code 3") {
+				t.Errorf("message = %q, want the missing startup report and the exit status", composeErr.Message)
+			}
+			if !strings.Contains(strings.Join(composeErr.Detail, "\n"), "failed after it started listening") {
+				t.Errorf("detail = %q, want the member's output", composeErr.Detail)
+			}
+		})
+	}
+}

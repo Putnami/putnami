@@ -27,6 +27,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	go.putnami.dev/protocol/config v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
+	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
@@ -65,3 +66,5 @@ replace go.putnami.dev/protocol/features => ../../../protocols/features
 retract [v0.1.0-0, v0.1.99999] // Pre-open-source builds; public history starts at v0.2.0.
 
 replace go.putnami.dev/protocol/architecture => ../../../protocols/architecture
+
+replace go.putnami.dev/protocol/runtime => ../../../protocols/runtime
