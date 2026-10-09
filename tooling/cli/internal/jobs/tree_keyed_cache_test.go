@@ -1,6 +1,6 @@
-// A task cache key describes the tree a run reads. The commit, the branch and
-// the directory the tree is checked out in are not part of it, except for a
-// task that declares its output embeds the publish version.
+// A task cache key describes the tree a run reads. The commit, the branch, the
+// line's base version and the directory the tree is checked out in are not part
+// of it, except for a task that declares its output embeds the publish version.
 package jobs
 
 import (
@@ -109,9 +109,11 @@ func treeKeyedGit(t *testing.T, dir string, args ...string) string {
 //   - The base commit carries the line tag v0.3.0.
 //   - The pull request branch, feature/tree-keys, adds one fix.
 //   - main adds an empty commit, then the squash commit: the pull request's tree
-//     on another parent, with another message.
+//     on another parent, with a title that calls for another bump.
 //
-// Both heads add one fix since the tag, so both resolve the base version 0.3.1.
+// The pull request head adds one fix since the tag and resolves the base
+// version 0.3.1. The squash title marks a breaking change, so main resolves
+// 0.4.0.
 func treeKeyedSquashMerge(t *testing.T, parent string) string {
 	t.Helper()
 	root := filepath.Join(parent, "pull-request")
@@ -132,7 +134,7 @@ func treeKeyedSquashMerge(t *testing.T, parent string) string {
 
 	other := treeKeyedGit(t, root, "commit-tree", "main^{tree}", "-p", "main", "-m", "chore: an unrelated merge")
 	squash := treeKeyedGit(t, root, "commit-tree", "HEAD^{tree}", "-p", other,
-		"-m", "fix(library): raise a, squashed")
+		"-m", "fix(library)!: raise a, squashed")
 	treeKeyedGit(t, root, "update-ref", "refs/heads/main", squash)
 	return root
 }
@@ -242,9 +244,10 @@ func sortedKeyNames(keys map[string]string) []string {
 }
 
 // A pull request lane and the main lane that follows its squash merge build the
-// same tree at two commits, on two branches, in two checkout directories. Both
-// lanes are Git checkouts, derive their versions from Git, and plan the shipped
-// Go, TypeScript and SDD task declarations. Every cacheable test, lint, build
+// same tree at two commits, on two branches, at two base versions, in two
+// checkout directories. Both lanes are Git checkouts, derive their versions
+// from Git, and plan the shipped Go, TypeScript and SDD task declarations.
+// Every cacheable test, lint, build
 // and validate key is the same in both, so the second lane reuses what the
 // first stored. The npm package task, which declares that its output embeds the
 // publish version, keeps one key per commit.
@@ -267,13 +270,14 @@ func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
 	pullRequest := openTreeKeyedLane(t, origin)
 	trunk := openTreeKeyedLane(t, treeKeyedCloneMain(t, origin, parent, "main"))
 
-	// The lanes differ in everything a key must not read, at one base version.
+	// The lanes differ in everything a key must not read, the base version
+	// included.
 	head, squash := pullRequest.versions[""], trunk.versions[""]
 	if head == nil || squash == nil {
 		t.Fatalf("versions = %+v and %+v, want the root line in both", pullRequest.versions, trunk.versions)
 	}
-	if head.Base != "0.3.1" || squash.Base != head.Base {
-		t.Fatalf("base versions = %q and %q, want 0.3.1 in both", head.Base, squash.Base)
+	if head.Base != "0.3.1" || squash.Base != "0.4.0" {
+		t.Fatalf("base versions = %q and %q, want 0.3.1 and 0.4.0", head.Base, squash.Base)
 	}
 	if head.SHA == squash.SHA || head.Branch == squash.Branch || head.Full == squash.Full {
 		t.Fatalf("the two lanes resolved one commit (%+v, %+v); the comparison would prove nothing", head, squash)

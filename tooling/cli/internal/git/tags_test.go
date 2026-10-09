@@ -274,6 +274,21 @@ func TestTreeStateReportsTheWorkingTree(t *testing.T) {
 	}
 }
 
+// The hosted pull request runner tests a squash commit it dates at the Unix
+// epoch. Git records that time as 0, and the run still has a commit time.
+func TestTreeStateReadsACommitDatedAtTheEpoch(t *testing.T) {
+	t.Parallel()
+	dir := initGitRepo(t)
+	commitAt(t, dir, "squash.txt", "ci: pull request squashed on its base", "@0 +0000")
+	state, err := TreeState(dir)
+	if err != nil {
+		t.Fatalf("TreeState on a commit dated at the epoch: %v", err)
+	}
+	if !strings.HasPrefix(state.Suffix, "19700101000000-") {
+		t.Fatalf("suffix = %q, want the epoch's time", state.Suffix)
+	}
+}
+
 // The line tag placeholder is restated in this package rather than imported.
 // This is the guard that keeps the two spellings equal.
 func TestLineTagPlaceholderMatchesTheWorkspaceProtocol(t *testing.T) {

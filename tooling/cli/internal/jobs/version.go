@@ -38,8 +38,8 @@ type VersionInfo struct {
 }
 
 // CapabilityPackageStamp is the deterministic, build-time package inventory
-// consumed by capability-manifest emitters. Version is the resolved workspace
-// project version (never a dependency range or volatile VCS suffix), while
+// consumed by capability-manifest emitters. Version is the tree's base version,
+// 0.0.0, never one Git resolved: cached tasks read the stamp (ADR 0060).
 // EvidencePath is workspace-relative. CapabilityManifestPath is relative to the
 // workload project root so language emitters can merge a dependency's shipped
 // static manifest without embedding a machine-specific workspace path.
@@ -370,7 +370,7 @@ func generateVersionFilesAtWithSourceBindings(
 			Name:               proj.Name,
 			BuildTime:          buildTime,
 			CapabilityRoot:     capabilityRoot(ws, proj),
-			CapabilityPackages: capabilityPackageStamps(ws, versions, proj, sourceBindings, &spawnedProcesses),
+			CapabilityPackages: capabilityPackageStamps(ws, proj, sourceBindings, &spawnedProcesses),
 		}
 		if projVersion != nil {
 			info.Version = projVersion.Full
@@ -584,7 +584,6 @@ func (s *Scheduler) invalidateCapabilitySourceBindingsForRestore(job *ScheduledJ
 
 func capabilityPackageStamps(
 	ws *workspace.Workspace,
-	versions RunVersions,
 	project *workspace.Project,
 	sourceBindings *capabilitySourceBindingMemo,
 	spawnedProcesses *int,
@@ -634,14 +633,13 @@ func capabilityPackageStamps(
 	}
 	stamps := make([]CapabilityPackageStamp, 0, len(projects))
 	for _, candidate := range projects {
-		version := LineBaseVersion(versions, candidate)
-		if version == "" {
-			version = "0.0.0"
-		}
 		evidence := capabilityPackageEvidence(ws, candidate)
 		stamp := CapabilityPackageStamp{
-			Package:      candidate.Name,
-			Version:      version,
+			Package: candidate.Name,
+			// Cached tasks read this stamp, so it names the tree's version
+			// (ADR 0060). It equals the version the same tasks read in their
+			// context's project references, which evidence matching needs.
+			Version:      treeBaseVersion,
 			EvidencePath: filepath.ToSlash(evidence),
 			SourceRoot:   filepath.ToSlash(candidate.Path),
 		}

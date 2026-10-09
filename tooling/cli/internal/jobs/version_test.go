@@ -205,8 +205,8 @@ func TestGenerateVersionFiles_UsesTheProjectsLineVersion(t *testing.T) {
 	if got.Version != "1.2.3-abc1234" {
 		t.Errorf("Version = %q, want the line version 1.2.3-abc1234", got.Version)
 	}
-	if len(got.CapabilityPackages) != 1 || got.CapabilityPackages[0].Package != "lib" || got.CapabilityPackages[0].Version != "1.2.3" {
-		t.Fatalf("CapabilityPackages = %+v, want stable self package lib@1.2.3", got.CapabilityPackages)
+	if len(got.CapabilityPackages) != 1 || got.CapabilityPackages[0].Package != "lib" || got.CapabilityPackages[0].Version != "0.0.0" {
+		t.Fatalf("CapabilityPackages = %+v, want self package lib at the tree version 0.0.0", got.CapabilityPackages)
 	}
 }
 
@@ -229,8 +229,8 @@ func TestGenerateVersionFiles_StampsTransitiveCapabilityPackageGraph(t *testing.
 	ws := &workspace.Workspace{Name: "ws", Root: wsRoot, Projects: projects}
 	job := &ScheduledJob{Project: projects[0], Extension: &extension.ExtensionDescription{Name: "ext"}, JobDef: &extension.JobDefinition{Name: "build"}}
 
-	// One line, so every project of the closure is stamped at one version: a
-	// project no longer declares one of its own.
+	// Every project of the closure is stamped at the tree version, whatever
+	// version Git resolved for the line (ADR 0060).
 	versions := rootLineVersions(&JobContextVersion{Base: "2.0.0", Full: "2.0.0-abc1234", Suffix: "abc1234"})
 	generateVersionFilesAt(ws, []*ScheduledJob{job}, versions, "2026-07-20T12:00:00Z", false)
 	data, err := os.ReadFile(filepath.Join(wsRoot, projects[0].Path, ".gen", "version.json"))
@@ -245,9 +245,9 @@ func TestGenerateVersionFiles_StampsTransitiveCapabilityPackageGraph(t *testing.
 		t.Fatalf("CapabilityPackages = %+v, want self + transitive dependencies", got.CapabilityPackages)
 	}
 	want := []CapabilityPackageStamp{
-		{Package: "feature", Version: "2.0.0", EvidencePath: "libs/feature/putnami.json", SourceRoot: "libs/feature", CapabilityManifestPath: "../../libs/feature/schema/capabilities.json"},
-		{Package: "framework", Version: "2.0.0", EvidencePath: "libs/framework/putnami.json", SourceRoot: "libs/framework", CapabilityManifestPath: "../../libs/framework/schema/capabilities.json"},
-		{Package: "workload", Version: "2.0.0", EvidencePath: "apps/workload/putnami.json", SourceRoot: "apps/workload"},
+		{Package: "feature", Version: "0.0.0", EvidencePath: "libs/feature/putnami.json", SourceRoot: "libs/feature", CapabilityManifestPath: "../../libs/feature/schema/capabilities.json"},
+		{Package: "framework", Version: "0.0.0", EvidencePath: "libs/framework/putnami.json", SourceRoot: "libs/framework", CapabilityManifestPath: "../../libs/framework/schema/capabilities.json"},
+		{Package: "workload", Version: "0.0.0", EvidencePath: "apps/workload/putnami.json", SourceRoot: "apps/workload"},
 	}
 	for i := range want {
 		if got.CapabilityPackages[i].SourceBindingUnavailable {
@@ -291,8 +291,8 @@ func TestGenerateVersionFiles_CapabilityStampsCoverWorkspaceProjectsOnly(t *test
 	ws := &workspace.Workspace{Name: "ws", Root: wsRoot, Projects: projects}
 	job := &ScheduledJob{Project: projects[0], Extension: &extension.ExtensionDescription{Name: "ext"}, JobDef: &extension.JobDefinition{Name: "build"}}
 
-	// One line, so every project of the closure is stamped at one version: a
-	// project no longer declares one of its own.
+	// Every project of the closure is stamped at the tree version, whatever
+	// version Git resolved for the line (ADR 0060).
 	versions := rootLineVersions(&JobContextVersion{Base: "2.0.0", Full: "2.0.0-abc1234", Suffix: "abc1234"})
 	generateVersionFilesAt(ws, []*ScheduledJob{job}, versions, "2026-07-20T12:00:00Z", false)
 	data, err := os.ReadFile(filepath.Join(wsRoot, projects[0].Path, ".gen", "version.json"))
@@ -786,7 +786,7 @@ func TestCapabilityPackageStamps_OutsideARepositoryMakeNoSourceClaim(t *testing.
 		return isUnmanaged(repoRoot)
 	}
 
-	stamps := capabilityPackageStamps(ws, rootLineVersions(&JobContextVersion{Base: "0.0.0"}), projects[0], memo, nil)
+	stamps := capabilityPackageStamps(ws, projects[0], memo, nil)
 	if len(stamps) != len(projects) {
 		t.Fatalf("stamps = %+v, want one per project of the closure", stamps)
 	}
@@ -823,7 +823,7 @@ func TestCapabilityPackageStamps_ABindingFailureInsideARepositoryIsNotMarkedUnav
 		return isUnmanaged(repoRoot)
 	}
 
-	stamps := capabilityPackageStamps(ws, rootLineVersions(&JobContextVersion{Base: "0.0.0"}), projects[0], memo, nil)
+	stamps := capabilityPackageStamps(ws, projects[0], memo, nil)
 	if len(stamps) != len(projects) {
 		t.Fatalf("stamps = %+v, want one per project of the closure", stamps)
 	}
@@ -853,7 +853,7 @@ func TestCapabilityPackageStamps_InsideARepositoryCarryTheSourceBinding(t *testi
 	}
 
 	spawned := 0
-	stamps := capabilityPackageStamps(ws, rootLineVersions(&JobContextVersion{Base: "0.0.0"}), projects[0], memo, &spawned)
+	stamps := capabilityPackageStamps(ws, projects[0], memo, &spawned)
 	if len(stamps) != len(projects) {
 		t.Fatalf("stamps = %+v, want one per project of the closure", stamps)
 	}

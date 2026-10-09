@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -99,5 +100,56 @@ var Cfg = config.Config[Server]("server")
 	}
 	if !canonicalPhaseStatuses[status] {
 		t.Fatalf("phase-end status %q is not in the canonical PhaseStatus vocabulary", status)
+	}
+}
+
+// The task is cached on the project's tree, so the schema it writes carries
+// the version the project declares, or "0.0.0", never the line's version: a
+// version from the line's history would be restored stale on a cache hit.
+func TestRun_SchemaCarriesTheDeclaredVersion(t *testing.T) {
+	source := `package server
+
+import "go.putnami.dev/config"
+
+type Server struct {
+	Port int ` + "`json:\"port\"`" + `
+}
+
+var Cfg = config.Config[Server]("server")
+`
+	for _, tc := range []struct {
+		name, config, want string
+	}{
+		{"declared", `{"name":"app","version":"2.1.0"}`, "2.1.0"},
+		{"inherited", `{"name":"app"}`, "0.0.0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := writeProject(t, map[string]string{
+				"go.mod":           "module example.com/app\n\ngo 1.25\n",
+				"putnami.json":     tc.config,
+				"server/server.go": source,
+			})
+			ctx := &pctx.Context{
+				Project:   pctx.Project{Name: "app", FullPath: dir},
+				Workspace: pctx.Workspace{Version: "0.4.0"},
+				Version:   &pctx.Version{Base: "0.4.0", Full: "0.4.0-20261009102646-0d1eeeefd76a"},
+			}
+			if status := capturePhaseStatus(t, ctx); status != "success" {
+				t.Fatalf("phase-end status = %q, want success", status)
+			}
+			data, err := os.ReadFile(filepath.Join(dir, DefaultOutputPath))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var schema struct {
+				Version string `json:"version"`
+			}
+			if err := json.Unmarshal(data, &schema); err != nil {
+				t.Fatal(err)
+			}
+			if schema.Version != tc.want {
+				t.Fatalf("schema version = %q, want %q", schema.Version, tc.want)
+			}
+		})
 	}
 }

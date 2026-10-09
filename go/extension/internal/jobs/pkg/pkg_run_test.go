@@ -543,12 +543,12 @@ func TestPackageWritesOnlyInsideDeclaredOutputs(t *testing.T) {
 		t.Fatalf("Run status = %q, want OK", status)
 	}
 
-	// Every declared output of the tasks that ran, and nothing else. bin/ and
-	// VERSION belong to build-cross-compile, archives/ to package-archives,
+	// Every declared output of the tasks that ran, and nothing else. bin/
+	// belongs to build-cross-compile, archives/ to package-archives,
 	// go/ to package-go, metadata.json to package-archives.
 	declared := map[string]bool{
 		"archives": true, "go": true, "docker": true, "bin": true,
-		"VERSION": true, "metadata.json": true,
+		"metadata.json": true,
 	}
 	entries, err := os.ReadDir(outputPath)
 	if err != nil {

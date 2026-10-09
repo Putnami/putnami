@@ -9,7 +9,6 @@
 package codegen
 
 import (
-	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -233,7 +232,7 @@ func run(ctx *pctx.Context, emit *jsonl.Emitter, mode string, clear bool) (*Gene
 	if artifact, ok, err := configextract.WriteArtifacts(
 		projectPath,
 		ctx.Project.Name,
-		configSchemaVersion(ctx, projectPath, configSchemaOutput),
+		configextract.SchemaVersion(projectPath),
 		configSchemaOutput,
 	); err != nil {
 		syncRequirements()
@@ -266,7 +265,7 @@ func run(ctx *pctx.Context, emit *jsonl.Emitter, mode string, clear bool) (*Gene
 		Project: sdkcodegen.ProjectInfo{
 			Name:            ctx.Project.Name,
 			Version:         stableVersion(ctx),
-			DeclaredVersion: declaredProjectVersion(projectPath),
+			DeclaredVersion: configextract.DeclaredProjectVersion(projectPath),
 			Module:          resolveModulePath(projectPath),
 			Options:         ctx.Project.Options,
 		},
@@ -519,53 +518,15 @@ func resolveModulePath(projectPath string) string {
 	return ""
 }
 
-// declaredProjectVersion reads the version the project declares for ITSELF in
-// its own putnami.json. It returns "" when the file is absent, unreadable,
-// malformed, or simply declares no version — the common case, where the project
-// inherits its scope's or the workspace's version.
-//
-// The distinction matters for committed artifacts: an inherited version
-// is WORKSPACE state, so stamping it into a tracked file makes that file churn
-// whenever the workspace is bumped, in every project at once. A declared version
-// is an input of this project alone. Producers of committed content therefore
-// read this, never stableVersion.
-//
-// The read is deliberately narrow — one field of one file inside the project —
-// so it stays a pure function of the project's own tree.
-func declaredProjectVersion(projectPath string) string {
-	data, err := os.ReadFile(filepath.Join(projectPath, "putnami.json"))
-	if err != nil {
-		return ""
-	}
-	var declared struct {
-		Version string `json:"version"`
-	}
-	if err := json.Unmarshal(data, &declared); err != nil {
-		return ""
-	}
-	return strings.TrimSpace(declared.Version)
-}
-
-// configSchemaVersion is the version stamped into the config schema written at
-// outputPath. The committed schema/config.json is a tracked file, so it carries
-// the version the project declares for itself, or "0.0.0": a release tag or a
-// workspace bump must not rewrite it. The .gen fallback is per-run output and
-// carries the stable version.
-func configSchemaVersion(ctx *pctx.Context, projectPath, outputPath string) string {
-	if outputPath == configextract.DefaultOutputPath {
-		return cmp.Or(declaredProjectVersion(projectPath), "0.0.0")
-	}
-	return stableVersion(ctx)
-}
-
 // stableVersion returns the workspace's stable base version — the part
 // without git SHA / dirty markers — so committed schemas don't churn on
 // every commit. ctx.Version.Full is intentionally avoided here; it's the
 // right value at runtime but the wrong value baked into a tracked file.
 //
 // It is still WORKSPACE-wide state: a workspace bump moves it for every
-// project. Committed artifacts must therefore use declaredProjectVersion;
-// this value is for ephemeral, per-run output only.
+// project. Committed artifacts must therefore use
+// configextract.DeclaredProjectVersion; this value is for ephemeral, per-run
+// output only.
 //
 // Order: ctx.Version.Base → ctx.Workspace.Version → "0.0.0".
 func stableVersion(ctx *pctx.Context) string {

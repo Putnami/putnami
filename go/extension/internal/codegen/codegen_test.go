@@ -776,10 +776,10 @@ func TestRunGeneratesConfigSchemaArtifact(t *testing.T) {
 	}
 }
 
-// A release tag or a workspace bump moves the stable version. The committed
-// schema/config.json must not follow it, or every build after a tag rewrites a
-// tracked file: it carries the version the project declares, or "0.0.0". The
-// .gen fallback is per-run output and keeps the stable version.
+// A release tag or a workspace bump moves the stable version. No config schema
+// may follow it: the committed schema/config.json would be rewritten after every
+// tag, and the .gen fallback, cached on the project's tree, would be restored
+// stale. Both carry the version the project declares, or "0.0.0".
 func TestCommittedConfigSchemaDoesNotCarryTheWorkspaceVersion(t *testing.T) {
 	configSrc := "package main\n\n" +
 		"import pconfig \"go.putnami.dev/config\"\n\n" +
@@ -843,8 +843,10 @@ func TestCommittedConfigSchemaDoesNotCarryTheWorkspaceVersion(t *testing.T) {
 			if err := mergeDependencyConfigSchema(ctx, root, genDir, false); err != nil {
 				t.Fatalf("mergeDependencyConfigSchema: %v", err)
 			}
-			if got := readVersion(t, filepath.Join(genDir, "config-schema.json")); got != "1.2.3" {
-				t.Fatalf("the .gen fallback carries %q, want the stable version 1.2.3", got)
+			// The fallback is cached on the project's tree too, so it never
+			// carries the line's version (tooling/cli ADR 0060).
+			if got := readVersion(t, filepath.Join(genDir, "config-schema.json")); got != tc.want {
+				t.Fatalf("the .gen fallback carries %q, want %q", got, tc.want)
 			}
 		})
 	}
