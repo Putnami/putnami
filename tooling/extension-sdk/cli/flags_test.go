@@ -78,6 +78,19 @@ func TestParseFlags_NextArgIsFlag(t *testing.T) {
 	}
 }
 
+func TestParseFlags_MultiWordHyphenValue(t *testing.T) {
+	flags := ParseFlags([]string{"--args", "--check --dry-run", "--concurrent", "--update-snapshots"})
+	if flags["args"] != "--check --dry-run" {
+		t.Errorf("args = %q, want %q", flags["args"], "--check --dry-run")
+	}
+	if flags["concurrent"] != "true" {
+		t.Errorf("concurrent = %q, want %q", flags["concurrent"], "true")
+	}
+	if flags["update-snapshots"] != "true" {
+		t.Errorf("update-snapshots = %q, want %q", flags["update-snapshots"], "true")
+	}
+}
+
 func TestParseFlags_LastFlagBool(t *testing.T) {
 	flags := ParseFlags([]string{"--verbose"})
 	if flags["verbose"] != "true" {

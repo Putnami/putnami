@@ -1550,6 +1550,30 @@ Extensions can declare additional flags in their manifest. These are passed thro
 putnami build --all --target linux/amd64
 ```
 
+A job flag takes the next argument as its value when that argument does not
+begin with a hyphen, or when it holds several words: no flag contains a space,
+so `"--check --dry-run"` is a value. Otherwise the flag is `true`, and the next
+argument is a flag of its own. A flag directly before `--`, or last, is `true`.
+Both spellings below set `args` to `--check --dry-run`:
+
+```bash
+putnami run my-job --args "--check --dry-run"
+putnami run my-job --args="--check --dry-run"
+```
+
+A one-word value that begins with a hyphen needs the `=` spelling, because
+`--args --gate` reads as two flags (and `--args --dry-run` turns on the CLI's
+own `--dry-run`):
+
+```bash
+putnami run my-job --args=--gate
+```
+
+Use the `=` spelling too when the first word of the value holds `=`:
+`--args="--port=3000 --watch"` sets `args` to `--port=3000 --watch`, while
+`--args "--port=3000 --watch"` sets `args` to `true` and `port` to
+`3000 --watch`, with no warning when the job declares `port`.
+
 Unknown flags are passed through to job processes. The CLI provides typo suggestions using Levenshtein distance when a flag doesn't match any known flag.
 
 ## Command Aliases

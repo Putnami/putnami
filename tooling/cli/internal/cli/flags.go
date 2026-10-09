@@ -3,6 +3,7 @@ package cli
 import (
 	"strconv"
 	"strings"
+	"unicode"
 
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -36,8 +37,17 @@ func parseCommandFlags(args []string) (GlobalFlags, []string, error) {
 	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false})
 }
 
+// parseJobFlags is parseCommandFlags for a job command, whose leftover tokens
+// become job params (buildCommandParams) and nothing else; see
+// splitInlineValues for what that changes.
+func parseJobFlags(args []string) (GlobalFlags, []string, error) {
+	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false, jobArgs: true})
+}
+
 type flagParseOptions struct {
 	consumeVersion bool
+	// jobArgs marks a job command's arguments (parseJobFlags).
+	jobArgs bool
 }
 
 // reservedGlobalFlags are consumed alongside any command but deliberately kept
@@ -79,16 +89,49 @@ func isGlobalFlag(arg string) bool {
 // known or not, because the tokens it does not consume are what
 // buildCommandParams turns into job params: splitting only known flags would
 // move every cache key carrying an unknown "--flag=value".
-func splitInlineValues(args []string) []string {
+//
+// For a job command (jobArgs), a token before the passthrough separator stays
+// whole when splitting would misread it (keepsInlineToken), and
+// buildCommandParams binds its inline value itself. A built-in command reads its
+// tokens by exact spelling, and an extension command group forwards them as its
+// process argv, so both always get the split.
+func splitInlineValues(args []string, jobArgs bool) []string {
+	cut := passthroughCut(args)
 	normalized := make([]string, 0, len(args))
-	for _, arg := range args {
-		if idx := strings.Index(arg, "="); idx > 0 && strings.HasPrefix(arg, "--") {
-			normalized = append(normalized, arg[:idx], arg[idx+1:])
-		} else {
+	for i, arg := range args {
+		idx := strings.Index(arg, "=")
+		if idx <= 0 || !strings.HasPrefix(arg, "--") || (jobArgs && i < cut && keepsInlineToken(arg[:idx], arg[idx+1:])) {
 			normalized = append(normalized, arg)
+			continue
 		}
+		normalized = append(normalized, arg[:idx], arg[idx+1:])
 	}
 	return normalized
+}
+
+// keepsInlineToken reports whether a job command's "--spelling=value" token
+// stays whole. A global flag's token is always split, so the global pass binds
+// it. Any other token stays whole when the split would bind its value to no
+// flag:
+//
+//   - its spelling contains whitespace, so the token is a multi-word value that
+//     holds "=" (`--args "--watch --port=3000"`), not a flag;
+//   - its value is one word that begins with a hyphen (`--args=--gate`,
+//     `--port=-1`), which the split would turn into a flag of its own.
+//
+// A split that misreads the token never bound what the user spelled, so keeping
+// it whole changes no params that were right. A multi-word value
+// (`--args="--check --dry-run"`) is still split: takesNextAsValue binds it to
+// the flag before it, exactly as the space form binds. Kept whole, it would be
+// a multi-word token that a preceding switch takes as its value.
+func keepsInlineToken(spelling, value string) bool {
+	if _, global := globalFlagSpec(spelling); global {
+		return false
+	}
+	if strings.ContainsFunc(spelling, unicode.IsSpace) {
+		return true
+	}
+	return strings.HasPrefix(value, "-") && !strings.ContainsFunc(value, unicode.IsSpace)
 }
 
 // parseGlobalFlags is phase 2 of the parse: syntax-normalized tokens in, bound
@@ -99,7 +142,7 @@ func splitInlineValues(args []string) []string {
 // parse.go knows whether an extension could own them.
 func parseGlobalFlags(args []string, opts flagParseOptions) (GlobalFlags, []string, error) {
 	g := GlobalFlags{}
-	normalized := splitInlineValues(args)
+	normalized := splitInlineValues(args, opts.jobArgs)
 	remaining := make([]string, 0, len(normalized))
 
 	for i := 0; i < len(normalized); i++ {

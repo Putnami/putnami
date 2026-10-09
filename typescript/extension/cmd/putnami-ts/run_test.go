@@ -201,6 +201,30 @@ func TestRunRun_PassesArgsAndPort(t *testing.T) {
 	}
 }
 
+func TestRunRun_ArgsThatBeginWithAHyphenReachTheProgram(t *testing.T) {
+	// `putnami run --args "--check --dry-run"` and `--args="--check --dry-run"`
+	// both deliver the one string param; the program receives its fields.
+	mockBunResolution(t)
+	var gotArgs []string
+	withMockRunBunOnce(t, func(_ *jsonl.Emitter, _, _, _ string, _ int, extraArgs []string) int {
+		gotArgs = extraArgs
+		return 0
+	})
+
+	ctx, _ := makeTestCtx(t)
+	ctx.Params = pctx.Params{
+		"entrypoint": json.RawMessage(`"src/start.ts"`),
+		"args":       json.RawMessage(`"--check --dry-run"`),
+	}
+
+	if _, _, err := runRun(ctx, jsonl.New(), nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(gotArgs) != 2 || gotArgs[0] != "--check" || gotArgs[1] != "--dry-run" {
+		t.Errorf("extraArgs = %q, want [--check --dry-run]", gotArgs)
+	}
+}
+
 func TestRunRun_BunResolutionFails(t *testing.T) {
 	// If the bun binary cannot be resolved, runRun returns the error directly.
 	orig := resolveBunBin

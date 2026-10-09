@@ -2,6 +2,8 @@ package cli
 
 import (
 	"errors"
+	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
@@ -313,6 +315,205 @@ func TestConflictingTaskFlags_SilentWhenCompatibleOrUnused(t *testing.T) {
 	// Passthrough is out of scope on this surface too.
 	if err := conflictingTaskFlags([]string{"build", "publish"}, conflicting, []string{"--", "--stable"}); err != nil {
 		t.Errorf("passthrough must never be validated: %v", err)
+	}
+}
+
+// --- job flag values that begin with a hyphen ---
+
+// renderParams binds rawArgs and lists the params as sorted "name=GoType(value)"
+// entries, the form parse_key_stability_test.go pins, so a value's Go type is
+// part of every assertion.
+func renderParams(rawArgs []string) string {
+	params := buildCommandParams(rawArgs)
+	names := make([]string, 0, len(params))
+	for name := range params {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	entries := make([]string, 0, len(names))
+	for _, name := range names {
+		entries = append(entries, fmt.Sprintf("%s=%T(%v)", name, params[name], params[name]))
+	}
+	return strings.Join(entries, " ")
+}
+
+// TestIsFlagValue pins the one shape predicate: the token after a flag is its
+// value when it does not begin with a hyphen or when it holds whitespace.
+func TestIsFlagValue(t *testing.T) {
+	t.Parallel()
+	for next, want := range map[string]bool{
+		"scan":              true,
+		"":                  true,
+		"linux/amd64":       true,
+		"--check --dry-run": true,
+		"-x y":              true,
+		"--a\t--b":          true,
+		"--gate":            false,
+		"-x":                false,
+		"-1":                false,
+		"-":                 false,
+		"--":                false,
+		"--port=3000":       false,
+	} {
+		if got := isFlagValue(next); got != want {
+			t.Errorf("isFlagValue(%q) = %v, want %v", next, got, want)
+		}
+	}
+}
+
+// TestSplitInlineValues_KeepsAJobTokenWholeOnlyWhereTheSplitMisreadsIt pins
+// which "--name=value" tokens a job command keeps whole, and that a global flag,
+// a token past the separator, and every token of a built-in or command-group
+// invocation are split.
+func TestSplitInlineValues_KeepsAJobTokenWholeOnlyWhereTheSplitMisreadsIt(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		args    []string
+		jobArgs bool
+		want    []string
+	}{
+		{"one hyphen word stays on its flag", []string{"--args=--gate"}, true, []string{"--args=--gate"}},
+		{"a negative number stays on its flag", []string{"--port=-1"}, true, []string{"--port=-1"}},
+		{"a spelling with whitespace is a value", []string{"--watch --port=3000"}, true, []string{"--watch --port=3000"}},
+		{"a multi-word hyphen value splits", []string{"--args=--check --dry-run"}, true, []string{"--args", "--check --dry-run"}},
+		{"a value holding = splits at the first =", []string{"--args=--port=3000 --watch"}, true, []string{"--args", "--port=3000 --watch"}},
+		{"a plain value splits", []string{"--target=linux"}, true, []string{"--target", "linux"}},
+		{"a multi-word plain value splits", []string{"--filter=a b"}, true, []string{"--filter", "a b"}},
+		{"a global flag always splits", []string{"--projects=-odd"}, true, []string{"--projects", "-odd"}},
+		{"past the separator every token splits", []string{"--", "--args=--gate"}, true, []string{"--", "--args", "--gate"}},
+		{"a single-dash token never splits", []string{"-x=-1"}, true, []string{"-x=-1"}},
+		{"a built-in or command-group invocation always splits", []string{"--args=--gate", "--watch --port=3000"}, false,
+			[]string{"--args", "--gate", "--watch --port", "3000"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assertStrings(t, "tokens", splitInlineValues(tc.args, tc.jobArgs), tc.want)
+		})
+	}
+}
+
+// TestBuildCommandParams_MultiWordValueBindsToTheFlagBefore pins the binding
+// rule: a flag takes the next token when isFlagValue holds, on both sides of the
+// passthrough separator, and a bare flag before a one-word hyphen token stays a
+// switch.
+func TestBuildCommandParams_MultiWordValueBindsToTheFlagBefore(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"multi-word hyphen value", []string{"--args", "--check --dry-run"}, "args=string(--check --dry-run)"},
+		{"multi-word value after a single hyphen", []string{"--args", "-x y"}, "args=string(-x y)"},
+		{"short spelling", []string{"-t", "-x y"}, "t=string(-x y)"},
+		{"one hyphen word is a flag of its own", []string{"--args", "--gate"}, "args=bool(true) gate=bool(true)"},
+		{"bare switch before a flag", []string{"--concurrent", "--update-snapshots"}, "concurrent=bool(true) update-snapshots=bool(true)"},
+		{"inline one-word hyphen value", []string{"--args=--gate"}, "args=string(--gate)"},
+		{"a negation takes no value", []string{"--no-args", "--check --dry-run"}, "args=bool(false) check --dry-run=bool(true)"},
+		{"an inline value takes no second value", []string{"--args=x", "--check --dry-run"}, "args=string(x) check --dry-run=bool(true)"},
+		{"a flag last takes no value", []string{"--args"}, "args=bool(true)"},
+		{"a plain value", []string{"--args", "scan"}, "args=string(scan)"},
+		{"a flag never takes the separator", []string{"--args", "--", "--check --dry-run"}, "=string(--check --dry-run) args=bool(true)"},
+		{"past the separator a multi-word hyphen token is a value", []string{"--", "--args", "--check --dry-run"}, "=bool(true) args=string(--check --dry-run)"},
+		{"past the separator a plain value binds", []string{"--", "--args", "scan"}, "=bool(true) args=string(scan)"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := renderParams(tc.args); got != tc.want {
+				t.Errorf("params = %s, want %s", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestJobFlagTokens_SkipEachValueTheBindingTakes pins the validation walk to the
+// binding: it returns every flag token before the separator except a value the
+// binding takes, and each flag it returns names a param the binding produced.
+func TestJobFlagTokens_SkipEachValueTheBindingTakes(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		args []string
+		want []string
+	}{
+		{[]string{"--args", "--check --dry-run"}, []string{"--args"}},
+		{[]string{"--args", "--gate"}, []string{"--args", "--gate"}},
+		{[]string{"--args=--gate"}, []string{"--args=--gate"}},
+		{[]string{"--args", "--watch --port=3000", "--minify"}, []string{"--args", "--minify"}},
+		{[]string{"--no-args", "--check --dry-run"}, []string{"--no-args", "--check --dry-run"}},
+		{[]string{"--args", "--check --dry-run", "--", "--x y"}, []string{"--args"}},
+		{[]string{"-5", "-x y", "--z"}, []string{"--z"}},
+	}
+	for _, tc := range cases {
+		got := jobFlagTokens(tc.args)
+		assertStrings(t, strings.Join(tc.args, " "), got, tc.want)
+		params := buildCommandParams(tc.args)
+		for _, flag := range got {
+			if _, ok := params[flagBaseName(flag)]; !ok {
+				t.Errorf("%q: the walk returned %s, which the binding did not bind (%s)", tc.args, flag, renderParams(tc.args))
+			}
+		}
+	}
+}
+
+// TestParseArgs_HyphenValueSpellingsBindAndWarn drives each spelling of a
+// hyphen-leading `--args` value through ParseArgs, the binding, and the
+// undeclared-flag warnings, against a `run` that declares only args.
+func TestParseArgs_HyphenValueSpellingsBindAndWarn(t *testing.T) {
+	t.Parallel()
+	declared := map[string]extension.FlagDefinition{"args": valueFlagDef()}
+	cases := []struct {
+		name       string
+		argv       []string
+		wantParams string
+		wantWarned []string
+	}{
+		{"separate multi-word value", []string{"run", ".", "--args", "--check --dry-run"}, "args=string(--check --dry-run)", nil},
+		{"inline multi-word value", []string{"run", ".", "--args=--check --dry-run"}, "args=string(--check --dry-run)", nil},
+		{"inline one-word value", []string{"run", ".", "--args=--gate"}, "args=string(--gate)", nil},
+		{"inline value holding =", []string{"run", ".", "--args=--port=3000 --watch"}, "args=string(--port=3000 --watch)", nil},
+		{"separate value with = after its first word", []string{"run", ".", "--args", "--watch --port=3000"}, "args=string(--watch --port=3000)", nil},
+		{"separate one-word value is a flag", []string{"run", ".", "--args", "--gate"}, "args=bool(true) gate=bool(true)", []string{"--gate"}},
+		{"separate value with = in its first word", []string{"run", ".", "--args", "--port=3000 --watch"}, "args=bool(true) port=string(3000 --watch)", []string{"--port"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			parsed := ParseArgs(tc.argv, nil, nil)
+			if parsed.Err != nil {
+				t.Fatalf("ParseArgs(%q): %v", tc.argv, parsed.Err)
+			}
+			if parsed.Global.DryRun {
+				t.Errorf("ParseArgs(%q) read --dry-run inside the value as the global flag", tc.argv)
+			}
+			if got := renderParams(parsed.RawJobArgs); got != tc.wantParams {
+				t.Errorf("params = %s, want %s", got, tc.wantParams)
+			}
+			warnings := undeclaredFlagWarnings("run", parsed.RawJobArgs, declared)
+			if len(warnings) != len(tc.wantWarned) {
+				t.Fatalf("warnings = %q, want one each for %q", warnings, tc.wantWarned)
+			}
+			for i, spelling := range tc.wantWarned {
+				if !strings.HasPrefix(warnings[i], "flag "+spelling+" ") {
+					t.Errorf("warning %d = %q, want it for %s", i, warnings[i], spelling)
+				}
+			}
+		})
+	}
+}
+
+// TestConflictingTaskFlags_SkipOnlyTheValue pins that the conflict pass skips a
+// multi-word value and still judges the flag after it.
+func TestConflictingTaskFlags_SkipOnlyTheValue(t *testing.T) {
+	t.Parallel()
+	jobMap := map[string][]*extension.JobDefinition{
+		"build":   {jobWithFlag("@putnami/go", "build", "stable", boolFlagDef())},
+		"publish": {jobWithFlag("@putnami/cloud", "publish", "stable", valueFlagDef())},
+	}
+	if err := conflictingTaskFlags([]string{"build", "publish"}, jobMap, []string{"--args", "--check --dry-run", "--stable"}); err == nil {
+		t.Error("a conflicting flag after a multi-word value must still fail")
 	}
 }
 
