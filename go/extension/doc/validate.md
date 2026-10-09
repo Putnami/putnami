@@ -4,7 +4,9 @@
 
 For every Go project the support catalog lists as stable, `validate` compares
 the exported API with the last tag of the project's version line. An incompatible change fails the command
-unless a commit since that tag declares it breaking. The breaking-change marker
+unless a commit since that tag declares it breaking. A project that ships a CLI
+can hold its commands and flags to the same rule with a committed
+[command surface](#command-surface). The breaking-change marker
 is what makes `putnami version` advance the line past a feature release, so a
 stable package cannot break its users in a release that promises it does not.
 
@@ -81,6 +83,63 @@ constant breaks no caller. These changes are compatible too:
 - A predeclared alias for its type: `any` and `interface{}`, `byte` and
   `uint8`, `rune` and `int32` compare equal.
 
+## Command surface
+
+A project that ships a command-line tool can hold its commands and flags to the
+same rule. It commits a
+[command-surface document](../../../protocols/cli/doc/06-command-surface.md)
+that lists the commands users type, with their flags and positionals, and the
+global flags. The `command-surface` option names it, relative to the project:
+
+```json
+{
+  "options": {
+    "@putnami/go:validate": {
+      "command-surface": "command-surface.json"
+    }
+  }
+}
+```
+
+The check reads the document from the working tree and from the tag it
+compares the API with, and compares the two. These changes are incompatible:
+
+- a command removed;
+- a flag removed, global or of a command, or a short alias removed;
+- a flag that starts or stops taking a value;
+- a value removed from a flag's closed list, or a closed list given to a flag
+  that accepted any value;
+- a positional removed, an optional positional that becomes required, or a new
+  required positional.
+
+Additions are compatible: a command, a flag, a short alias, an accepted value
+or an optional positional. The document's
+[compatibility rules](../../../protocols/cli/doc/06-command-surface.md#compatibility)
+list them with their messages.
+
+Each incompatible change is one error diagnostic with the code `api-compat`. It
+names the command and the flag, and points at the document:
+
+```text
+command "ci explain": flag --event removed since tooling/v0.3.0; declare the breaking change with "!" or a BREAKING CHANGE: footer
+```
+
+The same breaking-change marker allows the change, and the same rules decide
+whether the project is checked and whether a tag exists to compare with. The
+document adds these cases:
+
+| Case | Result |
+|---|---|
+| The tag does not hold the document yet | an information line; the API is still compared |
+| The declared document is missing from the project, is a directory, or is reached through a symbolic link | the task fails |
+| The document does not parse, in the working tree or at the tag | the task fails |
+| The option is an absolute path or a path out of the project | the task fails, even for a project the check skips |
+
+The CLI produces the document. Putnami's own CLI renders it from its command
+catalog and commits it as `tooling/cli/command-surface.json`, and a test fails
+when the committed bytes differ from the catalog, so a change to a command
+always shows in the reviewed diff.
+
 ## The breaking-change marker
 
 The check reads the commits from the tag to HEAD that touch the project
@@ -122,8 +181,9 @@ naming the import path and the symbol:
 go.example.com/lib: func Greet removed since lib/v0.4.0; declare the breaking change with "!" or a BREAKING CHANGE: footer
 ```
 
-A changed declaration also carries its file and line. Fix the code, or keep the
-change and commit it with the marker.
+A changed declaration also carries its file and line. A change to a command
+surface names the command and the flag instead, and points at the document.
+Fix the code, or keep the change and commit it with the marker.
 
 ## Caching
 
@@ -167,7 +227,8 @@ changes the answer without changing any file a cache key could name.
   `protocol` and a `package` subject.
 - **Platform files.** Files for every platform are read together. When two
   files declare the same name, the first in path order is compared.
-- **Go only.** TypeScript projects are not checked yet.
+- **Go only.** TypeScript projects are not checked yet, and the command
+  surface is compared only for a Go project.
 
 The choice of a source-level comparison over `apidiff` or `gorelease` is
 recorded in [ADR 0010](adr/0010-the-api-check-compares-source-not-types.md).

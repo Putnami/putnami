@@ -45,6 +45,8 @@ The dependencies are today's: a commit from before a dependency was added is rea
 
 A breaking change outside the stable projects still needs its migration in the release notes.
 
+The marker is checked, not trusted. For a stable Go project, `putnami validate` compares the exported API with the line's last tag, and fails an incompatible change that no commit since the tag declares breaking. A project that ships a CLI holds its commands and flags to the same rule through a committed command-surface document: this CLI renders `command-surface.json` from its command catalog, so a removed command, flag, short alias or accepted value without a `!` fails `validate`. See [the Go extension's validate command](../../../go/extension/doc/validate.md).
+
 A pre-release is always at least a patch above the last tag, so a docs-only commit still produces a new, ordered version. Versions of one line are totally ordered by their timestamp segment, which is what lets a registry answer "the newest build of this channel" without any Putnami-specific metadata.
 
 ```bash
