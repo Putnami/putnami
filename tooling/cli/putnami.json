@@ -56,7 +56,8 @@
         "../contributor/putnami.extension.json",
         "../contributor/src/**",
         "git:../../**/client.putnami.json",
-        "git:../../**/schema/openapi.json"
+        "git:../../**/schema/openapi.json",
+        "command-surface.json"
       ]
     },
     "package": {
@@ -73,6 +74,9 @@
     },
     "@putnami/go:test": {
       "race": true
+    },
+    "@putnami/go:validate": {
+      "command-surface": "command-surface.json"
     },
     "sdd": {
       "verification": {
