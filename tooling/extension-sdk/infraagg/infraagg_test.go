@@ -10,7 +10,9 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/distribution"
 	"go.putnami.dev/protocol/infra"
+	job "go.putnami.dev/protocol/job"
 	pctx "go.putnami.dev/sdk/extension/context"
 )
 
@@ -144,8 +146,9 @@ func TestAggregate_SingleContribution(t *testing.T) {
 	}
 
 	m := readAggregated(t, root, "app")
-	if m.Workload != "go.putnami.dev/app" {
-		t.Errorf("workload = %q, want go.putnami.dev/app", m.Workload)
+	// The workload and its sources are named by project id, not by name.
+	if m.Workload != "app" {
+		t.Errorf("workload = %q, want the project id app", m.Workload)
 	}
 	if m.Schema != AggregatedSchemaURL {
 		t.Errorf("$schema = %q, want %q", m.Schema, AggregatedSchemaURL)
@@ -157,7 +160,7 @@ func TestAggregate_SingleContribution(t *testing.T) {
 	if db.Name != "primary" || db.Engine != infra.EnginePostgres {
 		t.Errorf("database = %+v, want primary/postgres", db)
 	}
-	if len(db.Sources) != 1 || db.Sources[0].Project != "go.putnami.dev/lib" ||
+	if len(db.Sources) != 1 || db.Sources[0].Project != "lib" ||
 		db.Sources[0].Contributor != infra.GeneratedRequirementsContributor {
 		t.Errorf("sources = %+v, want [{lib %s}]", db.Sources, infra.GeneratedRequirementsContributor)
 	}
@@ -165,6 +168,71 @@ func TestAggregate_SingleContribution(t *testing.T) {
 	// Atomic write must not leave its temp file behind.
 	if _, err := os.Stat(aggregatedPath(root, "app") + ".tmp"); err == nil {
 		t.Error("temp file left behind after atomic write")
+	}
+}
+
+// A deployer matches the declaration to the release-set member of the same
+// workload, and that member names the project by id. A project whose name is
+// not its path, or whose path holds a grouping folder the id drops, must still
+// be named by id: here "sites/(web)/docs" has the id "/sites/docs" and the
+// name "docs.example". The closure is in id order, so the workload is not its
+// first entry.
+func TestAggregate_NamesTheWorkloadAndSourcesByProjectID(t *testing.T) {
+	root := t.TempDir()
+	ctx := &pctx.Context{
+		WorkspaceRoot: root,
+		Project: pctx.Project{
+			Name:     "docs.example",
+			Path:     "sites/(web)/docs",
+			FullPath: filepath.Join(root, "sites/(web)/docs"),
+			Type:     "application",
+			DependencyClosure: []pctx.ProjectRef{
+				{ID: "/libs/content", Name: "@example/content", Path: "libs/(internal)/content",
+					FullPath: filepath.Join(root, "libs/(internal)/content")},
+				{ID: "/sites/docs", Name: "docs.example", Path: "sites/(web)/docs",
+					FullPath: filepath.Join(root, "sites/(web)/docs")},
+			},
+		},
+	}
+	writeProjectFile(t, root, "libs/(internal)/content", "infra/requirements.json", dbManifest)
+
+	result := Aggregate(ctx, Options{})
+	if diag.HasErrors(result.Diagnostics) {
+		t.Fatalf("unexpected errors: %v", result.Diagnostics)
+	}
+	m := readAggregated(t, root, "sites/(web)/docs")
+	if m.Workload != distribution.MemberProjectID("/sites/docs") || m.Workload != "sites/docs" {
+		t.Errorf("workload = %q, want the release-set member project sites/docs", m.Workload)
+	}
+	if len(m.Databases) != 1 || len(m.Databases[0].Sources) != 1 ||
+		m.Databases[0].Sources[0].Project != "libs/content" {
+		t.Errorf("databases = %+v, want one source named libs/content", m.Databases)
+	}
+}
+
+// The typed task identity is the first answer, so a context whose closure does
+// not list the workload still names it by id.
+func TestWorkloadID_PrefersTheProjectScopedIdentity(t *testing.T) {
+	ctx := &pctx.Context{Project: pctx.Project{Name: "docs.example", Path: "sites/(web)/docs"}}
+	ctx.Identity = &job.TaskIdentity{Scope: job.TaskScopeProject}
+	ctx.Identity.Project.ID = "/sites/docs"
+	if got := workloadID(ctx); got != "sites/docs" {
+		t.Errorf("workloadID = %q, want sites/docs", got)
+	}
+
+	// A workspace-scoped identity names the workspace, not the project: the
+	// closure answers instead, and without one the path does.
+	ctx.Identity.Scope = job.TaskScopeWorkspace
+	ctx.Identity.Project.ID = "/"
+	if got := workloadID(ctx); got != "sites/(web)/docs" {
+		t.Errorf("workloadID without closure = %q, want the path sites/(web)/docs", got)
+	}
+
+	// A project at the workspace root has no id to name it by and keeps its name.
+	ctx.Identity = nil
+	ctx.Project.Path = ""
+	if got := workloadID(ctx); got != "docs.example" {
+		t.Errorf("workloadID at the root = %q, want the name docs.example", got)
 	}
 }
 

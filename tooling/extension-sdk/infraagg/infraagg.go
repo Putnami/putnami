@@ -51,7 +51,9 @@ import (
 	"path/filepath"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/distribution"
 	"go.putnami.dev/protocol/infra"
+	job "go.putnami.dev/protocol/job"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/robustio"
 )
@@ -164,7 +166,7 @@ func Aggregate(ctx *pctx.Context, opts Options) Result {
 		return Result{Outcome: OutcomeCleared, ManifestPath: manifestPath, Diagnostics: diags}
 	}
 
-	merged, assembleDiags := assemble(ctx.Project.Name, workloadRoot, contributions, runtime)
+	merged, assembleDiags := assemble(workloadID(ctx), workloadRoot, contributions, runtime)
 	diags = append(diags, assembleDiags...)
 	merged.Schema = AggregatedSchemaURL
 
@@ -235,6 +237,7 @@ func collectContributions(ctx *pctx.Context) ([]infra.ProjectContribution, []dia
 	closure := ctx.Project.DependencyClosure
 	if len(closure) == 0 {
 		closure = []pctx.ProjectRef{{
+			ID:       "/" + workloadID(ctx),
 			Name:     ctx.Project.Name,
 			Path:     ctx.Project.Path,
 			FullPath: ctx.Project.FullPath,
@@ -248,13 +251,67 @@ func collectContributions(ctx *pctx.Context) ([]infra.ProjectContribution, []dia
 		if root == "" {
 			continue
 		}
-		c, d := loadContribution(infra.ProjectRequirementsPath(root), member.Name)
+		c, d := loadContribution(infra.ProjectRequirementsPath(root), projectRefID(member))
 		if c != nil {
 			contributions = append(contributions, *c)
 		}
 		diags = append(diags, d...)
 	}
 	return contributions, diags
+}
+
+// workloadID is the name a workload's aggregated manifest and deployment
+// declaration give it in their workload member: the project id without its
+// leading slash, from distribution.MemberProjectID. A release-set member names
+// the same project with the same function, so a deployer that matches the
+// declaration to its release-set member compares equal values even when the
+// project's name differs from its path.
+//
+// The id comes from the task's typed identity when the task is project-scoped,
+// then from the dependency closure entry at the project's path. A context that
+// carries neither (an older orchestrator, a direct invocation) falls back to
+// the project path, which equals the id unless a grouping folder sits in it.
+// A project at the workspace root has an empty id; it keeps its name, because
+// the manifest requires a workload and no release-set member can name it.
+func workloadID(ctx *pctx.Context) string {
+	id := ""
+	if identity := ctx.Identity; identity != nil && identity.Scope == job.TaskScopeProject && identity.Project.ID != "" {
+		id = distribution.MemberProjectID(identity.Project.ID)
+	} else if member, ok := closureSeed(ctx); ok {
+		id = projectRefID(member)
+	} else {
+		id = distribution.MemberProjectID(filepath.ToSlash(ctx.Project.Path))
+	}
+	if id == "" {
+		return ctx.Project.Name
+	}
+	return id
+}
+
+// closureSeed returns the dependency closure entry of the project itself. The
+// closure is in project-id order, so the seed is not always its first entry.
+func closureSeed(ctx *pctx.Context) (pctx.ProjectRef, bool) {
+	for _, member := range ctx.Project.DependencyClosure {
+		if member.ID != "" && filepath.ToSlash(member.Path) == filepath.ToSlash(ctx.Project.Path) {
+			return member, true
+		}
+	}
+	return pctx.ProjectRef{}, false
+}
+
+// projectRefID is the name a contribution's sources give one closure member:
+// the same project-id form as workloadID, or the member's path when the
+// orchestrator assigned it no id. A member at the workspace root keeps its
+// name, because a source must name a project.
+func projectRefID(member pctx.ProjectRef) string {
+	id := distribution.MemberProjectID(member.ID)
+	if member.ID == "" {
+		id = distribution.MemberProjectID(filepath.ToSlash(member.Path))
+	}
+	if id == "" {
+		return member.Name
+	}
+	return id
 }
 
 // loadContribution loads a single per-project manifest from path under the
