@@ -201,7 +201,7 @@ func TestRunWithConfigHooks_BeforeFailureRecordsTelemetryEnd(t *testing.T) {
 	cfg := &wsproto.Config{Hooks: &wsproto.HooksConfig{
 		CLI: &wsproto.HookPhaseConfig{Before: []string{"false"}},
 	}}
-	if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil, nil, nil); code != ExitError {
+	if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil, nil); code != ExitError {
 		t.Fatalf("runTerminalSession exit code = %d, want %d", code, ExitError)
 	}
 
@@ -235,7 +235,7 @@ func TestRunWithConfigHooks_HookOptOutDiscardsTelemetry(t *testing.T) {
 	}}
 	// The root holds no project and no repository, so the bare run selects
 	// every project, finds none, and ends as a usage error after the hook ran.
-	if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil, nil, nil); code != ExitUsage {
+	if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil, nil); code != ExitUsage {
 		t.Fatalf("runTerminalSession exit code = %d, want %d", code, ExitUsage)
 	}
 
@@ -262,7 +262,7 @@ func TestRunWithConfigHooks_InteractiveNoticeAppearsOnce(t *testing.T) {
 	}}
 
 	first := captureStderr(t, func() {
-		if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil, nil, nil); code != ExitError {
+		if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil, nil); code != ExitError {
 			t.Fatalf("first run exit code = %d, want %d", code, ExitError)
 		}
 	})
@@ -271,7 +271,7 @@ func TestRunWithConfigHooks_InteractiveNoticeAppearsOnce(t *testing.T) {
 	}
 
 	second := captureStderr(t, func() {
-		if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil, nil, nil); code != ExitError {
+		if code := (&App{}).runTerminalSession(context.Background(), cfg, parsed, t.TempDir(), nil, nil); code != ExitError {
 			t.Fatalf("second run exit code = %d, want %d", code, ExitError)
 		}
 	})
@@ -284,7 +284,7 @@ func TestRunWithConfigHooks_InteractiveNoticeAppearsOnce(t *testing.T) {
 
 func TestBuildCommandParams_Empty(t *testing.T) {
 	t.Parallel()
-	params := buildCommandParams(nil, nil)
+	params := buildCommandParams(nil)
 	if len(params) != 0 {
 		t.Errorf("expected empty params, got %v", params)
 	}
@@ -292,7 +292,7 @@ func TestBuildCommandParams_Empty(t *testing.T) {
 
 func TestBuildCommandParams_BoolFlag(t *testing.T) {
 	t.Parallel()
-	params := buildCommandParams([]string{"--transpile"}, nil)
+	params := buildCommandParams([]string{"--transpile"})
 	if params["transpile"] != true {
 		t.Errorf("transpile = %v, want true", params["transpile"])
 	}
@@ -300,7 +300,7 @@ func TestBuildCommandParams_BoolFlag(t *testing.T) {
 
 func TestBuildCommandParams_ValueFlag(t *testing.T) {
 	t.Parallel()
-	params := buildCommandParams([]string{"--target", "node"}, nil)
+	params := buildCommandParams([]string{"--target", "node"})
 	if params["target"] != "node" {
 		t.Errorf("target = %v, want node", params["target"])
 	}
@@ -308,7 +308,7 @@ func TestBuildCommandParams_ValueFlag(t *testing.T) {
 
 func TestBuildCommandParams_EqualsSyntax(t *testing.T) {
 	t.Parallel()
-	params := buildCommandParams([]string{"--output=jsonl"}, nil)
+	params := buildCommandParams([]string{"--output=jsonl"})
 	if params["output"] != "jsonl" {
 		t.Errorf("output = %v, want jsonl", params["output"])
 	}
@@ -316,7 +316,7 @@ func TestBuildCommandParams_EqualsSyntax(t *testing.T) {
 
 func TestBuildCommandParams_NoFlag(t *testing.T) {
 	t.Parallel()
-	params := buildCommandParams([]string{"--no-cache"}, nil)
+	params := buildCommandParams([]string{"--no-cache"})
 	if params["cache"] != false {
 		t.Errorf("cache = %v, want false", params["cache"])
 	}
@@ -324,7 +324,7 @@ func TestBuildCommandParams_NoFlag(t *testing.T) {
 
 func TestBuildCommandParams_SkipsNonFlags(t *testing.T) {
 	t.Parallel()
-	params := buildCommandParams([]string{"positional", "--flag"}, nil)
+	params := buildCommandParams([]string{"positional", "--flag"})
 	if _, ok := params["positional"]; ok {
 		t.Error("positional args should be skipped")
 	}
@@ -335,7 +335,7 @@ func TestBuildCommandParams_SkipsNonFlags(t *testing.T) {
 
 func TestBuildCommandParams_FlagFollowedByFlag(t *testing.T) {
 	t.Parallel()
-	params := buildCommandParams([]string{"--verbose", "--quiet"}, nil)
+	params := buildCommandParams([]string{"--verbose", "--quiet"})
 	if params["verbose"] != true {
 		t.Errorf("verbose = %v, want true", params["verbose"])
 	}
@@ -346,7 +346,7 @@ func TestBuildCommandParams_FlagFollowedByFlag(t *testing.T) {
 
 func TestBuildCommandParams_Multiple(t *testing.T) {
 	t.Parallel()
-	params := buildCommandParams([]string{"--target", "linux/amd64", "--minify", "--output=jsonl"}, nil)
+	params := buildCommandParams([]string{"--target", "linux/amd64", "--minify", "--output=jsonl"})
 	if params["target"] != "linux/amd64" {
 		t.Errorf("target = %v, want linux/amd64", params["target"])
 	}

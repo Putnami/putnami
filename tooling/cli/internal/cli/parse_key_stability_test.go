@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -50,9 +49,6 @@ type keyStabilityCase struct {
 	args            []string
 	userAliases     map[string]string
 	extensionGroups map[string]bool
-	// declared is the flag surface the selected tasks declare. Nil binds every
-	// flag by shape, as an invocation of tasks that declare none does.
-	declared map[string]extension.FlagDefinition
 
 	// wantParams renders the params map as sorted "name=GoType(value)" entries,
 	// so a value that changes type fails with a readable diff rather than an
@@ -70,8 +66,8 @@ type keyStabilityCase struct {
 // buildCommandParams: bare root tasks, comma commands, builtin and user
 // aliases, the "." selector, --projects, global flags that must never reach
 // params, --flag=value, --no-flag, --flag value, bare --flag, the "--"
-// passthrough separator, extension flag passthrough, and a declared value flag
-// whose value begins with a hyphen.
+// passthrough separator, extension flag passthrough, and a value that begins
+// with a hyphen.
 var keyStabilityCorpus = []keyStabilityCase{
 	{
 		name:         "bare root task",
@@ -245,51 +241,132 @@ var keyStabilityCorpus = []keyStabilityCase{
 		wantMarker:   "e59f1698ce59",
 	},
 	{
-		name:         "declared string flag takes a separate value that begins with a hyphen",
+		name:         "a multi-word value that begins with a hyphen binds whole",
 		args:         []string{"run", "--args", "--check --dry-run"},
-		declared:     map[string]extension.FlagDefinition{"args": {Type: "string"}},
 		wantParams:   "args=string(--check --dry-run)",
 		wantCacheKey: "e6f5abd7cc8aeb7804a34caa8398099b8afdcf5156f044bc47ff7fa63f5bf67e",
 		wantMarker:   "eae433231770",
 	},
 	{
-		name:         "declared string flag takes an inline value that begins with a hyphen",
+		name:         "the inline form of a multi-word hyphen value binds the same",
 		args:         []string{"run", "--args=--check --dry-run"},
-		declared:     map[string]extension.FlagDefinition{"args": {Type: "string"}},
 		wantParams:   "args=string(--check --dry-run)",
 		wantCacheKey: "e6f5abd7cc8aeb7804a34caa8398099b8afdcf5156f044bc47ff7fa63f5bf67e",
 		wantMarker:   "eae433231770",
 	},
 	{
-		name:         "undeclared flag before a hyphen token keeps the shape rule",
-		args:         []string{"run", "--args", "--check --dry-run"},
-		wantParams:   "args=bool(true) check --dry-run=bool(true)",
-		wantCacheKey: "3f5befd8898f206ae58d849aa7dd58d089722c558fa886d0908995d9981a6b3b",
-		wantMarker:   "ed0c5f9d5d97",
+		name:         "an inline one-word hyphen value binds whole",
+		args:         []string{"run", "--args=--gate"},
+		wantParams:   "args=string(--gate)",
+		wantCacheKey: "077236196e9099be6dfb24b4516e6ac88515348591f8d7ac755c275cb89db08f",
+		wantMarker:   "5642f875a0fc",
 	},
 	{
-		name:         "declared boolean flag before a flag keeps the shape rule",
-		args:         []string{"build", "--minify", "--sourcemap"},
-		declared:     map[string]extension.FlagDefinition{"minify": {Type: "boolean"}},
+		name:         "a separate one-word hyphen value is a flag of its own",
+		args:         []string{"run", "--args", "--gate"},
+		wantParams:   "args=bool(true) gate=bool(true)",
+		wantCacheKey: "4cc0a321fa850b51c60ccf3efd7bba1729f27647f0a6e7aa852a34f323c8c806",
+		wantMarker:   "a327c9b0f7eb",
+	},
+	{
+		name:         "an inline negative number binds whole",
+		args:         []string{"run", "--port=-1"},
+		wantParams:   "port=string(-1)",
+		wantCacheKey: "4613ee9de99a32fef16f298169b3d02dc7bfe9808441fbfa1f08bea340f8f172",
+		wantMarker:   "721abc4ea711",
+	},
+	{
+		name:         "an inline multi-word value holding = binds whole",
+		args:         []string{"run", "--args=--port=3000 --watch"},
+		wantParams:   "args=string(--port=3000 --watch)",
+		wantCacheKey: "ac055dad6d9a06fae939f5d05256f0a60fa25410127b8acd4d08f7106be76ab7",
+		wantMarker:   "1232a47ad056",
+	},
+	{
+		name:         "an inline one-word value holding = binds whole",
+		args:         []string{"run", "--args=--port=3000"},
+		wantParams:   "args=string(--port=3000)",
+		wantCacheKey: "c13f36c740eeae11b2165e60b366a53cc994c958327ec94fba5db15c40c213cf",
+		wantMarker:   "1643d9d07175",
+	},
+	{
+		name:         "a separate value with = after its first word binds whole",
+		args:         []string{"run", "--args", "--watch --port=3000"},
+		wantParams:   "args=string(--watch --port=3000)",
+		wantCacheKey: "c10d8c2bf29f3c8e1f8251626c7610f4eb766306dd105af4410cb459b80878af",
+		wantMarker:   "33c023eb3d22",
+	},
+	{
+		name:         "a separate value with = in its first word is a flag with an inline value",
+		args:         []string{"run", "--args", "--port=3000 --watch"},
+		wantParams:   "args=bool(true) port=string(3000 --watch)",
+		wantCacheKey: "87c234f242663600d2a9ba3ab4d04d24795c6c5068d4f745cd3eef03f8f3992e",
+		wantMarker:   "c0ca325b1cc5",
+	},
+	{
+		name:         "a bare switch before a flag stays a switch",
+		args:         []string{"test", "--concurrent", "--update-snapshots"},
+		wantParams:   "concurrent=bool(true) update-snapshots=bool(true)",
+		wantCacheKey: "38c9e23ad932f770cdce4fd671cf9e67de81dbd577cc08b503f0fbc3fc437e0b",
+		wantMarker:   "51a7cf25a00f",
+	},
+	{
+		name:         "a bare switch before a negation stays a switch",
+		args:         []string{"test", "--parallel", "--no-enforce-coverage"},
+		wantParams:   "enforce-coverage=bool(false) parallel=bool(true)",
+		wantCacheKey: "f9012915d4bc03b4b6d6786be3c124c9d1496efbd8bdbf3fcb9a4ab5dea115df",
+		wantMarker:   "99774122259e",
+	},
+	{
+		name:         "a bare string-typed switch before a flag stays a switch",
+		args:         []string{"build", "--sourcemap", "--minify"},
 		wantParams:   "minify=bool(true) sourcemap=bool(true)",
 		wantCacheKey: "311ac78e9d35c8b0f56012da3324fc64c6e7ee206141f2435d99998e07d8985c",
 		wantMarker:   "6f0eb87789a5",
 	},
 	{
-		name:         "declared string flag before the passthrough separator takes no value",
-		args:         []string{"test", "--filter", "--", "-race"},
-		declared:     map[string]extension.FlagDefinition{"filter": {Type: "string"}},
-		wantParams:   "=bool(true) filter=bool(true) race=bool(true)",
-		wantCacheKey: "4d7a747bcde00867873d917314beed56cd52bdf5fa47a947b8fe947d30441c1f",
-		wantMarker:   "763c129656a0",
+		name:         "a switch before an inline multi-word value stays a switch",
+		args:         []string{"test", "--coverage", "--filter=a b"},
+		wantParams:   "coverage=bool(true) filter=string(a b)",
+		wantCacheKey: "d075c530fd6982a32f0db179db4676b2247b690e45be49ec6f3a55981b5813db",
+		wantMarker:   "2cba3a43d79e",
 	},
 	{
-		name:         "declared string flag last takes no value",
-		args:         []string{"run", "--args"},
-		declared:     map[string]extension.FlagDefinition{"args": {Type: "string"}},
-		wantParams:   "args=bool(true)",
-		wantCacheKey: "62035d79788ce1b49620e9fa6c565e81ac60520dbee424dafe6231e6ca0c98ef",
-		wantMarker:   "06972fa87f64",
+		name:         "a switch before an inline multi-word hyphen value stays a switch",
+		args:         []string{"test", "--coverage", "--args=--check --dry-run"},
+		wantParams:   "args=string(--check --dry-run) coverage=bool(true)",
+		wantCacheKey: "ce5320d0e43060e46de75cba5e13c73145a130900ea189d07151228a9bde9a71",
+		wantMarker:   "fd1413125a90",
+	},
+	{
+		name:         "past the separator an inline hyphen word splits",
+		args:         []string{"test", "--", "--args=--gate"},
+		wantParams:   "=bool(true) args=bool(true) gate=bool(true)",
+		wantCacheKey: "d67303273bad01479ab08b99f166686645d1ba4170ed5a202838d3221c40c030",
+		wantMarker:   "66a1e0f43e51",
+	},
+	{
+		name:         "past the separator a multi-word hyphen token is a flag",
+		args:         []string{"test", "--", "--args", "--check --dry-run"},
+		wantParams:   "=bool(true) args=bool(true) check --dry-run=bool(true)",
+		wantCacheKey: "1dd7b38b4e0c94391db7d416e9fe47af32fd5efb0bf5a9e0258fbf48e514f30c",
+		wantMarker:   "941b356cf2ed",
+	},
+	{
+		name:            "an extension command group splits an inline hyphen word",
+		args:            []string{"cloud", "deploy", "--env=-x"},
+		extensionGroups: map[string]bool{"cloud": true},
+		wantParams:      "env=bool(true) x=bool(true)",
+		wantCacheKey:    "9ad3aca55f159fccc2c4e44ebc2301b01b796162898964d9c37785d0d5c0ad37",
+		wantMarker:      "9b569eaddf37",
+	},
+	{
+		name:            "an extension command group binds a multi-word hyphen value whole",
+		args:            []string{"cloud", "deploy", "--args", "--a --b"},
+		extensionGroups: map[string]bool{"cloud": true},
+		wantParams:      "args=string(--a --b)",
+		wantCacheKey:    "193d2ccca480919abd56b33ce890a663e1c4a5e4b43e07ac0666259fc0990546",
+		wantMarker:      "7d30d7f1a8b1",
 	},
 }
 
@@ -312,7 +389,7 @@ func corpusHashes(t *testing.T, tc keyStabilityCase) (rendered, cacheKey, marker
 	if parsed.Err != nil {
 		t.Fatalf("ParseArgs(%v) rejected a currently-valid invocation: %v", tc.args, parsed.Err)
 	}
-	params := buildCommandParams(parsed.RawJobArgs, tc.declared)
+	params := buildCommandParams(parsed.RawJobArgs)
 
 	names := make([]string, 0, len(params))
 	for name := range params {

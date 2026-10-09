@@ -376,7 +376,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		return noWorkspaceFound(os.Stderr)
 	}
 
-	return a.runTerminalSession(ctx, cfg, parsed, wsRoot, extensions, hostedCache, hostedReporters)
+	return a.runTerminalSession(ctx, cfg, parsed, wsRoot, hostedCache, hostedReporters)
 }
 
 // ErrHostedExtensionCommand refuses an extension command group on a hosted
@@ -824,7 +824,7 @@ func projectPathsForRoot(wsRoot string) []string {
 // named runWithConfigHooks until a rework moved the lifecycle hooks it
 // used to bracket into Engine.Run, next to the version stamp that has to be read
 // before a hook can dirty the tree.
-func (a *App) runTerminalSession(ctx context.Context, cfg *wsproto.Config, parsed *ParsedArgs, wsRoot string, extensions []*extension.ExtensionDescription, hostedCache *engine.HostedRemoteCache, hostedReporters *engine.HostedReporters) (exitCode int) {
+func (a *App) runTerminalSession(ctx context.Context, cfg *wsproto.Config, parsed *ParsedArgs, wsRoot string, hostedCache *engine.HostedRemoteCache, hostedReporters *engine.HostedReporters) (exitCode int) {
 	telemetryStartedAt := time.Now()
 	tc := telemetry.NewClient()
 	interactive := stderrIsTTY()
@@ -851,5 +851,5 @@ func (a *App) runTerminalSession(ctx context.Context, cfg *wsproto.Config, parse
 	// this call are engine stages now: the stamp has to be read before the
 	// before-hooks can dirty the tree, so the two belong to the same
 	// owner. What stays here is the once-per-process telemetry session above.
-	return a.runJobCommands(ctx, parsed, cfg, wsRoot, extensions, tc, interactive, hostedCache, hostedReporters)
+	return a.runJobCommands(ctx, parsed, cfg, wsRoot, tc, interactive, hostedCache, hostedReporters)
 }

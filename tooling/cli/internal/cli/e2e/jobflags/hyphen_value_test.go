@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 }
 
 // runFixture writes a workspace whose one project, example, runs a `run`
-// command that declares the flag surface of the TypeScript extension's `run`
+// command that declares the value flags of the TypeScript extension's `run`
 // (typescript/extension/putnami.extension.json). Its task copies the job context
 // the CLI hands it to example/context.json, which is where a task reads its
 // params from.
@@ -66,18 +66,22 @@ done
 	return root
 }
 
-// TestRunArgsValueThatBeginsWithAHyphenReachesTheTask is the CLI-to-child
-// regression for `putnami run --args "--check --dry-run"`: in both spellings
-// the task receives the one string the user quoted, the CLI warns about no
-// flag, and --dry-run inside the value is not the global preview flag.
+// TestRunArgsValueThatBeginsWithAHyphenReachesTheTask drives a hyphen-leading
+// `--args` value from the argument vector to the task's job context. A
+// multi-word value binds in both spellings and a one-word value binds in the
+// inline spelling. In each, the task receives the one string the user quoted,
+// the CLI warns about no flag, and --dry-run inside the value is not the global
+// preview flag.
 func TestRunArgsValueThatBeginsWithAHyphenReachesTheTask(t *testing.T) {
 	clitest.RequireShell(t)
 	for _, tc := range []struct {
 		name string
 		args []string
+		want string
 	}{
-		{"separate value", []string{"run", "--projects", "example", "--args", "--check --dry-run"}},
-		{"inline value", []string{"run", "--projects", "example", "--args=--check --dry-run"}},
+		{"separate multi-word value", []string{"run", "--projects", "example", "--args", "--check --dry-run"}, "--check --dry-run"},
+		{"inline multi-word value", []string{"run", "--projects", "example", "--args=--check --dry-run"}, "--check --dry-run"},
+		{"inline one-word value", []string{"run", "--projects", "example", "--args=--gate"}, "--gate"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
@@ -103,10 +107,10 @@ func TestRunArgsValueThatBeginsWithAHyphenReachesTheTask(t *testing.T) {
 				t.Fatalf("decode job context: %v", err)
 			}
 			var args string
-			if err := json.Unmarshal(jobContext.Params["args"], &args); err != nil || args != "--check --dry-run" {
-				t.Errorf("params.args = %s, want the JSON string %q", jobContext.Params["args"], "--check --dry-run")
+			if err := json.Unmarshal(jobContext.Params["args"], &args); err != nil || args != tc.want {
+				t.Errorf("params.args = %s, want the JSON string %q", jobContext.Params["args"], tc.want)
 			}
-			for _, stray := range []string{"check --dry-run", "check", "dry-run"} {
+			for _, stray := range []string{"check --dry-run", "check", "dry-run", "gate"} {
 				if value, ok := jobContext.Params[stray]; ok {
 					t.Errorf("params[%q] = %s: part of the value became a param of its own", stray, value)
 				}

@@ -119,8 +119,14 @@ func ParseArgs(args []string, userAliases map[string]string, extensionGroups map
 
 	// Phase 3 — one semantic pass. Once a command has been selected, --version is
 	// a command/job flag (for example, `putnami upgrade --version 1.2.3`) rather
-	// than the top-level version shortcut.
-	globals, remaining, err := parseCommandFlags(rest)
+	// than the top-level version shortcut. A job command's leftover tokens become
+	// job params and nothing else, so parseJobFlags may keep an inline value on
+	// its flag (splitInlineValues).
+	parseSelected := parseCommandFlags
+	if !structured {
+		parseSelected = parseJobFlags
+	}
+	globals, remaining, err := parseSelected(rest)
 	result.Global, result.RawJobArgs = globals, remaining
 	result.Global.Help = result.Global.Help || helpRequested
 	if err != nil {

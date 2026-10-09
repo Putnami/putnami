@@ -188,7 +188,7 @@ func TestMCPAndTerminalAgreeOnResults(t *testing.T) {
 func terminalPlanJobs(t *testing.T, wsRoot string, argv []string) []string {
 	t.Helper()
 	parsed := ParseArgs(argv, nil, nil)
-	req := terminalRequest(parsed, wsproto.Load(wsRoot), wsRoot, nil, nil, false)
+	req := terminalRequest(parsed, wsproto.Load(wsRoot), wsRoot, nil, false)
 
 	var notices strings.Builder
 	req.Stdout = &notices

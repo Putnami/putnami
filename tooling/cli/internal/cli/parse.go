@@ -15,13 +15,14 @@ import (
 //
 // Phase 1 (syntax only) is splitInlineValues + the token predicates below: they
 // answer "what SHAPE is this token" without knowing any command.
+// takesNextAsValue is the one rule for which token a job flag takes as its
+// value: buildCommandParams binds by it, and jobFlagTokens, the walk both
+// job-arg validation passes share, skips by it, so a bound value is never
+// judged as a flag.
 // Phase 2 (catalog resolution) is commandmeta.CanonicalPath/ResolveFlags plus
 // the extension manifest lookups the callers supply.
 // Phase 3 (semantics) is parseGlobalFlags' binding pass in flags.go and the
-// validation in this file. Job args are judged against the flags the selected
-// tasks declare: consumesDeclaredValue is the one rule for which token a
-// declared value flag takes as its value, and buildCommandParams' binding and
-// jobFlagTokens, the walk both job-arg validation passes share, apply it alike.
+// validation in this file.
 //
 // The strictness policy is settled (epic refinement Q1) and is deliberately
 // asymmetric:
@@ -86,6 +87,28 @@ func passthroughCut(args []string) int {
 		}
 	}
 	return len(args)
+}
+
+// isFlagValue reports whether next, the token after a flag, is that flag's
+// value rather than a flag of its own: it does not begin with a hyphen, or it
+// contains whitespace. No flag spelling contains whitespace, so a multi-word
+// token such as "--check --dry-run" is a value. A single word that begins with a
+// hyphen is a flag.
+func isFlagValue(next string) bool {
+	return !strings.HasPrefix(next, "-") || strings.ContainsFunc(next, unicode.IsSpace)
+}
+
+// takesNextAsValue reports whether buildCommandParams binds args[i+1] as the
+// value of args[i]: args[i] is a flag with neither an inline value nor the "no-"
+// negation prefix, and args[i+1] is a value (isFlagValue). Callers pass the
+// tokens before the passthrough separator, so a flag directly before "--", or
+// last, takes no value here.
+func takesNextAsValue(args []string, i int) bool {
+	if i+1 >= len(args) || !strings.HasPrefix(args[i], "-") {
+		return false
+	}
+	name := strings.TrimLeft(args[i], "-")
+	return !strings.Contains(name, "=") && !strings.HasPrefix(name, "no-") && isFlagValue(args[i+1])
 }
 
 // promoteProjectSelector is the ONE positional-promotion implementation, shared
@@ -311,7 +334,7 @@ func undeclaredFlagWarnings(scope string, rawArgs []string, declared map[string]
 		seen     = map[string]bool{}
 		reported []string
 	)
-	for _, arg := range jobFlagTokens(rawArgs, declared) {
+	for _, arg := range jobFlagTokens(rawArgs) {
 		spelling := flagSpelling(arg)
 		if isGlobalFlag(spelling) || coreJobFlags[flagBaseName(arg)] || seen[spelling] {
 			continue
@@ -369,47 +392,18 @@ func declaredTaskFlags(commands []string, jobMap map[string][]*extension.JobDefi
 	return declared
 }
 
-// flagTakesValue reports whether a manifest flag takes a value. Every declared
-// type but boolean does (string, number, array); an empty type is a bare
-// switch, as help and shell completion render it.
-func flagTakesValue(def extension.FlagDefinition) bool {
-	return def.Type != "" && def.Type != "boolean"
-}
-
-// consumesDeclaredValue reports whether args[i] names, by its long name, a flag
-// declared with a value type, so that args[i+1] is its value whatever its shape:
-// `--args "--check --dry-run"` binds the string, exactly as
-// `--args="--check --dry-run"` does once splitInlineValues has split it.
-//
-// Callers pass only the tokens before the passthrough separator, so a value
-// flag directly before "--", or last, takes no value from here. A negated
-// (`--no-x`), inline (`-x=1`), short, undeclared or boolean spelling takes none
-// either: buildCommandParams binds those by shape alone.
-func consumesDeclaredValue(args []string, i int, declared map[string]extension.FlagDefinition) bool {
-	if i+1 >= len(args) || !isFlagToken(args[i]) {
-		return false
-	}
-	name := strings.TrimLeft(args[i], "-")
-	if strings.Contains(name, "=") || strings.HasPrefix(name, "no-") {
-		return false
-	}
-	def, ok := declared[name]
-	return ok && flagTakesValue(def)
-}
-
 // jobFlagTokens returns, in order, the flag tokens before the passthrough
-// separator, leaving out every token a declared value flag consumes as its
-// value (consumesDeclaredValue). It is the one walk undeclaredFlagWarnings and
-// conflictingTaskFlags share, so a value buildCommandParams binds is never
-// judged as a flag.
-func jobFlagTokens(rawArgs []string, declared map[string]extension.FlagDefinition) []string {
+// separator, leaving out each token buildCommandParams binds as a flag's value
+// (takesNextAsValue). It is the one walk undeclaredFlagWarnings and
+// conflictingTaskFlags share.
+func jobFlagTokens(rawArgs []string) []string {
 	args := rawArgs[:passthroughCut(rawArgs)]
 	var flags []string
 	for i := 0; i < len(args); i++ {
 		if isFlagToken(args[i]) {
 			flags = append(flags, args[i])
 		}
-		if consumesDeclaredValue(args, i, declared) {
+		if takesNextAsValue(args, i) {
 			i++
 		}
 	}
@@ -442,7 +436,7 @@ func conflictingTaskFlags(commands []string, jobMap map[string][]*extension.JobD
 		}
 	}
 
-	for _, arg := range jobFlagTokens(rawArgs, definitions) {
+	for _, arg := range jobFlagTokens(rawArgs) {
 		tasks := declaredBy[flagBaseName(arg)]
 		if len(tasks) < 2 {
 			continue

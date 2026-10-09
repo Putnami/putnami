@@ -44,8 +44,13 @@ putnami run my-app --entrypoint src/cli.ts
 putnami run my-job --port 3000 --args "--check --dry-run"
 
 # Assert a specific exit code from a gate
-putnami run my-migrator --args "--gate"; echo "exit: $?"
+putnami run my-migrator --args=--gate; echo "exit: $?"
 ```
+
+`--args` is split on whitespace into the program's arguments. A one-word value
+that begins with a hyphen needs the `=` spelling (`--args=--gate`): the CLI
+reads `--args --gate` as two flags. See
+[Job-Specific Flags](../../../tooling/cli/doc/03-commands.md#job-specific-flags).
 
 ## Exit Codes
 
@@ -63,7 +68,7 @@ putnami run my-migrator --args "--gate"; echo "exit: $?"
 |------|---------|-------------|
 | `--entrypoint <path>` | `./run` export → `main` → `src/main.ts` | File Bun should run |
 | `--port <n>` | — | Sets the `PORT` environment variable when provided |
-| `--args <string>` | — | Extra arguments passed to the program |
+| `--args <string>` | — | Extra arguments passed to the program, split on whitespace |
 
 ## Boundaries
 

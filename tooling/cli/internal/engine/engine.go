@@ -134,10 +134,9 @@ type Request struct {
 	// Global are the run-shaping flags.
 	Global GlobalFlags
 	// CommandParams are the job parameters passed to planning and scheduling.
-	// The CLI derives them from the raw job args and the flags the selected
-	// tasks declare (buildCommandParams); a param value's Go type is part of
-	// every cache key, so the engine only ever forwards this map — it never
-	// rebuilds or rewrites it.
+	// The CLI derives them from the raw job args (buildCommandParams); a param
+	// value's Go type is part of every cache key, so the engine only ever
+	// forwards this map — it never rebuilds or rewrites it.
 	CommandParams map[string]any
 	// RunMarkerParams key the persisted successful-run state (last-build SHA and
 	// remote run markers). Nil means "same as CommandParams", which is the
