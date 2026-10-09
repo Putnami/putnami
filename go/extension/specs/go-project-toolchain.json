@@ -121,7 +121,7 @@
     },
     {
       "id": "cli-compatibility-marker",
-      "text": "Validate holds the breaking-change marker for the command-surface document a stable Go project declares for the CLI it ships: since the last tag of the project's line, a removed command, flag, short alias or accepted value, or a flag that starts or stops taking a value, fails naming the command and the flag unless a commit since that tag declares it breaking. An added flag is compatible. A tag that does not hold the document yet gives a note, and the API is still compared."
+      "text": "Validate holds the breaking-change marker for the command-surface document a stable Go project declares for the CLI it ships: since the last tag of the project's line, a removed command, flag, short alias or accepted value, or a flag that starts or stops taking a value, fails naming the command and the flag unless a commit since that tag declares it breaking. An added flag is compatible. A tag at which the project declared no document gives a note, and the API is still compared."
     },
     {
       "id": "image-input-producers",

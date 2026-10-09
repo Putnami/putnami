@@ -6,8 +6,12 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	wsproto "go.putnami.dev/protocol/workspace"
 
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
+	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // commandSurfacePath is the CLI's committed command surface, relative to this
@@ -47,5 +51,47 @@ func TestGoldenCommandSurfaceDocument(t *testing.T) {
 	}
 	if _, err := protocolcli.ParseCommandSurface(want); err != nil {
 		t.Errorf("the committed command surface does not parse: %v", err)
+	}
+}
+
+// TestTheCLIDeliversTheWinningCommandSurfaceUnderTheCamelCaseKey pins the
+// CLI's half of the rule by which the Go extension's validate task reads its
+// command-surface option (go/extension/internal/jobs/apicheck surfaceOptionIn):
+// in the parameters the task receives, commandSurface holds the value of the
+// project layer that wins, whatever spelling each layer used. The cases are
+// the putnami.json files of the extension's TestBothSidesPickTheSamePathWhateverTheSpelling.
+func TestTheCLIDeliversTheWinningCommandSurfaceUnderTheCamelCaseKey(t *testing.T) {
+	t.Parallel()
+	for _, testCase := range []struct{ name, config string }{
+		{
+			name:   "a lower kebab-case layer under a higher camelCase one",
+			config: `{"name":"lib","options":{"validate":{"command-surface":"a.json"},"@putnami/go:validate":{"commandSurface":"b.json"}}}`,
+		},
+		{
+			name:   "a lower camelCase layer under a higher kebab-case one",
+			config: `{"name":"lib","options":{"validate":{"commandSurface":"a.json"},"@putnami/go:validate":{"command-surface":"b.json"}}}`,
+		},
+		{
+			name:   "a lower kebab-case layer under a higher camelCase one, the extension's",
+			config: `{"name":"lib","options":{"validate":{"command-surface":"a.json"},"@putnami/go":{"commandSurface":"b.json"}}}`,
+		},
+		{
+			name:   "both spellings in the winning layer",
+			config: `{"name":"lib","options":{"validate":{"commandSurface":"c.json"},"@putnami/go:validate":{"command-surface":"a.json","commandSurface":"b.json"}}}`,
+		},
+	} {
+		config, diagnostics := wsproto.ParseProjectConfig([]byte(testCase.config))
+		if len(diagnostics) > 0 {
+			t.Fatalf("%s: %v", testCase.name, diagnostics)
+		}
+		job := &jobs.ScheduledJob{
+			Project:   &workspace.Project{Name: "lib", Path: "lib", Config: config},
+			Extension: &extension.ExtensionDescription{Name: "@putnami/go", Path: "go/extension"},
+			JobDef:    &extension.JobDefinition{Name: "validate", ExtensionName: "@putnami/go"},
+		}
+		ctx := jobs.BuildJobContext(&workspace.Workspace{Name: "ws", Root: "/ws"}, job, nil, nil, nil)
+		if got := ctx.Params["commandSurface"]; got != "b.json" {
+			t.Errorf("%s: commandSurface = %v, want b.json", testCase.name, got)
+		}
 	}
 }

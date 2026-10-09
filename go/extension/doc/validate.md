@@ -89,7 +89,8 @@ A project that ships a command-line tool can hold its commands and flags to the
 same rule. It commits a
 [command-surface document](../../../protocols/cli/doc/06-command-surface.md)
 that lists the commands users type, with their flags and positionals, and the
-global flags. The `command-surface` option names it, relative to the project:
+global flags. The `command-surface` option names it, relative to the project,
+in the project's `putnami.json`:
 
 ```json
 {
@@ -101,8 +102,15 @@ global flags. The `command-surface` option names it, relative to the project:
 }
 ```
 
-The check reads the document from the working tree and from the tag it
-compares the API with, and compares the two. These changes are incompatible:
+The check reads the document from the working tree, at the path the option
+names now, and from the tag it compares the API with, at the path the
+project's `putnami.json` named at that tag. So a document that moves in the
+same change is still compared with the released one. At the tag, the check
+reads the option from the project's `options` under `validate`, `@putnami/go`
+and `@putnami/go:validate`, the last one winning, as the CLI merges them. Both
+sides follow the CLI's rule for the option's two spellings: a layer can write
+`command-surface` or `commandSurface`, and when one layer writes both,
+`commandSurface` wins. These changes are incompatible:
 
 - a command removed;
 - a flag removed, global or of a command, or a short alias removed;
@@ -130,10 +138,18 @@ document adds these cases:
 
 | Case | Result |
 |---|---|
-| The tag does not hold the document yet | an information line; the API is still compared |
-| The declared document is missing from the project, is a directory, or is reached through a symbolic link | the task fails |
-| The document does not parse, in the working tree or at the tag | the task fails |
+| The project declared no document at the tag | an information line; the API is still compared |
+| The project declared a document at the tag, but the tag does not hold it | a warning coded `api-compat-not-compared`; the API is still compared |
+| The document at the tag has a later protocol version than this extension reads | a warning coded `api-compat-not-compared`; the API is still compared |
+| The project's `putnami.json` at the tag does not parse, or sets the option to something other than a path of the project | a warning coded `api-compat-not-compared`; the API is still compared |
+| The declared document is missing from the project, is a directory, is reached through a symbolic link, or is named in another case than on disk | the task fails |
+| The document does not parse, in the working tree or at the tag, in a protocol version this extension reads | the task fails |
 | The option is an absolute path or a path out of the project | the task fails, even for a project the check skips |
+
+A warning stands for what no marker could fix: the check cannot read the
+released document, so it compares nothing rather than fail every run until the
+next tag. A newer `@putnami/go` reads every earlier protocol version of the
+document.
 
 The CLI produces the document. Putnami's own CLI renders it from its command
 catalog and commits it as `tooling/cli/command-surface.json`, and a test fails
@@ -185,6 +201,13 @@ A changed declaration also carries its file and line. A change to a command
 surface names the command and the flag instead, and points at the document.
 Fix the code, or keep the change and commit it with the marker.
 
+The summary counts the two kinds apart, for example `1 incompatible API change
+and 2 incompatible command-surface changes since tooling/v0.3.0`. A failure
+reports the `api-incompatible` metric with the API changes, and, for a project
+that declares a command surface, the `command-surface-incompatible` metric with
+the command-surface changes. The task's data holds the sum as `incompatible`,
+and the command-surface part as `commandSurfaceIncompatible`.
+
 ## Caching
 
 The task is never cached. Its verdict reads the line's tags, the files at the
@@ -229,6 +252,14 @@ changes the answer without changing any file a cache key could name.
   files declare the same name, the first in path order is compared.
 - **Go only.** TypeScript projects are not checked yet, and the command
   surface is compared only for a Go project.
+- **What the command surface holds.** The check holds what the document lists,
+  and Putnami's own CLI lists its core command catalog only:
+  - commands and flags an extension manifest declares, such as the
+    `--enforce-coverage` flag of `test` or the commands of the `specs` group,
+    are not in the document, so removing one is not caught;
+  - global flags carry no value list, because the catalog lists their values
+    as completion candidates, so a value removed from a global flag such as
+    `--output` is not caught.
 
 The choice of a source-level comparison over `apidiff` or `gorelease` is
 recorded in [ADR 0010](adr/0010-the-api-check-compares-source-not-types.md).

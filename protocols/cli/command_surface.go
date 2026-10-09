@@ -15,7 +15,10 @@ import (
 // its users type, and the comparison that finds an incompatible change between
 // two of them.
 const (
-	// CommandSurfaceVersion is the command-surface contract version.
+	// CommandSurfaceVersion is the latest command-surface contract version, the
+	// one NewCommandSurface writes. A reader reads every version from 1 to
+	// CommandSurfaceVersion: a later version keeps reading all prior ones,
+	// because a released document is what the next release is compared with.
 	CommandSurfaceVersion = 1
 	// CommandSurfaceSchemaID is the published schema's $id.
 	CommandSurfaceSchemaID = "https://putnami.dev/schemas/putnami-cli-command-surface.json"
@@ -78,6 +81,20 @@ type CommandSurfacePositional struct {
 	// Required reports whether an invocation must supply the argument.
 	Required bool `json:"required"`
 }
+
+// ErrUnknownCommandSurfaceVersion marks a document whose protocolVersion is
+// later than CommandSurfaceVersion: a document of a contract this reader does
+// not know yet, which is not a malformed one. Test for it with errors.Is.
+var ErrUnknownCommandSurfaceVersion = errors.New("unknown command-surface protocol version")
+
+// unknownVersionError is the error for a document of a later contract.
+type unknownVersionError struct{ version int }
+
+func (e unknownVersionError) Error() string {
+	return fmt.Sprintf("command surface: protocolVersion %d is later than %d, the latest this reader reads", e.version, CommandSurfaceVersion)
+}
+
+func (unknownVersionError) Is(target error) bool { return target == ErrUnknownCommandSurfaceVersion }
 
 // CommandChange is one incompatible change between two command surfaces.
 type CommandChange struct {
@@ -145,12 +162,16 @@ func canonicalFlags(flags []CommandSurfaceFlag) []CommandSurfaceFlag {
 	return out
 }
 
-// Validate checks every rule a reader relies on: the version, the spelling of
-// every path, flag, alias and value, and the canonical order that makes each
-// one unique. Lists are compared by byte order.
+// Validate checks every rule a reader relies on: a version from 1 to
+// CommandSurfaceVersion, the spelling of every path, flag, alias and value,
+// and the canonical order that makes each one unique. Lists are compared by
+// byte order. A later version is ErrUnknownCommandSurfaceVersion.
 func (s CommandSurface) Validate() error {
-	if s.ProtocolVersion != CommandSurfaceVersion {
-		return fmt.Errorf("command surface: protocolVersion %d is not %d", s.ProtocolVersion, CommandSurfaceVersion)
+	if s.ProtocolVersion > CommandSurfaceVersion {
+		return unknownVersionError{s.ProtocolVersion}
+	}
+	if s.ProtocolVersion < 1 {
+		return fmt.Errorf("command surface: protocolVersion %d is not a version", s.ProtocolVersion)
 	}
 	if s.GlobalFlags == nil || s.Commands == nil {
 		return errors.New("command surface: globalFlags and commands are required")
@@ -241,10 +262,19 @@ func MarshalCommandSurface(s CommandSurface) ([]byte, error) {
 
 // ParseCommandSurface strictly decodes and validates one bounded document:
 // every required member must be present, no member may be null or empty when
-// optional, and unknown members and trailing JSON are refused.
+// optional, and unknown members and trailing JSON are refused. It reads every
+// version from 1 to CommandSurfaceVersion. A document of a later version is
+// ErrUnknownCommandSurfaceVersion, whatever members it holds: its members are
+// the later contract's, so they are not checked against this one.
 func ParseCommandSurface(data []byte) (*CommandSurface, error) {
 	if len(data) > CommandSurfaceMaxBytes {
 		return nil, fmt.Errorf("command surface: the document exceeds %d bytes", CommandSurfaceMaxBytes)
+	}
+	var head struct {
+		ProtocolVersion *int `json:"protocolVersion"`
+	}
+	if json.Unmarshal(data, &head) == nil && head.ProtocolVersion != nil && *head.ProtocolVersion > CommandSurfaceVersion {
+		return nil, unknownVersionError{*head.ProtocolVersion}
 	}
 	if err := checkSurfaceMembers(data); err != nil {
 		return nil, err
@@ -325,21 +355,15 @@ func checkFlagMembers(data json.RawMessage) error {
 }
 
 // surfaceMembers refuses a value that is not an object, omits a required
-// member, or sets any member to null.
+// member, or sets any member to null. kind names the value in the error.
 func surfaceMembers(data []byte, kind string, required ...string) error {
-	var members map[string]json.RawMessage
-	if err := json.Unmarshal(data, &members); err != nil || members == nil {
+	switch fault, name := findMemberFault(data, required...); fault {
+	case memberFaultNotObject:
 		return fmt.Errorf("command surface: a %s is not a JSON object", kind)
-	}
-	for name, value := range members {
-		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-			return fmt.Errorf("command surface: %s member %s is null", kind, name)
-		}
-	}
-	for _, name := range required {
-		if _, ok := members[name]; !ok {
-			return fmt.Errorf("command surface: %s member %s is missing", kind, name)
-		}
+	case memberFaultNull:
+		return fmt.Errorf("command surface: %s member %s is null", kind, name)
+	case memberFaultMissing:
+		return fmt.Errorf("command surface: %s member %s is missing", kind, name)
 	}
 	return nil
 }
@@ -353,7 +377,8 @@ func surfaceMembers(data []byte, kind string, required ...string) error {
 // removed from a flag's closed list, or a closed list given to a flag that
 // accepted any value; a removed positional; an optional positional that
 // becomes required; and a new required positional. Positionals are compared by
-// position, not by name.
+// position, not by name; a removed positional is named when the names tell
+// which one went away.
 //
 // Everything added is compatible: a command, a flag, a short alias, a value,
 // an optional positional. So are a closed list that is removed, and a
@@ -431,11 +456,12 @@ func appendFlagChanges(changes []CommandChange, command string, previous, curren
 }
 
 func appendPositionalChanges(changes []CommandChange, command string, previous, current []CommandSurfacePositional) []CommandChange {
+	if len(current) < len(previous) {
+		changes = appendRemovedPositionals(changes, command, previous, current)
+	}
 	for i, before := range previous {
 		if i >= len(current) {
-			changes = append(changes, CommandChange{Command: command,
-				Message: fmt.Sprintf("command %q: positional %q (position %d) removed", command, before.Name, i+1)})
-			continue
+			break
 		}
 		if !before.Required && current[i].Required {
 			changes = append(changes, CommandChange{Command: command,
@@ -449,4 +475,39 @@ func appendPositionalChanges(changes []CommandChange, command string, previous, 
 		}
 	}
 	return changes
+}
+
+// appendRemovedPositionals reports the positionals a command lost. The one
+// that went away is not always the last: when exactly as many names went away
+// as positionals did, each is named with its position in previous. When a
+// rename in the same change leaves that unclear, one change gives the count.
+func appendRemovedPositionals(changes []CommandChange, command string, previous, current []CommandSurfacePositional) []CommandChange {
+	remaining := map[string]int{}
+	for _, positional := range current {
+		remaining[positional.Name]++
+	}
+	var gone []int
+	for i, positional := range previous {
+		if remaining[positional.Name] > 0 {
+			remaining[positional.Name]--
+			continue
+		}
+		gone = append(gone, i)
+	}
+	if len(gone) != len(previous)-len(current) {
+		return append(changes, CommandChange{Command: command,
+			Message: fmt.Sprintf("command %q: takes %d positional%s instead of %d", command, len(current), pluralS(len(current)), len(previous))})
+	}
+	for _, i := range gone {
+		changes = append(changes, CommandChange{Command: command,
+			Message: fmt.Sprintf("command %q: positional %q (position %d) removed", command, previous[i].Name, i+1)})
+	}
+	return changes
+}
+
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }

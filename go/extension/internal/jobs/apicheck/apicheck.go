@@ -12,7 +12,8 @@
 //
 // A project that ships a CLI also declares its command-surface document
 // (option command-surface), and the task holds the commands and flags it
-// lists to the same rule.
+// lists to the same rule. The released document is the one at the path the
+// project's putnami.json declared at the tag.
 package apicheck
 
 import (
@@ -64,9 +65,17 @@ type Report struct {
 	// command-surface document the project declares; empty when it declares
 	// none.
 	CommandSurface string
+	// ReleasedSurface is the slash path, relative to the project, of the
+	// document the project declared at Tag; empty when it declared none.
+	ReleasedSurface string
 	// SurfaceNote says why the command surface was not compared while the
-	// exported API was: Tag holds no document at that path.
+	// exported API was: the project declared no document at Tag.
 	SurfaceNote string
+	// SurfaceWarning says why the command surface was not compared although
+	// the project declared a document at Tag: the tag does not hold it, holds
+	// it in a protocol version this check does not read, or its putnami.json
+	// cannot be read.
+	SurfaceWarning string
 	// CommandChanges are the incompatible changes to the command surface
 	// since Tag.
 	CommandChanges []protocolcli.CommandChange
@@ -77,7 +86,7 @@ type Report struct {
 
 // surfaceCompared reports whether the command surface was compared with Tag.
 func (r *Report) surfaceCompared() bool {
-	return r.CommandSurface != "" && r.Tag != "" && r.SurfaceNote == ""
+	return r.CommandSurface != "" && r.Tag != "" && r.SurfaceNote == "" && r.SurfaceWarning == ""
 }
 
 // Commit identifies the commit that declares a breaking change.
@@ -181,14 +190,13 @@ func Check(workspaceRoot, projectDir, name string, options Options) (*Report, er
 	}
 	report := &Report{Tag: tag, Packages: len(old.Packages), Changes: apisurface.Incompatible(old, current), CommandSurface: surfacePath}
 	if surface != nil {
-		released, found, err := readSurfaceAtTag(projectDir, tag, surfacePath)
+		released, err := readReleasedSurface(projectDir, tag)
 		if err != nil {
 			return nil, err
 		}
-		if found {
-			report.CommandChanges = protocolcli.IncompatibleCommandChanges(*released, *surface)
-		} else {
-			report.SurfaceNote = fmt.Sprintf("the command surface %s does not exist at %s: there is no released command surface to compare with", surfacePath, tag)
+		report.ReleasedSurface, report.SurfaceNote, report.SurfaceWarning = released.path, released.note, released.warning
+		if released.surface != nil {
+			report.CommandChanges = protocolcli.IncompatibleCommandChanges(*released.surface, *surface)
 		}
 	}
 	if len(report.Changes) == 0 && len(report.CommandChanges) == 0 {
@@ -290,12 +298,19 @@ func render(emit *jsonl.Emitter, workspaceRoot, projectDir string, report *Repor
 	if report.SurfaceNote != "" {
 		emit.Info(report.SurfaceNote)
 	}
+	if report.SurfaceWarning != "" {
+		emit.DiagnosticWithCode("warning", report.SurfaceWarning, surfaceFile, 0, 0, NotComparedCode)
+	}
 	if len(report.Changes) == 0 {
 		emit.Info(fmt.Sprintf("the exported API of %d package%s is compatible with %s",
 			report.Packages, plural(report.Packages), report.Tag))
 	}
 	if report.surfaceCompared() && len(report.CommandChanges) == 0 {
-		emit.Info(fmt.Sprintf("the command surface %s is compatible with %s", report.CommandSurface, report.Tag))
+		released := report.Tag
+		if report.ReleasedSurface != report.CommandSurface {
+			released = report.ReleasedSurface + " at " + report.Tag
+		}
+		emit.Info(fmt.Sprintf("the command surface %s is compatible with %s", report.CommandSurface, released))
 	}
 	if incompatible == 0 {
 		emit.PhaseEnd(phase, "success")
@@ -314,8 +329,7 @@ func render(emit *jsonl.Emitter, workspaceRoot, projectDir string, report *Repor
 			emit.DiagnosticWithCode("info", fmt.Sprintf("%s since %s, %s",
 				change.Message, report.Tag, declared), surfaceFile, 0, 0, Code)
 		}
-		emit.Info(fmt.Sprintf("%d incompatible API change%s since %s, %s",
-			incompatible, plural(incompatible), report.Tag, declared))
+		emit.Info(fmt.Sprintf("%s since %s, %s", changeCounts(report), report.Tag, declared))
 		emit.PhaseEnd(phase, "success")
 		return "OK", data, nil
 	}
@@ -329,11 +343,27 @@ func render(emit *jsonl.Emitter, workspaceRoot, projectDir string, report *Repor
 		emit.DiagnosticWithCode("error", fmt.Sprintf("%s since %s; %s",
 			change.Message, report.Tag, markerHint), surfaceFile, 0, 0, Code)
 	}
-	emit.Metric("api-incompatible", incompatible, "count")
+	emit.Metric("api-incompatible", len(report.Changes), "count")
+	if report.CommandSurface != "" {
+		emit.Metric("command-surface-incompatible", len(report.CommandChanges), "count")
+	}
 	emit.PhaseEnd(phase, "failed")
-	emit.Summary(fmt.Sprintf("%d incompatible API change%s since %s and no commit declares a breaking change",
-		incompatible, plural(incompatible), report.Tag))
+	emit.Summary(fmt.Sprintf("%s since %s and no commit declares a breaking change", changeCounts(report), report.Tag))
 	return "FAILED", data, nil
+}
+
+// changeCounts states the incompatible changes of a report by kind, for
+// example "1 incompatible API change and 2 incompatible command-surface
+// changes".
+func changeCounts(report *Report) string {
+	var counts []string
+	if n := len(report.Changes); n > 0 {
+		counts = append(counts, fmt.Sprintf("%d incompatible API change%s", n, plural(n)))
+	}
+	if n := len(report.CommandChanges); n > 0 {
+		counts = append(counts, fmt.Sprintf("%d incompatible command-surface change%s", n, plural(n)))
+	}
+	return strings.Join(counts, " and ")
 }
 
 // location returns the workspace-relative file and line of a position in the

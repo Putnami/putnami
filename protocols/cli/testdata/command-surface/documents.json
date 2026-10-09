@@ -89,6 +89,7 @@
   {
     "name": "unknown-version",
     "valid": false,
+    "unknownVersion": true,
     "document": {
       "protocolVersion": 2,
       "globalFlags": [
@@ -162,6 +163,40 @@
           ]
         }
       ]
+    }
+  },
+  {
+    "name": "later-version-with-members-this-reader-does-not-know",
+    "valid": false,
+    "unknownVersion": true,
+    "document": {
+      "protocolVersion": 3,
+      "commands": [
+        {
+          "path": "build",
+          "aliases": [
+            "b"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "version-zero",
+    "valid": false,
+    "document": {
+      "protocolVersion": 0,
+      "globalFlags": [],
+      "commands": []
+    }
+  },
+  {
+    "name": "version-not-an-integer",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1.5,
+      "globalFlags": [],
+      "commands": []
     }
   },
   {

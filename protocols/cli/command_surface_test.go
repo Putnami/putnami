@@ -4,6 +4,8 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -25,15 +27,18 @@ var commandSurfaceCorpus []byte
 func TestCommandSurfaceCorpus(t *testing.T) {
 	t.Parallel()
 	var corpus []struct {
-		Name     string          `json:"name"`
-		Valid    bool            `json:"valid"`
-		Document json.RawMessage `json:"document"`
-		Raw      string          `json:"raw"`
+		Name  string `json:"name"`
+		Valid bool   `json:"valid"`
+		// UnknownVersion marks a document of a later contract, which a reader
+		// tells apart from a malformed one.
+		UnknownVersion bool            `json:"unknownVersion"`
+		Document       json.RawMessage `json:"document"`
+		Raw            string          `json:"raw"`
 	}
 	if err := json.Unmarshal(commandSurfaceCorpus, &corpus); err != nil {
 		t.Fatal(err)
 	}
-	valid, invalid := 0, 0
+	valid, invalid, unknown := 0, 0, 0
 	for _, c := range corpus {
 		t.Run(c.Name, func(t *testing.T) {
 			data := []byte(c.Raw)
@@ -43,6 +48,9 @@ func TestCommandSurfaceCorpus(t *testing.T) {
 			surface, err := ParseCommandSurface(data)
 			if (err == nil) != c.Valid {
 				t.Fatalf("valid=%v error=%v", c.Valid, err)
+			}
+			if got := errors.Is(err, ErrUnknownCommandSurfaceVersion); got != c.UnknownVersion {
+				t.Fatalf("unknown version = %v, want %v (error %v)", got, c.UnknownVersion, err)
 			}
 			if err != nil {
 				return
@@ -68,9 +76,40 @@ func TestCommandSurfaceCorpus(t *testing.T) {
 		} else {
 			invalid++
 		}
+		if c.UnknownVersion {
+			unknown++
+		}
 	}
-	if valid == 0 || invalid == 0 {
-		t.Fatalf("corpus must pin both verdicts: %d valid, %d invalid", valid, invalid)
+	if valid == 0 || invalid == 0 || unknown == 0 {
+		t.Fatalf("corpus must pin every verdict: %d valid, %d invalid, %d of an unknown version", valid, invalid, unknown)
+	}
+}
+
+// A reader reads every version up to its own, and tells a later version apart
+// from a malformed document, so a consumer can skip a document it cannot read
+// yet instead of failing on it.
+func TestAReaderReadsEveryVersionUpToItsOwn(t *testing.T) {
+	t.Parallel()
+	document := func(version int) []byte {
+		return fmt.Appendf(nil, `{"protocolVersion":%d,"globalFlags":[],"commands":[]}`, version)
+	}
+	for version := 1; version <= CommandSurfaceVersion; version++ {
+		if _, err := ParseCommandSurface(document(version)); err != nil {
+			t.Errorf("version %d: %v, want it read", version, err)
+		}
+	}
+	later := CommandSurfaceVersion + 1
+	if _, err := ParseCommandSurface(document(later)); !errors.Is(err, ErrUnknownCommandSurfaceVersion) {
+		t.Errorf("version %d: err = %v, want ErrUnknownCommandSurfaceVersion", later, err)
+	}
+	for _, version := range []int{0, -1} {
+		if _, err := ParseCommandSurface(document(version)); err == nil || errors.Is(err, ErrUnknownCommandSurfaceVersion) {
+			t.Errorf("version %d: err = %v, want a malformed document", version, err)
+		}
+	}
+	surface := CommandSurface{ProtocolVersion: later, GlobalFlags: []CommandSurfaceFlag{}, Commands: []CommandSurfaceCommand{}}
+	if _, err := MarshalCommandSurface(surface); !errors.Is(err, ErrUnknownCommandSurfaceVersion) {
+		t.Errorf("render version %d: err = %v, want ErrUnknownCommandSurfaceVersion", later, err)
 	}
 }
 
@@ -145,11 +184,14 @@ func TestCommandSurfaceSchemaDrift(t *testing.T) {
 						Enum []string `json:"enum"`
 					} `json:"type"`
 					Values struct {
-						Items struct {
+						MinItems    int  `json:"minItems"`
+						UniqueItems bool `json:"uniqueItems"`
+						Items       struct {
 							Pattern string `json:"pattern"`
 						} `json:"items"`
 					} `json:"values"`
 				} `json:"properties"`
+				AllOf []json.RawMessage `json:"allOf"`
 			} `json:"flag"`
 			Positional struct {
 				Properties struct {
@@ -169,6 +211,17 @@ func TestCommandSurfaceSchemaDrift(t *testing.T) {
 	if got, want := bounds.Defs.Flag.Properties.Type.Enum, []string{CommandFlagBool, CommandFlagValue}; !reflect.DeepEqual(got, want) {
 		t.Errorf("schema flag type enum = %v, Go vocabulary = %v", got, want)
 	}
+	// Validate refuses an empty or repeated value list, and any value list on a
+	// bool flag: the schema states the same three rules. Sortedness has no
+	// JSON Schema keyword; the descriptions state it.
+	if values := bounds.Defs.Flag.Properties.Values; values.MinItems != 1 || !values.UniqueItems {
+		t.Errorf("schema flag values: minItems %d, uniqueItems %v, want 1 and true", values.MinItems, values.UniqueItems)
+	}
+	boolRule := []byte(`{"if":{"properties":{"type":{"const":"` + CommandFlagBool + `"}},"required":["type"]},` +
+		`"then":{"not":{"required":["values"]}}}`)
+	if len(bounds.Defs.Flag.AllOf) != 1 || !sameJSON(t, bounds.Defs.Flag.AllOf[0], boolRule) {
+		t.Errorf("schema flag allOf = %s, want only the rule %s", bounds.Defs.Flag.AllOf, boolRule)
+	}
 	// The schema anchors the end of input with a lookahead, because "$" may
 	// match before a final newline in other regular expression dialects.
 	schemaPattern := func(goPattern string) string { return strings.TrimSuffix(goPattern, "$") + `(?![\s\S])` }
@@ -183,6 +236,19 @@ func TestCommandSurfaceSchemaDrift(t *testing.T) {
 			t.Errorf("schema %s pattern = %q, want %q", name, pair[0], want)
 		}
 	}
+}
+
+// sameJSON reports whether two JSON texts hold the same value.
+func sameJSON(t *testing.T, a, b []byte) bool {
+	t.Helper()
+	var left, right any
+	if err := json.Unmarshal(a, &left); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(b, &right); err != nil {
+		t.Fatal(err)
+	}
+	return reflect.DeepEqual(left, right)
 }
 
 func TestNewCommandSurfaceIsCanonical(t *testing.T) {
@@ -269,6 +335,16 @@ func TestParseCommandSurfaceRefusesAnOversizedDocument(t *testing.T) {
 	padded := append(bytes.Repeat([]byte(" "), CommandSurfaceMaxBytes), document...)
 	if _, err := ParseCommandSurface(padded); err == nil || !strings.Contains(err.Error(), "exceeds") {
 		t.Fatalf("err = %v, want the size bound", err)
+	}
+}
+
+func TestParseCommandSurfaceNamesTheSameNullMemberEveryTime(t *testing.T) {
+	t.Parallel()
+	document := []byte(`{"protocolVersion":1,"globalFlags":[],"commands":[{"path":null,"positionals":null,"flags":null}]}`)
+	for range 50 {
+		if _, err := ParseCommandSurface(document); err == nil || err.Error() != "command surface: command member flags is null" {
+			t.Fatalf("err = %v, want the first null member in name order", err)
+		}
 	}
 }
 
@@ -397,6 +473,19 @@ func TestIncompatibleCommandChanges(t *testing.T) {
 			name:   "a removed positional",
 			change: func(s *CommandSurface) { c := surfaceCommand(s, "projects tag"); c.Positionals = c.Positionals[:1] },
 			want:   []CommandChange{{Command: "projects tag", Message: `command "projects tag": positional "tag" (position 2) removed`}},
+		},
+		{
+			name:   "a removed leading positional",
+			change: func(s *CommandSurface) { c := surfaceCommand(s, "projects tag"); c.Positionals = c.Positionals[1:] },
+			want:   []CommandChange{{Command: "projects tag", Message: `command "projects tag": positional "name" (position 1) removed`}},
+		},
+		{
+			name: "a removed positional and a renamed one",
+			change: func(s *CommandSurface) {
+				c := surfaceCommand(s, "projects tag")
+				c.Positionals = []CommandSurfacePositional{{Name: "project", Required: true}}
+			},
+			want: []CommandChange{{Command: "projects tag", Message: `command "projects tag": takes 1 positional instead of 2`}},
 		},
 		{
 			name: "additions",

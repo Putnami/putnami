@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://putnami.dev/schemas/putnami-cli-command-surface.json",
   "title": "CLI command surface",
-  "description": "The commands and flags a CLI's users type, committed by the CLI so a change to them can be compared with a released version. Descriptions, usage lines and examples are not part of it. Lists are sorted by byte order; readers also refuse a duplicate short alias within one flag list, a null member, trailing JSON, and a document over 1 MiB.",
+  "description": "The commands and flags a CLI's users type, committed by the CLI so a change to them can be compared with a released version. Descriptions, usage lines and examples are not part of it. This schema is protocol version 1; a reader of a later version still reads it. Lists are sorted by byte order; readers also refuse a duplicate short alias within one flag list, a null member, trailing JSON, and a document over 1 MiB.",
   "$ref": "#/$defs/document",
   "$defs": {
     "document": {
@@ -94,13 +94,20 @@
         "values": {
           "type": "array",
           "minItems": 1,
+          "uniqueItems": true,
           "items": {
             "type": "string",
             "pattern": "^\\S+(?![\\s\\S])"
           },
           "description": "The closed list of values a value flag accepts, sorted, values unique. Absent when the flag accepts any value, and always absent on a bool flag."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "bool" } }, "required": ["type"] },
+          "then": { "not": { "required": ["values"] } }
+        }
+      ]
     },
     "positional": {
       "type": "object",

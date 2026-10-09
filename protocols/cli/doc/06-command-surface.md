@@ -40,7 +40,7 @@ and examples are not part of it: rewording help never changes the document.
 
 | Member | Meaning |
 | --- | --- |
-| `protocolVersion` | Always `1`. |
+| `protocolVersion` | The contract version: `1`. See [Versions](#versions). |
 | `globalFlags` | The flags the CLI accepts with any command, sorted by `long`. |
 | `commands` | The commands users type, sorted by `path`. An alternate spelling of another command is a command of its own. |
 | `path` | The space-separated invocation path after the program name, such as `projects list`. |
@@ -58,6 +58,19 @@ are sorted by byte order, and a path, a long spelling, a short alias within one
 flag list and a value within one list each appear once. Readers refuse unknown
 members, trailing JSON and documents over 1 MiB. The canonical bytes use
 two-space indentation and end with a newline.
+
+## Versions
+
+A reader reads every version from 1 to its own: a later version keeps reading
+all earlier ones, because a released document is what the next release is
+compared with. A change to the contract that an earlier document cannot meet
+takes a new version, and the reader of that version still reads the earlier
+ones.
+
+A document of a later version than the reader's is not a malformed one. The
+reader recognizes it by its `protocolVersion` alone, whatever other members it
+holds, and a consumer that cannot read it skips the comparison with a warning
+rather than fail.
 
 ## Compatibility
 
@@ -81,6 +94,11 @@ optional positional. So are a closed list that is removed, a positional that
 becomes optional, and a positional renamed in place: positionals are compared
 by position, not by name.
 
+A removed positional is named by the names that went away, so removing the
+first of two names the first. When a positional is renamed in the same change,
+the names cannot tell which one went away, and the message gives the count
+instead: `command "projects tag": takes 1 positional instead of 2`.
+
 ## API
 
 Go publishes the document from `go.putnami.dev/protocol/cli`:
@@ -90,7 +108,8 @@ Go publishes the document from `go.putnami.dev/protocol/cli`:
 | `CommandSurface`, `CommandSurfaceCommand`, `CommandSurfaceFlag`, `CommandSurfacePositional` | The document |
 | `NewCommandSurface` | Builds the canonical document from unsorted input, and refuses a duplicate |
 | `MarshalCommandSurface` | The canonical bytes of a valid document |
-| `ParseCommandSurface` | Strictly decodes and validates one document |
+| `ParseCommandSurface` | Strictly decodes and validates one document of any version from 1 to `CommandSurfaceVersion` |
+| `ErrUnknownCommandSurfaceVersion` | The error, tested with `errors.Is`, for a document of a later version than `CommandSurfaceVersion` |
 | `IncompatibleCommandChanges` | The incompatible changes from one document to another, as `CommandChange` values sorted by command, flag and message |
 
 The schema is [`command-surface.json`](../schemas/command-surface.json). Go is
@@ -103,10 +122,17 @@ which documents a reader accepts.
 
 `@putnami/cli` commits its surface as `tooling/cli/command-surface.json`,
 rendered from its command catalog and pinned by a test that fails when the
-committed bytes differ.
+committed bytes differ. The document holds that catalog only:
+
+- commands and flags an extension manifest declares, such as the flags of
+  `test` or the commands of the `specs` group, are not in it;
+- its global flags carry no `values`, because the catalog lists their values
+  as completion candidates, not as the closed set a parser enforces.
+
+A change to either is therefore not held by the comparison.
 
 The `validate` task of `@putnami/go` reads the document a stable project names
-with its `command-surface` option, compares it with the one at the last tag of
-the project's version line, and fails an incompatible change that no commit
-since the tag declares as breaking. See
+with its `command-surface` option, compares it with the document at the path
+the project named at the last tag of its version line, and fails an
+incompatible change that no commit since the tag declares as breaking. See
 [`go/extension/doc/validate.md`](../../../go/extension/doc/validate.md).

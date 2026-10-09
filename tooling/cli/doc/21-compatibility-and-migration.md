@@ -24,8 +24,9 @@ document fails the build.
 | Support catalog | `putnami.support.json` | exactly 1 | Author the file at version 1. |
 | Pre-release version suffix | Published npm/Go versions, image tags, locks, release sets | `<sha>[-<dirty>]` (prior releases) and `<commitTime>-<sha>[-<dirty>]` (current) both read | Nothing to migrate: every reader treats the suffix as an opaque semver identifier; only native `@latest` ordering needs the current shape. |
 | Infra requirements | `<project>/infra/requirements.json`, `<workload>/infra/runtime.json` | exactly 1 (currently 2) | Migrate the manifest. See [protocols/infra](../../../protocols/infra/README.md#migrating-a-workspace-from-v1-to-v2). |
+| Command surface | `command-surface.json`, named by the `command-surface` option of `@putnami/go` `validate` | every version from 1 to the reader's own (currently 1) | Newer: upgrade `@putnami/go`. Until then, `validate` refuses a newer committed document and compares nothing with a newer released one. |
 
-Two of these windows are ranges and three are single values. That is a
+Three of these windows are ranges and three are single values. That is a
 deliberate split, not an inconsistency:
 
 - a **range** is affordable when the newer version's vocabulary is *additive*
@@ -328,6 +329,7 @@ the [migration guide](18-agent-workflows.md#migrating-separate-artifacts-to-an-e
 | `cliContract` rejection against a genuine pre-registry manifest | `protocols/extension/prior_release_test.go` |
 | Result v1 is readable and unwritable | `protocols/cli/result_test.go`, `tooling/cli/internal/cli/v1_bridge_ratchet_test.go` |
 | Support catalog exact-version rejection | `protocols/support/support_test.go` |
+| Command-surface read window | `protocols/cli/command_surface_test.go` (`TestAReaderReadsEveryVersionUpToItsOwn`), `tooling/cli/internal/lockfile/prior_release_test.go` |
 | Superseded artifacts install until migrated; the migration resumes and rolls back | `tooling/cli/internal/commands/lifecycle/agent_workflows_lifecycle_test.go` (`TestAgentContentMigration_*`) |
 | A CLI that predates the `extension:` opt-in fails closed on a migrated workspace | `protocols/workspace/agent_content_opt_in_test.go` (`TestAgentContentOptIn_OlderReaderFailsClosed`) |
 

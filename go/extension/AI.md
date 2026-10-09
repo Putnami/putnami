@@ -158,8 +158,9 @@ change (`feat!:` or a `BREAKING CHANGE:` footer). Commit a deliberate break with
 the marker, and put the marker in the pull request title too when the branch is
 squash-merged. Do not work around the check. A project that ships a CLI
 declares its committed command-surface document with the `command-surface`
-option, and a removed command, flag, short alias or accepted value fails the
-same way; an addition passes. See [doc/validate.md](doc/validate.md).
+option in its `putnami.json`, and a removed command, flag, short alias or
+accepted value fails the same way; an addition passes. See
+[doc/validate.md](doc/validate.md).
 
 ### Go build cache
 

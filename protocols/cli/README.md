@@ -33,7 +33,7 @@ import protocolcli "go.putnami.dev/protocol/cli"
 | `SessionReporterCommand`, `LogReporterCommand` and their `*Env`/`*TokenEnv`, `SessionReportingArtifacts`, `SessionReportingPlanBytes`, `SessionReportingChunk`, `SessionReportingAck`, `SessionReportingHandshake`, `SessionReportingHandshakeResult` | The native reporting capabilities (session reporter, log reporter), their chunk/ACK wire, and the v2 handshake that hands a reporter the run credential of a hosted run — [doc/04-session-reporting.md](doc/04-session-reporting.md) |
 | `SessionSubscribersFile`, `NewSessionSubscriberEvidence`, `ParseSessionSubscribersFile` | Per-subscriber delivery evidence (`subscribers.json`) for a session's event stream — [doc/05-session-subscribers.md](doc/05-session-subscribers.md) |
 | `ReservedGlobalFlags`, `IsReservedGlobalFlag`, `LookupReservedGlobalFlag`, `ValidateNoReservedShadow` | The reserved global-flag registry — flags every surface handles and no extension may redefine |
-| `CommandSurface`, `NewCommandSurface`, `MarshalCommandSurface`, `ParseCommandSurface`, `IncompatibleCommandChanges` | The command-surface document a CLI commits, and the comparison that finds an incompatible change to its commands and flags — [doc/06-command-surface.md](doc/06-command-surface.md) |
+| `CommandSurface`, `NewCommandSurface`, `MarshalCommandSurface`, `ParseCommandSurface`, `ErrUnknownCommandSurfaceVersion`, `IncompatibleCommandChanges` | The command-surface document a CLI commits, and the comparison that finds an incompatible change to its commands and flags — [doc/06-command-surface.md](doc/06-command-surface.md) |
 
 See [doc/01-contract.md](doc/01-contract.md) for the full contract.
 
@@ -88,7 +88,9 @@ until the dedicated producer-adoption task enables it.
 
 [doc/06-command-surface.md](doc/06-command-surface.md) specifies the
 command-surface document: the commands, flags and positionals a CLI's users
-type, sorted and free of help prose, at `protocolVersion: 1`.
+type, sorted and free of help prose, at `protocolVersion: 1`. A reader reads
+every version up to its own, and reports a later one as
+`ErrUnknownCommandSurfaceVersion` rather than as a malformed document.
 `IncompatibleCommandChanges` compares two of them and names each change that
 can break an invocation that used to work, such as a removed flag or a value
 dropped from a closed list. It is published as
