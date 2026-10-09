@@ -897,9 +897,9 @@ func TestCacheKey_ComputeHash_WithUpstreamHashes(t *testing.T) {
 	}
 }
 
-// The memoized extra-files hash must be byte-identical to the inline
-// hashExtraFiles it replaced — otherwise every existing cache key that carries
-// ExtraFiles would silently change and invalidate the whole cache.
+// The memoized extra-files hash is byte-identical to hashExtraFiles for the same
+// workspace root and paths, so the memo never moves a cache key that carries
+// ExtraFiles.
 func TestCacheManager_LookupExtraFilesHash_MatchesInlineHash(t *testing.T) {
 	dir := t.TempDir()
 	docDir := filepath.Join(dir, "doc")
@@ -913,9 +913,34 @@ func TestCacheManager_LookupExtraFilesHash_MatchesInlineHash(t *testing.T) {
 	missing := filepath.Join(dir, "does-not-exist")
 
 	paths := []string{docDir, file, missing}
-	want := hashExtraFiles(paths)
-	if got := NewCacheManager(nil).lookupExtraFilesHash(paths); got != want {
-		t.Errorf("memoized extra-files hash %q != inline hashExtraFiles %q", got, want)
+	for _, root := range []string{"", dir} {
+		want := hashExtraFiles(root, paths)
+		if got := NewCacheManager(nil).lookupExtraFilesHash(root, paths); got != want {
+			t.Errorf("root %q: memoized extra-files hash %q != inline hashExtraFiles %q", root, got, want)
+		}
+	}
+}
+
+// One path set named against two workspace roots is two memo entries: the root
+// decides the name each path is hashed under, so a manager that answered for
+// one root never answers with that value for another.
+func TestCacheManager_LookupExtraFilesHash_SeparatesWorkspaceRoots(t *testing.T) {
+	dir := t.TempDir()
+	asset := filepath.Join(dir, "asset.txt")
+	os.WriteFile(asset, []byte("data"), 0o644)
+	paths := []string{asset}
+
+	cm := NewCacheManager(nil)
+	underRoot := cm.lookupExtraFilesHash(dir, paths)
+	noRoot := cm.lookupExtraFilesHash("", paths)
+	if underRoot == noRoot {
+		t.Fatal("a path set looked up under a second workspace root was served the first root's memo entry")
+	}
+	if want := hashExtraFiles(dir, paths); underRoot != want {
+		t.Errorf("under the root: memoized %q != inline %q", underRoot, want)
+	}
+	if want := hashExtraFiles("", paths); noRoot != want {
+		t.Errorf("without a root: memoized %q != inline %q", noRoot, want)
 	}
 }
 
@@ -931,18 +956,18 @@ func TestCacheManager_LookupExtraFilesHash_MemoizedPerSession(t *testing.T) {
 	os.WriteFile(b, []byte("bbb"), 0o644)
 
 	cm := NewCacheManager(nil)
-	first := cm.lookupExtraFilesHash([]string{a, b})
+	first := cm.lookupExtraFilesHash(dir, []string{a, b})
 
 	// Mutate an input: the same manager must keep serving the memoized value.
 	os.WriteFile(a, []byte("changed"), 0o644)
-	if again := cm.lookupExtraFilesHash([]string{a, b}); again != first {
+	if again := cm.lookupExtraFilesHash(dir, []string{a, b}); again != first {
 		t.Errorf("same manager recomputed the extra-files hash: %q != %q", again, first)
 	}
-	if reordered := cm.lookupExtraFilesHash([]string{b, a}); reordered != first {
+	if reordered := cm.lookupExtraFilesHash(dir, []string{b, a}); reordered != first {
 		t.Errorf("reordered path set missed the memo entry: %q != %q", reordered, first)
 	}
 
-	if fresh := NewCacheManager(nil).lookupExtraFilesHash([]string{a, b}); fresh == first {
+	if fresh := NewCacheManager(nil).lookupExtraFilesHash(dir, []string{a, b}); fresh == first {
 		t.Error("fresh manager should observe changed extra-file content")
 	}
 }
@@ -957,9 +982,9 @@ func TestCacheManager_LookupExtraFilesHash_DistinctSetsDistinctEntries(t *testin
 	os.WriteFile(b, []byte("bbb"), 0o644)
 
 	cm := NewCacheManager(nil)
-	hA := cm.lookupExtraFilesHash([]string{a})
-	hB := cm.lookupExtraFilesHash([]string{b})
-	hAB := cm.lookupExtraFilesHash([]string{a, b})
+	hA := cm.lookupExtraFilesHash(dir, []string{a})
+	hB := cm.lookupExtraFilesHash(dir, []string{b})
+	hAB := cm.lookupExtraFilesHash(dir, []string{a, b})
 	if hA == hB || hA == hAB || hB == hAB {
 		t.Errorf("distinct extra-file sets collided: a=%q b=%q ab=%q", hA, hB, hAB)
 	}
@@ -999,6 +1024,72 @@ func TestCacheKey_ComputeHash_ExtraFilesVariesHash(t *testing.T) {
 	}
 	if h1 == h2 {
 		t.Error("changed extra-file content should produce a different cache key")
+	}
+}
+
+// A key names an extra file under the workspace root by its workspace-relative
+// path: one asset tree in two checkout directories gives one key, and the
+// asset's content and its place in the tree both still reach the key.
+func TestCacheKey_ComputeHash_ExtraFilesKeyTheSameInTwoCheckouts(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "tree-keyed-task-cache",
+		"a-generate-asset-keys-by-its-workspace-relative-path")
+
+	// checkout writes one tree under a fresh root and returns the key of a task
+	// whose extra files are the tree's file asset and directory asset.
+	checkout := func(files map[string]string, assets ...string) string {
+		t.Helper()
+		root := t.TempDir()
+		for rel, content := range files {
+			path := filepath.Join(root, filepath.FromSlash(rel))
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		key := &CacheKey{
+			Extension:     "ext",
+			Task:          "generate",
+			Project:       "site",
+			WorkspaceRoot: root,
+		}
+		for _, asset := range assets {
+			key.ExtraFiles = append(key.ExtraFiles, filepath.Join(root, filepath.FromSlash(asset)))
+		}
+		hash, err := key.ComputeHashUsing(NewCacheManager(nil))
+		if err != nil {
+			t.Fatalf("ComputeHashUsing: %v", err)
+		}
+		return hash
+	}
+
+	tree := map[string]string{
+		"README.md":           "readme",
+		"docs/guide/intro.md": "intro",
+		"docs/index.md":       "index",
+	}
+	first := checkout(tree, "README.md", "docs")
+	if second := checkout(tree, "README.md", "docs"); second != first {
+		t.Errorf("one asset tree in two checkout directories gave two keys: %s != %s", first, second)
+	}
+
+	edited := map[string]string{
+		"README.md":           "readme",
+		"docs/guide/intro.md": "intro, edited",
+		"docs/index.md":       "index",
+	}
+	if got := checkout(edited, "README.md", "docs"); got == first {
+		t.Error("an edit under a directory asset kept the key")
+	}
+
+	moved := map[string]string{
+		"notes/README.md":     "readme",
+		"docs/guide/intro.md": "intro",
+		"docs/index.md":       "index",
+	}
+	if got := checkout(moved, "notes/README.md", "docs"); got == first {
+		t.Error("an asset with the same content at another workspace-relative path kept the key")
 	}
 }
 

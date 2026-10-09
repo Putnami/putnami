@@ -100,6 +100,10 @@
     {
       "id": "result-only-remote-restore",
       "text": "With a provider that echoes restore-result-only, a remote hit whose files no job of the run reads, in minimal mode or in toplevel mode outside the selected projects, moves no blob: it reports its cached status, writes nothing, and records a local result-only entry. A task a planned job waits for, by dependency or serialization, keeps its files. A run that reads the files never serves a result-only entry: it restores the full entry or executes. A provider without the capability receives no new field."
+    },
+    {
+      "id": "tree-keyed-task-cache",
+      "text": "Two runs on one tree, at one base version of its release line, compute the same task cache key, whatever the commit, the branch or the checkout directory. A file pattern reads the build stamp without its build-time, commit and publication fields. A generate asset under the workspace root contributes its workspace-relative path and content; a stamp inside it keeps all but its build time. Otherwise, the commit reaches a key only through the publish version of a task with cache.versionAware or version-var."
     }
   ],
   "decisions": [
@@ -113,6 +117,7 @@
     "tooling/cli/doc/adr/0030-a-failed-task-is-cached-until-its-inputs-change.md",
     "tooling/cli/doc/adr/0031-scratch-generations-expire-between-consumers.md",
     "tooling/cli/doc/adr/0034-a-declared-output-polices-its-own-drift.md",
-    "tooling/cli/doc/adr/0058-a-hit-no-job-reads-is-restored-without-its-files.md"
+    "tooling/cli/doc/adr/0058-a-hit-no-job-reads-is-restored-without-its-files.md",
+    "tooling/cli/doc/adr/0059-a-cache-key-describes-the-tree-not-the-commit.md"
   ]
 }

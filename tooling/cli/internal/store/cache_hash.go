@@ -423,9 +423,9 @@ func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, erro
 	return files, nil
 }
 
-// Candidate readers inspect raw bytes: project-config task tuning and version
-// stamp buildTime are visible too. Domain-separate types so replacing a file
-// with a symlink holding the same bytes also invalidates its verdict.
+// Candidate readers inspect raw bytes: project-config task tuning and every
+// field of the version stamp are visible too. Domain-separate types so replacing
+// a file with a symlink holding the same bytes also invalidates its verdict.
 func gitCandidateDigest(file fileEntry, buf []byte) []byte {
 	h := sha256.New()
 	if file.info.Mode()&os.ModeSymlink != 0 {
@@ -756,7 +756,7 @@ func hashFileContents(files []fileEntry, scope ProjectConfigScope, projectDir st
 // cut the syscall count relative to io.Copy's default chunking.
 func fileContentDigest(path string, buf []byte, scope ProjectConfigScope) []byte {
 	if isVersionStamp(path) {
-		return versionStampDigest(path)
+		return versionStampDigest(path, versionStampNonTreeFields)
 	}
 	if isProjectConfig(path) {
 		return projectConfigDigest(path, scope)
@@ -775,9 +775,26 @@ func fileContentDigest(path string, buf []byte, scope ProjectConfigScope) []byte
 	return h.Sum(nil)
 }
 
-// versionStampFieldBuildTime is the one field of the .gen/version.json stamp
-// that describes the invocation rather than the tree it was taken from.
+// versionStampFieldBuildTime is the field of the .gen/version.json stamp that
+// describes the invocation rather than the tree it was taken from.
 const versionStampFieldBuildTime = "buildTime"
+
+// versionStampInvocationFields are the stamp fields that change between two
+// invocations over one commit. Both stamp digests leave them out.
+var versionStampInvocationFields = []string{versionStampFieldBuildTime}
+
+// versionStampNonTreeFields are every top-level stamp field a file-pattern input
+// leaves out of its digest, because none of them describes the tree:
+//   - buildTime changes with each invocation that executes a job.
+//   - sha, suffix, version, branch and isDirty name the commit.
+//   - image, image_digest and publish name a publication of that commit. A
+//     publish merges them into the stamp, and the scheduler carries them into
+//     the stamp of the next commit.
+var versionStampNonTreeFields = []string{
+	versionStampFieldBuildTime,
+	"sha", "suffix", "version", "branch", "isDirty",
+	"image", "image_digest", "publish",
+}
 
 // isVersionStamp reports whether path is a project's .gen/version.json — the
 // build stamp the CLI writes for every planned project before jobs run.
@@ -789,23 +806,22 @@ func isVersionStamp(p string) bool {
 	return filepath.Base(filepath.Clean(dir)) == ".gen"
 }
 
-// versionStampDigest hashes .gen/version.json with buildTime blanked, so two
-// stamps that differ only in build time contribute the same digest.
+// versionStampDigest hashes the .gen/version.json stamp at path without its
+// top-level fields named in dropped. Two stamps that differ only in those fields
+// contribute the same digest.
 //
-// Hashing the raw bytes makes the stamp invalidate the very key it was hashed
-// into. The scheduler refreshes buildTime *after* a job's key is computed and
-// only for a job that is about to execute (scheduler_exec.go), so a miss stores
-// its entry under a key describing a tree state that no longer exists on disk.
-// The next run keys on the refreshed stamp, misses again, refreshes again — a
-// project that takes one genuine miss can never hit again. Any task whose input
-// globs reach the stamp is affected; TypeScript lint (**/*.json) is the one that
-// bites in practice.
+// A file-pattern input drops versionStampNonTreeFields (fileContentDigest), so a
+// task whose input globs reach the stamp keys the same at two commits that share
+// one tree, and at two invocations over one commit. The commit reaches such a
+// key only through CacheKey.EmbeddedVersion, which a task opts into with
+// cache.versionAware or a version-var parameter. Every other field stays hashed,
+// whoever wrote it: name, capabilityRoot, capabilityPackages, contentHash, and
+// any field another writer merges into the document.
 //
-// Every field a task can legitimately depend on — version, sha, branch, isDirty
-// and the capability stamps — stays hashed, so a HEAD change still invalidates
-// the entry. This mirrors versionFileMatchesBuild, which
-// already compares stamps on every field except buildTime.
-func versionStampDigest(path string) []byte {
+// A generate asset drops versionStampInvocationFields only (hashFileBytes). The
+// asset copies the stamp into the task's output, so its key keeps the commit and
+// publication fields that copy carries.
+func versionStampDigest(path string, dropped []string) []byte {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
@@ -816,7 +832,9 @@ func versionStampDigest(path string) []byte {
 	if json.Unmarshal(data, &stamp) != nil {
 		return sum256(data)
 	}
-	delete(stamp, versionStampFieldBuildTime)
+	for _, field := range dropped {
+		delete(stamp, field)
+	}
 	// json.Marshal sorts map keys, so the normalized form is deterministic.
 	normalized, err := json.Marshal(stamp)
 	if err != nil {
@@ -864,11 +882,11 @@ type ProjectConfigScope struct {
 	// config as text: its edits depend on layout, on the tasks block, and on
 	// every other extension's options, and a decoded projection hides exactly
 	// the edits a formatter makes. The .gen/version.json build stamp keeps its
-	// buildTime-free digest in this mode too: the CLI writes that file, not a
-	// task. A config read as a whole document — across the project root, or
-	// through a workspace-relative pattern — drops the two lists and keeps
-	// this field. A config a glob pattern selects is read verbatim whatever
-	// the scope says (fileEntry.sweptByGlob).
+	// tree-only digest (versionStampDigest) in this mode too: the CLI writes
+	// that file, not a task. A config read as a whole document — across the
+	// project root, or through a workspace-relative pattern — drops the two
+	// lists and keeps this field. A config a glob pattern selects is read
+	// verbatim whatever the scope says (fileEntry.sweptByGlob).
 	Verbatim bool
 }
 
@@ -967,27 +985,42 @@ func hashEnvVars(names []string) string {
 // hashExtraFiles computes a hash from the contents of individual paths outside
 // the project root (e.g., cross-project generate assets). A path may name a
 // file or a directory: a directory is walked recursively so every file beneath
-// it contributes its tree-relative path and content. A doc site that pulls in
-// `/sites/putnami.dev/doc` as a generate asset is the motivating case — the
-// prior implementation io.Copy'd a directory file descriptor, which reads zero
-// bytes, so edits to files under a declared asset directory never invalidated
-// the generate cache key.
+// it contributes its tree-relative path and content, and a missing path
+// contributes a sentinel (hashPathContent).
 //
-// The per-path encoding for a regular file or a missing path is byte-identical
-// to the previous implementation, so cache keys that referenced only files are
-// unchanged; only directory paths (which previously contributed nothing) now
-// fold in their contents.
-func hashExtraFiles(paths []string) string {
-	sorted := make([]string, len(paths))
-	copy(sorted, paths)
-	sort.Strings(sorted)
+// Each path is written under a name, then its content. A path under
+// workspaceRoot is named by its workspace-relative slash form, so one asset
+// tree hashes the same in every checkout directory and on every host
+// separator. A path outside workspaceRoot, and every path when workspaceRoot is
+// empty, is named as given. Paths fold in name order, then in path order, so
+// the result does not depend on the order of paths.
+func hashExtraFiles(workspaceRoot string, paths []string) string {
+	type namedPath struct{ name, path string }
+	named := make([]namedPath, len(paths))
+	for i, p := range paths {
+		named[i] = namedPath{name: p, path: p}
+		if workspaceRoot == "" {
+			continue
+		}
+		rel, err := filepath.Rel(workspaceRoot, p)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		named[i].name = filepath.ToSlash(rel)
+	}
+	sort.Slice(named, func(i, j int) bool {
+		if named[i].name != named[j].name {
+			return named[i].name < named[j].name
+		}
+		return named[i].path < named[j].path
+	})
 
 	h := sha256.New()
-	for _, p := range sorted {
-		h.Write([]byte(p)) //nolint:errcheck // hash.Hash.Write never errors
-		h.Write([]byte{0}) //nolint:errcheck // hash.Hash.Write never errors
+	for _, entry := range named {
+		h.Write([]byte(entry.name)) //nolint:errcheck // hash.Hash.Write never errors
+		h.Write([]byte{0})          //nolint:errcheck // hash.Hash.Write never errors
 
-		hashPathContent(h, p)
+		hashPathContent(h, entry.path)
 
 		h.Write([]byte{0}) //nolint:errcheck // hash.Hash.Write never errors
 	}
@@ -1037,10 +1070,11 @@ func hashPathContent(h io.Writer, p string) {
 // stat) but cannot be opened contributes the stable unreadableSentinel so the
 // hash stays defined rather than silently treating it as empty.
 func hashFileBytes(h io.Writer, p string) {
-	// A declared asset directory can carry another project's build stamp; fold
-	// in its buildTime-free digest for the same reason fileContentDigest does.
+	// A declared asset directory can carry another project's build stamp. The
+	// asset copies it into the task's output, so it contributes everything but
+	// the fields that change between invocations over one commit.
 	if isVersionStamp(p) {
-		digest := versionStampDigest(p)
+		digest := versionStampDigest(p, versionStampInvocationFields)
 		if digest == nil {
 			h.Write([]byte(unreadableSentinel)) //nolint:errcheck // hash.Hash.Write never errors
 			return

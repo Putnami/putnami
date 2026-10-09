@@ -983,11 +983,11 @@ func closureKeyPatterns(job *ScheduledJob) []string {
 // closure input.
 //
 // Each member contributes its workspace-relative PATH and its content digest, so
-// the value is independent of where the workspace is checked out — which
-// ExtraFiles, the other cross-project key mechanism, is not (it hashes absolute
-// paths). That matters here because this digest reaches a CONSUMER's key through
-// the producing action, and a key that varied with the checkout directory would
-// make every remote entry unshareable between a developer and CI.
+// the value is independent of where the workspace is checked out, as ExtraFiles,
+// the other cross-project key mechanism, is for a path under the workspace root.
+// That matters here because this digest reaches a CONSUMER's key through the
+// producing action, and a key that varied with the checkout directory would make
+// every remote entry unshareable between a developer and CI.
 //
 // A member with no matching file contributes its empty digest rather than being
 // skipped, so ADDING a manifest to a dependency moves the key exactly as

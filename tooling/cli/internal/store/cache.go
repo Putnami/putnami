@@ -22,7 +22,7 @@ type CacheManager struct {
 	store              *LocalStore
 	fileHashCache      map[string]string // memoizes file hashes: "dir|patterns" → hash
 	fileHashMu         sync.Mutex
-	extraFileHashCache map[string]string // memoizes extra-file hashes: sorted NUL-joined paths → hash
+	extraFileHashCache map[string]string // memoizes extra-file hashes: workspace root and sorted paths, NUL-joined → hash
 	extraFileHashMu    sync.Mutex
 	sourceStates       map[string]string // memoizes SourceState: workspace root → state
 	sourceStateMu      sync.Mutex
@@ -115,11 +115,12 @@ func (cm *CacheManager) InvalidateFileHashes() {
 // recursively and reads every byte beneath it, and the same ExtraFiles set is
 // hashed once at key-precompute time and again at execute-time lookup for
 // every cacheable step that declares it — the memo turns those repeated full
-// tree reads into one per CLI invocation. The memo key is the sorted path set
-// joined with NUL (which cannot occur in a path), so distinct sets never
-// collide; hashExtraFiles is order-independent, so two orderings of the same
-// set correctly share one entry. The cached value is byte-identical to
-// hashExtraFiles(paths), leaving cache keys unchanged for unchanged inputs.
+// tree reads into one per CLI invocation. The memo key is the workspace root
+// followed by the sorted path set, joined with NUL (which cannot occur in a
+// path), so distinct sets never collide and one set named against two roots
+// never shares an entry; hashExtraFiles is order-independent, so two orderings
+// of the same set correctly share one entry. The cached value is byte-identical
+// to hashExtraFiles(workspaceRoot, paths).
 //
 // The memo assumes ExtraFiles are stable for the lifetime of a CLI invocation —
 // cross-project *source* assets (committed docs, `build.assets` public trees),
@@ -128,11 +129,11 @@ func (cm *CacheManager) InvalidateFileHashes() {
 // precompute-time hash at execute-time lookup, so its later content is not seen;
 // route such intra-run outputs through the normal dependency graph (which
 // carries the producing job's hash) rather than declaring them as ExtraFiles.
-func (cm *CacheManager) lookupExtraFilesHash(paths []string) string {
+func (cm *CacheManager) lookupExtraFilesHash(workspaceRoot string, paths []string) string {
 	sorted := make([]string, len(paths))
 	copy(sorted, paths)
 	sort.Strings(sorted)
-	key := strings.Join(sorted, "\x00")
+	key := workspaceRoot + "\x00" + strings.Join(sorted, "\x00")
 
 	cm.extraFileHashMu.Lock()
 	if cached, ok := cm.extraFileHashCache[key]; ok {
@@ -141,7 +142,7 @@ func (cm *CacheManager) lookupExtraFilesHash(paths []string) string {
 	}
 	cm.extraFileHashMu.Unlock()
 
-	hash := hashExtraFiles(sorted)
+	hash := hashExtraFiles(workspaceRoot, sorted)
 
 	cm.extraFileHashMu.Lock()
 	cm.extraFileHashCache[key] = hash
@@ -301,6 +302,11 @@ type CacheKey struct {
 	// `versionVar`) param or a `cache.versionAware` task policy; otherwise
 	// empty. Including it in the key prevents serving cached bytes that embed a
 	// stale version.
+	//
+	// It is the only field through which the commit reaches a key, apart from
+	// a build stamp a generate asset copies into the output (ExtraFiles). Every
+	// other field describes the tree, so a task that leaves it empty keys the
+	// same at two commits that share one tree.
 	EmbeddedVersion string
 
 	// SelectedProjects identifies the resolved command selection for a
@@ -334,9 +340,13 @@ type CacheKey struct {
 	// EnvVars are environment variable names whose values affect the cache.
 	EnvVars []string
 
-	// ExtraFiles are absolute paths to individual files outside the project
-	// root whose content should contribute to the cache key (e.g., cross-project
-	// generate assets).
+	// ExtraFiles are absolute paths to individual files or directories outside
+	// the project root whose content should contribute to the cache key (e.g.,
+	// cross-project generate assets). A path under WorkspaceRoot contributes
+	// under its workspace-relative slash form, so the key does not depend on the
+	// checkout directory; any other path contributes as given (hashExtraFiles).
+	// A build stamp inside an asset keeps its commit fields, because the asset
+	// copies it into the output.
 	ExtraFiles []string
 
 	// UpstreamHashes are hashes from upstream task outputs that this
@@ -345,9 +355,10 @@ type CacheKey struct {
 }
 
 // cacheKeyVersion prefixes every computed key, so an entry written under one
-// key format is never served as a hit under another. It changes whenever a
-// field is added or what a field covers changes, and each change is a
-// deliberate one-time whole-cache miss.
+// key format is never served as a hit under another. It changes when a key
+// computation change could serve an existing address under a different
+// meaning. It stays when the change only moves keys to addresses no earlier
+// entry occupies (ADR 0059). Each change is a one-time whole-cache miss.
 const cacheKeyVersion = "v8"
 
 // ComputeHashUsing computes a SHA-256 cache key from all CacheKey fields,
@@ -438,7 +449,7 @@ func (k *CacheKey) ComputeHashUsing(cm *CacheManager) (string, error) {
 	// so each asset tree is walked and read once per CLI invocation instead of
 	// once per (job × precompute/execute) key computation.
 	if len(k.ExtraFiles) > 0 {
-		extraHash := cm.lookupExtraFilesHash(k.ExtraFiles)
+		extraHash := cm.lookupExtraFilesHash(k.WorkspaceRoot, k.ExtraFiles)
 		writeField(h, extraHash)
 	}
 
@@ -792,7 +803,7 @@ type CacheKeyPolicy struct {
 	Files           []string
 	WorkspaceFiles  []string
 	Env             []string
-	ExtraFiles      []string // absolute paths to files outside the project root
+	ExtraFiles      []string // absolute paths outside the project root, keyed workspace-relative when under the workspace root
 	RuntimeIdentity []string // resolved `name=value` pairs for declared runtime inputs
 	// ConfigScope names the extension whose option layers a hashed project
 	// config contributes. Empty keeps the file whole.

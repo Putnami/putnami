@@ -345,14 +345,16 @@ func TestSchedulerGenerationLocalHitStampsTheCurrentRevision(t *testing.T) {
 // TestSchedulerGenerationLocalHitLeavesTheStampKeyInputUnchanged is the
 // stable-key-inputs guarantee on the
 // restore path. prepareRun seeds the stamp BEFORE any key is computed, so its
-// buildTime-free digest is a keyed input of every task whose globs reach it
+// tree-only digest is a keyed input of every task whose globs reach it
 // (TypeScript lint's **/*.json). The gen restore then overwrites that file with
-// the producing run's bytes. If the run ended there, the very inputs its keys
-// were computed from would no longer be on disk, and a project that took one
-// miss could never hit again.
+// the producing run's bytes, and the re-stamp rewrites its identity. The digest
+// reads neither revision, so the seed for a new revision leaves the keyed input
+// where the producing run left it, and the run ends holding the value its keys
+// were computed from. A project that took one miss can hit again.
 func TestSchedulerGenerationLocalHitLeavesTheStampKeyInputUnchanged(t *testing.T) {
 	job := genStampJob()
 	f := newCaptureFixture(t, job)
+	projectRoot := filepath.Join(f.ws.Root, captureTestProject)
 
 	produced := stampCommitA()
 	current := stampCommitB()
@@ -361,9 +363,10 @@ func TestSchedulerGenerationLocalHitLeavesTheStampKeyInputUnchanged(t *testing.T
 
 	// What prepareRun does: seed the current identity, then key on it.
 	preserveMatchingVersionFiles(f.ws, []*ScheduledJob{job}, current, "2026-07-31T09:00:00Z")
+	assertStampReports(t, "seed", projectRoot, current)
 	keyedInput := stampKeyInput(t, f.ws, captureTestProject)
-	if keyedInput == producedInput {
-		t.Fatal("the stamp digest is blind to the revision; this test would prove nothing")
+	if keyedInput != producedInput {
+		t.Fatalf("seeding a new revision over an unchanged tree moved the stamp's key input: %s → %s", producedInput, keyedInput)
 	}
 
 	f.sched.cfg.VersionInfo = current
@@ -373,6 +376,13 @@ func TestSchedulerGenerationLocalHitLeavesTheStampKeyInputUnchanged(t *testing.T
 
 	if after := stampKeyInput(t, f.ws, captureTestProject); after != keyedInput {
 		t.Fatalf("the run mutated a value its own keys hashed: stamp digest %s → %s", keyedInput, after)
+	}
+
+	// The control: the digest still reads the stamp. Without it the equalities
+	// above would also hold for a digest blind to the whole document.
+	mergeStampField(t, projectRoot, "contentHash", "sha256:0000000000000000")
+	if changed := stampKeyInput(t, f.ws, captureTestProject); changed == keyedInput {
+		t.Fatal("a new contentHash kept the stamp's key input; the digest no longer reads the stamp")
 	}
 }
 

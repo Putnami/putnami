@@ -257,16 +257,18 @@ func RequireFullClone(repoRoot string) error {
 // writes.
 //
 // Against store.versionStampDigest, which is how the file reaches a cache key:
-// that digest re-marshals the document as a MAP with only `buildTime` deleted, so
-// it is already key-order independent and the reordering here cannot move it.
-// What the merge does change is that a carried field now contributes to the
-// digest instead of being deleted on the next scheduler write — which is correct
-// (it is real content) and strictly MORE stable than before, because the lossy
-// write made a value flip between present and absent depending on which writer
-// touched the file last. A project whose .gen starts empty still settles in one
-// run — the restore introduces the field after that run's keys were computed —
-// but that is the same one-time settle a real generate execution always had, not
-// a loop: the next run seeds, keys and re-stamps on the identical document.
+// that digest re-marshals the document as a MAP without the fields that do not
+// describe the tree, so it is already key-order independent and the reordering
+// here cannot move it.
+// What the merge does change is that a carried tree field, such as contentHash,
+// now contributes to the digest instead of being deleted on the next scheduler
+// write — which is correct (it is real content) and strictly MORE stable than
+// before, because the lossy write made a value flip between present and absent
+// depending on which writer touched the file last. A project whose .gen starts
+// empty still settles in one run — the restore introduces the field after that
+// run's keys were computed — but that is the same one-time settle a real
+// generate execution always had, not a loop: the next run seeds, keys and
+// re-stamps on the identical document.
 func writeVersionStamp(path string, info VersionInfo) error {
 	owned, err := json.Marshal(info)
 	if err != nil {
