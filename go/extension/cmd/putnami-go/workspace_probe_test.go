@@ -111,6 +111,7 @@ func probeFixture(t *testing.T) string {
 			"require (\n\texample.com/core v0.0.0\n\tgithub.com/google/uuid v1.6.0 // indirect\n)\n\n"+
 			"replace example.com/core => ../../libs/core\n")
 	writeProbeFile(t, filepath.Join(root, "libs", "core", "go.mod"), "module example.com/core\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "libs", "core", "core.go"), "package core\n\nconst Name = \"core\"\n")
 	writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"),
 		"package main\n\nimport \"example.com/core\"\n\nfunc main() { _ = core.Name }\n")
 	writeProbeFile(t, filepath.Join(root, "apps", "svc", "putnami.json"), `{"publish":["go"]}`)
@@ -249,18 +250,201 @@ func TestProbe_AttributesAnUnimportedRequireAsADeclaration(t *testing.T) {
 // A require of a workspace module whose sources import only a module nested
 // inside it is a DECLARATION: the nested module provides those packages, so
 // the parent the go.mod requires is not read by the build.
-func TestProbe_AttributesARequireOfAParentOfAnImportedNestedModuleAsADeclaration(t *testing.T) {
+//
+// The import of the nested module the go.mod does not require is an edge and a
+// warning: go.work builds it, so a change to the nested module must select the
+// importer, and a module-mode build cannot resolve it until go.mod states it.
+func TestProbe_AnUnrequiredImportOfAWorkspaceModuleIsAnEdgeAndAWarning(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "probe-graph-fidelity", "an-unrequired-import-of-a-workspace-module-is-an-edge-and-a-warning")
 	root := probeFixture(t)
 	writeProbeFile(t, filepath.Join(root, "libs", "core", "client", "go.mod"), "module example.com/core/client\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "libs", "core", "client", "client.go"), "package client\n")
 	writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"),
 		"package main\n\nimport \"example.com/core/client\"\n\nfunc main() { _ = client.Hello }\n")
 
-	svc := projectAt(t, probeAll(t, root, "apps/svc", "libs/core", "libs/core/client"), "apps/svc")
-	if !slices.Equal(svc.Dependencies, []string{"libs/core"}) {
-		t.Fatalf("dependencies = %v, want the edge the require still states", svc.Dependencies)
+	result := probeAll(t, root, "apps/svc", "libs/core", "libs/core/client")
+	svc := projectAt(t, result, "apps/svc")
+	if !slices.Equal(svc.Dependencies, []string{"libs/core", "libs/core/client"}) {
+		t.Fatalf("dependencies = %v, want the required parent and the imported nested module", svc.Dependencies)
 	}
 	if got := svc.DependencySources["libs/core"]; got != wsproto.DependencySourceDeclared {
 		t.Errorf("dependencySources[libs/core] = %q, want %q", got, wsproto.DependencySourceDeclared)
+	}
+	if got := svc.DependencySources["libs/core/client"]; got != wsproto.DependencySourceGoModule {
+		t.Errorf("dependencySources[libs/core/client] = %q, want %q", got, wsproto.DependencySourceGoModule)
+	}
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("diagnostics = %v, want one warning for the unrequired import", result.Diagnostics)
+	}
+	warning := result.Diagnostics[0]
+	if warning.Severity != diag.Warning || warning.Code != "unrequired-import" || warning.Field != "apps/svc/go.mod" {
+		t.Errorf("diagnostic = %+v, want an unrequired-import warning on apps/svc/go.mod", warning)
+	}
+	for _, remedy := range []string{"require example.com/core/client v0.0.0", "replace example.com/core/client => ../../libs/core/client"} {
+		if !strings.Contains(warning.Message, remedy) {
+			t.Errorf("diagnostic message %q does not name %q", warning.Message, remedy)
+		}
+	}
+}
+
+// A replace alone does not make go.mod state an import: a module-mode build
+// still cannot resolve a module nothing requires. The replace's edge and the
+// import's edge are one edge.
+func TestProbe_AReplaceWithoutARequireStillWarnsAboutTheImport(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"),
+		"module example.com/svc\n\ngo 1.25\n\nreplace example.com/core => ../../libs/core\n")
+
+	result := probeAll(t, root, "apps/svc", "libs/core")
+	svc := projectAt(t, result, "apps/svc")
+	if !slices.Equal(svc.Dependencies, []string{"libs/core"}) {
+		t.Fatalf("dependencies = %v, want one edge to libs/core", svc.Dependencies)
+	}
+	if got := svc.DependencySources["libs/core"]; got != wsproto.DependencySourceGoModule {
+		t.Errorf("dependencySources[libs/core] = %q, want %q", got, wsproto.DependencySourceGoModule)
+	}
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != "unrequired-import" {
+		t.Errorf("diagnostics = %v, want one unrequired-import warning", result.Diagnostics)
+	}
+}
+
+// A package under a workspace module's path that a nested module the probe
+// does not know provides is not credited to the workspace module: requiring
+// that module would not resolve the import.
+func TestProbe_AnImportANestedUnknownModuleProvidesIsNotCreditedToItsParent(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"), "module example.com/svc\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "libs", "core", "plugin", "go.mod"), "module example.com/core/plugin\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "libs", "core", "plugin", "api", "api.go"), "package api\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"),
+		"package main\n\nimport _ \"example.com/core/plugin/api\"\n\nfunc main() {}\n")
+
+	result := probeAll(t, root, "apps/svc", "libs/core")
+	if svc := projectAt(t, result, "apps/svc"); len(svc.Dependencies) != 0 {
+		t.Errorf("dependencies = %v, want none", svc.Dependencies)
+	}
+	if len(result.Diagnostics) != 0 {
+		t.Errorf("diagnostics = %v, want none", result.Diagnostics)
+	}
+}
+
+// An import path with a `..` element names no package of the module it
+// resolves under, and the probe answers without walking out of the module.
+func TestProbe_AnImportPathThatLeavesTheModuleIsNotCredited(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"), "module example.com/svc\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"),
+		"package main\n\nimport _ \"example.com/core/../../..\"\n\nfunc main() {}\n")
+
+	result := probeAll(t, root, "apps/svc", "libs/core")
+	if svc := projectAt(t, result, "apps/svc"); len(svc.Dependencies) != 0 {
+		t.Errorf("dependencies = %v, want none", svc.Dependencies)
+	}
+	if len(result.Diagnostics) != 0 {
+		t.Errorf("diagnostics = %v, want none", result.Diagnostics)
+	}
+}
+
+// An import path element holding a backslash names no package, even where a
+// directory of that literal name exists: on Windows it would leave the module.
+func TestProbe_AnImportPathElementWithABackslashIsNotCredited(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"), "module example.com/svc\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "libs", "core", `a\b`, "pkg.go"), "package pkg\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"),
+		"package main\n\nimport _ \"example.com/core/a\\\\b\"\n\nfunc main() {}\n")
+
+	result := probeAll(t, root, "apps/svc", "libs/core")
+	if svc := projectAt(t, result, "apps/svc"); len(svc.Dependencies) != 0 {
+		t.Errorf("dependencies = %v, want none", svc.Dependencies)
+	}
+	if len(result.Diagnostics) != 0 {
+		t.Errorf("diagnostics = %v, want none", result.Diagnostics)
+	}
+}
+
+// A package directory that holds no `.go` file the scan reads provides no
+// package, and a file whose name starts with "_" is never read.
+func TestProbe_AnImportOfADirectoryWithoutGoFilesIsNotCredited(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"), "module example.com/svc\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "libs", "core", "assets", "_draft.go"), "package assets\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"),
+		"package main\n\nimport _ \"example.com/core/assets\"\n\nfunc main() {}\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "_old.go"),
+		"package main\n\nimport _ \"example.com/core\"\n")
+
+	result := probeAll(t, root, "apps/svc", "libs/core")
+	if svc := projectAt(t, result, "apps/svc"); len(svc.Dependencies) != 0 {
+		t.Errorf("dependencies = %v, want none", svc.Dependencies)
+	}
+	if len(result.Diagnostics) != 0 {
+		t.Errorf("diagnostics = %v, want none", result.Diagnostics)
+	}
+}
+
+// A file only `//go:build ignore` admits is one `go mod tidy` never reads, so
+// its imports are neither an edge nor a warning.
+func TestProbe_AnImportInAnIgnoredFileIsNotAnEdge(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "libs", "util", "go.mod"), "module example.com/util\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "libs", "util", "util.go"), "package util\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "gen.go"),
+		"//go:build ignore\n\npackage main\n\nimport _ \"example.com/util\"\n")
+
+	result := probeAll(t, root, "apps/svc", "libs/core", "libs/util")
+	if svc := projectAt(t, result, "apps/svc"); !slices.Equal(svc.Dependencies, []string{"libs/core"}) {
+		t.Errorf("dependencies = %v, want [libs/core]", svc.Dependencies)
+	}
+	if len(result.Diagnostics) != 0 {
+		t.Errorf("diagnostics = %v, want none", result.Diagnostics)
+	}
+}
+
+// An unparsable file leaves the scan incomplete and the walk reads the rest of
+// the module, so an import in another file is still an edge and a warning.
+func TestProbe_AnUnparsableFileHidesNoOtherImport(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "libs", "util", "go.mod"), "module example.com/util\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "libs", "util", "util.go"), "package util\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "a_broken.go"), "package main\n\nimport \"example.com/util\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "z_util.go"), "package main\n\nimport _ \"example.com/util\"\n")
+
+	result := probeAll(t, root, "apps/svc", "libs/core", "libs/util")
+	if svc := projectAt(t, result, "apps/svc"); !slices.Equal(svc.Dependencies, []string{"libs/core", "libs/util"}) {
+		t.Errorf("dependencies = %v, want [libs/core libs/util]", svc.Dependencies)
+	}
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != "unrequired-import" {
+		t.Errorf("diagnostics = %v, want one unrequired-import warning", result.Diagnostics)
+	}
+}
+
+// The replace target the warning names is relative to the importing go.mod,
+// from the workspace root, a parent and a sibling alike.
+func TestGoReplaceTargetIsRelativeToTheImportingGoMod(t *testing.T) {
+	for _, c := range []struct{ from, to, want string }{
+		{".", "libs/core", "./libs/core"},
+		{"libs/core", "libs/core/client", "./client"},
+		{"apps/svc", "libs/core", "../../libs/core"},
+		{"libs/core/client", ".", "../../.."},
+	} {
+		if got := goReplaceTarget(c.from, c.to); got != c.want {
+			t.Errorf("goReplaceTarget(%q, %q) = %q, want %q", c.from, c.to, got, c.want)
+		}
+	}
+}
+
+// An import of a module the go.mod requires, `// indirect` included, and an
+// import of the module's own packages are not reported.
+func TestProbe_ARequiredImportIsNotReported(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"),
+		"module example.com/svc\n\ngo 1.25\n\nrequire example.com/core v0.0.0 // indirect\n\nreplace example.com/core => ../../libs/core\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "run", "run.go"),
+		"package run\n\nimport \"example.com/svc/internal/self\"\n\nvar _ = self.X\n")
+
+	if result := probeAll(t, root, "apps/svc", "libs/core"); len(result.Diagnostics) != 0 {
+		t.Errorf("diagnostics = %v, want none", result.Diagnostics)
 	}
 }
 
@@ -343,6 +527,20 @@ func TestProbe_ModuleLessManifestWarnsAndSkips(t *testing.T) {
 func TestProbe_IsDeterministicAcrossRunsAndRequestOrder(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "probe-purity", "the-answer-is-identical-across-repeated-runs-and-request-orderings")
 	root := probeFixture(t)
+	// Two importers each import two workspace modules their go.mod does not
+	// require, so the warnings' order is part of the compared answer.
+	writeProbeFile(t, filepath.Join(root, "libs", "util", "go.mod"), "module example.com/util\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "libs", "util", "util.go"), "package util\n")
+	writeProbeFile(t, filepath.Join(root, "libs", "core", "client", "go.mod"), "module example.com/core/client\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "libs", "core", "client", "client.go"), "package client\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "extra.go"),
+		"package main\n\nimport (\n\t_ \"example.com/core/client\"\n\t_ \"example.com/util\"\n)\n")
+	writeProbeFile(t, filepath.Join(root, "libs", "core", "core.go"),
+		"package core\n\nimport (\n\t_ \"example.com/core/client\"\n\t_ \"example.com/util\"\n)\n")
+	paths := []string{".", "apps/svc", "libs/core", "libs/core/client", "libs/util", "web"}
+	if result := probeAll(t, root, paths...); len(result.Diagnostics) != 4 {
+		t.Fatalf("diagnostics = %v, want four unrequired-import warnings", result.Diagnostics)
+	}
 	render := func(paths []string) string {
 		result, err := probeGoWorkspace(root, wsproto.ProbeRequest{
 			Version: wsproto.ProbeProtocolVersion, Extension: goExtensionName, Paths: paths,
@@ -357,12 +555,14 @@ func TestProbe_IsDeterministicAcrossRunsAndRequestOrder(t *testing.T) {
 		return string(encoded)
 	}
 
-	forward := render([]string{".", "apps/svc", "libs/core", "web"})
-	reversed := render([]string{"web", "libs/core", "apps/svc", "."})
+	forward := render(paths)
+	backward := slices.Clone(paths)
+	slices.Reverse(backward)
+	reversed := render(backward)
 	if forward != reversed {
 		t.Fatalf("candidate order changed the answer:\n%s\n%s", forward, reversed)
 	}
-	if again := render([]string{".", "apps/svc", "libs/core", "web"}); again != forward {
+	if again := render(paths); again != forward {
 		t.Fatalf("two runs over one tree disagree:\n%s\n%s", forward, again)
 	}
 

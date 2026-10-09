@@ -428,6 +428,9 @@ func synchronize(req SyncRequest) (*SyncOutcome, error) {
 	if err := req.Workspace.AdoptValidatedProbeView(merged); err != nil {
 		failure := wsproto.NewProbeFailure(wsproto.ProbeFailureConflict, "",
 			"the merged provider view does not describe a loadable workspace: %v", err)
+		// The providers' warnings travel with the refusal: they can name the
+		// source of the edge or the identity that closed the cycle.
+		failure.Diagnostics = append(failure.Diagnostics, outcome.Diagnostics...)
 		failure.Diagnostics = append(failure.Diagnostics, diag.Errorf(
 			extproto.FailureWorkspaceSnapshotInvalid, WorkspaceIndexFilename,
 			"the index was NOT updated; %s still records the last view that loaded", WorkspaceIndexFilename))

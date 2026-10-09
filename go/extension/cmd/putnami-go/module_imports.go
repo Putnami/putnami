@@ -1,6 +1,8 @@
 package main
 
 import (
+	"go/ast"
+	"go/build/constraint"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -23,8 +25,11 @@ import (
 //
 //   - a test file counts exactly like a non-test file, because a requirement a
 //     `_test.go` alone imports is one tidy keeps;
-//   - build constraints are ignored, because tidy considers every build
-//     configuration;
+//   - build constraints count only through the `ignore` tag: tidy considers
+//     every build configuration except one that sets `ignore`, so a file only
+//     `//go:build ignore` admits is skipped, and so is a file whose
+//     `//go:build` line is malformed or repeated;
+//   - a file whose name starts with "." or "_" is skipped, like a directory;
 //   - `testdata`, `vendor` and directories whose name starts with "." or "_"
 //     are skipped, because the go command loads no package from them — `.gen`
 //     is one of them, so a generated tree a build wrote never changes the
@@ -33,17 +38,19 @@ import (
 //
 // The scan is read-only and toolchain-free: no `go list`, no module download,
 // no build cache. Each file is parsed in imports-only mode, which stops at the
-// first declaration.
+// first declaration. It reads the whole module: an import of a workspace module
+// the go.mod does not require is found only by reading every file.
 
-// moduleImportScan is one module's answer: which of the workspace modules asked
-// about its own sources import, and whether the walk read everything it meant
-// to.
+// moduleImportScan is one module's answer: which of the modules asked about its
+// own sources import, and whether the walk read everything it meant to.
 type moduleImportScan struct {
 	// imported holds the asked-about module paths a source file imports.
 	imported map[string]bool
-	// complete reports that every file under the module was read and parsed. A
-	// scan that is not complete attributes NOTHING: an unreadable directory or
-	// an unparsable file must never turn a real import into a phantom edge.
+	// packages maps each imported package path to the module credited with it.
+	packages map[string]string
+	// complete reports that every file under the module was read and parsed.
+	// Every recorded import is real either way; an incomplete scan only keeps
+	// a require from reading as unimported.
 	complete bool
 }
 
@@ -58,58 +65,114 @@ func (s moduleImportScan) importsModule(module string) bool {
 }
 
 // scanModuleImports reads the module rooted at moduleDir and reports which of
-// wanted its sources import.
+// providers its sources import.
 //
-// An import is credited to the module that provides it, resolved against
-// wanted and providers together, and counts only when that module is wanted. A
-// module nested under a wanted one therefore keeps its own packages even when
-// this go.mod requires the parent alone.
-//
-// The walk stops as soon as every wanted module has been seen: a healthy module
-// imports what it requires, so the common case reads a prefix of the tree.
-func scanModuleImports(moduleDir string, wanted, providers []string) moduleImportScan {
-	scan := moduleImportScan{imported: make(map[string]bool, len(wanted)), complete: true}
-	if len(wanted) == 0 {
+// An import is credited to the longest provider that provides it, so a module
+// nested under another one is credited alone for its own packages. An
+// unreadable directory or an unparsable file leaves the scan incomplete, and
+// the walk reads every other file.
+func scanModuleImports(moduleDir string, providers []string) moduleImportScan {
+	scan := moduleImportScan{imported: make(map[string]bool), packages: make(map[string]string), complete: true}
+	if len(providers) == 0 {
 		return scan
 	}
-	isWanted := make(map[string]bool, len(wanted))
-	for _, module := range wanted {
-		isWanted[module] = true
-	}
-	candidates := append(append([]string(nil), wanted...), providers...)
 	fset := token.NewFileSet()
-	err := filepath.WalkDir(moduleDir, func(current string, entry fs.DirEntry, walkErr error) error {
+	_ = filepath.WalkDir(moduleDir, func(current string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
-			return walkErr
-		}
-		if len(scan.imported) == len(wanted) {
-			return fs.SkipAll
+			scan.complete = false
+			return nil
 		}
 		if entry.IsDir() {
 			return skipGoDirectory(current, moduleDir, entry.Name())
 		}
-		if !strings.HasSuffix(entry.Name(), ".go") {
+		if !strings.HasSuffix(entry.Name(), ".go") || skipGoFile(entry.Name()) {
 			return nil
 		}
-		file, err := parser.ParseFile(fset, current, nil, parser.ImportsOnly)
+		file, err := parser.ParseFile(fset, current, nil, parser.ImportsOnly|parser.ParseComments)
 		if err != nil {
-			return err
+			scan.complete = false
+			return nil
+		}
+		if tidyIgnores(fset, file) {
+			return nil
 		}
 		for _, spec := range file.Imports {
 			imported, err := strconv.Unquote(spec.Path.Value)
 			if err != nil {
 				continue
 			}
-			if module := longestModuleMatch(imported, candidates); isWanted[module] {
+			if module := longestModuleMatch(imported, providers); module != "" {
 				scan.imported[module] = true
+				scan.packages[imported] = module
 			}
 		}
 		return nil
 	})
-	if err != nil {
-		scan.complete = false
-	}
 	return scan
+}
+
+// skipGoFile reports that the go command loads no package from a file of
+// this name.
+func skipGoFile(name string) bool {
+	return strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")
+}
+
+// tidyIgnores reports that `go mod tidy` reads nothing of file: no build
+// configuration with the `ignore` tag unset satisfies its build constraint, or
+// its `//go:build` line is malformed or repeated. A `//go:build` line wins over
+// `// +build` lines, which are ANDed and count only in a comment group a blank
+// line separates from the package clause.
+func tidyIgnores(fset *token.FileSet, file *ast.File) bool {
+	packageLine := fset.Position(file.Package).Line
+	var goBuild []string
+	var plusBuild []constraint.Expr
+	for _, group := range file.Comments {
+		if group.Pos() >= file.Package {
+			break
+		}
+		separated := fset.Position(group.End()).Line < packageLine-1
+		for _, comment := range group.List {
+			switch {
+			case constraint.IsGoBuild(comment.Text):
+				goBuild = append(goBuild, comment.Text)
+			case separated && constraint.IsPlusBuild(comment.Text):
+				if expr, err := constraint.Parse(comment.Text); err == nil {
+					plusBuild = append(plusBuild, expr)
+				}
+			}
+		}
+	}
+	switch len(goBuild) {
+	case 0:
+	case 1:
+		expr, err := constraint.Parse(goBuild[0])
+		return err != nil || !tidyAdmits(expr, true)
+	default:
+		return true
+	}
+	for _, expr := range plusBuild {
+		if !tidyAdmits(expr, true) {
+			return true
+		}
+	}
+	return false
+}
+
+// tidyAdmits evaluates expr the way `go mod tidy` does: `ignore` is false, and
+// every other tag takes whichever value satisfies the term it sits in.
+func tidyAdmits(expr constraint.Expr, prefer bool) bool {
+	switch expr := expr.(type) {
+	case *constraint.TagExpr:
+		return expr.Tag != "ignore" && prefer
+	case *constraint.NotExpr:
+		return !tidyAdmits(expr.X, !prefer)
+	case *constraint.AndExpr:
+		return tidyAdmits(expr.X, prefer) && tidyAdmits(expr.Y, prefer)
+	case *constraint.OrExpr:
+		return tidyAdmits(expr.X, prefer) || tidyAdmits(expr.Y, prefer)
+	default:
+		return true
+	}
 }
 
 // skipGoDirectory applies the go command's package-loading rule to one

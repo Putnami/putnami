@@ -7,8 +7,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 
 	"go.putnami.dev/go/extension/internal/gosource"
 	"go.putnami.dev/go/extension/internal/releaseplan"
@@ -48,14 +50,14 @@ import (
 //     holds its own go.mod; the moment one stops doing so, SourceFile and the
 //     replace-target index still point at the real file.
 //
-//   - SOLE OWNER. Edge derivation is what core's `deriveGoDependencies` used to
-//     do: requires resolve through a module index, local replaces resolve
-//     through a DIRECTORY index over every candidate — not only the Go ones,
-//     because core indexes every project by directory and a probe that indexed
-//     fewer would silently drop an edge. That parser is gone, so there
-//     is no second opinion left to compare against: a dropped edge here is a
-//     dropped edge in the build graph. The corpus in
-//     workspace_corpus_test.go is now the sole conformance suite.
+//   - SOLE OWNER. The probe is the only source of Go edges: requires and
+//     workspace modules imported without a require resolve through a module
+//     index, local replaces resolve through a DIRECTORY index over every
+//     candidate — not only the Go ones, because core indexes every project by
+//     directory and a probe that indexed fewer would silently drop an edge. No
+//     second opinion exists to compare against: a dropped edge here is a
+//     dropped edge in the build graph. The corpus in workspace_corpus_test.go
+//     is the sole conformance suite.
 
 // goExtensionName is the identity this extension answers under. It keys the
 // provider-owned metadata bucket in core's merged view and must match the
@@ -181,31 +183,58 @@ func probeGoWorkspace(root string, request wsproto.ProbeRequest) (wsproto.ProbeR
 		}
 	}
 
-	for _, candidate := range candidates {
-		project := goProbeProjectFor(root, candidate, byModule, byDir, workspace)
-		if candidate.modFile == "" {
-			project.Type = goImageProjectType
-			result.Projects = append(result.Projects, project)
-			continue
-		}
-		classified, err := goProjectType(root, candidate)
-		if err != nil {
-			// Classification is REPORTED and left empty rather than guessed.
-			// Empty is core's "application" default, which is what every Go
-			// project got before this probe classified anything — so an
-			// unreadable tree degrades to the old behavior instead of
-			// silently demoting a workload to a library and taking its
-			// serve, run, and infra aggregation with it.
-			result.Diagnostics = append(result.Diagnostics,
-				diag.Warningf("classification-failed", candidate.path, "%v", err))
-		} else {
-			project.Type = classified
-		}
-		result.Projects = append(result.Projects, project)
+	// Each candidate reads its own sources and only reads the shared indexes, so
+	// the candidates render concurrently; the answer keeps the sorted order.
+	rendered := make([]goRenderedCandidate, len(candidates))
+	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
+	var wait sync.WaitGroup
+	for i, candidate := range candidates {
+		wait.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			rendered[i] = goRenderCandidate(root, candidate, byModule, byDir, workspace)
+		})
+	}
+	wait.Wait()
+	for _, candidate := range rendered {
+		result.Projects = append(result.Projects, candidate.project)
+		result.Diagnostics = append(result.Diagnostics, candidate.diagnostics...)
 	}
 
 	wsproto.NormalizeProbeResult(&result)
 	return result, nil
+}
+
+// goRenderedCandidate is one candidate's project and the warnings it raised.
+type goRenderedCandidate struct {
+	project     wsproto.ProbeProject
+	diagnostics []diag.Diagnostic
+}
+
+// goRenderCandidate renders and classifies one candidate.
+func goRenderCandidate(
+	root string,
+	candidate *goCandidate,
+	byModule map[string]*goCandidate,
+	byDir map[string]string,
+	workspace goWorkspaceDocument,
+) goRenderedCandidate {
+	project, diagnostics := goProbeProjectFor(root, candidate, byModule, byDir, workspace)
+	if candidate.modFile == "" {
+		project.Type = goImageProjectType
+		return goRenderedCandidate{project: project, diagnostics: diagnostics}
+	}
+	classified, err := goProjectType(root, candidate)
+	if err != nil {
+		// Classification is REPORTED and left empty rather than guessed.
+		// Empty reads as core's "application" default, so an unreadable tree
+		// never demotes a workload to a library and takes its serve, run, and
+		// infra aggregation with it.
+		diagnostics = append(diagnostics, diag.Warningf("classification-failed", candidate.path, "%v", err))
+	} else {
+		project.Type = classified
+	}
+	return goRenderedCandidate{project: project, diagnostics: diagnostics}
 }
 
 // readGoCandidate reads one candidate's go.mod or an authored image project's
@@ -235,14 +264,15 @@ func readGoCandidate(root, candidate string) (*goCandidate, error) {
 	}, nil
 }
 
-// goProbeProjectFor renders one candidate's answer.
+// goProbeProjectFor renders one candidate's answer, with one warning for each
+// workspace module its sources import and its go.mod does not require.
 func goProbeProjectFor(
 	root string,
 	c *goCandidate,
 	byModule map[string]*goCandidate,
 	byDir map[string]string,
 	workspace goWorkspaceDocument,
-) wsproto.ProbeProject {
+) (wsproto.ProbeProject, []diag.Diagnostic) {
 	sourceFile := c.modFile
 	if sourceFile == "" {
 		sourceFile = goProjectConfigPathFor(c.path)
@@ -253,7 +283,9 @@ func goProbeProjectFor(
 		_, scopeFiles := wsproto.LoadScopeChainWithSources(root, filepath.Join(root, filepath.FromSlash(c.path)))
 		watched = append(watched, scopeFiles...)
 	}
-	dependencies := goDependencyPaths(c, byModule, byDir)
+	scan := goModuleImportScan(root, c, byModule)
+	unrequired := goUnrequiredImports(root, c, byModule, scan)
+	dependencies := goDependencyPaths(c, byModule, byDir, unrequired)
 	return wsproto.ProbeProject{
 		Path:       c.path,
 		SourceName: c.mod.Module,
@@ -270,9 +302,9 @@ func goProbeProjectFor(
 		// Type and therefore which build pipeline is planned.
 		WatchedFiles:      watched,
 		Dependencies:      dependencies,
-		DependencySources: goDependencySources(root, c, dependencies, byModule),
+		DependencySources: goDependencySources(c, dependencies, byModule, scan),
 		Metadata:          goReleaseSetMetadata(root, c, byModule, workspace),
-	}
+	}, goUnrequiredImportDiagnostics(c, byModule, unrequired)
 }
 
 // goReleaseSetMetadata records only the internal module paths that the staged
@@ -544,22 +576,25 @@ func goProjectType(root string, c *goCandidate) (string, error) {
 	return goTypeLibrary, nil
 }
 
-// goDependencyPaths resolves one module's require and replace directives onto
-// the repo-relative paths of the candidates that answer for them.
+// goDependencyPaths resolves one module's require and replace directives, and
+// the workspace modules it imports without requiring them, onto the
+// repo-relative paths of the candidates that answer for them.
 //
-// Two independent signals resolve an edge, because a local go.mod replace
-// carries a placeholder version and the require line alone is not enough:
+// Three independent signals resolve an edge, because a local go.mod replace
+// carries a placeholder version and the require line alone is not enough, and
+// because go.work builds an import the go.mod does not state:
 //
 //   - a require's module path → the candidate whose go.mod declares it;
 //   - a replace target → for a local (`./`, `../`) target, the candidate
-//     directory it resolves to; for a module-path target, the module index.
+//     directory it resolves to; for a module-path target, the module index;
+//   - an unrequired import → the candidate whose go.mod declares the module.
 //
 // A module no candidate answers for contributes nothing: it is an external
 // dependency, and inventing a path for it would make core resolve an edge to a
 // directory that is not a project. A self-edge is dropped for the same reason
 // core drops one.
-func goDependencyPaths(c *goCandidate, byModule map[string]*goCandidate, byDir map[string]string) []string {
-	seen := make(map[string]bool, len(c.mod.Requires)+len(c.mod.Replaces))
+func goDependencyPaths(c *goCandidate, byModule map[string]*goCandidate, byDir map[string]string, unrequired []string) []string {
+	seen := make(map[string]bool, len(c.mod.Requires)+len(c.mod.Replaces)+len(unrequired))
 	var paths []string
 	add := func(target string) {
 		if target == "" || target == c.path || seen[target] {
@@ -593,9 +628,114 @@ func goDependencyPaths(c *goCandidate, byModule map[string]*goCandidate, byDir m
 			add(target)
 		}
 	}
+	for _, imported := range unrequired {
+		add(byModule[imported].path)
+	}
 
 	sort.Strings(paths)
 	return paths
+}
+
+// goModuleImportScan reads which modules the candidate's sources import, among
+// the workspace's modules and the modules its go.mod requires, so a module
+// nested under another one answers for its own packages wherever it lives. An
+// image project carries no module and is not walked.
+func goModuleImportScan(root string, c *goCandidate, byModule map[string]*goCandidate) moduleImportScan {
+	if c.modFile == "" {
+		return moduleImportScan{complete: true}
+	}
+	providers := append(make([]string, 0, len(byModule)+len(c.mod.Requires)), c.mod.Requires...)
+	for module := range byModule {
+		providers = append(providers, module)
+	}
+	return scanModuleImports(goModuleDirOf(root, c), providers)
+}
+
+// goUnrequiredImports lists, sorted, the workspace modules the candidate's
+// sources import and its go.mod does not require. go.work resolves such an
+// import; a module-mode build, `go mod tidy` included, does not.
+//
+// A module is listed only when its own tree provides the imported package: the
+// package directory exists under the module's go.mod with no other go.mod on
+// the way, so a nested module the probe does not know is never mistaken for
+// its parent.
+func goUnrequiredImports(root string, c *goCandidate, byModule map[string]*goCandidate, scan moduleImportScan) []string {
+	required := make(map[string]bool, len(c.mod.Requires))
+	for _, module := range c.mod.Requires {
+		required[module] = true
+	}
+	listed := make(map[string]bool)
+	var modules []string
+	for imported, module := range scan.packages {
+		target, workspace := byModule[module]
+		if !workspace || module == c.mod.Module || required[module] || listed[module] {
+			continue
+		}
+		if !goModuleProvides(root, target.modDir, strings.TrimPrefix(imported, module)) {
+			continue
+		}
+		listed[module] = true
+		modules = append(modules, module)
+	}
+	sort.Strings(modules)
+	return modules
+}
+
+// goModuleProvides reports that the package at the slash-separated suffix
+// below the module rooted at modDir belongs to that module: each element names
+// a directory below modDir, none of them holds a go.mod, and the last one holds
+// a `.go` file the import scan reads. A `.` or `..` element, or one holding a
+// path separator or volume character of any host, names no package.
+func goModuleProvides(root, modDir, suffix string) bool {
+	dir := filepath.Join(root, filepath.FromSlash(modDir))
+	if trimmed := strings.Trim(suffix, "/"); trimmed != "" {
+		for _, element := range strings.Split(trimmed, "/") {
+			if element == "" || element == "." || element == ".." || strings.ContainsAny(element, `\:`) {
+				return false
+			}
+			dir = filepath.Join(dir, element)
+			if info, err := os.Stat(filepath.Join(dir, goWorkspaceMarker)); err == nil && !info.IsDir() {
+				return false
+			}
+		}
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if !entry.IsDir() && strings.HasSuffix(name, ".go") && !skipGoFile(name) {
+			return true
+		}
+	}
+	return false
+}
+
+// goUnrequiredImportDiagnostics names, for each unrequired import, the require
+// and the local replace that make the go.mod state it.
+func goUnrequiredImportDiagnostics(c *goCandidate, byModule map[string]*goCandidate, unrequired []string) []diag.Diagnostic {
+	diagnostics := make([]diag.Diagnostic, 0, len(unrequired))
+	for _, module := range unrequired {
+		diagnostics = append(diagnostics, diag.Warningf("unrequired-import", c.modFile,
+			"%s imports %s, which this go.mod does not require: go.work resolves the import and a module-mode build does not; add `require %s v0.0.0` and `replace %s => %s`",
+			c.mod.Module, module, module, module, goReplaceTarget(c.modDir, byModule[module].modDir)))
+	}
+	return diagnostics
+}
+
+// goReplaceTarget is the local replace target that reaches toDir from a go.mod
+// in fromDir, both repo-relative.
+func goReplaceTarget(fromDir, toDir string) string {
+	rel, err := filepath.Rel(filepath.FromSlash(fromDir), filepath.FromSlash(toDir))
+	if err != nil {
+		return toDir
+	}
+	rel = filepath.ToSlash(rel)
+	if !strings.HasPrefix(rel, "../") {
+		rel = "./" + rel
+	}
+	return rel
 }
 
 // goDependencySources attributes every reported edge this provider answers
@@ -609,40 +749,26 @@ func goDependencyPaths(c *goCandidate, byModule map[string]*goCandidate, byDir m
 // it from go.mod, and the consumers that act on real imports alone — the
 // visibility check, the declared-edge check — read the attribution rather than
 // re-deriving it.
-//
-// One scan serves every edge of the module, and it is skipped entirely for a
-// module with no workspace edge to attribute.
-func goDependencySources(root string, c *goCandidate, dependencies []string,
-	byModule map[string]*goCandidate) map[string]wsproto.DependencySource {
+func goDependencySources(c *goCandidate, dependencies []string, byModule map[string]*goCandidate,
+	scan moduleImportScan) map[string]wsproto.DependencySource {
 	if len(dependencies) == 0 {
 		return nil
 	}
 	moduleByPath := make(map[string]string, len(byModule))
-	// providers is every module an import may resolve to: the workspace's and
-	// every module this go.mod requires, so a module nested under a wanted
-	// path answers for its own packages wherever it lives.
-	providers := append(make([]string, 0, len(byModule)+len(c.mod.Requires)), c.mod.Requires...)
 	for module, candidate := range byModule {
 		moduleByPath[candidate.path] = module
-		providers = append(providers, module)
 	}
 	direct := directRequires(c)
-	wanted := make([]string, 0, len(dependencies))
-	for _, dependency := range dependencies {
-		if module, ok := moduleByPath[dependency]; ok && direct[module] {
-			wanted = append(wanted, module)
-		}
-	}
-	scan := scanModuleImports(goModuleDirOf(root, c), wanted, providers)
 
 	sources := make(map[string]wsproto.DependencySource, len(dependencies))
 	for _, dependency := range dependencies {
 		module, known := moduleByPath[dependency]
-		// Two edges are attributed to the module graph without a scan. A
+		// Two edges are attributed to the module graph without the scan. A
 		// dependency path no candidate module answers to is one this provider
 		// resolved onto a directory it does not know as a module. An
 		// `// indirect` requirement is the module graph's own need rather than
-		// this module's declaration, and `go mod tidy` puts it back.
+		// this module's declaration, and `go mod tidy` puts it back. An
+		// unrequired import is not a direct require either, and the scan read it.
 		if !known || !direct[module] || scan.importsModule(module) {
 			sources[dependency] = wsproto.DependencySourceGoModule
 			continue

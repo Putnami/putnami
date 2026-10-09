@@ -224,7 +224,10 @@ type DependencyGraph struct {
 
 Dependencies are declared in each project's `putnami.json` using `/path` IDs, and
 unioned with the edges each language provider derives from its own manifest
-(`go.mod` requires and replaces, `workspace:` package dependencies):
+(`go.mod` requires and replaces, `workspace:` package dependencies). The Go
+provider also derives an edge from an import of a workspace module that the
+importing `go.mod` does not require, because `go.work` builds it, and warns
+that a module-mode build cannot resolve it:
 
 ```json
 {
@@ -721,7 +724,8 @@ nested scope wins over its parent: with `go/putnami.json` and
 between them crosses a boundary.
 
 The check judges the imports the build really performs — a `go.mod` `require`
-or `replace` of a workspace module, a `package.json` dependency on a workspace
+or `replace` of a workspace module, an import of a workspace module that
+`go.mod` does not require, a `package.json` dependency on a workspace
 package — and never a `dependencies` entry a `putnami.json` merely declares. A
 declared edge with no import behind it is a boundary crossing that never
 happens, and the implicit ordering edge an activated scope adds to its includes
@@ -804,10 +808,11 @@ crosses it.
 
 A provider claims an import family for an edge only when its own sources import
 the target — the Go provider parses the module's `.go` files under `go mod
-tidy`'s own walk rule (test files count, build tags do not, `testdata`,
-`vendor`, dot-directories and nested modules are skipped), and the TypeScript
-provider reads the package's committed sources and skips `node_modules`,
-`dist`, `build`, `coverage` and dot-directories. Neither runs a toolchain, and
+tidy`'s own walk rule (test files count, build tags do not except `ignore`,
+`testdata`, `vendor`, dot-directories and nested modules are skipped), and the
+TypeScript provider reads the package's committed sources and skips
+`node_modules`, `dist`, `build`, `coverage` and dot-directories. Neither runs a
+toolchain, and
 neither reads a tree a build wrote, so a cold clone and a warm checkout answer
 the same thing. A scan that cannot read a file attributes nothing: the manifest
 stands, and a phantom is never invented from an unreadable tree.

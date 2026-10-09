@@ -27,7 +27,9 @@ reports the module path as the project's source identity, and its dependency
 edges as repo-relative paths resolved from `require` lines (direct and
 indirect) and from `replace` targets in module-path and local `./`/`../`
 form. An external module contributes no edge; a project never depends on
-itself. The answer comes from the tree alone: no `go` invocation, no clock, no
+itself. [ADR 0011](0011-an-import-go-mod-does-not-require-is-an-edge.md)
+adds an edge for an import of a workspace module that `go.mod` does not
+require. The answer comes from the tree alone: no `go` invocation, no clock, no
 absolute path, no host fact.
 
 **Sync.** `workspace-sync` maintains the workspace replace closure. It appends
