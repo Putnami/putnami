@@ -36,8 +36,8 @@ if errors.Is(err, storage.CodeStorageNotFound) {
 // info.Size, info.LastModified, info.ETag, info.ContentType
 ```
 
-It never lists: it reads the object's entry in memory, the object file and
-its metadata file on the filesystem, sends one `HeadObject` on S3, and one
+It never lists: it reads the object's entry in memory, stats the object file
+and reads its metadata file on the filesystem, sends one `HeadObject` on S3, and one
 object metadata read on GCS, which bills as a Class B operation where a list
 bills as Class A. `Stat` is the optional
 `Stater` interface rather than a `Backend` method, so a backend you write
