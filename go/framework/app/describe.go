@@ -6,7 +6,6 @@ import (
 	stderrors "errors"
 	"os"
 	"path/filepath"
-	"reflect"
 
 	"go.putnami.dev/errors"
 	"go.putnami.dev/migration"
@@ -192,23 +191,23 @@ func wantsDescriber(ctx *DescribeContext, describer Describer) bool {
 // plugins discovered through the module tree via Collect, followed by the
 // describe-only contributors registered with UseForDescribe. A contributor
 // that is also registered via Use (and so already discovered by Collect) is
-// de-duplicated by pointer identity, so its sidecar is written once.
+// de-duplicated by dynamic type and address, so its sidecar is written once.
 func (a *Application) describers() []Describer {
 	result := Collect[Describer](a.Module)
-	// Dedup is by pointer identity, mirroring Collect; the rare non-pointer
-	// Describer is never deduped (no framework producer is a value type).
-	seen := make(map[uintptr]struct{}, len(result))
+	// Dedup uses the same key as Collect; the rare non-pointer Describer is
+	// never deduped (no framework producer is a value type).
+	seen := make(map[identity]struct{}, len(result))
 	for _, d := range result {
-		if rv := reflect.ValueOf(d); rv.Kind() == reflect.Pointer && !rv.IsNil() {
-			seen[rv.Pointer()] = struct{}{}
+		if id, ok := identityOf(d); ok {
+			seen[id] = struct{}{}
 		}
 	}
 	for _, d := range a.collectDescribeOnly() {
-		if rv := reflect.ValueOf(d); rv.Kind() == reflect.Pointer && !rv.IsNil() {
-			if _, dup := seen[rv.Pointer()]; dup {
+		if id, ok := identityOf(d); ok {
+			if _, dup := seen[id]; dup {
 				continue
 			}
-			seen[rv.Pointer()] = struct{}{}
+			seen[id] = struct{}{}
 		}
 		result = append(result, d)
 	}

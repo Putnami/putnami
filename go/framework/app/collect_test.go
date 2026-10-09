@@ -145,3 +145,80 @@ func TestCollectFromRootOfSubtree(t *testing.T) {
 		t.Errorf("Collect from child = %v, want [b]", got)
 	}
 }
+
+// emptyGreeterA and emptyGreeterB are distinct zero-size plugin types. Go may
+// give every zero-size value the same address, so &emptyGreeterA{} and
+// &emptyGreeterB{} can be equal as raw pointers.
+type emptyGreeterA struct{}
+
+func (*emptyGreeterA) Name() string  { return "a" }
+func (*emptyGreeterA) Greet() string { return "a" }
+
+type emptyGreeterB struct{}
+
+func (*emptyGreeterB) Name() string  { return "b" }
+func (*emptyGreeterB) Greet() string { return "b" }
+
+// sameAddress reports whether a and b point at the same memory, ignoring type.
+func sameAddress(a, b any) bool {
+	return reflect.ValueOf(a).Pointer() == reflect.ValueOf(b).Pointer()
+}
+
+func TestCollectKeepsDistinctZeroSizePlugins(t *testing.T) {
+	a, b := &emptyGreeterA{}, &emptyGreeterB{}
+	if !sameAddress(a, b) {
+		t.Skip("the runtime gave the two zero-size values distinct addresses; the shared-address case does not arise")
+	}
+	root := NewModule("root").Use(a).Use(b)
+
+	got := greetings(Collect[greeter](root))
+	want := []string{"a", "b"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Collect merged two plugin types that share an address: got %v, want %v", got, want)
+	}
+}
+
+func TestCollectKeepsDistinctZeroSizeContributions(t *testing.T) {
+	a, b := &emptyGreeterA{}, &emptyGreeterB{}
+	if !sameAddress(a, b) {
+		t.Skip("the runtime gave the two zero-size values distinct addresses; the shared-address case does not arise")
+	}
+	root := NewModule("root")
+	Contribute[greeter](root, a)
+	Contribute[greeter](root, b)
+
+	got := greetings(Collect[greeter](root))
+	want := []string{"a", "b"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Collect merged two contributions that share an address: got %v, want %v", got, want)
+	}
+}
+
+// outerGreeter embeds a greeter as its first field, so &outer and &outer.inner
+// share an address by layout on every Go implementation.
+type innerGreeter struct{ msg string }
+
+func (g *innerGreeter) Greet() string { return g.msg }
+
+type outerGreeter struct {
+	inner innerGreeter
+	msg   string
+}
+
+func (g *outerGreeter) Greet() string { return g.msg }
+
+func TestCollectKeepsValuesThatShareAnAddressByLayout(t *testing.T) {
+	outer := &outerGreeter{inner: innerGreeter{msg: "inner"}, msg: "outer"}
+	if !sameAddress(outer, &outer.inner) {
+		t.Fatal("a struct and its first field must share an address")
+	}
+	root := NewModule("root")
+	Contribute[greeter](root, outer)
+	Contribute[greeter](root, &outer.inner)
+
+	got := greetings(Collect[greeter](root))
+	want := []string{"outer", "inner"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Collect merged two values that share an address: got %v, want %v", got, want)
+	}
+}
