@@ -808,6 +808,21 @@
           }
         },
         {
+          "id": "go-embed-cache-inputs",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-describe-key-includes-embedded-asset-only-edit",
+              "go-describe-cached-old-bundle-cannot-restore-after-embedded-asset-edit",
+              "go-test-only-embed-does-not-move-build-key",
+              "go-embed-portable-inputs-bind-asset-and-fail-on-deletion",
+              "go-embed-selector-selects-changed-and-deleted-targets"
+            ]
+          }
+        },
+        {
           "id": "result-only-remote-restore",
           "stage": "coded",
           "evidenceKinds": [

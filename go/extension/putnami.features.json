@@ -501,6 +501,20 @@
           }
         },
         {
+          "id": "embedded-source-cache-inputs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-build-and-test-task-inputs-declare-respective-embed-selectors",
+              "go-module-packager-shares-embed-target-resolution-with-task-inputs"
+            ]
+          }
+        },
+        {
           "id": "single-schema-committer",
           "stage": "coded",
           "evidenceKinds": [

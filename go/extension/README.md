@@ -2,6 +2,12 @@
 
 Go build tooling for Putnami workspaces — build, test, lint, serve, run, and package Go projects alongside TypeScript and Python.
 
+Go task inputs include files named by `//go:embed` directives. An embedded
+asset-only edit invalidates the relevant build or test cache key; build tasks
+exclude directives in `_test.go` sources, while test tasks include them.
+Directives in potentially buildable platform or tag variants are included
+independently of the current host, so every such target must resolve.
+
 ## Features
 
 - **Build** — compile Go binaries with cross-compilation (5 platforms)

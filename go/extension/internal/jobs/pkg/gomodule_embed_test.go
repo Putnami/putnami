@@ -5,12 +5,148 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
+	extproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/goembed"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
+
+func TestGoBuildAndTestTaskInputsDeclareRespectiveEmbedSelectors(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "embedded-source-cache-inputs", "go-build-and-test-task-inputs-declare-respective-embed-selectors")
+	manifest, err := extproto.LoadManifest(filepath.Join(findRepoRoot(t), "go", "extension", "putnami.extension.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	buildTasks, testTasks := 0, 0
+	for name, task := range manifest.Tasks {
+		sources, ok := task.Inputs["sources"]
+		if !ok {
+			continue
+		}
+		if sources.From != extproto.TaskInputFromProject {
+			t.Fatalf("%s sources are not project inputs", name)
+		}
+		selected := goembed.TestSelector
+		if slices.Contains(sources.Files, "!**/*_test.go") {
+			selected = goembed.BuildSelector
+			buildTasks++
+		} else {
+			testTasks++
+		}
+		if !slices.Contains(sources.Files, selected) {
+			t.Errorf("%s misses %s", name, selected)
+		}
+	}
+	if buildTasks < 4 || testTasks == 0 {
+		t.Fatalf("unexpected task coverage: %d build, %d test", buildTasks, testTasks)
+	}
+}
+
+func TestGoModulePackagerSharesEmbedTargetResolutionWithTaskInputs(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "embedded-source-cache-inputs", "go-module-packager-shares-embed-target-resolution-with-task-inputs")
+	project := t.TempDir()
+	stage := t.TempDir()
+	source := "package example\nimport _ \"embed\"\n//go:embed \"assets/report one.json\"\nvar data []byte\n"
+	mustWrite(t, filepath.Join(project, "embed.go"), source)
+	mustWrite(t, filepath.Join(project, "assets", "report one.json"), `{"value":1}`)
+	mustWrite(t, filepath.Join(stage, "embed.go"), source)
+	inputs, err := goembed.Resolve(project, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inputs) != 1 {
+		t.Fatalf("resolved inputs = %v", inputs)
+	}
+	if err := stageEmbedTargets(project, stage); err != nil {
+		t.Fatal(err)
+	}
+	staged, err := os.ReadFile(filepath.Join(stage, "assets", "report one.json"))
+	if err != nil || string(staged) != `{"value":1}` {
+		t.Fatalf("staged input = %q, %v", staged, err)
+	}
+}
+
+func TestPrepareGoModuleStagesSourceSymlinkEmbedTarget(t *testing.T) {
+	project := t.TempDir()
+	output := t.TempDir()
+	mustWrite(t, filepath.Join(project, "go.mod"), "module example.com/source-link\n\ngo 1.24\n")
+	source := "package sourcelink\nimport _ \"embed\"\n//go:embed payload.sql\nvar payload string\n"
+	mustWrite(t, filepath.Join(project, ".source.txt"), source)
+	mustWrite(t, filepath.Join(project, "payload.sql"), "SELECT 1;\n")
+	if err := os.Symlink(".source.txt", filepath.Join(project, "embed.go")); err != nil {
+		t.Skipf("source-file symlinks unavailable: %v", err)
+	}
+	inputs, err := goembed.Resolve(project, false)
+	if err != nil || !slices.Equal(inputs, []string{filepath.Join(project, "payload.sql")}) {
+		t.Fatalf("task inputs = %v, %v", inputs, err)
+	}
+	ctx := &pctx.Context{WorkspaceRoot: project, OutputPath: filepath.Join(output, "build"), Project: pctx.Project{Name: "source-link", Path: "source-link", FullPath: project}}
+	if ok := prepareGoModule(ctx, jsonl.New(), "1.2.3", output, false); !ok {
+		t.Fatal("source-link module packaging failed")
+	}
+	stage := filepath.Join(output, "go", "source")
+	for rel, want := range map[string]string{"embed.go": source, "payload.sql": "SELECT 1;\n"} {
+		got, err := os.ReadFile(filepath.Join(stage, rel))
+		if err != nil || string(got) != want {
+			t.Fatalf("staged %s = %q, %v", rel, got, err)
+		}
+	}
+}
+
+func TestPrepareGoModuleStagesBuildableOutSubpackageEmbed(t *testing.T) {
+	project := t.TempDir()
+	output := t.TempDir()
+	mustWrite(t, filepath.Join(project, "go.mod"), "module example.com/subpackage\n\ngo 1.24\n")
+	mustWrite(t, filepath.Join(project, "out", "p", "embed.go"), "/*\n//go:build ignore\n*/\npackage p\nimport _ \"embed\"\n//go:embed payload.txt\nvar payload string\n")
+	mustWrite(t, filepath.Join(project, "out", "p", "payload.txt"), "payload\n")
+	ctx := &pctx.Context{WorkspaceRoot: project, OutputPath: filepath.Join(output, "build"), Project: pctx.Project{Name: "subpackage", Path: "subpackage", FullPath: project}}
+	if ok := prepareGoModule(ctx, jsonl.New(), "1.2.3", output, false); !ok {
+		t.Fatal("buildable out subpackage packaging failed")
+	}
+	staged := filepath.Join(output, "go", "source", "out", "p", "payload.txt")
+	if bytes, err := os.ReadFile(staged); err != nil || string(bytes) != "payload\n" {
+		t.Fatalf("staged embed = %q, %v", bytes, err)
+	}
+	zipPath := filepath.Join(output, "go", "example.com/subpackage@v1.2.3.zip")
+	if !zipEntryNames(t, zipPath)["example.com/subpackage@v1.2.3/out/p/payload.txt"] {
+		t.Fatal("published zip omitted the out subpackage embed payload")
+	}
+}
+
+func TestPrepareGoModuleRejectsEscapingSourceSymlink(t *testing.T) {
+	project := t.TempDir()
+	output := t.TempDir()
+	outside := t.TempDir()
+	mustWrite(t, filepath.Join(project, "go.mod"), "module example.com/source-link\n\ngo 1.24\n")
+	mustWrite(t, filepath.Join(outside, "source.txt"), "package sourcelink\n")
+	if err := os.Symlink(filepath.Join(outside, "source.txt"), filepath.Join(project, "embed.go")); err != nil {
+		t.Skipf("source-file symlinks unavailable: %v", err)
+	}
+	ctx := &pctx.Context{WorkspaceRoot: project, OutputPath: filepath.Join(output, "build"), Project: pctx.Project{Name: "source-link", Path: "source-link", FullPath: project}}
+	if ok := prepareGoModule(ctx, jsonl.New(), "1.2.3", output, false); ok {
+		t.Fatal("packager staged a source symlink outside the project")
+	}
+}
+
+func TestPrepareGoModuleRejectsNestedModuleSourceSymlink(t *testing.T) {
+	project := t.TempDir()
+	output := t.TempDir()
+	mustWrite(t, filepath.Join(project, "go.mod"), "module example.com/source-link\n\ngo 1.24\n")
+	mustWrite(t, filepath.Join(project, "nested", "go.mod"), "module example.com/nested\n\ngo 1.24\n")
+	mustWrite(t, filepath.Join(project, "nested", "source.txt"), "package sourcelink\n")
+	if err := os.Symlink(filepath.Join("nested", "source.txt"), filepath.Join(project, "embed.go")); err != nil {
+		t.Skipf("source-file symlinks unavailable: %v", err)
+	}
+	ctx := &pctx.Context{WorkspaceRoot: project, OutputPath: filepath.Join(output, "build"), Project: pctx.Project{Name: "source-link", Path: "source-link", FullPath: project}}
+	if ok := prepareGoModule(ctx, jsonl.New(), "1.2.3", output, false); ok {
+		t.Fatal("packager staged a source symlink crossing a nested module")
+	}
+}
 
 // Every //go:embed target must ship in the staged module source and the
 // published zip, whatever its name or extension. A module that embeds

@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/go/extension/internal/releaseplan"
 	"go.putnami.dev/go/extension/internal/toolchain"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/goembed"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/releaseset"
@@ -139,7 +140,12 @@ func prepareGoModule(ctx *pctx.Context, emit *jsonl.Emitter, version, outputRoot
 
 		destPath := filepath.Join(stageDir, rel)
 		os.MkdirAll(filepath.Dir(destPath), 0o755)
-		data, err := os.ReadFile(path)
+		var data []byte
+		if ext == ".go" {
+			data, err = goembed.ReadSource(projectRoot, path)
+		} else {
+			data, err = os.ReadFile(path)
+		}
 		if err != nil {
 			return err
 		}

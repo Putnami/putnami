@@ -24,6 +24,10 @@
       "text": "When the run's cache provider serves an object cache and the remote-build-cache option is on, Go's build cache is backed by the extension's own GOCACHEPROG helper: a lookup answers locally first and asks the provider only on a miss, served bytes are verified against the output id they were announced under, stores are offered asynchronously, and a provider failure degrades to the local cache. The trust policy decides which channels a lookup accepts, and the option never keys a task."
     },
     {
+      "id": "embedded-source-cache-inputs",
+      "text": "The Go extension declares go-embed:build for buildable non-test source tasks and go-embed:test for tasks that read test sources. The Go module packager and the task-input resolver share one directive parser and target resolver, so assets that ship in a module are the same inputs the manifest declares for cache keys."
+    },
+    {
       "id": "pinned-lint-tools",
       "text": "Lint tools resolve to the versions pinned in tools/versions.json; a PATH binary is reused only when it matches the pin, and a stale one is replaced rather than trusted."
     },

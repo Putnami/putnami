@@ -77,6 +77,9 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	if err := json.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("parse extension manifest %s: %w", path, err)
 	}
+	if diags := validateGoEmbedSelectors(&m); diag.HasErrors(diags) {
+		return nil, fmt.Errorf("extension manifest %s: %s", path, formatDiagnostics(diags))
+	}
 	required := RequiredCLIContract(&m)
 	switch {
 	case m.CLIContract > protocolcli.LatestContract:
@@ -102,6 +105,45 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 				"re-package the extension with putnami %d (or run `putnami extensions update` to pull a build that has been)",
 			path, m.CLIContract, required, reason, required)
 	}
+}
+
+// validateGoEmbedSelectors is shared by the early negotiated loader and the
+// full authoring validator. Both must reject a selector the CLI cannot read.
+func validateGoEmbedSelectors(m *Manifest) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	check := func(pattern, where string, allowed bool) {
+		if !strings.HasPrefix(pattern, "go-embed:") {
+			return
+		}
+		if pattern != "go-embed:build" && pattern != "go-embed:test" {
+			diags = append(diags, diag.Errorf("invalid-value", where, "unsupported go embed selector %q", pattern))
+			return
+		}
+		if !allowed {
+			diags = append(diags, diag.Errorf("invalid-value", where, "go embed selector %q is only valid in project task inputs", pattern))
+		}
+	}
+	for _, name := range sortedKeys(m.Tasks) {
+		task := m.Tasks[name]
+		for _, portName := range sortedKeys(task.Inputs) {
+			port := task.Inputs[portName]
+			for index, pattern := range port.Files {
+				check(pattern, fmt.Sprintf("tasks.%s.inputs.%s.files[%d]", name, portName, index), port.From == TaskInputFromProject)
+			}
+		}
+		if task.Cache != nil && task.Cache.Key != nil {
+			for index, pattern := range task.Cache.Key.Files {
+				check(pattern, fmt.Sprintf("tasks.%s.cache.key.files[%d]", name, index), true)
+			}
+			for index, pattern := range task.Cache.Key.ClosureFiles {
+				check(pattern, fmt.Sprintf("tasks.%s.cache.key.closureFiles[%d]", name, index), false)
+			}
+			for index, pattern := range task.Cache.Key.WorkspaceFiles {
+				check(pattern, fmt.Sprintf("tasks.%s.cache.key.workspaceFiles[%d]", name, index), false)
+			}
+		}
+	}
+	return diags
 }
 
 func formatDiagnostics(diags []diag.Diagnostic) string {

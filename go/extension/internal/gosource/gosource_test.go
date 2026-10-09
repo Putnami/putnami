@@ -135,6 +135,9 @@ func TestHeader_Buildable(t *testing.T) {
 		{"//go:build !ignore\n\npackage p\n", true},
 		{"//go:build linux && !linux\n\npackage p\n", false},
 		{"// +build ignore\n\npackage p\n", false},
+		{"// +build ignore\npackage p\n", true},
+		{"/*\n//go:build ignore\n*/\npackage p\n", true},
+		{"/*\n// +build ignore\n*/\n\npackage p\n", true},
 		{"//go:build darwin\n\npackage p\n", true},
 	}
 	for _, c := range cases {

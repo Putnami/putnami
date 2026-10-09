@@ -29,8 +29,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
+
+	"go.putnami.dev/sdk/extension/goembed"
 )
 
 // headerPrefixBytes is how much of a file is read before falling back to the
@@ -63,30 +64,7 @@ type Header struct {
 // the packager stages an embed it might not have needed, and the probe calls a
 // module an application it might have called a library.
 func (h Header) buildable() bool {
-	if h.Constraint == nil {
-		return true
-	}
-	tagSet := make(map[string]struct{})
-	collectConstraintTags(h.Constraint, tagSet)
-	delete(tagSet, "ignore")
-	tags := make([]string, 0, len(tagSet))
-	for tag := range tagSet {
-		tags = append(tags, tag)
-	}
-	sort.Strings(tags)
-	if len(tags) > 12 {
-		return true
-	}
-	for mask := 0; mask < 1<<len(tags); mask++ {
-		assignment := make(map[string]bool, len(tags))
-		for i, tag := range tags {
-			assignment[tag] = mask&(1<<i) != 0
-		}
-		if h.Constraint.Eval(func(tag string) bool { return assignment[tag] }) {
-			return true
-		}
-	}
-	return false
+	return goembed.ConstraintBuildable(h.Constraint)
 }
 
 // headerOf reads a Go file's header out of the bytes in hand.
@@ -140,12 +118,7 @@ func readHeader(path string) (Header, error) {
 // slash-separated module-relative path: `testdata` directories and any segment
 // beginning with `_` or `.` are invisible to the build.
 func ToolingIgnoresPath(rel string) bool {
-	for _, s := range strings.Split(rel, "/") {
-		if s == "testdata" || strings.HasPrefix(s, "_") || strings.HasPrefix(s, ".") {
-			return true
-		}
-	}
-	return false
+	return goembed.ToolingIgnoresPath(rel)
 }
 
 // ModuleHasMain reports whether the module rooted at dir contains a package
@@ -224,44 +197,5 @@ func packageClause(src []byte) string {
 // `// +build` lines are ANDed together per the build-constraint spec. Only
 // lines before the package clause are considered.
 func buildConstraintExpr(src []byte) constraint.Expr {
-	var plus constraint.Expr
-	for _, line := range strings.Split(string(src), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "package ") || trimmed == "package" {
-			break
-		}
-		if constraint.IsGoBuild(trimmed) {
-			if expr, err := constraint.Parse(trimmed); err == nil {
-				return expr
-			}
-			return nil
-		}
-		if constraint.IsPlusBuild(trimmed) {
-			expr, err := constraint.Parse(trimmed)
-			if err != nil {
-				continue
-			}
-			if plus == nil {
-				plus = expr
-			} else {
-				plus = &constraint.AndExpr{X: plus, Y: expr}
-			}
-		}
-	}
-	return plus
-}
-
-func collectConstraintTags(expr constraint.Expr, out map[string]struct{}) {
-	switch v := expr.(type) {
-	case *constraint.TagExpr:
-		out[v.Tag] = struct{}{}
-	case *constraint.NotExpr:
-		collectConstraintTags(v.X, out)
-	case *constraint.AndExpr:
-		collectConstraintTags(v.X, out)
-		collectConstraintTags(v.Y, out)
-	case *constraint.OrExpr:
-		collectConstraintTags(v.X, out)
-		collectConstraintTags(v.Y, out)
-	}
+	return goembed.BuildConstraintExpr(src)
 }

@@ -144,18 +144,21 @@ package` for Go archive extensions and npm extension packages, and the SDK's
 `agentartifact.PackageExtension` for a content-only extension) validates the
 staged manifest strictly and stamps `"cliContract": N` on success, where N is
 the lowest contract whose vocabulary covers the manifest
-(`RequiredCLIContract`): `protocols/cli.CurrentContract` (4), or
-`protocols/cli.AgentContentContract` (5) for a manifest that declares
-`agentContent`. The gate applies to every non-empty command, command-group, MCP
+(`RequiredCLIContract`): `protocols/cli.CurrentContract` (4),
+`protocols/cli.AgentContentContract` (5) for `agentContent`, or
+`protocols/cli.GoEmbedInputsContract` (6) for `go-embed:build` or
+`go-embed:test` task inputs/cache-key files. The gate applies to every non-empty command, command-group, MCP
 tool, or agent-content surface. A non-conforming manifest — for example one
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contract 5 is **additive**. It adds vocabulary a manifest opts into and changes
-nothing a manifest without that vocabulary means, so an extension that ships no
-agent content keeps its contract-4 stamp and keeps loading in every contract-4
-reader. The reader loads every stamp from the one the manifest's vocabulary
-requires up to `protocols/cli.LatestContract` (5):
+Contracts 5 and 6 are **additive**. They add vocabulary a manifest opts into and
+change nothing a manifest without that vocabulary means. An extension without
+agent content or Go embed inputs keeps its contract-4 stamp; one with agent
+content but no Go embed inputs requires contract 5. A manifest with Go embed
+inputs requires contract 6 even if it also declares agent content. The reader
+loads every stamp from the one the manifest's vocabulary requires up to
+`protocols/cli.LatestContract` (6):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|
@@ -208,9 +211,12 @@ package job.
 |-----|----------|---------|
 | current | contract-4 manifest without agent content | Loads; reserved-shadow and same-session prerequisite rules enforced. |
 | current | contract-5 manifest | Loads; its agent content is materialized only in a workspace that opts in. |
+| current | contract-6 manifest with Go embed inputs | Loads; Go source and embedded input selection is enforced. |
+| current | Go embed manifest stamped 5 or lower, or unstamped | Rejected: the stamp does not cover Go embed input semantics. |
 | current | agent-content manifest stamped 4, or unstamped | Rejected: the stamp does not cover the contribution. |
 | current | contract-3 or lower manifest with a surface | Skipped, with the re-package/`putnami extensions update` remediation on the skip record; a contract-3 reader cannot represent `sessionPrerequisites`, so loading it would permit an ungated dependent command. |
 | contract-4 CLI | contract-5 artifact | Rejected by that CLI's own higher-contract arm ("requires a newer putnami"). Its permissive decode would drop `agentContent` silently, which is why the stamp, not the schema, carries the refusal. The remedy is `putnami upgrade`. |
+| contract-5 CLI | contract-6 artifact | Rejected by that CLI's own higher-contract arm. It cannot bind Go embed inputs to cache identity. |
 | contract-3 CLI | contract-4 artifact | Rejected by that CLI's own higher-contract arm ("requires a newer putnami"). The remedy is `putnami upgrade`; there is no artifact shape that both permits the new field and lets the old reader ignore it. |
 
 Task-contract version stays ORTHOGONAL to this ladder. A contract-4 manifest
@@ -219,6 +225,11 @@ manifest; requiring every task to declare belongs to the slice that deletes
 inferred capture, not to the loader. `FullValidateManifest` and
 `putnami extensions validate` remain maximally strict regardless of the declared
 contract — they are the authoring surface.
+The Go embed file selectors follow one rule at both authoring and load time:
+only `go-embed:build` and `go-embed:test` are recognized, and they belong to
+project task inputs (or the corresponding project cache-key files). Workspace
+and closure inputs cannot carry them. `FullValidateManifest`, the SDK manifest
+builder and the negotiated loader all reject the same invalid selector.
 
 ## Conformance Fixtures
 

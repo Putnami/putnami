@@ -94,6 +94,10 @@
       "text": "Every task key names the implementation of the extension that runs it: a workspace-local prepared runtime by its digest, an installed extension by the content digest of its tree without the version a build stamps in its manifests, any other extension by its version. A key with a digest omits the version, so version-only builds share entries; any other tree change or a toolchain pin moves the key. A digest recorded beside an artifact-store entry is trusted only inside the store, under the current schema."
     },
     {
+      "id": "go-embed-cache-inputs",
+      "text": "For a negotiated Go embed task input, cache keys include exact embedded asset paths and bytes even when no Go source changes; build selectors omit directives in test sources, while test selectors include them. Deleted or unsafe targets fail before cache reuse or portable admission, and asset-only changes cannot restore an older described migration bundle. Change impact attributes a deleted embedded target to its owning task."
+    },
+    {
       "id": "result-only-remote-restore",
       "text": "With a provider that echoes restore-result-only, a remote hit whose files no job of the run reads, in minimal mode or in toplevel mode outside the selected projects, moves no blob: it reports its cached status, writes nothing, and records a local result-only entry. A task a planned job waits for, by dependency or serialization, keeps its files. A run that reads the files never serves a result-only entry: it restores the full entry or executes. A provider without the capability receives no new field."
     }

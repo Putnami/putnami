@@ -29,6 +29,10 @@ type PortableTaskInputs struct {
 	// saying "I read these", which is what makes an ignored match among them a
 	// required input worth binding.
 	Files []string
+	// GoEmbedFiles is the subset of Files selected as raw semantic Go embed
+	// inputs. Admission must refuse a portable request if snapshot policy would
+	// omit one of these bytes, even when a lifecycle normally recreates it.
+	GoEmbedFiles []string
 	// FallbackFiles are the paths the key hashes only because the task
 	// declares NO file input at all: the whole non-hidden project tree the
 	// empty-pattern collector returns. That fallback is what the key does in
@@ -59,24 +63,30 @@ type PortablePlanInputs struct {
 // and never hashes anything. One call memoizes its collector results, so a
 // project tree is walked once for a pattern set however many jobs share it —
 // the same reason the key path memoizes through the CacheManager.
-func PortableInputs(ws *workspace.Workspace, planned []*ScheduledJob, commandParams map[string]any) PortablePlanInputs {
+func PortableInputs(ws *workspace.Workspace, planned []*ScheduledJob, commandParams map[string]any) (PortablePlanInputs, error) {
 	inputs := PortablePlanInputs{Tasks: make([]PortableTaskInputs, 0, len(planned))}
 	if ws == nil {
-		return inputs
+		return inputs, nil
 	}
 	memo := keyFileMemo{}
 	for _, job := range planned {
 		if job == nil || job.JobDef == nil || job.Project == nil {
 			continue
 		}
+		if err := validateDeclaredGoEmbedSelectors(ws, job, commandParams); err != nil {
+			return PortablePlanInputs{}, err
+		}
 		files, workspaceFiles := keyFilePatterns(ws, job, commandParams)
-		declared, fallback := portableKeyFiles(memo, ws, job, files, workspaceFiles)
+		declared, fallback, goEmbed, err := portableKeyFiles(memo, ws, job, files, workspaceFiles)
+		if err != nil {
+			return PortablePlanInputs{}, err
+		}
 		inputs.Tasks = append(inputs.Tasks, PortableTaskInputs{
-			Key: job.Key(), Files: declared, FallbackFiles: fallback, Env: portableKeyEnv(ws, job),
+			Key: job.Key(), Files: declared, GoEmbedFiles: goEmbed, FallbackFiles: fallback, Env: portableKeyEnv(ws, job),
 		})
 	}
 	inputs.Outputs = portableDeclaredOutputs(ws, planned)
-	return inputs
+	return inputs, nil
 }
 
 // keyFileMemo holds one PortableInputs call's collector results, keyed by the
@@ -84,16 +94,24 @@ func PortableInputs(ws *workspace.Workspace, planned []*ScheduledJob, commandPar
 // worktree it describes is read at one instant, and a later call must see a
 // later tree. A NUL separator cannot appear in a path or in a manifest glob,
 // so two different pattern sets cannot share a key.
-type keyFileMemo map[string][]string
+type keyFileMemo map[string]store.KeyFileSelection
 
-func (m keyFileMemo) collect(root string, patterns []string) []string {
+func (m keyFileMemo) collect(root string, patterns []string) ([]string, error) {
+	selection, err := m.collectSelection(root, patterns)
+	return selection.Files, err
+}
+
+func (m keyFileMemo) collectSelection(root string, patterns []string) (store.KeyFileSelection, error) {
 	key := root + "\x00" + strings.Join(patterns, "\x00")
 	if cached, found := m[key]; found {
-		return cached
+		return cached, nil
 	}
-	files, _ := store.CollectKeyFiles(root, patterns)
+	files, err := store.CollectKeyFileSelection(root, patterns)
+	if err != nil {
+		return store.KeyFileSelection{}, err
+	}
 	m[key] = files
-	return files
+	return files, nil
 }
 
 // portableKeyFiles resolves the file set computeJobCacheHash hashes for job
@@ -105,25 +123,39 @@ func (m keyFileMemo) collect(root string, patterns []string) []string {
 // The fallback is deliberately independent of the RUN's cache bypass: whether
 // --no-cache was typed does not change what a task reads, and the bound set
 // travels inside the request's identity, which must not move with a flag.
-func portableKeyFiles(memo keyFileMemo, ws *workspace.Workspace, job *ScheduledJob, files, workspaceFiles []string) (declared, fallback []string) {
+func portableKeyFiles(memo keyFileMemo, ws *workspace.Workspace, job *ScheduledJob, files, workspaceFiles []string) (declared, fallback, goEmbed []string, resultErr error) {
 	projectRoot := filepath.Join(ws.Root, job.Project.Path)
-	var absolute, fallbackAbsolute []string
+	var absolute, fallbackAbsolute, semanticAbsolute []string
+	collect := func(root string, patterns []string, explicit bool) []string {
+		if resultErr != nil {
+			return nil
+		}
+		selection, err := memo.collectSelection(root, patterns)
+		resultErr = err
+		if explicit {
+			semanticAbsolute = append(semanticAbsolute, selection.GoEmbed...)
+		}
+		return selection.Files
+	}
 	switch {
 	case len(files) > 0:
-		absolute = append(absolute, memo.collect(projectRoot, files)...)
+		absolute = append(absolute, collect(projectRoot, files, true)...)
 	case CanUseCache(job):
-		fallbackAbsolute = append(fallbackAbsolute, memo.collect(projectRoot, nil)...)
+		fallbackAbsolute = append(fallbackAbsolute, collect(projectRoot, nil, false)...)
 	}
 	if len(workspaceFiles) > 0 {
-		absolute = append(absolute, memo.collect(ws.Root, workspaceFiles)...)
+		absolute = append(absolute, collect(ws.Root, workspaceFiles, true)...)
 	}
 	if patterns := closureKeyPatterns(job); len(patterns) > 0 {
 		for _, root := range projectClosureRoots(ws, job.Project) {
-			absolute = append(absolute, memo.collect(root, patterns)...)
+			absolute = append(absolute, collect(root, patterns, true)...)
 		}
 	}
+	if resultErr != nil {
+		return nil, nil, nil, resultErr
+	}
 	absolute = append(absolute, store.ExtraKeyFiles(generateAssetFiles(ws, job))...)
-	return workspaceRelativePaths(ws.Root, absolute), workspaceRelativePaths(ws.Root, fallbackAbsolute)
+	return workspaceRelativePaths(ws.Root, absolute), workspaceRelativePaths(ws.Root, fallbackAbsolute), workspaceRelativePaths(ws.Root, semanticAbsolute), nil
 }
 
 // portableKeyEnv returns the environment variable names a cacheable job's key

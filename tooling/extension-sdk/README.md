@@ -50,6 +50,27 @@ the author's-eye version, with the CLI-side behavior, is
 | Workspace adapter | `workspace.markers`, `.inputs`, `.excludes`, `.syncTask` | `ServeProbe` in `go.putnami.dev/protocol/workspace` serves `__putnami workspace-probe`; project-level `watchedFiles` may include provider-owned workspace-root invalidation inputs without changing the v1 wire shape |
 | Invocation-scoped sensitive outputs | `declares.outputs` (`scope: "invocation"`, `sensitive`), `runOn: "finally"` + `finalizes` | `dbtestenv` is the reference implementation — provisioning, the non-secret lease, orphan reaping after `SIGKILL`, and the `sensitive` binding artifact a consumer reads with `BindingFrom` |
 
+The `goembed` package supplies the shared Go directive parser and target
+resolver used by Go module packaging and the CLI's `go-embed:build` /
+`go-embed:test` task input selectors. It scans potentially buildable source
+files across platforms, resolves quoted, directory and `all:` patterns to
+regular assets, and rejects missing, unsafe or cross-module targets. Callers
+hash lexical sources, source referents and assets as raw bytes; the package itself has no cache or job side
+effects. A symlinked `.go` source is read when a relative link points directly to a regular
+file inside the same Go module. Its directives resolve from the link's package
+directory. The source target is also a task input, so an ignored target travels
+in a remote snapshot. Absolute, broken, chained, escaping and irregular source links
+fail; directory symlinks are not traversed.
+The source scan uses Go's actual leading build comments, so text inside a
+`/* ... */` comment cannot exclude a buildable source. Legacy `// +build`
+lines need the blank separator before the package clause. Ordinary subpackages
+under `out`, `dist` or `node_modules` are scanned. For a portable CLI run,
+ignored semantic inputs in lifecycle-owned paths or declared generated outputs
+are refused when the native snapshot would omit them; tracked and non-ignored
+files at those paths remain capturable.
+See [Go embed source inputs](doc/10-go-embed-inputs.md) for the reader API and
+portable boundary.
+
 Beside them, an extension that keeps a machine-global cache owns it end to end:
 core hands it `extension.cacheRoot` and dispatches the reserved hidden commands
 `cache-clean` and `cache-gc` to it. `cachepolicy` supplies the neutral half —

@@ -3,6 +3,7 @@ package store
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -315,6 +316,108 @@ func TestHasMatchingFiles(t *testing.T) {
 	}
 	if !matched {
 		t.Fatal("Go pattern did not match Go project")
+	}
+}
+
+func TestGoEmbedBatchProbeDefersSemanticReadToKey(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nimport _ \"embed\"\n//go:embed missing.txt\nvar text string\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	patterns := []string{"**/*.go", "go-embed:build"}
+	if matched, err := HasMatchingFiles(dir, patterns); err != nil || !matched {
+		t.Fatalf("ordinary Go input should admit a live batch candidate: matched=%v err=%v", matched, err)
+	}
+	if _, err := hashFiles(dir, patterns, ProjectConfigScope{}); !errors.Is(err, ErrGoEmbedInput) {
+		t.Fatalf("actual key must reject missing embedded input: %v", err)
+	}
+	if matched, err := HasMatchingFiles(dir, []string{"go-embed:build"}); !errors.Is(err, ErrGoEmbedInput) || matched {
+		t.Fatalf("selector-only batch must resolve inputs: matched=%v err=%v", matched, err)
+	}
+	if matched, err := HasMatchingFiles(dir, []string{"**/*.go", "go-embed:unknown"}); !errors.Is(err, ErrGoEmbedInput) || matched {
+		t.Fatalf("unsupported selector must fail before ordinary probe: matched=%v err=%v", matched, err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "missing.txt"), []byte("A"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	first, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "missing.txt"), []byte("B"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	second, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	if err != nil || first == second {
+		t.Fatalf("embedded bytes must still change key: first=%q second=%q err=%v", first, second, err)
+	}
+}
+
+func TestMixedGitGoInputRequiresAvailableCandidateInventory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	patterns := []string{"git:**", "**/*.go", "go-embed:build"}
+	if _, err := hashFiles(dir, patterns, ProjectConfigScope{}); !errors.Is(err, ErrGoEmbedInput) || !strings.Contains(err.Error(), "go input selection unavailable") {
+		t.Fatalf("mixed selection with unknown Git candidates must fail closed: %v", err)
+	}
+	if matched, err := HasMatchingFiles(dir, patterns); !errors.Is(err, ErrGoEmbedInput) || matched {
+		t.Fatalf("mixed batch selection with unknown Git candidates: matched=%v err=%v", matched, err)
+	}
+	if _, err := hashFiles(dir, []string{"git:**"}, ProjectConfigScope{}); err == nil || errors.Is(err, ErrGoEmbedInput) {
+		t.Fatalf("Git-only error must keep its generic category: %v", err)
+	}
+}
+
+func TestMixedGitGoInputWithAvailableCandidatesHashesPayload(t *testing.T) {
+	dir := gitInputPhysicalRoot(t)
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nimport _ \"embed\"\n//go:embed payload.txt\nvar payload string\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	asset := filepath.Join(dir, "payload.txt")
+	if err := os.WriteFile(asset, []byte("A"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	patterns := []string{"git:**", "**/*.go", "go-embed:build"}
+	first, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(asset, []byte("B"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	second, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	if err != nil || first == second {
+		t.Fatalf("available mixed selection lost payload identity: %q %q %v", first, second, err)
+	}
+}
+
+func TestGoEmbedBatchProbeObservesCreationDeletionAndExclusion(t *testing.T) {
+	dir := t.TempDir()
+	patterns := []string{"file.txt", "go-embed:build"}
+	for i := 0; i < 2; i++ {
+		if matched, err := HasMatchingFiles(dir, patterns); err != nil || matched {
+			t.Fatalf("empty probe %d: matched=%v err=%v", i, matched, err)
+		}
+	}
+	file := filepath.Join(dir, "file.txt")
+	if err := os.WriteFile(file, []byte("content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if matched, err := HasMatchingFiles(dir, patterns); err != nil || !matched {
+			t.Fatalf("created probe %d: matched=%v err=%v", i, matched, err)
+		}
+	}
+	if matched, err := HasMatchingFiles(dir, []string{"file.txt", "!file.txt", "go-embed:build"}); err != nil || matched {
+		t.Fatalf("excluded ordinary input: matched=%v err=%v", matched, err)
+	}
+	if err := os.Remove(file); err != nil {
+		t.Fatal(err)
+	}
+	if matched, err := HasMatchingFiles(dir, patterns); err != nil || matched {
+		t.Fatalf("deleted probe: matched=%v err=%v", matched, err)
 	}
 }
 

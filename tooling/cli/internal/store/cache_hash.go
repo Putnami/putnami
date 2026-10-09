@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,8 +17,14 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/sdk/extension/goembed"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
+
+// ErrGoEmbedInput identifies invalid required Go source or embed inputs. A
+// scheduler must fail such a task before cache restoration or execution; an
+// unrelated cache-store failure may still fall back to execution.
+var ErrGoEmbedInput = errors.New("invalid Go embed input")
 
 // --- hash helpers ---
 
@@ -60,6 +67,7 @@ type fileEntry struct {
 	path         string
 	info         os.FileInfo
 	gitCandidate bool
+	rawEmbed     bool
 	// sweptByGlob is set when a pattern whose last segment is a glob selected
 	// the file (`**/*.json`, `*.json`, `doc/**`). Such a pattern selects files by
 	// type or by directory, so the task reads what it selects as text, and a
@@ -128,89 +136,194 @@ func collectFiles(dir string, patterns []string) ([]fileEntry, error) {
 	var files []fileEntry
 	includes, excludes := wsproto.SplitFilePatterns(patterns)
 	var ordinaryPatterns, gitPatterns []string
+	var embedPatterns []string
 	for _, pattern := range includes {
 		if _, ok := wsproto.GitFilePattern(pattern); ok {
 			gitPatterns = append(gitPatterns, pattern)
+		} else if goembed.IsSelector(pattern) {
+			embedPatterns = append(embedPatterns, pattern)
+		} else if strings.HasPrefix(pattern, "go-embed:") {
+			return nil, fmt.Errorf("%w: unsupported selector %q", ErrGoEmbedInput, pattern)
 		} else {
 			ordinaryPatterns = append(ordinaryPatterns, pattern)
 		}
 	}
 
 	if len(patterns) == 0 {
-		err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return nil
-			}
-			name := info.Name()
-			if strings.HasPrefix(name, ".") || name == "node_modules" || name == ".putnami" || name == "out" {
-				if info.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if !info.IsDir() {
-				files = append(files, fileEntry{path: path, info: info})
-			}
-			return nil
-		})
+		files, err = collectDefaultFiles(dir)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		for _, pattern := range ordinaryPatterns {
-			slashed := filepath.ToSlash(pattern)
-			sweptByGlob := strings.ContainsAny(slashed[strings.LastIndex(slashed, "/")+1:], "*?[")
-			var matches []string
-			if strings.Contains(pattern, "**") {
-				matches = globDoubleStar(dir, pattern)
-			} else {
-				matches, _ = filepath.Glob(filepath.Join(dir, pattern))
-			}
-			for _, m := range matches {
-				info, err := os.Stat(m)
-				if err != nil || info.IsDir() {
-					continue
-				}
-				if len(excludes) > 0 {
-					rel, _ := filepath.Rel(dir, m)
-					if wsproto.MatchesAnyFilePattern(filepath.ToSlash(rel), excludes) {
-						continue
-					}
-				}
-				files = append(files, fileEntry{path: m, info: info, sweptByGlob: sweptByGlob})
-			}
-		}
+		files = collectOrdinaryFiles(dir, ordinaryPatterns, excludes, len(embedPatterns) > 0)
 	}
 	if len(gitPatterns) > 0 {
 		candidates, err := collectGitFiles(dir, gitPatterns, excludes)
 		if err != nil {
+			if len(embedPatterns) > 0 {
+				return nil, fmt.Errorf("%w: go input selection unavailable: %w", ErrGoEmbedInput, err)
+			}
 			return nil, err
 		}
 		files = append(files, candidates...)
 	}
+	if len(embedPatterns) > 0 {
+		files, err = appendSelectedGoReferents(dir, files)
+		if err != nil {
+			return nil, fmt.Errorf("%w: selected Go source: %w", ErrGoEmbedInput, err)
+		}
+	}
+	files, err = appendGoEmbedInputs(dir, files, embedPatterns)
+	if err != nil {
+		return nil, err
+	}
+	return sortedUniqueFileEntries(files), nil
+}
 
+func collectDefaultFiles(dir string) ([]fileEntry, error) {
+	var files []fileEntry
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		name := info.Name()
+		if strings.HasPrefix(name, ".") || name == "node_modules" || name == ".putnami" || name == "out" {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !info.IsDir() {
+			files = append(files, fileEntry{path: path, info: info})
+		}
+		return nil
+	})
+	return files, err
+}
+
+func collectOrdinaryFiles(dir string, patterns, excludes []string, hasGoEmbed bool) []fileEntry {
+	var files []fileEntry
+	for _, pattern := range patterns {
+		slashed := filepath.ToSlash(pattern)
+		sweptByGlob := strings.ContainsAny(slashed[strings.LastIndex(slashed, "/")+1:], "*?[")
+		var matches []string
+		if strings.Contains(pattern, "**") {
+			matches = globDoubleStar(dir, pattern)
+		} else {
+			matches, _ = filepath.Glob(filepath.Join(dir, pattern))
+		}
+		for _, match := range matches {
+			file, ok := ordinaryFileEntry(dir, match, excludes, hasGoEmbed, sweptByGlob)
+			if ok {
+				files = append(files, file)
+			}
+		}
+	}
+	return files
+}
+
+func ordinaryFileEntry(dir, path string, excludes []string, hasGoEmbed, sweptByGlob bool) (fileEntry, bool) {
+	info, err := os.Stat(path)
+	if err != nil {
+		// A selected Go source link with a broken target must reach the shared
+		// validator. Ordinary inputs keep their previous missing-match behavior.
+		if !hasGoEmbed || filepath.Ext(path) != ".go" {
+			return fileEntry{}, false
+		}
+		info, err = os.Lstat(path)
+		if err != nil || info.Mode()&os.ModeSymlink == 0 {
+			return fileEntry{}, false
+		}
+	}
+	if info.IsDir() {
+		if !hasGoEmbed || filepath.Ext(path) != ".go" {
+			return fileEntry{}, false
+		}
+		linkInfo, linkErr := os.Lstat(path)
+		if linkErr != nil || linkInfo.Mode()&os.ModeSymlink == 0 {
+			return fileEntry{}, false
+		}
+		info = linkInfo
+	}
+	if len(excludes) > 0 {
+		rel, _ := filepath.Rel(dir, path)
+		if wsproto.MatchesAnyFilePattern(filepath.ToSlash(rel), excludes) {
+			return fileEntry{}, false
+		}
+	}
+	return fileEntry{path: path, info: info, sweptByGlob: sweptByGlob}, true
+}
+
+// Ordinary globs can select Go links in directories the Go source scanner
+// ignores. Bind those links and referents without parsing excluded packages.
+func appendSelectedGoReferents(dir string, files []fileEntry) ([]fileEntry, error) {
+	for index := range files {
+		file := files[index]
+		if filepath.Ext(file.path) != ".go" {
+			continue
+		}
+		info, err := os.Lstat(file.path)
+		if err != nil {
+			return nil, err
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			continue
+		}
+		referent, err := goembed.SourceReferent(dir, file.path)
+		if err != nil {
+			return nil, fmt.Errorf("%w: resolve selected Go source link %s: %w", ErrGoEmbedInput, file.path, err)
+		}
+		referentInfo, err := os.Lstat(referent)
+		if err != nil {
+			return nil, fmt.Errorf("%w: stat Go source referent %s: %w", ErrGoEmbedInput, referent, err)
+		}
+		files[index].rawEmbed = true
+		files = append(files, fileEntry{path: referent, info: referentInfo, rawEmbed: true})
+	}
+	return files, nil
+}
+
+func appendGoEmbedInputs(dir string, files []fileEntry, selectors []string) ([]fileEntry, error) {
+	for _, selector := range selectors {
+		targets, err := goembed.ResolveInputs(dir, selector == goembed.TestSelector)
+		if err != nil {
+			return nil, fmt.Errorf("%w: resolve %s inputs: %w", ErrGoEmbedInput, selector, err)
+		}
+		for _, target := range targets {
+			info, err := os.Lstat(target)
+			if err != nil {
+				return nil, fmt.Errorf("%w: stat resolved input %s: %w", ErrGoEmbedInput, target, err)
+			}
+			files = append(files, fileEntry{path: target, info: info, rawEmbed: true})
+		}
+	}
+	return files, nil
+}
+
+func sortedUniqueFileEntries(files []fileEntry) []fileEntry {
 	sort.Slice(files, func(i, j int) bool { return slashPathLess(files[i].path, files[j].path, filepath.Separator) })
-
-	// Deduplicate
 	if len(files) > 1 {
 		j := 0
 		for i := 1; i < len(files); i++ {
 			if files[i].path != files[j].path {
 				j++
 				files[j] = files[i]
-			} else if files[i].gitCandidate {
-				// Raw Git bytes win over a normal pattern's semantic digest,
-				// independent of declaration and sort order.
-				files[j] = files[i]
-			} else if files[i].sweptByGlob {
-				// A raw reading wins over a decoded one the same way.
-				files[j].sweptByGlob = true
+			} else {
+				rawEmbed := files[j].rawEmbed || files[i].rawEmbed
+				if files[i].gitCandidate {
+					// Raw Git bytes win over a normal pattern's semantic digest,
+					// independent of declaration and sort order.
+					files[j] = files[i]
+				} else if files[i].sweptByGlob {
+					// A raw reading wins over a decoded one the same way.
+					files[j].sweptByGlob = true
+				}
+				files[j].rawEmbed = rawEmbed
 			}
 		}
 		files = files[:j+1]
 	}
-
-	return files, nil
+	return files
 }
 
 // slashPathLess orders two paths as their slash forms compare, reading
@@ -257,7 +370,15 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return dirlink.Resolve(absolute)
+		resolved, err := dirlink.Resolve(absolute)
+		if err != nil {
+			for _, selected := range patterns {
+				if goembed.IsSelector(selected) {
+					return "", fmt.Errorf("%w: go input selection unavailable: %w", ErrGoEmbedInput, err)
+				}
+			}
+		}
+		return resolved, err
 	}
 	return dir, nil
 }
@@ -334,16 +455,33 @@ func gitCandidateDigest(file fileEntry, buf []byte) []byte {
 // to know WHICH files a key reads (the portable admission binding required
 // ignored inputs) cannot disagree with the key about it. An empty pattern set
 // keeps its key meaning: the whole non-hidden project tree.
-func CollectKeyFiles(dir string, patterns []string) ([]string, error) {
+// KeyFileSelection carries the collector's semantic Go embed provenance into
+// portable admission without re-resolving directives under a second policy.
+type KeyFileSelection struct {
+	Files   []string
+	GoEmbed []string
+}
+
+// CollectKeyFileSelection returns the key's paths and the subset whose raw
+// bytes were selected by a Go embed selector.
+func CollectKeyFileSelection(dir string, patterns []string) (KeyFileSelection, error) {
 	files, err := collectFiles(dir, patterns)
 	if err != nil {
-		return nil, err
+		return KeyFileSelection{}, err
 	}
-	paths := make([]string, 0, len(files))
+	selection := KeyFileSelection{Files: make([]string, 0, len(files))}
 	for _, file := range files {
-		paths = append(paths, file.path)
+		selection.Files = append(selection.Files, file.path)
+		if file.rawEmbed {
+			selection.GoEmbed = append(selection.GoEmbed, file.path)
+		}
 	}
-	return paths, nil
+	return selection, nil
+}
+
+func CollectKeyFiles(dir string, patterns []string) ([]string, error) {
+	selection, err := CollectKeyFileSelection(dir, patterns)
+	return selection.Files, err
 }
 
 // ExtraKeyFiles returns the sorted absolute paths of every regular file an
@@ -395,13 +533,34 @@ func SelectsPath(rel string, patterns []string) bool {
 // many tools report an unmatched project only when it runs alone, so folding
 // an empty root into a non-empty group could hide that project's failure.
 func HasMatchingFiles(dir string, patterns []string) (bool, error) {
+	hasGoEmbed := false
 	for _, pattern := range patterns {
-		if _, candidate := wsproto.GitFilePattern(pattern); candidate {
+		_, gitCandidate := wsproto.GitFilePattern(pattern)
+		if gitCandidate {
+			files, err := collectFiles(dir, patterns)
+			return len(files) > 0, err
+		}
+		if strings.HasPrefix(pattern, "go-embed:") {
+			if !goembed.IsSelector(pattern) {
+				return false, fmt.Errorf("%w: unsupported selector %q", ErrGoEmbedInput, pattern)
+			}
+			hasGoEmbed = true
+		}
+	}
+	includes, excludes := wsproto.SplitFilePatterns(patterns)
+	if hasGoEmbed {
+		ordinary := includes[:0:0]
+		for _, pattern := range includes {
+			if !goembed.IsSelector(pattern) {
+				ordinary = append(ordinary, pattern)
+			}
+		}
+		includes = ordinary
+		if len(includes) == 0 {
 			files, err := collectFiles(dir, patterns)
 			return len(files) > 0, err
 		}
 	}
-	includes, excludes := wsproto.SplitFilePatterns(patterns)
 	matched := false
 	err := filepath.WalkDir(dir, func(filePath string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -439,6 +598,10 @@ func HasMatchingFiles(dir string, patterns []string) (bool, error) {
 	})
 	if err != nil {
 		return false, err
+	}
+	if hasGoEmbed && !matched {
+		files, collectErr := collectFiles(dir, patterns)
+		return len(files) > 0, collectErr
 	}
 	return matched, nil
 }
@@ -491,6 +654,11 @@ func hashFiles(dir string, patterns []string, scope ProjectConfigScope) (string,
 	}
 
 	digests := hashFileContents(files, scope, projectDir)
+	for i, file := range files {
+		if file.rawEmbed && digests[i] == nil {
+			return "", fmt.Errorf("%w: cannot read %s", ErrGoEmbedInput, file.path)
+		}
+	}
 
 	h := sha256.New()
 	for i, f := range files {
@@ -555,7 +723,18 @@ func hashFileContents(files []fileEntry, scope ProjectConfigScope, projectDir st
 			defer wg.Done()
 			buf := make([]byte, 128*1024)
 			for i := range indexes {
-				if files[i].gitCandidate {
+				if files[i].rawEmbed {
+					file, err := os.Open(files[i].path)
+					if err != nil {
+						continue
+					}
+					h := sha256.New()
+					_, readErr := io.CopyBuffer(h, file, buf)
+					closeErr := file.Close()
+					if readErr == nil && closeErr == nil {
+						digests[i] = h.Sum(nil)
+					}
+				} else if files[i].gitCandidate {
 					digests[i] = gitCandidateDigest(files[i], buf)
 				} else {
 					digests[i] = fileContentDigest(files[i].path, buf, scopeFor(files[i]))

@@ -1,6 +1,8 @@
 package jobs
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -128,6 +130,163 @@ func TestPrecomputeKeys_SkipsDisabledJobs(t *testing.T) {
 	}
 	if keys["/test-proj:b"] != wantB {
 		t.Errorf("key B = %s, want %s (no upstream contribution)", keys["/test-proj:b"], wantB)
+	}
+}
+
+func TestInvocationProducerGoEmbedFailureReachesConsumerKeys(t *testing.T) {
+	ws := makeExecutorTestWorkspace(t)
+	source := filepath.Join(ws.Root, "proj", "embed.go")
+	if err := os.WriteFile(source, []byte("package proj\nimport _ \"embed\"\n//go:embed missing.sql\nvar payload string\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	producer := cacheableJob("prepare", "/proj", "proj", "proj")
+	producer.JobDef.Cache = false // invocation-scoped producers do not publish keys
+	producer.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{Files: []string{"go-embed:build"}}}
+	consumer := cacheableJob("consume", "/test-proj", "test-proj", "test-proj", producer.Key())
+	consumer.InvocationProducer = producer
+	ws = workspace.NewWorkspace(ws.Root, nil, []*workspace.Project{producer.Project, consumer.Project})
+	cache := func() *store.CacheManager {
+		return store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
+	}
+	for _, test := range []struct {
+		name string
+		key  func() (string, error)
+	}{
+		{"precompute", func() (string, error) {
+			keys, err := PrecomputeKeys(ws, []*ScheduledJob{producer, consumer}, nil, nil, cache(), CacheBypass{})
+			return keys[consumer.Key()], err
+		}},
+		{"execution", func() (string, error) { return computeJobCacheHash(ws, consumer, nil, nil, cache(), nil) }},
+		{"selection", func() (string, error) { return computeJobCacheHashWith(ws, consumer, nil, nil, cache(), nil, true) }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			key, err := test.key()
+			if !errors.Is(err, store.ErrGoEmbedInput) || key != "" || !strings.Contains(err.Error(), "missing.sql") {
+				t.Fatalf("invalid invocation producer yielded consumer key %q, %v", key, err)
+			}
+		})
+	}
+	// The producer contributes to the identity through InvocationProducer. It
+	// need not be a scheduled dependency to exercise task opening below.
+	consumer.DependsOn = nil
+	for _, tc := range []struct {
+		name      string
+		withCache bool
+		bypass    bool
+		cacheable bool
+	}{
+		{"declared", true, false, true},
+		{"bypass", true, true, true},
+		{"nil cache", false, false, true},
+		{"uncacheable consumer", true, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			consumer.JobDef.Cache = tc.cacheable
+			var manager *store.CacheManager
+			if tc.withCache {
+				manager = cache()
+			}
+			result := runSharedScheduler(context.Background(), ws, []*ScheduledJob{consumer}, SchedulerConfig{NoCache: tc.bypass}, manager)
+			row := result.Results[consumer.Key()]
+			if result.Success || row == nil || row.CacheKey != "" || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "missing.sql") {
+				t.Fatalf("consumer reached execution despite invalid producer: row=%+v", row)
+			}
+		})
+	}
+}
+
+func TestClosureGoEmbedFailureTerminatesConsumerBeforeExecution(t *testing.T) {
+	root := t.TempDir()
+	lib := &workspace.Project{ID: "/lib", Name: "lib", Path: "lib"}
+	app := &workspace.Project{ID: "/app", Name: "app", Path: "app", Dependencies: []string{"lib"}}
+	ws := workspace.NewWorkspace(root, nil, []*workspace.Project{lib, app})
+	ws.Graph = workspace.BuildGraph(ws.Projects)
+	if err := os.MkdirAll(filepath.Join(root, "lib"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "app"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "lib", "embed.go"), []byte("package lib\nimport _ \"embed\"\n//go:embed missing.sql\nvar payload string\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	job := cacheableJob("consume", app.ID, app.Name, app.Path)
+	job.Project = app
+	job.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{ClosureFiles: []string{"go-embed:build"}}}
+	cache := func() *store.CacheManager {
+		return store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
+	}
+	if _, err := computeJobCacheHash(ws, job, nil, nil, cache(), nil); !errors.Is(err, store.ErrGoEmbedInput) {
+		t.Fatalf("closure member failure lost typed semantic category: %v", err)
+	}
+	for _, tc := range []struct {
+		name      string
+		withCache bool
+		bypass    bool
+		cacheable bool
+	}{
+		{"declared", true, false, true},
+		{"bypass", true, true, true},
+		{"nil cache", false, false, true},
+		{"uncacheable", true, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			job.JobDef.Cache = tc.cacheable
+			var manager *store.CacheManager
+			if tc.withCache {
+				manager = cache()
+			}
+			result := runSharedScheduler(context.Background(), ws, []*ScheduledJob{job}, SchedulerConfig{NoCache: tc.bypass}, manager)
+			row := result.Results[job.Key()]
+			if result.Success || row == nil || row.CacheKey != "" || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "missing.sql") {
+				t.Fatalf("closure failure reached execution: row=%+v", row)
+			}
+		})
+	}
+}
+
+func TestSelectionFingerprintsPropagateInvocationProducerGoEmbedInputs(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "library"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "library", "embed.go"), []byte("package library\nimport _ \"embed\"\n//go:embed missing.sql\nvar payload string\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	project := &workspace.Project{
+		ID: "/library", Name: "@putnami/library", Path: "library", Type: "library",
+		Metadata: releaseSetProjectMetadata(t, "npm", "@putnami/library"),
+	}
+	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "putnami"}, []*workspace.Project{project})
+	memberKey := releaseset.MemberKey("npm", "@putnami/library")
+	members := map[string]*workspace.Project{memberKey: project}
+	producer := cacheableJob("prepare", project.ID, project.Name, project.Path)
+	producer.Project = project
+	producer.JobDef.Cache = false
+	producer.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{Files: []string{"go-embed:build"}}}
+	packageJob := packageTaskFixture(project, "test-provider", "1.0.0", t.TempDir())
+	planned := []*ScheduledJob{producer, packageJob}
+	fingerprint := func() (string, error) {
+		cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
+		got, err := SelectionFingerprints(ws, planned, nil, cache, testProfiles(), members)
+		return got[memberKey], err
+	}
+
+	withoutProducer, err := fingerprint()
+	if err != nil || withoutProducer == "" {
+		t.Fatalf("no invocation producer should yield a selection fingerprint: %q, %v", withoutProducer, err)
+	}
+	packageJob.InvocationProducer = producer
+	packageJob.DependsOn = []string{producer.Key()}
+	if got, err := fingerprint(); err == nil || got != "" || !strings.Contains(err.Error(), "missing.sql") {
+		t.Fatalf("invalid invocation producer yielded selection fingerprint %q, %v", got, err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "library", "missing.sql"), []byte("SELECT 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	withProducer, err := fingerprint()
+	if err != nil || withProducer == "" || withProducer == withoutProducer {
+		t.Fatalf("valid invocation producer selection fingerprint = %q (without producer %q), %v", withProducer, withoutProducer, err)
 	}
 }
 

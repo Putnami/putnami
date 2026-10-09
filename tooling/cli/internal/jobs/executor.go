@@ -3,6 +3,7 @@ package jobs
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -669,6 +670,68 @@ func keyFilePatterns(
 	return files, workspaceFiles
 }
 
+// Go embed selectors are extension capabilities, not user-supplied globs.
+// A project option or CLI filePatterns flag has no negotiated manifest stamp;
+// accepting one there would let an older CLI silently drop that input.
+func validateDeclaredGoEmbedSelectors(ws *workspace.Workspace, job *ScheduledJob, params map[string]any) error {
+	for _, patterns := range [][]string{paramStrings(params, "filePatterns"), projectFilePatterns(ws, job)} {
+		for _, pattern := range patterns {
+			if strings.HasPrefix(pattern, "go-embed:") {
+				return fmt.Errorf("%w: selector %q requires an extension task input, not filePatterns", store.ErrGoEmbedInput, pattern)
+			}
+		}
+	}
+	return nil
+}
+
+// validateUnkeyedGoEmbedInputs keeps required selector inputs fail-closed for
+// tasks without a cache identity. Keyed tasks validate these same declarations
+// through ComputeHashUsing; this path runs only when key computation is skipped.
+func validateUnkeyedGoEmbedInputs(ws *workspace.Workspace, job *ScheduledJob, params map[string]any) error {
+	if err := validateDeclaredGoEmbedSelectors(ws, job, params); err != nil {
+		return err
+	}
+	files, workspaceFiles := keyFilePatterns(ws, job, params)
+	hasSelector := func(patterns []string) bool {
+		for _, pattern := range patterns {
+			if strings.HasPrefix(pattern, "go-embed:") {
+				return true
+			}
+		}
+		return false
+	}
+	cache := store.NewCacheManager(nil)
+	validatePatterns := func(root string, patterns []string, scope store.ProjectConfigScope) error {
+		if !hasSelector(patterns) {
+			return nil
+		}
+		_, err := cache.HashFiles(root, patterns, scope)
+		if errors.Is(err, store.ErrGoEmbedInput) {
+			return err
+		}
+		return nil
+	}
+	if err := validatePatterns(filepath.Join(ws.Root, job.Project.Path), files, jobConfigScope(ws, job)); err != nil {
+		return fmt.Errorf("validate unkeyed project inputs: %w", err)
+	}
+	if err := validatePatterns(ws.Root, workspaceFiles, store.ProjectConfigScope{Verbatim: true}); err != nil {
+		return fmt.Errorf("validate unkeyed workspace inputs: %w", err)
+	}
+	if hasSelector(closureKeyPatterns(job)) {
+		for _, member := range projectDependencyClosure(ws, job.Project) {
+			if err := validatePatterns(filepath.Join(ws.Root, member.Path), closureKeyPatterns(job), jobConfigScope(ws, job)); err != nil {
+				return fmt.Errorf("closure inputs for %s: %w", member.ID, err)
+			}
+		}
+	}
+	if job.InvocationProducer != nil {
+		if err := validateUnkeyedGoEmbedInputs(ws, job.InvocationProducer, params); err != nil {
+			return fmt.Errorf("invocation producer for %s: %w", job.Key(), err)
+		}
+	}
+	return nil
+}
+
 // hostOSClass maps the OS class store.BuildCacheKey records for this host to
 // the one computeJobCacheHashWith keys with. It is the identity; tests replace
 // it to key a job the way another host would.
@@ -721,6 +784,9 @@ func computeJobCacheHashWith(
 	hashes map[string]string,
 	selection bool,
 ) (string, error) {
+	if err := validateDeclaredGoEmbedSelectors(ws, job, commandParams); err != nil {
+		return "", err
+	}
 	cacheParams := taskCacheParamsWith(ws, job, commandParams, selection)
 
 	// Build cache key policy from task cache config
@@ -783,8 +849,12 @@ func computeJobCacheHashWith(
 	// a re-provisioned server on a new ephemeral port produced a different key
 	// for identical inputs — and it needed a process-global side effect
 	// sequenced before every key computation to work at all.
-	if digest := invocationProducerDigest(ws, job, commandParams, versions, cache, hashes, selection); digest != "" {
-		upstreamHashes = append(upstreamHashes, digest)
+	producerDigest, err := invocationProducerDigest(ws, job, commandParams, versions, cache, hashes, selection)
+	if err != nil {
+		return "", fmt.Errorf("invocation producer for %s: %w", job.Key(), err)
+	}
+	if producerDigest != "" {
+		upstreamHashes = append(upstreamHashes, producerDigest)
 	}
 
 	// A task that declares a `closure` input reads its DEPENDENCIES' committed
@@ -798,7 +868,11 @@ func computeJobCacheHashWith(
 	// runtime walks the closure's infra/requirements.json — kept one key while
 	// the environment it provisions changed, and the consumer that folds its
 	// action digest served a stored verdict against a different world.
-	if digest := closureInputsDigest(ws, job, cache); digest != "" {
+	digest, err := closureInputsDigest(ws, job, cache)
+	if err != nil {
+		return "", err
+	}
+	if digest != "" {
 		upstreamHashes = append(upstreamHashes, digest)
 	}
 
@@ -919,14 +993,14 @@ func closureKeyPatterns(job *ScheduledJob) []string {
 // skipped, so ADDING a manifest to a dependency moves the key exactly as
 // editing one does. The per-member digests come from the CacheManager's memo, so
 // one closure walk costs one stat per (member, pattern set) per CLI invocation.
-func closureInputsDigest(ws *workspace.Workspace, job *ScheduledJob, cache *store.CacheManager) string {
+func closureInputsDigest(ws *workspace.Workspace, job *ScheduledJob, cache *store.CacheManager) (string, error) {
 	patterns := closureKeyPatterns(job)
 	if len(patterns) == 0 || ws == nil || cache == nil || job == nil || job.Project == nil {
-		return ""
+		return "", nil
 	}
 	members := projectDependencyClosure(ws, job.Project)
 	if len(members) == 0 {
-		return ""
+		return "", nil
 	}
 	// The closure is already in canonical project-id order, but sort the parts
 	// anyway: the digest must not depend on the graph walk's ordering.
@@ -934,13 +1008,13 @@ func closureInputsDigest(ws *workspace.Workspace, job *ScheduledJob, cache *stor
 	for _, member := range members {
 		digest, err := cache.HashFiles(filepath.Join(ws.Root, member.Path), patterns, jobConfigScope(ws, job))
 		if err != nil {
-			continue
+			return "", fmt.Errorf("closure inputs for %s: %w", member.ID, err)
 		}
 		parts = append(parts, member.Path+"\x00"+digest)
 	}
 	sort.Strings(parts)
 	sum := sha256.Sum256([]byte(strings.Join(parts, "\x01")))
-	return "closureFiles:" + hex.EncodeToString(sum[:])
+	return "closureFiles:" + hex.EncodeToString(sum[:]), nil
 }
 
 // invocationProducerDigest returns the action digest of the producer whose
@@ -958,15 +1032,15 @@ func invocationProducerDigest(
 	cache *store.CacheManager,
 	hashes map[string]string,
 	selection bool,
-) string {
+) (string, error) {
 	if job == nil || job.InvocationProducer == nil {
-		return ""
+		return "", nil
 	}
 	digest, err := computeJobCacheHashWith(ws, job.InvocationProducer, commandParams, versions, cache, hashes, selection)
 	if err != nil {
-		return ""
+		return "", err
 	}
-	return digest
+	return digest, nil
 }
 
 // cacheKeyDependencies names every plan key whose cache hash contributes to

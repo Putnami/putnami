@@ -187,6 +187,10 @@ manifest that declares one is stamped `5`. Every other manifest keeps contract
 `4` and loads exactly as before, while a contract-4 CLI — whose permissive
 decode would drop the contribution silently — refuses a contract-5 package as
 written for a newer putnami.
+Contract `6` is additive for `go-embed:build` and `go-embed:test` in an
+extension's project task inputs. A reader limited to contract 5 refuses that
+manifest before interpreting its inputs; unrelated manifests retain their
+existing required stamp.
 Contract `4` adds dependent-owned `sessionPrerequisites`: their same-session
 command expansion, selection and parameter projection, and functional gate
 edges are semantic. A contract-3 CLI has no representation for that field, so

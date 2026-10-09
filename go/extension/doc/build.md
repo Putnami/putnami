@@ -1,5 +1,11 @@
 # Build
 
+Go build keys include the exact bytes of files selected by `//go:embed`, even
+when no `.go` file changes. Build phases read directives from non-test sources;
+test phases also read test sources. The resolver includes every potentially
+buildable platform or custom-tag variant, so a missing target in any such
+source is an error before a cached result can be restored.
+
 **Command:** `putnami build [project]`
 
 Compiles Go packages and binaries **for the host platform**, with cross-compilation available as an explicit opt-in. In a combined `lint,test,build` invocation, an ordinary library compile is omitted only when test and lint provide equivalent host compile evidence, including a matching race setting. Automatically keeps `go.mod` and the project's `putnami.json` in sync so workspace dependencies are always tracked.
