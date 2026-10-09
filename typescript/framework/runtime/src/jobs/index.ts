@@ -9,6 +9,7 @@ export {
   type EventType,
   hasEventErrors,
   isKnownProtocolVersion,
+  isValidReadyEndpoint,
   JobEventEmitter,
   type JobError,
   type LogLevel,

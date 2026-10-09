@@ -493,3 +493,24 @@ func TestOuterSessionStreamIsNotOwnedHere(t *testing.T) {
 		t.Fatal("scanned no production sources — the assertion would pass vacuously")
 	}
 }
+
+func TestValidReadyEndpoint(t *testing.T) {
+	cases := map[string]struct {
+		endpoint ReadyEndpoint
+		want     bool
+	}{
+		"http":           {ReadyEndpoint{Scheme: ReadySchemeHTTP, Host: "localhost", Port: 8080}, true},
+		"with path":      {ReadyEndpoint{Scheme: ReadySchemeHTTPS, Host: "h", Port: 443, Path: "/api"}, true},
+		"port 0":         {ReadyEndpoint{Scheme: ReadySchemeHTTP, Host: "localhost"}, false},
+		"no host":        {ReadyEndpoint{Scheme: ReadySchemeHTTP, Port: 80}, false},
+		"unknown scheme": {ReadyEndpoint{Scheme: "amqp", Host: "h", Port: 5672}, false},
+		"relative path":  {ReadyEndpoint{Scheme: ReadySchemeHTTP, Host: "h", Port: 80, Path: "api"}, false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := ValidReadyEndpoint(tc.endpoint); got != tc.want {
+				t.Errorf("ValidReadyEndpoint(%+v) = %v, want %v", tc.endpoint, got, tc.want)
+			}
+		})
+	}
+}

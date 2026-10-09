@@ -16,7 +16,15 @@ import {
   registerContributedConfig,
   useLogger,
 } from '@putnami/runtime';
-import { compareReadyEndpoints, READY_LOG_KEY, type ReadyData, readyMarker } from '@putnami/runtime/jobs';
+import {
+  compareReadyEndpoints,
+  isValidReadyEndpoint,
+  READY_LOG_KEY,
+  type ReadyData,
+  type ReadyEndpoint,
+  readyMarker,
+  readyEndpointUrl,
+} from '@putnami/runtime/jobs';
 import { getProjectRoot } from '@putnami/utils';
 import { markStartupFailureLogged } from './app-bootstrap';
 import { emitDesignGraph } from '../features/design-graph';
@@ -49,7 +57,19 @@ export {
  * `startedMarker` in go/framework/app.
  */
 function startedMarker(plugins: Array<{ plugin: Plugin }>, durationMs: number): ReadyData {
-  const endpoints = plugins.flatMap(({ plugin }) => plugin.readyEndpoints?.() ?? []);
+  // An endpoint the runtime protocol rejects is dropped with a warning: kept,
+  // it would void the whole ready record, and a consumer waiting for completed
+  // startup would never learn it.
+  const endpoints = plugins.flatMap(({ plugin }) =>
+    (plugin.readyEndpoints?.() ?? []).filter((endpoint: ReadyEndpoint) => {
+      if (isValidReadyEndpoint(endpoint)) return true;
+      useLogger('putnami').warn('dropped an invalid ready endpoint', {
+        plugin: plugin.constructor.name,
+        endpoint: readyEndpointUrl(endpoint),
+      });
+      return false;
+    }),
+  );
   const marker = readyMarker({ target: 'workload', endpoints, durationMs });
   if (marker.endpoints) {
     const sorted = marker.endpoints;
@@ -208,10 +228,15 @@ export class Application extends Module {
 
   /**
    * Mark the application as running without going through the full lifecycle.
-   * Useful in tests that manually call warmup/start on individual plugins.
+   * Useful in tests that manually call warmup/start on individual plugins: it
+   * stands for completed startup, so the plugins learn it as they would from
+   * {@link start}, and a mounted platform plugin's /readyz can turn ready.
    */
   markAsRunning(): void {
     this.running = true;
+    for (const { plugin } of this.collectPlugins()) {
+      plugin.startupCompleted?.();
+    }
   }
 
   /**

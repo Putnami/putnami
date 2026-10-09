@@ -356,6 +356,16 @@ export function validateReadyData(data: ReadyData): EventDiagnostic[] {
 }
 
 /**
+ * Reports whether one endpoint satisfies the rules a readiness payload holds
+ * each of its endpoints to. A producer that gathers endpoints from several
+ * sources drops one that fails them, instead of voiding the whole claim it
+ * would otherwise invalidate. Mirrors the Go `ValidReadyEndpoint`.
+ */
+export function isValidReadyEndpoint(endpoint: ReadyEndpoint): boolean {
+  return !hasEventErrors(validateReadyData({ target: 'server', endpoints: [endpoint] }));
+}
+
+/**
  * Validates the structural invariants of a single parsed event,
  * mirroring the Go protocol's `ValidateEvent`.
  */

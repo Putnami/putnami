@@ -278,7 +278,7 @@ func (a *Application) Start(ctx context.Context) error {
 	durationMs := time.Since(startedAt).Milliseconds()
 	a.log.Info("🤖 ready",
 		slog.Int64("durationMs", durationMs),
-		slog.Any(runtimeproto.ReadyLogKey, startedMarker(durationMs, readyEndpoints(allPlugins))))
+		slog.Any(runtimeproto.ReadyLogKey, startedMarker(durationMs, a.readyEndpoints(allPlugins))))
 
 	if a.runner != nil {
 		if err := a.runner(ctx); err != nil && ctx.Err() == nil {
@@ -313,12 +313,24 @@ func startedMarker(durationMs int64, endpoints []runtimeproto.ReadyEndpoint) run
 }
 
 // readyEndpoints gathers the endpoints of every EndpointReporter, in plugin
-// order.
-func readyEndpoints(plugins []PluginOwner) []runtimeproto.ReadyEndpoint {
+// order. An endpoint the runtime protocol rejects is dropped with a warning:
+// kept, it would void the whole ready record, and a consumer waiting for
+// completed startup would never learn it.
+func (a *Application) readyEndpoints(plugins []PluginOwner) []runtimeproto.ReadyEndpoint {
 	var endpoints []runtimeproto.ReadyEndpoint
 	for _, po := range plugins {
-		if reporter, ok := po.Plugin.(EndpointReporter); ok {
-			endpoints = append(endpoints, reporter.ReadyEndpoints()...)
+		reporter, ok := po.Plugin.(EndpointReporter)
+		if !ok {
+			continue
+		}
+		for _, endpoint := range reporter.ReadyEndpoints() {
+			if !runtimeproto.ValidReadyEndpoint(endpoint) {
+				a.log.Warn("dropped an invalid ready endpoint",
+					slog.String("plugin", reflect.TypeOf(po.Plugin).String()),
+					slog.String("endpoint", endpoint.URL()))
+				continue
+			}
+			endpoints = append(endpoints, endpoint)
 		}
 	}
 	return endpoints

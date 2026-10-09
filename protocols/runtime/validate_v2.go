@@ -67,6 +67,14 @@ func validateReadyData(data *ReadyData) []diag.Diagnostic {
 	return diags
 }
 
+// ValidReadyEndpoint reports whether one endpoint satisfies the rules a ready
+// payload holds each of its endpoints to. A producer that gathers endpoints
+// from several sources drops one that fails them, instead of voiding the whole
+// claim it would otherwise invalidate.
+func ValidReadyEndpoint(endpoint ReadyEndpoint) bool {
+	return !diag.HasErrors(validateReadyEndpoints([]ReadyEndpoint{endpoint}))
+}
+
 // validateReadyEndpoints checks each endpoint and the list's canonical order.
 func validateReadyEndpoints(endpoints []ReadyEndpoint) []diag.Diagnostic {
 	var diags []diag.Diagnostic

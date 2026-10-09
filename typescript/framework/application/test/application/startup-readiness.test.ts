@@ -224,7 +224,9 @@ describe('ready record', () => {
       app = application()
         .use({ readyEndpoints: () => admin } satisfies Plugin)
         .use({ readyEndpoints: () => [http(8080), grpc] } satisfies Plugin)
-        .use({ readyEndpoints: () => [] } satisfies Plugin);
+        .use({ readyEndpoints: () => [] } satisfies Plugin)
+        // An endpoint the protocol rejects is dropped; kept, it would void the claim.
+        .use({ readyEndpoints: () => [http(0)] } satisfies Plugin);
 
       await app.start();
 
@@ -234,6 +236,28 @@ describe('ready record', () => {
       expect(data?.target).toBe('workload');
       expect(data?.endpoints).toEqual([grpc, http(8080), http(8081)]);
       expect(admin).toEqual([http(8081), http(8080)]);
+    },
+  );
+});
+
+describe('markAsRunning', () => {
+  specTest(
+    'tells every plugin that startup completed',
+    {
+      feature: 'typescript/application-lifecycle',
+      requirement: 'completed-startup-readiness',
+      check: 'plugins-learn-completed-startup-before-the-ready-record',
+    },
+    () => {
+      const completed: string[] = [];
+      app = application()
+        .use({ startupCompleted: () => completed.push('alpha') } satisfies Plugin)
+        .use({ startupCompleted: () => completed.push('beta') } satisfies Plugin);
+
+      app.markAsRunning();
+
+      expect(app.isRunning()).toBe(true);
+      expect(completed).toEqual(['alpha', 'beta']);
     },
   );
 });

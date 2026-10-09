@@ -307,6 +307,8 @@ func TestStart_TheReadyRecordCarriesTheEndpointsThePluginsBound(t *testing.T) {
 	a.Use(admin)
 	a.Use(&reporterPlugin{name: "api", endpoints: []runtimeproto.ReadyEndpoint{http(8080), grpc}})
 	a.Use(&reporterPlugin{name: "worker"})
+	// An endpoint the protocol rejects is dropped; kept, it would void the claim.
+	a.Use(&reporterPlugin{name: "unbound", endpoints: []runtimeproto.ReadyEndpoint{http(0)}})
 	if err := a.Start(context.Background()); err != nil {
 		t.Fatalf("start: %v", err)
 	}

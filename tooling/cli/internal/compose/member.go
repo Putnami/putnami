@@ -40,8 +40,9 @@ func isServeReadyEvent(event jobs.RawJobEvent) bool {
 	return data.Target == runtimeproto.ReadyTargetServer || data.Target == runtimeproto.ReadyTargetWorkload
 }
 
-// readyClaim is the target of a readiness claim and the port of its first
-// endpoint, 0 for a claim that carries none (a workload claim).
+// readyClaim is the target of a readiness claim and the port the proxy should
+// forward to: the first http or https endpoint, because the proxy speaks HTTP,
+// else the first endpoint, else 0 for a claim that carries none.
 func readyClaim(event jobs.RawJobEvent) (target string, port int) {
 	data, err := runtimeproto.ExtractReadyData(event.Data)
 	if err != nil || data == nil {
@@ -49,6 +50,11 @@ func readyClaim(event jobs.RawJobEvent) (target string, port int) {
 	}
 	if len(data.Endpoints) == 0 {
 		return data.Target, 0
+	}
+	for _, endpoint := range data.Endpoints {
+		if endpoint.Scheme == runtimeproto.ReadySchemeHTTP || endpoint.Scheme == runtimeproto.ReadySchemeHTTPS {
+			return data.Target, endpoint.Port
+		}
 	}
 	return data.Target, data.Endpoints[0].Port
 }
