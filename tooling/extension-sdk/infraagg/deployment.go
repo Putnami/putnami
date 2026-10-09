@@ -62,7 +62,7 @@ func Deployment(ctx *pctx.Context, opts Options) (Result, error) {
 	contributions, diags := collectContributions(ctx)
 	runtime, _, runtimeDiags := resolveRuntime(workloadRoot, opts)
 	diags = append(diags, runtimeDiags...)
-	merged, assembleDiags := assemble(ctx.Project.Name, workloadRoot, contributions, runtime)
+	merged, assembleDiags := assemble(workloadID(ctx), workloadRoot, contributions, runtime)
 	diags = append(diags, assembleDiags...)
 
 	withheld := Result{
