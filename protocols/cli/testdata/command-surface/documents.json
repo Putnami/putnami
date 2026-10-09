@@ -1,0 +1,1926 @@
+[
+  {
+    "name": "minimal",
+    "valid": true,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [],
+      "commands": []
+    }
+  },
+  {
+    "name": "full",
+    "valid": true,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-version",
+    "valid": false,
+    "document": {
+      "protocolVersion": 2,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing-commands",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": []
+    }
+  },
+  {
+    "name": "null-global-flags",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": null,
+      "commands": []
+    }
+  },
+  {
+    "name": "unknown-document-member",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "name": "putnami"
+    }
+  },
+  {
+    "name": "unknown-flag-member",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool",
+          "description": "Shorthand"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-command-member",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": [],
+          "usage": "putnami build"
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "unsorted-commands",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate-command",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "unsorted-flags",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--json",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate-flag",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate-short-alias",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool",
+          "short": "-v"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "bool-flag-with-values",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool",
+          "values": [
+            "yes"
+          ]
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty-values",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value",
+          "values": []
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "unsorted-values",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "tag",
+                "push",
+                "pull_request"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate-value",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "push",
+                "push"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-flag-type",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "string"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty-short-alias",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool",
+          "short": ""
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "null-short-alias",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool",
+          "short": null
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "long-without-two-dashes",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "-json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "short-of-two-letters",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-vv",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "path-with-a-double-space",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci  validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "path-with-a-leading-space",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": " build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "command-without-flags",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "positional-without-required",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash|zsh|fish"
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "positional-name-with-a-space",
+    "valid": false,
+    "document": {
+      "protocolVersion": 1,
+      "globalFlags": [
+        {
+          "long": "--json",
+          "type": "bool"
+        },
+        {
+          "long": "--output",
+          "type": "value"
+        },
+        {
+          "long": "--verbose",
+          "short": "-v",
+          "type": "bool"
+        }
+      ],
+      "commands": [
+        {
+          "path": "build",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "path": "ci validate",
+          "flags": [
+            {
+              "long": "--event",
+              "type": "value",
+              "values": [
+                "pull_request",
+                "push",
+                "tag"
+              ]
+            },
+            {
+              "long": "--global",
+              "short": "-g",
+              "type": "bool"
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "path": "completion",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "bash zsh",
+              "required": true
+            }
+          ]
+        },
+        {
+          "path": "projects tag",
+          "flags": [
+            {
+              "long": "--remove",
+              "type": "bool"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "name",
+              "required": true
+            },
+            {
+              "name": "tag",
+              "required": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-an-object",
+    "valid": false,
+    "raw": "[]"
+  },
+  {
+    "name": "trailing-data",
+    "valid": false,
+    "raw": "{\"protocolVersion\":1,\"globalFlags\":[],\"commands\":[]} {}"
+  }
+]

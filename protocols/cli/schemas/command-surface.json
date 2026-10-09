@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/putnami-cli-command-surface.json",
+  "title": "CLI command surface",
+  "description": "The commands and flags a CLI's users type, committed by the CLI so a change to them can be compared with a released version. Descriptions, usage lines and examples are not part of it. Lists are sorted by byte order; readers also refuse a duplicate short alias within one flag list, a null member, trailing JSON, and a document over 1 MiB.",
+  "$ref": "#/$defs/document",
+  "$defs": {
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "globalFlags",
+        "commands"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": 1,
+          "description": "The command-surface contract version."
+        },
+        "globalFlags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/flag"
+          },
+          "description": "The flags the CLI accepts with any command, sorted by long, longs unique."
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/command"
+          },
+          "description": "The commands users type, sorted by path, paths unique."
+        }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One command users type, an alternate spelling of another command included.",
+      "required": [
+        "path",
+        "flags",
+        "positionals"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*( [A-Za-z0-9][A-Za-z0-9_-]*)*(?![\\s\\S])",
+          "description": "The space-separated invocation path after the program name, for example projects list."
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/flag"
+          },
+          "description": "The command's own flags, sorted by long, longs unique."
+        },
+        "positionals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/positional"
+          },
+          "description": "The command's positional arguments, in invocation order."
+        }
+      }
+    },
+    "flag": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One flag of a command, or one global flag.",
+      "required": [
+        "long",
+        "type"
+      ],
+      "properties": {
+        "long": {
+          "type": "string",
+          "pattern": "^--[A-Za-z0-9][A-Za-z0-9_-]*(?![\\s\\S])",
+          "description": "The long spelling with its dashes, for example --dry-run."
+        },
+        "short": {
+          "type": "string",
+          "pattern": "^-[A-Za-z0-9](?![\\s\\S])",
+          "description": "The single-dash alias, for example -g. Absent when the flag has none."
+        },
+        "type": {
+          "enum": [
+            "bool",
+            "value"
+          ],
+          "description": "bool: the flag takes no value. value: the flag takes a value."
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^\\S+(?![\\s\\S])"
+          },
+          "description": "The closed list of values a value flag accepts, sorted, values unique. Absent when the flag accepts any value, and always absent on a bool flag."
+        }
+      }
+    },
+    "positional": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One positional argument of a command.",
+      "required": [
+        "name",
+        "required"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^\\S+(?![\\s\\S])",
+          "description": "The argument's name as the CLI's usage line spells it, for example name or bash|zsh|fish."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether an invocation must supply the argument."
+        }
+      }
+    }
+  }
+}
