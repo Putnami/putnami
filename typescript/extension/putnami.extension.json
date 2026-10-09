@@ -1812,7 +1812,7 @@
       }
     },
     "test-env-down": {
-      "description": "Finalize the database test environment: read the non-secret lease and do what it says. The ordinary run RETAINS its server — a still-running container whose configuration digest matches is interchangeable across invocations, and the next `test-env-up` reaps every digest-mismatched container before it reuses or starts one — while an `--infra-down` lease sweeps. Runs with `runOn: finally`, so the orchestrator runs it exactly once whenever `test-env` STARTED, consumer failure and cancellation included. UNCACHEABLE on purpose: its only input is the lease this invocation's `test-env-up` wrote, which no cache key covers, and under `--infra-down` a replayed success would skip the sweep. The task contract also forbids a cache on a task with the `process` effect.",
+      "description": "Finalize the database test environment: read the non-secret lease and do what it says. The ordinary run RETAINS its server — a still-running container whose configuration digest matches is interchangeable across invocations, and the next `test-env-up` reaps every digest-mismatched container before it reuses or starts one — while an `--infra-down` lease sweeps. Runs with `runOn: finally`, so the orchestrator runs it exactly once whenever `test-env` STARTED, consumer failure and cancellation included. UNCACHEABLE on purpose: it acts on the lease this invocation's `test-env-up` wrote, which no cache key covers, and under `--infra-down` a replayed success would skip the sweep. The task contract also forbids a cache on a task with the `process` effect.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
