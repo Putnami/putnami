@@ -57,7 +57,7 @@
     },
     {
       "id": "local-readiness-is-completed-startup",
-      "text": "compose records per member the first typed v2 ready event with target workload, which the Go and TypeScript application frameworks emit only after every plugin starter and module start hook returned. Unless the inventory declares GET <prefix>/readyz or --platform-prefix is set, --target local waits for that claim within --ready-timeout; a server claim or an answered request never replaces it. A claim that never arrives is timed_out with no request sent; a target that exits first is composition_failed."
+      "text": "Go and TypeScript applications report completed startup, once every plugin starter and module start hook returned, two ways: a typed v2 ready event with target workload, which compose records per member, and a platform /readyz that answers 200 only from then on. --target local polls GET <prefix>/readyz when the inventory declares it or --platform-prefix is set, else waits for the claim; a server claim never counts. No claim in time is timed_out with no request sent; an early exit is composition_failed."
     },
     {
       "id": "every-non-pass-state-exits-non-zero",

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import type { Application, HealthChecker, Module, Plugin, ReadinessChecker } from '../../src';
 import { application, http, module, platform } from '../../src';
 import {
@@ -72,6 +73,68 @@ async function fetchEnvelope(baseUrl: string, path: string): Promise<{ status: n
   const res = await fetch(`${baseUrl}${path}`);
   const body = (await res.json()) as Envelope;
   return { status: res.status, body };
+}
+
+/** Bounds every wait on a pending start. It detects a hang; it is never a latency assertion. */
+const HANG_DETECTOR_MS = 30_000;
+
+/** Polls until `poll` returns a value, within the hang detector. */
+async function eventually<T>(what: string, poll: () => Promise<T | undefined>): Promise<T> {
+  const deadline = Date.now() + HANG_DETECTOR_MS;
+  for (;;) {
+    const value = await poll();
+    if (value !== undefined) return value;
+    if (Date.now() > deadline) throw new Error(`${what} did not happen`);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+/**
+ * Starts an application whose server mounts a platform plugin next to a plugin
+ * whose `start()` stays pending until `release()`, then resolves, or rejects
+ * with `error`. `track` receives the application before it starts, so the
+ * caller stops it. Returns once that start is pending and the platform plugin
+ * itself started: `/healthz` answers 200.
+ */
+async function startWithPendingPlugin(
+  track: (started: Application) => void,
+  error?: Error,
+): Promise<{
+  baseUrl: string;
+  starting: Promise<void>;
+  release: () => void;
+}> {
+  let release = (): void => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let enter = (): void => {};
+  const entered = new Promise<void>((resolve) => {
+    enter = resolve;
+  });
+  const httpPlugin = http({ port: 0 });
+  const app = application()
+    .use(httpPlugin)
+    .use(platform())
+    .use({
+      name: 'pending',
+      start: async () => {
+        enter();
+        await released;
+        if (error) throw error;
+      },
+    } satisfies Plugin);
+  track(app);
+  const starting = app.start();
+  // A rejection is asserted by the caller; this keeps it from surfacing as unhandled meanwhile.
+  starting.catch(() => {});
+  await entered;
+  const port = await eventually('the server listening', async () => httpPlugin.getServer()?.port);
+  const baseUrl = `http://localhost:${port}`;
+  await eventually('/healthz answering 200', async () =>
+    (await fetchEnvelope(baseUrl, '/healthz')).status === HTTP_STATUS_OK ? true : undefined,
+  );
+  return { baseUrl, starting, release };
 }
 
 // --- tests ---
@@ -309,6 +372,56 @@ describe('PlatformPlugin', () => {
       expect(pool.calls).toBe(1);
       expect(pool.sawSignal).toBe(true);
     });
+  });
+
+  describe('/readyz until startup completed', () => {
+    specTest(
+      'stays unavailable while a plugin start is pending',
+      {
+        feature: 'typescript/application-lifecycle',
+        requirement: 'completed-startup-readiness',
+        check: 'readiness-answers-ready-only-after-every-plugin-start',
+      },
+      async () => {
+        const { baseUrl, starting, release } = await startWithPendingPlugin((started) => {
+          app = started;
+        });
+        try {
+          const pending = await fetchEnvelope(baseUrl, '/readyz');
+          expect(pending.status).toBe(HTTP_STATUS_UNAVAILABLE);
+          expect(pending.body.status).toBe(STATUS_UNAVAILABLE);
+        } finally {
+          release();
+        }
+        await starting;
+
+        const started = await fetchEnvelope(baseUrl, '/readyz');
+        expect(started.status).toBe(HTTP_STATUS_OK);
+        expect(started.body.status).toBe(STATUS_OK);
+      },
+    );
+
+    specTest(
+      'never answers ready when a plugin start rejects',
+      {
+        feature: 'typescript/application-lifecycle',
+        requirement: 'completed-startup-readiness',
+        check: 'a-rejected-plugin-start-never-answers-ready',
+      },
+      async () => {
+        const { baseUrl, starting, release } = await startWithPendingPlugin((started) => {
+          app = started;
+        }, new Error('boom'));
+        try {
+          const pending = await fetchEnvelope(baseUrl, '/readyz');
+          expect(pending.status).toBe(HTTP_STATUS_UNAVAILABLE);
+          expect(pending.body.status).toBe(STATUS_UNAVAILABLE);
+        } finally {
+          release();
+        }
+        await expect(starting).rejects.toThrow('boom');
+      },
+    );
   });
 
   describe('required readiness', () => {

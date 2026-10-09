@@ -47,7 +47,7 @@
     },
     {
       "id": "readiness-marker",
-      "text": "The listening log record carries the canonical readiness marker with the port the listener actually bound, and degrades to a workload claim rather than announcing an address nobody can reach."
+      "text": "The listening log record carries the canonical server readiness marker with the port the listener actually bound, and the server reports that endpoint to the application from Start until Stop, so the application's ready record carries it too. A listener that is not addressable writes no marker and reports no endpoint rather than announcing an address nobody can reach."
     },
     {
       "id": "websocket-framing",

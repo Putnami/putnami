@@ -810,7 +810,7 @@ local composes the workload on this machine; an http(s) URL is a running deploym
 Required with a URL target: the git sha the deployment must report on /version.
 .TP
 .B --platform-prefix
-Prefix under which /readyz and /version are mounted; default: where the route inventory declares both, else the root.
+Prefix under which /readyz and /version are mounted; setting it makes local readiness poll <path>/readyz instead of waiting for the startup claim; default: where the route inventory declares both, else the root.
 .TP
 .B --ready-timeout
 Deadline for readiness; default 60s.

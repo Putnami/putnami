@@ -8,11 +8,14 @@ A plugin is an object that implements one or more lifecycle hooks:
 
 ```ts
 import type { Module, Plugin, GenerateResult } from '@putnami/application';
+import type { ReadyEndpoint } from '@putnami/runtime/jobs';
 
 interface Plugin {
   generate?(owner: Module): Promise<GenerateResult> | GenerateResult;
   warmup?(owner: Module): Promise<void> | void;
   start?(owner: Module): Promise<void> | void;
+  startupCompleted?(): void;
+  readyEndpoints?(): ReadyEndpoint[];
   stop?(owner: Module): Promise<void> | void;
 }
 ```
@@ -110,6 +113,18 @@ export function metricsPlugin(): Plugin {
   };
 }
 ```
+
+### startupCompleted() and the ready record
+
+Every plugin `start()` runs in parallel. Once all of them resolved, the
+application calls `startupCompleted()` on every plugin, in plugin order, then
+logs `🤖 ready`. That record carries a runtime-protocol `workload` readiness
+claim under the reserved `putnami.ready` key, with the endpoints every plugin
+reports from `readyEndpoints()` (the HTTP plugin reports its listener). The
+platform plugin implements `startupCompleted()`: its `/readyz` answers ready
+only from then on. A `start()` that is still pending delays both, and a
+`start()` that rejects means neither happens. `startupCompleted()` must not
+block.
 
 ### stop()
 

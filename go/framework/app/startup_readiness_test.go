@@ -107,6 +107,23 @@ func recordingHook(rec *recorder, event string) func(context.Context) error {
 	}
 }
 
+// observerPlugin is a StartupObserver that adds "observed" to rec.
+type observerPlugin struct{ rec *recorder }
+
+func (p *observerPlugin) Name() string      { return "observer" }
+func (p *observerPlugin) StartupCompleted() { p.rec.add("observed") }
+
+// reporterPlugin is an EndpointReporter with fixed endpoints.
+type reporterPlugin struct {
+	name      string
+	endpoints []runtimeproto.ReadyEndpoint
+}
+
+func (p *reporterPlugin) Name() string { return p.name }
+func (p *reporterPlugin) ReadyEndpoints() []runtimeproto.ReadyEndpoint {
+	return p.endpoints
+}
+
 func waitFor(t *testing.T, ch <-chan struct{}, what string) {
 	t.Helper()
 	select {
@@ -171,6 +188,7 @@ func TestStart_ADelayedStarterOrStartHookDelaysTheReadyRecord(t *testing.T) {
 			a, rec, _ := newReadinessApp("ready-delayed")
 			entered, release := make(chan struct{}), make(chan struct{})
 			a.Use(&gatePlugin{name: "fast", rec: rec})
+			a.Use(&observerPlugin{rec: rec})
 			if gated == "starter" {
 				a.Use(&gatePlugin{name: "slow", rec: rec, entered: entered, release: release})
 			} else {
@@ -189,8 +207,8 @@ func TestStart_ADelayedStarterOrStartHookDelaysTheReadyRecord(t *testing.T) {
 			started := make(chan error, 1)
 			go func() { started <- a.Start(context.Background()) }()
 			waitFor(t, entered, "the gated "+gated)
-			if events := rec.snapshot(); slices.Contains(events, "ready") {
-				t.Fatalf("events = %v: the ready record was written while a %s was still running", events, gated)
+			if events := rec.snapshot(); slices.Contains(events, "ready") || slices.Contains(events, "observed") {
+				t.Fatalf("events = %v: startup was reported completed while a %s was still running", events, gated)
 			}
 			close(release)
 			select {
@@ -237,16 +255,76 @@ func TestStart_AFailedStarterOrStartHookWritesNoReadyRecord(t *testing.T) {
 	for name, setup := range cases {
 		t.Run(name, func(t *testing.T) {
 			a, rec, out := newReadinessApp("ready-failed")
+			a.Use(&observerPlugin{rec: rec})
 			setup(a, rec)
 			if err := a.Start(context.Background()); err == nil {
 				t.Fatal("Start succeeded, want the startup failure")
 			}
-			if events := rec.snapshot(); slices.Contains(events, "ready") || slices.Contains(events, "runner") {
-				t.Errorf("events = %v: a failed startup reported readiness or ran its runner", events)
+			for _, event := range []string{"ready", "observed", "runner"} {
+				if events := rec.snapshot(); slices.Contains(events, event) {
+					t.Errorf("events = %v: a failed startup reached %q", events, event)
+				}
 			}
 			if marked := out.marked(); len(marked) != 0 {
 				t.Errorf("a failed startup wrote %d readiness markers: %v", len(marked), marked)
 			}
 		})
+	}
+}
+
+func TestStart_StartupObserversLearnCompletedStartupBeforeTheReadyRecord(t *testing.T) {
+	spectest.Proves(t, "go/application-lifecycle", "completed-startup-readiness",
+		"startup-observers-learn-completed-startup-before-the-ready-record")
+	a, rec, _ := newReadinessApp("ready-observed")
+	child := NewModule("child")
+	a.Use(child)
+	a.Use(&gatePlugin{name: "alpha", rec: rec})
+	child.Use(&observerPlugin{rec: rec})
+	child.OnStart(recordingHook(rec, "onstart:child"))
+
+	if err := a.Start(context.Background()); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	t.Cleanup(func() { _ = a.Stop(context.Background()) })
+
+	events := rec.snapshot()
+	want := []string{"start:alpha", "onstart:child", "observed", "ready", "runner"}
+	if !slices.Equal(events, want) {
+		t.Errorf("events = %v, want %v", events, want)
+	}
+}
+
+func TestStart_TheReadyRecordCarriesTheEndpointsThePluginsBound(t *testing.T) {
+	spectest.Proves(t, "go/application-lifecycle", "completed-startup-readiness",
+		"the-ready-record-carries-the-endpoints-the-plugins-bound")
+	http := func(port int) runtimeproto.ReadyEndpoint {
+		return runtimeproto.ReadyEndpoint{Scheme: runtimeproto.ReadySchemeHTTP, Host: "localhost", Port: port}
+	}
+	grpc := runtimeproto.ReadyEndpoint{Scheme: runtimeproto.ReadySchemeGRPC, Host: "localhost", Port: 9090}
+	admin := &reporterPlugin{name: "admin", endpoints: []runtimeproto.ReadyEndpoint{http(8081), http(8080)}}
+
+	a, _, out := newReadinessApp("ready-endpoints")
+	a.Use(admin)
+	a.Use(&reporterPlugin{name: "api", endpoints: []runtimeproto.ReadyEndpoint{http(8080), grpc}})
+	a.Use(&reporterPlugin{name: "worker"})
+	if err := a.Start(context.Background()); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	t.Cleanup(func() { _ = a.Stop(context.Background()) })
+
+	marked := out.marked()
+	if len(marked) != 1 {
+		t.Fatalf("%d records carry a readiness marker, want the ready record alone: %v", len(marked), marked)
+	}
+	data, ok := runtimeproto.ReadyMarkerFromLogRecord(marked[0])
+	if !ok {
+		t.Fatalf("the ready record carries no valid readiness marker: %v", marked[0])
+	}
+	want := []runtimeproto.ReadyEndpoint{grpc, http(8080), http(8081)}
+	if data.Target != runtimeproto.ReadyTargetWorkload || !slices.Equal(data.Endpoints, want) {
+		t.Errorf("marker = %+v, want a workload claim with endpoints %v", data, want)
+	}
+	if !slices.Equal(admin.endpoints, []runtimeproto.ReadyEndpoint{http(8081), http(8080)}) {
+		t.Errorf("a reporter's endpoints were reordered in place: %v", admin.endpoints)
 	}
 }

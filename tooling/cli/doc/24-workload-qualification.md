@@ -245,9 +245,11 @@ phase.
 A local target is ready when its application reports that its startup completed:
 a typed `ready` event with target `workload`. The Go and TypeScript application
 frameworks write it on their `🤖 ready` log record, only after every plugin
-starter and every module start hook returned. The composition records it for every
-member. A member's first ready event, which is all compose waits for before it
-starts the next member, is usually a server claim: an HTTP plugin writes one as
+starter and every module start hook returned. It lists the endpoints the
+application's plugins bound, such as the HTTP listener, and a worker without a
+listener writes none. The composition records it for every member. A member's
+first ready event, which is all compose waits for before it starts the next
+member, is usually a server claim: an HTTP plugin writes one as
 soon as it listens, before the rest of the application started. That claim is
 not a completed startup, and neither is an answer from a route: an auth denial
 or a `404` comes from a listener whatever state the application is in.
@@ -259,7 +261,8 @@ A target that never reports completed startup within `--ready-timeout` is
 When the route inventory declares `GET <prefix>/readyz` as an exact route, or
 `--platform-prefix` names where the platform endpoints are mounted, readiness
 polls `<prefix>/readyz` through the target's proxy instead, as it does for a URL
-target.
+target. The platform plugin of both frameworks answers `503` there until the
+same completed startup, so a `200` proves the same thing as the claim.
 
 Serve logs are not part of the verdict. Human output shows them, with the
 preparation's task output, only with `--verbose`, on stderr. Without `--verbose`,

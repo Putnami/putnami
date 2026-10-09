@@ -1062,7 +1062,7 @@ var catalog = []Command{
 		Flags: []Flag{
 			{Long: "--target", Type: FlagValue, ValueName: "<local|url>", Description: "local composes the workload on this machine; an http(s) URL is a running deployment"},
 			{Long: "--expect-sha", Type: FlagValue, ValueName: "<sha>", Description: "Required with a URL target: the git sha the deployment must report on /version"},
-			{Long: "--platform-prefix", Type: FlagValue, ValueName: "<path>", Description: "Prefix under which /readyz and /version are mounted; default: where the route inventory declares both, else the root"},
+			{Long: "--platform-prefix", Type: FlagValue, ValueName: "<path>", Description: "Prefix under which /readyz and /version are mounted; setting it makes local readiness poll <path>/readyz instead of waiting for the startup claim; default: where the route inventory declares both, else the root"},
 			{Long: "--ready-timeout", Type: FlagValue, ValueName: "<duration>", Description: "Deadline for readiness; default 60s"},
 			{Long: "--request-timeout", Type: FlagValue, ValueName: "<duration>", Description: "Deadline per smoke request; default 5s"},
 			{Long: "--print-contract", Type: FlagBool, Description: "Print the derived contract and exit without a target"},

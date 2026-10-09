@@ -390,7 +390,7 @@ _putnami_flags_for() {
         'qualify')
             reply=(
                 '--expect-sha[Required with a URL target: the git sha the deployment must report on /version]:sha:'
-                '--platform-prefix[Prefix under which /readyz and /version are mounted; default: where the route inventory declares both, else the root]:path:'
+                '--platform-prefix[Prefix under which /readyz and /version are mounted; setting it makes local readiness poll <path>/readyz instead of waiting for the startup claim; default: where the route inventory declares both, else the root]:path:'
                 '--print-contract[Print the derived contract and exit without a target]'
                 '--ready-timeout[Deadline for readiness; default 60s]:duration:'
                 '--request-timeout[Deadline per smoke request; default 5s]:duration:'

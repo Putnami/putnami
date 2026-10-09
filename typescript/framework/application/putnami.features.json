@@ -124,7 +124,12 @@
             "checks": [
               "the-ready-record-follows-every-plugin-start",
               "a-delayed-plugin-start-delays-the-ready-record",
-              "a-rejected-plugin-start-writes-no-ready-record"
+              "a-rejected-plugin-start-writes-no-ready-record",
+              "plugins-learn-completed-startup-before-the-ready-record",
+              "the-ready-record-carries-the-endpoints-the-plugins-bound",
+              "the-ready-record-carries-the-http-endpoint",
+              "readiness-answers-ready-only-after-every-plugin-start",
+              "a-rejected-plugin-start-never-answers-ready"
             ]
           }
         },

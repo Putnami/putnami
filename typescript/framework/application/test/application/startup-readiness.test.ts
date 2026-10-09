@@ -1,6 +1,6 @@
 import { afterEach, describe, expect } from 'bun:test';
 import { buildJsonRecord, type LogEntry, resetDefaultLogger, setRootLogger } from '@putnami/runtime';
-import { READY_LOG_KEY, readyMarkerFromLogRecord } from '@putnami/runtime/jobs';
+import { READY_LOG_KEY, type ReadyEndpoint, readyMarkerFromLogRecord } from '@putnami/runtime/jobs';
 import { specTest } from '@putnami/runtime/spectest';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import { type Application, application, type Plugin } from '../../src/application';
@@ -113,8 +113,14 @@ describe('ready record', () => {
       captureLogs();
       const slow = gate();
       const entered = gate();
+      let completed = false;
       app = application()
         .use({ start: async () => {} } satisfies Plugin)
+        .use({
+          startupCompleted: () => {
+            completed = true;
+          },
+        } satisfies Plugin)
         .use({
           start: async () => {
             entered.release();
@@ -127,10 +133,12 @@ describe('ready record', () => {
       // Let every other pending start settle: only the gated one may hold the record back.
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(hasWorkloadMarker()).toBe(false);
+      expect(completed).toBe(false);
 
       slow.release();
       await withinHangDetector(started, 'start()');
       expect(hasWorkloadMarker()).toBe(true);
+      expect(completed).toBe(true);
     },
   );
 
@@ -144,8 +152,14 @@ describe('ready record', () => {
     async () => {
       captureLogs();
       let ran = false;
+      let completed = false;
       app = application()
         .use({ start: async () => {} } satisfies Plugin)
+        .use({
+          startupCompleted: () => {
+            completed = true;
+          },
+        } satisfies Plugin)
         .use({
           start: async () => {
             throw new Error('boom');
@@ -157,9 +171,69 @@ describe('ready record', () => {
 
       await expect(app.start()).rejects.toThrow('boom');
 
+      expect(completed).toBe(false);
       expect(markedRecords()).toHaveLength(0);
       expect(memory.entries.some((entry) => entry.message.includes('🤖 ready'))).toBe(false);
       expect(ran).toBe(false);
+    },
+  );
+
+  specTest(
+    'follows the plugins learning that startup completed',
+    {
+      feature: 'typescript/application-lifecycle',
+      requirement: 'completed-startup-readiness',
+      check: 'plugins-learn-completed-startup-before-the-ready-record',
+    },
+    async () => {
+      captureLogs();
+      const events: string[] = [];
+      const observer = (name: string): Plugin => ({
+        start: async () => {
+          await Promise.resolve();
+          events.push(`start:${name}`);
+        },
+        startupCompleted: () => {
+          events.push(hasWorkloadMarker() ? `late:${name}` : `completed:${name}`);
+        },
+      });
+      app = application().use(observer('alpha')).use(observer('beta'));
+      app.run(async () => {
+        events.push('runner');
+      });
+
+      await app.start();
+
+      expect(events).toEqual(['start:alpha', 'start:beta', 'completed:alpha', 'completed:beta', 'runner']);
+      expect(hasWorkloadMarker()).toBe(true);
+    },
+  );
+
+  specTest(
+    'carries the endpoints the plugins bound',
+    {
+      feature: 'typescript/application-lifecycle',
+      requirement: 'completed-startup-readiness',
+      check: 'the-ready-record-carries-the-endpoints-the-plugins-bound',
+    },
+    async () => {
+      captureLogs();
+      const http = (port: number): ReadyEndpoint => ({ scheme: 'http', host: 'localhost', port });
+      const grpc: ReadyEndpoint = { scheme: 'grpc', host: 'localhost', port: 9090 };
+      const admin = [http(8081), http(8080)];
+      app = application()
+        .use({ readyEndpoints: () => admin } satisfies Plugin)
+        .use({ readyEndpoints: () => [http(8080), grpc] } satisfies Plugin)
+        .use({ readyEndpoints: () => [] } satisfies Plugin);
+
+      await app.start();
+
+      const marked = markedRecords();
+      expect(marked).toHaveLength(1);
+      const data = readyMarkerFromLogRecord(marked[0] ?? {});
+      expect(data?.target).toBe('workload');
+      expect(data?.endpoints).toEqual([grpc, http(8080), http(8081)]);
+      expect(admin).toEqual([http(8081), http(8080)]);
     },
   );
 });

@@ -239,7 +239,7 @@ complete -c putnami -n '__putnami_seen_path projects sync' -l 'skip-install' -d 
 complete -c putnami -n '__putnami_seen_path projects tag' -l 'remove' -d 'Remove the given tags from the project'
 complete -c putnami -n '__putnami_seen_path projects tag' -l 'set' -d 'Replace the project\'s tags with the given list'
 complete -c putnami -n '__putnami_seen_path qualify' -l 'expect-sha' -d 'Required with a URL target: the git sha the deployment must report on /version' -r
-complete -c putnami -n '__putnami_seen_path qualify' -l 'platform-prefix' -d 'Prefix under which /readyz and /version are mounted; default: where the route inventory declares both, else the root' -r
+complete -c putnami -n '__putnami_seen_path qualify' -l 'platform-prefix' -d 'Prefix under which /readyz and /version are mounted; setting it makes local readiness poll <path>/readyz instead of waiting for the startup claim; default: where the route inventory declares both, else the root' -r
 complete -c putnami -n '__putnami_seen_path qualify' -l 'print-contract' -d 'Print the derived contract and exit without a target'
 complete -c putnami -n '__putnami_seen_path qualify' -l 'ready-timeout' -d 'Deadline for readiness; default 60s' -r
 complete -c putnami -n '__putnami_seen_path qualify' -l 'request-timeout' -d 'Deadline per smoke request; default 5s' -r

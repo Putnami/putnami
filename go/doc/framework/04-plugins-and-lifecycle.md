@@ -99,6 +99,18 @@ type Starter interface {
     Start(ctx context.Context, owner *Module) error
 }
 
+// Once startup completed, before the ready record — must not block
+type StartupObserver interface {
+    Plugin
+    StartupCompleted()
+}
+
+// The addresses a plugin bound while starting, carried by the ready record
+type EndpointReporter interface {
+    Plugin
+    ReadyEndpoints() []runtime.ReadyEndpoint
+}
+
 // Reverse order — graceful shutdown
 type Stopper interface {
     Plugin
@@ -168,6 +180,7 @@ next phase begins.
 6. Invoke                 (sequential)  — run InvokeFunc functions
 7. Plugins.Start          (parallel)    — start servers and workers
 8. Modules.OnStart        (top-down)    — after plugins are running
+   Ready                                 — StartupObservers, then the ready record
 9. Run / wait for cancellation
 10. Modules.OnStop        (bottom-up)   — before plugins stop
 11. Plugins.Stop          (reverse)     — graceful shutdown
@@ -196,6 +209,15 @@ listeners.
 **Start** — All `Starter` plugins start in parallel and returned failures are
 aggregated after every starter finishes. A phase timeout cancels siblings and
 waits a bounded interval for cooperative starters to drain.
+
+**Ready** — Once every `Starter` and every module `OnStart` hook returned
+without an error, `Start` calls `StartupCompleted` on every `StartupObserver`,
+then logs `🤖 ready`. That record carries a runtime-protocol `workload`
+readiness claim under the reserved `putnami.ready` key, with the endpoints every
+`EndpointReporter` bound (the HTTP server reports its listener). The platform
+plugin is a `StartupObserver`: its `/readyz` answers ready only from then on. A
+starter or hook that is still running delays both, and a failed or timed-out
+start does neither.
 
 **Stop** — Module `OnStop` hooks run leaves-first, then `Stopper` plugins run in
 reverse registration order, and DI close hooks run last.

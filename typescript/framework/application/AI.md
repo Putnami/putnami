@@ -18,9 +18,9 @@ export const app = () =>
     .use(myModule);       // Mount DI module
 ```
 
-Lifecycle: `generate()` -> `postGenerate()` -> `warmup()` -> `migrate()` -> `start()` -> `stop()`
+Lifecycle: `generate()` -> `postGenerate()` -> `warmup()` -> `migrate()` -> `start()` -> `startupCompleted()` -> `stop()`
 
-Once every plugin `start()` resolved, `start()` logs `🤖 ready` with a `workload` readiness claim under `putnami.ready`, then runs the runner. A rejected `start()` writes no such record.
+Once every plugin `start()` resolved, `start()` calls every plugin's optional `startupCompleted()`, then logs `🤖 ready` with a `workload` readiness claim under `putnami.ready` carrying every plugin's optional `readyEndpoints()`, then runs the runner. A rejected `start()` does neither. The platform plugin's `/readyz` answers ready only after `startupCompleted()`.
 
 ## Endpoint Builder
 

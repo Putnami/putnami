@@ -245,7 +245,11 @@ func probeKindFor(which checkerSet) ProbeKind {
 type Plugin struct {
 	cfg    Config
 	prefix string
-	ready  atomic.Bool
+	// running is set from Start until Stop; it gates /healthz.
+	running atomic.Bool
+	// ready is set from StartupCompleted until Stop; with running, it gates
+	// /readyz.
+	ready atomic.Bool
 	// mounted is set once RegisterOn has registered the endpoints on a server.
 	mounted           atomic.Bool
 	mu                sync.RWMutex
@@ -363,8 +367,9 @@ func (p *Plugin) ensureDiscovered() {
 	})
 }
 
-// Start marks the application as running. /healthz and /readyz return
-// 503 until Start is called and 503 again after Stop.
+// Start marks the application as running. /healthz returns 503 until Start
+// is called and 503 again after Stop. /readyz also waits for
+// StartupCompleted.
 //
 // Before flipping the running flag it validates auto-discovered probe
 // names and Config.Required names against the protocol contract. Probe
@@ -396,12 +401,24 @@ func (p *Plugin) Start(_ context.Context, _ *app.Module) error {
 			return err
 		}
 	}
-	p.ready.Store(true)
+	p.running.Store(true)
 	return nil
 }
 
-// Stop flips the running flag back off.
+// StartupCompleted implements app.StartupObserver: the application calls it
+// once every Starter and every module OnStart hook returned without an error,
+// right before its ready record. /readyz answers ready only from then on, so a
+// readiness probe never passes while a sibling plugin or a start hook is still
+// starting, and never after a failed startup.
+func (p *Plugin) StartupCompleted() {
+	p.ready.Store(true)
+}
+
+var _ app.StartupObserver = (*Plugin)(nil)
+
+// Stop flips the running and ready flags back off.
 func (p *Plugin) Stop(_ context.Context, _ *app.Module) error {
+	p.running.Store(false)
 	p.ready.Store(false)
 	return nil
 }
@@ -438,10 +455,10 @@ func (p *Plugin) healthzHandler() http.Handler {
 	return p.aggregateHandler(checkersHealth)
 }
 
-// readyzHandler aggregates the running flag and every ReadinessChecker
-// probe. Returns 503 with status="unavailable" before Start / after
-// Stop, or 503 with status="degraded" and per-probe detail when any
-// probe fails.
+// readyzHandler aggregates the running and ready flags and every
+// ReadinessChecker probe. Returns 503 with status="unavailable" before the
+// application completed startup / after Stop, or 503 with status="degraded"
+// and per-probe detail when any probe fails.
 func (p *Plugin) readyzHandler() http.Handler {
 	return p.aggregateHandler(checkersReadiness)
 }
@@ -477,7 +494,7 @@ type probeResult struct {
 
 func (p *Plugin) aggregateHandler(which checkerSet) http.Handler {
 	return func(ctx *http.Context) *http.Response {
-		if !p.ready.Load() {
+		if !p.available(which) {
 			return http.JSONStatus(protocol.HTTPStatusUnavailable, map[string]string{
 				"status": string(protocol.StatusUnavailable),
 			})
@@ -636,6 +653,15 @@ func (p *Plugin) aggregateHandler(which checkerSet) http.Handler {
 			"checks": checks,
 		})
 	}
+}
+
+// available reports whether an aggregate may run its probes: /healthz from
+// Start, /readyz once the application also completed startup.
+func (p *Plugin) available(which checkerSet) bool {
+	if which == checkersReadiness {
+		return p.running.Load() && p.ready.Load()
+	}
+	return p.running.Load()
 }
 
 // snapshot returns a (names, probes) parallel-array pair under RLock.

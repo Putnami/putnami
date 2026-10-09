@@ -47,8 +47,10 @@ func main() {
 - It mounts the routes. When the application configures, the plugin registers
   its endpoints on the application's single `http.ServerPlugin`, in any plugin
   order.
-- It wires the lifecycle. `/healthz` and `/readyz` answer `unavailable` until
-  `Start` sets the running flag.
+- It wires the lifecycle. `/healthz` answers `unavailable` until `Start` sets
+  the running flag. `/readyz` also waits until the application completed
+  startup: every plugin `Start` and every module `OnStart` hook returned. A
+  failed startup never makes it ready.
 
 An application that holds no server, or several, fails configure with an error
 that names `RegisterOn`. Call `ops.RegisterOn(server)` before the application

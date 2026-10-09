@@ -37,7 +37,7 @@ await app.start();
 | ---- | ------- |
 | `/livez` | Lightweight liveness — `200 {"status":"ok"}` whenever the handler can run. No probes, no flags. Safe for Kubernetes liveness probes. |
 | `/healthz` | Liveness aggregate — `200` when running and every `HealthChecker` probe passes; `503 {"status":"unavailable"}` before `start()` and after `stop()`; `503 {"status":"degraded","checks":{…}}` when any probe fails. |
-| `/readyz` | Readiness aggregate — same shape as `/healthz`, driven by `ReadinessChecker` probes. The endpoint to use as a Kubernetes readiness probe. |
+| `/readyz` | Readiness aggregate — same shape as `/healthz`, driven by `ReadinessChecker` probes, and `503 {"status":"unavailable"}` until the application completed startup: every plugin `start()` resolved. The endpoint to use as a Kubernetes readiness probe. |
 | `/version` | Build metadata as JSON. Returns the `VersionInfo` you configure; empty fields are omitted. |
 
 Default mount is root. Set `prefix` to namespace (`prefix: '/_'` mounts `/_/healthz`, `/_/livez`, …).

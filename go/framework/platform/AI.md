@@ -35,7 +35,7 @@ choose the server; the plugin then registers nothing more.
 |------|----------|
 | `GET /livez` | `200 {"status":"ok"}` whenever the handler can run. No probes, no flags. Use it as the Kubernetes liveness probe. |
 | `GET /healthz` | `503 {"status":"unavailable"}` before `Start` and after `Stop`; `503 {"status":"degraded","checks":{…}}` when an `app.HealthChecker` probe fails; otherwise `200`. |
-| `GET /readyz` | Same shape, driven by `app.ReadinessChecker` probes plus `Config.Required`. Use it as the Kubernetes readiness probe. |
+| `GET /readyz` | Same shape, driven by `app.ReadinessChecker` probes plus `Config.Required`; `unavailable` until the application completed startup (every `Starter` and module `OnStart` hook returned; the plugin is an `app.StartupObserver`). Use it as the Kubernetes readiness probe. |
 | `GET /version` | `VersionInfo` as JSON; empty fields fall back to `runtime/debug.ReadBuildInfo`. |
 | `GET /debug/pprof/*` | `net/http/pprof` index and profiles. Off unless `Config.EnablePprof` is true. |
 

@@ -984,9 +984,11 @@ workload with no inventory, or with no safe route, is `unsupported`, never
 `--target local` composes the workload on this machine the way `compose
 --no-watch --port 0` does, runs the contract against its proxy, and tears the
 composition down on every path. Unless the route inventory declares
-`<prefix>/readyz`, its readiness is the application's own completed-startup
-report (a typed `ready` event with target `workload`), never a listening port or
-an answered request. Its verdict binds to the worktree fingerprint:
+`<prefix>/readyz` or `--platform-prefix` is set, its readiness is the
+application's own completed-startup report (a typed `ready` event with target
+`workload`), never a listening port or an answered request; the platform's
+`/readyz` answers `200` only after that same completed startup. Its verdict binds
+to the worktree fingerprint:
 read before the serve pipelines are prepared, and read again once every member is
 ready. A tree that changed in between is `digest_mismatch`, a composition that
 cannot start is `composition_failed` naming the member and phase, and `cleanup`

@@ -49,7 +49,8 @@ const (
 	// StateDigestMismatch means the target does not report the expected build:
 	// its /version sha differs from the expected one, or reports none.
 	StateDigestMismatch State = "digest_mismatch"
-	// StateCompositionFailed means a local target could not be composed.
+	// StateCompositionFailed means a local target could not be composed: compose
+	// failed, or a member exited before it reported completed startup.
 	StateCompositionFailed State = "composition_failed"
 )
 
