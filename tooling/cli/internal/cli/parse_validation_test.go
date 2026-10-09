@@ -395,9 +395,9 @@ func TestSplitInlineValues_KeepsAJobTokenWholeOnlyWhereTheSplitMisreadsIt(t *tes
 }
 
 // TestBuildCommandParams_MultiWordValueBindsToTheFlagBefore pins the binding
-// rule: before the passthrough separator a flag takes the next token when
-// isFlagValue holds, and a bare flag before a one-word hyphen token stays a
-// switch. Past the separator, only a token without a leading hyphen is a value.
+// rule: a flag takes the next token when isFlagValue holds, on both sides of the
+// passthrough separator, and a bare flag before a one-word hyphen token stays a
+// switch.
 func TestBuildCommandParams_MultiWordValueBindsToTheFlagBefore(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -415,8 +415,8 @@ func TestBuildCommandParams_MultiWordValueBindsToTheFlagBefore(t *testing.T) {
 		{"an inline value takes no second value", []string{"--args=x", "--check --dry-run"}, "args=string(x) check --dry-run=bool(true)"},
 		{"a flag last takes no value", []string{"--args"}, "args=bool(true)"},
 		{"a plain value", []string{"--args", "scan"}, "args=string(scan)"},
-		{"a flag never takes the separator", []string{"--args", "--", "--check --dry-run"}, "=bool(true) args=bool(true) check --dry-run=bool(true)"},
-		{"past the separator a multi-word hyphen token is a flag", []string{"--", "--args", "--check --dry-run"}, "=bool(true) args=bool(true) check --dry-run=bool(true)"},
+		{"a flag never takes the separator", []string{"--args", "--", "--check --dry-run"}, "=string(--check --dry-run) args=bool(true)"},
+		{"past the separator a multi-word hyphen token is a value", []string{"--", "--args", "--check --dry-run"}, "=bool(true) args=string(--check --dry-run)"},
 		{"past the separator a plain value binds", []string{"--", "--args", "scan"}, "=bool(true) args=string(scan)"},
 	}
 	for _, tc := range cases {

@@ -346,11 +346,11 @@ var keyStabilityCorpus = []keyStabilityCase{
 		wantMarker:   "66a1e0f43e51",
 	},
 	{
-		name:         "past the separator a multi-word hyphen token is a flag",
+		name:         "past the separator a multi-word hyphen token is a value",
 		args:         []string{"test", "--", "--args", "--check --dry-run"},
-		wantParams:   "=bool(true) args=bool(true) check --dry-run=bool(true)",
-		wantCacheKey: "1dd7b38b4e0c94391db7d416e9fe47af32fd5efb0bf5a9e0258fbf48e514f30c",
-		wantMarker:   "941b356cf2ed",
+		wantParams:   "=bool(true) args=string(--check --dry-run)",
+		wantCacheKey: "98247031bf581ddbb30f768ca2d5ebe58b645f0b0ee29e122b67e3a27c26a6a0",
+		wantMarker:   "9dc20478bd52",
 	},
 	{
 		name:            "an extension command group splits an inline hyphen word",

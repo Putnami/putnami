@@ -100,9 +100,8 @@ func isFlagValue(next string) bool {
 
 // takesNextAsValue reports whether buildCommandParams binds args[i+1] as the
 // value of args[i]: args[i] is a flag with neither an inline value nor the "no-"
-// negation prefix, and args[i+1] is a value (isFlagValue). Callers pass the
-// tokens before the passthrough separator, so a flag directly before "--", or
-// last, takes no value here.
+// negation prefix, and args[i+1] is a value (isFlagValue). A flag directly
+// before "--", or last, takes no value: "--" is not a value.
 func takesNextAsValue(args []string, i int) bool {
 	if i+1 >= len(args) || !strings.HasPrefix(args[i], "-") {
 		return false

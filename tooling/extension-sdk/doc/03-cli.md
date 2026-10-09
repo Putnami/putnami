@@ -140,7 +140,7 @@ Controls whether `Run` automatically emits `SKIP` when the project name is empty
 
 #### `ParseFlags(args []string) map[string]string`
 
-Parses arguments into a flag map. Supports `--key value`, `--key=value`, `--flag` (boolean true), and `--no-flag` (boolean false). Non-flag arguments are ignored.
+Parses arguments into a flag map. Supports `--key value`, `--key=value`, `--flag` (boolean true), and `--no-flag` (boolean false). Non-flag arguments are ignored. The argument after a flag is its value when it does not begin with a hyphen, or when it contains whitespace (`--args "--check --dry-run"`); otherwise the flag is `true`.
 
 #### `FlagString(flags map[string]string, key, defaultVal string) string`
 

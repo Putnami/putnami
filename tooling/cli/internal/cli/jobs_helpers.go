@@ -65,13 +65,11 @@ func profileUsageError(value string, fromFlag bool) error {
 }
 
 // buildCommandParams turns the job args into the params every task receives and
-// every job cache key and run marker hashes. Before the passthrough separator a
-// flag takes the next token as its value under takesNextAsValue, so a multi-word
-// value binds even when it begins with a hyphen. Past the separator, only a next
-// token that does not begin with a hyphen is a value.
+// every job cache key and run marker hashes. A flag takes the next token as its
+// value under takesNextAsValue, so a multi-word value binds even when it begins
+// with a hyphen, as the extension SDK's ParseFlags reads the same tokens.
 func buildCommandParams(rawArgs []string) map[string]any {
 	params := make(map[string]any)
-	flagArgs := rawArgs[:passthroughCut(rawArgs)]
 	for i := 0; i < len(rawArgs); i++ {
 		arg := rawArgs[i]
 		if !strings.HasPrefix(arg, "-") {
@@ -93,7 +91,7 @@ func buildCommandParams(rawArgs []string) map[string]any {
 		}
 
 		// Check if next arg is a value
-		if takesNextAsValue(flagArgs, i) || (i+1 < len(rawArgs) && !strings.HasPrefix(rawArgs[i+1], "-")) {
+		if i+1 < len(rawArgs) && takesNextAsValue(rawArgs, i) {
 			params[name] = rawArgs[i+1]
 			i++
 		} else {
