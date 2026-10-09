@@ -1471,6 +1471,10 @@
           "type": "boolean",
           "description": "Whether a configured coverage-threshold could fail this run. Defaults to true; a run that passed --no-enforce-coverage still measures and still reports percentages, so this marks whether a green verdict actually means the thresholds held."
         },
+        "fix": {
+          "type": "boolean",
+          "description": "The run's explicit --fix value: false for --fix=false or --no-fix, true for --fix or --fix=true. Absent when the run was not given the flag or gave it any other value. False states that lint reported findings instead of rewriting files."
+        },
         "git": { "$ref": "#/$defs/reportGit" },
         "run": { "$ref": "#/$defs/reportRun" },
         "commands": { "type": "array", "items": { "$ref": "#/$defs/reportCommand" } },

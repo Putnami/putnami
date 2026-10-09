@@ -190,7 +190,7 @@ func (r *verifyRun) checkGate(session, report any, current string, baseSHA any, 
 			}
 		}
 	}
-	required := r.requiredCommands(floor)
+	required := r.requiredCommands(floor, report)
 	require(!slices.ContainsFunc(required, func(command string) bool { return !commands[command] }),
 		"gate lacks required commands or their executed companions")
 	recorded := []any{}
@@ -231,9 +231,12 @@ func checkGateRun(run any) {
 }
 
 // requiredCommands reads the commands putnami.ci.json version 3 requires,
-// followed by the floor commands it omits. Without a policy file, a non-empty
-// floor is the whole requirement.
-func (r *verifyRun) requiredCommands(floor []string) []string {
+// followed by the floor commands it omits, and checks that report proves every
+// flag the policy appends to the gate: --fix=false needs the report's
+// fix: false, --enforce-coverage and --continue-on-error need nothing more, and
+// any other flag fails. Without a policy file, a non-empty floor is the whole
+// requirement.
+func (r *verifyRun) requiredCommands(floor []string, report any) []string {
 	exists := func() bool {
 		_, err := os.Stat(r.path("putnami.ci.json"))
 		return err == nil
@@ -246,8 +249,11 @@ func (r *verifyRun) requiredCommands(floor []string) []string {
 	require(strictEqual(at(policy, "version"), 3.0), "unsupported CI policy version")
 	flags, isList := orEmpty(at(policy, "flags")).([]any)
 	require(isList && !slices.ContainsFunc(flags, func(flag any) bool {
-		return !oneOf(flag, "--enforce-coverage", "--continue-on-error")
+		return !oneOf(flag, "--enforce-coverage", "--continue-on-error", "--fix=false")
 	}), "CI flags require evidence this verifier does not support")
+	if slices.ContainsFunc(flags, func(flag any) bool { return strictEqual(flag, "--fix=false") }) {
+		require(strictEqual(at(report, "fix"), false), "CI flag --fix=false not proved by the gate report")
+	}
 	result := []string{}
 	for _, command := range each(at(policy, "commands")) {
 		switch command := command.(type) {

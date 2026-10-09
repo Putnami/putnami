@@ -75,6 +75,8 @@ func marshalReport(t *testing.T, report ReportFile) []byte {
 // member the Go producer writes survives, and the result conforms.
 func TestReportFileRoundTrip(t *testing.T) {
 	want := reportFileFixture()
+	fix := false
+	want.Fix = &fix
 	want.Cache = &ReportCache{Hits: 3, Misses: 1, Restored: 3, Uploads: 1, TimeSavedMs: 9100, BytesFetched: 42000, BytesUploaded: 1200}
 	want.Scheduler = &ReportScheduler{Parallelism: 8, CriticalPathMs: 18400}
 	want.Commands[0].Tests = &ReportTests{
@@ -103,7 +105,7 @@ func TestReportAbsentIsNotZero(t *testing.T) {
 	report := reportFileFixture()
 	report.Git = nil
 	data := marshalReport(t, report)
-	for _, member := range []string{"git", "cache", "scheduler", "cpu", "coverage", "tests", "cpuMs", "truncatedCount", "failureDetailsTruncated"} {
+	for _, member := range []string{"fix", "git", "cache", "scheduler", "cpu", "coverage", "tests", "cpuMs", "truncatedCount", "failureDetailsTruncated"} {
 		if strings.Contains(string(data), `"`+member+`"`) {
 			t.Errorf("an unmeasured %q was serialized: %s", member, data)
 		}

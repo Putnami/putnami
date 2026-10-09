@@ -328,6 +328,19 @@ func (f *verifyFixture) refreshPolicies() {
 	f.record["policies"] = policies
 }
 
+// setPolicyFlags replaces the flags of the fixture CI policy and binds the
+// dossier to the changed policy file.
+func (f *verifyFixture) setPolicyFlags(flags ...string) {
+	f.t.Helper()
+	policy := f.readJSON("putnami.ci.json")
+	policy["flags"] = fxStrings(flags)
+	f.write("putnami.ci.json", policy)
+	f.refreshPolicies()
+	f.record["changedFiles"] = fxArr{"app.txt", "putnami.ci.json"}
+	fxAppend(fxObjAt(f.record, "review"), "coverage", fxObj{"path": "putnami.ci.json", "status": "reviewed",
+		"reason": "Synthetic CI policy flags."})
+}
+
 // useCLIPlan leaves the native plan to the default Plan, which runs the fake
 // ./putnamiw. Windows never runs that script, so the case is skipped there.
 func (f *verifyFixture) useCLIPlan(t *testing.T) {
@@ -788,6 +801,37 @@ func TestVerifierRecord(t *testing.T) {
 			fxObjAt(f.session, "run", "counts")["succeeded"] = true
 			f.bindProducers()
 		}},
+		{name: "a --fix=false policy is proved by a gate report with fix false", setup: func(_ *testing.T, f *verifyFixture) {
+			f.setPolicyFlags("--enforce-coverage", "--fix=false")
+			f.report["fix"] = false
+			f.bindProducers()
+		}},
+		{name: "a --fix=false policy is not proved by a report without fix", reason: "^CI flag --fix=false not proved by the gate report$",
+			setup: func(_ *testing.T, f *verifyFixture) {
+				f.setPolicyFlags("--enforce-coverage", "--fix=false")
+			}},
+		{name: "a --fix=false policy is not proved by a gate that fixed", reason: "--fix=false not proved", setup: func(_ *testing.T, f *verifyFixture) {
+			f.setPolicyFlags("--enforce-coverage", "--fix=false")
+			f.report["fix"] = true
+			f.bindProducers()
+		}},
+		{name: "a --fix=false policy is not proved by a string fix", reason: "--fix=false not proved", setup: func(_ *testing.T, f *verifyFixture) {
+			f.setPolicyFlags("--enforce-coverage", "--fix=false")
+			f.report["fix"] = "false"
+			f.bindProducers()
+		}},
+		{name: "a --fix=true policy is rejected", reason: "^CI flags require evidence this verifier does not support$",
+			setup: func(_ *testing.T, f *verifyFixture) {
+				f.setPolicyFlags("--enforce-coverage", "--fix=true")
+				f.report["fix"] = true
+				f.bindProducers()
+			}},
+		{name: "a bare --fix policy is rejected", reason: "^CI flags require evidence this verifier does not support$",
+			setup: func(_ *testing.T, f *verifyFixture) {
+				f.setPolicyFlags("--enforce-coverage", "--fix")
+				f.report["fix"] = true
+				f.bindProducers()
+			}},
 		{name: "CI policy may omit optional flags", setup: func(_ *testing.T, f *verifyFixture) {
 			policy := f.readJSON("putnami.ci.json")
 			delete(policy, "flags")
@@ -959,6 +1003,19 @@ func TestVerifierGate(t *testing.T) {
 			f.write("putnami.ci.json", fxObj{"version": 3, "commands": fxArr{"test"}, "flags": fxArr{"--enforce-coverage"}})
 			fxDropCommands(f.session, "lint", "build", "validate", "validate-workspace")
 		}},
+		{name: "finalizer reuses a gate whose report proves the policy's --fix=false", setup: func(f *verifyFixture) {
+			f.setPolicyFlags("--enforce-coverage", "--continue-on-error", "--fix=false")
+			f.report["fix"] = false
+		}},
+		{name: "finalizer refuses a gate whose report does not prove the policy's --fix=false",
+			reason: "^CI flag --fix=false not proved by the gate report$", setup: func(f *verifyFixture) {
+				f.setPolicyFlags("--enforce-coverage", "--fix=false")
+			}},
+		{name: "finalizer refuses a --fix=true policy", reason: "^CI flags require evidence this verifier does not support$",
+			setup: func(f *verifyFixture) {
+				f.setPolicyFlags("--enforce-coverage", "--fix=true")
+				f.report["fix"] = true
+			}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -524,6 +524,7 @@ var (
 		req("endTime", nonEmptyString),
 		req("origin", enumOf(ReportOriginCLI, ReportOriginMCP)),
 		req("enforceCoverage", boolean),
+		opt("fix", boolean),
 		opt("git", reportGit),
 		req("run", reportRun),
 		req("commands", arrayOf(reportCommand)),
