@@ -181,7 +181,7 @@
       }
     },
     "clientgen-workspace-check": {
-      "description": "Judge every committed generated client against its committed manifest and the committed provider contract (hashes, coverage, forged markers), validate the two inventories, and scan all consumer sources for handwritten first-party transports. It builds nothing, renders nothing and spawns no Putnami: whether a committed client is what the current contract generates is the generator task's own verdict (declared-output drift), so this check reads committed inputs only and its verdict is the same on a cold clone and on a tree the session just built. UNCACHEABLE on purpose: it scans every consumer source of the workspace, so no key short of the whole tree covers its read set, and the scan takes about two seconds.",
+      "description": "Judge every committed generated client against its committed manifest and the committed provider contract (hashes, coverage, forged markers), validate the two inventories, and scan all consumer sources for handwritten first-party transports. It builds nothing, renders nothing and spawns no Putnami: whether a committed client is what the current contract generates is the generator task's own verdict (declared-output drift), so this check reads committed inputs only and its verdict is the same on a cold clone and on a tree the session just built. UNCACHEABLE on purpose: it scans every consumer source of the workspace, so no key short of the whole tree covers its read set, and a key that missed one source would serve a green verdict for a new handwritten transport.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["workspace-check"],
