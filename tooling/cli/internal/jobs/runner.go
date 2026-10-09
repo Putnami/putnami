@@ -681,14 +681,11 @@ func runJob(
 	duration := time.Since(start)
 	spawnWall := time.Since(spawnedAt)
 
-	// No process of the job's group outlives runJob. Once the root exited, the
-	// rest of the group is asked to exit. When a descendant still holds the
-	// job's stdout or stderr, the group is killed once that pipe has no EOF
-	// within orphanPipeDrainDelay, so reading the job's output never waits
-	// forever. A process that ignores the request without holding the pipes is
-	// killed after processGroupKillDelay. This runs before runJob returns: the
-	// CLI often exits right after the run, and nothing else stops the group on
-	// Unix.
+	// Once the root exited, the rest of the job's group is asked to exit. A
+	// descendant that still holds the job's stdout or stderr after
+	// orphanPipeDrainDelay is killed, so reading the job's output ends. A
+	// descendant still running after processGroupKillDelay is killed, whether
+	// it holds the pipes or not.
 	_ = tree.Terminate()
 	evResult := waitForJobRead(eventsCh, stdout, tree)
 	stderrText := waitForJobStderr(stderrCh, stderr, tree)
@@ -810,7 +807,9 @@ func forceKillProcessGroupAfter(done <-chan struct{}, tree *proctree.Tree, delay
 // exit, then kills the ones still running. It returns at once when the group
 // is empty or the tree never started. The caller asks the group to exit first,
 // and calls stopProcessGroup before it closes the tree: after Close, Kill does
-// nothing.
+// nothing. On Unix a zombie member counts as running until its parent reaps
+// it, so a group whose orphans an init process never reaps waits the full
+// delay.
 func stopProcessGroup(tree *proctree.Tree, delay time.Duration) {
 	id := tree.ID()
 	deadline := time.Now().Add(delay)

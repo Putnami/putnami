@@ -683,6 +683,24 @@ ways:
 `userScope` is run state, like `selection`: nothing derived from it reaches a
 cache key or a session record.
 
+### Process Teardown
+
+A job runs as the root of its own process tree: a process group on Unix, a
+Job Object on Windows. Every process the job starts belongs to that tree. A
+job's processes do not outlive the job:
+
+1. **Timeout or cancellation** — The runner asks the tree to exit (SIGTERM on
+   Unix, CTRL_BREAK_EVENT on Windows). When the root still runs 5 seconds
+   later, the runner kills the tree.
+2. **Root exit** — Once the root exits, for any reason, the runner asks the
+   rest of the tree to exit. When a process still holds the job's stdout or
+   stderr after 2 seconds, the runner kills the tree. When any process of the
+   tree still runs 5 seconds later, the runner kills it.
+
+A process that a task needs after its job ends must leave the tree, for example
+a container that a daemon runs. A timed-out job stays failed with its error,
+and a canceled job stays canceled, whatever the teardown had to do.
+
 ### Version Info
 
 The CLI computes git metadata once per session and combines it with each project's effective version. The effective version is resolved as project, then nearest scope, then workspace. This allows jobs (e.g., publish, build-info) to embed version information without running git themselves:
