@@ -502,7 +502,7 @@
   },
   "tasks": {
     "test-env-up": {
-      "description": "Provision the database test environment this project's tests run against, and write the resolved binding into the invocation-scoped sensitive artifact `test-exec` reads. Extension-owned since an earlier migration — the CLI used to discover the datasources, run the container and inject the binding through a private env seam it then had to hide from its own cache key. Policy is unchanged: an externally supplied DATABASE_TEST_BINDINGS always wins, `--infra` (auto|require|skip) steers the mode with the CI default `require`, `--infra-down` tears every workspace-labeled container down and provisions nothing, and only a local `auto` run with docker on PATH ever touches the docker CLI. NEVER FAILS: an environment that could not be provisioned is reported by `test-exec` itself, which fails under `require` and skips its live cases otherwise.",
+      "description": "Provision the database test environment this project's tests run against, and write the resolved binding into the invocation-scoped sensitive artifact `test-exec` reads. Extension-owned since an earlier migration — the CLI used to discover the datasources, run the container and inject the binding through a private env seam it then had to hide from its own cache key. Policy is unchanged: an externally supplied DATABASE_TEST_BINDINGS always wins, `--infra` (auto|require|skip) steers the mode with the CI default `require`, `--infra-down` tears every workspace-labeled container down and provisions nothing, and only a local `auto` run with docker on PATH ever touches the docker CLI. NEVER FAILS: an environment that could not be provisioned is reported by `test-exec` itself, which fails under `require` and skips its live cases otherwise. UNCACHEABLE on purpose: its result is a live server and a binding scoped to this invocation, neither of which a cache entry can restore, so a replayed success would leave `test-exec` without a binding.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["test-env-up"],
@@ -544,7 +544,7 @@
       }
     },
     "test-env-down": {
-      "description": "Finalize the database test environment: read the non-secret lease and do what it says. The ordinary run RETAINS its server — a still-running container whose configuration digest matches is interchangeable across invocations, and the next `test-env-up` reaps every digest-mismatched container before it reuses or starts one — while an `--infra-down` lease sweeps. Runs with `runOn: finally`, so the orchestrator runs it exactly once whenever `test-env` STARTED, consumer failure and cancellation included.",
+      "description": "Finalize the database test environment: read the non-secret lease and do what it says. The ordinary run RETAINS its server — a still-running container whose configuration digest matches is interchangeable across invocations, and the next `test-env-up` reaps every digest-mismatched container before it reuses or starts one — while an `--infra-down` lease sweeps. Runs with `runOn: finally`, so the orchestrator runs it exactly once whenever `test-env` STARTED, consumer failure and cancellation included. UNCACHEABLE on purpose: it acts on the containers this invocation leased, so a replayed success would skip the teardown it exists to do.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["test-env-down"],
