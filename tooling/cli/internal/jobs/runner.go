@@ -34,6 +34,10 @@ var (
 	processGroupKillDelay = 5 * time.Second
 )
 
+// processGroupPollInterval is how often stopProcessGroup checks whether the
+// job's process group is empty.
+const processGroupPollInterval = 10 * time.Millisecond
+
 // goExtensionName identifies jobs whose subprocesses run Go tooling, for which
 // GOMAXPROCS is the canonical lever to bound CPU usage.
 const goExtensionName = "@putnami/go"
@@ -628,8 +632,9 @@ func runJob(
 		}
 		return nil, fmt.Errorf("start subprocess %s: %w", inv.command, err)
 	}
-	// Closing the tree ends nothing on Unix; on Windows it ends every process
-	// the job left behind once its pipes are drained.
+	// Closing the tree ends nothing on Unix, so runJob stops the tree itself
+	// before it returns (stopProcessGroup below); on Windows, closing also ends
+	// every process the job left behind.
 	defer func() { _ = tree.Close() }()
 	_ = stdoutWriter.Close()
 	_ = stderrWriter.Close()
@@ -676,12 +681,15 @@ func runJob(
 	duration := time.Since(start)
 	spawnWall := time.Since(spawnedAt)
 
-	// A job that starts a background process and exits can leave stdout/stderr
-	// inherited by the descendant. Without this cleanup the parent runner waits
-	// forever for EOF even though the job process already exited.
+	// Once the root exited, the rest of the job's group is asked to exit. A
+	// descendant that still holds the job's stdout or stderr after
+	// orphanPipeDrainDelay is killed, so reading the job's output ends. A
+	// descendant still running after processGroupKillDelay is killed, whether
+	// it holds the pipes or not.
 	_ = tree.Terminate()
 	evResult := waitForJobRead(eventsCh, stdout, tree)
 	stderrText := waitForJobStderr(stderrCh, stderr, tree)
+	stopProcessGroup(tree, processGroupKillDelay)
 
 	// Build result
 	result := evResult.result
@@ -792,5 +800,24 @@ func forceKillProcessGroupAfter(done <-chan struct{}, tree *proctree.Tree, delay
 	case <-done:
 	case <-time.After(delay):
 		_ = tree.Kill()
+	}
+}
+
+// stopProcessGroup waits up to delay for every process of the tree's group to
+// exit, then kills the ones still running. It returns at once when the group
+// is empty or the tree never started. The caller asks the group to exit first,
+// and calls stopProcessGroup before it closes the tree: after Close, Kill does
+// nothing. On Unix a zombie member counts as running until its parent reaps
+// it, so a group whose orphans an init process never reaps waits the full
+// delay.
+func stopProcessGroup(tree *proctree.Tree, delay time.Duration) {
+	id := tree.ID()
+	deadline := time.Now().Add(delay)
+	for proctree.GroupAlive(id) {
+		if !time.Now().Before(deadline) {
+			_ = tree.Kill()
+			return
+		}
+		time.Sleep(processGroupPollInterval)
 	}
 }
