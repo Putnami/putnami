@@ -13,7 +13,9 @@
 // A project that ships a CLI also declares its command-surface document
 // (option command-surface), and the task holds the commands and flags it
 // lists to the same rule. The released document is the one at the path the
-// project's putnami.json declared at the tag.
+// project's putnami.json declared at the tag. A project that declared one at
+// the tag and declares none now gets a warning, so removing the option does
+// not end the comparison without a trace.
 package apicheck
 
 import (
@@ -27,6 +29,7 @@ import (
 
 	"go.putnami.dev/go/extension/internal/apisurface"
 	protocolcli "go.putnami.dev/protocol/cli"
+	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
@@ -66,15 +69,17 @@ type Report struct {
 	// none.
 	CommandSurface string
 	// ReleasedSurface is the slash path, relative to the project, of the
-	// document the project declared at Tag; empty when it declared none.
+	// document the project declared at Tag, whether or not it declares one
+	// now; empty when it declared none, or declared something that is not
+	// the path of a file of the project.
 	ReleasedSurface string
 	// SurfaceNote says why the command surface was not compared while the
 	// exported API was: the project declared no document at Tag.
 	SurfaceNote string
 	// SurfaceWarning says why the command surface was not compared although
-	// the project declared a document at Tag: the tag does not hold it, holds
-	// it in a protocol version this check does not read, or its putnami.json
-	// cannot be read.
+	// the project declared a document at Tag, or may have: the project
+	// declares none now, the tag does not hold it, holds it in a protocol
+	// version this check does not read, or its putnami.json cannot be read.
 	SurfaceWarning string
 	// CommandChanges are the incompatible changes to the command surface
 	// since Tag.
@@ -87,6 +92,13 @@ type Report struct {
 // surfaceCompared reports whether the command surface was compared with Tag.
 func (r *Report) surfaceCompared() bool {
 	return r.CommandSurface != "" && r.Tag != "" && r.SurfaceNote == "" && r.SurfaceWarning == ""
+}
+
+// surfaceReported reports whether the result data carries the command-surface
+// members: the project declares a document, or a warning says why the one it
+// declared at Tag, or may have, is not compared.
+func (r *Report) surfaceReported() bool {
+	return r.CommandSurface != "" || r.SurfaceWarning != ""
 }
 
 // Commit identifies the commit that declares a breaking change.
@@ -114,8 +126,10 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string
 
 // Check compares the exported API of the project in projectDir with its
 // line's last tag, and its command-surface document when options declare
-// one. name is the project's resolved name: its support-catalog identity, and
-// the module path used when the project has no go.mod.
+// one. When they declare none, it still reads the declaration at the tag and
+// warns when there was one. name is the project's resolved name: its
+// support-catalog identity, and the module path used when the project has no
+// go.mod.
 func Check(workspaceRoot, projectDir, name string, options Options) (*Report, error) {
 	var surfacePath string
 	if options.CommandSurface != "" {
@@ -197,6 +211,13 @@ func Check(workspaceRoot, projectDir, name string, options Options) (*Report, er
 		report.ReleasedSurface, report.SurfaceNote, report.SurfaceWarning = released.path, released.note, released.warning
 		if released.surface != nil {
 			report.CommandChanges = protocolcli.IncompatibleCommandChanges(*released.surface, *surface)
+		}
+	} else {
+		// The declaration at the tag still counts when the working tree
+		// declares none: removing the option warns.
+		report.ReleasedSurface, report.SurfaceWarning, err = droppedSurface(projectDir, tag)
+		if err != nil {
+			return nil, err
 		}
 	}
 	if len(report.Changes) == 0 && len(report.CommandChanges) == 0 {
@@ -287,19 +308,38 @@ func render(emit *jsonl.Emitter, workspaceRoot, projectDir string, report *Repor
 		"packages":     report.Packages,
 		"incompatible": incompatible,
 	}
-	// A command change has no line: it points at the document.
-	var surfaceFile string
-	if report.CommandSurface != "" {
+	// A command change has no line: it points at the document. A project
+	// that declares no document now is named by the one it declared at the
+	// tag, and its warning points at its putnami.json, where the option was.
+	surfaceFile, warningFile := "", ""
+	switch {
+	case report.CommandSurface != "":
 		surfaceFile, _ = location(workspaceRoot, projectDir, apisurface.Position{File: report.CommandSurface})
-		data["commandSurface"] = surfaceFile
+		warningFile = surfaceFile
+	case report.SurfaceWarning != "":
+		surfaceFile, _ = location(workspaceRoot, projectDir, apisurface.Position{File: report.ReleasedSurface})
+		warningFile, _ = location(workspaceRoot, projectDir, apisurface.Position{File: wsproto.ConfigFilename})
+	}
+	if report.surfaceReported() {
+		if surfaceFile != "" {
+			data["commandSurface"] = surfaceFile
+		}
 		data["commandSurfaceCompared"] = report.surfaceCompared()
 		data["commandSurfaceIncompatible"] = len(report.CommandChanges)
+		// A report carries a note or a warning, never both.
+		if !report.surfaceCompared() {
+			reason := report.SurfaceWarning
+			if reason == "" {
+				reason = report.SurfaceNote
+			}
+			data["commandSurfaceNotCompared"] = reason
+		}
 	}
 	if report.SurfaceNote != "" {
 		emit.Info(report.SurfaceNote)
 	}
 	if report.SurfaceWarning != "" {
-		emit.DiagnosticWithCode("warning", report.SurfaceWarning, surfaceFile, 0, 0, NotComparedCode)
+		emit.DiagnosticWithCode("warning", report.SurfaceWarning, warningFile, 0, 0, NotComparedCode)
 	}
 	if len(report.Changes) == 0 {
 		emit.Info(fmt.Sprintf("the exported API of %d package%s is compatible with %s",

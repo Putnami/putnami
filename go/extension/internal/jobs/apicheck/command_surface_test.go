@@ -160,6 +160,7 @@ func TestARemovedFlagUnderAFeatCommitFailsValidate(t *testing.T) {
 
 // An API change and a command-surface change in one release are counted
 // apart, in the summary and in the metrics.
+// It runs serially, since f.run redirects os.Stdout.
 func TestTheCountsTellAPIChangesFromCommandSurfaceChanges(t *testing.T) {
 	f := newSurfaceFixture(t)
 	f.write(surfaceLocation, surfaceDocument(t))
@@ -270,8 +271,8 @@ func TestATagWithoutTheCommandSurfaceGivesANote(t *testing.T) {
 		t.Fatalf("status = %q, data = %v", status, data)
 	}
 	note := "the project declares no command surface at lib/v0.4.0: there is no released command surface to compare with"
-	if !logged(events, note) || len(notCompared(events)) != 0 {
-		t.Fatalf("events = %+v, want the note %q and no warning", events, note)
+	if !logged(events, note) || len(notCompared(events)) != 0 || data["commandSurfaceNotCompared"] != note {
+		t.Fatalf("events = %+v, data = %v, want the note %q and no warning", events, data, note)
 	}
 
 	f.write("lib/greet/greet.go", waveOnlySource)
@@ -418,6 +419,7 @@ func TestTheCommandSurfaceOptionComesFromTheTaskParameters(t *testing.T) {
 
 // A released document of a later protocol version than this check reads is
 // not compared, and says so; the API is still compared.
+// It runs serially, since f.run redirects os.Stdout.
 func TestACommandSurfaceOfALaterVersionAtTheTagIsNotCompared(t *testing.T) {
 	f := newFixture(t, catalog("package", "stable"))
 	declareSurface(f, surfaceFile)
@@ -447,6 +449,7 @@ func TestACommandSurfaceOfALaterVersionAtTheTagIsNotCompared(t *testing.T) {
 
 // The released document is the one at the path the project declared at the
 // tag, so moving it in the same change keeps the comparison.
+// It runs serially, since f.run redirects os.Stdout.
 func TestAMovedCommandSurfaceIsComparedWithTheReleasedOne(t *testing.T) {
 	f := newSurfaceFixture(t)
 	if err := os.Remove(filepath.Join(f.project, surfaceFile)); err != nil {
@@ -477,6 +480,7 @@ func TestAMovedCommandSurfaceIsComparedWithTheReleasedOne(t *testing.T) {
 
 // A document the tag declares but does not hold cannot be compared: a
 // warning says so, rather than a note that reads as no release.
+// It runs serially, since f.run redirects os.Stdout.
 func TestACommandSurfaceTheTagDeclaresButDoesNotHoldWarns(t *testing.T) {
 	f := newFixture(t, catalog("package", "stable"))
 	declareSurface(f, surfaceFile)
@@ -493,10 +497,57 @@ func TestACommandSurfaceTheTagDeclaresButDoesNotHoldWarns(t *testing.T) {
 	}
 }
 
+// Removing the option in the change that breaks the command surface does not
+// end the comparison without a trace: the check reads the declaration at the
+// tag whatever the working tree declares, and warns that the released surface
+// is not compared. The API is still compared, and a project that never
+// declared a document gets no warning and no command-surface data.
+// It runs serially, since f.run redirects os.Stdout.
+func TestRemovingTheCommandSurfaceOptionWarns(t *testing.T) {
+	f := newSurfaceFixture(t)
+	f.write("lib/greet/putnami.json", `{"name":"`+projectName+`","tags":["go"]}`+"\n")
+	f.options = Options{}
+	f.write(surfaceLocation, surfaceDocument(t, styleFlag()))
+	f.commit("feat: a quieter greet, with no command surface declared")
+
+	status, data, events := f.run()
+	warnings := notCompared(events)
+	want := "the project declared the command surface command-surface.json at lib/v0.5.0 and declares none now, " +
+		"so the command surface is not compared; declare it with option command-surface to compare it"
+	if status != "OK" || len(warnings) != 1 || warnings[0].Message != want ||
+		warnings[0].Location == nil || warnings[0].Location.File != "lib/greet/putnami.json" {
+		t.Fatalf("status = %q, warnings = %+v, want one warning %q on the project's putnami.json", status, warnings, want)
+	}
+	if data["compared"] != true || data["tag"] != surfaceTag || data["commandSurface"] != surfaceLocation ||
+		data["commandSurfaceCompared"] != false || data["commandSurfaceNotCompared"] != want || data["commandSurfaceIncompatible"] != 0 {
+		t.Fatalf("data = %v, want the document declared at the tag, not compared, and why", data)
+	}
+
+	f.write("lib/greet/greet.go", waveOnlySource)
+	report := f.check()
+	if report.SurfaceWarning != want || report.ReleasedSurface != surfaceFile || len(report.Changes) != 1 || len(report.CommandChanges) != 0 {
+		t.Fatalf("report = %+v, want the warning and the removed function", report)
+	}
+
+	never := newFixture(t, catalog("package", "stable"))
+	never.write("lib/greet/greet.go", greetSource+"\n// Bow bows.\nfunc Bow() {}\n")
+	never.commit("feat: bow")
+	status, data, events = never.run()
+	if status != "OK" || len(notCompared(events)) != 0 {
+		t.Fatalf("status = %q, events = %+v, want no warning for a project that never declared a document", status, events)
+	}
+	for member := range data {
+		if strings.HasPrefix(member, "commandSurface") {
+			t.Fatalf("data = %v, want no command-surface member", data)
+		}
+	}
+}
+
 // A putnami.json at the tag that the check cannot read, or that sets the
 // option to something other than a path of the project, leaves the surface
 // uncompared with a warning; it never fails the task, since no marker could
-// make history readable.
+// make history readable. The warning stands whether or not the working tree
+// declares a document: the check cannot tell what the tag declared.
 func TestAnUnreadableDeclarationAtTheTagWarns(t *testing.T) {
 	t.Parallel()
 	const config = "lib/greet/putnami.json"
@@ -504,6 +555,9 @@ func TestAnUnreadableDeclarationAtTheTagWarns(t *testing.T) {
 		name    string
 		prepare func(f *fixture)
 		want    string
+		// dropped is the warning when the working tree declares no
+		// document; want when empty.
+		dropped string
 	}{
 		{
 			name:    "not JSON",
@@ -521,6 +575,7 @@ func TestAnUnreadableDeclarationAtTheTagWarns(t *testing.T) {
 			name:    "out of the project",
 			prepare: func(f *fixture) { f.write(config, `{"options":{"validate":{"command-surface":"../out.json"}}}`) },
 			want:    `option command-surface is "../out.json" at lib/v0.5.0, not the path of a file of the project, so the command surface is not compared`,
+			dropped: `the project declared the command surface "../out.json" at lib/v0.5.0 and declares none now, so the command surface is not compared`,
 		},
 		{
 			name: "a symbolic link",
@@ -554,6 +609,18 @@ func TestAnUnreadableDeclarationAtTheTagWarns(t *testing.T) {
 		report := f.check()
 		if !strings.HasPrefix(report.SurfaceWarning, testCase.want) || report.surfaceCompared() {
 			t.Errorf("%s: warning %q, want %q", testCase.name, report.SurfaceWarning, testCase.want)
+		}
+
+		// The task parameters carry no option: the working tree declares no
+		// document.
+		f.options = Options{}
+		dropped := testCase.dropped
+		if dropped == "" {
+			dropped = testCase.want
+		}
+		report = f.check()
+		if !strings.HasPrefix(report.SurfaceWarning, dropped) || report.ReleasedSurface != "" || !report.surfaceReported() {
+			t.Errorf("%s, declared nowhere now: warning %q, released %q, want %q", testCase.name, report.SurfaceWarning, report.ReleasedSurface, dropped)
 		}
 	}
 }

@@ -248,6 +248,27 @@ func readReleasedSurface(dir, tag string) (releasedSurface, error) {
 	return released, nil
 }
 
+// droppedSurface answers for a project that declares no command surface now.
+// When its putnami.json declared one at tag, a warning says the command
+// surface is not compared, so removing the option in the change that breaks
+// the surface does not end the comparison without a trace. rel is the slash
+// path, relative to the project, that the tag declares, when it is the path of
+// a file of the project. A putnami.json at tag that the check cannot read
+// gives its warning too, since the check cannot tell what it declared. A tag
+// that declares no document gives neither.
+func droppedSurface(dir, tag string) (rel, warning string, err error) {
+	option, warning, err := surfaceOptionAtTag(dir, tag)
+	if err != nil || warning != "" || option == "" {
+		return "", warning, err
+	}
+	declared := fmt.Sprintf("%q", option)
+	if clean, invalid := surfaceDocumentPath(option); invalid == nil {
+		rel, declared = clean, clean
+	}
+	return rel, fmt.Sprintf("the project declared the command surface %s at %s and declares none now, so the command surface is not compared; "+
+		"declare it with option %s to compare it", declared, tag, commandSurfaceOption), nil
+}
+
 // surfaceOptionAtTag returns the command-surface option the project's
 // putnami.json declares at tag; empty when it declares none or the tag has no
 // putnami.json. A putnami.json the check cannot read gives a warning.

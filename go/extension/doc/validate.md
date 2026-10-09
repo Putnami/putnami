@@ -105,10 +105,15 @@ in the project's `putnami.json`:
 The check reads the document from the working tree, at the path the option
 names now, and from the tag it compares the API with, at the path the
 project's `putnami.json` named at that tag. So a document that moves in the
-same change is still compared with the released one. At the tag, the check
-reads the option from the project's `options` under `validate`, `@putnami/go`
-and `@putnami/go:validate`, the last one winning, as the CLI merges them. Both
-sides follow the CLI's rule for the option's two spellings: a layer can write
+same change is still compared with the released one. The check reads the
+declaration at the tag even when the project declares no document now: a
+project that removes the option after a release gets a warning until its next
+tag, so removing it does not end the comparison without a trace. At the tag,
+the check reads the option from the project's `options` under `validate`,
+`@putnami/go` and `@putnami/go:validate`, the last one winning, as the CLI
+merges them. Workspace options and command-line flags are not read at the
+tag: declare the option in the project's `putnami.json`. Both sides follow the
+CLI's rule for the option's two spellings: a layer can write
 `command-surface` or `commandSurface`, and when one layer writes both,
 `commandSurface` wins. These changes are incompatible:
 
@@ -139,17 +144,18 @@ document adds these cases:
 | Case | Result |
 |---|---|
 | The project declared no document at the tag | an information line; the API is still compared |
+| The project declared a document at the tag and declares none now | a warning coded `api-compat-not-compared` on the project's `putnami.json`; the API is still compared |
 | The project declared a document at the tag, but the tag does not hold it | a warning coded `api-compat-not-compared`; the API is still compared |
 | The document at the tag has a later protocol version than this extension reads | a warning coded `api-compat-not-compared`; the API is still compared |
-| The project's `putnami.json` at the tag does not parse, or sets the option to something other than a path of the project | a warning coded `api-compat-not-compared`; the API is still compared |
+| The project's `putnami.json` at the tag does not parse, or sets the option to something other than a path of the project, whether or not the project declares a document now | a warning coded `api-compat-not-compared`; the API is still compared |
 | The declared document is missing from the project, is a directory, is reached through a symbolic link, or is named in another case than on disk | the task fails |
 | The document does not parse, in the working tree or at the tag, in a protocol version this extension reads | the task fails |
 | The option is an absolute path or a path out of the project | the task fails, even for a project the check skips |
 
 A warning stands for what no marker could fix: the check cannot read the
-released document, so it compares nothing rather than fail every run until the
-next tag. A newer `@putnami/go` reads every earlier protocol version of the
-document.
+released document, or the project no longer declares the current one, so it
+compares nothing rather than fail every run until the next tag. A newer
+`@putnami/go` reads every earlier protocol version of the document.
 
 The CLI produces the document. Putnami's own CLI renders it from its command
 catalog and commits it as `tooling/cli/command-surface.json`, and a test fails
@@ -207,6 +213,14 @@ reports the `api-incompatible` metric with the API changes, and, for a project
 that declares a command surface, the `command-surface-incompatible` metric with
 the command-surface changes. The task's data holds the sum as `incompatible`,
 and the command-surface part as `commandSurfaceIncompatible`.
+
+For a project that declares a command surface, and for one that declares none
+now but gets a command-surface warning, the task's data also holds
+`commandSurfaceCompared`, whether the document was compared with the tag, and
+`commandSurface`, the document's workspace-relative path when the check knows
+it: the path the project declares, or else the one it declared at the tag.
+When the document was not compared, `commandSurfaceNotCompared` holds the note
+or the warning that says why.
 
 ## Caching
 
