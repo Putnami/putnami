@@ -889,19 +889,19 @@ func TestReport_FixStatesTheRunFlag(t *testing.T) {
 		meta.Fix = fix
 		data := encodeReport(t, gateLikeRun().Report(meta, nil, nil))
 
-		var members map[string]any
+		var members map[string]json.RawMessage
 		if err := json.Unmarshal(data, &members); err != nil {
 			t.Fatalf("parse report: %v", err)
 		}
 		got, present := members["fix"]
 		if fix == nil {
 			if present {
-				t.Errorf("a run without --fix states fix = %v", got)
+				t.Errorf("a run without --fix states fix = %s", got)
 			}
 			continue
 		}
-		if got != *fix {
-			t.Errorf("fix = %#v, want %v", got, *fix)
+		if want := fmt.Sprint(*fix); string(got) != want {
+			t.Errorf("fix = %s, want %s", got, want)
 		}
 	}
 }

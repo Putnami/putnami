@@ -1082,6 +1082,35 @@ if grep -Fq -e 'is not reusable' -e 'reusing gate' "$TEST_DIR/old-cli-reuse.err"
 fi
 [ "$(cat "$TEST_DIR/state/gate-invocations")" = "lint,test,build,validate --impacted --enforce-coverage" ]
 rm -f "$TEST_DIR/state/no-tree-verify"
+
+# The gate and its retry carry the CI policy's --fix=false after
+# --enforce-coverage, once, and no other flag of that policy. The policy file
+# is ignored, so the tree the gate binds stays the committed one.
+reset_verification_logs
+printf '*\n' >"$TEST_DIR/state/reject-gate-reuse"
+touch "$TEST_DIR/state/fail-gate-once"
+mkdir -p "$TEST_DIR/work/.git/info"
+printf 'putnami.ci.json\n' >>"$TEST_DIR/work/.git/info/exclude"
+printf '%s\n' '{"version":3,"commands":["lint","test","build","validate"],"flags":["--fix=false","--continue-on-error","--enforce-coverage"]}' \
+  >"$TEST_DIR/work/putnami.ci.json"
+fix_false_output="$(run_reusing_finalizer 2>"$TEST_DIR/fix-false-gate.err")"
+[ "$(sed -n 's/^PROPOSAL_REF=//p' <<<"$fix_false_output")" = "$PROPOSAL" ]
+if [ "$(cat "$TEST_DIR/state/gate-invocations")" != "$(printf '%s\n' \
+  "lint,test,build,validate --impacted --enforce-coverage --fix=false" \
+  "lint,test,build,validate --impacted --enforce-coverage --fix=false --retry-failed")" ]; then
+  echo "finalize-pr test: the gate did not carry exactly the CI policy's --fix=false:" >&2
+  cat "$TEST_DIR/state/gate-invocations" >&2
+  exit 1
+fi
+printf '%s\n' '{"version":3,"commands":["lint"],"flags":"--fix=false"}' >"$TEST_DIR/work/putnami.ci.json"
+reset_verification_logs
+if run_reusing_finalizer >/dev/null 2>"$TEST_DIR/fix-false-flags.err"; then
+  echo "finalize-pr test: expected a failure on a CI policy whose flags are not a list" >&2
+  exit 1
+fi
+grep -Fq "putnami.ci.json is not readable JSON with a flags list" "$TEST_DIR/fix-false-flags.err"
+[ ! -s "$TEST_DIR/state/gate-invocations" ]
+rm -f "$TEST_DIR/work/putnami.ci.json" "$TEST_DIR/state/reject-gate-reuse"
 remove_gate_records
 
 # The usual /fix path: the coordinator gated a dirty tree, and the finalizer

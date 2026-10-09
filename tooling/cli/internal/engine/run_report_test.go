@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/machine"
@@ -219,14 +220,15 @@ func TestWriteRunReport_RecordsTheExplicitFixFlag(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name   string
-		params map[string]any
-		want   any
+		params extension.ParamMap
+		// want is the report's fix member as JSON, empty when the member is absent.
+		want string
 	}{
-		{name: "--fix=false", params: map[string]any{"fix": "false"}, want: false},
-		{name: "--no-fix", params: map[string]any{"fix": false}, want: false},
-		{name: "--fix", params: map[string]any{"fix": true}, want: true},
-		{name: "--fix=0", params: map[string]any{"fix": "0"}, want: nil},
-		{name: "without the flag", params: map[string]any{"enforce-coverage": true}, want: nil},
+		{name: "--fix=false", params: extension.ParamMap{"fix": "false"}, want: "false"},
+		{name: "--no-fix", params: extension.ParamMap{"fix": false}, want: "false"},
+		{name: "--fix", params: extension.ParamMap{"fix": true}, want: "true"},
+		{name: "--fix=0", params: extension.ParamMap{"fix": "0"}},
+		{name: "without the flag", params: extension.ParamMap{"enforce-coverage": true}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -243,19 +245,19 @@ func TestWriteRunReport_RecordsTheExplicitFixFlag(t *testing.T) {
 			if violations := protocolcli.ValidateDocument(protocolcli.DocumentReportFile, data); len(violations) != 0 {
 				t.Fatalf("recorded report violates the contract: %v\n%s", violations, data)
 			}
-			var members map[string]any
+			var members map[string]json.RawMessage
 			if err := json.Unmarshal(data, &members); err != nil {
 				t.Fatalf("parse report: %v", err)
 			}
 			got, present := members["fix"]
-			if tc.want == nil {
+			if tc.want == "" {
 				if present {
-					t.Errorf("fix = %v, want the member absent: %s", got, data)
+					t.Errorf("fix = %s, want the member absent: %s", got, data)
 				}
 				return
 			}
-			if got != tc.want {
-				t.Errorf("fix = %#v, want %#v: %s", got, tc.want, data)
+			if string(got) != tc.want {
+				t.Errorf("fix = %s, want %s: %s", got, tc.want, data)
 			}
 		})
 	}

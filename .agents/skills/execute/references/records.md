@@ -134,11 +134,12 @@ stamp. It does not certify a deployment or downstream adoption.
 
 This bounded script checks the fields it consumes, not every native producer
 schema/cross-field invariant. A CI `--fix=false` flag requires the gate report's
-`fix: false`, so run the gate with that flag. CI flags other than
-`--enforce-coverage`, `--continue-on-error` and `--fix=false` fail closed until
-supported. It assumes unmodified outputs from the installed
-producers; it is not a replacement for their Go validators. Metadata not carried
-by those records (such as test-name filters), required-scope
+`fix: false`, so run the gate with that flag; the recomputed plan carries the
+policy's `--enforce-coverage` and `--fix=false`, never `--continue-on-error`.
+CI flags other than `--enforce-coverage`, `--continue-on-error` and
+`--fix=false` fail closed until supported. It assumes unmodified outputs from
+the installed producers; it is not a replacement for their Go validators.
+Metadata not carried by those records (such as test-name filters), required-scope
 completeness, semantic review quality, author identity, historical immutability
 and authorization of exceptions remain reviewed conventions. A hash identifies
 bytes, not a trusted author. Shared writers can rewrite the index or verifier.
