@@ -98,6 +98,17 @@ func IsPortableChannel(name string) bool { return channelPattern.MatchString(nam
 // because of the shape of a directory name.
 func IsMemberProject(value string) bool { return memberProjectPattern.MatchString(value) }
 
+// MemberProjectID returns the identity under which a release-set member names
+// a workspace project: the project's canonical logical id without its leading
+// slash ("/sites/docs" becomes "sites/docs"). The id already omits a grouping
+// folder such as "(internal)/", so the result does too. It does not check the
+// grammar; call IsMemberProject for that.
+//
+// Every artifact that names the same workload derives the name here. A
+// deployer that matches a deployment declaration to its release-set member
+// then compares two values from one function, not a project name with a path.
+func MemberProjectID(projectID string) string { return strings.TrimPrefix(projectID, "/") }
+
 // EncodeTagAsChannel maps a git tag to the immutable channel a tagged publish
 // creates: every slash becomes a hyphen, so ts/v0.3.0 becomes ts-v0.3.0. It
 // fails when the encoded name is still outside the portable alphabet, because

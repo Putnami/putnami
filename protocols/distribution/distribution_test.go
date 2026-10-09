@@ -731,3 +731,20 @@ func mustFixture(t *testing.T, name string) []byte {
 	}
 	return data
 }
+
+func TestMemberProjectIDDropsTheLeadingSlash(t *testing.T) {
+	for id, want := range map[string]string{
+		"/sites/putnami.dev": "sites/putnami.dev",
+		"sites/putnami.dev":  "sites/putnami.dev",
+		"/":                  "",
+		"":                   "",
+	} {
+		got := MemberProjectID(id)
+		if got != want {
+			t.Errorf("MemberProjectID(%q) = %q, want %q", id, got, want)
+		}
+		if want != "" && !IsMemberProject(got) {
+			t.Errorf("MemberProjectID(%q) = %q is not a recordable member project", id, got)
+		}
+	}
+}

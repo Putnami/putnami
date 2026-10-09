@@ -2015,7 +2015,7 @@ func releaseMemberProject(project *workspace.Project) string {
 	if project == nil {
 		return ""
 	}
-	identity := strings.TrimPrefix(project.ID, "/")
+	identity := distribution.MemberProjectID(project.ID)
 	if !distribution.IsMemberProject(identity) {
 		return ""
 	}

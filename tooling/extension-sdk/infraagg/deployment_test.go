@@ -163,6 +163,27 @@ func TestDeployment_WritesTheCanonicalAggregate(t *testing.T) {
 	}
 }
 
+// TestDeployment_NamesTheWorkloadByProjectID pins the declaration's workload to
+// the identity a release-set member records for the same project, so a deployer
+// that matches the declaration to its member accepts a project whose name is
+// not its path.
+func TestDeployment_NamesTheWorkloadByProjectID(t *testing.T) {
+	root := t.TempDir()
+	ctx := closureContext(root, "sites/example.dev", "example.dev", "application")
+
+	result, err := Deployment(ctx, Options{})
+	if err != nil || result.Outcome != OutcomeEmitted {
+		t.Fatalf("Deployment = %q %v %v", result.Outcome, result.Diagnostics, err)
+	}
+	m, diags := infra.ParseDeployment([]byte(readFile(t, result.ManifestPath)))
+	if m == nil || diag.HasErrors(diags) {
+		t.Fatalf("parse declaration: %v", diags)
+	}
+	if m.Workload != "sites/example.dev" {
+		t.Errorf("workload = %q, want the project id sites/example.dev, not the name example.dev", m.Workload)
+	}
+}
+
 // TestDeployment_CarriesOverridesAndTheAuthoredRuntime pins the inputs beyond
 // the closure: the workload's overrides and its authored runtime reach the
 // declaration, with the language's compatibility hook applied.

@@ -111,17 +111,23 @@ Because a `RequirementManifest` has no `connection` field at all (strict parsing
 
 ### Aggregated release artifact example
 
+`workload` is the project ID, the workspace-relative path the release set
+names: the canonical project id without its leading slash. It is not the
+project name, and it drops a grouping folder such as `(internal)/`. A deployer
+that matches the declaration to its release-set member compares the two values
+directly. Each `sources[].project` uses the same form.
+
 ```json
 {
   "$schema": "https://putnami.dev/schemas/putnami-infra.json",
   "protocolVersion": 2,
-  "workload": "go.putnami.dev/example/api",
+  "workload": "services/api",
   "databases": [
     {
       "name": "primary", "engine": "postgres", "schemas": ["audit", "iam"],
       "sources": [
-        { "project": "go.putnami.dev/example/audit", "contributor": "framework:requirements" },
-        { "project": "go.putnami.dev/example/iam",   "contributor": "framework:requirements" }
+        { "project": "libs/audit", "contributor": "framework:requirements" },
+        { "project": "libs/iam",   "contributor": "framework:requirements" }
       ]
     }
   ],
