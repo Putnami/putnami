@@ -1561,7 +1561,7 @@ putnami run my-job --args=--gate
 Use the `=` spelling too when the first word of the value holds `=`:
 `--args="--port=3000 --watch"` sets `args` to `--port=3000 --watch`, while
 `--args "--port=3000 --watch"` sets `args` to `true` and `port` to
-`3000 --watch`.
+`3000 --watch`, with no warning when the job declares `port`.
 
 Unknown flags are passed through to job processes. The CLI provides typo suggestions using Levenshtein distance when a flag doesn't match any known flag.
 

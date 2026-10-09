@@ -3,6 +3,7 @@ package cli
 import (
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // ParseFlags parses remaining args into a flag map.
@@ -30,8 +31,10 @@ func ParseFlags(args []string) map[string]string {
 			continue
 		}
 
-		// Check if next arg is a value or another flag
-		if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+		// The next arg is a value when it does not begin with a hyphen, or when
+		// it contains whitespace: no flag spelling does, so "--check --dry-run"
+		// is a value. The CLI binds job params by the same rule.
+		if i+1 < len(args) && (!strings.HasPrefix(args[i+1], "-") || strings.ContainsFunc(args[i+1], unicode.IsSpace)) {
 			flags[key] = args[i+1]
 			i++
 		} else {

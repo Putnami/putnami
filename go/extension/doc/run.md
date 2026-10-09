@@ -44,8 +44,13 @@ putnami run my-service --entrypoint ./cmd/migrate
 putnami run my-job --args "--check --dry-run" --port 8080
 
 # Assert a specific exit code from a gate (e.g. a migration guard)
-putnami run my-migrator --args "--gate"; echo "exit: $?"
+putnami run my-migrator --args=--gate; echo "exit: $?"
 ```
+
+`--args` is split on whitespace into the program's arguments. A one-word value
+that begins with a hyphen needs the `=` spelling (`--args=--gate`): the CLI
+reads `--args --gate` as two flags. See
+[Job-Specific Flags](../../../tooling/cli/doc/03-commands.md#job-specific-flags).
 
 ## Exit Codes
 
@@ -70,7 +75,7 @@ the request.
 | `--entrypoint <path>` | auto-detect | Package path to run (e.g. `./cmd/migrate`) |
 | `--port <n>` | — | Sets the `PORT` environment variable when provided |
 | `--race` | `false` | Run with the Go race detector |
-| `--args <string>` | — | Extra arguments passed to the program |
+| `--args <string>` | — | Extra arguments passed to the program, split on whitespace |
 
 ## Boundaries
 
