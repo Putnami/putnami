@@ -1539,6 +1539,19 @@ Extensions can declare additional flags in their manifest. These are passed thro
 putnami build --all --target linux/amd64
 ```
 
+A flag the selected tasks declare with a value type (`string`, `number` or
+`array`) takes the next argument as its value, even one that begins with a
+hyphen. Both spellings below pass `--check --dry-run` to the program:
+
+```bash
+putnami run my-job --args "--check --dry-run"
+putnami run my-job --args="--check --dry-run"
+```
+
+A flag no task declares, and a declared boolean, take the next argument as
+their value only when it does not begin with a hyphen; otherwise they are
+`true`. A value flag directly before `--`, or at the end, is `true` too.
+
 Unknown flags are passed through to job processes. The CLI provides typo suggestions using Levenshtein distance when a flag doesn't match any known flag.
 
 ## Command Aliases

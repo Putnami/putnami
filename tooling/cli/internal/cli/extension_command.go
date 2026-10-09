@@ -336,7 +336,7 @@ func negatedGlobalFlagNames(originalArgs []string, flags map[string]extension.Fl
 }
 
 func buildExtensionCommandParams(parsed *ParsedArgs, flags map[string]extension.FlagDefinition) map[string]any {
-	params := buildCommandParams(parsed.RawJobArgs)
+	params := buildCommandParams(parsed.RawJobArgs, flags)
 	// Extension command groups such as `putnami cloud publish-config` use
 	// command-local flags, but ParseArgs consumes globally-known flags before
 	// dispatch. Preserve the common dry-run flag only for commands whose
@@ -460,8 +460,9 @@ func runPlannedExtensionAlias(
 		// param value's Go type is part of every marker key, so folding those in
 		// would change which last-build marker a bare `putnami <group> <sub>`
 		// looks up — and, through it, what an unrelated terminal run considers
-		// impacted.
-		RunMarkerParams: buildCommandParams(aliasParsed.RawJobArgs),
+		// impacted. It binds the tokens against the same effective flag surface
+		// commandParams does.
+		RunMarkerParams: buildCommandParams(aliasParsed.RawJobArgs, resolved.EffectiveFlags()),
 		// One extension, rebound by stable owner identity after before-hooks,
 		// with the group/subcommand flag layers overlaid on the fresh command.
 		// Planning against the whole discovered set would schedule every other

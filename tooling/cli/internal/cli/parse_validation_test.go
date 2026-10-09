@@ -2,6 +2,8 @@ package cli
 
 import (
 	"errors"
+	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
@@ -316,6 +318,174 @@ func TestConflictingTaskFlags_SilentWhenCompatibleOrUnused(t *testing.T) {
 	}
 }
 
+// --- declared value flags ---
+
+// runFlagSurface is the flag surface of the TypeScript extension's `run`
+// command (typescript/extension/putnami.extension.json), plus one array and one
+// boolean flag and a short alias, so every declared type is represented.
+func runFlagSurface() map[string]extension.FlagDefinition {
+	return map[string]extension.FlagDefinition{
+		"entrypoint": {Type: "string"},
+		"port":       {Type: "number"},
+		"args":       {Type: "string"},
+		"platforms":  {Type: "array"},
+		"minify":     {Type: "boolean"},
+		"switch":     {Type: ""},
+		"token":      {Type: "string", Short: "t"},
+	}
+}
+
+// renderBinding binds rawArgs against declared and lists the params as sorted
+// "name=GoType(value)" entries, the form parse_key_stability_test.go pins, so a
+// value's Go type is part of every assertion.
+func renderBinding(rawArgs []string, declared map[string]extension.FlagDefinition) string {
+	params := buildCommandParams(rawArgs, declared)
+	names := make([]string, 0, len(params))
+	for name := range params {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	entries := make([]string, 0, len(names))
+	for _, name := range names {
+		entries = append(entries, fmt.Sprintf("%s=%T(%v)", name, params[name], params[name]))
+	}
+	return strings.Join(entries, " ")
+}
+
+// TestBuildCommandParams_DeclaredValueFlagTakesTheNextToken pins the binding
+// rule both forms of `putnami run --args "--check --dry-run"` reach: a flag the
+// selected tasks declare with a value type takes the next token as its value
+// whatever its shape, and every other spelling keeps the shape rule.
+func TestBuildCommandParams_DeclaredValueFlagTakesTheNextToken(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name     string
+		args     []string
+		declared map[string]extension.FlagDefinition
+		want     string
+	}{
+		{"declared string, separate hyphen value", []string{"--args", "--check --dry-run"}, runFlagSurface(),
+			"args=string(--check --dry-run)"},
+		{"declared string, value with one hyphen", []string{"--args", "-x"}, runFlagSurface(),
+			"args=string(-x)"},
+		{"declared number, negative value", []string{"--port", "-1"}, runFlagSurface(),
+			"port=string(-1)"},
+		{"declared array, hyphen value", []string{"--platforms", "--all-of-them"}, runFlagSurface(),
+			"platforms=string(--all-of-them)"},
+		{"a consumed value is never a flag of its own", []string{"--entrypoint", "--args", "--check"}, runFlagSurface(),
+			"check=bool(true) entrypoint=string(--args)"},
+		{"single-dash long name", []string{"-args", "--check"}, runFlagSurface(),
+			"args=string(--check)"},
+		{"undeclared flag keeps the shape rule", []string{"--args", "--check --dry-run"}, nil,
+			"args=bool(true) check --dry-run=bool(true)"},
+		{"declared boolean keeps the shape rule", []string{"--minify", "--check"}, runFlagSurface(),
+			"check=bool(true) minify=bool(true)"},
+		{"untyped switch keeps the shape rule", []string{"--switch", "--check"}, runFlagSurface(),
+			"check=bool(true) switch=bool(true)"},
+		{"short alias keeps the shape rule", []string{"-t", "-x"}, runFlagSurface(),
+			"t=bool(true) x=bool(true)"},
+		{"negation keeps the shape rule", []string{"--no-args", "--check"}, runFlagSurface(),
+			"args=bool(false) check=bool(true)"},
+		{"declared value flag last takes no value", []string{"--args"}, runFlagSurface(),
+			"args=bool(true)"},
+		{"declared value flag never takes the separator", []string{"--args", "--", "--check"}, runFlagSurface(),
+			"=bool(true) args=bool(true) check=bool(true)"},
+		{"declarations stop at the separator", []string{"--", "--args", "--check"}, runFlagSurface(),
+			"=bool(true) args=bool(true) check=bool(true)"},
+		{"a non-hyphen value binds the same either way", []string{"--args", "scan"}, runFlagSurface(),
+			"args=string(scan)"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := renderBinding(tc.args, tc.declared); got != tc.want {
+				t.Fatalf("params = %s, want %s", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestParsedRunArgs_BothSpellingsBindOneValueWithoutWarning drives both
+// spellings of the issue's invocation through ParseArgs, then through the
+// binding and the warning pass the terminal adapter runs, against the `run`
+// flag surface.
+func TestParsedRunArgs_BothSpellingsBindOneValueWithoutWarning(t *testing.T) {
+	t.Parallel()
+	for _, argv := range [][]string{
+		{"run", "--projects", "example", "--args", "--check --dry-run"},
+		{"run", "--projects", "example", "--args=--check --dry-run"},
+	} {
+		parsed := ParseArgs(argv, nil, nil)
+		if parsed.Err != nil {
+			t.Fatalf("ParseArgs(%q): %v", argv, parsed.Err)
+		}
+		if parsed.Global.DryRun {
+			t.Errorf("ParseArgs(%q) read --dry-run inside the value as the global flag", argv)
+		}
+		params := buildCommandParams(parsed.RawJobArgs, runFlagSurface())
+		if len(params) != 1 || params["args"] != "--check --dry-run" {
+			t.Errorf("params for %q = %#v, want only args=\"--check --dry-run\"", argv, params)
+		}
+		if warnings := undeclaredFlagWarnings("run", parsed.RawJobArgs, runFlagSurface()); len(warnings) != 0 {
+			t.Errorf("warnings for %q = %v, want none", argv, warnings)
+		}
+	}
+}
+
+// TestUndeclaredFlagWarnings_SkipTheValueADeclaredFlagTakes holds the warning
+// pass to the binding: a token a declared value flag takes is a value, so it is
+// never reported, while a flag after it still is.
+func TestUndeclaredFlagWarnings_SkipTheValueADeclaredFlagTakes(t *testing.T) {
+	t.Parallel()
+	if warnings := undeclaredFlagWarnings("run", []string{"--args", "--check --dry-run"}, runFlagSurface()); len(warnings) != 0 {
+		t.Errorf("warnings = %v, want none for a declared flag's value", warnings)
+	}
+	warnings := undeclaredFlagWarnings("run", []string{"--args", "--check", "--bogus"}, runFlagSurface())
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "--bogus") {
+		t.Errorf("warnings = %v, want exactly one, for --bogus", warnings)
+	}
+	// Without the declaration the token is a flag, and the warning stays.
+	warnings = undeclaredFlagWarnings("run", []string{"--args", "--check --dry-run"}, nil)
+	if len(warnings) != 2 || !strings.Contains(warnings[1], "--check --dry-run") {
+		t.Errorf("warnings = %v, want one each for --args and --check --dry-run", warnings)
+	}
+}
+
+// TestConflictingTaskFlags_SkipTheValueADeclaredFlagTakes is the same rule on
+// the conflict pass: a value that spells a conflicting flag is not that flag.
+func TestConflictingTaskFlags_SkipTheValueADeclaredFlagTakes(t *testing.T) {
+	t.Parallel()
+	jobMap := map[string][]*extension.JobDefinition{
+		"build": {{
+			Name: "build", ExtensionName: "@putnami/go",
+			Flags: map[string]extension.FlagDefinition{"args": valueFlagDef(), "stable": boolFlagDef()},
+		}},
+		"publish": {jobWithFlag("@putnami/cloud", "publish", "stable", valueFlagDef())},
+	}
+	if err := conflictingTaskFlags([]string{"build", "publish"}, jobMap, []string{"--args", "--stable"}); err != nil {
+		t.Errorf("a declared flag's value is not a conflicting flag: %v", err)
+	}
+	if err := conflictingTaskFlags([]string{"build", "publish"}, jobMap, []string{"--args", "x", "--stable"}); err == nil {
+		t.Error("a conflicting flag after the value must still fail")
+	}
+}
+
+// TestJobFlagTokens_MatchTheBinding pins that the validation walk and the
+// binding agree token by token: every flag the walk returns is a param name the
+// binding produced, and no value the binding took is returned as a flag.
+func TestJobFlagTokens_MatchTheBinding(t *testing.T) {
+	t.Parallel()
+	args := []string{"--entrypoint", "--args", "--port", "-1", "--args", "--check --dry-run", "--minify", "--x", "--", "--args", "--y"}
+	got := jobFlagTokens(args, runFlagSurface())
+	assertStrings(t, "flags", got, []string{"--entrypoint", "--port", "--args", "--minify", "--x"})
+	params := buildCommandParams(args, runFlagSurface())
+	for _, flag := range got {
+		if _, ok := params[strings.TrimLeft(flag, "-")]; !ok {
+			t.Errorf("walk returned %s, which the binding did not bind (params %#v)", flag, params)
+		}
+	}
+}
+
 // --- the one positional-promotion implementation ---
 
 func TestPromoteProjectSelector(t *testing.T) {
@@ -363,8 +533,8 @@ func TestPromoteProjectSelector_NeverMovesParams(t *testing.T) {
 		promoted := GlobalFlags{}
 		kept := GlobalFlags{Projects: "already-selected"}
 
-		withPromotion := buildCommandParams(promoteProjectSelector(&promoted, args))
-		withoutPromotion := buildCommandParams(promoteProjectSelector(&kept, args))
+		withPromotion := buildCommandParams(promoteProjectSelector(&promoted, args), nil)
+		withoutPromotion := buildCommandParams(promoteProjectSelector(&kept, args), nil)
 
 		if len(withPromotion) != len(withoutPromotion) {
 			t.Fatalf("params differ for %v: %v vs %v", args, withPromotion, withoutPromotion)

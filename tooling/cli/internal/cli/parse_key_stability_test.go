@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -49,6 +50,9 @@ type keyStabilityCase struct {
 	args            []string
 	userAliases     map[string]string
 	extensionGroups map[string]bool
+	// declared is the flag surface the selected tasks declare. Nil binds every
+	// flag by shape, as an invocation of tasks that declare none does.
+	declared map[string]extension.FlagDefinition
 
 	// wantParams renders the params map as sorted "name=GoType(value)" entries,
 	// so a value that changes type fails with a readable diff rather than an
@@ -66,7 +70,8 @@ type keyStabilityCase struct {
 // buildCommandParams: bare root tasks, comma commands, builtin and user
 // aliases, the "." selector, --projects, global flags that must never reach
 // params, --flag=value, --no-flag, --flag value, bare --flag, the "--"
-// passthrough separator, and extension flag passthrough.
+// passthrough separator, extension flag passthrough, and a declared value flag
+// whose value begins with a hyphen.
 var keyStabilityCorpus = []keyStabilityCase{
 	{
 		name:         "bare root task",
@@ -239,6 +244,53 @@ var keyStabilityCorpus = []keyStabilityCase{
 		wantCacheKey: "2f6e339148ad636eb2d97b1dcc7c05d9c87910cf3b30def51d31677822c8cd75",
 		wantMarker:   "e59f1698ce59",
 	},
+	{
+		name:         "declared string flag takes a separate value that begins with a hyphen",
+		args:         []string{"run", "--args", "--check --dry-run"},
+		declared:     map[string]extension.FlagDefinition{"args": {Type: "string"}},
+		wantParams:   "args=string(--check --dry-run)",
+		wantCacheKey: "e6f5abd7cc8aeb7804a34caa8398099b8afdcf5156f044bc47ff7fa63f5bf67e",
+		wantMarker:   "eae433231770",
+	},
+	{
+		name:         "declared string flag takes an inline value that begins with a hyphen",
+		args:         []string{"run", "--args=--check --dry-run"},
+		declared:     map[string]extension.FlagDefinition{"args": {Type: "string"}},
+		wantParams:   "args=string(--check --dry-run)",
+		wantCacheKey: "e6f5abd7cc8aeb7804a34caa8398099b8afdcf5156f044bc47ff7fa63f5bf67e",
+		wantMarker:   "eae433231770",
+	},
+	{
+		name:         "undeclared flag before a hyphen token keeps the shape rule",
+		args:         []string{"run", "--args", "--check --dry-run"},
+		wantParams:   "args=bool(true) check --dry-run=bool(true)",
+		wantCacheKey: "3f5befd8898f206ae58d849aa7dd58d089722c558fa886d0908995d9981a6b3b",
+		wantMarker:   "ed0c5f9d5d97",
+	},
+	{
+		name:         "declared boolean flag before a flag keeps the shape rule",
+		args:         []string{"build", "--minify", "--sourcemap"},
+		declared:     map[string]extension.FlagDefinition{"minify": {Type: "boolean"}},
+		wantParams:   "minify=bool(true) sourcemap=bool(true)",
+		wantCacheKey: "311ac78e9d35c8b0f56012da3324fc64c6e7ee206141f2435d99998e07d8985c",
+		wantMarker:   "6f0eb87789a5",
+	},
+	{
+		name:         "declared string flag before the passthrough separator takes no value",
+		args:         []string{"test", "--filter", "--", "-race"},
+		declared:     map[string]extension.FlagDefinition{"filter": {Type: "string"}},
+		wantParams:   "=bool(true) filter=bool(true) race=bool(true)",
+		wantCacheKey: "4d7a747bcde00867873d917314beed56cd52bdf5fa47a947b8fe947d30441c1f",
+		wantMarker:   "763c129656a0",
+	},
+	{
+		name:         "declared string flag last takes no value",
+		args:         []string{"run", "--args"},
+		declared:     map[string]extension.FlagDefinition{"args": {Type: "string"}},
+		wantParams:   "args=bool(true)",
+		wantCacheKey: "62035d79788ce1b49620e9fa6c565e81ac60520dbee424dafe6231e6ca0c98ef",
+		wantMarker:   "06972fa87f64",
+	},
 }
 
 // corpusHashes is the single derivation point: it parses an invocation exactly
@@ -260,7 +312,7 @@ func corpusHashes(t *testing.T, tc keyStabilityCase) (rendered, cacheKey, marker
 	if parsed.Err != nil {
 		t.Fatalf("ParseArgs(%v) rejected a currently-valid invocation: %v", tc.args, parsed.Err)
 	}
-	params := buildCommandParams(parsed.RawJobArgs)
+	params := buildCommandParams(parsed.RawJobArgs, tc.declared)
 
 	names := make([]string, 0, len(params))
 	for name := range params {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"go.putnami.dev/cli/model/extension"
 	"go.putnami.dev/protocol/doctor"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/env"
@@ -64,8 +65,16 @@ func profileUsageError(value string, fromFlag bool) error {
 	return fmt.Errorf("invalid profile %q: must be one of %s", value, strings.Join(valid, ", "))
 }
 
-func buildCommandParams(rawArgs []string) map[string]any {
+// buildCommandParams turns the job args into the params every task receives
+// and every job cache key and run marker hashes. declared is the flag surface
+// the selected tasks declare: a value flag there takes the next token before
+// the passthrough separator as its value, even one that begins with a hyphen
+// (consumesDeclaredValue). Every other flag is bound by shape: the next token is
+// its value unless it begins with a hyphen, and otherwise the flag is true. A
+// nil surface binds every flag by shape.
+func buildCommandParams(rawArgs []string, declared map[string]extension.FlagDefinition) map[string]any {
 	params := make(map[string]any)
+	beforeSeparator := rawArgs[:passthroughCut(rawArgs)]
 	for i := 0; i < len(rawArgs); i++ {
 		arg := rawArgs[i]
 		if !strings.HasPrefix(arg, "-") {
@@ -87,7 +96,7 @@ func buildCommandParams(rawArgs []string) map[string]any {
 		}
 
 		// Check if next arg is a value
-		if i+1 < len(rawArgs) && !strings.HasPrefix(rawArgs[i+1], "-") {
+		if i+1 < len(rawArgs) && (!strings.HasPrefix(rawArgs[i+1], "-") || consumesDeclaredValue(beforeSeparator, i, declared)) {
 			params[name] = rawArgs[i+1]
 			i++
 		} else {

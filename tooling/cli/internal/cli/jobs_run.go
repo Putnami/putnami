@@ -30,9 +30,10 @@ var drainTelemetry = telemetry.DrainContext
 // runJobCommands runs the selected job commands through the engine. A hosted
 // run reads the remote cache through hostedCache, and its session adopts
 // hostedReporters, which the first-use bootstrap may have started before its
-// first repository code.
-func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc *telemetry.Client, interactive bool, hostedCache *engine.HostedRemoteCache, hostedReporters *engine.HostedReporters) int {
-	req := terminalRequest(parsed, cfg, wsRoot, tc, interactive)
+// first repository code. extensions are the ones App.Run discovered to
+// dispatch the invocation (terminalRequest).
+func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, extensions []*extension.ExtensionDescription, tc *telemetry.Client, interactive bool, hostedCache *engine.HostedRemoteCache, hostedReporters *engine.HostedReporters) int {
+	req := terminalRequest(parsed, cfg, wsRoot, extensions, tc, interactive)
 	req.HostedRemoteCache = hostedCache
 	req.HostedReporters = hostedReporters
 	result, _ := engine.New().Run(ctx, req, nil)
@@ -44,18 +45,24 @@ func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wspro
 // copy. An earlier change pulled it out of runJobCommands for exactly that: the
 // MCP equivalence test builds its terminal side here, so "terminal and MCP agree"
 // is a claim about the shipping mapping and not about a restatement of it.
-func terminalRequest(parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc *telemetry.Client, interactive bool) engine.Request {
+//
+// extensions are the ones App.Run discovered to dispatch the invocation: the
+// set `putnami help <command>` renders flags from and the extension-alias
+// adapter binds params against. Nil binds every job flag by shape.
+func terminalRequest(parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, extensions []*extension.ExtensionDescription, tc *telemetry.Client, interactive bool) engine.Request {
 	req := engine.Request{
 		WorkspaceRoot: wsRoot,
 		Config:        cfg,
 		Commands:      parsed.Commands,
 		Global:        parsed.Global,
 		// The params a job sees, and every cache key and run marker derived from
-		// them, stay a pure function of the raw job args — with ONE deliberate,
-		// named synthesis: applyPublishDryRun below, mirroring the alias
-		// adapter's buildExtensionCommandParams. The engine forwards this map,
-		// it never rebuilds it.
-		CommandParams: buildCommandParams(parsed.RawJobArgs),
+		// them, stay a pure function of the raw job args and the flags the
+		// selected tasks declare — with ONE deliberate, named synthesis:
+		// applyPublishDryRun below, mirroring the alias adapter's
+		// buildExtensionCommandParams. The engine forwards this map, it never
+		// rebuilds it.
+		CommandParams: buildCommandParams(parsed.RawJobArgs,
+			declaredTaskFlags(parsed.Commands, extension.BuildJobMap(extensions))),
 		// Lifecycle hooks run for the terminal path only, for the same reason the
 		// observer does: a later adapter must opt in deliberately.
 		Hooks:                cfg.Hooks,

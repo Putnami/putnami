@@ -18,7 +18,10 @@ import (
 // Phase 2 (catalog resolution) is commandmeta.CanonicalPath/ResolveFlags plus
 // the extension manifest lookups the callers supply.
 // Phase 3 (semantics) is parseGlobalFlags' binding pass in flags.go and the
-// validation in this file.
+// validation in this file. Job args are judged against the flags the selected
+// tasks declare: consumesDeclaredValue is the one rule for which token a
+// declared value flag takes as its value, and buildCommandParams' binding and
+// jobFlagTokens, the walk both job-arg validation passes share, apply it alike.
 //
 // The strictness policy is settled (epic refinement Q1) and is deliberately
 // asymmetric:
@@ -308,10 +311,7 @@ func undeclaredFlagWarnings(scope string, rawArgs []string, declared map[string]
 		seen     = map[string]bool{}
 		reported []string
 	)
-	for _, arg := range rawArgs[:passthroughCut(rawArgs)] {
-		if !isFlagToken(arg) {
-			continue
-		}
+	for _, arg := range jobFlagTokens(rawArgs, declared) {
 		spelling := flagSpelling(arg)
 		if isGlobalFlag(spelling) || coreJobFlags[flagBaseName(arg)] || seen[spelling] {
 			continue
@@ -369,6 +369,53 @@ func declaredTaskFlags(commands []string, jobMap map[string][]*extension.JobDefi
 	return declared
 }
 
+// flagTakesValue reports whether a manifest flag takes a value. Every declared
+// type but boolean does (string, number, array); an empty type is a bare
+// switch, as help and shell completion render it.
+func flagTakesValue(def extension.FlagDefinition) bool {
+	return def.Type != "" && def.Type != "boolean"
+}
+
+// consumesDeclaredValue reports whether args[i] names, by its long name, a flag
+// declared with a value type, so that args[i+1] is its value whatever its shape:
+// `--args "--check --dry-run"` binds the string, exactly as
+// `--args="--check --dry-run"` does once splitInlineValues has split it.
+//
+// Callers pass only the tokens before the passthrough separator, so a value
+// flag directly before "--", or last, takes no value from here. A negated
+// (`--no-x`), inline (`-x=1`), short, undeclared or boolean spelling takes none
+// either: buildCommandParams binds those by shape alone.
+func consumesDeclaredValue(args []string, i int, declared map[string]extension.FlagDefinition) bool {
+	if i+1 >= len(args) || !isFlagToken(args[i]) {
+		return false
+	}
+	name := strings.TrimLeft(args[i], "-")
+	if strings.Contains(name, "=") || strings.HasPrefix(name, "no-") {
+		return false
+	}
+	def, ok := declared[name]
+	return ok && flagTakesValue(def)
+}
+
+// jobFlagTokens returns, in order, the flag tokens before the passthrough
+// separator, leaving out every token a declared value flag consumes as its
+// value (consumesDeclaredValue). It is the one walk undeclaredFlagWarnings and
+// conflictingTaskFlags share, so a value buildCommandParams binds is never
+// judged as a flag.
+func jobFlagTokens(rawArgs []string, declared map[string]extension.FlagDefinition) []string {
+	args := rawArgs[:passthroughCut(rawArgs)]
+	var flags []string
+	for i := 0; i < len(args); i++ {
+		if isFlagToken(args[i]) {
+			flags = append(flags, args[i])
+		}
+		if consumesDeclaredValue(args, i, declared) {
+			i++
+		}
+	}
+	return flags
+}
+
 // conflictingTaskFlags rejects a comma-composed invocation in which two of the
 // selected tasks declare the SAME supplied flag with different behavior, naming
 // the conflicting tasks. One token cannot carry two meanings, and
@@ -395,10 +442,7 @@ func conflictingTaskFlags(commands []string, jobMap map[string][]*extension.JobD
 		}
 	}
 
-	for _, arg := range rawArgs[:passthroughCut(rawArgs)] {
-		if !isFlagToken(arg) {
-			continue
-		}
+	for _, arg := range jobFlagTokens(rawArgs, definitions) {
 		tasks := declaredBy[flagBaseName(arg)]
 		if len(tasks) < 2 {
 			continue
