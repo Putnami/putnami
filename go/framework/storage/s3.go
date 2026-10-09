@@ -31,7 +31,7 @@ type S3Config struct {
 	// Bucket is the S3 bucket name. All logical buckets are mapped as key prefixes within this bucket.
 	Bucket string
 	// RequestTimeout bounds non-streaming control-plane operations (Put, Delete,
-	// List, Exists). Default: 30s. It does NOT cap a streaming Get — that body
+	// List, Exists, Stat). Default: 30s. It does NOT cap a streaming Get — that body
 	// read is bounded only by the caller's context, so large/slow downloads are
 	// not aborted mid-stream. Set to a negative value to disable the per-op cap.
 	RequestTimeout time.Duration
@@ -392,21 +392,41 @@ func (b *S3Backend) List(ctx context.Context, bucket string, opts *ListOptions) 
 }
 
 // Exists checks whether an object exists in S3 using a HEAD request.
-func (b *S3Backend) Exists(ctx context.Context, bucket, key string) (_ bool, retErr error) {
+func (b *S3Backend) Exists(ctx context.Context, bucket, key string) (bool, error) {
+	info, err := b.head(ctx, bucket, key, "exists check failed")
+	return info != nil, err
+}
+
+// Stat returns the metadata of an object in S3 with one HEAD request
+// (HeadObject).
+func (b *S3Backend) Stat(ctx context.Context, bucket, key string) (*ObjectInfo, error) {
+	info, err := b.head(ctx, bucket, key, "stat failed")
+	if err != nil {
+		return nil, err
+	}
+	if info == nil {
+		return nil, statNotFound("s3", bucket, key)
+	}
+	return info, nil
+}
+
+// head sends one HEAD request for an object. It returns nil and no error when
+// the object is absent.
+func (b *S3Backend) head(ctx context.Context, bucket, key, failure string) (_ *ObjectInfo, retErr error) {
 	ctx, cancel := ctxutil.WithRequestTimeout(ctx, b.config.RequestTimeout)
 	defer cancel()
 
 	url := b.objectURL(bucket, key)
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
 	if err != nil {
-		return false, errors.Wrap(err, CodeStorageRequest, errors.String("backend", "s3"), errors.String("method", "HEAD"))
+		return nil, errors.Wrap(err, CodeStorageRequest, errors.String("backend", "s3"), errors.String("method", "HEAD"))
 	}
 
 	b.signRequest(req, sha256Hex(nil))
 
 	resp, err := b.client.Do(req)
 	if err != nil {
-		return false, errors.Wrap(err, CodeStorageRead, errors.String("backend", "s3"), errors.String("bucket", bucket), errors.String("key", key))
+		return nil, errors.Wrap(err, CodeStorageRead, errors.String("backend", "s3"), errors.String("bucket", bucket), errors.String("key", key))
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil && retErr == nil {
@@ -415,21 +435,31 @@ func (b *S3Backend) Exists(ctx context.Context, bucket, key string) (_ bool, ret
 	}()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return false, nil
+		return nil, nil
 	}
 	if resp.StatusCode >= 400 {
 		// Surface 403 (missing s3:HeadObject grant / policy deny) and transient
 		// 5xx as errors instead of collapsing them to "absent". A false-negative
 		// existence check drives create/overwrite decisions and is a
 		// data-integrity risk; this mirrors Get/Delete and GCSBackend.Exists.
-		return false, errors.New(CodeStorageRead, "exists check failed",
+		return nil, errors.New(CodeStorageRead, failure,
 			errors.String("backend", "s3"),
 			errors.String("bucket", bucket),
 			errors.String("key", key),
 			errors.Int("status", resp.StatusCode))
 	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, nil
+	}
 
-	return resp.StatusCode == http.StatusOK, nil
+	lastModified, _ := http.ParseTime(resp.Header.Get("Last-Modified")) //nolint:errcheck // a missing or malformed date yields the zero time
+	return &ObjectInfo{
+		Key:          key,
+		Size:         resp.ContentLength,
+		ContentType:  resp.Header.Get("Content-Type"),
+		ETag:         resp.Header.Get("ETag"),
+		LastModified: lastModified,
+	}, nil
 }
 
 // Copy duplicates an object within S3. Uses get+put for simplicity.
@@ -460,7 +490,11 @@ func (b *S3Backend) Close() error {
 }
 
 // Ensure S3Backend implements URLSigner at compile time.
-var _ URLSigner = (*S3Backend)(nil)
+var (
+	_ Backend   = (*S3Backend)(nil)
+	_ Stater    = (*S3Backend)(nil)
+	_ URLSigner = (*S3Backend)(nil)
+)
 
 // SignedGetURL returns a query-string SigV4 pre-signed URL for downloading an
 // object. Requires AccessKey and SecretKey to be configured.

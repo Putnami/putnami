@@ -48,6 +48,12 @@ data, err := io.ReadAll(obj.Body)
 // Exists — cheap presence check (HEAD on S3).
 ok, err := backend.Exists(ctx, "avatars", "user-123/avatar.png")
 
+// Stat — one object's metadata without its bytes or a list. Fails with
+// storage.not_found when missing, storage.unsupported on a backend that does
+// not implement storage.Stater.
+info, err := storage.Stat(ctx, backend, "avatars", "user-123/avatar.png")
+// info.Size, info.LastModified, info.ETag, info.ContentType
+
 // List — filter + paginate via ListOptions.
 page, err := backend.List(ctx, "avatars", &storage.ListOptions{
     Prefix:    "user-123/",

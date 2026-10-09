@@ -16,17 +16,19 @@ import (
 // wrapper. The backend that Plugin provides is already wrapped. Objects written to
 // buckets that are not registered pass through unconstrained.
 //
-// ConstrainedBackend implements URLSigner. A signed URL is delegated to the
-// wrapped backend when it implements URLSigner, and fails with
-// CodeStorageUnsupported otherwise. All other operations delegate unchanged.
+// ConstrainedBackend implements Stater and URLSigner. Stat and signed URLs are
+// delegated to the wrapped backend when it implements the matching interface,
+// and fail with CodeStorageUnsupported otherwise. All other operations
+// delegate unchanged.
 type ConstrainedBackend struct {
 	Backend
 	registry *Registry
 }
 
-// Ensure ConstrainedBackend implements both interfaces at compile time.
+// Ensure ConstrainedBackend implements every interface at compile time.
 var (
 	_ Backend   = (*ConstrainedBackend)(nil)
+	_ Stater    = (*ConstrainedBackend)(nil)
 	_ URLSigner = (*ConstrainedBackend)(nil)
 )
 
@@ -104,6 +106,11 @@ func (c *ConstrainedBackend) reject(ctx context.Context, bucket, key string, bac
 		err = err.WithAttr(errors.String("cleanupError", derr.Error()))
 	}
 	return err
+}
+
+// Stat delegates to the wrapped backend. Constraints apply to writes only.
+func (c *ConstrainedBackend) Stat(ctx context.Context, bucket, key string) (*ObjectInfo, error) {
+	return Stat(ctx, c.Backend, bucket, key)
 }
 
 // SignedGetURL delegates to the wrapped backend.

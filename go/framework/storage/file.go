@@ -20,6 +20,12 @@ type FileBackend struct {
 	dataDir string
 }
 
+// Ensure FileBackend implements Backend and Stater at compile time.
+var (
+	_ Backend = (*FileBackend)(nil)
+	_ Stater  = (*FileBackend)(nil)
+)
+
 // NewFileBackend creates a filesystem-based storage backend.
 func NewFileBackend(dataDir string) *FileBackend {
 	abs, err := filepath.Abs(dataDir)
@@ -185,20 +191,63 @@ func (b *FileBackend) Get(_ context.Context, bucket, key string) (*GetResult, er
 		ETag:         fmt.Sprintf("%x", info.Size()),
 	}
 
-	// Load metadata if it exists.
-	mp, merr := b.metaPath(bucket, key)
-	if merr == nil {
-		metaBytes, rerr := os.ReadFile(mp) //nolint:gosec // path validated by safePath
-		if rerr == nil {
-			var meta ObjectMetadata
-			if json.Unmarshal(metaBytes, &meta) == nil {
-				result.ContentType = meta.ContentType
-				result.Metadata = meta.Custom
-			}
-		}
+	if meta := b.loadMetadata(bucket, key); meta != nil {
+		result.ContentType = meta.ContentType
+		result.Metadata = meta.Custom
 	}
 
 	return result, nil
+}
+
+// loadMetadata reads an object's metadata file. It returns nil when the object
+// has none or the file cannot be read.
+func (b *FileBackend) loadMetadata(bucket, key string) *ObjectMetadata {
+	mp, err := b.metaPath(bucket, key)
+	if err != nil {
+		return nil
+	}
+	metaBytes, err := os.ReadFile(mp) //nolint:gosec // path validated by safePath
+	if err != nil {
+		return nil
+	}
+	var meta ObjectMetadata
+	if json.Unmarshal(metaBytes, &meta) != nil {
+		return nil
+	}
+	return &meta
+}
+
+// Stat returns the metadata of an object on the filesystem. A directory, a
+// metadata file and a temporary file hold no object, as in List.
+func (b *FileBackend) Stat(_ context.Context, bucket, key string) (*ObjectInfo, error) {
+	if strings.HasSuffix(key, fileMetaSuffix) || strings.HasSuffix(key, fileTempSuffix) {
+		return nil, statNotFound("file", bucket, key)
+	}
+	objPath, err := b.objectPath(bucket, key)
+	if err != nil {
+		return nil, errors.Wrapf(err, CodeStorageRead, "resolve object path", errors.String("op", "stat"))
+	}
+	fi, err := os.Stat(objPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, statNotFound("file", bucket, key)
+		}
+		return nil, errors.Wrap(err, CodeStorageRead, errors.String("backend", "file"), errors.String("op", "stat"))
+	}
+	if fi.IsDir() {
+		return nil, statNotFound("file", bucket, key)
+	}
+
+	info := &ObjectInfo{
+		Key:          key,
+		Size:         fi.Size(),
+		ETag:         fmt.Sprintf("%x", fi.Size()),
+		LastModified: fi.ModTime(),
+	}
+	if meta := b.loadMetadata(bucket, key); meta != nil {
+		info.ContentType = meta.ContentType
+	}
+	return info, nil
 }
 
 // Delete removes an object from the filesystem.

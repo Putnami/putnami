@@ -70,6 +70,28 @@ type Backend interface {
 }
 ```
 
+### Reading one object's metadata
+
+`storage.Stat` reads one object's size, write time, ETag and content type
+without its bytes and without listing its prefix. A missing key fails with
+`storage.not_found`:
+
+```go
+info, err := storage.Stat(ctx, backend, "avatars", "user-123/avatar.png")
+if errors.Is(err, storage.CodeStorageNotFound) {
+    // not found
+}
+// info.Size, info.LastModified, info.ETag, info.ContentType
+```
+
+It costs one lookup: a map read in memory, `os.Stat` on the filesystem,
+`HeadObject` on S3, and one object metadata read on GCS, which bills as a
+Class B operation where a list bills as Class A. `Stat` is the optional
+`Stater` interface rather than a `Backend` method, so a backend you write
+yourself keeps compiling. Every backend this package provides implements it,
+and the constrained and binding backends forward it. On a backend without it,
+`storage.Stat` fails with `storage.unsupported`.
+
 ## Memory Backend
 
 In-memory backend for testing:

@@ -327,9 +327,10 @@ type bindingBackend struct {
 	backends []Backend // distinct underlying backends, for Close
 }
 
-// Ensure bindingBackend implements both interfaces at compile time.
+// Ensure bindingBackend implements every interface at compile time.
 var (
 	_ Backend   = (*bindingBackend)(nil)
+	_ Stater    = (*bindingBackend)(nil)
 	_ URLSigner = (*bindingBackend)(nil)
 )
 
@@ -388,6 +389,21 @@ func (b *bindingBackend) Exists(ctx context.Context, bucket, key string) (bool, 
 		return false, err
 	}
 	return t.backend.Exists(ctx, t.bucket, t.prefix+key)
+}
+
+// Stat delegates to the bound backend under the provider bucket and prefixed
+// key, then restores the logical key on the result. It fails with
+// CodeStorageUnsupported when the bound backend does not implement Stater.
+func (b *bindingBackend) Stat(ctx context.Context, bucket, key string) (*ObjectInfo, error) {
+	t, err := b.resolve(bucket)
+	if err != nil {
+		return nil, err
+	}
+	res, err := Stat(ctx, t.backend, t.bucket, t.prefix+key)
+	if res != nil && t.prefix != "" {
+		res.Key = strings.TrimPrefix(res.Key, t.prefix)
+	}
+	return res, err
 }
 
 // Copy delegates to the bound backend, prefixing both source and destination.

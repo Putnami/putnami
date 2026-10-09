@@ -25,6 +25,12 @@ type MemoryBackend struct {
 	buckets map[string]map[string]*memoryObject
 }
 
+// Ensure MemoryBackend implements Backend and Stater at compile time.
+var (
+	_ Backend = (*MemoryBackend)(nil)
+	_ Stater  = (*MemoryBackend)(nil)
+)
+
 // NewMemoryBackend creates a new in-memory storage backend.
 func NewMemoryBackend() *MemoryBackend {
 	return &MemoryBackend{
@@ -188,6 +194,27 @@ func (b *MemoryBackend) Exists(_ context.Context, bucket, key string) (bool, err
 		return ok, nil
 	}
 	return false, nil
+}
+
+// Stat returns the metadata of an object in memory.
+func (b *MemoryBackend) Stat(_ context.Context, bucket, key string) (*ObjectInfo, error) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	obj, ok := b.buckets[bucket][key]
+	if !ok {
+		return nil, statNotFound("memory", bucket, key)
+	}
+	info := &ObjectInfo{
+		Key:          key,
+		Size:         int64(len(obj.data)),
+		ETag:         fmt.Sprintf("%x", len(obj.data)),
+		LastModified: obj.lastModified,
+	}
+	if obj.metadata != nil {
+		info.ContentType = obj.metadata.ContentType
+	}
+	return info, nil
 }
 
 // Copy duplicates an object within the same bucket in memory.
