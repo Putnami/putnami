@@ -6,6 +6,7 @@ import {
   EVENT_TYPES_V2,
   hasEventErrors,
   isKnownProtocolVersion,
+  isValidReadyEndpoint,
   JobEventEmitter,
   MAX_KNOWN_PROTOCOL_VERSION,
   negotiatedRuntimeEventVersion,
@@ -351,6 +352,19 @@ describe('runtime event protocol v2', () => {
     >[0];
     const diags = validateReadyData(malformed);
     expect(diags.some((d) => d.code === 'invalid-type' && d.field === 'data.endpoints')).toBe(true);
+  });
+
+  it('accepts only an endpoint the Go validator accepts', () => {
+    const endpoint = (port: number): ReadyEndpoint => ({ scheme: 'http', host: 'localhost', port });
+    expect(isValidReadyEndpoint(endpoint(8080))).toBe(true);
+    expect(isValidReadyEndpoint({ ...endpoint(443), path: '/api' })).toBe(true);
+    // Go decodes the port into an int: a fractional or NaN port is a payload
+    // Go rejects, so the TypeScript twin must reject it too.
+    for (const port of [0, 70_000, 8080.5, Number.NaN]) {
+      expect(isValidReadyEndpoint(endpoint(port))).toBe(false);
+    }
+    expect(isValidReadyEndpoint({ ...endpoint(80), path: 'api' })).toBe(false);
+    expect(isValidReadyEndpoint({ scheme: 'amqp', host: 'h', port: 5672 } as unknown as ReadyEndpoint)).toBe(false);
   });
 
   describe('reserved readiness log marker', () => {

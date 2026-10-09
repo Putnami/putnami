@@ -48,7 +48,8 @@ Planning refuses, before anything starts:
 5. Members start in topological order, dependencies first, target last. Each
    member starts only after the one before it emitted the runtime protocol's
    typed `ready` event (v2, target `server` or `workload`). The proxy forwards to
-   the port of the event's first endpoint.
+   the port of the event's first `http` or `https` endpoint, else of its first
+   endpoint.
 
 Readiness is never inferred from a log line or a TCP poll. A member that exits
 before its ready event fails the composition at once (`compose.member_exited`);

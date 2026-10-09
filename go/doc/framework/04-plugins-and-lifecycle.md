@@ -214,7 +214,9 @@ waits a bounded interval for cooperative starters to drain.
 without an error, `Start` calls `StartupCompleted` on every `StartupObserver`,
 then logs `🤖 ready`. That record carries a runtime-protocol `workload`
 readiness claim under the reserved `putnami.ready` key, with the endpoints every
-`EndpointReporter` bound (the HTTP server reports its listener). The platform
+`EndpointReporter` bound (the HTTP server reports its listener). An endpoint
+the runtime protocol rejects, such as port 0, is dropped with a warning rather
+than voiding the claim. The platform
 plugin is a `StartupObserver`: its `/readyz` answers ready only from then on. A
 starter or hook that is still running delays both, and a failed or timed-out
 start does neither.

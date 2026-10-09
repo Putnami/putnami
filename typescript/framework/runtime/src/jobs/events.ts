@@ -329,7 +329,7 @@ export function validateReadyData(data: ReadyData): EventDiagnostic[] {
     if (!endpoint.host) {
       err('required-field', field('host'), 'endpoint requires a host');
     }
-    if (typeof endpoint.port !== 'number' || endpoint.port < 1 || endpoint.port > MAX_PORT) {
+    if (!Number.isInteger(endpoint.port) || endpoint.port < 1 || endpoint.port > MAX_PORT) {
       err('invalid-value', field('port'), `endpoint port ${endpoint.port} out of range [1,${MAX_PORT}]`);
     }
     if (endpoint.path && !endpoint.path.startsWith('/')) {

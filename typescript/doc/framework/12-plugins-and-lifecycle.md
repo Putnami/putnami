@@ -120,7 +120,9 @@ Every plugin `start()` runs in parallel. Once all of them resolved, the
 application calls `startupCompleted()` on every plugin, in plugin order, then
 logs `🤖 ready`. That record carries a runtime-protocol `workload` readiness
 claim under the reserved `putnami.ready` key, with the endpoints every plugin
-reports from `readyEndpoints()` (the HTTP plugin reports its listener). The
+reports from `readyEndpoints()` (the HTTP plugin reports its listener). An
+endpoint the runtime protocol rejects, such as port 0, is dropped with a
+warning rather than voiding the claim. The
 platform plugin implements `startupCompleted()`: its `/readyz` answers ready
 only from then on. A `start()` that is still pending delays both, and a
 `start()` that rejects means neither happens. `startupCompleted()` must not
