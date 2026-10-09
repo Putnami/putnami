@@ -5,12 +5,14 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 
 	"go.putnami.dev/errors"
 )
@@ -70,6 +72,19 @@ const fileMetaSuffix = ".meta.json"
 // temporary file never appears as an object.
 const fileTempSuffix = ".putnami-tmp"
 
+// reservedSuffix returns the reserved suffix that ends a path segment of key,
+// compared without regard to case, or "" when no segment ends with one.
+func reservedSuffix(key string) string {
+	for _, segment := range strings.Split(strings.ToLower(key), "/") {
+		for _, suffix := range []string{fileMetaSuffix, fileTempSuffix} {
+			if strings.HasSuffix(segment, suffix) {
+				return suffix
+			}
+		}
+	}
+	return ""
+}
+
 // Put stores an object on the filesystem. It streams data into a temporary
 // file in the object's directory and renames it over the object path only
 // after the whole body is written, so a failing reader leaves any existing
@@ -81,15 +96,10 @@ const fileTempSuffix = ".putnami-tmp"
 // names for metadata and temporary files, and a directory with such a name
 // would block the metadata or temporary file of another key.
 func (b *FileBackend) Put(_ context.Context, bucket, key string, data io.Reader, meta *ObjectMetadata) (*PutResult, error) {
-	for _, segment := range strings.Split(strings.ToLower(key), "/") {
-		for _, suffix := range []string{fileMetaSuffix, fileTempSuffix} {
-			if !strings.HasSuffix(segment, suffix) {
-				continue
-			}
-			return nil, errors.New(CodeStorageWrite, "key has a path segment with a suffix the file backend reserves",
-				errors.String("backend", "file"), errors.String("bucket", bucket),
-				errors.String("key", key), errors.String("suffix", suffix))
-		}
+	if suffix := reservedSuffix(key); suffix != "" {
+		return nil, errors.New(CodeStorageWrite, "key has a path segment with a suffix the file backend reserves",
+			errors.String("backend", "file"), errors.String("bucket", bucket),
+			errors.String("key", key), errors.String("suffix", suffix))
 	}
 	objPath, err := b.objectPath(bucket, key)
 	if err != nil {
@@ -218,9 +228,10 @@ func (b *FileBackend) loadMetadata(bucket, key string) *ObjectMetadata {
 }
 
 // Stat returns the metadata of an object on the filesystem. A directory, a
-// metadata file and a temporary file hold no object, as in List.
+// path below an object, and a key Put would reject for a reserved suffix hold
+// no object.
 func (b *FileBackend) Stat(_ context.Context, bucket, key string) (*ObjectInfo, error) {
-	if strings.HasSuffix(key, fileMetaSuffix) || strings.HasSuffix(key, fileTempSuffix) {
+	if reservedSuffix(key) != "" {
 		return nil, statNotFound("file", bucket, key)
 	}
 	objPath, err := b.objectPath(bucket, key)
@@ -229,7 +240,8 @@ func (b *FileBackend) Stat(_ context.Context, bucket, key string) (*ObjectInfo, 
 	}
 	fi, err := os.Stat(objPath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		// ENOTDIR: a parent segment of key is an object, so key holds none.
+		if os.IsNotExist(err) || stderrors.Is(err, syscall.ENOTDIR) {
 			return nil, statNotFound("file", bucket, key)
 		}
 		return nil, errors.Wrap(err, CodeStorageRead, errors.String("backend", "file"), errors.String("op", "stat"))

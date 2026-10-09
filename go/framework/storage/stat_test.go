@@ -66,8 +66,9 @@ func TestFileBackendStat(t *testing.T) {
 		t.Errorf("Stat = %+v", info)
 	}
 
-	// A missing key, a directory and the metadata file hold no object.
-	for _, key := range []string{"dir/missing.txt", "dir", "dir/a.txt" + fileMetaSuffix} {
+	// A missing key, a directory, a path below an object and a metadata file,
+	// in any case, hold no object.
+	for _, key := range []string{"dir/missing.txt", "dir", "dir/a.txt/below", "dir/a.txt" + fileMetaSuffix, "dir/a.txt.META.JSON"} {
 		info, err := b.Stat(ctx, "bucket", key)
 		assertStatNotFound(t, info, err)
 	}
@@ -92,6 +93,9 @@ func TestS3BackendStat(t *testing.T) {
 			w.Header().Set("Last-Modified", modified.Format(http.TimeFormat))
 		case "/bucket/denied.txt":
 			w.WriteHeader(http.StatusForbidden)
+		case "/bucket/moved.txt":
+			// A wrong-region endpoint answers 301 without a Location header.
+			w.WriteHeader(http.StatusMovedPermanently)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -112,9 +116,11 @@ func TestS3BackendStat(t *testing.T) {
 	info, err = b.Stat(ctx, "bucket", "missing.txt")
 	assertStatNotFound(t, info, err)
 
-	_, err = b.Stat(ctx, "bucket", "denied.txt")
-	if !errors.Is(err, CodeStorageRead) {
-		t.Errorf("Stat(403) error code = %q, want %q", errors.GetCode(err), CodeStorageRead)
+	for _, key := range []string{"denied.txt", "moved.txt"} {
+		_, err = b.Stat(ctx, "bucket", key)
+		if !errors.Is(err, CodeStorageRead) {
+			t.Errorf("Stat(%s) error code = %q, want %q", key, errors.GetCode(err), CodeStorageRead)
+		}
 	}
 
 	mu.Lock()
@@ -142,19 +148,22 @@ func TestGCSBackendStat(t *testing.T) {
 		t.Errorf("Stat = %+v", info)
 	}
 
-	// One metadata read: a GET on the object resource, without media and
-	// without a list of the bucket.
-	served := f.served()
-	if len(served) != 1 {
-		t.Fatalf("Stat sent %d requests %v, want 1", len(served), served)
-	}
-	if !strings.HasPrefix(served[0], "GET ") || !strings.Contains(served[0], "/o/dir%2Fa.txt?") ||
-		strings.Contains(served[0], "alt=media") {
-		t.Errorf("Stat request = %q, want one object metadata GET", served[0])
-	}
-
 	info, err = b.Stat(ctx, "bucket", "dir/missing.txt")
 	assertStatNotFound(t, info, err)
+
+	// Each Stat is one metadata read: a GET on the object resource, without
+	// media and without a list of the bucket, whether the key holds an object
+	// or not.
+	served := f.served()
+	if len(served) != 2 {
+		t.Fatalf("two Stat calls sent %d requests %v, want 2", len(served), served)
+	}
+	for i, object := range []string{"dir%2Fa.txt", "dir%2Fmissing.txt"} {
+		if !strings.HasPrefix(served[i], "GET ") || !strings.Contains(served[i], "/o/"+object+"?") ||
+			strings.Contains(served[i], "alt=media") {
+			t.Errorf("Stat request %d = %q, want one metadata GET of %s", i, served[i], object)
+		}
+	}
 
 	f.setFail()
 	_, err = b.Stat(ctx, "bucket", "dir/a.txt")

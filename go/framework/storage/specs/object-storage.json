@@ -17,7 +17,7 @@
   "requirements": [
     {
       "id": "backend-contract",
-      "text": "Backends implement put, get, delete, list, exists, copy, and close consistently; a missing Get returns no object and no fabricated content; every provided backend reads one object's metadata with Stat in a single lookup that never lists its prefix, and a missing key fails as not found; a Put whose body reader fails commits nothing and leaves any existing object intact."
+      "text": "Backends implement put, get, delete, list, exists, copy, and close consistently; a missing Get returns no object and no fabricated content; every provided backend reads one object's metadata with Stat without listing its prefix, and a missing key fails as not found; a Put whose body reader fails commits nothing and leaves any existing object intact."
     },
     {
       "id": "isolation",

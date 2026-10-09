@@ -36,9 +36,10 @@ if errors.Is(err, storage.CodeStorageNotFound) {
 // info.Size, info.LastModified, info.ETag, info.ContentType
 ```
 
-It costs one lookup: a map read in memory, `os.Stat` on the filesystem,
-`HeadObject` on S3, and one object metadata read on GCS, which bills as a
-Class B operation where a list bills as Class A. `Stat` is the optional
+It never lists: it reads the object's entry in memory, the object file and
+its metadata file on the filesystem, sends one `HeadObject` on S3, and one
+object metadata read on GCS, which bills as a Class B operation where a list
+bills as Class A. `Stat` is the optional
 `Stater` interface rather than a `Backend` method, so a backend you write
 yourself keeps compiling. Every backend this package provides implements it,
 and the constrained and binding backends forward it. On a backend without it,

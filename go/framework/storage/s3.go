@@ -393,40 +393,47 @@ func (b *S3Backend) List(ctx context.Context, bucket string, opts *ListOptions) 
 
 // Exists checks whether an object exists in S3 using a HEAD request.
 func (b *S3Backend) Exists(ctx context.Context, bucket, key string) (bool, error) {
-	info, err := b.head(ctx, bucket, key, "exists check failed")
+	info, _, err := b.head(ctx, bucket, key, "exists check failed")
 	return info != nil, err
 }
 
 // Stat returns the metadata of an object in S3 with one HEAD request
-// (HeadObject).
+// (HeadObject). A status other than 200 and 404, such as the 301 of a
+// wrong-region endpoint, is an error rather than an absent object.
 func (b *S3Backend) Stat(ctx context.Context, bucket, key string) (*ObjectInfo, error) {
-	info, err := b.head(ctx, bucket, key, "stat failed")
+	info, status, err := b.head(ctx, bucket, key, "stat failed")
 	if err != nil {
 		return nil, err
 	}
-	if info == nil {
+	if status == http.StatusNotFound {
 		return nil, statNotFound("s3", bucket, key)
+	}
+	if info == nil {
+		return nil, errors.New(CodeStorageRead, "stat failed",
+			errors.String("backend", "s3"), errors.String("bucket", bucket),
+			errors.String("key", key), errors.Int("status", status))
 	}
 	return info, nil
 }
 
-// head sends one HEAD request for an object. It returns nil and no error when
-// the object is absent.
-func (b *S3Backend) head(ctx context.Context, bucket, key, failure string) (_ *ObjectInfo, retErr error) {
+// head sends one HEAD request for an object and returns its status. It returns
+// object information only for a 200, and an error for a status of 400 or more
+// other than 404.
+func (b *S3Backend) head(ctx context.Context, bucket, key, failure string) (_ *ObjectInfo, status int, retErr error) {
 	ctx, cancel := ctxutil.WithRequestTimeout(ctx, b.config.RequestTimeout)
 	defer cancel()
 
 	url := b.objectURL(bucket, key)
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, CodeStorageRequest, errors.String("backend", "s3"), errors.String("method", "HEAD"))
+		return nil, 0, errors.Wrap(err, CodeStorageRequest, errors.String("backend", "s3"), errors.String("method", "HEAD"))
 	}
 
 	b.signRequest(req, sha256Hex(nil))
 
 	resp, err := b.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, CodeStorageRead, errors.String("backend", "s3"), errors.String("bucket", bucket), errors.String("key", key))
+		return nil, 0, errors.Wrap(err, CodeStorageRead, errors.String("backend", "s3"), errors.String("bucket", bucket), errors.String("key", key))
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil && retErr == nil {
@@ -435,21 +442,21 @@ func (b *S3Backend) head(ctx context.Context, bucket, key, failure string) (_ *O
 	}()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, nil
+		return nil, resp.StatusCode, nil
 	}
 	if resp.StatusCode >= 400 {
 		// Surface 403 (missing s3:HeadObject grant / policy deny) and transient
 		// 5xx as errors instead of collapsing them to "absent". A false-negative
 		// existence check drives create/overwrite decisions and is a
 		// data-integrity risk; this mirrors Get/Delete and GCSBackend.Exists.
-		return nil, errors.New(CodeStorageRead, failure,
+		return nil, resp.StatusCode, errors.New(CodeStorageRead, failure,
 			errors.String("backend", "s3"),
 			errors.String("bucket", bucket),
 			errors.String("key", key),
 			errors.Int("status", resp.StatusCode))
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil
+		return nil, resp.StatusCode, nil
 	}
 
 	lastModified, _ := http.ParseTime(resp.Header.Get("Last-Modified")) //nolint:errcheck // a missing or malformed date yields the zero time
@@ -459,7 +466,7 @@ func (b *S3Backend) head(ctx context.Context, bucket, key, failure string) (_ *O
 		ContentType:  resp.Header.Get("Content-Type"),
 		ETag:         resp.Header.Get("ETag"),
 		LastModified: lastModified,
-	}, nil
+	}, resp.StatusCode, nil
 }
 
 // Copy duplicates an object within S3. Uses get+put for simplicity.
