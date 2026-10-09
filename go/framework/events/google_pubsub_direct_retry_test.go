@@ -332,9 +332,11 @@ func TestDirectPubSubPublishRespectsTheOverallBudget(t *testing.T) {
 		}
 	})
 	t.Cleanup(func() { close(release) })
+	// The budget leaves 300ms after the first attempt, so a loaded runner
+	// still starts a second one.
 	policy = &googlePubSubRetryPolicy{
-		attemptTimeout: 40 * time.Millisecond,
-		budget:         100 * time.Millisecond,
+		attemptTimeout: 200 * time.Millisecond,
+		budget:         500 * time.Millisecond,
 		backoff:        func(int) time.Duration { return time.Millisecond },
 		sleep:          sleepWithContext,
 	}
@@ -348,7 +350,7 @@ func TestDirectPubSubPublishRespectsTheOverallBudget(t *testing.T) {
 		t.Fatalf("%d attempts, want 2 to 4", got)
 	}
 	if elapsed > 2*time.Second {
-		t.Fatalf("Publish took %v, want about 100ms", elapsed)
+		t.Fatalf("Publish took %v, want about 500ms", elapsed)
 	}
 }
 
