@@ -6,7 +6,8 @@ package treecmd
 // evidence files. Only the two producers are synthetic: the tree fingerprint is
 // the injected Verifier.Fingerprint, and the native plan is the injected
 // Verifier.Plan, or, for the cases that exercise the default plan, a fake
-// ./putnamiw script that prints .context/plan.json.
+// ./putnamiw script that prints .context/plan.json or
+// .context/plan-fix-false.json.
 
 import (
 	"bytes"
@@ -38,11 +39,16 @@ const (
 )
 
 // fxPutnamiw answers the native plan only: it records its arguments, prints
-// .context/plan.json and exits with the code in .context/plan-exit, 0 when
-// that file is absent.
+// .context/plan-fix-false.json when it receives --fix=false and that file
+// exists, .context/plan.json otherwise, and exits with the code in
+// .context/plan-exit, 0 when that file is absent.
 const fxPutnamiw = `#!/bin/sh
 printf '%s\n' "$@" > .context/plan-args
-cat .context/plan.json
+plan=.context/plan.json
+for arg in "$@"; do
+  if [ "$arg" = --fix=false ] && [ -f .context/plan-fix-false.json ]; then plan=.context/plan-fix-false.json; fi
+done
+cat "$plan"
 code=0
 if [ -f .context/plan-exit ]; then code=$(cat .context/plan-exit); fi
 exit "$code"
@@ -69,8 +75,12 @@ type verifyFixture struct {
 	report  fxObj
 	qualify fxObj
 	plan    fxObj
-	// planCommands and planBaseline are the request the native plan expects.
+	// fixFalsePlan is the native plan with --fix=false; nil when it is plan.
+	fixFalsePlan fxObj
+	// planCommands, planFlags and planBaseline are the request the native plan
+	// expects.
 	planCommands []string
+	planFlags    []string
 	planBaseline string
 	// cliPlan leaves Verifier.Plan nil, so the fake ./putnamiw answers.
 	cliPlan bool
@@ -171,6 +181,7 @@ func newVerifyFixture(t *testing.T) *verifyFixture {
 		"plan": fxObj{"dryRun": true, "tasks": fxArr{}}}
 	f.planFromSession()
 	f.planCommands = slices.Clone(fxCommands)
+	f.planFlags = []string{"--enforce-coverage"}
 	f.planBaseline = f.head
 	f.writePlan()
 	f.report = fxObj{"protocolVersion": 2, "sessionId": "synthetic-gate", "startTime": fxStart, "endTime": fxEnd,
@@ -316,6 +327,47 @@ func (f *verifyFixture) planFromSession() {
 func (f *verifyFixture) writePlan() {
 	f.t.Helper()
 	f.write(".context/plan.json", f.plan)
+	if f.fixFalsePlan != nil {
+		f.write(".context/plan-fix-false.json", f.fixFalsePlan)
+	}
+}
+
+// checkOnlyLint models a lint pipeline that --fix selects: the gate ran
+// /application:lint~check-only, the native plan holds lint~check and
+// lint~format instead, and the native plan with --fix=false holds
+// lint~check-only.
+func (f *verifyFixture) checkOnlyLint() {
+	f.t.Helper()
+	lintTask := func(name string) fxObj {
+		task := f.task("lint")
+		identity := task["identity"].(fxObj)
+		identity["key"] = "/application:" + name
+		identity["task"].(fxObj)["name"] = name
+		return task
+	}
+	tasks := fxArr{}
+	for _, task := range fxArrAt(f.session, "tasks") {
+		if fxAt(task, "identity", "task", "command") == "lint" {
+			task = lintTask("lint~check-only")
+		}
+		tasks = append(tasks, task)
+	}
+	f.session["tasks"] = tasks
+	f.planFromSession()
+	f.fixFalsePlan = fxClone(f.plan).(fxObj)
+	planned := fxArr{}
+	for _, task := range fxArrAt(f.plan, "plan", "tasks") {
+		if fxAt(task, "identity", "key") == "/application:lint~check-only" {
+			for _, name := range []string{"lint~check", "lint~format"} {
+				planned = append(planned, fxObj{"identity": lintTask(name)["identity"]})
+			}
+			continue
+		}
+		planned = append(planned, task)
+	}
+	fxObjAt(f.plan, "plan")["tasks"] = planned
+	f.writePlan()
+	f.bindProducers()
 }
 
 // refreshPolicies rebinds every recorded policy reference to its current bytes.
@@ -326,6 +378,19 @@ func (f *verifyFixture) refreshPolicies() {
 		policies = append(policies, f.reference(fxAt(item, "path").(string)))
 	}
 	f.record["policies"] = policies
+}
+
+// setPolicyFlags replaces the flags of the fixture CI policy and binds the
+// dossier to the changed policy file.
+func (f *verifyFixture) setPolicyFlags(flags ...string) {
+	f.t.Helper()
+	policy := f.readJSON("putnami.ci.json")
+	policy["flags"] = fxStrings(flags)
+	f.write("putnami.ci.json", policy)
+	f.refreshPolicies()
+	f.record["changedFiles"] = fxArr{"app.txt", "putnami.ci.json"}
+	fxAppend(fxObjAt(f.record, "review"), "coverage", fxObj{"path": "putnami.ci.json", "status": "reviewed",
+		"reason": "Synthetic CI policy flags."})
 }
 
 // useCLIPlan leaves the native plan to the default Plan, which runs the fake
@@ -354,23 +419,30 @@ func (f *verifyFixture) fakeFingerprint(string) (string, error) {
 	return fxTree, nil
 }
 
-func (f *verifyFixture) fakePlan(_ string, commands []string, baseSHA string) ([]string, error) {
+func (f *verifyFixture) fakePlan(_ string, commands, flags []string, baseSHA string) ([]string, error) {
 	if got, want := slices.Sorted(slices.Values(commands)), slices.Sorted(slices.Values(f.planCommands)); !slices.Equal(got, want) {
 		f.t.Errorf("plan commands = %v, want the set %v", commands, f.planCommands)
+	}
+	if !slices.Equal(flags, f.planFlags) {
+		f.t.Errorf("plan flags = %q, want %q", flags, f.planFlags)
 	}
 	if baseSHA != f.planBaseline {
 		f.t.Errorf("plan baseline = %q, want %q", baseSHA, f.planBaseline)
 	}
+	plan := f.plan
+	if f.fixFalsePlan != nil && slices.Contains(flags, "--fix=false") {
+		plan = f.fixFalsePlan
+	}
 	keys := []string{}
-	for _, task := range fxArrAt(f.plan, "plan", "tasks") {
+	for _, task := range fxArrAt(plan, "plan", "tasks") {
 		keys = append(keys, fxAt(task, "identity", "key").(string))
 	}
 	return keys, nil
 }
 
 // checkCLIPlanRequest checks the arguments the fake ./putnamiw received: the
-// required commands, the native impacted plan against the base SHA, JSON
-// output, and no --projects narrowing.
+// required commands, then exactly --impacted --baseline <base SHA>, the plan
+// flags, --plan and --output=json.
 func (f *verifyFixture) checkCLIPlanRequest() {
 	f.t.Helper()
 	data, err := os.ReadFile(filepath.Join(f.root, ".context", "plan-args"))
@@ -379,14 +451,10 @@ func (f *verifyFixture) checkCLIPlanRequest() {
 		return
 	}
 	args := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
-	baseline := slices.Index(args, "--baseline")
-	switch {
-	case len(args) != 6,
-		!slices.Equal(slices.Sorted(slices.Values(strings.Split(args[0], ","))), slices.Sorted(slices.Values(f.planCommands))),
-		!slices.Contains(args, "--impacted"), !slices.Contains(args, "--plan"), !slices.Contains(args, "--output=json"),
-		baseline < 0 || baseline+1 >= len(args) || args[baseline+1] != f.planBaseline,
-		slices.ContainsFunc(args, func(arg string) bool { return strings.HasPrefix(arg, "--projects") }):
-		f.t.Errorf("plan request = %q, want %v --impacted --baseline %s --plan --output=json", args, f.planCommands, f.planBaseline)
+	want := slices.Concat([]string{"--impacted", "--baseline", f.planBaseline}, f.planFlags, []string{"--plan", "--output=json"})
+	if !slices.Equal(slices.Sorted(slices.Values(strings.Split(args[0], ","))), slices.Sorted(slices.Values(f.planCommands))) ||
+		!slices.Equal(args[1:], want) {
+		f.t.Errorf("plan request = %q, want %v %q", args, f.planCommands, want)
 	}
 }
 
@@ -499,6 +567,9 @@ func (f *verifyFixture) gate(reason string, options fxFingerprint) {
 	f.resetFingerprint(options)
 	f.bindProducers()
 	result := f.invoke("--gate", ".context/session.json", "--report", ".context/report.json", "--base", f.head)
+	if f.cliPlan {
+		f.checkCLIPlanRequest()
+	}
 	f.expect(result, reason, "gate reusable")
 	if reason == "" && result.value["gateSession"] != "synthetic-gate" {
 		f.t.Fatalf("gateSession = %v, want synthetic-gate", result.value["gateSession"])
@@ -788,7 +859,59 @@ func TestVerifierRecord(t *testing.T) {
 			fxObjAt(f.session, "run", "counts")["succeeded"] = true
 			f.bindProducers()
 		}},
+		{name: "a --fix=false policy is proved by a gate report with fix false", setup: func(_ *testing.T, f *verifyFixture) {
+			f.setPolicyFlags("--enforce-coverage", "--fix=false")
+			f.planFlags = []string{"--enforce-coverage", "--fix=false"}
+			f.report["fix"] = false
+			f.bindProducers()
+		}},
+		{name: "a --fix=false gate covers the native plan computed with --fix=false", setup: func(_ *testing.T, f *verifyFixture) {
+			f.setPolicyFlags("--enforce-coverage", "--fix=false")
+			f.planFlags = []string{"--enforce-coverage", "--fix=false"}
+			f.report["fix"] = false
+			f.checkOnlyLint()
+		}},
+		{name: "the default plan passes the policy's --fix=false to the workspace CLI", setup: func(t *testing.T, f *verifyFixture) {
+			f.useCLIPlan(t)
+			f.setPolicyFlags("--fix=false", "--enforce-coverage")
+			f.planFlags = []string{"--fix=false", "--enforce-coverage"}
+			f.report["fix"] = false
+			f.checkOnlyLint()
+		}},
+		{name: "without --fix=false in the policy the native plan keeps the fixing lint tasks", reason: "narrower",
+			setup: func(t *testing.T, f *verifyFixture) {
+				f.useCLIPlan(t)
+				f.report["fix"] = false
+				f.checkOnlyLint()
+			}},
+		{name: "a --fix=false policy is not proved by a report without fix", reason: "^CI flag --fix=false not proved by the gate report$",
+			setup: func(_ *testing.T, f *verifyFixture) {
+				f.setPolicyFlags("--enforce-coverage", "--fix=false")
+			}},
+		{name: "a --fix=false policy is not proved by a gate that fixed", reason: "--fix=false not proved", setup: func(_ *testing.T, f *verifyFixture) {
+			f.setPolicyFlags("--enforce-coverage", "--fix=false")
+			f.report["fix"] = true
+			f.bindProducers()
+		}},
+		{name: "a --fix=false policy is not proved by a string fix", reason: "--fix=false not proved", setup: func(_ *testing.T, f *verifyFixture) {
+			f.setPolicyFlags("--enforce-coverage", "--fix=false")
+			f.report["fix"] = "false"
+			f.bindProducers()
+		}},
+		{name: "a --fix=true policy is rejected", reason: "^CI flags require evidence this verifier does not support$",
+			setup: func(_ *testing.T, f *verifyFixture) {
+				f.setPolicyFlags("--enforce-coverage", "--fix=true")
+				f.report["fix"] = true
+				f.bindProducers()
+			}},
+		{name: "a bare --fix policy is rejected", reason: "^CI flags require evidence this verifier does not support$",
+			setup: func(_ *testing.T, f *verifyFixture) {
+				f.setPolicyFlags("--enforce-coverage", "--fix")
+				f.report["fix"] = true
+				f.bindProducers()
+			}},
 		{name: "CI policy may omit optional flags", setup: func(_ *testing.T, f *verifyFixture) {
+			f.planFlags = nil
 			policy := f.readJSON("putnami.ci.json")
 			delete(policy, "flags")
 			f.write("putnami.ci.json", policy)
@@ -949,6 +1072,7 @@ func TestVerifierGate(t *testing.T) {
 			fxDropCommands(f.session, "validate-workspace")
 			f.planFromSession()
 			f.planCommands = []string{"lint", "test", "build", "validate"}
+			f.planFlags = nil
 			f.writePlan()
 		}},
 		{name: "without a CI policy a gate missing a finalizer command is refused", reason: "gate lacks required commands", setup: func(f *verifyFixture) {
@@ -959,6 +1083,32 @@ func TestVerifierGate(t *testing.T) {
 			f.write("putnami.ci.json", fxObj{"version": 3, "commands": fxArr{"test"}, "flags": fxArr{"--enforce-coverage"}})
 			fxDropCommands(f.session, "lint", "build", "validate", "validate-workspace")
 		}},
+		{name: "finalizer reuses a gate whose report proves the policy's --fix=false", setup: func(f *verifyFixture) {
+			f.setPolicyFlags("--enforce-coverage", "--continue-on-error", "--fix=false")
+			f.planFlags = []string{"--enforce-coverage", "--fix=false"}
+			f.report["fix"] = false
+		}},
+		{name: "finalizer reuses a --fix=false gate that ran check-only lint", setup: func(f *verifyFixture) {
+			f.useCLIPlan(f.t)
+			f.setPolicyFlags("--fix=false", "--continue-on-error", "--enforce-coverage")
+			f.planFlags = []string{"--fix=false", "--enforce-coverage"}
+			f.report["fix"] = false
+			f.checkOnlyLint()
+		}},
+		{name: "finalizer refuses a check-only lint gate when the policy lacks --fix=false", reason: "narrower",
+			setup: func(f *verifyFixture) {
+				f.report["fix"] = false
+				f.checkOnlyLint()
+			}},
+		{name: "finalizer refuses a gate whose report does not prove the policy's --fix=false",
+			reason: "^CI flag --fix=false not proved by the gate report$", setup: func(f *verifyFixture) {
+				f.setPolicyFlags("--enforce-coverage", "--fix=false")
+			}},
+		{name: "finalizer refuses a --fix=true policy", reason: "^CI flags require evidence this verifier does not support$",
+			setup: func(f *verifyFixture) {
+				f.setPolicyFlags("--enforce-coverage", "--fix=true")
+				f.report["fix"] = true
+			}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

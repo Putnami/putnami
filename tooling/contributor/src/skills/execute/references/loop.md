@@ -131,8 +131,9 @@ the pushed commit, and returns the proposal to draft when one fails. It can
 wait up to `verification.ciGate.timeoutMinutes`, so run it in the background
 where the host bounds a command's duration; invoking it again keeps waiting.
 Otherwise run the final gate with
-`--impacted --baseline <baseSHA> --enforce-coverage`, or the broader all-project
-selection. `validate` includes its manifest-declared `validate-workspace`
+`--impacted --baseline <baseSHA> --enforce-coverage`, plus `--fix=false` when
+the policy's `flags` list it, or the broader all-project selection with the
+same flags. `validate` includes its manifest-declared `validate-workspace`
 companion; spelling both does not add coverage. Do not infer missing checks
 from the shorter command list. Unsupported custom required policy needs an
 explicit implementation before the local verifier can claim it.

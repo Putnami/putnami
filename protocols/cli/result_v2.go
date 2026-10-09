@@ -1675,6 +1675,11 @@ type ReportFile struct {
 	// longitudinal consumer whether a green verdict actually means the thresholds
 	// held.
 	EnforceCoverage bool `json:"enforceCoverage"`
+	// Fix is the run's explicit --fix value: false for --fix=false or --no-fix,
+	// true for --fix or --fix=true. It is absent when the run was not given the
+	// flag or gave it any other value. False states that lint reported findings
+	// instead of rewriting files.
+	Fix *bool `json:"fix,omitempty"`
 	// Git is the repository state the run was produced against, absent outside a
 	// git worktree.
 	Git *ReportGit `json:"git,omitempty"`

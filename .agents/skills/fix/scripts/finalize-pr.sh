@@ -41,6 +41,8 @@ The helper is resumable: if the branch is already committed or its proposal
 already exists, it verifies and completes the remaining lifecycle operations.
 It runs the Putnami gate with --impacted, once when that run is green and once
 more with --retry-failed when it is red, so a replayed failure cannot wedge it.
+The gate carries --enforce-coverage, and --fix=false when the flags of
+putnami.ci.json list it; it carries no other flag of that policy.
 It runs no gate when a green --impacted or all-project gate already ran on this
 exact tree and `putnami tree verify --gate` accepts it: same
 fingerprint, enforced coverage, and no task of the native impacted plan missing.
@@ -253,6 +255,19 @@ done
 case "$CI_LOAD" in
   '' | *[!0-9.]*) echo "finalize-pr: policy verification.ciGate.load must be a number: $CI_LOAD" >&2; exit 1 ;;
 esac
+# The gate flags: --enforce-coverage, then --fix=false when the flags of
+# putnami.ci.json list it. No other flag of that policy, --continue-on-error
+# included, reaches the gate.
+GATE_FLAGS=(--enforce-coverage)
+if [ -f putnami.ci.json ]; then
+  if ! CI_FLAGS="$(jq -r '(.flags // [])[] | strings' putnami.ci.json)"; then
+    echo "finalize-pr: putnami.ci.json is not readable JSON with a flags list" >&2
+    exit 1
+  fi
+  if grep -Fxq -- --fix=false <<<"$CI_FLAGS"; then
+    GATE_FLAGS+=(--fix=false)
+  fi
+fi
 TASK_REFERENCE_LINE=""
 if [ -n "$TASK_ID" ] && [ -n "$TASK_REFERENCE_TEMPLATE" ]; then
   TASK_REFERENCE_LINE="${TASK_REFERENCE_TEMPLATE//\{id\}/$TASK_ID}"
@@ -567,9 +582,9 @@ elif [ "$DRAFT_STAGE" = false ] && [ -z "$VERIFICATION_FILE" ]; then
     # run with unchanged inputs replays the failure instead of executing it;
     # --retry-failed re-executes only the recorded failures and keeps every other
     # cache hit. A genuinely broken tree still fails, twice, naming the same task.
-    if ! "$PUTNAMI_CLI" lint,test,build,validate --impacted --enforce-coverage; then
+    if ! "$PUTNAMI_CLI" lint,test,build,validate --impacted "${GATE_FLAGS[@]}"; then
       echo "finalize-pr: the gate failed; re-running it once with --retry-failed, which re-executes recorded failures instead of replaying them" >&2
-      "$PUTNAMI_CLI" lint,test,build,validate --impacted --enforce-coverage --retry-failed
+      "$PUTNAMI_CLI" lint,test,build,validate --impacted "${GATE_FLAGS[@]}" --retry-failed
     fi
 
     # The tree the gate CONSUMED is read from the record that gate wrote, not

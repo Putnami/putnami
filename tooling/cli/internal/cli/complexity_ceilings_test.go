@@ -84,8 +84,14 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  24,
-		funcs:  173,
-		why: "RAISED 168→173 (cli/portable-runner, commit-request): a version 2 bound request names " +
+		funcs:  174,
+		why: "RAISED 173→174 (cli/report-fix): the run report states the run's explicit --fix value, " +
+			"which `tree verify` requires as fix: false for a CI policy that lists --fix=false. " +
+			"report.go holds reportFix, which reads the `fix` command param as only a bool or the " +
+			"strings \"true\" and \"false\"; reportEnforceCoverage also reads \"1\", so the two stay " +
+			"apart. The member's shape lives in protocols/cli and its projection in internal/machine, " +
+			"not here. " +
+			"RAISED 168→173 (cli/portable-runner, commit-request): a version 2 bound request names " +
 			"a commit and a requested selection, and the executing engine plans its checkout through " +
 			"the ordinary stages. portable.go holds PortableExecution's frozen, the one predicate every " +
 			"stage that reads a version 1 snapshot instead of the root asks; invocation, the block the " +

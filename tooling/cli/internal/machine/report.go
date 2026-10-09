@@ -34,8 +34,8 @@ import (
 
 // ReportMeta is what the report's producer knows and the run does not: which
 // session this synthesis belongs to, the settled interval it covers, which
-// surface drove it, whether the enforcing cadence was in force, and the commit
-// a longitudinal consumer files it under.
+// surface drove it, whether the enforcing cadence was in force, the --fix value
+// it was given, and the commit a longitudinal consumer files it under.
 //
 // The interval is required by the contract because a report is written from a
 // SETTLED run: the producer passes the session's own start and end, so the wall
@@ -53,6 +53,8 @@ type ReportMeta struct {
 	// EnforceCoverage records whether the run ran the enforcing cadence, so a
 	// longitudinal consumer compares like with like.
 	EnforceCoverage bool
+	// Fix is the run's explicit --fix value, nil when the run was not given one.
+	Fix *bool
 	// Git is the repository state the run was produced against, absent outside a
 	// worktree.
 	Git *protocolcli.ReportGit
@@ -87,6 +89,7 @@ func (r Run) Report(
 		EndTime:         stamp(meta.EndTime),
 		Origin:          reportOrigin(meta.Origin),
 		EnforceCoverage: meta.EnforceCoverage,
+		Fix:             meta.Fix,
 		Git:             meta.Git,
 		Run:             reportRun(summary),
 		Commands:        reportCommands(counted, meta.EnforceCoverage),

@@ -889,6 +889,17 @@ workspace CLI of the checked repository answers as a dry run (`--plan`).
 `origin/main`. With `--record` it has no default; when given, the dossier's
 base SHA must equal `git merge-base <rev> HEAD`.
 
+With `--record` and `--gate`, the gate's report must record
+`enforceCoverage: true`, and the gate must satisfy the CI policy,
+`putnami.ci.json` version 3: it runs every blocking command, and every flag the
+policy appends has evidence. `--fix=false` passes only when the gate's report
+records `fix: false`, which a run given `--fix=false` or `--no-fix` writes.
+`--enforce-coverage` and `--continue-on-error` need nothing more. Any other
+flag, `--fix=true` included, fails the check. The impacted plan carries the
+policy's `--enforce-coverage` and `--fix=false` flags, never
+`--continue-on-error`, so a `--fix=false` gate is checked against the lint
+tasks `--fix=false` plans.
+
 Paths resolve against the Git top level, not the working directory. Evidence is
 read strictly: invalid UTF-8, duplicate JSON members, or a file that is not
 JSON fail the check. A failure prints

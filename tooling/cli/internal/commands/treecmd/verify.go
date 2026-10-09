@@ -37,10 +37,11 @@ type Verifier struct {
 	// git.FingerprintTree, the calculation `putnami tree fingerprint` prints.
 	Fingerprint func(root string) (string, error)
 	// Plan returns the task identity keys of the native, unfiltered impacted
-	// plan of commands against baseSHA. Nil runs the workspace CLI (`./putnamiw`
-	// when it is executable, `putnami` otherwise, `putnami` on Windows) with
-	// `<commands joined by ,> --impacted --baseline <baseSHA> --plan --output=json`.
-	Plan func(root string, commands []string, baseSHA string) ([]string, error)
+	// plan of commands with flags against baseSHA. Nil runs the workspace CLI
+	// (`./putnamiw` when it is executable, `putnami` otherwise, `putnami` on
+	// Windows) with `<commands joined by ,> --impacted --baseline <baseSHA>
+	// <flags> --plan --output=json`.
+	Plan func(root string, commands, flags []string, baseSHA string) ([]string, error)
 	// Stdout receives exactly one JSON document, or the usage line for --help.
 	Stdout io.Writer
 }
@@ -471,8 +472,9 @@ func workspaceCLI(root, goos string) string {
 }
 
 // workspacePlan is the default Verifier.Plan: it asks the workspace CLI for
-// the native impacted plan as a dry run and returns its task identity keys.
-func workspacePlan(root string, commands []string, baseSHA string) (keys []string, err error) {
+// the native impacted plan with flags as a dry run and returns its task
+// identity keys.
+func workspacePlan(root string, commands, flags []string, baseSHA string) (keys []string, err error) {
 	name := workspaceCLI(root, runtime.GOOS)
 	executable := name
 	if name == "./putnamiw" {
@@ -480,8 +482,8 @@ func workspacePlan(root string, commands []string, baseSHA string) (keys []strin
 	}
 	// The workspace CLI may be a build of the workspace's source.
 	runcredential.MarkRepositoryCodeStarted("tree verify native plan")
-	command := exec.Command(executable,
-		strings.Join(commands, ","), "--impacted", "--baseline", baseSHA, "--plan", "--output=json")
+	args := append([]string{strings.Join(commands, ","), "--impacted", "--baseline", baseSHA}, flags...)
+	command := exec.Command(executable, append(args, "--plan", "--output=json")...)
 	command.Dir = root
 	out, err := capture(name, command)
 	if err != nil {

@@ -56,6 +56,7 @@ tempted to fill in a default:
 | `coverage` | the command collected none | 0% covered |
 | `cpuMs` | the platform measured no CPU for this task | it ran and cost nothing |
 | `git.dirty` | the producer did not determine it | the worktree matched `sha` |
+| `fix` | the run was not given `--fix`, so each extension applied its own default | lint did not rewrite files |
 
 The corollary is that the report never *forces* instrumentation. It displays
 what the run collected; a command that measures no coverage produces a report
@@ -142,6 +143,7 @@ also why `run` carries no `failures[]` — see below.
 | `startTime` / `endTime` | required | RFC 3339; the run is settled |
 | `origin` | required | `cli` or `mcp` |
 | `enforceCoverage` | required | whether this run ran the enforcing cadence |
+| `fix` | optional | the run's explicit `--fix` value |
 | `git` | optional | `reportGit` — absent outside a worktree |
 | `run` | required | `reportRun` — the verdict |
 | `commands[]` | required | `reportCommand` — the per-command synthesis |
@@ -221,6 +223,16 @@ facts (`parallelism`, `criticalPathMs`) a budget consumer reads.
 
 `restored` never exceeds `hits`: a key the cache did not hold cannot have been
 materialized, so the reverse means two different accountings got mixed.
+
+### `fix` — the run's own flag
+
+`fix` states the `--fix` value the run was given: `false` for `--fix=false` or
+`--no-fix`, `true` for `--fix` or `--fix=true`. It is absent when the run was
+not given the flag, and when the value is any other spelling, such as
+`--fix=0`, which a lint job and its pipeline condition could read differently.
+The producer reads the command line, so a consumer compares a boolean and never
+a string. `putnami tree verify` reads `fix: false` as the proof that a gate ran
+with the `--fix=false` its CI policy appends.
 
 ### `git` — report-owned
 

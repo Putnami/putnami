@@ -1202,6 +1202,13 @@ export interface ReportFile {
    * verdict actually means the thresholds held.
    */
   enforceCoverage: boolean;
+  /**
+   * The run's explicit --fix value: false for --fix=false or --no-fix, true for
+   * --fix or --fix=true. Absent when the run was not given the flag or gave it
+   * any other value. False states that lint reported findings instead of
+   * rewriting files.
+   */
+  fix?: boolean;
   git?: ReportGit;
   run: ReportRun;
   commands: ReportCommand[];
@@ -2684,6 +2691,7 @@ const reportFileFields: Field[] = [
   req('endTime', nonEmptyString),
   req('origin', enumOf(REPORT_ORIGIN.cli, REPORT_ORIGIN.mcp)),
   req('enforceCoverage', boolean),
+  opt('fix', boolean),
   opt('git', reportGit),
   req('run', reportRun),
   req('commands', arrayOf(reportCommand)),

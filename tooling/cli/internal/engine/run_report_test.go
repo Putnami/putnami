@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/machine"
@@ -174,6 +175,91 @@ func TestReportEnforceCoverage_ReadsTheCadence(t *testing.T) {
 		if got := reportEnforceCoverage(tc.param); got != tc.want {
 			t.Errorf("reportEnforceCoverage(%v) = %v, want %v", tc.param, got, tc.want)
 		}
+	}
+}
+
+// TestReportFix_ReadsTheExplicitFlag pins the values the report states:
+// buildCommandParams produces the bool for `--fix` and `--no-fix` and the string
+// for `--fix=<value>`. Only "true" and "false" are read; any other value, and a
+// run without the flag, state nothing.
+func TestReportFix_ReadsTheExplicitFlag(t *testing.T) {
+	t.Parallel()
+	yes, no := true, false
+	for _, tc := range []struct {
+		param any
+		want  *bool
+	}{
+		{nil, nil},
+		{true, &yes},
+		{false, &no},
+		{"true", &yes},
+		{"false", &no},
+		{"0", nil},
+		{"1", nil},
+		{"no", nil},
+		{"FALSE", nil},
+		{"", nil},
+		{0, nil},
+	} {
+		got := reportFix(tc.param)
+		switch {
+		case tc.want == nil && got != nil:
+			t.Errorf("reportFix(%#v) = %v, want absent", tc.param, *got)
+		case tc.want != nil && got == nil:
+			t.Errorf("reportFix(%#v) is absent, want %v", tc.param, *tc.want)
+		case tc.want != nil && *got != *tc.want:
+			t.Errorf("reportFix(%#v) = %v, want %v", tc.param, *got, *tc.want)
+		}
+	}
+}
+
+// TestWriteRunReport_RecordsTheExplicitFixFlag: the run's `fix` command param
+// reaches the recorded report as a boolean, and a run without the flag records
+// no member at all.
+func TestWriteRunReport_RecordsTheExplicitFixFlag(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		params extension.ParamMap
+		// want is the report's fix member as JSON, empty when the member is absent.
+		want string
+	}{
+		{name: "--fix=false", params: extension.ParamMap{"fix": "false"}, want: "false"},
+		{name: "--no-fix", params: extension.ParamMap{"fix": false}, want: "false"},
+		{name: "--fix", params: extension.ParamMap{"fix": true}, want: "true"},
+		{name: "--fix=0", params: extension.ParamMap{"fix": "0"}},
+		{name: "without the flag", params: extension.ParamMap{"enforce-coverage": true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			session := settledSession(t, root)
+			req := &Request{WorkspaceRoot: root, CommandParams: tc.params}
+			if err := writeRunReport(root, session, reportedRun(), req, nil, nil); err != nil {
+				t.Fatalf("writeRunReport failed: %v", err)
+			}
+			data, err := os.ReadFile(workspace_state.NewReportStore(root).Path(session.ID))
+			if err != nil {
+				t.Fatalf("read report: %v", err)
+			}
+			if violations := protocolcli.ValidateDocument(protocolcli.DocumentReportFile, data); len(violations) != 0 {
+				t.Fatalf("recorded report violates the contract: %v\n%s", violations, data)
+			}
+			var members map[string]json.RawMessage
+			if err := json.Unmarshal(data, &members); err != nil {
+				t.Fatalf("parse report: %v", err)
+			}
+			got, present := members["fix"]
+			if tc.want == "" {
+				if present {
+					t.Errorf("fix = %s, want the member absent: %s", got, data)
+				}
+				return
+			}
+			if string(got) != tc.want {
+				t.Errorf("fix = %s, want %s: %s", got, tc.want, data)
+			}
+		})
 	}
 }
 

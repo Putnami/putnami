@@ -880,6 +880,32 @@ func TestReport_CoverageEnforcementTracksTheRunCadence(t *testing.T) {
 	}
 }
 
+// TestReport_FixStatesTheRunFlag: the run's --fix value reaches the document as
+// given, and a run without the flag carries no member.
+func TestReport_FixStatesTheRunFlag(t *testing.T) {
+	yes, no := true, false
+	for _, fix := range []*bool{nil, &no, &yes} {
+		meta := reportMeta()
+		meta.Fix = fix
+		data := encodeReport(t, gateLikeRun().Report(meta, nil, nil))
+
+		var members map[string]json.RawMessage
+		if err := json.Unmarshal(data, &members); err != nil {
+			t.Fatalf("parse report: %v", err)
+		}
+		got, present := members["fix"]
+		if fix == nil {
+			if present {
+				t.Errorf("a run without --fix states fix = %s", got)
+			}
+			continue
+		}
+		if want := fmt.Sprint(*fix); string(got) != want {
+			t.Errorf("fix = %s, want %s", got, want)
+		}
+	}
+}
+
 // TestReport_MeasurementsAreDeterministic: two projections of the same measured
 // run are the same bytes. The granularity pick reads a map, which is exactly
 // where an iteration order could leak into a document meant to be diffable.

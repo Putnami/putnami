@@ -228,6 +228,7 @@ func writeRunReport(
 		EndTime:         session.EndTime,
 		Origin:          reportOrigin(req),
 		EnforceCoverage: reportEnforceCoverage(req.CommandParams["enforce-coverage"]),
+		Fix:             reportFix(req.CommandParams["fix"]),
 		Git:             reportGit(wsRoot, req),
 	}, tuning, cache)
 	if report == nil {
@@ -266,6 +267,23 @@ func reportEnforceCoverage(param any) bool {
 	default:
 		return false
 	}
+}
+
+// reportFix reads the run's explicit `fix` command param value: the bool
+// buildCommandParams produces for `--fix` and `--no-fix`, or the string "true"
+// or "false" it produces for `--fix=<value>` and `--fix <value>`. It is nil for
+// any other value and for a run without the flag.
+func reportFix(param any) *bool {
+	switch value := param.(type) {
+	case bool:
+		return &value
+	case string:
+		if value == "true" || value == "false" {
+			fix := value == "true"
+			return &fix
+		}
+	}
+	return nil
 }
 
 // reportGit is the repository state the run was produced against.

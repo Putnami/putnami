@@ -2453,6 +2453,7 @@
         "endTime": "2026-08-07T09:15:26.400Z",
         "origin": "cli",
         "enforceCoverage": true,
+        "fix": false,
         "git": {
           "branch": "epic/session-report",
           "sha": "0123456789abcdef0123456789abcdef01234567",
@@ -2717,6 +2718,51 @@
         "elidedJobs": 0
       },
       "violations": [{ "code": "cli.result.invalid_enum", "path": "origin" }]
+    },
+    {
+      "id": "invalid.report.fix-is-not-a-boolean",
+      "document": "reportFile",
+      "expect": "reject",
+      "summary": "fix is a boolean: the producer reads the command line's \"false\" before it writes the report, so a consumer that checks fix === false never has to guess what a string spelling meant.",
+      "value": {
+        "protocolVersion": 2,
+        "sessionId": "20260807-104012-7f31aa",
+        "startTime": "2026-08-07T10:40:12.000Z",
+        "endTime": "2026-08-07T10:40:12.900Z",
+        "origin": "cli",
+        "enforceCoverage": true,
+        "fix": "false",
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": { "total": 1, "succeeded": 1, "failed": 0, "canceled": 0, "skipped": 0 },
+          "reuse": { "localCache": 1, "remoteCache": 0, "coalesced": 0 },
+          "durationMs": 900
+        },
+        "commands": [
+          {
+            "command": "build",
+            "counts": { "total": 1, "succeeded": 1, "failed": 0, "canceled": 0, "skipped": 0 },
+            "reuse": { "localCache": 1, "remoteCache": 0, "coalesced": 0 },
+            "freshWallMs": 0,
+            "errors": 0,
+            "warnings": 0
+          }
+        ],
+        "jobs": [
+          {
+            "key": "/tooling/cli:build~compile",
+            "project": "/tooling/cli",
+            "task": "build~compile",
+            "command": "build",
+            "outcome": "success",
+            "reuse": "local-cache",
+            "durationMs": 4210
+          }
+        ],
+        "elidedJobs": 0
+      },
+      "violations": [{ "code": "cli.result.invalid_type", "path": "fix" }]
     },
     {
       "id": "invalid.report.git-sha-is-a-reference",
