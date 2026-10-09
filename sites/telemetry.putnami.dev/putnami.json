@@ -26,6 +26,7 @@
   "options": {
     "package": {
       "docker": true,
+      "deployment": true,
       "port": 8080
     },
     "publish": {
