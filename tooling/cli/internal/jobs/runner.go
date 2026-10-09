@@ -34,6 +34,10 @@ var (
 	processGroupKillDelay = 5 * time.Second
 )
 
+// processGroupPollInterval is how often stopProcessGroup checks whether the
+// job's process group is empty.
+const processGroupPollInterval = 10 * time.Millisecond
+
 // goExtensionName identifies jobs whose subprocesses run Go tooling, for which
 // GOMAXPROCS is the canonical lever to bound CPU usage.
 const goExtensionName = "@putnami/go"
@@ -628,8 +632,9 @@ func runJob(
 		}
 		return nil, fmt.Errorf("start subprocess %s: %w", inv.command, err)
 	}
-	// Closing the tree ends nothing on Unix; on Windows it ends every process
-	// the job left behind once its pipes are drained.
+	// Closing the tree ends nothing on Unix, so runJob stops the tree itself
+	// before it returns (stopProcessGroup below); on Windows, closing also ends
+	// every process the job left behind.
 	defer func() { _ = tree.Close() }()
 	_ = stdoutWriter.Close()
 	_ = stderrWriter.Close()
@@ -676,12 +681,18 @@ func runJob(
 	duration := time.Since(start)
 	spawnWall := time.Since(spawnedAt)
 
-	// A job that starts a background process and exits can leave stdout/stderr
-	// inherited by the descendant. Without this cleanup the parent runner waits
-	// forever for EOF even though the job process already exited.
+	// No process of the job's group outlives runJob. Once the root exited, the
+	// rest of the group is asked to exit. When a descendant still holds the
+	// job's stdout or stderr, the group is killed once that pipe has no EOF
+	// within orphanPipeDrainDelay, so reading the job's output never waits
+	// forever. A process that ignores the request without holding the pipes is
+	// killed after processGroupKillDelay. This runs before runJob returns: the
+	// CLI often exits right after the run, and nothing else stops the group on
+	// Unix.
 	_ = tree.Terminate()
 	evResult := waitForJobRead(eventsCh, stdout, tree)
 	stderrText := waitForJobStderr(stderrCh, stderr, tree)
+	stopProcessGroup(tree, processGroupKillDelay)
 
 	// Build result
 	result := evResult.result
@@ -792,5 +803,22 @@ func forceKillProcessGroupAfter(done <-chan struct{}, tree *proctree.Tree, delay
 	case <-done:
 	case <-time.After(delay):
 		_ = tree.Kill()
+	}
+}
+
+// stopProcessGroup waits up to delay for every process of the tree's group to
+// exit, then kills the ones still running. It returns at once when the group
+// is empty or the tree never started. The caller asks the group to exit first,
+// and calls stopProcessGroup before it closes the tree: after Close, Kill does
+// nothing.
+func stopProcessGroup(tree *proctree.Tree, delay time.Duration) {
+	id := tree.ID()
+	deadline := time.Now().Add(delay)
+	for proctree.GroupAlive(id) {
+		if !time.Now().Before(deadline) {
+			_ = tree.Kill()
+			return
+		}
+		time.Sleep(processGroupPollInterval)
 	}
 }
