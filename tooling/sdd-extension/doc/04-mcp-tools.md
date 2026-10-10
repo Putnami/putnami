@@ -8,7 +8,7 @@ graph.
 
 | Tool | Answers | Arguments |
 |---|---|---|
-| `sdd.list_features` | The compact authored-feature catalog | `query`, `projects`, `impacted`, `baseline` |
+| `sdd.list_features` | One bounded page of the authored-feature catalog | `query`, `projects`, `impacted`, `baseline`, `cursor`, `limit` |
 | `sdd.feature_context` | One feature's scoped design facts | `feature` (required) |
 | `sdd.list_specs` | The durable spec catalog | `projects`, `impacted`, `baseline` |
 | `sdd.spec_context` | One complete spec document | `feature` (required) |
@@ -90,6 +90,45 @@ project, so the same member is a follow-up there rather than a blocker.
 **A request with no resolved `selection` is refused**, never defaulted to "all".
 A wrong answer an agent cannot tell from a right one is worse than an error.
 
+## The feature catalog is one bounded page
+
+`sdd.list_features` answers one page of short entries, ordered by feature id.
+An entry tells an agent which feature to read next; `sdd.feature_context`
+returns that feature's declarations, requirements, relations, and
+implementations.
+
+| Entry member | Content |
+|---|---|
+| `id` | The feature id, whole |
+| `name`, `owner` | The first declaration's values, at most 128 characters |
+| `summary` | The first declaration's outcome on one line, at most 160 characters |
+| `target` | The target stage of the first manifest declaration that names one |
+| `counts` | `projects`, `declarations`, and distinct `requirements` the feature declares |
+| `conflictingSources` | At most 8 paths of declarations that disagree with the first one, when any do |
+| `conflictCount` | The number of those paths, when any exist |
+
+The page carries `total`, the number of features the query matches, and
+`next` while more entries exist. Pass `next` back as `cursor` for the following
+page. A cursor carries only the last id it returned: following `next` returns
+every feature once, in id order, and a cursor continues any query or selection
+from that id. A cursor that does not decode is a usage error.
+
+`limit` caps the entries in a page: 50 by default, at most 200. A page also
+stops before its indented JSON would pass 64 KiB, and always holds at least one
+entry. `name`, `owner`, `summary`, and `conflictingSources` are truncated,
+`unreadable` keeps at most 20 authorities with 256-character reasons, and
+`unreadableCount` counts them all. With no argument, the answer is therefore at
+most 64 KiB, whatever the number of declared features and projects. A test
+builds 600 features over 1,500 projects and holds every page under that bound.
+Only a scoped call that names more projects than 64 KiB holds, or one entry
+larger than the budget, passes it.
+
+`selection` reports `projectCount`. It names the selected `projects` only for a
+scoped call (`projects` or `impacted`), where the caller chose them.
+
+`putnami features list` keeps the full catalog, with every declaration, in its
+own output.
+
 ## Architecture context is worktree-only
 
 `sdd.architecture_context` requires the exact `domain` minted by a
@@ -121,10 +160,12 @@ tool did not run” from “the evaluator ran and rejected this worktree.”
 
 `tooling/cli/internal/cli/sdd_mcp_parity_test.go` drives one real `mcp.Server`
 built by production's own constructor and compares content blocks byte for byte
-across seventeen calls for the four extracted tools — every narrowing their
+across twenty calls for the four extracted tools — every narrowing their
 schemas declare and every failure mode. Since the core tools were removed,
 those answers are compared against **recorded fixtures** captured from core
 before the deletion, with no `-update` flag; see [05-parity.md](05-parity.md).
+The `sdd.list_features` recordings hold the bounded page this tool answers,
+not core's unpaged catalog, and change only with the contract above.
 Architecture context was added after that oracle was deleted, so its tests pin
 the shared evaluator, full typed projection, worktree-only boundary, and
 report-plus-error failure envelope directly.
@@ -141,4 +182,6 @@ interactive path's:
 - **A failure may carry its report.** A core tool that fails with a value
   attached writes two content blocks, the value then the message. The SDK's
   `mcp.Serve` reproduces that split; argument guards return a nil payload, and
-  engine calls return the report beside the error.
+  engine calls return the report beside the error. `sdd.list_features` fails
+  only before it has a report — a rejected argument or a workspace it cannot
+  load — so its errors carry no payload.

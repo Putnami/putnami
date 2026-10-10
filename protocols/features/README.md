@@ -598,12 +598,13 @@ extension, not by the CLI itself; a workspace that does not declare it has
 neither.
 
 Through the local Putnami MCP server, use `sdd.list_features` (optionally with
-query terms) to discover the small semantic catalog and `sdd.feature_context` to
+query terms) to page through short catalog entries and `sdd.feature_context` to
 retrieve one compact authored feature. These tools merge only explicit authority from
 native design feature nodes and durable `putnami.features.json` files at the
-workspace or exact project roots. They preserve every sorted declaration source
-and durable manifest field; technical categories and critical paths appear only
-when a native graph declares them. A spec, nested file, directory name, or
+workspace or exact project roots. `sdd.feature_context` preserves every sorted
+declaration source and durable manifest field; technical categories and critical
+paths appear only when a native graph declares them. A catalog entry carries
+counts and a one-line summary instead. A spec, nested file, directory name, or
 heuristic never mints a feature. `agent_context` also exposes the native feature
 summaries for its selected project while keeping the durable agent-context
 document unchanged.

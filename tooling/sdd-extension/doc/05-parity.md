@@ -24,7 +24,7 @@ tree:
 |---|---|
 | `testdata/sdd-parity/structured` | 38 structured invocations |
 | `testdata/sdd-parity/human` | 15 human invocations |
-| `testdata/sdd-parity/mcp` | 17 MCP calls |
+| `testdata/sdd-parity/mcp` | 20 MCP calls; the `list_features` ones hold the paged answer of [04-mcp-tools.md](04-mcp-tools.md) |
 | `testdata/sdd-parity/contracts` | 4 generated contract artifacts |
 
 They live with the tests that read them, in

@@ -46,9 +46,10 @@ import (
 // The error shape is the second half of the same contract. A core tool that
 // fails WITH a value attached reports two content blocks — the value, then the
 // message — and one that fails during argument validation reports only the
-// message. Each adapter below reproduces its counterpart's split exactly: the
-// argument guards return a nil payload, and the engine calls return the report
-// they built beside the error.
+// message. Each adapter below reproduces that split: the argument guards return
+// a nil payload, and the engine calls return the report they built beside the
+// error. The feature catalog fails only before it has a report, so its errors
+// carry none.
 const (
 	toolListFeatures        = "sdd.list_features"
 	toolFeatureContext      = "sdd.feature_context"
@@ -83,15 +84,17 @@ func runMCPTool(ctx context.Context, in io.Reader, out io.Writer) error {
 }
 
 // featureCatalogArgs, featureContextArgs, specCatalogArgs and specContextArgs
-// are the tools' argument objects, member for member and tag for tag with the
-// core tools they replace (tooling/cli/internal/mcp/adapter.go). They are
-// decoded strictly, so an argument the schema does not declare is the same
-// "invalid arguments" error on both sides instead of a silently ignored key.
+// are the tools' argument objects, member for member and tag for tag with their
+// inputSchema in putnami.extension.json. They are decoded strictly, so an
+// argument the schema does not declare is an "invalid arguments" error instead
+// of a silently ignored key.
 type featureCatalogArgs struct {
 	Query    string   `json:"query"`
 	Projects []string `json:"projects"`
 	Impacted bool     `json:"impacted"`
 	Baseline string   `json:"baseline"`
+	Cursor   string   `json:"cursor"`
+	Limit    *int     `json:"limit"`
 }
 
 type featureContextArgs struct {
@@ -121,7 +124,17 @@ func handleListFeatures(_ context.Context, request proto.ToolCallRequest) (any, 
 	if err != nil {
 		return nil, err
 	}
-	return sdd.BuildFeatureCatalogResult(ws, args.Query, selection)
+	limit := sdd.FeatureCatalogDefaultLimit
+	if args.Limit != nil {
+		limit = *args.Limit
+	}
+	// The catalog degrades around unreadable authorities, so it fails only on a
+	// rejected argument or a workspace it cannot load, with nothing to report.
+	page, err := sdd.BuildFeatureCatalogPage(ws, args.Query, selection, args.Cursor, limit)
+	if err != nil {
+		return nil, err
+	}
+	return page, nil
 }
 
 func handleFeatureContext(_ context.Context, request proto.ToolCallRequest) (any, error) {

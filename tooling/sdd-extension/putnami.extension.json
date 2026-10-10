@@ -1318,7 +1318,7 @@
       "workspaceSelection": true
     },
     "sdd.list_features": {
-      "description": "List the compact product-feature catalog derived from explicit native design declarations and durable putnami.features.json files at the workspace or exact project roots. Use this first when the feature id is unknown. Narrow it with projects or impacted to bound both the answer and the work: project selection is applied FIRST and decides which design graphs are read at all, then optional query terms filter semantic ids, names, outcomes, and owners. Durable declarations stay workspace-wide so feature identity and duplicate detection never depend on the selection.",
+      "description": "List one page of the compact product-feature catalog derived from explicit native design declarations and durable putnami.features.json files at the workspace or exact project roots. Use this first when the feature id is unknown, then read one feature's declarations, requirements and implementations with sdd.feature_context. An entry carries the id, name, a one-line outcome summary, owner, target stage and counts. The page is ordered by id, holds at most limit entries within a fixed byte budget, reports the total, and returns next while more entries exist: pass it back as cursor. Narrow the catalog with projects or impacted to bound the work: project selection is applied FIRST and decides which design graphs are read at all, then optional query terms filter semantic ids, names, outcomes, and owners. Durable declarations stay workspace-wide so feature identity and duplicate detection never depend on the selection.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1340,6 +1340,16 @@
           "baseline": {
             "type": "string",
             "description": "Git baseline ref for 'impacted'. When omitted, Putnami resolves workspace config baseline, nearest configured epic branch, trunk (origin/HEAD, origin/main), local main/master, then the upstream tracking ref \u2014 never the current branch itself."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The next value of the previous page; omit it for the first page"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Most entries in the page (default 50, at most 200)"
           }
         },
         "additionalProperties": false

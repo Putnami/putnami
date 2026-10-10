@@ -163,7 +163,7 @@ ARC/DARC evaluation for one exact domain:
 
 | Tool | Replaces | Arguments |
 |---|---|---|
-| `sdd.list_features` | `list_features` | `query`, `projects`, `impacted`, `baseline` |
+| `sdd.list_features` | `list_features` | `query`, `projects`, `impacted`, `baseline`, `cursor`, `limit` |
 | `sdd.feature_context` | `feature_context` | `feature` |
 | `sdd.list_specs` | `list_specs` | `projects`, `impacted`, `baseline` |
 | `sdd.spec_context` | `spec_context` | `feature` |
@@ -226,11 +226,13 @@ instead of falling back to the whole workspace. A wrong answer an agent cannot
 tell from a right one is worse than an error.
 
 Parity is measured the way the interactive surface's was:
-`tooling/cli/internal/cli/sdd_mcp_parity_test.go` runs seventeen calls — every
+`tooling/cli/internal/cli/sdd_mcp_parity_test.go` runs twenty calls — every
 tool, every narrowing its schema declares, and every failure — through ONE real
 `mcp.Server` carrying the four extracted tools registered by real discovery,
 and compares their content blocks byte for byte against the answers recorded
-from core before they were removed. `sdd.architecture_context` postdates that
+from core before they were removed. The `sdd.list_features` recordings hold
+the bounded page this tool answers instead, and change only with the contract
+in [doc/04-mcp-tools.md](doc/04-mcp-tools.md). `sdd.architecture_context` postdates that
 oracle; its acceptance instead pins the shared evaluator, worktree-only
 boundary, complete typed projection, and failure envelope in this project.
 

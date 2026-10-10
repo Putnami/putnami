@@ -71,6 +71,20 @@
           }
         },
         {
+          "id": "bounded-feature-catalog",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "catalog-pages-stay-under-their-bound-and-return-every-feature-once",
+              "catalog-entries-are-short-and-capped"
+            ]
+          }
+        },
+        {
           "id": "architecture-agent-context",
           "stage": "coded",
           "evidenceKinds": [

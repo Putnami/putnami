@@ -11,13 +11,12 @@ isError false
     "scoped": true,
     "baseline": "main",
     "baselineSource": "local-trunk",
-    "projects": [],
+    "projectCount": 0,
     "emptyImpact": true,
-    "features": 0,
-    "specs": 0,
-    "externalRecords": []
+    "features": 0
   },
   "graphs": 0,
   "manifests": 0,
+  "total": 0,
   "features": []
 }
