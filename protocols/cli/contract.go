@@ -57,9 +57,10 @@ package cli
 //	     context carries, and a selected unmerged candidate produces no key.
 //	     An older reader keys a candidate's bytes alone, so a task whose
 //	     verdict reads the bit (an evidence source binding) or the membership
-//	     would replay a verdict across a chmod or a membership change. The pattern itself is older
-//	     than 7, but no manifest declared one on a task before it; the floor
-//	     makes a reader that keys the old meaning refuse the manifest.
+//	     would replay a verdict across a chmod or a membership change. The
+//	     pattern itself is older than 7, but no manifest declared one on a
+//	     task before it; the floor makes a reader that keys the old meaning
+//	     refuse the manifest.
 //	6: ADDITIVE — go-embed:build and go-embed:test task file selectors.
 //	   Older readers would silently treat them as unmatched globs and
 //	   restore outputs against changed embedded bytes.

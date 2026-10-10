@@ -39,7 +39,8 @@ projects from `workspaceProjects`, which the CLI resolves from
 are candidates, so the key holds them. The CLI also folds the membership itself
 into the key of every task keyed on the cut, so a membership that user config
 or an ignored scope manifest changes moves the key too. A context without a
-membership is a `clientgen.discovery` finding. The check never falls back to the index.
+membership is a `clientgen.discovery` finding. The check never falls back to
+the index.
 
 **3. A provider's inputs are the files it commits.** The contract is the
 committed sidecar `schema/openapi.json`, and the targets are the committed
