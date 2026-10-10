@@ -10,6 +10,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -200,8 +201,9 @@ func TestImpactPlanRefusesACommandNoExtensionDeclares(t *testing.T) {
 	} {
 		err := validate(tc.commands, tc.discovered)
 		if protocolcli.ExitCodeForError(err) != protocolcli.ExitUsage || !strings.Contains(err.Error(), tc.want) ||
-			!strings.Contains(err.Error(), "`putnami extensions list`") {
-			t.Errorf("%v: error = %v, want a usage error containing %q", tc.commands, err, tc.want)
+			!strings.Contains(err.Error(), "`putnami extensions list` shows the commands the installed extensions declare") ||
+			!strings.Contains(err.Error(), commandmeta.CommandsThatLeftTheCoreURL) {
+			t.Errorf("%v: error = %v, want a usage error containing %q, the command that lists the declared commands, and the reference of the moved commands", tc.commands, err, tc.want)
 		}
 	}
 

@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
@@ -282,9 +283,11 @@ var sddExtensionCommands = []string{"architecture", "contracts", "features", "sp
 // sddExtensionHintRemedy is the one-line answer, stated once so the two callers
 // below cannot drift into two different instructions. It names no extension and
 // no path: the engine does not know which extension a workspace installs for
-// these commands, and a path of one repository means nothing in another.
+// these commands, and a path of one repository means nothing in another. The
+// published reference it cites names the extension.
 const sddExtensionHintRemedy = "moved from the core CLI to an extension that is not loaded; " +
-	"declare that extension under \"extensions\" in putnami.workspace.json, then run `putnami install`"
+	commandmeta.CommandsThatLeftTheCoreURL + " names that extension: " +
+	"declare it under \"extensions\" in putnami.workspace.json, then run `putnami install`"
 
 // reportUnservedSDDCommands writes the courtesy hint for every selected command
 // that moved into an extension and that no loaded extension serves.

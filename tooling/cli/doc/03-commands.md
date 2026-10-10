@@ -149,7 +149,7 @@ Without a release-set provider, `putnami publish --all` still publishes every me
 
 ### Promote and roll back
 
-Promotion and rollback are the same gesture: move a channel to a release set that already exists. Neither runs a publisher, a build, or a checkout. The core CLI has no command for it; the release-set provider owns the move. `putnami channel …` and `putnami ci …` exit with a usage error unless an installed extension declares that root. With Putnami Cloud:
+Promotion and rollback are the same gesture: move a channel to a release set that already exists. Neither runs a publisher, a build, or a checkout. The core CLI has no command for it; the release-set provider owns the move. `putnami channel …` and `putnami ci …` exit with a usage error unless an installed extension declares that root; [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli) lists where each one moved. With Putnami Cloud:
 
 ```bash
 putnami cloud channels set latest --from canary          # promote the head canary points at
@@ -294,7 +294,9 @@ These four command groups are **not part of the CLI**. They are provided by the
 first-party `@putnami/sdd` extension, which also contributes the `validate` and
 `validate-workspace` jobs and the five `sdd.*` MCP tools. A workspace that does
 not declare the extension has none of them, and a run that plans zero jobs
-prints a courtesy hint that the command moved to an extension.
+prints a courtesy hint that the command moved to an extension. The hint links
+to [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli),
+which names the extension.
 
 ```json
 {

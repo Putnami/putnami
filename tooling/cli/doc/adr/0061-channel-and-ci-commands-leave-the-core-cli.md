@@ -26,8 +26,12 @@ already carries both: `@putnami/cloud` serves them as
    channel …` and `putnami ci …` are a usage error, raised before the
    workspace bootstrap, the implicit install and planning. The message names
    no extension and no replacement command, because the core does not know
-   which extension a workspace installs. An installed extension that declares
-   the exact root, as a command group or as a job, serves it as usual.
+   which extension a workspace installs. It links the published CLI reference
+   section that records where each moved command went, and it assumes no
+   workspace, because the refusal also fires outside one. `putnami help
+   channel` and `putnami help ci` get the same refusal. An installed extension
+   that declares the exact root, as a command group or as a job, serves it as
+   usual.
 3. **`impact-plan` is the seam.** An extension that needs the impacted plan of
    a change reads the ImpactPlan of `putnami impact-plan <commands> --base
    <commit>` with the protocol package alone

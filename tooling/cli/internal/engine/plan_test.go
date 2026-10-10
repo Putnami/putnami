@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -536,7 +537,8 @@ func TestReportUnservedSDDCommands_NamesTheExtensionOnlyWhenNothingServesIt(t *t
 
 // TestSDDExtensionHintNamesNoExtensionAndStaysActionable keeps the engine
 // from naming an extension or a path of one repository, while the remedy
-// still says where an extension is declared and how it is installed.
+// still cites the published reference that names the extension, and says
+// where an extension is declared and how it is installed.
 func TestSDDExtensionHintNamesNoExtensionAndStaysActionable(t *testing.T) {
 	t.Parallel()
 	for _, banned := range []string{"@putnami/", "sdd", "/tooling/"} {
@@ -544,7 +546,7 @@ func TestSDDExtensionHintNamesNoExtensionAndStaysActionable(t *testing.T) {
 			t.Errorf("the remedy names %q:\n%s", banned, sddExtensionHintRemedy)
 		}
 	}
-	for _, want := range []string{"moved from the core CLI to an extension", `"extensions"`, "putnami.workspace.json", "`putnami install`"} {
+	for _, want := range []string{"moved from the core CLI to an extension", commandmeta.CommandsThatLeftTheCoreURL + " names that extension", `"extensions"`, "putnami.workspace.json", "`putnami install`"} {
 		if !strings.Contains(sddExtensionHintRemedy, want) {
 			t.Errorf("the remedy does not name %q:\n%s", want, sddExtensionHintRemedy)
 		}
