@@ -24,6 +24,9 @@ func skipSourceWrapperOnWindows(t *testing.T) {
 	}
 }
 
+// The skill script suites run in parallel: each works in its own temporary
+// directory, and on a loaded machine they outlasted `go test`'s limit when the
+// finalizer suite waited for the others to finish first.
 func TestPortableFixFinalizer(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "the-finalizer-publishes-through-the-contracts")
@@ -39,21 +42,25 @@ func TestPortableFixFinalizer(t *testing.T) {
 }
 
 func TestTreeFingerprint(t *testing.T) {
+	t.Parallel()
 	skipSourceWrapperOnWindows(t)
 	runSkillScriptTestBesideAForeignRepository(t, "fix", "tree-fingerprint.test.sh", "tree-fingerprint test: ok", nil)
 }
 
 func TestMachineLoad(t *testing.T) {
+	t.Parallel()
 	skipSourceWrapperOnWindows(t)
 	runSkillScriptTest(t, "fix", "machine-load.test.sh", "machine-load test: ok", nil)
 }
 
 func TestEnglishOnlyDetector(t *testing.T) {
+	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "the-language-rule-reads-tasks-through-the-contract")
 	runSkillScriptTestBesideAForeignRepository(t, "check", "english-only.test.sh", "english-only test: ok", collaborationScriptEnv(t))
 }
 
 func TestSessionCapHook(t *testing.T) {
+	t.Parallel()
 	runSkillScriptTest(t, "fix", "session-cap.test.sh", "session-cap test: ok", nil)
 }
 
@@ -71,6 +78,7 @@ var englishOnlyCall = regexp.MustCompile(`english-only\.sh (\w+)`)
 // `putnami proposals find`, which runs here against the real CLI and the
 // shipped local provider.
 func TestAuditLanguageRuleScansTasksAndProposalsThroughTheContracts(t *testing.T) {
+	t.Parallel()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
