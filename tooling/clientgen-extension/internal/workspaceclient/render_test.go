@@ -247,8 +247,9 @@ func TestFreshRenderWritesTheBytesTheBuildWrites(t *testing.T) {
 		t.Skip("fixture uses a POSIX executable")
 	}
 	cases := map[string]string{
-		"a catalog entry":     `{"name":"consumer","catalog":{"@putnami/client":"0.4.0"}}`,
-		"a pinned dependency": `{"name":"consumer","dependencies":{"@putnami/client":"0.4.0"}}`,
+		"a catalog entry":      `{"name":"consumer","catalog":{"@putnami/client":"0.4.0"}}`,
+		"a pinned dependency":  `{"name":"consumer","dependencies":{"@putnami/client":"0.4.0"}}`,
+		"no root package.json": "",
 	}
 	for name, rootPackage := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -259,7 +260,9 @@ func TestFreshRenderWritesTheBytesTheBuildWrites(t *testing.T) {
 			}
 			root := t.TempDir()
 			writeWorkspaceFile(t, root, "putnami.workspace.json", `{"name":"consumer"}`)
-			writeWorkspaceFile(t, root, "package.json", rootPackage)
+			if rootPackage != "" {
+				writeWorkspaceFile(t, root, "package.json", rootPackage)
+			}
 			writeWorkspaceFile(t, root, "tsconfig.base.json", `{}`)
 			writeWorkspaceFile(t, root, ".putnami/workspace-index.json", `{"version":4,"projects":[{"path":"services/catalog"}]}`)
 			writeWorkspaceFile(t, root, "services/catalog/.gen/clientgen/config.json", `{"targets":["ts"],"ts":{"output":"clients/ts"}}`)

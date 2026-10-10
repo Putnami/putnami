@@ -92,8 +92,7 @@ func TestGenerationTasksKeyOnTheBuiltContract(t *testing.T) {
 
 // The TypeScript emitter reads the workspace root package.json to decide how a
 // client depends on @putnami/client (`catalog:`, a pinned version, or
-// `workspace:*`). That choice is an emitted byte, so the file keys clientgen-ts:
-// without it, a catalog edit serves the previous dependency line as a HIT.
+// `workspace:*`). That choice is an emitted byte, so the file keys clientgen-ts.
 func TestClientgenTsCacheKeyCoversTheWorkspaceRootPackageJSON(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "formatter-inputs-are-cache-keyed", "the-workspace-root-package-json-keys-the-typescript-target")
 	task := loadExtensionManifest(t).Tasks["clientgen-ts"]

@@ -43,7 +43,7 @@
     },
     {
       "id": "formatter-inputs-are-cache-keyed",
-      "text": "The emitted TypeScript is canonicalized by Biome, so the resolved configuration, its overrides, its extends chain and the EditorConfig beside it are generation inputs. Every one of them is a declared cache-key entry, an input that cannot be declared fails resolution instead of being skipped, and both cacheable generators key on the built contract they read."
+      "text": "The emitted TypeScript is canonicalized by Biome, so the resolved configuration, its overrides, its extends chain and the EditorConfig beside it are generation inputs, and so is the workspace root package.json, which decides how the TypeScript client depends on @putnami/client. Every one of them is a declared cache-key entry, an input that cannot be declared fails resolution instead of being skipped, and both cacheable generators key on the built contract they read."
     },
     {
       "id": "no-source-mutation",
@@ -67,7 +67,7 @@
     },
     {
       "id": "drift-closure",
-      "text": "Check judges every committed manifest against the committed contract and every committed file against the hash its manifest recorded; it fails on forged hashes, missing or extra artifacts, a deleted target, operation or contract, and a manifest that does not parse, while an intentional sync passes before commit. Sync compares a fresh render with the worktree it regenerated. Whether committed bytes are what the contract generates is the generator task's verdict, judged by the engine on its declared output."
+      "text": "Check judges every committed manifest against the committed contract and every committed file against the hash its manifest recorded; it fails on forged hashes, missing or extra artifacts, a deleted target, operation or contract, and an unparseable manifest, while an intentional sync passes before commit. Sync compares the worktree it regenerated with a fresh render reading the build's workspace-root inputs. Whether committed bytes match the contract is the generator task's verdict on its declared output."
     },
     {
       "id": "named-omissions",
