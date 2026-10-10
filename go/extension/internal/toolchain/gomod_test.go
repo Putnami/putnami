@@ -206,6 +206,63 @@ func TestParseGoMod_UnterminatedBlockDoesNotSwallowLaterDirectives(t *testing.T)
 	}
 }
 
+// TestParseGoMod_IgnoreForms covers the `ignore` directive (Go 1.25) in its
+// single-line, block and quoted forms, and a require block it ends.
+func TestParseGoMod_IgnoreForms(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    []string
+	}{
+		{
+			name:    "single-line ignore",
+			content: "module m\n\nignore ./tools\n",
+			want:    []string{"./tools"},
+		},
+		{
+			name:    "block form with a comment",
+			content: "module m\n\nignore (\n\tstatic // assets\n\tcontent/html\n\t./third_party/js\n)\n",
+			want:    []string{"static", "content/html", "./third_party/js"},
+		},
+		{
+			name:    "a double-quoted path is unquoted",
+			content: "module m\n\nignore \"./with space\"\n",
+			want:    []string{"./with space"},
+		},
+		{
+			name:    "an entry the go command rejects is dropped",
+			content: "module m\n\nignore a b\nignore `raw`\nignore it's\nignore c\n",
+			want:    []string{"c"},
+		},
+		{
+			name:    "an empty block opens nothing",
+			content: "module m\n\nignore ()\n\ntool (\n\texample.com/cmd/x\n)\n\nignore c\n",
+			want:    []string{"c"},
+		},
+		{
+			name:    "a tab or a paren follows the verb",
+			content: "module m\n\nignore\t./tools\nignore(\n\tstatic\n)\n",
+			want:    []string{"./tools", "static"},
+		},
+		{
+			name:    "an ignore ends a require block that never closed",
+			content: "module m\n\nrequire (\n\tfoo v1\n\nignore ./tools\n",
+			want:    []string{"./tools"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mod, err := ParseGoMod(tt.content)
+			if err != nil {
+				t.Fatalf("ParseGoMod: %v", err)
+			}
+			if !reflect.DeepEqual(mod.Ignores, tt.want) {
+				t.Errorf("Ignores = %q, want %q", mod.Ignores, tt.want)
+			}
+		})
+	}
+}
+
 // ReplacedModules is the closure computation's oracle for "already satisfied";
 // both directive forms must feed it.
 func TestGoModFile_ReplacedModules(t *testing.T) {

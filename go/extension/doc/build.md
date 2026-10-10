@@ -528,6 +528,14 @@ reads, and for each such import it:
 putnami: warning: [warning] consumer/go.mod: example.com/consumer imports example.com/provider/client, which this go.mod does not require: go.work resolves the import and a module-mode build does not; add `require example.com/provider/client v0.0.0` and `replace example.com/provider/client => ../provider/client` (unrequired-import)
 ```
 
+Like `go mod tidy`, the probe skips the directories that the `go.mod`
+`ignore` directive (Go 1.25) names, with everything below them. A path that
+starts with `./` names one directory under the module root. Any other path
+names every directory with that path, at any depth. An import in an ignored
+directory adds no edge and no warning, unless a package outside the ignored
+directories imports the package that holds it: the go command builds that
+package, so the probe reads it too.
+
 ### Manual declaration (putnami.json → go.mod)
 
 You can also declare dependencies manually in `putnami.json`. For each workspace dependency with a `go.mod`, the build adds the `replace` directive automatically on the next run.

@@ -809,7 +809,9 @@ crosses it.
 A provider claims an import family for an edge only when its own sources import
 the target — the Go provider parses the module's `.go` files under `go mod
 tidy`'s own walk rule (test files count, build tags do not except `ignore`,
-`testdata`, `vendor`, dot-directories and nested modules are skipped), and the
+`testdata`, `vendor`, dot-directories and nested modules are skipped, and so is
+a directory the `go.mod` `ignore` directive names unless the module imports a
+package in it), and the
 TypeScript provider reads the package's committed sources and skips
 `node_modules`, `dist`, `build`, `coverage` and dot-directories. Neither runs a
 toolchain, and

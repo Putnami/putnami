@@ -287,6 +287,59 @@ func TestProbe_AnUnrequiredImportOfAWorkspaceModuleIsAnEdgeAndAWarning(t *testin
 	}
 }
 
+// A directory the go.mod ignores is one `go mod tidy` never reads: an import
+// there is no edge and no warning, because the require the warning would ask
+// for is one tidy removes again.
+func TestProbe_AnImportInADirectoryTheGoModIgnoresIsNoEdge(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "probe-graph-fidelity", "an-import-in-a-directory-the-go-mod-ignores-is-no-edge")
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"), "module example.com/svc\n\ngo 1.25\n\nignore ./tools\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"), "package main\n\nfunc main() {}\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "tools", "gen.go"),
+		"package tools\n\nimport \"example.com/core\"\n\nvar _ = core.Name\n")
+
+	result := probeAll(t, root, "apps/svc", "libs/core")
+	if svc := projectAt(t, result, "apps/svc"); len(svc.Dependencies) != 0 {
+		t.Errorf("dependencies = %v, want none", svc.Dependencies)
+	}
+	if len(result.Diagnostics) != 0 {
+		t.Errorf("diagnostics = %v, want none", result.Diagnostics)
+	}
+}
+
+// A require that only an ignored directory imports is a declaration: the build
+// reads none of the module.
+func TestProbe_ARequireOnlyAnIgnoredDirectoryImportsIsADeclaration(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"),
+		"module example.com/svc\n\ngo 1.25\n\nrequire example.com/core v0.0.0\n\nreplace example.com/core => ../../libs/core\n\nignore tools\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"), "package main\n\nfunc main() {}\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "cmd", "tools", "gen.go"),
+		"package tools\n\nimport \"example.com/core\"\n\nvar _ = core.Name\n")
+
+	svc := projectAt(t, probeAll(t, root, "apps/svc", "libs/core"), "apps/svc")
+	if got := svc.DependencySources["libs/core"]; got != wsproto.DependencySourceDeclared {
+		t.Errorf("dependencySources[libs/core] = %q, want %q", got, wsproto.DependencySourceDeclared)
+	}
+}
+
+// An ignored package the module's own code imports is still built, so what it
+// imports is an import of the module.
+func TestProbe_AnIgnoredPackageTheModuleImportsStillImports(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "go.mod"),
+		"module example.com/svc\n\ngo 1.25\n\nrequire example.com/core v0.0.0\n\nreplace example.com/core => ../../libs/core\n\nignore ./tools\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "main.go"),
+		"package main\n\nimport \"example.com/svc/tools\"\n\nfunc main() { tools.Run() }\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "tools", "gen.go"),
+		"package tools\n\nimport \"example.com/core\"\n\nfunc Run() { _ = core.Name }\n")
+
+	svc := projectAt(t, probeAll(t, root, "apps/svc", "libs/core"), "apps/svc")
+	if got := svc.DependencySources["libs/core"]; got != wsproto.DependencySourceGoModule {
+		t.Errorf("dependencySources[libs/core] = %q, want %q", got, wsproto.DependencySourceGoModule)
+	}
+}
+
 // A replace alone does not make go.mod state an import: a module-mode build
 // still cannot resolve a module nothing requires. The replace's edge and the
 // import's edge are one edge.
