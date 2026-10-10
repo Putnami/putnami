@@ -283,6 +283,33 @@ func (v RunVersions) Primary() *JobContextVersion {
 	return v[lines[0]]
 }
 
+// treeBaseVersion is the base version of every line in what a cached task reads
+// (ADR 0060): its job context and the capability packages of the build stamp.
+const treeBaseVersion = "0.0.0"
+
+// versionsSeenBy returns the version of each line that a job's context carries
+// (ADR 0060).
+//
+// Git resolves a line's version from the tags and commit messages a checkout
+// holds, not from the tree, so two lanes that build one tree resolve two
+// versions. A task the cache can serve therefore sees a line's version only
+// when its key carries that version: the task declares cache.versionAware, or
+// it reads a version-var parameter that is set. Every other cached task sees
+// base version 0.0.0 and no commit. A task the cache never serves sees every
+// line as Git resolved it. The rule reads the task, not --no-cache, so one task
+// reads one context whether or not the run uses the cache. versionVarSet tells
+// whether the job's resolved cache-key parameters set version-var.
+func versionsSeenBy(job *ScheduledJob, versions RunVersions, versionVarSet bool) RunVersions {
+	if len(versions) == 0 || !CanUseCache(job) || keyEmbedsVersion(job, versionVarSet) {
+		return versions
+	}
+	tree := make(RunVersions, len(versions))
+	for line := range versions {
+		tree[line] = &JobContextVersion{Base: treeBaseVersion, Line: line}
+	}
+	return tree
+}
+
 // LineBaseVersion is the base version of a project's line, or "" when no
 // version was computed for it. It is the value the wire's project references
 // and the workspace block carry: a package reference is a pair, and the version
@@ -317,6 +344,8 @@ func BuildJobContext(
 ) *JobCommandContext {
 	cmdName := jobCommandName(job)
 	identity := job.TypedIdentity()
+	versions = versionsSeenBy(job, versions,
+		paramHasVersionVar(taskCacheParamsWith(ws, job, commandParams, false)))
 	ctx := &JobCommandContext{
 		ProtocolVersion: protocoljob.ProtocolVersion2,
 		Identity:        &identity,

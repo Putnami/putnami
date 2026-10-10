@@ -322,12 +322,6 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 		return "FAILED", nil, nil
 	}
 
-	// Write VERSION file from workspace version
-	if ctx.Workspace.Version != "" {
-		versionPath := filepath.Join(ctx.OutputPath, "VERSION")
-		os.WriteFile(versionPath, []byte(ctx.Workspace.Version+"\n"), 0o644)
-	}
-
 	emit.PhaseEnd("compile", "success")
 
 	// Post-compile install: copy binary to a well-known location if configured.
@@ -492,12 +486,6 @@ func runCrossCompile(ctx *pctx.Context, emit *jsonl.Emitter, goBinary, entrypoin
 		return "FAILED", nil, nil
 	}
 
-	// Write VERSION file from workspace version
-	if ctx.Workspace.Version != "" {
-		versionPath := filepath.Join(ctx.OutputPath, "VERSION")
-		os.WriteFile(versionPath, []byte(ctx.Workspace.Version+"\n"), 0o644)
-	}
-
 	emit.PhaseEnd("cross-compile", "success")
 	return "OK", map[string]any{
 		"platformBinaries": platformBinaries,
@@ -556,15 +544,6 @@ func runCompileCheck(
 	if failed {
 		emit.PhaseEnd("compile", "failed")
 		return "FAILED", nil, nil
-	}
-
-	// The VERSION stamp stays: it is a declared output of this task and its
-	// meaning ("the workspace version this output tree was built at") does not
-	// depend on whether the tree also holds binaries.
-	if ctx.Workspace.Version != "" {
-		os.MkdirAll(ctx.OutputPath, 0o755)
-		versionPath := filepath.Join(ctx.OutputPath, "VERSION")
-		os.WriteFile(versionPath, []byte(ctx.Workspace.Version+"\n"), 0o644)
 	}
 
 	emit.PhaseEnd("compile", "success")

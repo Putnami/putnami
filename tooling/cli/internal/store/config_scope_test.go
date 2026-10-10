@@ -369,7 +369,7 @@ func TestProjectConfigScope_VerbatimIsNotTheDecodedDigest(t *testing.T) {
 	}
 	key := func(patterns []string, scope ProjectConfigScope) string {
 		t.Helper()
-		k := BuildCacheKey("@test/ext", "1.0.0", "", "", "lint-format", "", "proj", "", "0.0.0", "", nil, nil,
+		k := BuildCacheKey("@test/ext", "1.0.0", "", "", "lint-format", "", "proj", "", "", nil, nil,
 			dir, "", CacheKeyPolicy{Files: patterns, ConfigScope: scope}, nil)
 		got, err := k.ComputeHashUsing(NewCacheManager(nil))
 		if err != nil {
@@ -482,7 +482,7 @@ func TestProjectConfigScope_VerbatimReachesConfigsOutsideTheProject(t *testing.T
 	}
 	key := func(scope ProjectConfigScope) string {
 		t.Helper()
-		k := BuildCacheKey("@test/ext", "1.0.0", "", "", "lint-format", "", "proj", "", "0.0.0", "", nil, nil,
+		k := BuildCacheKey("@test/ext", "1.0.0", "", "", "lint-format", "", "proj", "", "", nil, nil,
 			filepath.Join(root, "proj"), root,
 			CacheKeyPolicy{Files: []string{"index.ts"}, WorkspaceFiles: []string{"other/putnami.json"}, ConfigScope: scope},
 			nil)

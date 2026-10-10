@@ -1105,7 +1105,7 @@ func TestCacheKeyVariesWithHostPlatform(t *testing.T) {
 			"tc1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 			"go.putnami.dev/cache",
 			"wsid1:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-			"1.0.0", "",
+			"",
 			nil,
 			nil, // no params: the point is that the MACHINE moves the key on its own
 			"", "",

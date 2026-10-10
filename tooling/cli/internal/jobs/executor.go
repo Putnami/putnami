@@ -231,6 +231,14 @@ func taskIsVersionAware(job *ScheduledJob) bool {
 	return job.JobDef.TaskCachePolicy != nil && job.JobDef.TaskCachePolicy.VersionAware
 }
 
+// keyEmbedsVersion reports whether a job's cache key carries its line's full
+// version. versionVarSet tells whether the job's resolved cache-key parameters
+// set version-var. Only such a job reads a version in its context when the
+// cache can serve it (versionsSeenBy).
+func keyEmbedsVersion(job *ScheduledJob, versionVarSet bool) bool {
+	return taskIsVersionAware(job) || (taskReadsVersionVar(job) && versionVarSet)
+}
+
 // taskReadsVersionVar reports whether the job's task consumes a `version-var`
 // param input — the signal that it injects the publish version into its output
 // via -X ldflags (the Go build/cross-compile tasks). It reads the task's
@@ -908,8 +916,7 @@ func computeJobCacheHashWith(
 	// entries age out through ordinary GC instead of costing every user and every
 	// CI namespace the whole-cache miss a bump would.
 	var embeddedVersion string
-	if len(versions) > 0 && (taskIsVersionAware(job) ||
-		(taskReadsVersionVar(job) && paramHasVersionVar(cacheParams))) {
+	if len(versions) > 0 && keyEmbedsVersion(job, paramHasVersionVar(cacheParams)) {
 		if projVersion := VersionInfoForProject(versions, job.Project); projVersion != nil {
 			embeddedVersion = projVersion.Full
 		}
@@ -920,12 +927,14 @@ func computeJobCacheHashWith(
 		return "", fmt.Errorf("hash extension implementation: %w", err)
 	}
 
-	workspaceVersion := LineBaseVersion(versions, job.Project)
+	// The line's base version is not a key input (ADR 0060): it comes from the
+	// tags and commit messages a checkout holds, which differ between lanes
+	// that build one tree. A task whose output embeds it declares it above.
 	if selection {
-		// Both version positions are emptied together: a selection fingerprint
-		// that moved with the version would republish every member on every
-		// publication, which is exactly what it exists to avoid.
-		workspaceVersion, embeddedVersion = "", ""
+		// A selection fingerprint that moved with the version would republish
+		// every member on every publication, which is exactly what it exists
+		// to avoid.
+		embeddedVersion = ""
 	}
 
 	cacheKey := store.BuildCacheKey(
@@ -937,7 +946,6 @@ func computeJobCacheHashWith(
 		jobContractDigest(job),
 		job.Project.Name,
 		ws.MetadataDigestFor(job.Project),
-		workspaceVersion,
 		embeddedVersion,
 		selectedProjectIDs(job.SelectedProjects),
 		cacheParams,

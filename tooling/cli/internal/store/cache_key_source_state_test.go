@@ -10,7 +10,7 @@ import (
 )
 
 // An empty source state writes zero bytes, so every key computed inside a
-// repository keeps its v8 address. The unmanaged state inserts exactly
+// repository keeps its v9 address. The unmanaged state inserts exactly
 // "sourceState\0unmanaged\0" after the OS-class block and before the task, and
 // nothing else moves: the two states of one task differ by that marker alone.
 func TestCacheKey_SourceStateAddsOnlyItsMarker(t *testing.T) {

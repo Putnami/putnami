@@ -74,7 +74,7 @@ caches outside this root keep their existing lifetimes. See
 A cache key is a SHA-256 hash composed of:
 
 ```
-v8                          ← format version (for compatibility)
+v9                          ← format version (for compatibility)
 + extension name            ← e.g., "@putnami/typescript"
 + extension version         ← only when the extension has no implementation digest (see below)
 + implementation digest     ← what the extension runs; empty when it has none
@@ -86,7 +86,6 @@ v8                          ← format version (for compatibility)
 + task contract digest      ← the task's declaration in the manifest
 + project name              ← e.g., "my-app"
 + project metadata digest   ← provider-owned project metadata
-+ workspace version         ← base version of the project's release line, without the commit suffix
 + publish version           ← full version incl. commit suffix, only for version-bearing tasks (see Version-Aware Tasks)
 + task params hash          ← resolved task inputs plus owning-command flags
 + file content hash         ← SHA-256 of source files matching patterns
@@ -96,13 +95,18 @@ v8                          ← format version (for compatibility)
 ```
 
 Apart from a build stamp that a generate asset copies into the output, no input
-names the commit, the branch or the checkout directory. Two runs on one tree,
-at one base version, compute the same key. A pull request and the commit its
+names the commit, the branch, the checkout directory or the base version of the
+project's release line. Two runs on one tree compute the same key, whatever
+tags their checkouts hold. A pull request and the commit its
 squash merge puts on the main branch share their entries, and so do two
 checkouts of one commit in two directories. Otherwise the commit reaches a key
 only through the publish version, for a task that opts in (see
-[Version-Aware Tasks](#version-aware-tasks)). See
-[ADR 0059](adr/0059-a-cache-key-describes-the-tree-not-the-commit.md).
+[Version-Aware Tasks](#version-aware-tasks)). A task the cache can serve reads
+a line's version only when its key carries it. Every other cached task reads
+base version `0.0.0` and no commit in its job context, and the build stamp's
+`capabilityPackages` name every package at `0.0.0`. See
+[ADR 0059](adr/0059-a-cache-key-describes-the-tree-not-the-commit.md) and
+[ADR 0060](adr/0060-the-base-version-is-not-a-cache-key-input.md).
 
 ### Extension Implementation
 
@@ -1765,4 +1769,4 @@ putnami cache clean
 | Wrong glob pattern | Files not included in hash | Update `cache.key.files` |
 | Version bump | Different effective project version | Expected behavior |
 | Extension changed | Different implementation digest, or a different version for an extension without one | Expected behavior |
-| New task format | Format version changed (now `v8`) | Clean cache after CLI upgrade |
+| New task format | Format version changed (now `v9`) | Clean cache after CLI upgrade |

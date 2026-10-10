@@ -291,22 +291,19 @@ type CacheKey struct {
 	// for two checkouts of the same commit.
 	ProjectMetadataDigest string
 
-	// WorkspaceVersion is the workspace version string.
-	WorkspaceVersion string
-
 	// EmbeddedVersion is the version string that the task injects into its
 	// output (e.g., via Go -X ldflags, or stamped into an npm/Go module
-	// package). Distinct from WorkspaceVersion: the latter is the base semver,
-	// the former includes the per-commit suffix. Set when the task signals a
-	// version-bearing output — either a non-empty `version-var` (or
-	// `versionVar`) param or a `cache.versionAware` task policy; otherwise
+	// package): the line's base version and the per-commit suffix. Set when the
+	// task signals a version-bearing output — either a non-empty `version-var`
+	// (or `versionVar`) param or a `cache.versionAware` task policy; otherwise
 	// empty. Including it in the key prevents serving cached bytes that embed a
 	// stale version.
 	//
-	// It is the only field through which the commit reaches a key, apart from
-	// a build stamp a generate asset copies into the output (ExtraFiles). Every
-	// other field describes the tree, so a task that leaves it empty keys the
-	// same at two commits that share one tree.
+	// It is the only field through which the commit or the line's base version
+	// reaches a key, apart from a build stamp a generate asset copies into the
+	// output (ExtraFiles). Every other field describes the tree, so a task that
+	// leaves it empty keys the same at two commits that share one tree, whatever
+	// base version their histories and tags resolve (ADR 0060).
 	EmbeddedVersion string
 
 	// SelectedProjects identifies the resolved command selection for a
@@ -358,8 +355,9 @@ type CacheKey struct {
 // key format is never served as a hit under another. It changes when a key
 // computation change could serve an existing address under a different
 // meaning. It stays when the change only moves keys to addresses no earlier
-// entry occupies (ADR 0059). Each change is a one-time whole-cache miss.
-const cacheKeyVersion = "v8"
+// entry occupies (ADR 0059). Each change is a one-time whole-cache miss. v9
+// removed the line's base version, which moved every key (ADR 0060).
+const cacheKeyVersion = "v9"
 
 // ComputeHashUsing computes a SHA-256 cache key from all CacheKey fields,
 // using the CacheManager's file hash memoization to avoid redundant I/O when
@@ -408,7 +406,6 @@ func (k *CacheKey) ComputeHashUsing(cm *CacheManager) (string, error) {
 	writeField(h, k.TaskContractDigest)
 	writeField(h, k.Project)
 	writeField(h, k.ProjectMetadataDigest)
-	writeField(h, k.WorkspaceVersion)
 	writeField(h, k.EmbeddedVersion)
 	if len(k.SelectedProjects) > 0 {
 		writeField(h, "selectedProjects")
@@ -696,7 +693,7 @@ func (cm *CacheManager) MarkUsed(hash string) {
 // the task injects the version string into its output, so successive builds
 // with different commit suffixes don't share cached bytes; otherwise empty.
 func BuildCacheKey(
-	extensionName, extensionVersion, extensionImplementationDigest, toolchainVersion, taskName, taskContractDigest, projectName, projectMetadataDigest, workspaceVersion, embeddedVersion string,
+	extensionName, extensionVersion, extensionImplementationDigest, toolchainVersion, taskName, taskContractDigest, projectName, projectMetadataDigest, embeddedVersion string,
 	selectedProjects []string,
 	params map[string]any,
 	projectRoot, workspaceRoot string,
@@ -714,7 +711,6 @@ func BuildCacheKey(
 		TaskContractDigest:            taskContractDigest,
 		Project:                       projectName,
 		ProjectMetadataDigest:         projectMetadataDigest,
-		WorkspaceVersion:              workspaceVersion,
 		EmbeddedVersion:               embeddedVersion,
 		SelectedProjects:              selectedProjects,
 		Params:                        params,

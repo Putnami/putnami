@@ -13,11 +13,10 @@ import (
 
 func TestCacheKey_ComputeHash_Deterministic(t *testing.T) {
 	key := &CacheKey{
-		Extension:        "@putnami/typescript",
-		Task:             "build~transpile",
-		Project:          "my-project",
-		WorkspaceVersion: "1.0.0",
-		Params:           map[string]any{"target": "es2022"},
+		Extension: "@putnami/typescript",
+		Task:      "build~transpile",
+		Project:   "my-project",
+		Params:    map[string]any{"target": "es2022"},
 	}
 
 	h1, err := key.ComputeHashUsing(NewCacheManager(nil))
@@ -39,7 +38,7 @@ func TestCacheKey_ComputeHash_Deterministic(t *testing.T) {
 }
 
 func TestCacheKeyFormatVersion(t *testing.T) {
-	const want = "v8"
+	const want = "v9"
 	if cacheKeyVersion != want {
 		t.Fatalf("cache key format version = %q, want %q", cacheKeyVersion, want)
 	}
@@ -542,7 +541,6 @@ func TestBuildCacheKey(t *testing.T) {
 		"tc1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		"my-project",
 		"wsid1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-		"1.0.0",
 		"",
 		[]string{"/pkg"},
 		map[string]any{"target": "es2022"},
@@ -628,7 +626,7 @@ func TestCacheKey_ComputeHash_ExtensionImplementationDigestMoves(t *testing.T) {
 }
 
 func TestCacheKey_HashFormatIsPinned(t *testing.T) {
-	// Golden pin of the v8 key format: a fixed key must hash to a fixed value.
+	// Golden pin of the v9 key format: a fixed key must hash to a fixed value.
 	// If this moves, the KEY FORMAT changed and every existing cache entry
 	// becomes a miss — that is sometimes the intent (a version bump like
 	// v4→v5), but it must be a reviewed, deliberate event, never a side
@@ -639,9 +637,9 @@ func TestCacheKey_HashFormatIsPinned(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "0c6e523e28d04888c42e9d19ae36a3c4aeba1ab429b661eff9d3d639bdf0c3c6"
+	const want = "9b56284a123d7de2564e0414418c0c61fa63f158200f36cff5f1b3dcbad577e9"
 	if got != want {
-		t.Errorf("v8 key format moved: got %s, pinned %s", got, want)
+		t.Errorf("v9 key format moved: got %s, pinned %s", got, want)
 	}
 }
 
@@ -658,7 +656,6 @@ func pinnedFormatKey() *CacheKey {
 		TaskContractDigest:            "tc1:0000000000000000000000000000000000000000000000000000000000000000",
 		Project:                       "proj",
 		ProjectMetadataDigest:         "wsid1:0000000000000000000000000000000000000000000000000000000000000000",
-		WorkspaceVersion:              "1.0.0",
 		EmbeddedVersion:               "1.0.0-abc",
 		SelectedProjects:              []string{"a", "b"},
 		UpstreamHashes:                []string{"up1", "up2"},
@@ -782,10 +779,9 @@ func TestCacheKey_ComputeHash_WithEnvVars(t *testing.T) {
 
 func TestCacheKey_ComputeHash_EmbeddedVersionVariesHash(t *testing.T) {
 	base := CacheKey{
-		Extension:        "ext",
-		Task:             "build",
-		Project:          "pkg",
-		WorkspaceVersion: "1.0.0",
+		Extension: "ext",
+		Task:      "build",
+		Project:   "pkg",
 	}
 
 	keyA := base

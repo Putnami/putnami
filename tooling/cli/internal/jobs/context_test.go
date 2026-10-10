@@ -1301,3 +1301,47 @@ func TestRegistriesParamIsNotACacheKeyInput(t *testing.T) {
 		t.Fatalf("moving the registry endpoint changed the task cache key: %s → %s", before, after)
 	}
 }
+
+// Two lanes that build one tree resolve two versions of its line, so a task the
+// cache can serve reads the line's version only when its key carries it (ADR
+// 0060). Every other cached task reads the tree's version, 0.0.0, and no
+// commit, in its own version and in every project reference.
+func TestBuildJobContextGivesTheLineVersionOnlyToATaskWhoseKeyCarriesIt(t *testing.T) {
+	t.Parallel()
+	ws := makeExecutorTestWorkspace(t)
+	project := &workspace.Project{ID: "/proj", Name: "proj", Path: "proj"}
+	ws.Projects = []*workspace.Project{project}
+	resolved := &JobContextVersion{
+		Base: "0.4.0", Full: "0.4.0-20261004094924-a389c95", Suffix: "20261004094924-a389c95",
+		SHA: "a389c95f00dfeed0123456789abcdef012345678", Branch: "main",
+	}
+	versions := rootLineVersions(resolved)
+
+	cached := cacheableJob("lint", "/proj", "proj", "proj")
+	versionAware := cacheableJob("package", "/proj", "proj", "proj")
+	versionAware.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{VersionAware: true}
+	uncached := cacheableJob("deploy", "/proj", "proj", "proj")
+	uncached.JobDef.Cache = false
+
+	for _, tc := range []struct {
+		name string
+		job  *ScheduledJob
+		want JobContextVersion
+	}{
+		{"a cached task", cached, JobContextVersion{Base: "0.0.0"}},
+		{"a version-aware task", versionAware, *resolved},
+		{"an uncached task", uncached, *resolved},
+	} {
+		tc.job.Project = project
+		ctx := BuildJobContext(ws, tc.job, nil, nil, versions)
+		if ctx.Version == nil || *ctx.Version != tc.want {
+			t.Errorf("%s: version = %+v, want %+v", tc.name, ctx.Version, tc.want)
+		}
+		if ctx.Workspace.Version != tc.want.Base {
+			t.Errorf("%s: workspace version = %q, want %q", tc.name, ctx.Workspace.Version, tc.want.Base)
+		}
+		if len(ctx.WorkspaceProjects) != 1 || ctx.WorkspaceProjects[0].Version != tc.want.Base {
+			t.Errorf("%s: workspace projects = %+v, want proj at %q", tc.name, ctx.WorkspaceProjects, tc.want.Base)
+		}
+	}
+}

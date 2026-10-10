@@ -38,6 +38,43 @@ const DefaultOutputPath = "schema/config.json"
 // options.generate.schema=false.
 const FallbackOutputPath = ".gen/config-schema.json"
 
+// DeclaredProjectVersion reads the version the project declares for ITSELF in
+// its own putnami.json. It returns "" when the file is absent, unreadable,
+// malformed, or declares no version: the common case, where the project
+// inherits its line's version.
+//
+// An inherited version comes from the line's tags and commit history, so
+// stamping it into a file makes that file churn on every release, in every
+// project at once, and a cache hit would restore it stale. A declared version is
+// an input of this project alone.
+//
+// The read is deliberately narrow — one field of one file inside the project —
+// so it stays a pure function of the project's own tree.
+func DeclaredProjectVersion(projectPath string) string {
+	data, err := os.ReadFile(filepath.Join(projectPath, "putnami.json"))
+	if err != nil {
+		return ""
+	}
+	var declared struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(data, &declared); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(declared.Version)
+}
+
+// SchemaVersion is the version every config schema carries, committed or under
+// .gen: the version the project declares for itself, or "0.0.0". The tasks that
+// write a schema are cached on the project's tree, and a version from the line's
+// history would be restored stale on a hit (tooling/cli ADR 0060).
+func SchemaVersion(projectPath string) string {
+	if version := DeclaredProjectVersion(projectPath); version != "" {
+		return version
+	}
+	return "0.0.0"
+}
+
 // ArtifactResult describes the files written by config schema extraction.
 type ArtifactResult struct {
 	SchemaPath     string
@@ -73,12 +110,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string
 
 	projectPath := ctx.Project.FullPath
 	appName := ctx.Project.Name
-	version := ""
-	if ctx.Version != nil {
-		version = ctx.Version.Full
-	}
-
-	result, ok, err := WriteArtifacts(projectPath, appName, version, resolveOutputPath(ctx))
+	result, ok, err := WriteArtifacts(projectPath, appName, SchemaVersion(projectPath), resolveOutputPath(ctx))
 	if err != nil {
 		emit.PhaseEnd("config-extract", "failed")
 		return "FAILED", nil, err

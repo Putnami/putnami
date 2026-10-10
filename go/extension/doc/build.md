@@ -29,7 +29,6 @@ Compiles Go packages and binaries **for the host platform**, with cross-compilat
 - Compile-checks libraries (`go build ./...`) instead of linking a binary they
   cannot produce; a top-level `lint,test,build` validation run omits only this
   redundant host-default step
-- Writes a `VERSION` file from the workspace version alongside the output binary
 - Emits a `binary-size` metric after each successful compile
 
 **Activation:** Any project containing `go.mod` or `*.go` files.
@@ -300,7 +299,6 @@ there would serve a stored verdict for a test the run never executed.
      applies the `--entrypoint` override if provided, and executes `go build`
      with the configured flags
    - Copies binary to `--install` path if specified
-   - Writes `VERSION` file next to the output binary
    - An explicit platform request additionally applies the distribution-flavoured
      defaults (`-trimpath`, CGO off unless `--cgo` says otherwise) and writes the
      platform-partitioned `bin/<platform-suffix>/` tree
@@ -533,10 +531,10 @@ and naming it would make the path depend on the machine that produced it. An
 explicit platform request keeps the partitioned tree the package channels index
 by. Libraries write no `bin/` at all.
 
-The binary name is derived from the project name. A `VERSION` file is written to
-the command output directory in every case, including for libraries: it records
-the workspace version the output tree was built at, which is true whether or not
-the tree also holds binaries.
+The binary name is derived from the project name. The output tree holds no
+version file: a compile key does not read the release line's version, so a file
+naming it would go stale on a cache hit. A binary that reports its version gets
+it from `version-var`, which puts the version in the key.
 
 ## Declared Outputs
 
@@ -550,8 +548,8 @@ Every declared output has exactly one owning task:
 | `build-describe` | `.gen/schema/`, `.gen/clientgen/`, `.gen/design/`, `.gen/migrations.json`, `.gen/migration-bundle/`, and the generated client directory (via the `clientOutputs` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
 | `config-merge-exec` | `.gen/conf/.env.<APP_ENV or local>.yaml` (via the `mergedConfig` port) | project dir |
 | `config-merge-test-exec` | `.gen/conf/.env.test.yaml` | project dir |
-| `build-compile` | `bin/`, `VERSION` | per-command output dir (`build` only) |
-| `build-cross-compile` | `bin/`, `VERSION` | per-command output dir (`package` only) |
+| `build-compile` | `bin/` | per-command output dir (`build` only) |
+| `build-cross-compile` | `bin/` | per-command output dir (`package` only) |
 | `test-exec` | `coverage.out`, `coverage.html` | per-command output dir |
 | `package-go` | `go/` | per-command output dir |
 | `package-archives` | `archives/` | per-command output dir |

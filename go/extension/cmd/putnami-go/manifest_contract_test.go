@@ -362,8 +362,8 @@ func (r ownerRow) String() string {
 //     (APP_ENV is pinned there), the build variant through the mergedConfig
 //     port, because two pathFrom outputs on ONE port name collide at plan
 //     time for two manifest tasks planned for the same project.
-//   - build-compile and build-cross-compile both write `bin/` and `VERSION` into
-//     the per-command output directory. Resolved by COMMAND DISJOINTNESS: they
+//   - build-compile and build-cross-compile both write `bin/` into the
+//     per-command output directory. Resolved by COMMAND DISJOINTNESS: they
 //     never appear in one command (compile only under `build`, cross-compile only
 //     under `package`), so they resolve to different directories.
 //   - The three package channels share one per-command output directory.
@@ -394,9 +394,7 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 
 	want := []ownerRow{
 		{task: "build-compile", id: "bin", kind: "directory", root: "command-output", path: "bin", optionalEmpty: true},
-		{task: "build-compile", id: "version", kind: "file", root: "command-output", path: "VERSION", optionalEmpty: true},
 		{task: "build-cross-compile", id: "bin", kind: "directory", root: "command-output", path: "bin", optionalEmpty: true},
-		{task: "build-cross-compile", id: "version", kind: "file", root: "command-output", path: "VERSION", optionalEmpty: true},
 		{task: "build-describe", id: "client", kind: "directory", root: "project", path: "clientOutputs", optionalEmpty: true, drift: "fail"},
 		{task: "build-describe", id: "clientgen", kind: "directory", root: "project", path: ".gen/clientgen", optionalEmpty: true},
 		{task: "build-describe", id: "design", kind: "directory", root: "project", path: ".gen/design", optionalEmpty: true},
@@ -716,8 +714,8 @@ func stepDependsOn(m *proto.Manifest, command string, step proto.PipelineStep, i
 	return reaches(step)
 }
 
-// TestCompileAndCrossCompileNeverShareACommand pins the premise the bin//VERSION
-// ownership rests on. Both tasks declare the same two command-output paths; that
+// TestCompileAndCrossCompileNeverShareACommand pins the premise the bin/
+// ownership rests on. Both tasks declare the same command-output path; that
 // is legal only because they are scheduled by disjoint command sets, so the
 // per-command output directory each resolves to is a different directory. If
 // they ever land in one command, the declarations become a real collision and
@@ -734,7 +732,7 @@ func TestCompileAndCrossCompileNeverShareACommand(t *testing.T) {
 	}
 	if sharesAnyCommand(commands["build-compile"], commands["build-cross-compile"]) {
 		t.Errorf("build-compile (%v) and build-cross-compile (%v) now share a command; "+
-			"their identical bin/ and VERSION declarations would resolve to one directory",
+			"their identical bin/ declarations would resolve to one directory",
 			commands["build-compile"], commands["build-cross-compile"])
 	}
 }

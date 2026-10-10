@@ -1,6 +1,7 @@
 # ADR 0059 — A cache key describes the tree, not the commit
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0060](0060-the-base-version-is-not-a-cache-key-input.md)
 - **Scope**: `@putnami/cli` (`internal/store`, `internal/jobs`)
 
 ## Context
@@ -73,12 +74,10 @@ not ignore it.
 - Two runs on one tree, at one base version, share every key that is not
   version-aware and copies no stamp through a generate asset, whatever the
   commit, the branch or the checkout directory.
-- A key still carries the base version of the project's release line
-  (`WorkspaceVersion`). Two commits on one tree that resolve two base versions
-  key differently. The base comes from the conventional commits since the
-  line's last tag, so a pull request head and its squash commit resolve two
-  bases on one tree when the squash title and the branch's commits call for
-  different bumps, and their keys move by design.
+- A key still carried the base version of the project's release line
+  (`WorkspaceVersion`), so two lanes that resolved two base versions on one
+  tree keyed differently. [ADR 0060](0060-the-base-version-is-not-a-cache-key-input.md)
+  removes it.
 - A task that reads the commit from the stamp, without declaring
   `versionAware` or receiving `version-var`, is served the output of another
   commit on a hit.

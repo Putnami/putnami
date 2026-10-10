@@ -175,13 +175,17 @@ func versionFromLineTag(tag, pattern string) (string, bool) {
 // the author time, is what changes when a commit is rebased or amended, so it
 // is the time that orders what actually reached a branch. The revision follows
 // --end-of-options so a caller-supplied value can never be read as a flag.
+//
+// Zero is a time: a commit dated at the Unix epoch records it. The hosted
+// pull request runner dates its squash commit there so that one base and one
+// tree always give one commit, and refusing it left that run with no version.
 func commitTime(repoRoot, revision string) (time.Time, bool) {
 	output, err := run(repoRoot, "show", "-s", "--format=%ct", "--end-of-options", revision)
 	if err != nil {
 		return time.Time{}, false
 	}
 	seconds, err := strconv.ParseInt(strings.TrimSpace(output), 10, 64)
-	if err != nil || seconds <= 0 {
+	if err != nil || seconds < 0 {
 		return time.Time{}, false
 	}
 	return time.Unix(seconds, 0).UTC(), true
