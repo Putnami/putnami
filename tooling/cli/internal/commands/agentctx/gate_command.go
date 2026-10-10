@@ -1,33 +1,26 @@
 package agentctx
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	ciproto "go.putnami.dev/protocol/ci"
-	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
+	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
-// defaultGateTasks is the generic verification gate emitted for a workspace
-// that declares no CI document. It matches the commands `putnami ci init`
-// scaffolds, so a workspace that later adopts the default document keeps the
-// same line.
+// defaultGateTasks is the part of the default gate every workspace without a
+// usable CI document receives, whatever its extensions declare. It equals the
+// gate of the protocol's default CI document.
 const defaultGateTasks = "lint,test,build"
 
-// sddExtensionName is the extension that owns `validate` and
-// `validate-workspace`. A workspace that declares it plans both, so its
-// verification gate is one word longer than the generic one.
-const sddExtensionName = "@putnami/sdd"
-
-// sddDefaultGateTasks is the gate a workspace without a CI document receives
-// when it declares the SDD extension. `validate` alone is enough: the SDD
-// manifest's `alsoRuns` plans `validate-workspace` with it, and this is the
-// fixed gate Putnami Cloud's native runner executes for every workspace.
-const sddDefaultGateTasks = defaultGateTasks + ",validate"
+// validateTask joins the default gate when an extension the workspace
+// discovers declares a job of that name. The gate names it alone: the
+// manifest that declares it plans its companions (`alsoRuns`) with it.
+const validateTask = "validate"
 
 // gateTaskPrefix is the conventional putnami verification order: lint gives the
 // fastest signal, test the strongest, build the slowest. The generated guidance
@@ -40,22 +33,15 @@ var gateTaskPrefix = []string{"lint", "test", "build"}
 // blocking commands join it: a `failOnError: false` entry never fails a run,
 // so telling a contributor it gates their merge would be false.
 //
-// The gate is guidance about THIS workspace, so hardcoding it is wrong in both
-// directions: a workspace that declares extension tasks (`validate` and
-// `validate-workspace` come from @putnami/sdd) gets told to run less than CI
-// does, and a workspace without that extension would be told to run commands
-// that do not exist. Reading putnami.ci.json makes the sentence true by
-// construction and keeps the generated files stable — the CI document is the
-// only input, and a regeneration that does not change it cannot change them.
+// The gate is guidance about THIS workspace: a hardcoded line would tell a
+// workspace whose extensions declare more tasks to run less than its CI does,
+// and tell another workspace to run commands that do not exist. Reading
+// putnami.ci.json makes the sentence true by construction and keeps the
+// generated files stable: a regeneration that does not change the document
+// cannot change them.
 //
-// Every failure to read a usable job falls back to the workspace default: an
-// absent, unreadable, or invalid document must leave the generic guidance
-// exactly as it was before this derivation existed. The default itself is
-// derived from the one declaration that decides whether `validate` exists at
-// all — whether the workspace declares the SDD extension — because Putnami
-// Cloud's native runner executes the same fixed gate for every workspace and
-// consumes no CI document, so a workspace without one must still be told the
-// gate that CI actually runs.
+// Every failure to read a usable command falls back to the workspace default
+// (defaultGateTasksForWorkspace).
 func gateTasksForWorkspace(wsRoot string) string {
 	data, err := os.ReadFile(filepath.Join(wsRoot, ciproto.Filename))
 	if err != nil {
@@ -93,21 +79,24 @@ func GateTasks(wsRoot string) string {
 	return gateTasksForWorkspace(wsRoot)
 }
 
-// defaultGateTasksForWorkspace returns the generic gate, plus `validate` when
-// the workspace declares the SDD extension by name or as a local path whose
-// manifest carries that name. Any unreadable input keeps the generic gate.
+// defaultGateTasksForWorkspace returns the gate of a workspace without a
+// usable CI document: lint, test and build always, then validate when an
+// extension the workspace discovers declares a job of that name. Any failure
+// to discover the extensions keeps lint, test and build.
 func defaultGateTasksForWorkspace(wsRoot string) string {
-	if workspaceDeclaresExtension(wsRoot, sddExtensionName) {
-		return sddDefaultGateTasks
+	if workspaceDeclaresJob(wsRoot, validateTask) {
+		return defaultGateTasks + "," + validateTask
 	}
 	return defaultGateTasks
 }
 
-// workspaceDeclaresExtension reports whether the workspace's own
-// putnami.workspace.json declares the named extension, either directly or as a
-// local path whose manifest names it. It reads the workspace file alone, never
-// the global config, so the answer is a function of the committed tree.
-func workspaceDeclaresExtension(wsRoot, name string) bool {
+// workspaceDeclaresJob reports whether an extension the workspace discovers
+// declares the named job. Discovery reads the workspace's own
+// putnami.workspace.json and never the global configuration, so the answer
+// depends on the workspace and the extensions installed for it, not on the
+// machine's user settings. A workspace without that file runs no discovery.
+// An extension that discovery skips declares nothing.
+func workspaceDeclaresJob(wsRoot, name string) bool {
 	data, err := os.ReadFile(filepath.Join(wsRoot, wsproto.WorkspaceConfigFilename))
 	if err != nil {
 		return false
@@ -116,35 +105,12 @@ func workspaceDeclaresExtension(wsRoot, name string) bool {
 	if cfg == nil || len(diagnostics) != 0 {
 		return false
 	}
-	for _, declared := range cfg.Extensions.Names() {
-		if declared == name {
-			return true
-		}
-		if !strings.HasPrefix(declared, "/") {
-			continue
-		}
-		if localExtensionManifestName(filepath.Join(wsRoot, filepath.FromSlash(declared))) == name {
-			return true
-		}
+	discovered, err := shared.DiscoverWorkspaceExtensions(wsRoot, cfg)
+	if err != nil || discovered == nil {
+		return false
 	}
-	return false
-}
-
-// localExtensionManifestName reads only the manifest's name. It deliberately
-// avoids the full manifest loader: the gate derivation must not depend on the
-// extension contract version the running CLI accepts.
-func localExtensionManifestName(dir string) string {
-	data, err := os.ReadFile(filepath.Join(dir, extproto.ManifestFilename))
-	if err != nil {
-		return ""
-	}
-	var manifest struct {
-		Name string `json:"name"`
-	}
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		return ""
-	}
-	return strings.TrimSpace(manifest.Name)
+	_, declared := extension.BuildJobMap(discovered.Extensions)[name]
+	return declared
 }
 
 // orderGateTasks renders the gate as the comma-joined argument list a

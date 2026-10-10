@@ -17,7 +17,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // seededCommands is the order `ci init` writes the discovered commands in. It
@@ -202,17 +201,9 @@ type ciGraph struct {
 }
 
 func loadCIGraph(wsRoot string, cfg *wsproto.Config) (ciGraph, error) {
-	ws, err := workspace.Load(wsRoot)
+	discovered, err := shared.DiscoverWorkspaceExtensions(wsRoot, cfg)
 	if err != nil {
-		return ciGraph{}, cmderr.InvalidConfigf("load workspace graph: %v", err)
-	}
-	projectPaths := make([]string, 0, len(ws.Projects))
-	for _, project := range ws.Projects {
-		projectPaths = append(projectPaths, project.Path)
-	}
-	discovered, err := extension.DiscoverExtensionsDetailed(wsRoot, cfg, projectPaths)
-	if err != nil {
-		return ciGraph{}, cmderr.InvalidConfigf("discover workspace jobs: %v", err)
+		return ciGraph{}, cmderr.InvalidConfigf("%v", err)
 	}
 	if len(discovered.Skipped) > 0 {
 		first := discovered.Skipped[0]
