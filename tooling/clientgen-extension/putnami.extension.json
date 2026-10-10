@@ -148,7 +148,7 @@
             "package.json",
             "schema/openapi.json"
           ],
-          "workspaceFiles": [".editorconfig", "biome.json", "tsconfig.base.json"]
+          "workspaceFiles": [".editorconfig", "biome.json", "package.json", "tsconfig.base.json"]
         }
       },
       "declares": {

@@ -112,7 +112,8 @@
             "checks": [
               "a-cacheable-generator-keys-on-the-built-contract-it-reads",
               "an-undeclarable-formatter-input-fails-instead-of-being-skipped",
-              "every-resolved-formatter-input-is-a-declared-cache-key-entry"
+              "every-resolved-formatter-input-is-a-declared-cache-key-entry",
+              "the-workspace-root-package-json-keys-the-typescript-target"
             ]
           }
         },
@@ -210,7 +211,8 @@
               "forged-missing-and-extra-generated-artifacts-fail",
               "intentional-sync-can-be-checked-before-commit",
               "sync-compares-a-fresh-render-with-the-worktree",
-              "the-check-judges-committed-bytes-against-the-committed-manifest-and-contract"
+              "the-check-judges-committed-bytes-against-the-committed-manifest-and-contract",
+              "the-fresh-render-reads-the-workspace-root-inputs-the-build-reads"
             ]
           }
         },

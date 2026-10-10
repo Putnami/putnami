@@ -290,7 +290,9 @@ while another step of the same project rewrites `.gen`.
 
 Both project tasks are cacheable, so their cache keys name every input that
 decides an emitted byte: the clientgen configuration, the built contract, the
-provider `package.json` and — for the TypeScript target — the Biome
+provider `package.json` and — for the TypeScript target — the workspace root
+`package.json`, which decides whether the client depends on `@putnami/client`
+through `catalog:`, a pinned version or `workspace:*`, and the Biome
 configuration, its `extends` chain and the EditorConfig beside it, because the
 emitter canonicalizes every file it writes with Biome. A configuration this
 resolution cannot name as a workspace path (a package specifier, a path outside
