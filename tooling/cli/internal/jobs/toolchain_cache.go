@@ -12,8 +12,8 @@ import (
 // The value is deliberately far above what a healthy `--version` costs
 // (milliseconds), because a slow but working tool that trips the deadline
 // fails its probe. Five seconds absorbs a cold page-in of a ~100MB binary on a
-// loaded CI box while still bounding a tool that wedges while it runs to a
-// single short stall per process.
+// loaded CI box while still bounding a tool that wedges while it runs to one
+// short stall per probe.
 //
 // The deadline counts from the probe's first instruction (hostProcessDeadline).
 // The time the host holds a new process before that, such as darwin's check of

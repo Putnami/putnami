@@ -1602,7 +1602,9 @@ restore stale build, test, or lint results. They also vary with the Bun **binary
 version: Bun produces those outputs, and a package lockfile does not name the
 Bun that runs. The TypeScript extension declares Bun as the `taskRuntime`
 runtime toolchain of every task, so the toolchain field of the key carries the
-lock identity of that Bun alongside the Go runtime identity.
+lock identity of that Bun alongside the Go runtime identity. A workspace with no
+`putnami.lock.json` yet runs the Bun on its PATH under an unavailable identity,
+so its keys do not follow that Bun until the lock pins one.
 
 | Variable | Effect | Default |
 |----------|--------|---------|
