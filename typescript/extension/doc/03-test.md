@@ -258,6 +258,10 @@ code that treats `K_SERVICE` as the production signal
 would otherwise refuse test-only behavior inside a test, failing deterministically
 on that host and nowhere else.
 
+On a hosted run, `PUTNAMI_OFFLINE_DEPENDENCIES` and `PUTNAMI_JOB_CREDENTIAL_FD`
+are removed too. They describe the job to the extension, and your tests are not
+jobs of the run.
+
 Credentials are **not** scrubbed. `GOOGLE_APPLICATION_CREDENTIALS`, the AWS
 credential variables, `GOOGLE_CLOUD_PROJECT` and `DATABASE_TEST_BINDINGS` all
 survive, so an integration test that talks to a real backend still can. The

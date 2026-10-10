@@ -89,7 +89,7 @@
     },
     {
       "id": "test-host-identity-scrub",
-      "text": "A test subprocess does not inherit the managed-runtime platform identity of the machine that launched it, while every other inherited environment variable is preserved."
+      "text": "A test subprocess inherits neither the managed-runtime platform identity of the machine that launched it nor the two variables that describe a job of a hosted run. Every other inherited environment variable is preserved, the go settings that forbid a module download among them."
     },
     {
       "id": "test-failure-attribution",

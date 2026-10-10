@@ -156,7 +156,8 @@
               "credential-and-endpoint-bearing-variables-are-excluded",
               "the-list-is-sorted-and-unique",
               "matching-is-case-sensitive",
-              "the-list-is-returned-as-an-independent-copy"
+              "the-list-is-returned-as-an-independent-copy",
+              "the-job-variables-of-a-hosted-run-are-scrubbed"
             ]
           }
         },

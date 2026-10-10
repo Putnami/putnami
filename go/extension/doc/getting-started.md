@@ -417,6 +417,9 @@ With it:
 - `build-tidy` runs no `go mod tidy`, as with `GOPROXY=off`. The task keys its
   cache on `PUTNAMI_OFFLINE_DEPENDENCIES`, so this no-op never answers a run that
   can download modules.
+- The `go test` process and the tests it runs keep those `go` settings, and see
+  neither `PUTNAMI_OFFLINE_DEPENDENCIES` nor `PUTNAMI_JOB_CREDENTIAL_FD`. Your
+  tests are not jobs of the run.
 
 Without `PUTNAMI_OFFLINE_DEPENDENCIES`, every `go` command runs with the same
 environment and arguments as before.
