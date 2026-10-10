@@ -357,7 +357,7 @@ func runGoDeps(ctx context.Context, wsRoot, action string, modules []string, pro
 // goDepsCommand returns the go command a deps edit runs: the one a task of the
 // workspace's Go extension runs, the release the workspace lock pins, installed
 // first on a host that has none (ensureGoCommand). A caller resolves it before
-// its first edit, so a failure leaves the workspace as it was. When the version
+// its first edit, so a failure edits no go.mod or putnami.json. When the version
 // probe of a go timed out, that go is there and slow: the error names rerun, the
 // deps command the user ran, as the next step. Any other failure to find a go
 // names putnami install.

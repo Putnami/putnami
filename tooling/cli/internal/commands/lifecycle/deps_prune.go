@@ -275,8 +275,8 @@ func manualManifestEdit(entry routedFinding) string {
 //
 // The go the Go module edits run with is resolved once, before the first edit
 // of any file. A go that cannot be found, or whose version probe timed out,
-// stops the command with the workspace as it was, so the rerun it names reads
-// the provider view this one read.
+// stops the command before it edits any go.mod or putnami.json, so the rerun
+// it names reads the provider view this one read.
 func applyPrune(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 	routed []routedFinding, pruned int, rerun string, out io.Writer, env LifecycleEnv) error {
 	byProject := make(map[string][]routedFinding)

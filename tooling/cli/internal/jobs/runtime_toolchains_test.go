@@ -138,6 +138,41 @@ func TestRuntimeToolchainProbeTimeoutIsFiveSecondsUnlessTheCallerSetsOne(t *test
 	if got := runtimeToolchainProbeTimeout(WithToolchainProbeTimeout(context.Background(), 0)); got != 5*time.Second {
 		t.Fatalf("probe timeout = %s, want the production 5s for a deadline of zero", got)
 	}
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var callers []string
+	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if name := entry.Name(); name == "testdata" || name == ".putnami" || name == "node_modules" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for line := range strings.SplitSeq(string(data), "\n") {
+			if strings.Contains(line, "WithToolchainProbeTimeout(") && !strings.HasPrefix(line, "func WithToolchainProbeTimeout(") && !strings.HasPrefix(strings.TrimSpace(line), "//") {
+				callers = append(callers, path)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(callers) != 0 {
+		t.Fatalf("production code shortens the toolchain probe timeout: %v", callers)
+	}
 }
 
 // A required toolchain whose probe timed out fails with the text of any other
