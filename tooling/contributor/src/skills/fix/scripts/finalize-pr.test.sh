@@ -21,11 +21,10 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 # The finalizer runs from a copy of the shipped scripts, and every copy below
 # sits under TEST_DIR, whose putnamiw starts the CLI the Go harness built from
-# this tree. Its tree fingerprint is then the CLI's, without the staleness
-# check this repository's own putnamiw runs over the CLI sources first: the
-# suite fingerprints the tree about 150 times, and on a loaded machine that
-# check alone outlasted `go test`'s limit. TestTreeFingerprint runs the script
-# through the real wrapper.
+# this tree: each tree fingerprint is that CLI's, without the staleness check
+# this repository's putnamiw runs over the CLI sources first.
+# tree-fingerprint.test.sh runs the script through the real wrapper and
+# through a CLI on PATH.
 mkdir -p "$TEST_DIR/shipped/skills/fix/scripts" "$TEST_DIR/shipped/skills/check/scripts"
 for script in finalize-pr.sh tree-fingerprint.sh machine-load.sh; do
   cp "$ROOT/.agents/skills/fix/scripts/$script" "$TEST_DIR/shipped/skills/fix/scripts/$script"
@@ -126,7 +125,10 @@ set -euo pipefail
 # PUTNAMI_TEST_UPSERT_RECONCILE from the CLI's own hint producer.
 case "${1:-}" in
   tree)
-    [ "${2:-}" = verify ]
+    if [ "${2:-}" != verify ]; then
+      echo "finalize-pr test: the gate CLI answers only tree verify, not tree ${2:-}" >&2
+      exit 2
+    fi
     shift 2
     # no-tree-verify stands for a CLI older than `tree verify`, which answers
     # the way the published one does.
@@ -967,8 +969,8 @@ if grep -q '^PROPOSAL_REF=' "$TEST_DIR/unresolved.out"; then
 fi
 
 # Consumer repositories may install only the PATH CLI. Exercise the real
-# finalizer and its retry through that entrypoint, with real git, a local
-# remote and the real collaboration route.
+# finalizer's collaboration calls and its retry through that entrypoint, with
+# real git, a local remote and the real collaboration route.
 cp "$TEST_DIR/work/putnamiw" "$TEST_DIR/bin/putnami"
 git -C "$TEST_DIR/work" rm -q putnamiw
 git -C "$TEST_DIR/work" commit -q -m "fix(test): use the installed CLI"
