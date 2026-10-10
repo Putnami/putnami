@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"regexp"
+	"slices"
 )
 
 // Session subscriber evidence: the v1 document the engine writes beside a
@@ -194,19 +196,52 @@ func ParseSessionSubscribersFile(data []byte) (*SessionSubscribersFile, error) {
 // requireEvidenceMembers refuses a value that is not an object, omits a required
 // member, or sets any member to null.
 func requireEvidenceMembers(data []byte, required ...string) error {
+	switch fault, name := findMemberFault(data, required...); fault {
+	case memberFaultNotObject:
+		return fmt.Errorf("invalid subscriber evidence JSON")
+	case memberFaultNull:
+		return fmt.Errorf("null subscriber evidence member")
+	case memberFaultMissing:
+		return fmt.Errorf("missing subscriber evidence member %s", name)
+	}
+	return nil
+}
+
+// memberFault is what findMemberFault finds wrong with a value that must be a
+// JSON object.
+type memberFault int
+
+const (
+	// memberFaultNone: the value is an object with every required member and
+	// no null member.
+	memberFaultNone memberFault = iota
+	// memberFaultNotObject: the value is not a JSON object.
+	memberFaultNotObject
+	// memberFaultNull: a member is null.
+	memberFaultNull
+	// memberFaultMissing: a required member is absent.
+	memberFaultMissing
+)
+
+// findMemberFault finds the first fault of a value that must be a JSON object
+// holding every required member and no null member, which a struct decode
+// cannot tell from an absent or zero one. It checks in that order: the object,
+// then a null member, the first in name order, then a missing member, the
+// first in required order. It returns the member the fault names.
+func findMemberFault(data []byte, required ...string) (memberFault, string) {
 	var members map[string]json.RawMessage
 	if err := json.Unmarshal(data, &members); err != nil || members == nil {
-		return fmt.Errorf("invalid subscriber evidence JSON")
+		return memberFaultNotObject, ""
 	}
-	for _, value := range members {
-		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-			return fmt.Errorf("null subscriber evidence member")
+	for _, name := range slices.Sorted(maps.Keys(members)) {
+		if bytes.Equal(bytes.TrimSpace(members[name]), []byte("null")) {
+			return memberFaultNull, name
 		}
 	}
 	for _, name := range required {
 		if _, ok := members[name]; !ok {
-			return fmt.Errorf("missing subscriber evidence member %s", name)
+			return memberFaultMissing, name
 		}
 	}
-	return nil
+	return memberFaultNone, ""
 }

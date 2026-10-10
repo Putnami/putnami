@@ -33,6 +33,7 @@ import protocolcli "go.putnami.dev/protocol/cli"
 | `SessionReporterCommand`, `LogReporterCommand` and their `*Env`/`*TokenEnv`, `SessionReportingArtifacts`, `SessionReportingPlanBytes`, `SessionReportingChunk`, `SessionReportingAck`, `SessionReportingHandshake`, `SessionReportingHandshakeResult` | The native reporting capabilities (session reporter, log reporter), their chunk/ACK wire, and the v2 handshake that hands a reporter the run credential of a hosted run — [doc/04-session-reporting.md](doc/04-session-reporting.md) |
 | `SessionSubscribersFile`, `NewSessionSubscriberEvidence`, `ParseSessionSubscribersFile` | Per-subscriber delivery evidence (`subscribers.json`) for a session's event stream — [doc/05-session-subscribers.md](doc/05-session-subscribers.md) |
 | `ReservedGlobalFlags`, `IsReservedGlobalFlag`, `LookupReservedGlobalFlag`, `ValidateNoReservedShadow` | The reserved global-flag registry — flags every surface handles and no extension may redefine |
+| `CommandSurface`, `NewCommandSurface`, `MarshalCommandSurface`, `ParseCommandSurface`, `ErrUnknownCommandSurfaceVersion`, `IncompatibleCommandChanges` | The command-surface document a CLI commits, and the comparison that finds an incompatible change to its commands and flags — [doc/06-command-surface.md](doc/06-command-surface.md) |
 
 See [doc/01-contract.md](doc/01-contract.md) for the full contract.
 
@@ -83,6 +84,20 @@ whole live/artifact pair passing `ValidateSessionStream` makes the bounded
 promise. This module defines that opt-in wire; the CLI producer remains legacy
 until the dedicated producer-adoption task enables it.
 
+## The command surface
+
+[doc/06-command-surface.md](doc/06-command-surface.md) specifies the
+command-surface document: the commands, flags and positionals a CLI's users
+type, sorted and free of help prose, at `protocolVersion: 1`. A reader reads
+every version up to its own, and reports a later one as
+`ErrUnknownCommandSurfaceVersion` rather than as a malformed document.
+`IncompatibleCommandChanges` compares two of them and names each change that
+can break an invocation that used to work, such as a removed flag or a value
+dropped from a closed list. It is published as
+[schemas/command-surface.json](schemas/command-surface.json) (`$id`
+`https://putnami.dev/schemas/putnami-cli-command-surface.json`). Go is its only
+runtime.
+
 ## The session report
 
 [doc/03-report.md](doc/03-report.md) specifies `reportFile` — the run's
@@ -105,6 +120,7 @@ ceilings drop **counted** rather than lost.
 | `tooling/cli/internal/mcp` | The MCP `run_jobs` / `plan_jobs` results |
 | `tooling/cli/internal/telemetry`, `.../watch`, `.../engine`, `.../jobs` | Run summaries, task records and stream records |
 | `go/extension/internal/jobs/test`, `typescript/extension/cmd/putnami-ts`, `python/extension/internal/jobs` | The bounded `TestCase` list a test task hands the CLI, which the CLI writes as `test:case` records |
+| `tooling/cli/internal/commandmeta` | The CLI's command surface, committed as `tooling/cli/command-surface.json` |
 
 **Consumers**
 
@@ -113,6 +129,7 @@ ceilings drop **counted** rather than lost.
 | `tooling/cli/internal/{cli,clibin,cmderr,commands,extension,launch,lockfile,workspace_state}` | Exit-code classification, output-mode resolution, reserved flags, and reading recorded sessions |
 | `tooling/extension-sdk/{cli,manifest,runtimeinfo}` | The exit-code taxonomy and reserved global-flag registry every extension binary must honour |
 | `go/extension/internal/jobs/pkg`, `typescript/extension/internal/pkg` | The package-time contract stamp |
+| `go/extension/internal/jobs/apicheck` | Compares a stable project's command surface with its line's last tag in `validate` |
 | [`protocols/extension`](../extension/README.md) | Negotiates a manifest's `cliContract` against `CurrentContract` |
 | [`protocols/job`](../job/README.md) | Shares the typed task identity |
 | [`protocols/ci`](../ci/README.md) | Carries the typed task identity in every ChangePlan task |
@@ -155,6 +172,9 @@ Compatibility rules:
   `https://putnami.dev/schemas/putnami-cli-result.json`, the retired v1 shape
   kept for readers). `drift_test.go` and `drift_v2_test.go` hold each schema and
   its Go structs in lock-step.
+- Command surface: [`schemas/command-surface.json`](schemas/command-surface.json),
+  held against its Go types by `command_surface_test.go`, with a Go-only
+  corpus in [`testdata/command-surface/`](testdata/command-surface/documents.json).
 - Conformance corpus: [`conformance/manifest.json`](conformance/manifest.json)
   and [`conformance/pack.json`](conformance/pack.json), documented in
   [`conformance/README.md`](conformance/README.md). Each case embeds the exact

@@ -185,6 +185,23 @@
           }
         },
         {
+          "id": "cli-compatibility-marker",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-incompatible-cli-change-without-a-marker-fails-naming-command-and-flag",
+              "an-added-cli-flag-is-compatible",
+              "a-breaking-marker-allows-a-cli-change",
+              "a-cli-flag-type-change-is-incompatible",
+              "a-tag-without-the-cli-document-gives-a-note"
+            ]
+          }
+        },
+        {
           "id": "managed-toolchain",
           "stage": "coded",
           "evidenceKinds": [

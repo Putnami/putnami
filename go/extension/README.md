@@ -13,7 +13,7 @@ independently of the current host, so every such target must resolve.
 - **Build** — compile Go binaries with cross-compilation (5 platforms)
 - **Test** — run tests with coverage, metrics, and per-file breakdown
 - **Lint** — golangci-lint + staticcheck, auto-installed on first use
-- **Validate** — a stable project's exported API cannot break without a breaking-change marker
+- **Validate** — a stable project's exported API, and the commands and flags of a CLI it ships, cannot break without a breaking-change marker
 - **Serve** — hot-reload in development, pre-built binary in production
 - **Run** — run a workload once for the host and forward its exit code
 - **Package** — create release archives, Docker images, and Go module distributions
@@ -52,7 +52,7 @@ putnami serve api-gateway
 | Build | `putnami build` | Compile with cross-compilation, automatic dependency sync | [doc/build.md](./doc/build.md) |
 | Test | `putnami test` | Run tests with coverage profile and per-file breakdown | [doc/test.md](./doc/test.md) |
 | Lint | `putnami lint` | golangci-lint + staticcheck, auto-fix support | [doc/lint.md](./doc/lint.md) |
-| Validate | `putnami validate` | Fail an incompatible API change of a stable project without a breaking-change marker | [doc/validate.md](./doc/validate.md) |
+| Validate | `putnami validate` | Fail an incompatible API or command-surface change of a stable project without a breaking-change marker | [doc/validate.md](./doc/validate.md) |
 | Serve | `putnami serve` | Hot-reload dev server or pre-built production binary | [doc/serve.md](./doc/serve.md) |
 | Run | `putnami run` | Run a workload once for the host and forward its exit code | [doc/run.md](./doc/run.md) |
 | Package | `putnami package` | Create archives, Docker images, Go module distributions | [doc/package.md](./doc/package.md) |

@@ -12,7 +12,7 @@
 //	build-generate  Generate openapi/proto/etc. specs from project sources
 //	test            Run Go tests with coverage
 //	lint            Lint Go code with golangci-lint and staticcheck
-//	validate-api    Check a stable project's exported API against its line's last tag
+//	validate-api    Check a stable project's exported API and command surface against its line's last tag
 //	serve           Run Go application with hot-reload
 //	run             Run a Go workload once and forward its exit code
 //	package         Create distribution packages

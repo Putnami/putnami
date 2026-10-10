@@ -120,6 +120,10 @@
       "text": "Validate holds the breaking-change marker for every Go project the root support catalog lists as stable, or every Go project when there is no catalog: an incompatible change to the exported API since the last tag of the project's line fails, naming the package and the symbol, unless a commit since that tag that touches the project declares it with \"!\" or a breaking-change footer. Additions, renamed parameters and renamed imports are compatible; an unlisted, preview or experimental project is not checked."
     },
     {
+      "id": "cli-compatibility-marker",
+      "text": "Validate holds the breaking-change marker for the command-surface document a stable Go project declares for the CLI it ships: since the last tag of the project's line, a removed command, flag, short alias or accepted value, or a flag that starts or stops taking a value, fails naming the command and the flag unless a commit since that tag declares it breaking. An added flag is compatible. A tag at which the project declared no document gives a note, and the API is still compared."
+    },
+    {
       "id": "image-input-producers",
       "text": "Image packaging materializes the project's declared build producers before assembly, including when the image is selected through an upstream package dependency; it does not enter Go compiler steps for an image project."
     },

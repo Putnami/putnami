@@ -617,6 +617,7 @@ func TestCompatibilityBudgetDocumentMatchesTheCode(t *testing.T) {
 			MinSupportedVersion, MaxSupportedVersion, DefaultWriteVersion),
 		fmt.Sprintf("implements CLI ↔ extension contract %d", protocolcli.CurrentContract),
 		fmt.Sprintf("carries machine result protocol version %d", protocolcli.ResultProtocolVersion),
+		fmt.Sprintf("every version from 1 to the reader's own (currently %d)", protocolcli.CommandSurfaceVersion),
 	}
 	for _, claim := range claims {
 		if !strings.Contains(doc, claim) {

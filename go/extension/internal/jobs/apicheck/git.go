@@ -158,23 +158,18 @@ func withoutGitTrace(env []string) []string {
 // Symbolic links and submodules are not files of the package and are left
 // out.
 func filesAtTag(dir, tag string) ([]apisurface.File, error) {
-	listing, err := gitOutput(dir, "ls-tree", "-r", "-z", "refs/tags/"+tag, "--", ".")
+	entries, err := treeAtTag(dir, tag, ".", treeListing{recursive: true})
 	if err != nil {
 		return nil, err
 	}
 	blobs := map[string]string{}
 	var listed []string
-	for entry := range strings.SplitSeq(listing, "\x00") {
-		meta, name, found := strings.Cut(entry, "\t")
-		if !found {
+	for _, entry := range entries {
+		if !entry.regular {
 			continue
 		}
-		fields := strings.Fields(meta)
-		if len(fields) != 3 || fields[1] != "blob" || fields[0] == "120000" {
-			continue
-		}
-		blobs[name] = fields[2]
-		listed = append(listed, name)
+		blobs[entry.name] = entry.object
+		listed = append(listed, entry.name)
 	}
 	paths := apisurface.Reads(listed)
 	if len(paths) == 0 {
@@ -193,6 +188,70 @@ func filesAtTag(dir, tag string) ([]apisurface.File, error) {
 		files[i] = apisurface.File{Path: name, Data: contents[i]}
 	}
 	return files, nil
+}
+
+// treeEntry is one entry of a tag's tree.
+type treeEntry struct {
+	// name is the entry's slash path, relative to the directory listed.
+	name string
+	// object is a regular file's blob.
+	object string
+	// size is a regular file's size in bytes, read only by a sized listing.
+	size int
+	// regular is false for a symbolic link, a directory or a submodule.
+	regular bool
+}
+
+// treeListing selects what treeAtTag lists.
+type treeListing struct {
+	// recursive lists every entry under the path instead of the entry at it.
+	recursive bool
+	// sized reads each regular file's size. A wide listing leaves it off: a
+	// partial clone fetches every blob it sizes.
+	sized bool
+}
+
+// treeAtTag returns the entries of tag's tree that `git ls-tree` lists at
+// pathspec, read literally and relative to dir.
+func treeAtTag(dir, tag, pathspec string, listing treeListing) ([]treeEntry, error) {
+	args := []string{"ls-tree", "-z"}
+	if listing.recursive {
+		args = append(args, "-r")
+	}
+	if listing.sized {
+		args = append(args, "-l")
+	}
+	args = append(args, "refs/tags/"+tag, "--", pathspec)
+	output, stderr, err := gitCapture(dir, append(os.Environ(), "GIT_LITERAL_PATHSPECS=1"), nil, args...)
+	if err != nil {
+		return nil, fmt.Errorf("git ls-tree (in %s): %w: %s", dir, err, strings.TrimSpace(stderr))
+	}
+	// An entry is "<mode> <type> <object>", then " <size>" in a sized
+	// listing, then a tab and the path. The size of a tree or a submodule is
+	// "-".
+	fieldCount := 3
+	if listing.sized {
+		fieldCount = 4
+	}
+	var entries []treeEntry
+	for record := range strings.SplitSeq(output, "\x00") {
+		meta, name, found := strings.Cut(record, "\t")
+		if !found {
+			continue
+		}
+		entry := treeEntry{name: name}
+		fields := strings.Fields(meta)
+		if len(fields) == fieldCount && fields[1] == "blob" && fields[0] != "120000" {
+			entry.object, entry.regular = fields[2], true
+			if listing.sized {
+				if entry.size, err = strconv.Atoi(fields[3]); err != nil {
+					return nil, fmt.Errorf("git ls-tree: unexpected size in %q", meta)
+				}
+			}
+		}
+		entries = append(entries, entry)
+	}
+	return entries, nil
 }
 
 // sourceFile reports whether a project-relative path is a file the API

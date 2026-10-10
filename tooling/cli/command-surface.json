@@ -1,0 +1,1230 @@
+{
+  "protocolVersion": 1,
+  "globalFlags": [
+    {
+      "long": "--all",
+      "type": "bool"
+    },
+    {
+      "long": "--baseline",
+      "type": "value"
+    },
+    {
+      "long": "--cache-trust",
+      "type": "value"
+    },
+    {
+      "long": "--color",
+      "type": "bool"
+    },
+    {
+      "long": "--continue-on-error",
+      "type": "bool"
+    },
+    {
+      "long": "--cpu-policy",
+      "type": "value"
+    },
+    {
+      "long": "--credential-fd",
+      "type": "value"
+    },
+    {
+      "long": "--debug",
+      "short": "-d",
+      "type": "bool"
+    },
+    {
+      "long": "--dry-run",
+      "type": "bool"
+    },
+    {
+      "long": "--exclude",
+      "type": "value"
+    },
+    {
+      "long": "--exclude-tag",
+      "type": "value"
+    },
+    {
+      "long": "--help",
+      "short": "-h",
+      "type": "bool"
+    },
+    {
+      "long": "--impacted",
+      "type": "bool"
+    },
+    {
+      "long": "--impacted-strict",
+      "type": "bool"
+    },
+    {
+      "long": "--json",
+      "type": "bool"
+    },
+    {
+      "long": "--max-parallel",
+      "type": "value"
+    },
+    {
+      "long": "--no-cache",
+      "type": "bool"
+    },
+    {
+      "long": "--no-cache-projects",
+      "type": "value"
+    },
+    {
+      "long": "--no-color",
+      "type": "bool"
+    },
+    {
+      "long": "--output",
+      "type": "value"
+    },
+    {
+      "long": "--plan",
+      "type": "bool"
+    },
+    {
+      "long": "--profile",
+      "type": "value"
+    },
+    {
+      "long": "--projects",
+      "type": "value"
+    },
+    {
+      "long": "--providers",
+      "type": "value"
+    },
+    {
+      "long": "--quiet",
+      "type": "bool"
+    },
+    {
+      "long": "--resource",
+      "type": "value"
+    },
+    {
+      "long": "--retry",
+      "type": "value"
+    },
+    {
+      "long": "--retry-failed",
+      "type": "bool"
+    },
+    {
+      "long": "--tag",
+      "type": "value"
+    },
+    {
+      "long": "--trace-profile",
+      "type": "value"
+    },
+    {
+      "long": "--verbose",
+      "short": "-v",
+      "type": "bool"
+    },
+    {
+      "long": "--version",
+      "short": "-V",
+      "type": "bool"
+    },
+    {
+      "long": "--watch",
+      "short": "-w",
+      "type": "bool"
+    },
+    {
+      "long": "--where",
+      "type": "value"
+    }
+  ],
+  "commands": [
+    {
+      "path": "D",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "P",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "b",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "build",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "cache",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "cache clean",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "cache gc",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "cache verify",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "change-plan",
+      "flags": [
+        {
+          "long": "--base",
+          "type": "value"
+        },
+        {
+          "long": "--head",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "channel",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "set|status",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "channel set",
+      "flags": [
+        {
+          "long": "--expected",
+          "type": "value"
+        },
+        {
+          "long": "--from",
+          "type": "value"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "channel",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "channel status",
+      "flags": [
+        {
+          "long": "--wait",
+          "type": "value"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "channel",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "ci",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "ci explain",
+      "flags": [
+        {
+          "long": "--branch",
+          "type": "value"
+        },
+        {
+          "long": "--event",
+          "type": "value",
+          "values": [
+            "pull_request",
+            "push",
+            "tag"
+          ]
+        },
+        {
+          "long": "--pr",
+          "type": "value"
+        },
+        {
+          "long": "--tag",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "ci fmt",
+      "flags": [
+        {
+          "long": "--check",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "ci init",
+      "flags": [
+        {
+          "long": "--force",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "ci validate",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "completion",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "bash|zsh|fish",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "completion bash",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "completion fish",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "completion zsh",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "compose",
+      "flags": [
+        {
+          "long": "--no-watch",
+          "type": "bool"
+        },
+        {
+          "long": "--port",
+          "type": "value"
+        },
+        {
+          "long": "--ready-timeout",
+          "type": "value"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "project",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "config",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "config set",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "key",
+          "required": true
+        },
+        {
+          "name": "value",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "config show",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "context",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "context generate",
+      "flags": [
+        {
+          "long": "--force",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "context map",
+      "flags": [
+        {
+          "long": "--print",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "d",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "deploy",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "deps",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "deps add",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "deps install",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "deps remove",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "dev",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "dev extension",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "path",
+          "required": false
+        }
+      ]
+    },
+    {
+      "path": "dev template",
+      "flags": [
+        {
+          "long": "--keep",
+          "type": "bool"
+        },
+        {
+          "long": "--skip-build",
+          "type": "bool"
+        },
+        {
+          "long": "--stable",
+          "type": "bool"
+        },
+        {
+          "long": "--version",
+          "type": "value"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "validate|test|package",
+          "required": true
+        },
+        {
+          "name": "path",
+          "required": false
+        }
+      ]
+    },
+    {
+      "path": "doctor",
+      "flags": [
+        {
+          "long": "--profile",
+          "type": "value"
+        },
+        {
+          "long": "--project",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "extensions",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "extensions install",
+      "flags": [
+        {
+          "long": "--dest",
+          "type": "value"
+        },
+        {
+          "long": "--latest",
+          "type": "bool"
+        },
+        {
+          "long": "--platform",
+          "type": "value"
+        },
+        {
+          "long": "--user",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "extensions list",
+      "flags": [
+        {
+          "long": "--user",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "extensions remove",
+      "flags": [
+        {
+          "long": "--user",
+          "type": "bool"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "extensions update",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "f",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "format",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "generate",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "help",
+      "flags": [
+        {
+          "long": "--man",
+          "type": "bool"
+        },
+        {
+          "long": "--markdown",
+          "type": "bool"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "command",
+          "required": false
+        },
+        {
+          "name": "subcommand",
+          "required": false
+        }
+      ]
+    },
+    {
+      "path": "infra",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "infra plan",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "init",
+      "flags": [
+        {
+          "long": "--channel",
+          "type": "value"
+        },
+        {
+          "long": "--extension",
+          "type": "value"
+        },
+        {
+          "long": "--force",
+          "type": "bool"
+        },
+        {
+          "long": "--project",
+          "type": "value"
+        },
+        {
+          "long": "--project-path",
+          "type": "value"
+        },
+        {
+          "long": "--workspace",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "install",
+      "flags": [
+        {
+          "long": "--latest",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "l",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "lint",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "mcp",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "install",
+          "required": false
+        }
+      ]
+    },
+    {
+      "path": "mcp install",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "migrate",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "migrate agent-content",
+      "flags": [
+        {
+          "long": "--apply",
+          "type": "bool"
+        },
+        {
+          "long": "--check",
+          "type": "bool"
+        },
+        {
+          "long": "--rollback",
+          "type": "bool"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "extension",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "migrate vnext",
+      "flags": [
+        {
+          "long": "--apply",
+          "type": "bool"
+        },
+        {
+          "long": "--check",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "p",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "package",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "pin",
+      "flags": [
+        {
+          "long": "--remove",
+          "type": "bool"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "version",
+          "required": false
+        }
+      ]
+    },
+    {
+      "path": "projects",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "projects create",
+      "flags": [
+        {
+          "long": "--force",
+          "type": "bool"
+        },
+        {
+          "long": "--path",
+          "type": "value"
+        },
+        {
+          "long": "--template",
+          "type": "value"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "projects describe",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "projects list",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "projects sync",
+      "flags": [
+        {
+          "long": "--prune",
+          "type": "bool"
+        },
+        {
+          "long": "--skip-install",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "projects tag",
+      "flags": [
+        {
+          "long": "--remove",
+          "type": "bool"
+        },
+        {
+          "long": "--set",
+          "type": "bool"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "name",
+          "required": true
+        },
+        {
+          "name": "tag",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "publish",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "qualify",
+      "flags": [
+        {
+          "long": "--expect-sha",
+          "type": "value"
+        },
+        {
+          "long": "--platform-prefix",
+          "type": "value"
+        },
+        {
+          "long": "--print-contract",
+          "type": "bool"
+        },
+        {
+          "long": "--ready-timeout",
+          "type": "value"
+        },
+        {
+          "long": "--request-timeout",
+          "type": "value"
+        },
+        {
+          "long": "--target",
+          "type": "value"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "project",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "report",
+      "flags": [
+        {
+          "long": "--session",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "run",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "s",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "scopes",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "scopes list",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "serve",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "sessions",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "sessions export",
+      "flags": [
+        {
+          "long": "--since",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "sessions inspect",
+      "flags": [
+        {
+          "long": "--run",
+          "type": "value"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "id",
+          "required": false
+        }
+      ]
+    },
+    {
+      "path": "sessions list",
+      "flags": [
+        {
+          "long": "--revision",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "sessions replay",
+      "flags": [
+        {
+          "long": "--session",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "sessions summary",
+      "flags": [
+        {
+          "long": "--by-digest",
+          "type": "bool"
+        },
+        {
+          "long": "--command",
+          "type": "value"
+        },
+        {
+          "long": "--since",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "t",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "telemetry",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "telemetry off",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "telemetry on",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "telemetry show",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "telemetry status",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "templates",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "templates install",
+      "flags": [
+        {
+          "long": "--latest",
+          "type": "bool"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "name",
+          "required": false
+        }
+      ]
+    },
+    {
+      "path": "templates list",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "templates remove",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "templates update",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "test",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "tree",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "tree fingerprint",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "tree verify",
+      "flags": [
+        {
+          "long": "--base",
+          "type": "value"
+        },
+        {
+          "long": "--gate",
+          "type": "value"
+        },
+        {
+          "long": "--record",
+          "type": "value"
+        },
+        {
+          "long": "--ref",
+          "type": "value"
+        },
+        {
+          "long": "--report",
+          "type": "value"
+        },
+        {
+          "long": "--snapshot",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "upgrade",
+      "flags": [
+        {
+          "long": "--channel",
+          "type": "value",
+          "values": [
+            "canary",
+            "stable"
+          ]
+        },
+        {
+          "long": "--cli",
+          "type": "bool"
+        },
+        {
+          "long": "--deps",
+          "type": "bool"
+        },
+        {
+          "long": "--dry-run",
+          "type": "bool"
+        },
+        {
+          "long": "--extensions",
+          "type": "bool"
+        },
+        {
+          "long": "--from-source",
+          "type": "bool"
+        },
+        {
+          "long": "--global",
+          "short": "-g",
+          "type": "bool"
+        },
+        {
+          "long": "--namespace",
+          "type": "value"
+        },
+        {
+          "long": "--release",
+          "type": "value"
+        },
+        {
+          "long": "--version",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "version",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "get|tag|list|use",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "version get",
+      "flags": [
+        {
+          "long": "--scope",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "version list",
+      "flags": [
+        {
+          "long": "--global",
+          "short": "-g",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "version tag",
+      "flags": [
+        {
+          "long": "--dry-run",
+          "type": "bool"
+        },
+        {
+          "long": "--push",
+          "type": "bool"
+        },
+        {
+          "long": "--scope",
+          "type": "value"
+        },
+        {
+          "long": "--yes",
+          "type": "bool"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "tag",
+          "required": false
+        }
+      ]
+    },
+    {
+      "path": "version use",
+      "flags": [
+        {
+          "long": "--global",
+          "short": "-g",
+          "type": "bool"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "workspace",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "workspace describe",
+      "flags": [],
+      "positionals": []
+    },
+    {
+      "path": "workspace init",
+      "flags": [
+        {
+          "long": "--channel",
+          "type": "value"
+        },
+        {
+          "long": "--extension",
+          "type": "value"
+        },
+        {
+          "long": "--force",
+          "type": "bool"
+        },
+        {
+          "long": "--project",
+          "type": "value"
+        },
+        {
+          "long": "--project-path",
+          "type": "value"
+        },
+        {
+          "long": "--workspace",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    }
+  ]
+}

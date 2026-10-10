@@ -44,6 +44,9 @@ type fixture struct {
 	t       *testing.T
 	root    string
 	project string
+	// options are the project's options: check passes them to Check, and run
+	// delivers them as task parameters.
+	options Options
 }
 
 func newFixture(t *testing.T, supportCatalog string, projectTags ...string) *fixture {
@@ -108,7 +111,7 @@ func (f *fixture) commit(message string) {
 
 func (f *fixture) check() *Report {
 	f.t.Helper()
-	report, err := Check(f.root, f.project, projectName)
+	report, err := Check(f.root, f.project, projectName, f.options)
 	if err != nil {
 		f.t.Fatalf("Check: %v", err)
 	}
@@ -123,6 +126,13 @@ func (f *fixture) run() (string, map[string]any, []runtime.Event) {
 	ctx := &pctx.Context{
 		WorkspaceRoot: f.root,
 		Project:       pctx.Project{Name: projectName, Path: "lib/greet", FullPath: f.project},
+	}
+	if f.options.CommandSurface != "" {
+		value, err := json.Marshal(f.options.CommandSurface)
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		ctx.Params = pctx.Params{commandSurfaceOption: value}
 	}
 	var status string
 	var data map[string]any
@@ -360,7 +370,7 @@ func TestAWorkspaceWithoutACatalogChecksEveryProject(t *testing.T) {
 func TestAnInvalidCatalogFailsTheTask(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, `{"protocolVersion":1,"entries":[{"id":"x","kind":"package","status":"beta"}]}`)
-	_, err := Check(f.root, f.project, projectName)
+	_, err := Check(f.root, f.project, projectName, Options{})
 	if err == nil || !strings.Contains(err.Error(), "putnami.support.json is invalid") {
 		t.Fatalf("err = %v, want the invalid catalog named", err)
 	}
@@ -459,7 +469,7 @@ func TestAWorkspaceOutsideGitHasNothingToCompare(t *testing.T) {
 	}
 	// The temporary directory may sit inside a repository; git must not find it.
 	t.Setenv("GIT_CEILING_DIRECTORIES", root)
-	report, err := Check(root, project, projectName)
+	report, err := Check(root, project, projectName, Options{})
 	if err != nil || !strings.Contains(report.Warning, "not in a git repository") || report.Note != "" {
 		t.Fatalf("report = %+v, err = %v", report, err)
 	}
@@ -495,7 +505,7 @@ func TestARepositoryWithoutACommitHasNothingToCompare(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	runGit(t, root, "init", "-q")
-	report, err := Check(root, root, projectName)
+	report, err := Check(root, root, projectName, Options{})
 	if err != nil || !strings.Contains(report.Note, "no commit") {
 		t.Fatalf("report = %+v, err = %v", report, err)
 	}
@@ -507,7 +517,7 @@ func TestAShallowCloneWarnsInsteadOfComparing(t *testing.T) {
 	f.commit("chore: a second commit")
 	clone := filepath.Join(t.TempDir(), "clone")
 	runGit(t, f.root, "clone", "-q", "--depth", "1", "file://"+f.root, clone)
-	report, err := Check(clone, filepath.Join(clone, "lib", "greet"), projectName)
+	report, err := Check(clone, filepath.Join(clone, "lib", "greet"), projectName, Options{})
 	if err != nil || !strings.Contains(report.Warning, "shallow") {
 		t.Fatalf("report = %+v, err = %v", report, err)
 	}
