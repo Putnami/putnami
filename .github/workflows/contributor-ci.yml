@@ -72,8 +72,8 @@ jobs:
       #
       # The image is Docker Hub's official `postgres:17-alpine`, served by its
       # Amazon ECR Public mirror. Both registries cap anonymous pulls per IP
-      # address and GitHub-hosted runners share addresses; ECR Public's cap
-      # (1 pull per second) is the one those shared addresses stay under.
+      # address, and GitHub-hosted runners share addresses. ECR Public's caps,
+      # 1 pull per second and 500 GB per month, are far above Docker Hub's.
       postgres:
         image: public.ecr.aws/docker/library/postgres:17-alpine
         env:
