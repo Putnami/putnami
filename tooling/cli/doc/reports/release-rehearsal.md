@@ -89,7 +89,7 @@ addition. Re-read them from the test's log output at any time.
 | Release series | 0.3.0 (from `tooling/CHANGELOG.md`) |
 | Builder archive matrix | `darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64` |
 | Publishable artifacts | 101 across `archives=19 docker=4 go=63 npm=15 template-archives=7` |
-| Publish order | protocols → extension-sdk → go-framework → typescript-framework → language-extensions → intelligence-extensions → cli → contributor-extensions → templates |
+| Publish order | protocols → extension-sdk → go-framework → typescript-framework → language-extensions → intelligence-extensions → cloud-extensions → cli → contributor-extensions → templates |
 | Public-cut scrub findings | 0 unresolved beyond the reviewed baseline |
 
 The `docker` channel carries four artifacts — the documentation site, the
@@ -118,6 +118,7 @@ downstream extension builds.
 | 3 | typescript-framework | `npm` | Superseding patch version plus a deprecation of the bad version. |
 | 4 | language-extensions | `archives` | Repoint the extension archive channel at the previous version. |
 | 5 | intelligence-extensions | `archives` | Repoint the agent-readiness archive channel at the previous version. |
+| 5a | cloud-extensions | `archives` | Repoint the Cloud CLI extension archive channel at the previous version. |
 | 6 | cli | `archives` | Repoint the CLI download channel at the previous version. |
 | 7 | templates | `archives`, `template-archives` | Repoint the template archive channel at the previous version. |
 

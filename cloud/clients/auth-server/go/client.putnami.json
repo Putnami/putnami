@@ -1,0 +1,67 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "auth-server",
+    "audience": "auth-server"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/auth-server/go",
+    "clients": [
+      {
+        "service": "auth-server",
+        "clientSymbol": "AuthClient",
+        "bindingSymbol": "RegisterAuthClient"
+      }
+    ]
+  },
+  "contractSha256": "0404165019522ca63ce9d53ce8a1ba51b87efc808ff74fec135a647794a018bc",
+  "operations": [
+    {
+      "operationId": "deleteApikeys_id",
+      "service": "auth-server",
+      "methodSymbol": "DeleteApikeys",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/apikeys/{id}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getApikeys_id",
+      "service": "auth-server",
+      "methodSymbol": "GetApikeys",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/apikeys/{id}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postApikeys",
+      "service": "auth-server",
+      "methodSymbol": "CreateApikeys",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/apikeys",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "b5ea620d242d8cf90a181fea8d298ac96c0a03b14372d8869353153956d2adc5"
+    }
+  ]
+}

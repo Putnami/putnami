@@ -1,0 +1,666 @@
+{
+  "components": {
+    "schemas": {
+      "Grant": {
+        "additionalProperties": false,
+        "properties": {
+          "caller_service_account": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updated_by": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Grant2": {
+        "additionalProperties": false,
+        "properties": {
+          "caller_service_account": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updated_by": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PutBindingGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "expected_revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PutOperationGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "expected_revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Workspace runtime data plane: profiles, deployments, placement, previews, and event topology. Consumers call it through the generated clients in clients/go and clients/ts.",
+    "title": "Putnami Runtime API",
+    "version": "dev"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/v1/workspaces/{workspace}/runtime/binding-grants/{caller}": {
+      "get": {
+        "description": "Read one workspace-owned Runtime binding read grant, including revocation tombstones.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Runtime_Binding-grants_Caller",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "caller",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Grant"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runtime/binding-grants/{caller}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "put": {
+        "description": "Enable or revoke one Runtime binding read grant with revision CAS and atomic audit history.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "putV1_Workspaces_Workspace_Runtime_Binding-grants_Caller",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "caller",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutBindingGrant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Grant"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runtime/binding-grants/{caller}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/runtime/operation-grants/{caller}": {
+      "get": {
+        "description": "Read one workspace-owned Runtime operation mutation grant, including revocation tombstones.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Runtime_Operation-grants_Caller",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "caller",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Grant2"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runtime/operation-grants/{caller}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "put": {
+        "description": "Enable or revoke one Runtime operation mutation grant with revision CAS and atomic audit history.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "putV1_Workspaces_Workspace_Runtime_Operation-grants_Caller",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "caller",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutOperationGrant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Grant2"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runtime/operation-grants/{caller}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "x-putnami-client": {
+    "credentials": {
+      "service": {
+        "kind": "service-token"
+      },
+      "user": {
+        "kind": "forwarded-user-token"
+      }
+    },
+    "protocolVersion": 1,
+    "service": {
+      "audience": "runtime-api",
+      "id": "runtime-api"
+    }
+  }
+}

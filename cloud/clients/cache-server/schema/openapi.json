@@ -1,0 +1,2199 @@
+{
+  "components": {
+    "schemas": {
+      "ActionError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ActionEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "level": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "v": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ActionResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "durationMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ActionError",
+            "nullable": true
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/ActionEvent"
+            },
+            "type": "array"
+          },
+          "sizeBytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "BlobRef": {
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "BlobTransfer": {
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "type": "string"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "method": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CapabilitiesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CommitBatchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/CommitEntry"
+            },
+            "type": "array"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CommitBatchResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/CommitResult"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CommitEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/Manifest",
+            "nullable": true
+          },
+          "result": {
+            "$ref": "#/components/schemas/ActionResult",
+            "nullable": true
+          }
+        },
+        "type": "object"
+      },
+      "CommitRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/Manifest",
+            "nullable": true
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ActionResult",
+            "nullable": true
+          }
+        },
+        "type": "object"
+      },
+      "CommitResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "committed": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CommitResult": {
+        "additionalProperties": false,
+        "properties": {
+          "committed": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DownloadBatchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "digests": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "DownloadBatchResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "blobs": {
+            "items": {
+              "$ref": "#/components/schemas/InlineBlob"
+            },
+            "type": "array"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "FileEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "type": "string"
+          },
+          "mode": {
+            "format": "uint32",
+            "maximum": 4294967295,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          },
+          "size": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "FindMissingRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "blobs": {
+            "items": {
+              "$ref": "#/components/schemas/BlobRef"
+            },
+            "type": "array"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "FindMissingResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "uploads": {
+            "items": {
+              "$ref": "#/components/schemas/BlobTransfer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "InlineBlob": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "format": "byte",
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "KeyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "durationMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "extension": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "task": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "KeyResult": {
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "downloads": {
+            "items": {
+              "$ref": "#/components/schemas/BlobTransfer"
+            },
+            "type": "array"
+          },
+          "hit": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/Manifest",
+            "nullable": true
+          },
+          "producer": {
+            "type": "string"
+          },
+          "producerIdentity": {
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ActionResult",
+            "nullable": true
+          }
+        },
+        "type": "object"
+      },
+      "Manifest": {
+        "additionalProperties": false,
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "NegotiateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/KeyRequest"
+            },
+            "type": "array"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "NegotiateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/KeyResult"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ObjectLookupRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ObjectLookupResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "objects": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectRecord"
+            },
+            "type": "array"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ObjectOffer": {
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "meta": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ObjectRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "blob": {
+            "$ref": "#/components/schemas/InlineBlob",
+            "nullable": true
+          },
+          "channel": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "download": {
+            "$ref": "#/components/schemas/BlobTransfer",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "meta": {
+            "type": "string"
+          },
+          "producer": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ObjectStoreRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "objects": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectOffer"
+            },
+            "type": "array"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ObjectStoreResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectStoreResult"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ObjectStoreResult": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "stored": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "PublishRunMarkerRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "commands": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "observedSha": {
+            "type": "string"
+          },
+          "paramsHash": {
+            "type": "string"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "selection": {
+            "type": "string"
+          },
+          "sha": {
+            "type": "string"
+          },
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PublishRunMarkerResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "marker": {
+            "$ref": "#/components/schemas/RunMarker",
+            "nullable": true
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "published": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "RunMarker": {
+        "additionalProperties": false,
+        "properties": {
+          "sha": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RunMarkerRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "commands": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "paramsHash": {
+            "type": "string"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "selection": {
+            "type": "string"
+          },
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RunMarkerResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "marker": {
+            "$ref": "#/components/schemas/RunMarker",
+            "nullable": true
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "StoreRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/Manifest",
+            "nullable": true
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "StoreResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "uploads": {
+            "items": {
+              "$ref": "#/components/schemas/BlobTransfer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Build cache protocol: negotiate/read, store/commit write path, and successful-run markers. Consumers call it through the generated clients in clients/go and clients/ts.",
+    "title": "Putnami Cache Server API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/v1/cache/capabilities": {
+      "get": {
+        "description": "Advertise the optional capabilities the server supports beyond the v1 baseline.",
+        "operationId": "getV1_Cache_Capabilities",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilitiesResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "resilience": {
+            "maxResponseBytes": 67108864,
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/cache/capabilities",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/cache/commit": {
+      "post": {
+        "description": "Finalize an Action Cache entry once its blobs are uploaded (write path, step 2).",
+        "operationId": "postV1_Cache_Commit",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "maxResponseBytes": 67108864,
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/cache/commit",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/cache/commit-batch": {
+      "post": {
+        "description": "Finalize several Action Cache entries once their blobs are uploaded (batched write path).",
+        "operationId": "postV1_Cache_Commit-batch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitBatchResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "maxResponseBytes": 67108864,
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/cache/commit-batch",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/cache/download-batch": {
+      "post": {
+        "description": "Return several small CAS blobs inline in one response (download-batch coalescing).",
+        "operationId": "postV1_Cache_Download-batch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadBatchResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "maxResponseBytes": 67108864,
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/cache/download-batch",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/cache/find-missing": {
+      "post": {
+        "description": "Report which of a window's freshly built blobs the org must upload (batched write path).",
+        "operationId": "postV1_Cache_Find-missing",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FindMissingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindMissingResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "maxResponseBytes": 67108864,
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/cache/find-missing",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/cache/negotiate": {
+      "post": {
+        "description": "Negotiate cache hits for a batch of keys (read path). With X-Putnami-Cache-Entry-Provenance: v1, each hit with complete metadata also carries producer, producerIdentity and channel.",
+        "operationId": "postV1_Cache_Negotiate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NegotiateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NegotiateResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "maxResponseBytes": 67108864,
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/cache/negotiate",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/cache/objects/lookup": {
+      "post": {
+        "description": "Resolve a batch of compiler-cache objects by (namespace, id), with small objects' bytes inline; a missing or evicted object is omitted.",
+        "operationId": "postV1_Cache_Objects_Lookup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjectLookupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectLookupResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "maxResponseBytes": 67108864,
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/cache/objects/lookup",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/cache/objects/store": {
+      "post": {
+        "description": "Record index rows for compiler-cache objects whose bytes are already in CAS, stamping producer and trust channel from the verified credential.",
+        "operationId": "postV1_Cache_Objects_Store",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjectStoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectStoreResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "maxResponseBytes": 67108864,
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/cache/objects/store",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/cache/run-marker/lookup": {
+      "post": {
+        "description": "Read the last successful full-target run marker for a workspace, branch, command list, params hash, and selection scope.",
+        "operationId": "postV1_Cache_Run-marker_Lookup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunMarkerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunMarkerResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "maxResponseBytes": 67108864,
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/cache/run-marker/lookup",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/cache/run-marker/publish": {
+      "post": {
+        "description": "Publish a successful full-target run marker using compare-and-swap semantics.",
+        "operationId": "postV1_Cache_Run-marker_Publish",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishRunMarkerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishRunMarkerResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "maxResponseBytes": 67108864,
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/cache/run-marker/publish",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/cache/store": {
+      "post": {
+        "description": "Report which freshly built blobs the org must upload (write path, step 1).",
+        "operationId": "postV1_Cache_Store",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "maxResponseBytes": 67108864,
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/cache/store",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "x-putnami-client": {
+    "credentials": {
+      "user": {
+        "kind": "forwarded-user-token"
+      },
+      "workload": {
+        "kind": "service-token"
+      }
+    },
+    "protocolVersion": 1,
+    "service": {
+      "audience": "cache-server",
+      "id": "cache-server"
+    }
+  }
+}

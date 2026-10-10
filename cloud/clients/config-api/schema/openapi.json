@@ -1,0 +1,2407 @@
+{
+  "components": {
+    "schemas": {
+      "ConfigApp": {
+        "additionalProperties": false,
+        "properties": {
+          "environments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConfigAppList": {
+        "additionalProperties": false,
+        "properties": {
+          "apps": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigApp"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ConfigRollStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "failed": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigRollWorkload"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          },
+          "rolled": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigRollWorkload"
+            },
+            "type": "array"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigRollWorkload"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ConfigRollWorkload": {
+        "additionalProperties": false,
+        "properties": {
+          "app": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Entry": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Grant": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "appName": {
+            "type": "string"
+          },
+          "callerServiceAccount": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "revokedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "LayerInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "dimension": {
+            "type": "string"
+          },
+          "priority": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ListEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ListSecretsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ListEntry"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "PutConfigResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "roll": {
+            "$ref": "#/components/schemas/ConfigRollStatus",
+            "nullable": true
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PutSecretRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PutSecretResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ResolveConfigsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "includeSecrets": {
+            "type": "boolean"
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "schemaHash": {
+            "type": "string"
+          },
+          "secretsMode": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ResolveConfigsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "nullable": true,
+            "type": "object"
+          },
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/LayerInfo"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "resolved": {
+            "type": "boolean"
+          },
+          "schemaMatch": {
+            "type": "boolean"
+          },
+          "secretsApplied": {
+            "type": "boolean"
+          },
+          "secretsLayers": {
+            "items": {
+              "$ref": "#/components/schemas/LayerInfo"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ResolveSecretsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "schemaHash": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ResolveSecretsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/LayerInfo"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "resolved": {
+            "type": "boolean"
+          },
+          "schemaMatch": {
+            "type": "boolean"
+          },
+          "secrets": {
+            "additionalProperties": true,
+            "nullable": true,
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "SecretKeyStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SecretStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/SecretKeyStatus"
+            },
+            "type": "array"
+          },
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/LayerInfo"
+            },
+            "type": "array"
+          },
+          "schemaHash": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "configError": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "errorResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "grantList": {
+        "additionalProperties": false,
+        "properties": {
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/Grant"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schemaBlockDoc": {
+        "additionalProperties": false,
+        "properties": {
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/schemaFieldDoc"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "optional": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "schemaFieldDoc": {
+        "additionalProperties": false,
+        "properties": {
+          "constraints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "default": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "env": {
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "keys": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "productionUnsafeDefault": {
+            "type": "boolean"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "sensitive": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "schemaManifestDoc": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "configs": {
+            "items": {
+              "$ref": "#/components/schemas/schemaBlockDoc"
+            },
+            "type": "array"
+          },
+          "registeredAt": {
+            "type": "string"
+          },
+          "schemaHash": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "statusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Config, schema, secret, durable caller-grant and KMS-authority APIs, plus encrypted credential custody. Owner mutations require a live Identity projection. Consumers call it through the generated clients in clients/go and clients/ts.",
+    "title": "Putnami Config API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/api/configs": {
+      "put": {
+        "description": "Write plaintext configuration values for a specific dimension. The write rolls no revision: a workload reads the new value on its next deploy. The `roll` and `rollShared` query parameters and the `roll` response member are ignored and never set.\n\nRequired scopes: config.value.write.",
+        "operationId": "putApi_Configs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "roll",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rollShared",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Entry"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutConfigResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "config.schema_not_registered",
+              "status": 400
+            },
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.value.write"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/configs",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/api/configs/resolve": {
+      "post": {
+        "description": "Resolve and merge configuration values for an application environment. Pass secretsMode=redacted to merge secret shape without plaintext, or includeSecrets=true / secretsMode=reveal for plaintext (requires config.secret.read or an exact runtime service-account config claim).\n\nRequired scopes: config.value.read.",
+        "operationId": "postApi_Configs_Resolve",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveConfigsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveConfigsResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "resilience": {
+            "attemptTimeoutMs": 5000,
+            "retry": {
+              "maxAttempts": 8,
+              "statuses": [
+                408,
+                425,
+                429,
+                500,
+                502,
+                503,
+                504
+              ]
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.value.read"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "profile": "service",
+                    "scopes": [
+                      "config.value.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/configs/resolve",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/api/schemas": {
+      "get": {
+        "description": "Return the latest registered schema for an application by appName query.\n\nRequired scopes: config.schema.read.",
+        "operationId": "getApi_Schemas",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "appName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/schemaManifestDoc"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.schema.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/schemas",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "post": {
+        "description": "Register a configuration schema for an application.\n\nRequired scopes: config.schema.write.",
+        "operationId": "postApi_Schemas",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/schemaManifestDoc"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/schemaManifestDoc"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "config.schema_invalid",
+              "schema": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "status": 400
+            },
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.schema.write"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/schemas",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/api/schemas/{app}": {
+      "get": {
+        "description": "Return the latest registered schema for an application.\n\nRequired scopes: config.schema.read.",
+        "operationId": "getApi_Schemas_App",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/schemaManifestDoc"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.schema.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/schemas/{app}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/api/secrets": {
+      "delete": {
+        "description": "Delete one envelope-encrypted secret field, or the whole path when field is omitted.\n\nRequired scopes: config.secret.write.",
+        "operationId": "deleteApi_Secrets",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "appName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "field",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/statusResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.secret.write"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/secrets",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "get": {
+        "description": "List secret entry metadata (paths + UpdatedAt; never plaintext or ciphertext) for a specific dimension, or for the whole workspace when appName/environment are omitted.\n\nRequired scopes: config.secret.read.",
+        "operationId": "getApi_Secrets",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "appName",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSecretsResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.secret.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/secrets",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "put": {
+        "description": "Write envelope-encrypted secret values for a specific dimension.\n\nRequired scopes: config.secret.write.",
+        "operationId": "putApi_Secrets",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutSecretRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutSecretResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "config.schema_not_registered",
+              "status": 400
+            },
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.secret.write"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/secrets",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/api/secrets/resolve": {
+      "post": {
+        "description": "Resolve and decrypt secret values for an application environment. Requires config.secret.read or an exact runtime service-account config claim for the requested app environment.\n\nRequired scopes: config.value.read.",
+        "operationId": "postApi_Secrets_Resolve",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveSecretsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveSecretsResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "resilience": {
+            "attemptTimeoutMs": 5000,
+            "retry": {
+              "maxAttempts": 8,
+              "statuses": [
+                408,
+                425,
+                429,
+                500,
+                502,
+                503,
+                504
+              ]
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.value.read"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "profile": "service",
+                    "scopes": [
+                      "config.value.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/secrets/resolve",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/api/secrets/status": {
+      "get": {
+        "description": "List schema-declared secret keys with resolved set/missing status. Plaintext and ciphertext are never returned.\n\nRequired scopes: config.secret.read.",
+        "operationId": "getApi_Secrets_Status",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "appName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretStatusResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.secret.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/secrets/status",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/apps": {
+      "get": {
+        "description": "List concrete config apps and environments in a workspace. Requires platform.workspace.read resolved at the target workspace; returns metadata only.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Config_Apps",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigAppList"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Invalid config read selection"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Insufficient workspace permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Config version not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Config read service unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/apps",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/secret-grants": {
+      "get": {
+        "description": "List Config-owned caller grants for one exact workspace.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "getV1_Workspaces_Workspace_Config_Secret-grants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/grantList"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/secret-grants",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "x-putnami-client": {
+    "credentials": {
+      "service": {
+        "kind": "service-token"
+      },
+      "user": {
+        "kind": "forwarded-user-token"
+      }
+    },
+    "protocolVersion": 1,
+    "service": {
+      "audience": "config-api",
+      "id": "config-api"
+    }
+  }
+}

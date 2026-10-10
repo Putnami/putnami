@@ -1,0 +1,151 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "@putnami/cloud-extension",
+      "status": "transport-primitive",
+      "adapter": "cloud/extension/internal/deliverycli/internal/remotecache/client.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/internal/remotecache/client.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "c0e844ab12f2590cb44364e95f6830a5308c073ffc148272542de00d4bb9fe0d"
+        },
+        {
+          "path": "cloud/extension/internal/deliverycli/internal/remotecache/client.go",
+          "transport": "http",
+          "symbol": "http.Transport",
+          "fingerprint": "16b2cdf891557af6c72b1338ba38cce6f6a9b747f4c5f1ec14f61c4c68c5582a"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/internal/remotecache/client_test.go",
+        "cloud/extension/internal/deliverycli/internal/remotecache/control_test.go"
+      ],
+      "reason": "The pooled HTTP client and transport of the remote cache. They carry the presigned CAS transfers (GCS signed URLs in clientgen.external.json), and control.go hands a copy to cache-server's generated binding, so every control operation goes through the generated client on the same connection pool. No request is built here."
+    },
+    {
+      "runtime": "@putnami/cloud-extension",
+      "status": "transport-primitive",
+      "adapter": "cloud/extension/internal/deliverycli/internal/remotecache/protocolroutes.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/internal/remotecache/protocolroutes.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "d4c2e3b0695190a876fa05cff56d330c5469f4731a19b49f8d19b9a2cbd38c04"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/internal/remotecache/batch_test.go",
+        "cloud/extension/internal/deliverycli/internal/remotecache/control_test.go"
+      ],
+      "reason": "The protocol/cache upload-grant and upload-batch routes. cache-server serves neither and never advertises direct-cas-put or upload-batch, so the client calls them only on a user-configured server at PUTNAMI_CACHE_URL that advertises them; the endpoint and its contract belong to that server."
+    },
+    {
+      "runtime": "@putnami/cloud-extension",
+      "status": "transport-primitive",
+      "adapter": "cloud/extension/internal/deliverycli/internal/remotecache/token.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/internal/remotecache/token.go",
+          "transport": "http",
+          "symbol": "http.DefaultClient.Do",
+          "fingerprint": "6c0e4f49da8d565aec20f3e28b0db81b3aab632668c144ab80f86488cd96b59b"
+        },
+        {
+          "path": "cloud/extension/internal/deliverycli/internal/remotecache/token.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "47b732a1ae23280ef79204f6cfba41180874958b278b199db4a26fb4a478b7c8"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/internal/remotecache/token_test.go"
+      ],
+      "reason": "Reads a bearer from the user-configured cache token URL; the endpoint and its contract belong to the user's provider."
+    },
+    {
+      "runtime": "@putnami/cloud-extension",
+      "status": "pending-provider-contract",
+      "adapter": "cloud/extension/internal/deliverycli/logreporter.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/logreporter.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "dbbb5b894b8e778847b954a3355a9792e2688a7fb3c57c53af4425fe050ff84d"
+        },
+        {
+          "path": "cloud/extension/internal/deliverycli/logreporter.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "9435f65f3523c2daac0b648243ec0790aecec762ffa8327247662b58772c6c01"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/logreporter_test.go"
+      ],
+      "reason": "Log reporter chunk ingest to delivery-api. Same gap as the session reporter: the octet body is expressible in the strict contract, the frame's identity is not. Each POST carries X-Putnami-Log-Seq, X-Putnami-Log-Final, X-Putnami-Log-Offset and X-Putnami-Log-Sha256, and a Go provider cannot declare header parameters yet, so the strict contract cannot state this operation's inputs. The route is also credential-only and registered outside delivery-api's OpenAPI document, so there is no operation to generate yet.",
+      "operations": [
+        "delivery-api.run-logs.chunks.ingest"
+      ],
+      "pendingWork": "Provider-side contract declarations in delivery-api and oci-server"
+    },
+    {
+      "runtime": "@putnami/cloud-extension",
+      "status": "pending-provider-contract",
+      "adapter": "cloud/extension/internal/deliverycli/sessionreporter.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/sessionreporter.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "166b45522f9cc5b1858aaffe02925e6190eaa9bdd2c98429f6b408eb16ab7616"
+        },
+        {
+          "path": "cloud/extension/internal/deliverycli/sessionreporter.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "0b3577a19d3c41b154b73e39b343b25d6cc2e7a909d0203ee7fcd5ed866c2506"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/sessionreporter_test.go"
+      ],
+      "reason": "Session reporter chunk ingest to delivery-api. The octet body is expressible in the strict contract; the frame's identity is not. Each POST carries X-Putnami-Session-Part, X-Putnami-Session-Seq and X-Putnami-Session-Final, and a Go provider cannot declare header parameters yet (the OpenAPI generator emits path and query parameters only), so the strict contract cannot state this operation's inputs and a generated client has no typed place to carry them. Moving the three facts into the path or the query would change the wire the deployed CI runners already speak, which needs a skew plan rather than a client swap.",
+      "operations": [
+        "delivery-api.run-sessions.chunks.ingest"
+      ],
+      "pendingWork": "Provider-side contract declarations in delivery-api and oci-server"
+    },
+    {
+      "runtime": "@putnami/cloud-extension",
+      "status": "pending-provider-contract",
+      "adapter": "cloud/extension/internal/distributioncli/oci.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/distributioncli/oci.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "12ff80bb9238da32547071fbf634b9986622f9a7b33dfcbeb7a1b0cf5bbe2afe"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/distributioncli/oci_test.go"
+      ],
+      "reason": "CLI use of oci-server's Putnami fast-path routes under /v2/_putnami (copy, tag-digest, revert). The capabilities probe of this same file runs on the generated client; this leg cannot follow yet. Three gaps remain, all in oci-server's own contract. (1) copy and revert are declared with neither a request body nor a response schema, so the generated CreateV2PutnamiCopy and CreateV2PutnamiRevert send no body and read no answer, while the CLI posts the copy or revert JSON body and reads the digest revert computes from its move history. (2) The fast path's 4xx body is the OCI Distribution `errors` array, not the first-party envelope `{code,message,details}` a declared error schema describes: a schema declared against this body makes every refusal a client.response contract violation, and rewriting the registry's error wire changes the verdict every deployed CLI prints. (3) Each call carries X-Putnami-Source-Ref, the caller's --source-ref provenance string the registry records verbatim; it is per-invocation, not a static default header a service binding expresses, and a Go provider cannot declare a header parameter yet. When these land, oci-server also declares the OCI registry lease bearer as a credential profile.",
+      "operations": [
+        "oci-server.putnami.fast-path"
+      ],
+      "pendingWork": "Provider-side contract declarations in delivery-api and oci-server"
+    }
+  ]
+}

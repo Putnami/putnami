@@ -194,6 +194,9 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 
 		// This extension declares executable acceptance criteria in its v2 manifest.
 		filepath.Join("intelligence", "agent-readiness", ManifestFilename): true,
+		// The Cloud CLI extension names the acceptance check of its archive
+		// publication in the verification block.
+		filepath.Join("cloud", "extension", ManifestFilename): true,
 
 		// The two client-matrix samples author their checks in the verification
 		// block, which only exists from version 2.

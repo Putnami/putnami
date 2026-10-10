@@ -1,0 +1,43 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/cloud-extension",
+  "description": "The @putnami/cloud CLI extension: sign-in, workspace setup, registries, packages, CI, configuration, databases, environments and deploys on Putnami Cloud.",
+  "tags": [
+    "go",
+    "extension"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "publish": [
+    "archives"
+  ],
+  "options": {
+    "build": {
+      "platforms": [
+        "host",
+        "linux/amd64"
+      ],
+      "trimpath": true
+    },
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-cloud",
+      "version-var": "go.putnami.dev/cloud/extension/internal/cloudcli.cloudRuntimeVersion",
+      "standalone": true
+    },
+    "package": {
+      "archives": true,
+      "binary-name": "putnami-cloud"
+    },
+    "publish": {
+      "archives": true,
+      "binary-name": "putnami-cloud"
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

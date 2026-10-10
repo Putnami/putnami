@@ -1,0 +1,119 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "control-api",
+    "audience": "control-api"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/control-api/go",
+    "clients": [
+      {
+        "service": "control-api",
+        "clientSymbol": "ControlClient",
+        "bindingSymbol": "RegisterControlClient"
+      }
+    ]
+  },
+  "contractSha256": "57edcababa03cc92bb5d9817c551310439b7954bd75cdfb4ff8706a805050d21",
+  "operations": [
+    {
+      "operationId": "getV1_Workspaces_Workspace_Deploy",
+      "service": "control-api",
+      "methodSymbol": "GetV1WorkspacesDeploy",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/deploy",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Deploy_Release",
+      "service": "control-api",
+      "methodSymbol": "GetV1WorkspacesWorkspaceDeployRelease",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/deploy/{release}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Deployments",
+      "service": "control-api",
+      "methodSymbol": "GetV1WorkspacesDeployments",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/deployments",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Environments_Environment_Channel-follow",
+      "service": "control-api",
+      "methodSymbol": "GetV1WorkspacesEnvironmentsChannelFollow",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/environments/{environment}/channel-follow",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Environments_Environment_Readiness",
+      "service": "control-api",
+      "methodSymbol": "GetV1WorkspacesEnvironmentsReadiness",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/environments/{environment}/readiness",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Deploy",
+      "service": "control-api",
+      "methodSymbol": "CreateV1WorkspacesDeploy",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/deploy",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Environment-definitions_Accept",
+      "service": "control-api",
+      "methodSymbol": "CreateV1WorkspacesEnvironmentDefinitionsAccept",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/environment-definitions/accept",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "691ca60f5e936361a598866d5eef684c576fc692ab53500e9932100ddc010ac9"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "go.putnami.dev/protocol/sitecontent",
+  "visibility": "public",
   "tags": ["go", "protocol"],
   "extensions": ["/go/extension"],
   "publish": ["go"],

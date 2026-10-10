@@ -1,0 +1,80 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "runtime-api",
+    "audience": "runtime-api"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/runtime-api/go",
+    "clients": [
+      {
+        "service": "runtime-api",
+        "clientSymbol": "RuntimeClient",
+        "bindingSymbol": "RegisterRuntimeClient"
+      }
+    ]
+  },
+  "contractSha256": "c7d55f585ff9242d667dcb91a8a8974ecaa8f06291285b592e4b19c0a057d865",
+  "operations": [
+    {
+      "operationId": "getV1_Workspaces_Workspace_Runtime_Binding-grants_Caller",
+      "service": "runtime-api",
+      "methodSymbol": "GetV1WorkspacesRuntimeBindingGrants",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runtime/binding-grants/{caller}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Runtime_Operation-grants_Caller",
+      "service": "runtime-api",
+      "methodSymbol": "GetV1WorkspacesRuntimeOperationGrants",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runtime/operation-grants/{caller}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "putV1_Workspaces_Workspace_Runtime_Binding-grants_Caller",
+      "service": "runtime-api",
+      "methodSymbol": "UpdateV1WorkspacesRuntimeBindingGrants",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runtime/binding-grants/{caller}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "putV1_Workspaces_Workspace_Runtime_Operation-grants_Caller",
+      "service": "runtime-api",
+      "methodSymbol": "UpdateV1WorkspacesRuntimeOperationGrants",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runtime/operation-grants/{caller}",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "abd586f07531465b9b99de86a632be71c65b9aa31d25348d27bc63653b0b2ce7"
+    }
+  ]
+}

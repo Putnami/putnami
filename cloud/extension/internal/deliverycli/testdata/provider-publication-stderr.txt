@@ -1,0 +1,37 @@
+# Stderr of the Cloud `publish` provider on a custody-lane publication run.
+# Lines starting with `#` are this header; readers drop them.
+#
+# Two byte-identical copies of this file exist, one per project that reads it:
+#   the CI runner image, at tests/fixtures/provider-publication-stderr.txt
+#   this package, at testdata/provider-publication-stderr.txt
+# The runner's shell suite checks that they are identical.
+#
+# Every other line is provider output, in the format
+# publication.go writes through credentialServer.diagnose
+# (prefix `putnami-cloud credential-provider: `):
+#   - open, rerun:              `open: immutable channel ... already has head ...`
+#   - release, superseded:      `release: <commit> is not the head of its default branch (its head is <head>); ...`
+#   - release, retry:           `release: a forward-only channel moved after it was read; ...`
+#   - release, no newer head:   `release: <commit> is not the head ... (Delivery names no newer head); ...`
+#   - release, rerun:           `release: immutable channel ... already has head rs_...; this run is a rerun ...`
+# plus one line in the retired publication-broker format, which the custody
+# lane must ignore.
+#
+# TestPublicationDiagnosticsMatchTheRunnerFixture (this package) has the
+# provider itself write the superseded, retry and no-newer-head lines, and
+# compares them with these byte for byte. The two rerun lines follow their
+# formats with picked values.
+#
+# The run's commit (CI_SHA) is aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.
+#
+# ci-run-native.sh native_note_publication_channel reads only the superseded
+# lines that name that commit. Each names its forward-only channels; a channel
+# keeps the head of the last line that names it. Expected note:
+#   canary already at eeeeeeeeeeee, preview already at eeeeeeeeeeee; no channel moved
+putnami-cloud credential-provider: open: immutable channel v3.0.0 already has head rs_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; this run is a rerun: it publishes its artifacts and moves no channel
+putnami-cloud credential-provider: release: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa is not the head of its default branch (its head is dddddddddddddddddddddddddddddddddddddddd); forward-only channels [canary] stay where they are
+putnami-cloud credential-provider: release: a forward-only channel moved after it was read; reading it again
+putnami-cloud credential-provider: release: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa is not the head of its default branch (Delivery names no newer head); forward-only channels [canary] stay where they are
+putnami-cloud credential-provider: release: immutable channel v3.0.0 already has head rs_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; this run is a rerun and channels [latest] stay where they are
+publication-broker: stable already at dddddddddddddddddddddddddddddddddddddddd; no channel moved
+putnami-cloud credential-provider: release: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa is not the head of its default branch (its head is eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee); forward-only channels [canary preview] stay where they are

@@ -1,0 +1,119 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "identity-api",
+    "audience": "identity-api"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/identity-api/go",
+    "clients": [
+      {
+        "service": "identity-api",
+        "clientSymbol": "Client",
+        "bindingSymbol": "RegisterClient"
+      }
+    ]
+  },
+  "contractSha256": "49e6f6e01cf2632bf218334788950fce669a16fb29e157ca647e56d84c4e0852",
+  "operations": [
+    {
+      "operationId": "deleteV1_Workspaces_Workspace_Tokens_Id",
+      "service": "identity-api",
+      "methodSymbol": "DeleteV1WorkspacesTokens",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/tokens/{id}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces",
+      "service": "identity-api",
+      "methodSymbol": "ListV1Workspaces",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Lookup",
+      "service": "identity-api",
+      "methodSymbol": "ListV1WorkspacesLookup",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/lookup",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace",
+      "service": "identity-api",
+      "methodSymbol": "GetV1Workspaces",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Tokens",
+      "service": "identity-api",
+      "methodSymbol": "GetV1WorkspacesTokens",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/tokens",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces",
+      "service": "identity-api",
+      "methodSymbol": "CreateV1Workspaces",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Tokens",
+      "service": "identity-api",
+      "methodSymbol": "CreateV1WorkspacesTokens",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/tokens",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "258ec4b0808f0fe1223a81a063f01af1df18bcfdd2e060cafb4c9bc8485a3a3c"
+    }
+  ]
+}

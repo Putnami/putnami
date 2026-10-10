@@ -1,0 +1,18 @@
+{
+  "projects": [
+    {
+      "project": "libs/cli",
+      "coveredStatements": 120,
+      "totalStatements": 150,
+      "percentage": 80,
+      "files": [
+        {
+          "file": "reportstream.go",
+          "coveredStatements": 60,
+          "totalStatements": 75,
+          "percentage": 80
+        }
+      ]
+    }
+  ]
+}

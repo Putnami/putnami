@@ -1,0 +1,1539 @@
+{
+  "components": {
+    "schemas": {
+      "Binding": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "installation_id": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "removed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "repo_id": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "suspended_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "uninstalled_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CompleteSourceGitHubOnboardingRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "installation_id": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "replace": {
+            "type": "boolean"
+          },
+          "repo_id": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "SourceGitHubError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SourceGitHubHealth": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "healthy": {
+            "type": "boolean"
+          },
+          "permission_gaps": {
+            "items": {
+              "$ref": "#/components/schemas/SourceGitHubPermissionGap"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "SourceGitHubOnboardingCandidate": {
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "account_login": {
+            "type": "string"
+          },
+          "account_type": {
+            "type": "string"
+          },
+          "installation_id": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "installation_suspended": {
+            "type": "boolean"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "private": {
+            "type": "boolean"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "repo_id": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "suspended_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SourceGitHubOnboardingSession": {
+        "additionalProperties": false,
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/SourceGitHubOnboardingCandidate"
+            },
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "failure_code": {
+            "type": "string"
+          },
+          "github_login": {
+            "type": "string"
+          },
+          "install_url": {
+            "type": "string"
+          },
+          "poll_interval_seconds": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SourceGitHubOnboardingStart": {
+        "additionalProperties": false,
+        "properties": {
+          "authorize_url": {
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "poll_interval_seconds": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "session_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SourceGitHubPermissionGap": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "granted": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "permission": {
+            "type": "string"
+          },
+          "required": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SourceGitHubPullRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "type": "string"
+          },
+          "base_ref": {
+            "type": "string"
+          },
+          "base_sha": {
+            "type": "string"
+          },
+          "closed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "draft": {
+            "type": "boolean"
+          },
+          "head_ref": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "merge_state": {
+            "type": "string"
+          },
+          "merged": {
+            "type": "boolean"
+          },
+          "merged_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "number": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SourceGitHubPullRequestList": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "degraded_reason": {
+            "type": "string"
+          },
+          "empty_reason": {
+            "type": "string"
+          },
+          "next_cursor": {
+            "type": "string"
+          },
+          "pull_requests": {
+            "items": {
+              "$ref": "#/components/schemas/SourceGitHubPullRequest"
+            },
+            "type": "array"
+          },
+          "stale": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "SourceGitHubRepository": {
+        "additionalProperties": false,
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/Binding",
+            "nullable": true
+          },
+          "connected": {
+            "type": "boolean"
+          },
+          "health": {
+            "$ref": "#/components/schemas/SourceGitHubHealth"
+          },
+          "provider": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Workspace-scoped GitHub source binding, onboarding, and pull-request read surface. Consumers call it through the generated clients in clients/go and clients/ts.",
+    "title": "Putnami Source API",
+    "version": "dev"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/v1/workspaces/{workspace}/source/github": {
+      "delete": {
+        "description": "Idempotently disconnect the workspace's current GitHub repository. Requires platform.workspace.manage resolved at the target workspace.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "deleteV1_Workspaces_Workspace_Source_Github",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "204": {
+            "description": "GitHub repository disconnected"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient workspace permissions"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/github",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "get": {
+        "description": "Get the workspace's GitHub repository binding and lifecycle/permission health. Requires platform.workspace.read resolved at the target workspace.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Source_Github",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubRepository"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient workspace permissions"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/github",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/github/pull-requests": {
+      "get": {
+        "description": "List durable open GitHub pull requests for the workspace. Requires platform.workspace.read; CI state is composed by Surfaces from Delivery.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Source_Github_Pull-requests",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubPullRequestList"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient workspace permissions"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubError"
+                }
+              }
+            },
+            "description": "Invalid cursor or page limit"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/github/pull-requests",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/github/sessions": {
+      "post": {
+        "description": "Start or restart browser-assisted GitHub repository onboarding. Requires platform.workspace.manage resolved at the target workspace.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "postV1_Workspaces_Workspace_Source_Github_Sessions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubOnboardingStart"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubOnboardingStart"
+                }
+              }
+            },
+            "description": "Onboarding session started"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient workspace permissions"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubError"
+                }
+              }
+            },
+            "description": "GitHub onboarding is temporarily unavailable"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubError"
+                }
+              }
+            },
+            "description": "GitHub onboarding is not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/github/sessions",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/github/sessions/{session}": {
+      "delete": {
+        "description": "Cancel an actor-owned GitHub onboarding session. Non-owner and foreign-workspace sessions return 404. Requires platform.workspace.manage.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "deleteV1_Workspaces_Workspace_Source_Github_Sessions_Session",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "204": {
+            "description": "Onboarding session canceled"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient workspace permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubError"
+                }
+              }
+            },
+            "description": "Onboarding session not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/github/sessions/{session}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "get": {
+        "description": "Poll an actor-owned GitHub onboarding session. Non-owner and foreign-workspace sessions return 404. Requires platform.workspace.manage.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "getV1_Workspaces_Workspace_Source_Github_Sessions_Session",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubOnboardingSession"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient workspace permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubError"
+                }
+              }
+            },
+            "description": "Onboarding session not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/github/sessions/{session}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/github/sessions/{session}/complete": {
+      "post": {
+        "description": "Complete an actor-owned fresh onboarding session by selecting a proved GitHub repository candidate. Replacement must be explicit. Requires platform.workspace.manage.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "postV1_Workspaces_Workspace_Source_Github_Sessions_Session_Complete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteSourceGitHubOnboardingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Binding"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient workspace permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubError"
+                }
+              }
+            },
+            "description": "Onboarding session not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubError"
+                }
+              }
+            },
+            "description": "Invalid or unproved candidate"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "source.github.repo_bound_elsewhere",
+              "status": 409
+            },
+            {
+              "code": "source.github.workspace_already_bound",
+              "status": 409
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/github/sessions/{session}/complete",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "x-putnami-client": {
+    "credentials": {
+      "service": {
+        "kind": "service-token"
+      },
+      "user": {
+        "kind": "forwarded-user-token"
+      }
+    },
+    "protocolVersion": 1,
+    "service": {
+      "audience": "source-api",
+      "id": "source-api"
+    }
+  }
+}

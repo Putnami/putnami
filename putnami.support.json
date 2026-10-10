@@ -49,6 +49,11 @@
       "status": "preview"
     },
     {
+      "id": "@putnami/cloud-extension",
+      "kind": "package",
+      "status": "preview"
+    },
+    {
       "id": "@putnami/contributor",
       "kind": "package",
       "status": "preview",

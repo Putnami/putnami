@@ -1,0 +1,119 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "data-api",
+    "audience": "data-api"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/data-api/go",
+    "clients": [
+      {
+        "service": "data-api",
+        "clientSymbol": "DataClient",
+        "bindingSymbol": "RegisterDataClient"
+      }
+    ]
+  },
+  "contractSha256": "1c871672642d07ad11f7e94f63ec746df72aafe543b92a36494fac85b0c76d3d",
+  "operations": [
+    {
+      "operationId": "deleteV1_Workspaces_Workspace_Databases_Database_Grants_Id",
+      "service": "data-api",
+      "methodSymbol": "DeleteV1WorkspacesDatabasesGrants",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/databases/{database}/grants/{id}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Database-bindings",
+      "service": "data-api",
+      "methodSymbol": "GetV1WorkspacesDatabaseBindings",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/database-bindings",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Databases",
+      "service": "data-api",
+      "methodSymbol": "GetV1WorkspacesDatabases",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/databases",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Databases_Database_Grants",
+      "service": "data-api",
+      "methodSymbol": "GetV1WorkspacesDatabasesGrants",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/databases/{database}/grants",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Data_Migrations_Publish",
+      "service": "data-api",
+      "methodSymbol": "CreateV1WorkspacesDataMigrationsPublish",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/data/migrations/publish",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Databases_Database_Grants",
+      "service": "data-api",
+      "methodSymbol": "CreateV1WorkspacesDatabasesGrants",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/databases/{database}/grants",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Databases_Database_Query",
+      "service": "data-api",
+      "methodSymbol": "CreateV1WorkspacesDatabasesQuery",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/databases/{database}/query",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "ae768a5909f0002c16fd5e594da2de35ed49f6f015209d210430b4a28bffc55d"
+    }
+  ]
+}

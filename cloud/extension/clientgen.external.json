@@ -1,0 +1,241 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "OAuth 2.0 token endpoint, RFC 6749 section 3.2, 4.5 (extension grant) and 6 (refresh); RFC 8628 section 3.4-3.5 (device access token request); OAuth 2.0 Token Revocation, RFC 7009 section 2",
+      "adapter": "cloud/extension/internal/clicore/oauth_token.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/clicore/oauth_token.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "087fb65bc0caf93d859de56bb6a4b8ffde60d7c6dab2de815e307664da6768e1"
+        },
+        {
+          "path": "cloud/extension/internal/clicore/oauth_token.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "0910d2a8b804b4bd213c51cb60c9132afb85619807159fca2a2923dc91f5e4a0"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/clicore/oauth_token_test.go",
+        "cloud/extension/internal/identitycli/login_test.go"
+      ],
+      "reason": "PostTokenEndpoint is the CLI's one request to the issuer's token_endpoint: the stored-session refresh (refresh_token), the login poll (device_code) and the API-key extension grant used by scoped workspace tokens and legacy registry credentials. PostRevocationEndpoint is the logout request to the issuer's revocation_endpoint. Grant and revocation bodies and their answers are the RFCs', not a first-party provider contract."
+    },
+    {
+      "authority": "OpenID Connect Discovery 1.0 section 4 (provider configuration request and response)",
+      "adapter": "cloud/extension/internal/clicore/oidc.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/clicore/oidc.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "abab5d2b5d8282f266bcef9aff57cc04a7052e843f2ef22e4be08f375438ec1f"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/clicore/oauth_token_test.go"
+      ],
+      "reason": "AuthEndpoints reads the issuer's /.well-known/openid-configuration to find the device authorization, token, userinfo and revocation endpoints every OAuth leg of the CLI calls, falling back to conventional paths when the issuer publishes none."
+    },
+    {
+      "authority": "Google Compute Engine metadata server v1 (cloud.google.com/compute/docs/metadata/overview)",
+      "adapter": "cloud/extension/internal/configcli/metadata_token.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/configcli/metadata_token.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "e70f026c0ff19e6c25d241afebe949f3ad90e854584aa25a2772021fe47b3a77"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/configcli/drift_test.go"
+      ],
+      "reason": "Mints an audience-bound ID token for the runner's attached service account from the fixed metadata endpoint."
+    },
+    {
+      "authority": "Go toolchain download index at go.dev/dl (the ?mode=json machine-readable index)",
+      "adapter": "cloud/extension/internal/deliverycli/godevindex.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/godevindex.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "12df8c30306df2e462c68e21c2f5c31287fb867b41d7e27268ea07a2e6aaa75e"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/godevindex_test.go"
+      ],
+      "reason": "Reads the sha256 go.dev publishes for each Go toolchain artifact, which the image producer verifies the downloaded archive against."
+    },
+    {
+      "authority": "Go toolchain download index (go.dev/dl)",
+      "adapter": "cloud/extension/internal/deliverycli/imagelayers.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/imagelayers.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "ab66d64740c5626591d4dba529b837910c79c64c27c6e47e2f763e8b08238610"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/imagelayers_test.go"
+      ],
+      "reason": "Downloads the Go toolchain archive named by the image spec from go.dev."
+    },
+    {
+      "authority": "Google Cloud Storage signed URLs (cloud.google.com/storage/docs/access-control/signed-urls)",
+      "adapter": "cloud/extension/internal/deliverycli/internal/remotecache/batch.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/internal/remotecache/batch.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "2d509e80f7484a5060e9cb465b8deaba201b991be69292e3b0995368e69c8c40"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/internal/remotecache/batch_test.go"
+      ],
+      "reason": "Direct blob upload to the presigned transfer URL the cache server granted."
+    },
+    {
+      "authority": "Google Cloud Storage signed URLs (cloud.google.com/storage/docs/access-control/signed-urls)",
+      "adapter": "cloud/extension/internal/deliverycli/internal/remotecache/fetch.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/internal/remotecache/fetch.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "564a2a7c2572e968ab52af175e3670db6dfb346b357bbd397824b2d2d859f818"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/internal/remotecache/fetch_test.go"
+      ],
+      "reason": "Blob download from the presigned transfer URL the cache server granted."
+    },
+    {
+      "authority": "Google Cloud Storage signed URLs (cloud.google.com/storage/docs/access-control/signed-urls)",
+      "adapter": "cloud/extension/internal/deliverycli/internal/remotecache/store.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/internal/remotecache/store.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "8f329cf4fbd27d9efa9981e27dd11dc9ad5d680cc0882a463074f4558f52719d"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/internal/remotecache/store_test.go"
+      ],
+      "reason": "Blob upload to the presigned transfer URL the cache server granted."
+    },
+    {
+      "authority": "Google Compute Engine metadata server v1 (cloud.google.com/compute/docs/metadata/overview)",
+      "adapter": "cloud/extension/internal/deliverycli/internal/remotecache/token.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/internal/remotecache/token.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "e70f026c0ff19e6c25d241afebe949f3ad90e854584aa25a2772021fe47b3a77"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/internal/remotecache/token_test.go"
+      ],
+      "reason": "Mints the audience-bound ID token for secretless CI cache access from the fixed metadata endpoint."
+    },
+    {
+      "authority": "OCI Distribution Specification v1.1 (github.com/opencontainers/distribution-spec)",
+      "adapter": "cloud/extension/internal/distributioncli/oci.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/distributioncli/oci.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "109fbe31674a3e82b1ac70835fe41c1027ec31848ac93164e00ee59147fbe0cc"
+        },
+        {
+          "path": "cloud/extension/internal/distributioncli/oci.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "33e76c0473ff9037e4e71accf326140f0d148f96e9216921258d1bebb84a010d"
+        },
+        {
+          "path": "cloud/extension/internal/distributioncli/oci.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "54d425abd69c945ef2aa4fe09eeb37172bdc215f288ddc1a3ecf82877357096f"
+        },
+        {
+          "path": "cloud/extension/internal/distributioncli/oci.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "d7f4c7e258e35032e04c86a67e3f4a21766aaedf90d7ee09b3b7cfc3a35ed901"
+        },
+        {
+          "path": "cloud/extension/internal/distributioncli/oci.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "dcb7cf6a783bfeb1f261e86af5ca34205604ab9102ae75b6e0809e2f21faae68"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/distributioncli/oci_test.go"
+      ],
+      "reason": "Standard OCI distribution leg (manifests, blobs, uploads, mounts) against the configured registry; the standard is the authority even when a Putnami registry serves it."
+    },
+    {
+      "authority": "OpenID Connect Core 1.0 section 5.3 (UserInfo endpoint)",
+      "adapter": "cloud/extension/internal/identitycli/identity.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/identitycli/identity.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "243d8cdd0b77123b5410e8e1e53fbf0f331e340f7e677919defa2837106b726c"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/identitycli/login_test.go",
+        "cloud/extension/internal/identitycli/whoami_test.go"
+      ],
+      "reason": "`putnami cloud login` and `whoami` read the signed-in user's standard claims from the issuer's userinfo_endpoint with the access token as a bearer. The claim set is OpenID Connect's, not a first-party provider contract."
+    },
+    {
+      "authority": "OAuth 2.0 Device Authorization Grant, RFC 8628 section 3.1-3.2 (device authorization request and response)",
+      "adapter": "cloud/extension/internal/identitycli/login.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/identitycli/login.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "1a5b86905b9541fb324aa3fddea8265ecaf42a71a47a934e7f72618acf7c20a2"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/identitycli/login_test.go"
+      ],
+      "reason": "`putnami cloud login` starts the device authorization grant at the issuer's device_authorization_endpoint, read from its discovery document. The request and the device/user-code answer are the RFC's, not a first-party provider contract; the poll that follows goes through internal/clicore/oauth_token.go."
+    }
+  ]
+}

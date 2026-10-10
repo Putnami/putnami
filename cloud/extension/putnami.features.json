@@ -1,0 +1,30 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "cloud",
+  "features": [
+    {
+      "id": "cloud/cli-archive-publication",
+      "type": "feature",
+      "name": "Archive publication from the Cloud CLI",
+      "outcome": "The Cloud CLI reports a published archive member only after Put accepted it, and the member names the archive by ecosystem and coordinate",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "member-only-after-accepted-put-response",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "archive-publication-member-contract"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

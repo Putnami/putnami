@@ -1,0 +1,184 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "config-api",
+    "audience": "config-api"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/config-api/go",
+    "clients": [
+      {
+        "service": "config-api",
+        "clientSymbol": "ConfigClient",
+        "bindingSymbol": "RegisterConfigClient"
+      }
+    ]
+  },
+  "contractSha256": "635652c1f1653f2009e182d73407d539e6edecc295015891c65daa4aa5536a98",
+  "operations": [
+    {
+      "operationId": "deleteApi_Secrets",
+      "service": "config-api",
+      "methodSymbol": "DeleteApiSecrets",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/api/secrets",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getApi_Schemas",
+      "service": "config-api",
+      "methodSymbol": "ListApiSchemas",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/api/schemas",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getApi_Schemas_App",
+      "service": "config-api",
+      "methodSymbol": "GetApiSchemas",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/api/schemas/{app}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getApi_Secrets",
+      "service": "config-api",
+      "methodSymbol": "ListApiSecrets",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/api/secrets",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getApi_Secrets_Status",
+      "service": "config-api",
+      "methodSymbol": "ListApiSecretsStatus",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/api/secrets/status",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Config_Apps",
+      "service": "config-api",
+      "methodSymbol": "GetV1WorkspacesConfigApps",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/config/apps",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Config_Secret-grants",
+      "service": "config-api",
+      "methodSymbol": "GetV1WorkspacesConfigSecretGrants",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/config/secret-grants",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postApi_Configs_Resolve",
+      "service": "config-api",
+      "methodSymbol": "CreateApiConfigsResolve",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/api/configs/resolve",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postApi_Schemas",
+      "service": "config-api",
+      "methodSymbol": "CreateApiSchemas",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/api/schemas",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postApi_Secrets_Resolve",
+      "service": "config-api",
+      "methodSymbol": "CreateApiSecretsResolve",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/api/secrets/resolve",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "putApi_Configs",
+      "service": "config-api",
+      "methodSymbol": "UpdateApiConfigs",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/api/configs",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "putApi_Secrets",
+      "service": "config-api",
+      "methodSymbol": "UpdateApiSecrets",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/api/secrets",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "85359f202937e4649e9f413cfb32a97c47c0f781d6f12bb7ec2d82ed821c44bd"
+    }
+  ]
+}

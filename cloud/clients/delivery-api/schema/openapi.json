@@ -1,0 +1,6607 @@
+{
+  "components": {
+    "schemas": {
+      "BuildsReport": {
+        "additionalProperties": false,
+        "properties": {
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskBuild"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CIRepairRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "CIRepairResult": {
+        "additionalProperties": false,
+        "properties": {
+          "cancellationRequests": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "reapedPhases": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "reapedRuns": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "reconciledRuns": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "scanLowerBound": {
+            "type": "boolean"
+          },
+          "scannedRuns": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunCancelRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "CIRunDiskResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "endGiB": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "goCacheGiB": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "goModcacheGiB": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "peakAt": {
+            "type": "string"
+          },
+          "peakGiB": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "peakPhase": {
+            "type": "string"
+          },
+          "totalGiB": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunFailedTaskDiagnostic": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunFailedTaskResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "detailOmitted": {
+            "type": "boolean"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/CIRunFailedTaskDiagnostic"
+            },
+            "type": "array"
+          },
+          "error": {
+            "type": "string"
+          },
+          "output": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "project": {
+            "type": "string"
+          },
+          "sharedOutput": {
+            "$ref": "#/components/schemas/CIRunFailedTaskSharedOutput",
+            "nullable": true
+          },
+          "task": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunFailedTaskSharedOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunFailureResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "step": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunHeartbeatResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "ageSeconds": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "attempt": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "cpuDeltaSeconds": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "cpuSeconds": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "elapsedSeconds": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "ioReadDeltaKb": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "ioWriteDeltaKb": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "observedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "processes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "rssKb": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "sequence": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "session": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunListFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "createdAfter": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "idPrefix": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "pullRequest": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "filter": {
+            "$ref": "#/components/schemas/CIRunListFilter",
+            "nullable": true
+          },
+          "limit": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "nextOffset": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "offset": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/CIRunResponse"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunLogDiagnostic": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "column": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunLogDiagnostics": {
+        "additionalProperties": false,
+        "properties": {
+          "failures": {
+            "items": {
+              "$ref": "#/components/schemas/CIRunLogFailure"
+            },
+            "type": "array"
+          },
+          "firstErrors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reproduce": {
+            "type": "string"
+          },
+          "truncatedFailures": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunLogFailure": {
+        "additionalProperties": false,
+        "properties": {
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/CIRunLogDiagnostic"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "truncated": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunLogFrame": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/LogEntry",
+            "nullable": true
+          },
+          "run": {
+            "$ref": "#/components/schemas/CIRunLogRunEvent",
+            "nullable": true
+          }
+        },
+        "type": "object"
+      },
+      "CIRunLogRunEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "conclusion": {
+            "type": "string"
+          },
+          "final": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunLogsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "diagnostics": {
+            "$ref": "#/components/schemas/CIRunLogDiagnostics",
+            "nullable": true
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/LogEntry"
+            },
+            "type": "array"
+          },
+          "liveCursor": {
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunPhaseResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "conclusion": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "cache": {
+            "$ref": "#/components/schemas/CacheEconomics",
+            "nullable": true
+          },
+          "checks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "conclusion": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "disk": {
+            "$ref": "#/components/schemas/CIRunDiskResponse",
+            "nullable": true
+          },
+          "failedTasks": {
+            "items": {
+              "$ref": "#/components/schemas/CIRunFailedTaskResponse"
+            },
+            "type": "array"
+          },
+          "failedTasksOmitted": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "failure": {
+            "$ref": "#/components/schemas/CIRunFailureResponse",
+            "nullable": true
+          },
+          "heartbeat": {
+            "$ref": "#/components/schemas/CIRunHeartbeatResponse",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "impactedProjects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "phases": {
+            "items": {
+              "$ref": "#/components/schemas/CIRunPhaseResponse"
+            },
+            "type": "array"
+          },
+          "provenance": {
+            "type": "string"
+          },
+          "pullRequest": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "session": {
+            "$ref": "#/components/schemas/CIRunSessionResponse",
+            "nullable": true
+          },
+          "sha": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "timing": {
+            "$ref": "#/components/schemas/CIRunTimingResponse",
+            "nullable": true
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunResultsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "coverage": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageResult"
+            },
+            "type": "array"
+          },
+          "derivedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticTaskResult"
+            },
+            "type": "array"
+          },
+          "elidedCoverage": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "elidedDiagnosticTasks": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "elidedPublications": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "elidedTestTasks": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "malformedLines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "omittedCases": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "publications": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationResult"
+            },
+            "type": "array"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "tests": {
+            "items": {
+              "$ref": "#/components/schemas/TestTaskResult"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunRetryRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "maxParallel": {
+            "format": "int64",
+            "maximum": 32,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "noCache": {
+            "type": "boolean"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "size": {
+            "enum": [
+              "auto",
+              "xsmall",
+              "small",
+              "standard",
+              "large",
+              "xlarge"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "CIRunSessionPartResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "bytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "chunks": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "final": {
+            "type": "boolean"
+          },
+          "shipped": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunSessionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "complete": {
+            "type": "boolean"
+          },
+          "events": {
+            "$ref": "#/components/schemas/CIRunSessionPartResponse"
+          },
+          "session": {
+            "$ref": "#/components/schemas/CIRunSessionPartResponse"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunStartRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "maxParallel": {
+            "format": "int64",
+            "maximum": 32,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "noCache": {
+            "type": "boolean"
+          },
+          "phases": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "pullRequest": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "repo": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "sha": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "size": {
+            "enum": [
+              "auto",
+              "xsmall",
+              "small",
+              "standard",
+              "large",
+              "xlarge"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "repo",
+          "sha"
+        ],
+        "type": "object"
+      },
+      "CIRunTimingResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "checkoutMode": {
+            "type": "string"
+          },
+          "cliVersion": {
+            "type": "string"
+          },
+          "coldStartUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "fetchUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "gateUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "installUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "queueUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "runDurationUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "tailUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunTimingsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "elidedTasks": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "malformedLines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "maxTasks": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskTiming"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CIStatusDimension": {
+        "additionalProperties": false,
+        "properties": {
+          "explanation": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "recovery": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "checkOutboxOldestPendingSeconds": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "checkOutboxPending": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "dimensions": {
+            "items": {
+              "$ref": "#/components/schemas/CIStatusDimension"
+            },
+            "type": "array"
+          },
+          "dispatchAxis": {
+            "type": "string"
+          },
+          "healthy": {
+            "type": "boolean"
+          },
+          "lastRun": {
+            "type": "string"
+          },
+          "lastRunCache": {
+            "$ref": "#/components/schemas/CacheEconomics",
+            "nullable": true
+          },
+          "lastRunCliVersion": {
+            "type": "string"
+          },
+          "lastRunDigest": {
+            "type": "string"
+          },
+          "lastRunRunnerChannel": {
+            "type": "string"
+          },
+          "lastRunRunnerSelector": {
+            "type": "string"
+          },
+          "lastRunSourceRevision": {
+            "type": "string"
+          },
+          "liveRun": {
+            "type": "string"
+          },
+          "liveRunHeartbeatSeconds": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "liveRunPhase": {
+            "type": "string"
+          },
+          "liveRunSequence": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "oldestQueuedSeconds": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "queueDepth": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "queueLowerBound": {
+            "type": "boolean"
+          },
+          "stuckRuns": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CISubscriptionTrackRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "producer_namespace": {
+            "type": "string"
+          },
+          "release_set_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIUsageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "gate": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CIUsageWallSummary"
+            },
+            "type": "object"
+          },
+          "outcomes": {
+            "additionalProperties": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "profiles": {
+            "additionalProperties": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "scanLowerBound": {
+            "type": "boolean"
+          },
+          "scannedRuns": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "sources": {
+            "additionalProperties": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "spend": {
+            "$ref": "#/components/schemas/CIUsageSpend"
+          },
+          "substrates": {
+            "additionalProperties": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "windowHours": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIUsageSpend": {
+        "additionalProperties": false,
+        "properties": {
+          "cloudRunEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "estimated": {
+            "type": "boolean"
+          },
+          "runsWithDuration": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "spotEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "totalEur": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "CIUsageWallSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "avgSecs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "maxSecs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "minSecs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "n": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CacheCapabilityResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "expiresAt": {
+            "type": "string"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CacheEconomics": {
+        "additionalProperties": false,
+        "properties": {
+          "executedMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "hitPercent": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "hits": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "misses": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "servedMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "tasks": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CapabilityEmptyRequest": {
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "CoverageReport": {
+        "additionalProperties": false,
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectCoverage"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CoverageResult": {
+        "additionalProperties": false,
+        "properties": {
+          "belowThreshold": {
+            "type": "boolean"
+          },
+          "covered": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "granularity": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "percentage": {
+            "format": "double",
+            "type": "number"
+          },
+          "project": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "threshold": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "total": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "DependencyUnavailableDetails": {
+        "additionalProperties": false,
+        "properties": {
+          "dependency": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Diagnostic": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "column": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DiagnosticResult": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "column": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DiagnosticTaskResult": {
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "infos": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticResult"
+            },
+            "type": "array"
+          },
+          "key": {
+            "type": "string"
+          },
+          "omitted": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "project": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "warnings": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "DisableCISubscriptionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "DriftSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "apps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "FailingCase": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FailureAttribution": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "step": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FileCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "coveredStatements": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "file": {
+            "type": "string"
+          },
+          "percentage": {
+            "format": "double",
+            "type": "number"
+          },
+          "totalStatements": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "GateSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "baseSha": {
+            "type": "string"
+          },
+          "baseline": {
+            "type": "string"
+          },
+          "changedFiles": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "projects": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "publication": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "releaseSetProjects": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "seedProjects": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "InstallCapabilityResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "bearer": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "LogEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "body": {
+            "type": "string"
+          },
+          "severity": {
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "severityText": {
+            "type": "string"
+          },
+          "spanId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "NativePublicationAdvanceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "advance": {
+            "type": "boolean"
+          },
+          "head": {
+            "type": "string"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "NativePublicationMember": {
+        "additionalProperties": false,
+        "properties": {
+          "coordinate": {
+            "type": "string"
+          },
+          "ecosystem": {
+            "type": "string"
+          },
+          "selectionFingerprint": {
+            "type": "string"
+          },
+          "sourceRevision": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "NativePublicationPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "immutableChannel": {
+            "type": "string"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/NativePublicationMember"
+            },
+            "type": "array"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "planDigest": {
+            "type": "string"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "sourceRevision": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "NativePublicationPlanningResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "expiresUnix": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "expires_in": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "forwardOnlyChannels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "immutableChannel": {
+            "type": "string"
+          },
+          "jti": {
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "sourceRevision": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "NativePublicationPublishResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "expires_in": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "jti": {
+            "type": "string"
+          },
+          "planDigest": {
+            "type": "string"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "OperationalMetrics": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptToPreviewReadyUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "baselineMergeBase": {
+            "type": "string"
+          },
+          "cacheReuseTasks": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "changePlanDigest": {
+            "type": "string"
+          },
+          "changePlanReason": {
+            "type": "string"
+          },
+          "changePlanStatus": {
+            "type": "string"
+          },
+          "checkoutMode": {
+            "type": "string"
+          },
+          "cliVersion": {
+            "type": "string"
+          },
+          "coldStartUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "cpuActualMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "cpuAllocatedMillicores": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "cpuAllocatedMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "cpuAllocatedSource": {
+            "type": "string"
+          },
+          "cpuExecutions": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "cpuPeriodUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "cpuQuotaUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "cpuUsageUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "diskEndBytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "diskPeakAt": {
+            "type": "string"
+          },
+          "diskPeakBytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "diskPeakPhase": {
+            "type": "string"
+          },
+          "diskTotalBytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "fetchUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "gateAttempts": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "gateFirstAttemptUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "gateSecondAttemptUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "gateUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "goCacheBytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "goModcacheBytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "installUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "previewReadyUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "previewUrl": {
+            "type": "string"
+          },
+          "runDurationUsec": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "testedHeadTree": {
+            "type": "string"
+          },
+          "testedTree": {
+            "type": "string"
+          },
+          "timedOutMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "timedOutTask": {
+            "type": "string"
+          },
+          "timeoutRecovery": {
+            "type": "string"
+          },
+          "timeoutRecoveryReason": {
+            "type": "string"
+          },
+          "workspaceProjects": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PipelineModeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "cancelRunning": {
+            "type": "boolean"
+          },
+          "incidentRef": {
+            "type": "string"
+          },
+          "mode": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "reviewRef": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "PipelineModeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "canceledRuns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ProjectCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "coveredStatements": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "deltaPercentage": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileCoverage"
+            },
+            "type": "array"
+          },
+          "percentage": {
+            "format": "double",
+            "type": "number"
+          },
+          "project": {
+            "type": "string"
+          },
+          "totalStatements": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ProjectTests": {
+        "additionalProperties": false,
+        "properties": {
+          "failed": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "failingCases": {
+            "items": {
+              "$ref": "#/components/schemas/FailingCase"
+            },
+            "type": "array"
+          },
+          "passed": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "project": {
+            "type": "string"
+          },
+          "skipped": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PublicationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "contentStatus": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "dryRun": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "registry": {
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "task": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PublishedImage": {
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "type": "string"
+          },
+          "package": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PutCISubscriptionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "drift": {
+            "$ref": "#/components/schemas/DriftSettings"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "expected_revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "required_checks": {
+            "$ref": "#/components/schemas/RequiredChecks"
+          },
+          "runner_channel": {
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "$ref": "#/components/schemas/CISubscriptionTrackRequest"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ReportBatchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "builds": {
+            "$ref": "#/components/schemas/BuildsReport",
+            "nullable": true
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/CoverageReport",
+            "nullable": true
+          },
+          "selection": {
+            "$ref": "#/components/schemas/SelectionReport",
+            "nullable": true
+          },
+          "stream": {
+            "$ref": "#/components/schemas/ReportStreamStats"
+          },
+          "submissionId": {
+            "type": "string"
+          },
+          "tests": {
+            "$ref": "#/components/schemas/TestsReport",
+            "nullable": true
+          },
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ReportBatchResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "dropped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "idempotent": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "partial": {
+            "type": "boolean"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "stored": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "subjectId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ReportCache": {
+        "additionalProperties": false,
+        "properties": {
+          "bytesFetched": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "bytesUploaded": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "hits": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "misses": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "restored": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "timeSavedMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "uploads": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ReportCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/RunCounts"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/ReportCoverage",
+            "nullable": true
+          },
+          "cpuMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "errors": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "freshWallMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "reuse": {
+            "$ref": "#/components/schemas/RunReuse"
+          },
+          "tests": {
+            "$ref": "#/components/schemas/ReportTests",
+            "nullable": true
+          },
+          "warnings": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ReportCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "covered": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "enforced": {
+            "type": "boolean"
+          },
+          "granularity": {
+            "type": "string"
+          },
+          "percentage": {
+            "format": "double",
+            "type": "number"
+          },
+          "total": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ReportFile": {
+        "additionalProperties": false,
+        "properties": {
+          "cache": {
+            "$ref": "#/components/schemas/ReportCache",
+            "nullable": true
+          },
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/ReportCommand"
+            },
+            "type": "array"
+          },
+          "elidedJobs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "endTime": {
+            "type": "string"
+          },
+          "enforceCoverage": {
+            "type": "boolean"
+          },
+          "git": {
+            "$ref": "#/components/schemas/ReportGit",
+            "nullable": true
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/ReportJob"
+            },
+            "type": "array"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "run": {
+            "$ref": "#/components/schemas/ReportRun"
+          },
+          "scheduler": {
+            "$ref": "#/components/schemas/ReportScheduler",
+            "nullable": true
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ReportGit": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "dirty": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "sha": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ReportJob": {
+        "additionalProperties": false,
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/ReportCoverage",
+            "nullable": true
+          },
+          "cpuMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/Diagnostic"
+            },
+            "type": "array"
+          },
+          "durationMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "failureDetailsTruncated": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "reuse": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "truncatedCount": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ReportRun": {
+        "additionalProperties": false,
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/RunCounts"
+          },
+          "cpu": {
+            "$ref": "#/components/schemas/RunCPU",
+            "nullable": true
+          },
+          "durationMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "exitCode": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "reuse": {
+            "$ref": "#/components/schemas/RunReuse"
+          }
+        },
+        "type": "object"
+      },
+      "ReportScheduler": {
+        "additionalProperties": false,
+        "properties": {
+          "criticalPathMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "parallelism": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ReportStreamStats": {
+        "additionalProperties": false,
+        "properties": {
+          "elidedLines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "lines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "malformedLines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "oversizedLines": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "unknownEvents": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ReportTests": {
+        "additionalProperties": false,
+        "properties": {
+          "failed": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "failureDetailsTruncated": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "passed": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "skipped": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "RequiredCheckRule": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_pattern": {
+            "type": "string"
+          },
+          "repo_pattern": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RequiredChecks": {
+        "additionalProperties": false,
+        "properties": {
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RequiredCheckRule"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RunCPU": {
+        "additionalProperties": false,
+        "properties": {
+          "actualMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "allocatedMillicores": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "allocatedMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "allocatedSource": {
+            "type": "string"
+          },
+          "executions": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "RunCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "canceled": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "failed": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "skipped": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "succeeded": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "RunReuse": {
+        "additionalProperties": false,
+        "properties": {
+          "coalesced": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "localCache": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "remoteCache": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "RunnerNextRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "completedRunId": {
+            "type": "string"
+          },
+          "machineRunId": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RunnerNextResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "env": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SelectedTask": {
+        "additionalProperties": false,
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SelectionReport": {
+        "additionalProperties": false,
+        "properties": {
+          "emitter": {
+            "type": "string"
+          },
+          "taskCount": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/SelectedTask"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "SubmitRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "conclusion": {
+            "type": "string"
+          },
+          "failure": {
+            "$ref": "#/components/schemas/FailureAttribution",
+            "nullable": true
+          },
+          "impactedProjects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "operational": {
+            "$ref": "#/components/schemas/OperationalMetrics",
+            "nullable": true
+          },
+          "provenance": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "published": {
+            "items": {
+              "$ref": "#/components/schemas/PublishedImage"
+            },
+            "type": "array"
+          },
+          "pullRequest": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/GateSelection",
+            "nullable": true
+          },
+          "sha": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "submissionId": {
+            "type": "string"
+          },
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SubmitResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "conclusion": {
+            "type": "string"
+          },
+          "idempotent": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "subjectId": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "Subscription": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "drift": {
+            "$ref": "#/components/schemas/DriftSettings"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "issuer_id": {
+            "type": "string"
+          },
+          "required_checks": {
+            "$ref": "#/components/schemas/RequiredChecks"
+          },
+          "revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "runner_channel": {
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "$ref": "#/components/schemas/Track"
+            },
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updated_by": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TaskBuild": {
+        "additionalProperties": false,
+        "properties": {
+          "cacheHit": {
+            "type": "boolean"
+          },
+          "durationMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "reuse": {
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TaskTiming": {
+        "additionalProperties": false,
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "cpuMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "durationMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "end": {
+            "type": "string"
+          },
+          "executionId": {
+            "type": "string"
+          },
+          "inputDigest": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "reuse": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TestCaseResult": {
+        "additionalProperties": false,
+        "properties": {
+          "durationMs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "output": {
+            "type": "string"
+          },
+          "outputTruncated": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "suite": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TestTaskResult": {
+        "additionalProperties": false,
+        "properties": {
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/TestCaseResult"
+            },
+            "type": "array"
+          },
+          "dropped": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "failed": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
+          "omitted": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "passed": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "project": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "skipped": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TestsReport": {
+        "additionalProperties": false,
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectTests"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "Track": {
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "producer_namespace": {
+            "type": "string"
+          },
+          "producer_workspace_id": {
+            "type": "string"
+          },
+          "release_set_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Delivery CI runs, records, and pipeline status. Consumers call it through the generated clients in clients/go and clients/ts.",
+    "title": "Putnami Delivery API",
+    "version": "dev"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/api/ci/runner/next": {
+      "post": {
+        "description": "Assign the next CI job to a reused machine. A separate host-purpose credential alias authenticates the original machine run and workspace; the job's ordinary ingest token and replay ingest aliases are refused. The completed run is checked by the assignment owner. Returns a bounded Docker env file in env, or an empty env when no job is assigned.",
+        "operationId": "postApi_Ci_Runner_Next",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunnerNextRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerNextResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid or oversized request"
+          },
+          "401": {
+            "description": "Run credential missing, invalid or expired"
+          },
+          "403": {
+            "description": "Host-purpose alias required, or machine or workspace differs from the credential"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "description": "Runner assignment failed"
+          },
+          "503": {
+            "description": "Runner reuse is not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 15000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/ci/runner/next",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/delivery/records": {
+      "post": {
+        "description": "Submit a delivery run record. With a run credential (the orchestrated runner or a dispatched worker) the body drives the run's lifecycle: the first contact moves queued to in_progress, a terminal status posts the conclusion, and a terminal submission may carry operational metrics, the published digest set, the impacted projects and a failure attribution; replays are 200 no-ops. The workspace and run come out of the credential; body workspace, repo, sha and submissionId are accepted only as consistency assertions. A workspace bearer submits a claimed local run instead.",
+        "operationId": "postV1_Delivery_Records",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid body, status, conclusion, metrics or an assertion that contradicts the credential's run"
+          },
+          "401": {
+            "description": "Run credential missing, invalid or expired"
+          },
+          "403": {
+            "description": "The body asserts a workspace or submission the credential is not scoped to"
+          },
+          "500": {
+            "description": "Delivery records backend unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 15000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/delivery/records",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/delivery/records/capabilities/cache": {
+      "post": {
+        "description": "Mint the run's cache lease: a cache token whose object writer is limited to default-branch runs. Authenticated by the run credential alone; the body is exactly {}. Refusals carry {error, message, code}; a provider passes the code on and retries only 408, 429 and 5xx.",
+        "operationId": "postV1_Delivery_Records_Capabilities_Cache",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapabilityEmptyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CacheCapabilityResponse"
+                }
+              }
+            },
+            "description": "The cache lease"
+          },
+          "204": {
+            "description": "The run has no run-scoped cache lease"
+          },
+          "400": {
+            "description": "The body is not exactly {}, or the run's authority cannot be derived"
+          },
+          "401": {
+            "description": "Run credential missing, invalid or expired"
+          },
+          "409": {
+            "description": "The run is terminal or its authority drifted"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "description": "The cache lease could not be minted, or was minted outside its bounds"
+          },
+          "503": {
+            "description": "The cache capability is not configured or not available now"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 12000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/delivery/records/capabilities/cache",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/delivery/records/capabilities/install": {
+      "post": {
+        "description": "Mint the run's install credential: one short Distribution bearer that reads exactly the installable members of the release set the run's workspace follows. Authenticated by the run credential alone; the body is exactly {}. Refusals carry {error, message, code}; a provider passes the code on and retries only 408, 429 and 5xx.",
+        "operationId": "postV1_Delivery_Records_Capabilities_Install",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapabilityEmptyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallCapabilityResponse"
+                }
+              }
+            },
+            "description": "The install credential"
+          },
+          "204": {
+            "description": "The run needs no install credential"
+          },
+          "400": {
+            "description": "The body is not exactly {}, or the run's authority cannot be derived"
+          },
+          "401": {
+            "description": "Run credential missing, invalid or expired"
+          },
+          "403": {
+            "description": "Identity denied the install delegation"
+          },
+          "409": {
+            "description": "The run is terminal, its authority drifted, or the release track is ambiguous or no longer authorized"
+          },
+          "422": {
+            "description": "The release set needs more read scopes than one bearer carries"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "description": "Identity or Distribution failed, or answered outside the contract"
+          },
+          "503": {
+            "description": "The install capability is not configured or not available now"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 12000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/delivery/records/capabilities/install",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/delivery/records/native-publication/advance": {
+      "post": {
+        "description": "Answer whether the run may move its forward-only channels now: false only for a default-branch run whose commit is no longer the head of that branch. Mints nothing and moves nothing. Authenticated by the run credential alone; the body is exactly {}.",
+        "operationId": "postV1_Delivery_Records_Native-publication_Advance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapabilityEmptyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativePublicationAdvanceResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "The body is not exactly {}"
+          },
+          "401": {
+            "description": "Run credential missing, invalid or expired"
+          },
+          "409": {
+            "description": "The run is terminal"
+          },
+          "413": {
+            "description": "The body exceeds 1 MiB"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Native publication is not configured, or the default branch head cannot be read"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.payload_too_large",
+              "status": 413
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 12000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/delivery/records/native-publication/advance",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/delivery/records/native-publication/planning": {
+      "post": {
+        "description": "Answer the run's native publication authority (namespace, channels, and the forward-only channels of a default-branch run) with one read-only release-set bearer. Authenticated by the run credential alone; the body is exactly {}.",
+        "operationId": "postV1_Delivery_Records_Native-publication_Planning",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapabilityEmptyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativePublicationPlanningResponse"
+                }
+              }
+            },
+            "description": "The planning authority and its bearer"
+          },
+          "400": {
+            "description": "The body is not exactly {}, or the run has no publication authority"
+          },
+          "401": {
+            "description": "Run credential missing, invalid or expired"
+          },
+          "409": {
+            "description": "The run is terminal, or its capability drifted"
+          },
+          "413": {
+            "description": "The body exceeds 1 MiB"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "description": "Identity failed to mint the capability, or answered outside the contract"
+          },
+          "503": {
+            "description": "Native publication is not configured, or the default branch head cannot be read"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.payload_too_large",
+              "status": 413
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 12000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/delivery/records/native-publication/planning",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/delivery/records/native-publication/publish": {
+      "post": {
+        "description": "Freeze the publication plan's digest on the run and answer one short bearer for only that plan's package and channel authority. Posting the same plan again mints another bearer. Authenticated by the run credential alone.",
+        "operationId": "postV1_Delivery_Records_Native-publication_Publish",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativePublicationPlan"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativePublicationPublishResponse"
+                }
+              }
+            },
+            "description": "The plan's write bearer"
+          },
+          "400": {
+            "description": "The plan does not match the run's publication authority, or its digest is invalid"
+          },
+          "401": {
+            "description": "Run credential missing, invalid or expired"
+          },
+          "409": {
+            "description": "Another plan is frozen on the run, or the run is terminal"
+          },
+          "413": {
+            "description": "The body exceeds 1 MiB"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "description": "Identity failed to mint the capability, or answered outside the contract"
+          },
+          "503": {
+            "description": "Native publication is not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.payload_too_large",
+              "status": 413
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 12000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/delivery/records/native-publication/publish",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/delivery/records/reports": {
+      "post": {
+        "description": "Submit a parsed report batch (tests, coverage, builds, selection) for an existing run. Idempotent per submission id and report kind; the workspace comes out of the credential, and a body workspace is accepted only as a consistency assertion.",
+        "operationId": "postV1_Delivery_Records_Reports",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportBatchResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid body, or a batch with no report"
+          },
+          "401": {
+            "description": "Credential missing, invalid or expired"
+          },
+          "403": {
+            "description": "The body asserts a workspace or submission the credential is not scoped to"
+          },
+          "404": {
+            "description": "No run for the submission id"
+          },
+          "500": {
+            "description": "Report ingestion unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 15000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/delivery/records/reports",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/ci/repair": {
+      "post": {
+        "description": "Run one safe, idempotent CI recovery pass within the path workspace: stale queued/in-progress runs become errored/timed_out, persisted compute is canceled, abandoned phases become timed_out, and existing terminal aggregate/phase checks are reconciled. Never fabricates success and never redispatches accepted work. The historical check scan is bounded and reports scanLowerBound when capped. Requires delivery.run.manage; workspace machine tokens are denied.\n\nRequired scopes: delivery.run.manage.",
+        "operationId": "postV1_Workspaces_Workspace_Ci_Repair",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CIRepairRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIRepairResult"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid or missing body fields"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Manage permission required, workspace mismatch, or machine token denied"
+          },
+          "500": {
+            "description": "Delivery operations backend unavailable"
+          },
+          "503": {
+            "description": "A service Delivery depends on failed. The body names it (code delivery.dependency_unavailable, dependency, details.dependency) and its sentence says whether a retry can help"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "delivery.dependency_unavailable",
+              "schema": {
+                "$ref": "#/components/schemas/DependencyUnavailableDetails"
+              },
+              "status": 503
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/ci/repair",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/ci/status": {
+      "get": {
+        "description": "Aggregated CI status and readiness for a workspace: pipeline breaker mode, delivery.ci config/preview readiness, runner-image freshness on the dispatch axis that actually runs, the effective release the last run recorded (image digest + Putnami CLI version), and a queue/stuck scan of the workspace's open runs — each as a dimension carrying a first-class state and exactly one recovery action. A dimension whose facts are missing reports provenance-unknown, never healthy. Operators (platform.operator.act) additionally see the GitHub ruleset-enforcement drift, the App check-publish permission dimension, and the durable check-publication backlog. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
+        "operationId": "getV1_Workspaces_Workspace_Ci_Status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIStatusResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid path or query parameter"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Workspace read permission required, workspace mismatch, or machine token denied"
+          },
+          "500": {
+            "description": "Delivery records read backend unavailable"
+          },
+          "503": {
+            "description": "CI status facts source is not configured on this host"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/ci/status",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/ci/subscription": {
+      "get": {
+        "description": "Read the workspace-owned operational CI subscription. Commercial contract state remains in Business. Responses are not cacheable.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Ci_Subscription",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscription"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid subscription settings or revision"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Workspace permission or producer access grant required"
+          },
+          "404": {
+            "description": "CI subscription not configured"
+          },
+          "409": {
+            "description": "Subscription revision changed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Live subscription or Distribution authority unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/ci/subscription",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "put": {
+        "description": "Create or replace the workspace-owned operational CI subscription with revision CAS. Producer workspace IDs are resolved server-side from live Distribution bindings and access grants.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "putV1_Workspaces_Workspace_Ci_Subscription",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutCISubscriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscription"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid subscription settings or revision"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Workspace permission or producer access grant required"
+          },
+          "409": {
+            "description": "Subscription revision changed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Live subscription or Distribution authority unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/ci/subscription",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/ci/subscription/disable": {
+      "post": {
+        "description": "Disable the operational CI subscription while preserving its settings, using revision CAS.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "postV1_Workspaces_Workspace_Ci_Subscription_Disable",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisableCISubscriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscription"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid subscription settings or revision"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Workspace permission or producer access grant required"
+          },
+          "409": {
+            "description": "Subscription revision changed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Live subscription or Distribution authority unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/ci/subscription/disable",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/ci/usage": {
+      "get": {
+        "description": "Aggregate a workspace's CI runs over a reporting window (default 7d, `window` a Go duration) into counts by substrate outcome, profile, and resolution source, a gate wall-time summary per substrate, a terminal-outcome taxonomy, and an estimated spend. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
+        "operationId": "getV1_Workspaces_Workspace_Ci_Usage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "window",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIUsageResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid path or query parameter"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Workspace read permission required, workspace mismatch, or machine token denied"
+          },
+          "500": {
+            "description": "Delivery records read backend unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/ci/usage",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/pipeline": {
+      "post": {
+        "description": "Set the workspace CI circuit-breaker mode: pause (paused — no new compute), drain (draining — no new compute, in-flight settles), or resume (active). A pause may request cancelRunning to also cancel the workspace's already-running runs. Records the actor + reason as a durable audit row. Requires delivery.run.manage at the path workspace; workspace machine tokens are denied.\n\nRequired scopes: delivery.run.manage.",
+        "operationId": "postV1_Workspaces_Workspace_Pipeline",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PipelineModeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineModeResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid or missing body fields"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Manage permission required, workspace mismatch, or machine token denied"
+          },
+          "500": {
+            "description": "Delivery operations backend unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/pipeline",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/runs": {
+      "get": {
+        "description": "List a workspace's CI runs newest-first with offset pagination and immutable subject references, optionally filtered by repository, branch, ref (a commit SHA prefix or a branch name), pull request, status or conclusion, phase, creation time and run id prefix. A filtered page carries a filter member naming the filters it applied; the caller applies any other one itself. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
+        "operationId": "getV1_Workspaces_Workspace_Runs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdAfter",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "idPrefix",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pullRequest",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ref",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "repo",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIRunListResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid path or query parameter"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Workspace read permission required, workspace mismatch, or machine token denied"
+          },
+          "500": {
+            "description": "Delivery records read backend unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runs",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "post": {
+        "description": "Manually start a CI run for an explicit pushed SHA on a repository bound to the workspace. The SHA is validated server-side as a known pushed commit on a bound repo (an unpushed or foreign SHA is rejected). Opens a run at attempt 1 with an optional safe phase selection, an optional allocation-v2 runner profile (size omitted or auto selects automatically; physical sizes are xsmall, small, standard, large, and xlarge), an optional per-run gate fan-out (maxParallel, 1..32), and an optional noCache that forces the gate to execute every planned task rather than reuse cache entries (recorded in provenance; it never widens the gate's impacted selection). Requires delivery.run.manage at the path workspace; workspace machine tokens are denied.\n\nRequired scopes: delivery.run.manage.",
+        "operationId": "postV1_Workspaces_Workspace_Runs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CIRunStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIRunResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIRunResponse"
+                }
+              }
+            },
+            "description": "Run opened; the network tail (queued check + Job start) proceeds asynchronously."
+          },
+          "400": {
+            "description": "Invalid or missing body fields"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Manage permission required, workspace mismatch, or machine token denied"
+          },
+          "404": {
+            "description": "The SHA is not a known pushed commit on a repository bound to this workspace"
+          },
+          "409": {
+            "description": "No run opened — the pipeline is paused or the change was gated"
+          },
+          "412": {
+            "description": "The request cannot open a run and no retry of it will: the trusted putnami.ci.json declares something this Delivery cannot read, the request names no branch, the sha is not the current head of the branch or pull request, or the trusted revision has no putnami.ci.json"
+          },
+          "500": {
+            "description": "Delivery operations backend unavailable"
+          },
+          "503": {
+            "description": "A service Delivery depends on failed. The body names it (code delivery.dependency_unavailable, dependency, details.dependency) and its sentence says whether a retry can help"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "precondition_failed",
+              "status": 412
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "delivery.dependency_unavailable",
+              "schema": {
+                "$ref": "#/components/schemas/DependencyUnavailableDetails"
+              },
+              "status": 503
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runs",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/runs/{run}": {
+      "get": {
+        "description": "Get one workspace CI run with its immutable subject reference and per-phase attempts. With detail=true it also carries each failed task's error, diagnostics and last output lines from the derived failure digest, and, on a finished run, the session record's delivery account. Requires delivery.run.read at the path workspace; a run from another workspace remains not found and workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
+        "operationId": "getV1_Workspaces_Workspace_Runs_Run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "detail",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIRunResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid path or query parameter"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Workspace read permission required, workspace mismatch, or machine token denied"
+          },
+          "404": {
+            "description": "Run not found in the workspace"
+          },
+          "500": {
+            "description": "Delivery records read backend unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runs/{run}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/runs/{run}/cancel": {
+      "post": {
+        "description": "Idempotently cancel a CI run: cancel its compute and transition it to canceled under the run CAS so a late runner conclusion loses (terminal truth wins). Re-cancel and cancel-after-conclusion are 200 no-ops. Requires delivery.run.manage at the path workspace; a run from another workspace is not found and workspace machine tokens are denied.\n\nRequired scopes: delivery.run.manage.",
+        "operationId": "postV1_Workspaces_Workspace_Runs_Run_Cancel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CIRunCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIRunResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid or missing body fields"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Manage permission required, workspace mismatch, or machine token denied"
+          },
+          "404": {
+            "description": "Run not found in the workspace"
+          },
+          "500": {
+            "description": "Delivery operations backend unavailable"
+          },
+          "503": {
+            "description": "A service Delivery depends on failed. The body names it (code delivery.dependency_unavailable, dependency, details.dependency) and its sentence says whether a retry can help"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "delivery.dependency_unavailable",
+              "schema": {
+                "$ref": "#/components/schemas/DependencyUnavailableDetails"
+              },
+              "status": 503
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runs/{run}/cancel",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/runs/{run}/insights": {
+      "get": {
+        "description": "Get one workspace CI run's contracted Putnami gate report. Requires delivery.run.read at the path workspace; missing report data remains not found rather than an all-zero projection.\n\nRequired scopes: delivery.run.read.",
+        "operationId": "getV1_Workspaces_Workspace_Runs_Run_Insights",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportFile"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid path or query parameter"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Workspace read permission required, workspace mismatch, or machine token denied"
+          },
+          "404": {
+            "description": "Run or gate report not found in the workspace"
+          },
+          "500": {
+            "description": "Delivery records read backend unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runs/{run}/insights",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/runs/{run}/insights/results": {
+      "get": {
+        "description": "Get one workspace CI run's derived results: the test cases of each test task (failed first), the coverage of each task with its enforced threshold, the diagnostics of each task by file and line, and the artifacts the run published. Requires delivery.run.read at the path workspace; a run whose session stream was not received remains not found rather than an empty document.\n\nRequired scopes: delivery.run.read.",
+        "operationId": "getV1_Workspaces_Workspace_Runs_Run_Insights_Results",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIRunResultsResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid path or query parameter"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Workspace read permission required, workspace mismatch, or machine token denied"
+          },
+          "404": {
+            "description": "Run or results not found in the workspace"
+          },
+          "500": {
+            "description": "Delivery records read backend unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runs/{run}/insights/results",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/runs/{run}/insights/timings": {
+      "get": {
+        "description": "Get one workspace CI run's derived per-task timing table — absolute start, end and CPU share per task, longest wall first — so a run's critical path can be reconstructed. Requires delivery.run.read at the path workspace; missing timing data remains not found rather than an empty table.\n\nRequired scopes: delivery.run.read.",
+        "operationId": "getV1_Workspaces_Workspace_Runs_Run_Insights_Timings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIRunTimingsResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid path or query parameter"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Workspace read permission required, workspace mismatch, or machine token denied"
+          },
+          "404": {
+            "description": "Run or timing table not found in the workspace"
+          },
+          "500": {
+            "description": "Delivery records read backend unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runs/{run}/insights/timings",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/runs/{run}/logs": {
+      "get": {
+        "description": "Read a bounded, cursor-paginated, redacted page of ONE CI run execution's logs, filtered server-side by phase, project, level, q text search, and time window, with actionable diagnostics + a copyable local reproduction command. Requires delivery.run.read at the target workspace; machine tokens are denied.\n\nRequired scopes: delivery.run.read.",
+        "operationId": "getV1_Workspaces_Workspace_Runs_Run_Logs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 2048,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "exactLevel",
+            "required": false,
+            "schema": {
+              "maxLength": 16,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "excludeLevel",
+            "required": false,
+            "schema": {
+              "maxLength": 16,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "excludePhase",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "excludeProject",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "maxLength": 16,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIRunLogsResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid selector (bad timestamp, level, q, or limit)"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions, machine token, or workspace mismatch"
+          },
+          "404": {
+            "description": "Run not found in this workspace, or no execution logs recorded yet"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "description": "Upstream telemetry credential/backend failure"
+          },
+          "503": {
+            "description": "CI run logs not available on this deployment, or the log store did not answer: the body then names it (code delivery.dependency_unavailable, dependency Cloud Logging or Cloud Storage)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "delivery.dependency_unavailable",
+              "schema": {
+                "$ref": "#/components/schemas/DependencyUnavailableDetails"
+              },
+              "status": 503
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runs/{run}/logs",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/runs/{run}/logs/tail": {
+      "get": {
+        "description": "Stream newly-arrived redacted log entries for one CI run execution over SSE with an opaque resume cursor. Requires delivery.run.read at the target workspace; machine tokens are denied.\n\nStream endpoint (WebSocket, SSE). Connect via WebSocket upgrade or Accept: text/event-stream.\n\nRequired scopes: delivery.run.read.",
+        "operationId": "getV1_Workspaces_Workspace_Runs_Run_Logs_Tail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 2048,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "exactLevel",
+            "required": false,
+            "schema": {
+              "maxLength": 16,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "excludeLevel",
+            "required": false,
+            "schema": {
+              "maxLength": 16,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "excludePhase",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "excludeProject",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "maxLength": 16,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "WebSocket upgrade"
+          },
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIRunLogFrame"
+                }
+              }
+            },
+            "description": "Server-Sent Events stream"
+          },
+          "400": {
+            "description": "Invalid selector (bad timestamp, level, q, or limit)"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions, machine token, or workspace mismatch"
+          },
+          "404": {
+            "description": "Run not found in this workspace, or no execution logs recorded yet"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "description": "Upstream telemetry credential/backend failure"
+          },
+          "503": {
+            "description": "CI run logs not available on this deployment, or the log store did not answer: the body then names it (code delivery.dependency_unavailable, dependency Cloud Logging or Cloud Storage)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "delivery.dependency_unavailable",
+              "schema": {
+                "$ref": "#/components/schemas/DependencyUnavailableDetails"
+              },
+              "status": 503
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "messages": {
+            "output": {
+              "$ref": "#/components/schemas/CIRunLogFrame"
+            }
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "server",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runs/{run}/logs/tail",
+              "protocol": "sse"
+            },
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runs/{run}/logs/tail",
+              "protocol": "websocket",
+              "websocket": {
+                "resume": false,
+                "subprotocol": "putnami.service.v1"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/runs/{run}/retry": {
+      "post": {
+        "description": "Retry a CI run as a new attempt of the same SHA/workflow snapshot: the whole run, or a single failed phase plus its invalidated dependents (phase ∪ dependents). Optional size (omitted or auto selects automatically; physical sizes are xsmall, small, standard, large, and xlarge) and maxParallel (1..32) fields override the runner profile and gate fan-out for the new attempt. An optional noCache requests an explicit clean, cache-busting run: the gate executes every planned task instead of reusing local or remote cache entries, and the request is recorded in provenance; otherwise the retry respects the run's content-addressed cache and publish state. It never widens the gate's impacted selection. Requires delivery.run.manage at the path workspace; a run from another workspace is not found and workspace machine tokens are denied.\n\nRequired scopes: delivery.run.manage.",
+        "operationId": "postV1_Workspaces_Workspace_Runs_Run_Retry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CIRunRetryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIRunResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CIRunResponse"
+                }
+              }
+            },
+            "description": "New attempt opened; the network tail proceeds asynchronously."
+          },
+          "400": {
+            "description": "Invalid or missing body fields"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Manage permission required, workspace mismatch, or machine token denied"
+          },
+          "404": {
+            "description": "Run not found in the workspace"
+          },
+          "409": {
+            "description": "No run opened — the pipeline is paused or the change was gated"
+          },
+          "412": {
+            "description": "The request cannot open a run and no retry of it will: no free run attempt id, an unreadable trusted putnami.ci.json, a retired acceptance run, a sha that is no longer the head of its branch or pull request, or a trusted revision with no putnami.ci.json"
+          },
+          "500": {
+            "description": "Delivery operations backend unavailable"
+          },
+          "503": {
+            "description": "A service Delivery depends on failed. The body names it (code delivery.dependency_unavailable, dependency, details.dependency) and its sentence says whether a retry can help"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "precondition_failed",
+              "status": 412
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "delivery.dependency_unavailable",
+              "schema": {
+                "$ref": "#/components/schemas/DependencyUnavailableDetails"
+              },
+              "status": 503
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/runs/{run}/retry",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "x-putnami-client": {
+    "credentials": {
+      "service": {
+        "kind": "service-token"
+      },
+      "user": {
+        "kind": "forwarded-user-token"
+      }
+    },
+    "protocolVersion": 1,
+    "service": {
+      "audience": "delivery-api",
+      "id": "delivery-api"
+    }
+  }
+}

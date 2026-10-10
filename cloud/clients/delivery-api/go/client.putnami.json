@@ -1,0 +1,362 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "delivery-api",
+    "audience": "delivery-api"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/delivery-api/go",
+    "clients": [
+      {
+        "service": "delivery-api",
+        "clientSymbol": "DeliveryClient",
+        "bindingSymbol": "RegisterDeliveryClient"
+      }
+    ]
+  },
+  "contractSha256": "30a2a295fa620d3318cfbdc381e77f6bb62ca7c1c86b88549554d6c8639506a8",
+  "operations": [
+    {
+      "operationId": "getV1_Workspaces_Workspace_Ci_Status",
+      "service": "delivery-api",
+      "methodSymbol": "GetV1WorkspacesCiStatus",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/ci/status",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Ci_Subscription",
+      "service": "delivery-api",
+      "methodSymbol": "GetV1WorkspacesCiSubscription",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/ci/subscription",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Ci_Usage",
+      "service": "delivery-api",
+      "methodSymbol": "GetV1WorkspacesCiUsage",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/ci/usage",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Runs",
+      "service": "delivery-api",
+      "methodSymbol": "GetV1WorkspacesRuns",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runs",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Runs_Run",
+      "service": "delivery-api",
+      "methodSymbol": "GetV1WorkspacesWorkspaceRunsRun",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runs/{run}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Runs_Run_Insights",
+      "service": "delivery-api",
+      "methodSymbol": "GetV1WorkspacesRunsInsights",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runs/{run}/insights",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Runs_Run_Insights_Results",
+      "service": "delivery-api",
+      "methodSymbol": "GetV1WorkspacesRunsInsightsResults",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runs/{run}/insights/results",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Runs_Run_Insights_Timings",
+      "service": "delivery-api",
+      "methodSymbol": "GetV1WorkspacesRunsInsightsTimings",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runs/{run}/insights/timings",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Runs_Run_Logs",
+      "service": "delivery-api",
+      "methodSymbol": "GetV1WorkspacesRunsLogs",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runs/{run}/logs",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Runs_Run_Logs_Tail",
+      "service": "delivery-api",
+      "methodSymbol": "GetV1WorkspacesRunsLogsTail",
+      "stream": "server",
+      "transports": [
+        {
+          "protocol": "sse",
+          "path": "/v1/workspaces/{workspace}/runs/{run}/logs/tail",
+          "encoding": "json"
+        },
+        {
+          "protocol": "websocket",
+          "path": "/v1/workspaces/{workspace}/runs/{run}/logs/tail",
+          "encoding": "json",
+          "websocket": {
+            "subprotocol": "putnami.service.v1",
+            "resume": false
+          }
+        }
+      ]
+    },
+    {
+      "operationId": "postApi_Ci_Runner_Next",
+      "service": "delivery-api",
+      "methodSymbol": "CreateApiCiRunnerNext",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/api/ci/runner/next",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Delivery_Records",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1DeliveryRecords",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/delivery/records",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Delivery_Records_Capabilities_Cache",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1DeliveryRecordsCapabilitiesCache",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/delivery/records/capabilities/cache",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Delivery_Records_Capabilities_Install",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1DeliveryRecordsCapabilitiesInstall",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/delivery/records/capabilities/install",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Delivery_Records_Native-publication_Advance",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1DeliveryRecordsNativePublicationAdvance",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/delivery/records/native-publication/advance",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Delivery_Records_Native-publication_Planning",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1DeliveryRecordsNativePublicationPlanning",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/delivery/records/native-publication/planning",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Delivery_Records_Native-publication_Publish",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1DeliveryRecordsNativePublicationPublish",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/delivery/records/native-publication/publish",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Delivery_Records_Reports",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1DeliveryRecordsReports",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/delivery/records/reports",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Ci_Repair",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1WorkspacesCiRepair",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/ci/repair",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Ci_Subscription_Disable",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1WorkspacesCiSubscriptionDisable",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/ci/subscription/disable",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Pipeline",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1WorkspacesPipeline",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/pipeline",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Runs",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1WorkspacesRuns",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runs",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Runs_Run_Cancel",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1WorkspacesRunsCancel",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runs/{run}/cancel",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Runs_Run_Retry",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1WorkspacesRunsRetry",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/runs/{run}/retry",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "putV1_Workspaces_Workspace_Ci_Subscription",
+      "service": "delivery-api",
+      "methodSymbol": "UpdateV1WorkspacesCiSubscription",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/ci/subscription",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "0fa00f8eec5741b12f1b375a8d26a80d14f5e3fb4d146861af21bc3fbe07882b"
+    }
+  ]
+}
