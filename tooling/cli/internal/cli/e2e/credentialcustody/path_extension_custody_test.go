@@ -70,7 +70,7 @@ func writePathExtensionFixture(t *testing.T, home string) (wsRoot, log string) {
 		return jsonString(fmt.Sprintf("printf '%%s\\n' %s >> %s", shellQuote(line), shellQuote(log)))
 	}
 	extRoot := filepath.Join(wsRoot, "tools", "local")
-	fixtureproc.Binary(t, filepath.Join(extRoot, "compiled", "runtime"))
+	warmRuntime(t, fixtureproc.Binary(t, filepath.Join(extRoot, "compiled", "runtime")))
 	clitest.WriteFile(t, filepath.Join(extRoot, "putnami.json"), `{"name":"@fixture/local"}`)
 	clitest.WriteFile(t, filepath.Join(extRoot, "putnami.extension.json"), fmt.Sprintf(`{
   "name": "@fixture/local",

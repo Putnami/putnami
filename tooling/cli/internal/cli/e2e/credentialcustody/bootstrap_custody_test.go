@@ -122,6 +122,7 @@ func writeBootstrapFixture(t *testing.T, home string) (wsRoot, log string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	warmRuntime(t, filepath.Join(stored, "compiled", "runtime"))
 	lock := lockfile.NewLockFile()
 	lock.SetExtension("@fixture/cache", lockfile.LockEntry{
 		Version:      "0.1.0",

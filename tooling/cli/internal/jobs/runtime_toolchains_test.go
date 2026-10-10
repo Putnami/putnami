@@ -3,9 +3,11 @@ package jobs
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -113,6 +115,40 @@ func TestRuntimeToolchainRequiredFailureNamesEveryCandidateInDeclarationOrder(t 
 	if err == nil || err.Error() != want {
 		t.Fatalf("resolution error = %v\nwant %s", err, want)
 	}
+	// The error carries the probe's own error, and no probe timed out.
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 3 {
+		t.Errorf("resolution error = %v, want it to unwrap to the probe's exit status 3", err)
+	}
+	if errors.Is(err, ErrToolchainProbeTimeout) {
+		t.Errorf("resolution error = %v, want no probe timeout", err)
+	}
+}
+
+// A required toolchain whose probe timed out fails with the text of any other
+// mismatch, and unwraps to ErrToolchainProbeTimeout: a caller tells a slow
+// toolchain from an absent one by the error, never by its text.
+func TestRuntimeToolchainMismatchUnwrapsToAProbeThatTimedOut(t *testing.T) {
+	path := writeProbedProgram(t, filepath.Join(t.TempDir(), "compiler"), fixtureproc.Program{Sleep: 5 * time.Second})
+	_, probeErr := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, 100*time.Millisecond)
+	if probeErr == nil {
+		t.Fatal("a probe that sleeps 5s answered within 100ms")
+	}
+	absent := runtimeToolchainRejection{candidate: `candidate 1 (path "compiler")`, reason: "path missing"}
+	timedOut := runtimeToolchainRejection{candidate: `candidate 2 (path "compiler") at ` + path, reason: probeErr.Error(), err: probeErr}
+
+	err := newRuntimeToolchainMismatchError("example", "compiler", "1.2.3", []runtimeToolchainRejection{absent, timedOut})
+	want := `resolve extension "example" runtime toolchain "compiler": no candidate matched locked version "1.2.3": ` +
+		`candidate 1 (path "compiler"): path missing; candidate 2 (path "compiler") at ` + path + `: probe timed out after 100ms`
+	if err.Error() != want {
+		t.Fatalf("error = %v\nwant %s", err, want)
+	}
+	if !errors.Is(err, ErrToolchainProbeTimeout) {
+		t.Errorf("error = %v, want it to unwrap to %v", err, ErrToolchainProbeTimeout)
+	}
+	if err := newRuntimeToolchainMismatchError("example", "compiler", "1.2.3", []runtimeToolchainRejection{absent}); errors.Is(err, ErrToolchainProbeTimeout) {
+		t.Errorf("error of an absent toolchain = %v, want no probe timeout", err)
+	}
 }
 
 // TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion pins each probe
@@ -146,6 +182,10 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 			got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, tc.timeout)
 			if err == nil || err.Error() != tc.want {
 				t.Fatalf("probe = %q, %v; want error %q", got, err, tc.want)
+			}
+			// Only a timeout is ErrToolchainProbeTimeout.
+			if timedOut := strings.HasPrefix(tc.want, "probe timed out"); errors.Is(err, ErrToolchainProbeTimeout) != timedOut {
+				t.Fatalf("errors.Is(%q, ErrToolchainProbeTimeout) = %t, want %t", err, !timedOut, timedOut)
 			}
 		})
 	}

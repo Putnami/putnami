@@ -56,7 +56,7 @@ func TestReporterRuntimeToolchainProbeHonorsCallerCancellation(t *testing.T) {
 	root := t.TempDir()
 	bin := t.TempDir()
 	ready := filepath.Join(root, "probe-ready")
-	fixtureproc.Write(t, filepath.Join(bin, "compiler"), fixtureproc.Program{Record: ready, Sleep: 30 * time.Second})
+	writeProbedProgram(t, filepath.Join(bin, "compiler"), fixtureproc.Program{Record: ready, Sleep: 30 * time.Second})
 	writeRuntimeToolchainLock(t, root, "compiler", "1.2.3", "test-integrity")
 	ext := runtimeToolchainExtension(runtimeToolchainFixture("compiler"))
 	ctx, cancel := context.WithCancel(context.Background())

@@ -261,6 +261,31 @@ func TestBinaryRunsAsTheTestBinary(t *testing.T) {
 	}
 }
 
+// A warm run of a placed binary passes it the arguments its TestMain answers,
+// and fails the test when it exits non-zero: a warm that did not run cannot
+// pass for one that did.
+func TestWarmBinaryRunsTheCopyWithItsArguments(t *testing.T) {
+	path := Binary(t, filepath.Join(t.TempDir(), "plain"))
+	WarmBinary(t, path, "-test.run=^$")
+	failed := &fatalRecorder{TB: t}
+	WarmBinary(failed, path, "-test.no-such-flag")
+	if !strings.Contains(failed.fatal, "no-such-flag") {
+		t.Fatalf("warm with an argument the copy refuses = %q, want a failure that names it", failed.fatal)
+	}
+}
+
+// fatalRecorder keeps the message of a Fatalf instead of ending the test.
+type fatalRecorder struct {
+	testing.TB
+	fatal string
+}
+
+func (r *fatalRecorder) Helper() {}
+
+func (r *fatalRecorder) Fatalf(format string, args ...any) {
+	r.fatal = fmt.Sprintf(format, args...)
+}
+
 func TestRunsOfAProgramThatNeverRanIsEmpty(t *testing.T) {
 	if runs := Runs(t, filepath.Join(t.TempDir(), "absent.jsonl")); len(runs) != 0 {
 		// A count, never the records: each one carries the run's whole environment.

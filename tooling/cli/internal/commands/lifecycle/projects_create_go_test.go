@@ -12,12 +12,14 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/hometest"
+	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -110,7 +112,9 @@ func (f goCreateFixture) writeGo(t *testing.T, path, version string) {
 }
 
 // writeGoAnswering is writeGo for a go command that answers the runs on names
-// as their outcomes say.
+// as their outcomes say. It launches the command once (fixtureproc.Warm), so
+// the version probe that later starts it within its deadline does not also
+// pay for the host's first-launch check of the new file.
 func (f goCreateFixture) writeGoAnswering(t *testing.T, path, version string, on map[string]fixtureproc.Outcome) {
 	t.Helper()
 	for _, placed := range *f.gos {
@@ -123,8 +127,32 @@ func (f goCreateFixture) writeGoAnswering(t *testing.T, path, version string, on
 		return
 	}
 	record := filepath.Join(f.root, "go-calls-"+strconv.Itoa(len(*f.gos))+".jsonl")
-	fixtureproc.Write(t, path, fixtureproc.Program{Record: record, Stdout: "go" + version + "\n", On: on})
+	fixtureproc.Warm(t, fixtureproc.Write(t, path, fixtureproc.Program{Record: record, Stdout: "go" + version + "\n", On: on}))
 	*f.gos = append(*f.gos, fixtureGo{path: path, version: version, record: record})
+}
+
+// writeSlowGo places, where the extension installs the go the lock pins, a go
+// command whose every run, the version probe included, outlasts the probe's
+// deadline.
+func (f goCreateFixture) writeSlowGo(t *testing.T) {
+	t.Helper()
+	fixtureproc.Warm(t, fixtureproc.Write(t, f.pinned, fixtureproc.Program{Stdout: "go" + goFixtureVersion + "\n", Sleep: time.Minute}))
+}
+
+// refusingGoInstall is the lock step and the workspace installers of a host
+// whose go is installed: the test fails when the command runs either.
+func (f goCreateFixture) refusingGoInstall(t *testing.T) LifecycleEnv {
+	t.Helper()
+	origFill := fillImplicitToolchainPins
+	t.Cleanup(func() { fillImplicitToolchainPins = origFill })
+	fillImplicitToolchainPins = func(context.Context, string) (bool, error) {
+		t.Error("the command pinned a go although one is installed")
+		return false, nil
+	}
+	return LifecycleEnv{RunJob: func(context.Context, WorkspaceJobRequest) (WorkspaceJobResult, error) {
+		t.Error("the command ran the workspace installers although a go is installed")
+		return WorkspaceJobResult{Outcome: WorkspaceJobFailed}, nil
+	}}
 }
 
 // pin records the Go release in the workspace lock, as the lock step does.
@@ -391,6 +419,34 @@ func TestProjectsCreateNamesTheRetryWhenNoGoCanBeInstalled(t *testing.T) {
 	}
 	if got, want := protocolcli.SuggestedNext(err), "putnami projects create app --template go-app --force"; got != want {
 		t.Fatalf("next command = %q, want %q", got, want)
+	}
+}
+
+// A go whose version probe does not exit within its deadline is there and
+// slow, not missing: create installs nothing, stops naming the timeout, and
+// names the command that creates the project again. The probe runs under its
+// production deadline of 5 s.
+func TestProjectsCreateReportsAGoProbeThatTimedOut(t *testing.T) {
+	f := newGoCreateFixture(t)
+	spectest.Proves(t, "cli/toolchain-lock", "create-installs-a-missing-go", "create-reports-a-go-probe-that-timed-out")
+	f.pin(t)
+	f.writeSlowGo(t)
+
+	output, err := f.create(t, f.refusingGoInstall(t))
+	if !errors.Is(err, jobs.ErrToolchainProbeTimeout) || errors.Is(err, errGoUnavailable) {
+		t.Fatalf("error = %v, want the probe timeout, not %v\n%s", err, errGoUnavailable, output)
+	}
+	if want := "probe timed out after 5s"; !strings.Contains(err.Error(), want) {
+		t.Errorf("error = %v, want it to name %q", err, want)
+	}
+	if strings.Contains(output, "No go command found") {
+		t.Errorf("create reported a missing go:\n%s", output)
+	}
+	if got, want := protocolcli.SuggestedNext(err), "putnami projects create app --template go-app --force"; got != want {
+		t.Fatalf("next command = %q, want %q", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(f.root, "app", "go.mod")); err != nil {
+		t.Errorf("create removed the project: %v", err)
 	}
 }
 

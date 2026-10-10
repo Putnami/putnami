@@ -42,7 +42,7 @@
     },
     {
       "id": "create-installs-a-missing-go",
-      "text": "putnami projects create sets a Go project up with the go command the template extension's tasks resolve: the release the lock pins, else a go on PATH. On a host with neither, it writes a missing go.work from the project's go directive, pins the Go that go.work declares, runs workspace-install and resolves again. If no go results, it fails naming the reasons and the create command to run again with --force."
+      "text": "putnami projects create sets a Go project up with the go command the template extension's tasks resolve: the release the lock pins, else a go on PATH. On a host with neither, it writes a missing go.work from the project's go directive, pins the Go that go.work declares, runs workspace-install and resolves again. If no go results, it fails naming the reasons and the create command to run again with --force. A go whose version probe times out is not missing: create installs nothing and fails the same way."
     },
     {
       "id": "create-reports-a-failed-install",
@@ -62,7 +62,7 @@
     },
     {
       "id": "deps-run-the-pinned-go",
-      "text": "putnami deps add and deps remove run go get and go mod tidy with the go command the Go extension's tasks resolve: the release the lock pins, else a go on PATH. On a host with neither, they pin and install the Go the lock pins the way projects create does, and fail naming putnami install when no go results."
+      "text": "putnami deps add and deps remove run go get and go mod tidy with the go command the Go extension's tasks resolve: the release the lock pins, else a go on PATH. On a host with neither, they pin and install the Go the lock pins the way projects create does, and fail naming putnami install when no go results. A go whose version probe times out is not missing: they install nothing and fail naming the timeout and putnami install."
     },
     {
       "id": "deps-report-a-failed-install",

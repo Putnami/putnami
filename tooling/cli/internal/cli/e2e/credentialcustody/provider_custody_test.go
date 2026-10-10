@@ -157,6 +157,7 @@ func writeProviderFixture(t *testing.T, self, home string, start int) providerFi
 	fx := providerFixture{wsRoot: t.TempDir(), log: filepath.Join(t.TempDir(), "order.log")}
 	extRoot := filepath.Join(artifactDir(home), "extensions", "cache@0.1.0")
 	runtimePath := fixtureproc.Binary(t, filepath.Join(extRoot, "compiled", "runtime"))
+	warmRuntime(t, runtimePath)
 	serve := `"command": "{extensionRuntime}", "args": ["cache-provider"]`
 	target := runtimePath
 	if start == launcherProvider {

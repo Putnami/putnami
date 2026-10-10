@@ -954,10 +954,18 @@ func TestBaselineActuallyReachesTheExtension(t *testing.T) {
 	root := parityWorkspace(t)
 	extensions := parityExtensions(t, root, parityExtensionRuntime(t))
 
-	without, _, _ := runParityExtension(t, root,
-		extensions, []string{"architecture", "validate", "--output=json"})
-	with, _, _ := runParityExtension(t, root,
-		extensions, []string{"architecture", "validate", "--baseline", "HEAD", "--output=json"})
+	// An empty answer is a failed run, not a flag that changed nothing: its
+	// exit code and stderr name the cause.
+	answer := func(args ...string) string {
+		t.Helper()
+		out, errOut, code := runParityExtension(t, root, extensions, args)
+		if out == "" {
+			t.Fatalf("%v wrote no answer and exited %d:\n%s", args, code, errOut)
+		}
+		return out
+	}
+	without := answer("architecture", "validate", "--output=json")
+	with := answer("architecture", "validate", "--baseline", "HEAD", "--output=json")
 
 	if with == without {
 		t.Fatal("--baseline changed nothing; the flag never reached the extension")

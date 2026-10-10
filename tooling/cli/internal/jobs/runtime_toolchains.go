@@ -445,11 +445,7 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 			if deferred {
 				continue
 			}
-			if detail != "" {
-				detail = ": " + detail
-			}
-			return fmt.Errorf("resolve extension %q runtime toolchain %q: no candidate matched locked version %q%s",
-				ext.Name, ref, entry.Version, detail)
+			return newRuntimeToolchainMismatchError(ext.Name, ref, entry.Version, rejections)
 		}
 		ext.RuntimeToolchains[ref] = resolution
 	}
@@ -556,7 +552,38 @@ func runtimeToolchainRefSet(resolutions map[string]model.RuntimeToolchainResolut
 type runtimeToolchainRejection struct {
 	candidate string
 	reason    string
+	// err is the probe's error when the probe is the reason, and nil
+	// otherwise.
+	err error
 }
+
+// runtimeToolchainMismatchError is the failure of a required toolchain that no
+// candidate qualified for. It unwraps to the error of each probe that failed,
+// so a caller can tell a probe that timed out (ErrToolchainProbeTimeout), whose
+// toolchain is there but slow, from a toolchain that is absent.
+type runtimeToolchainMismatchError struct {
+	message string
+	probes  []error
+}
+
+func newRuntimeToolchainMismatchError(extensionName, ref, version string, rejections []runtimeToolchainRejection) error {
+	detail := runtimeToolchainRejectionText(rejections)
+	if detail != "" {
+		detail = ": " + detail
+	}
+	err := &runtimeToolchainMismatchError{message: fmt.Sprintf(
+		"resolve extension %q runtime toolchain %q: no candidate matched locked version %q%s", extensionName, ref, version, detail)}
+	for _, rejection := range rejections {
+		if rejection.err != nil {
+			err.probes = append(err.probes, rejection.err)
+		}
+	}
+	return err
+}
+
+func (e *runtimeToolchainMismatchError) Error() string { return e.message }
+
+func (e *runtimeToolchainMismatchError) Unwrap() []error { return e.probes }
 
 // resolveRuntimeToolchain returns the first candidate that qualifies. When none
 // does, it returns one rejection per considered candidate, in declaration order.
@@ -604,7 +631,7 @@ func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirem
 		probeEnv = prependEnvPath(probeEnv, filepath.Dir(realExecutable))
 		got, err := probeRuntimeToolchain(ctx, realExecutable, requirement.Probe.Args, probeEnv, toolVersionProbeTimeout)
 		if err != nil {
-			reject(err.Error())
+			rejections = append(rejections, runtimeToolchainRejection{candidate: label, reason: err.Error(), err: err})
 			continue
 		}
 		want := strings.ReplaceAll(requirement.Probe.Expect, extensionproto.RuntimeToolchainVersionToken, version)
@@ -804,11 +831,16 @@ func runtimeExecutable(path string) bool {
 	return err == nil && info.Mode().IsRegular() && (runtime.GOOS == "windows" || info.Mode().Perm()&0o111 != 0)
 }
 
+// ErrToolchainProbeTimeout marks a runtime toolchain probe that did not exit
+// within its deadline. The candidate is there and may only be slow, so a
+// caller does not take the failure for an absent toolchain.
+var ErrToolchainProbeTimeout = errors.New("probe timed out")
+
 // probeRuntimeToolchain runs the declared probe under timeout and returns its
 // trimmed one-line output. The error states why the output cannot identify a
-// version: a timeout, a failed start, a failed exit, output that stays open
-// after the probe exits, or output that is empty, too long, or spans several
-// lines.
+// version: a timeout (ErrToolchainProbeTimeout), a failed start, a failed
+// exit, output that stays open after the probe exits, or output that is
+// empty, too long, or spans several lines.
 func probeRuntimeToolchain(ctx context.Context, path string, args, env []string, timeout time.Duration) (string, error) {
 	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -821,7 +853,7 @@ func probeRuntimeToolchain(ctx context.Context, path string, args, env []string,
 	cmd.WaitDelay = toolVersionProbeWaitDelay
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() == nil && errors.Is(probeCtx.Err(), context.DeadlineExceeded) {
-			return "", fmt.Errorf("probe timed out after %s", timeout)
+			return "", fmt.Errorf("%w after %s", ErrToolchainProbeTimeout, timeout)
 		}
 		if errors.Is(err, exec.ErrWaitDelay) {
 			return "", fmt.Errorf("probe output stayed open after exit (wait delay %s)", toolVersionProbeWaitDelay)

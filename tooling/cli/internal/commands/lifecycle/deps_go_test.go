@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
+	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -113,6 +115,35 @@ func TestDepsAddInstallsThePinnedGoOnAHostWithoutGo(t *testing.T) {
 	}
 	if after, err := os.ReadFile(filepath.Join(f.root, "go.work")); err != nil || string(after) != string(goWork) {
 		t.Fatalf("deps add rewrote go.work: %q, %v", after, err)
+	}
+}
+
+// A go whose version probe does not exit within its deadline is there and
+// slow, not missing: `deps add` installs nothing, stops naming the timeout,
+// and names putnami install. The probe runs under its production deadline of
+// 5 s.
+func TestDepsAddReportsAGoProbeThatTimedOut(t *testing.T) {
+	spectest.Proves(t, "cli/toolchain-lock", "deps-run-the-pinned-go", "deps-add-reports-a-go-probe-that-timed-out")
+	f := newGoCreateFixture(t)
+	f.withGoProject(t)
+	f.pin(t)
+	f.writeSlowGo(t)
+	env := f.refusingGoInstall(t)
+
+	output, err := captureStdout(t, func() error {
+		return DepsAdd(context.Background(), f.root, []string{"example.com/lib@v1.0.0"}, "", env)
+	})
+	if !errors.Is(err, jobs.ErrToolchainProbeTimeout) || errors.Is(err, errGoUnavailable) {
+		t.Fatalf("error = %v, want the probe timeout, not %v\n%s", err, errGoUnavailable, output)
+	}
+	if want := "probe timed out after 5s"; !strings.Contains(err.Error(), want) {
+		t.Errorf("error = %v, want it to name %q", err, want)
+	}
+	if strings.Contains(output, "No go command found") {
+		t.Errorf("deps add reported a missing go:\n%s", output)
+	}
+	if got, want := protocolcli.SuggestedNext(err), "putnami install"; got != want {
+		t.Fatalf("next command = %q, want %q", got, want)
 	}
 }
 

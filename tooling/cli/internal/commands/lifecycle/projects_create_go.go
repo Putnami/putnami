@@ -48,7 +48,10 @@ func (g goCommand) run(ctx context.Context, dir string, args ...string) ([]byte,
 //
 // When that resolution fails, a go on the ambient PATH still qualifies, as it
 // did before tasks resolved their toolchains from the lock, so a host that set
-// Go projects up before keeps doing so.
+// Go projects up before keeps doing so. Without one, the error is
+// errGoUnavailable, unless a version probe timed out
+// (jobs.ErrToolchainProbeTimeout): that go is there and slow, and the error
+// says so.
 func resolveGoCommand(ctx context.Context, wsRoot, extensionName string) (goCommand, error) {
 	base := os.Environ()
 	env, err := templateToolchainEnvironment(ctx, wsRoot, extensionName, base)
@@ -59,6 +62,9 @@ func resolveGoCommand(ctx context.Context, wsRoot, extensionName string) (goComm
 	}
 	if path, lookErr := osexec.LookPath("go"); lookErr == nil {
 		return goCommand{path: path, env: base}, nil
+	}
+	if errors.Is(err, jobs.ErrToolchainProbeTimeout) {
+		return goCommand{}, err
 	}
 	if err != nil {
 		return goCommand{}, fmt.Errorf("%w: %w", errGoUnavailable, err)
@@ -85,12 +91,18 @@ func templateToolchainEnvironment(ctx context.Context, wsRoot, extensionName str
 }
 
 // ensureGoCommand returns the go command resolveGoCommand finds for
-// extensionName and, on a host that offers none, installs the Go the
-// workspace pins first (provisionGoCommand). goVersion is the go directive a
-// missing go.work is written with; "" writes none.
+// extensionName and, on a host that offers none (errGoUnavailable), installs
+// the Go the workspace pins first (provisionGoCommand). Any other failure,
+// such as a version probe that timed out, returns as it is and installs
+// nothing. goVersion is the go directive a missing go.work is written with;
+// "" writes none.
 func ensureGoCommand(ctx context.Context, wsRoot, projectPath, goVersion, extensionName string, env LifecycleEnv) (goCommand, error) {
-	if command, err := resolveGoCommand(ctx, wsRoot, extensionName); err == nil {
+	command, err := resolveGoCommand(ctx, wsRoot, extensionName)
+	if err == nil {
 		return command, nil
+	}
+	if !errors.Is(err, errGoUnavailable) {
+		return goCommand{}, err
 	}
 	return provisionGoCommand(ctx, wsRoot, projectPath, goVersion, extensionName, env)
 }

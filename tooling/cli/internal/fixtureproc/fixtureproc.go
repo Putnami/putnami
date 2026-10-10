@@ -236,6 +236,18 @@ func Binary(t testing.TB, path string) string {
 	return path
 }
 
+// WarmBinary runs the copy Binary placed at path once with args, and fails the
+// test unless it exits 0. Like Warm, it has the host check the new file before
+// a later run that a deadline bounds: the check of a copy of a race-enabled
+// test binary takes about 1 s, and seconds more under load. The test's
+// TestMain must answer args without running the tests.
+func WarmBinary(t testing.TB, path string, args ...string) {
+	t.Helper()
+	if out, err := exec.Command(path, args...).CombinedOutput(); err != nil {
+		t.Fatalf("fixtureproc: warm %s: %v\n%s", path, err, out)
+	}
+}
+
 // place puts a copy of the executable source at target. A hard link would be
 // cheaper, but neither platform keeps one honest. macOS SIGKILLs some of the
 // programs parallel tests start from links to one binary while they place more

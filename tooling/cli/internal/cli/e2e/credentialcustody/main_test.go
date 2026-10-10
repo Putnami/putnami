@@ -42,6 +42,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 )
 
 // The environment variables that select a re-executed role and hand it the
@@ -170,6 +171,15 @@ func fixtureRuntimeInfo() string {
 		`{"extension":%q,"version":%q,"platform":%q,"cliContract":%d,"runtimeProtocol":%d,"runtimeABI":%d}`,
 		name, version, runtime.GOOS+"/"+runtime.GOARCH, protocolcli.CurrentContract,
 		runtimeproto.MaxKnownProtocolVersion, runtimeproto.RuntimeABIVersion)
+}
+
+// warmRuntime has the host check the runtime copy at path before an engine
+// bounds the copy's runtime-info handshake by its deadline
+// (fixtureproc.WarmBinary), so the deadline measures the copy alone. Call it
+// on the path the engine starts.
+func warmRuntime(t *testing.T, path string) {
+	t.Helper()
+	fixtureproc.WarmBinary(t, path, "__putnami", "runtime-info")
 }
 
 // runEngineRole is the hosted or local engine: it changes into the fixture

@@ -632,7 +632,7 @@ func (fx *publicationE2EFixture) installExtension(t *testing.T, ext extensionFix
 func (fx *publicationE2EFixture) installProvider(t *testing.T) {
 	t.Helper()
 	extRoot := filepath.Join(fx.store, "extensions", "provider@"+e2eRuntimeVersion)
-	fixtureproc.Binary(t, filepath.Join(extRoot, "compiled", "runtime"))
+	warmRuntime(t, fixtureproc.Binary(t, filepath.Join(extRoot, "compiled", "runtime")))
 	hosts := []string{serverHostOf(t, fx.npm.server), serverHostOf(t, fx.gomod.server)}
 	fx.install(t, "@fixture/provider", "provider", fixtureManifest{
 		Name: "@fixture/provider", Version: e2eRuntimeVersion, CLIContract: protocolcli.CurrentContract,
