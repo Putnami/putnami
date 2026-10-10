@@ -88,7 +88,7 @@ addition. Re-read them from the test's log output at any time.
 | Candidate files scanned | 8285 |
 | Release series | 0.3.0 (from `tooling/CHANGELOG.md`) |
 | Builder archive matrix | `darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64` |
-| Publishable artifacts | 98 across `archives=18 docker=4 go=62 npm=14 template-archives=7` |
+| Publishable artifacts | 101 across `archives=19 docker=4 go=63 npm=15 template-archives=7` |
 | Publish order | protocols → extension-sdk → go-framework → typescript-framework → language-extensions → intelligence-extensions → cli → contributor-extensions → templates |
 | Public-cut scrub findings | 0 unresolved beyond the reviewed baseline |
 

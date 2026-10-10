@@ -25,6 +25,7 @@
       "typescript"
     ],
     "scopes": [
+      "cloud",
       "go",
       "intelligence",
       "protocols",
@@ -43,6 +44,7 @@
       "priority/p1",
       "priority/p2",
       "priority/p3",
+      "scope/cloud",
       "scope/go",
       "scope/intelligence",
       "scope/protocols",

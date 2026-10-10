@@ -35,6 +35,7 @@
   },
   "version": "0.0.0",
   "workspaces": [
+    "cloud/runtime/typescript",
     "go/samples/service-to-service/clients/ts",
     "go/samples/service-to-service/consumer-ts",
     "sites/putnami.dev",

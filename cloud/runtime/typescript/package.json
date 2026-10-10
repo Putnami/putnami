@@ -1,0 +1,39 @@
+{
+  "name": "@putnami/cloud",
+  "version": "0.0.0",
+  "description": "Putnami Cloud runtime destination for TypeScript: remote config and secrets sources, and managed Event Server publication with Google workload identity.",
+  "keywords": [
+    "putnami",
+    "cloud",
+    "config",
+    "secrets",
+    "events"
+  ],
+  "homepage": "https://putnami.dev",
+  "bugs": {
+    "url": "https://github.com/Putnami/putnami/issues"
+  },
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Putnami/putnami.git",
+    "directory": "cloud/runtime/typescript"
+  },
+  "main": "src/runtime/index.ts",
+  "exports": {
+    "./runtime": {
+      "default": "./src/runtime/index.ts"
+    },
+    "./runtime/testing": {
+      "default": "./src/runtime/testing.ts"
+    }
+  },
+  "dependencies": {
+    "@putnami/events": "workspace:*",
+    "@putnami/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "@putnami/application": "workspace:*"
+  },
+  "private": false
+}
