@@ -262,8 +262,8 @@ func TestChannelsStatusWaitFailsWhenTheProviderNeverAnswers(t *testing.T) {
 		t.Fatalf("an unreadable channel without --wait = %v, want unknown and exit 0", err)
 	}
 	polls = 0
-	err := ChannelsStatus(map[string]any{}, []string{"canary", "--wait", "20ms"}, root, env, ioctx)
-	if clicore.ExitCode(err) != clicore.ExitFailure || !strings.Contains(err.Error(), "still unreadable after 20ms") {
+	err := ChannelsStatus(map[string]any{}, []string{"canary", "--wait", "500ms"}, root, env, ioctx)
+	if clicore.ExitCode(err) != clicore.ExitFailure || !strings.Contains(err.Error(), "still unreadable after 500ms") {
 		t.Fatalf("error = %v, want failing once the wait ends", err)
 	}
 	if polls < 2 {
