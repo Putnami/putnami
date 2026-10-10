@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -63,7 +64,8 @@ func writeFetchingLifecycleFixture(t *testing.T, wsRoot string, fetchExit int, s
 	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeFixtureFile(t, filepath.Join(extRoot, "bin", "runtime"), runtimeScript, 0o755)
+	// The runtime is warmed for the handshake's deadline (fixtureproc.Script).
+	fixtureproc.Script(t, filepath.Join(extRoot, "bin", "runtime"), runtimeScript, "__putnami", "runtime-info")
 	writeFixtureFile(t, filepath.Join(extRoot, "install.sh"), task("install", 0), 0o755)
 	fetchTask := `{ "kind": "command", "command": "{extensionRuntime}", "args": ["fetch"], "cache": false, "timeoutMs": 10000 }`
 	if scriptFetch {

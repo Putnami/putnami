@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 )
 
 // The extraction acceptance: for every one of the
@@ -399,12 +400,15 @@ func parityExtensionRuntime(t *testing.T) string {
 // server, and the broker wins over every authored route while answering 401
 // to a test archive. Tests that exercise the broker set it with t.Setenv. As
 // the runtime of a fixture extension, this binary answers the runtime-info
-// handshake and exits (answerRuntimeHandshake).
+// handshake and exits (answerRuntimeHandshake). Every copy of this binary the
+// tests start exits without the race runtime's 1 s exit sleep
+// (fixtureproc.QuietRaceExit).
 func TestMain(m *testing.M) {
 	if answerRuntimeHandshake() {
 		os.Exit(0)
 	}
 	os.Unsetenv(extension.PrivatePutRegistryURLEnv)
+	fixtureproc.QuietRaceExit()
 	code := m.Run()
 	_ = parityRuntimeDir.Remove()
 	_ = parityWorkspaceTemplateScratch.Remove()
@@ -954,10 +958,19 @@ func TestBaselineActuallyReachesTheExtension(t *testing.T) {
 	root := parityWorkspace(t)
 	extensions := parityExtensions(t, root, parityExtensionRuntime(t))
 
-	without, _, _ := runParityExtension(t, root,
-		extensions, []string{"architecture", "validate", "--output=json"})
-	with, _, _ := runParityExtension(t, root,
-		extensions, []string{"architecture", "validate", "--baseline", "HEAD", "--output=json"})
+	// An empty answer is a failed run, not a flag that changed nothing: the
+	// failure reports its exit code, where -1 is a child that a signal ended,
+	// and its stderr.
+	answer := func(args ...string) string {
+		t.Helper()
+		out, errOut, code := runParityExtension(t, root, extensions, args)
+		if out == "" {
+			t.Fatalf("%v wrote no answer and exited %d:\n%s", args, code, errOut)
+		}
+		return out
+	}
+	without := answer("architecture", "validate", "--output=json")
+	with := answer("architecture", "validate", "--baseline", "HEAD", "--output=json")
 
 	if with == without {
 		t.Fatal("--baseline changed nothing; the flag never reached the extension")

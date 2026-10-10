@@ -163,6 +163,7 @@ func writeReporterFixture(t *testing.T, home, role string) (wsRoot, log string) 
 	if err != nil {
 		t.Fatal(err)
 	}
+	warmRuntime(t, filepath.Join(stored, "compiled", "runtime"))
 	lock := lockfile.NewLockFile()
 	lock.SetExtension("@fixture/reporter", lockfile.LockEntry{
 		Version:      "0.1.0",

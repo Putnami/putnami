@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/extensions"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jsonutil"
 	"go.putnami.dev/tooling/cli/internal/template"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -182,7 +183,7 @@ func createProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config,
 			if errors.Is(err, errGoModTidy) && installErr != nil {
 				err = errors.Join(err, fmt.Errorf("install workspace dependencies: %w", installErr))
 			}
-			if errors.Is(err, errGoUnavailable) || errors.Is(err, errGoModTidy) {
+			if errors.Is(err, errGoUnavailable) || errors.Is(err, jobs.ErrToolchainProbeTimeout) || errors.Is(err, errGoModTidy) {
 				return createdProject{}, protocolcli.WithNext(err, projectsCreateRetryCommand(name, flags, projectPath))
 			}
 			return createdProject{}, err

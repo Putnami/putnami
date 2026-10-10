@@ -486,6 +486,9 @@ func newHome(t *testing.T, host string) (home, record string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The provider starts after its runtime answers the runtime-info handshake
+	// within its deadline, which must measure the runtime alone.
+	fixtureproc.Warm(t, filepath.Join(installed, "compiled", "provider"), "__putnami", "runtime-info")
 	if err := layout.LinkArtifactGlobal(userRoot, layout.Extensions, providerName, installed); err != nil {
 		t.Fatal(err)
 	}

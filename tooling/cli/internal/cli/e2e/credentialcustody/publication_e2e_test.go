@@ -500,7 +500,7 @@ func writePublicationE2EFixture(t *testing.T) *publicationE2EFixture {
 
 // buildExtensionRuntimes builds the TypeScript and Go extension runtimes from
 // their sources, as their prepare steps do, stamped e2eRuntimeVersion, into
-// the extensions of store, and returns their paths.
+// the extensions of store, warms them (warmRuntime), and returns their paths.
 func buildExtensionRuntimes(t *testing.T, store string) (tsRuntime, goRuntime string) {
 	t.Helper()
 	goBinary, err := exec.LookPath("go")
@@ -531,6 +531,8 @@ func buildExtensionRuntimes(t *testing.T, store string) (tsRuntime, goRuntime st
 	if err := errors.Join(tsErr, goErr); err != nil {
 		t.Fatal(err)
 	}
+	warmRuntime(t, tsRuntime)
+	warmRuntime(t, goRuntime)
 	return tsRuntime, goRuntime
 }
 
@@ -632,7 +634,7 @@ func (fx *publicationE2EFixture) installExtension(t *testing.T, ext extensionFix
 func (fx *publicationE2EFixture) installProvider(t *testing.T) {
 	t.Helper()
 	extRoot := filepath.Join(fx.store, "extensions", "provider@"+e2eRuntimeVersion)
-	fixtureproc.Binary(t, filepath.Join(extRoot, "compiled", "runtime"))
+	warmRuntime(t, fixtureproc.Binary(t, filepath.Join(extRoot, "compiled", "runtime")))
 	hosts := []string{serverHostOf(t, fx.npm.server), serverHostOf(t, fx.gomod.server)}
 	fx.install(t, "@fixture/provider", "provider", fixtureManifest{
 		Name: "@fixture/provider", Version: e2eRuntimeVersion, CLIContract: protocolcli.CurrentContract,

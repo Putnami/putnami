@@ -280,8 +280,9 @@ func TestNativeSessionReportingManagedToolchain(t *testing.T) {
 	root, req := reporterFixture(t, fixtureproc.Program{})
 	managedRoot := t.TempDir()
 	// The compiler is this test binary: it answers the version probe and
-	// otherwise runs as the provider.
-	fixtureproc.Binary(t, filepath.Join(managedRoot, "toolchains", "compiler", "compiler-1.2.3", "bin", reporterCompiler))
+	// otherwise runs as the provider. The probe has a deadline, so the copy is
+	// warmed first.
+	fixtureproc.Warm(t, fixtureproc.Binary(t, filepath.Join(managedRoot, "toolchains", "compiler", "compiler-1.2.3", "bin", reporterCompiler)), "--version")
 	t.Setenv("PUTNAMI_HOME", managedRoot)
 	locked := lockfile.NewLockFile()
 	locked.SetToolchain("compiler", lockfile.LockEntry{Version: "1.2.3", Integrities: map[string]string{lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH): "test-integrity"}})

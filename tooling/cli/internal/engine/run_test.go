@@ -65,6 +65,9 @@ func TestMain(m *testing.M) {
 	// must not configure one for every fixture workspace.
 	os.Unsetenv("PUTNAMI_CACHE_URL")
 	os.Unsetenv("PUTNAMI_CACHE_MODE")
+	// A copy of this race-enabled binary that a test starts, such as the
+	// managed compiler, exits without the race runtime's 1 s exit sleep.
+	fixtureproc.QuietRaceExit()
 	// scratch.New, not os.MkdirTemp: a killed binary cannot run the removal
 	// below, and the next run reclaims what it left.
 	dir, err := scratch.New("putnami-engine-test-")

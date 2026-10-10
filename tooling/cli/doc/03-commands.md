@@ -221,7 +221,10 @@ putnami projects tag <name> <tag>           # Manage project tags
 the project in the workspace config. On a host without Go, a Go project first
 installs the Go the workspace lock pins through the workspace installers. When
 those installers fail but still leave a Go, the project stays and the command
-exits non-zero with the command to run next: `putnami deps install`.
+exits non-zero with the command to run next: `putnami deps install`. A Go that
+does not answer its version probe within 5 seconds is not missing: the command
+installs nothing, names the timeout, keeps the project, and exits non-zero with
+the command that creates the project again.
 
 When the template renders `<%= goFrameworkVersion %>`, `projects create` asks
 for the newest version of `go.putnami.dev/app` the way the `go` command
@@ -671,7 +674,10 @@ the go command the Go extension's tasks run: the release the lock pins, or else
 a `go` on PATH. On a host with neither, they first pin and install the pinned Go,
 as `projects create` does. When the workspace installers fail but still leave a
 Go, `add`, `remove` and `prune` edit the modules with it and exit non-zero with
-the command to run next: `putnami deps install`. For
+the command to run next: `putnami deps install`. A Go that does not answer its
+version probe within 5 seconds is not missing: they install nothing, edit no
+`go.mod` or `putnami.json`, name the timeout, and exit non-zero with the same
+`deps` command to run next. For
 TypeScript, edit `package.json` and run `putnami deps install`.
 
 `prune` reads the provider view that the last install or build recorded. When a

@@ -3,9 +3,11 @@ package jobs
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -30,7 +32,7 @@ func TestRuntimeToolchainResolvesExactManagedCandidateWithFalseAmbientRoot(t *te
 	storeRoot := filepath.Join(home, ".putnami")
 	realRoot := filepath.Join(storeRoot, "toolchains", "compiler", "compiler-1.2.3", "root")
 	probes := filepath.Join(t.TempDir(), "probes.jsonl")
-	realBinary := writeProbedProgram(t, filepath.Join(realRoot, "bin", "compiler"),
+	realBinary := fixtureproc.Write(t, filepath.Join(realRoot, "bin", "compiler"),
 		fixtureproc.Program{Record: probes, Stdout: "1.2.3\n"})
 	realBinary, err := filepath.EvalSymlinks(realBinary)
 	if err != nil {
@@ -95,7 +97,7 @@ func TestRuntimeToolchainRequiredFailureNamesEveryCandidateInDeclarationOrder(t 
 	putnamiHome := t.TempDir()
 	notExecutable := writeNotExecutable(t, filepath.Join(putnamiHome, "tools", "compiler"))
 	bin := t.TempDir()
-	failing := writeProbedProgram(t, filepath.Join(bin, "compiler"), fixtureproc.Program{Exit: 3})
+	failing := fixtureproc.Write(t, filepath.Join(bin, "compiler"), fixtureproc.Program{Exit: 3})
 	writeRuntimeToolchainLock(t, workspaceRoot, "compiler", "1.2.3", "integrity-a")
 	requirement := runtimeToolchainFixture("compiler")
 	requirement.Candidates = []extensionproto.RuntimeToolchainCandidate{
@@ -112,6 +114,90 @@ func TestRuntimeToolchainRequiredFailureNamesEveryCandidateInDeclarationOrder(t 
 		`candidate 3 (path "compiler") at ` + failing + `: probe failed: exit status 3`
 	if err == nil || err.Error() != want {
 		t.Fatalf("resolution error = %v\nwant %s", err, want)
+	}
+	// The error carries the probe's own error, and no probe timed out.
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 3 {
+		t.Errorf("resolution error = %v, want it to unwrap to the probe's exit status 3", err)
+	}
+	if errors.Is(err, ErrToolchainProbeTimeout) {
+		t.Errorf("resolution error = %v, want no probe timeout", err)
+	}
+}
+
+// A runtime toolchain probe is bounded by the production 5 s unless its caller
+// sets another deadline (WithToolchainProbeTimeout), as a test does to prove a
+// timeout without waiting 5 s.
+func TestRuntimeToolchainProbeTimeoutIsFiveSecondsUnlessTheCallerSetsOne(t *testing.T) {
+	if got := runtimeToolchainProbeTimeout(context.Background()); got != 5*time.Second {
+		t.Fatalf("probe timeout = %s, want the production 5s", got)
+	}
+	if got := runtimeToolchainProbeTimeout(WithToolchainProbeTimeout(context.Background(), 100*time.Millisecond)); got != 100*time.Millisecond {
+		t.Fatalf("probe timeout = %s, want the 100ms the caller set", got)
+	}
+	if got := runtimeToolchainProbeTimeout(WithToolchainProbeTimeout(context.Background(), 0)); got != 5*time.Second {
+		t.Fatalf("probe timeout = %s, want the production 5s for a deadline of zero", got)
+	}
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var callers []string
+	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if name := entry.Name(); name == "testdata" || name == ".putnami" || name == "node_modules" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for line := range strings.SplitSeq(string(data), "\n") {
+			if strings.Contains(line, "WithToolchainProbeTimeout(") && !strings.HasPrefix(line, "func WithToolchainProbeTimeout(") && !strings.HasPrefix(strings.TrimSpace(line), "//") {
+				callers = append(callers, path)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(callers) != 0 {
+		t.Fatalf("production code shortens the toolchain probe timeout: %v", callers)
+	}
+}
+
+// A required toolchain whose probe timed out fails with the text of any other
+// mismatch, and unwraps to ErrToolchainProbeTimeout: a caller tells a slow
+// toolchain from an absent one by the error, never by its text.
+func TestRuntimeToolchainMismatchUnwrapsToAProbeThatTimedOut(t *testing.T) {
+	path := fixtureproc.Write(t, filepath.Join(t.TempDir(), "compiler"), fixtureproc.Program{Sleep: 5 * time.Second})
+	_, probeErr := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, 100*time.Millisecond)
+	if probeErr == nil {
+		t.Fatal("a probe that sleeps 5s answered within 100ms")
+	}
+	absent := runtimeToolchainRejection{candidate: `candidate 1 (path "compiler")`, reason: "path missing"}
+	timedOut := runtimeToolchainRejection{candidate: `candidate 2 (path "compiler") at ` + path, reason: probeErr.Error(), err: probeErr}
+
+	err := newRuntimeToolchainMismatchError("example", "compiler", "1.2.3", []runtimeToolchainRejection{absent, timedOut})
+	want := `resolve extension "example" runtime toolchain "compiler": no candidate matched locked version "1.2.3": ` +
+		`candidate 1 (path "compiler"): path missing; candidate 2 (path "compiler") at ` + path + `: probe timed out after 100ms`
+	if err.Error() != want {
+		t.Fatalf("error = %v\nwant %s", err, want)
+	}
+	if !errors.Is(err, ErrToolchainProbeTimeout) {
+		t.Errorf("error = %v, want it to unwrap to %v", err, ErrToolchainProbeTimeout)
+	}
+	if err := newRuntimeToolchainMismatchError("example", "compiler", "1.2.3", []runtimeToolchainRejection{absent}); errors.Is(err, ErrToolchainProbeTimeout) {
+		t.Errorf("error of an absent toolchain = %v, want no probe timeout", err)
 	}
 }
 
@@ -142,10 +228,14 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 				program.HoldOutput = filepath.Join(dir, "release")
 				defer fixtureproc.Release(t, program.HoldOutput)
 			}
-			path := writeProbedProgram(t, filepath.Join(dir, "compiler"), program)
+			path := fixtureproc.Write(t, filepath.Join(dir, "compiler"), program)
 			got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, tc.timeout)
 			if err == nil || err.Error() != tc.want {
 				t.Fatalf("probe = %q, %v; want error %q", got, err, tc.want)
+			}
+			// Only a timeout is ErrToolchainProbeTimeout.
+			if timedOut := strings.HasPrefix(tc.want, "probe timed out"); errors.Is(err, ErrToolchainProbeTimeout) != timedOut {
+				t.Fatalf("errors.Is(%q, ErrToolchainProbeTimeout) = %t, want %t", err, !timedOut, timedOut)
 			}
 		})
 	}
@@ -208,7 +298,7 @@ func TestRuntimeToolchainLockChangeInvalidatesPortableIdentity(t *testing.T) {
 		t.Helper()
 		bin := t.TempDir()
 		probes := filepath.Join(bin, "probes.jsonl")
-		writeProbedProgram(t, filepath.Join(bin, "compiler"), fixtureproc.Program{Record: probes, Stdout: version + "\n"})
+		fixtureproc.Write(t, filepath.Join(bin, "compiler"), fixtureproc.Program{Record: probes, Stdout: version + "\n"})
 		writeRuntimeToolchainLock(t, workspaceRoot, "compiler", version, integrity)
 		ext := runtimeToolchainExtension(requirement)
 		if err := resolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + bin}); err != nil {
@@ -634,22 +724,10 @@ func writeRuntimeToolchainLock(t *testing.T, root, name, version, integrity stri
 }
 
 // writeRuntimeTool places, at path, a program that prints version, and
-// returns its path (writeProbedProgram).
+// returns its path (fixtureproc.Write).
 func writeRuntimeTool(t *testing.T, path, version string) string {
 	t.Helper()
-	return writeProbedProgram(t, path, fixtureproc.Program{Stdout: version + "\n"})
-}
-
-// writeProbedProgram places, at path, a program that does p, and returns its
-// path: path, with ".exe" appended on Windows. It launches the program once
-// (fixtureproc.Warm), so the probe that later starts it within
-// toolVersionProbeTimeout does not also pay for the host's first-launch check
-// of the new file.
-func writeProbedProgram(t *testing.T, path string, p fixtureproc.Program) string {
-	t.Helper()
-	path = fixtureproc.Write(t, path, p)
-	fixtureproc.Warm(t, path)
-	return path
+	return fixtureproc.Write(t, path, fixtureproc.Program{Stdout: version + "\n"})
 }
 
 // writeNotExecutable places, at path, an entry a candidate finds and cannot

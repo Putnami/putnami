@@ -1557,6 +1557,7 @@
               "create-pins-and-installs-go-before-it-sets-the-project-up",
               "create-runs-the-pinned-go-before-another-on-path",
               "create-names-the-retry-when-no-go-results",
+              "create-reports-a-go-probe-that-timed-out",
               "init-and-create-install-the-pinned-go-through-the-engine"
             ]
           }
@@ -1628,7 +1629,9 @@
             "kind": "acceptance",
             "checks": [
               "deps-add-and-remove-run-the-pinned-go",
-              "deps-add-installs-the-pinned-go-first"
+              "deps-add-installs-the-pinned-go-first",
+              "deps-add-reports-a-go-probe-that-timed-out",
+              "deps-prune-changes-nothing-when-the-go-probe-times-out"
             ]
           }
         },

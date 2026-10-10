@@ -1670,12 +1670,17 @@ fi
 `, shellQuote(controls.mutationTrigger), shellQuote(controls.mutationTrigger),
 			shellQuote(controls.mutationTarget))
 	}
+	// The prepare runs the runtime it wrote once, as fixtureproc.Write does
+	// for each program it places, so the handshake that follows within its
+	// deadline does not also pay for the host's first-launch check of the new
+	// file.
 	prepare := `#!/bin/sh
 set -eu
 ` + controls.prepareAssertions + counterStep + barrierStep + delayStep + releaseStep + cpuWorkStep + `output="$2"
 mkdir -p "$output/bin"
 cp bin/runtime-template "$output/bin/runtime"
 chmod +x "$output/bin/runtime"
+"$output/bin/runtime" __putnami runtime-info >/dev/null
 ` + mutationStep
 	mustWriteRuntimeFile(t, filepath.Join(root, "bin", "prepare"), prepare, 0o755)
 	mustWriteRuntimeFile(t, filepath.Join(root, "bin", "runtime-template"), runtimeScript, 0o755)

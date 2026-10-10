@@ -42,6 +42,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 )
 
 // The environment variables that select a re-executed role and hand it the
@@ -105,7 +106,9 @@ const (
 // without running any test. As the
 // runtime of a fixture extension, this binary first answers the CLI's
 // runtime-info handshake and workspace probe, which inherit the engine's
-// environment and so its role.
+// environment and so its role. Every copy the tests start, an engine or a
+// runtime it starts, exits without the race runtime's 1 s exit sleep
+// (fixtureproc.QuietRaceExit).
 func TestMain(m *testing.M) {
 	if len(os.Args) == 3 && os.Args[1] == "__putnami" && os.Args[2] == "runtime-info" {
 		fmt.Println(fixtureRuntimeInfo())
@@ -116,6 +119,7 @@ func TestMain(m *testing.M) {
 	}
 	switch role := os.Getenv(custodyRoleEnv); role {
 	case "":
+		fixtureproc.QuietRaceExit()
 		os.Exit(clitest.Main(m))
 	case "engine":
 		os.Exit(runEngineRole())
@@ -170,6 +174,15 @@ func fixtureRuntimeInfo() string {
 		`{"extension":%q,"version":%q,"platform":%q,"cliContract":%d,"runtimeProtocol":%d,"runtimeABI":%d}`,
 		name, version, runtime.GOOS+"/"+runtime.GOARCH, protocolcli.CurrentContract,
 		runtimeproto.MaxKnownProtocolVersion, runtimeproto.RuntimeABIVersion)
+}
+
+// warmRuntime has the host check the runtime at path before an engine bounds
+// the runtime's runtime-info handshake by its deadline (fixtureproc.Warm), so
+// the deadline measures the runtime alone. Call it on the path the engine
+// starts.
+func warmRuntime(t *testing.T, path string) {
+	t.Helper()
+	fixtureproc.Warm(t, path, "__putnami", "runtime-info")
 }
 
 // runEngineRole is the hosted or local engine: it changes into the fixture

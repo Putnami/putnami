@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -149,6 +150,9 @@ func installCredentialDeclarer(t *testing.T, root, name, bearer string, hosts ..
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The provider starts after its runtime answers the runtime-info handshake
+	// within its deadline, which must measure the runtime alone.
+	fixtureproc.Warm(t, filepath.Join(installed, filepath.FromSlash(fixtureRuntimeExecutable)), "__putnami", "runtime-info")
 	if err := layout.LinkArtifactGlobal(root, layout.Extensions, name, installed); err != nil {
 		t.Fatal(err)
 	}
@@ -269,6 +273,40 @@ func TestBootstrapProviderServesOnlyTheLockedDownloads(t *testing.T) {
 	spectest.Proves(t, "cli/credential-custody", "credential-on-a-descriptor", "bootstrap-provider-serves-only-the-locked-downloads")
 	t.Run("only a user-scope extension is the provider", testBootstrapProviderIsOnlyTheUserScopes)
 	t.Run("the provider serves the locked downloads", testBootstrapProviderServesTheLockedDownloads)
+	t.Run("a test that ends early restores the credential source", testServeUntilCleanupRestoresOnEveryExit)
+}
+
+// serveUntilCleanup installs a credential source with serve and restores the
+// previous one when t ends, however it ends. The returned restore restores it
+// earlier; only the first call has an effect.
+func serveUntilCleanup(t *testing.T, serve func() (restore func())) (restore func()) {
+	t.Helper()
+	restore = sync.OnceFunc(serve())
+	t.Cleanup(restore)
+	return restore
+}
+
+// A subtest that ends early, as a fatal failure does, leaves no credential
+// source installed: a later download in a hosted run asks none and goes out
+// without a credential.
+func testServeUntilCleanupRestoresOnEveryExit(t *testing.T) {
+	defer runcredential.SetForTest(bootstrapRunCredential)()
+	t.Run("ends early", func(t *testing.T) {
+		serveUntilCleanup(t, func() func() {
+			return extension.InstallRegistryReadCredential(func(context.Context, *url.URL) (string, bool, error) {
+				return "", false, errors.New("the credential provider is closed")
+			})
+		})
+		// SkipNow ends the test through runtime.Goexit, as t.Fatal does.
+		t.SkipNow()
+	})
+	req, err := http.NewRequest(http.MethodGet, "https://put.example.test/putnami/cli/download", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missing, err := extension.AuthorizeRegistryRequest(req); err != nil || missing == "" {
+		t.Errorf("after the subtest ended: missing %q, err %v; want no credential source asked", missing, err)
+	}
 }
 
 // A hosted run's bootstrap provider starts on the first download that needs
@@ -303,7 +341,7 @@ func testBootstrapProviderServesTheLockedDownloads(t *testing.T) {
 
 	// The pinned CLI download, as the relaunch runs it, on the provider's host
 	// and on another.
-	restore := boot.launchBootstrap().Serve()
+	restore := serveUntilCleanup(t, boot.launchBootstrap().Serve)
 	for _, server := range []*httptest.Server{served, other} {
 		if err := resolvePinnedCLI(t, server, binary); err != nil {
 			t.Fatalf("download the pinned CLI from %s: %v", server.URL, err)
@@ -445,7 +483,7 @@ func testBootstrapProviderIsOnlyTheUserScopes(t *testing.T) {
 	if boot == nil {
 		t.Fatal("the user scope's provider is not the bootstrap provider")
 	}
-	restore := boot.launchBootstrap().Serve()
+	restore := serveUntilCleanup(t, boot.launchBootstrap().Serve)
 	req, err := http.NewRequest(http.MethodGet, "https://"+host+"/putnami/cli/download", nil)
 	if err != nil {
 		t.Fatal(err)

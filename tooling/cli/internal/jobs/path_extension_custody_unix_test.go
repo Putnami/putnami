@@ -59,7 +59,7 @@ func TestAHandoffAfterAPathExtensionRuntimeIsRefused(t *testing.T) {
 			reason: "runtime toolchain probe of @acme/local",
 			before: func(t *testing.T) func(t *testing.T) {
 				bin, record := t.TempDir(), filepath.Join(t.TempDir(), "runs.jsonl")
-				writeProbedProgram(t, filepath.Join(bin, "compiler"), fixtureproc.Program{Record: record, Stdout: "1.2.3\n"})
+				fixtureproc.Write(t, filepath.Join(bin, "compiler"), fixtureproc.Program{Record: record, Stdout: "1.2.3\n"})
 				return func(t *testing.T) {
 					wsRoot, ext := pathExtension(t)
 					ext.Runtime.Toolchains = map[string]extensionproto.RuntimeToolchain{"compiler": runtimeToolchainFixture("compiler")}
@@ -142,7 +142,7 @@ func TestAStoreExtensionToolchainProbeAndRuntimeKeepCustody(t *testing.T) {
 	fixtureproc.Write(t, filepath.Join(ext.Path, filepath.FromSlash(providerRuntimeExecutable)),
 		fixtureproc.Program{Record: runtimeRecord, Stdout: runtimeInfoFor(t, ext)})
 	bin, probeRecord := t.TempDir(), filepath.Join(t.TempDir(), "probe.jsonl")
-	writeProbedProgram(t, filepath.Join(bin, "compiler"), fixtureproc.Program{Record: probeRecord, Stdout: "1.2.3\n"})
+	fixtureproc.Write(t, filepath.Join(bin, "compiler"), fixtureproc.Program{Record: probeRecord, Stdout: "1.2.3\n"})
 	hostedJobTest(t)
 
 	wsRoot := t.TempDir()

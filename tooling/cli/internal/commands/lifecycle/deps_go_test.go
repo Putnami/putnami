@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
+	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -116,6 +118,54 @@ func TestDepsAddInstallsThePinnedGoOnAHostWithoutGo(t *testing.T) {
 	}
 }
 
+// A go whose version probe does not exit within its deadline is there and
+// slow, not missing: `deps add` installs nothing, stops naming the timeout,
+// and names the same `deps add` as the command to run next.
+func TestDepsAddReportsAGoProbeThatTimedOut(t *testing.T) {
+	spectest.Proves(t, "cli/toolchain-lock", "deps-run-the-pinned-go", "deps-add-reports-a-go-probe-that-timed-out")
+	f := newGoCreateFixture(t)
+	f.withGoProject(t)
+	f.pin(t)
+	f.writeSlowGo(t)
+	env := f.refusingGoInstall(t)
+
+	ctx := jobs.WithToolchainProbeTimeout(context.Background(), testProbeTimeout)
+	output, err := captureStdout(t, func() error {
+		return DepsAdd(ctx, f.root, []string{"example.com/lib@v1.0.0"}, "", env)
+	})
+	if !errors.Is(err, jobs.ErrToolchainProbeTimeout) || errors.Is(err, errGoUnavailable) {
+		t.Fatalf("error = %v, want the probe timeout, not %v\n%s", err, errGoUnavailable, output)
+	}
+	if want := "probe timed out after " + testProbeTimeout.String(); !strings.Contains(err.Error(), want) {
+		t.Errorf("error = %v, want it to name %q", err, want)
+	}
+	if strings.Contains(output, "No go command found") {
+		t.Errorf("deps add reported a missing go:\n%s", output)
+	}
+	if got, want := protocolcli.SuggestedNext(err), "putnami deps add example.com/lib@v1.0.0"; got != want {
+		t.Fatalf("next command = %q, want %q", got, want)
+	}
+}
+
+// The command a deps run names after a probe timeout is the one the user ran:
+// its modules, except for prune, which takes none, and its project selector.
+func TestDepsCommandIsTheCommandTheUserRan(t *testing.T) {
+	for _, tc := range []struct {
+		action, selector string
+		modules          []string
+		want             string
+	}{
+		{"add", "", []string{"example.com/lib@v1.0.0"}, "putnami deps add example.com/lib@v1.0.0"},
+		{"remove", "api", []string{"example.com/a", "example.com/b"}, "putnami deps remove example.com/a example.com/b --projects api"},
+		{"prune", "", nil, "putnami deps prune"},
+		{"prune", "api", nil, "putnami deps prune --projects api"},
+	} {
+		if got := depsCommand(tc.action, tc.modules, tc.selector); got != tc.want {
+			t.Errorf("depsCommand(%q, %q, %q) = %q, want %q", tc.action, tc.modules, tc.selector, got, tc.want)
+		}
+	}
+}
+
 // failingGoInstall is the workspace installers of a host without go that
 // install the pinned Go and then fail on another dependency. jobs records the
 // workspace jobs they run.
@@ -191,12 +241,18 @@ func TestDepsAddAndRemoveNameDepsInstallWhenTheGoInstallFails(t *testing.T) {
 // goPruneWorkspace writes two Go projects, app and tool, whose go.mod requires
 // the workspace module example.com/lib, and returns the workspace model the
 // declared-edge check reads: no import backs either requirement, so both are
-// manifest findings that prune removes through `deps remove`.
-func (f goCreateFixture) goPruneWorkspace(t *testing.T) *workspace.Workspace {
+// manifest findings that prune removes through `deps remove`. app's
+// putnami.json also declares appConfigDeps, which no import backs: findings
+// prune removes from that file.
+func (f goCreateFixture) goPruneWorkspace(t *testing.T, appConfigDeps ...string) *workspace.Workspace {
 	t.Helper()
 	writeRawFile(t, filepath.Join(f.root, "putnami.workspace.json"), `{"name":"go-ws","includes":["app","ext","lib","tool"]}`)
 	for _, name := range []string{"app", "tool"} {
-		writeRawFile(t, filepath.Join(f.root, name, "putnami.json"), `{"name":"`+name+`"}`)
+		config := `{"name":"` + name + `"}`
+		if name == "app" && len(appConfigDeps) > 0 {
+			config = `{"name":"app","dependencies":["` + strings.Join(appConfigDeps, `","`) + `"]}`
+		}
+		writeRawFile(t, filepath.Join(f.root, name, "putnami.json"), config)
 		writeRawFile(t, filepath.Join(f.root, name, "go.mod"),
 			"module example.com/"+name+"\n\ngo "+goFixtureVersion+"\n\nrequire example.com/lib v0.0.0\n")
 	}
@@ -214,8 +270,61 @@ func (f goCreateFixture) goPruneWorkspace(t *testing.T) *workspace.Workspace {
 			},
 		}
 	}
+	app := requiresLib("/app", "app")
+	if len(appConfigDeps) > 0 {
+		app.Config = &wsproto.ProjectConfig{Name: "app", Dependencies: appConfigDeps}
+		app.Dependencies = append(app.Dependencies, appConfigDeps...)
+	}
 	lib := &workspace.Project{ID: "/lib", Name: "example.com/lib", SourceName: "example.com/lib", Path: "lib"}
-	return workspace.NewWorkspace(f.root, nil, []*workspace.Project{requiresLib("/app", "app"), lib, requiresLib("/tool", "tool")})
+	return workspace.NewWorkspace(f.root, nil, []*workspace.Project{app, lib, requiresLib("/tool", "tool")})
+}
+
+// A go whose version probe times out stops `deps prune` before it edits any
+// file: the putnami.json and go.mod files it would prune keep their bytes, so
+// the same `deps prune` it names as the command to run next reads the provider
+// view this run read.
+func TestDepsPruneChangesNothingWhenTheGoProbeTimesOut(t *testing.T) {
+	spectest.Proves(t, "cli/toolchain-lock", "deps-run-the-pinned-go", "deps-prune-changes-nothing-when-the-go-probe-times-out")
+	f := newGoCreateFixture(t)
+	ws := f.goPruneWorkspace(t, "tool")
+	f.pin(t)
+	f.writeSlowGo(t)
+	env := f.refusingGoInstall(t)
+	files := []string{
+		filepath.Join("app", "putnami.json"), filepath.Join("app", "go.mod"),
+		filepath.Join("tool", "putnami.json"), filepath.Join("tool", "go.mod"),
+	}
+	before := make(map[string]string, len(files))
+	for _, file := range files {
+		data, err := os.ReadFile(filepath.Join(f.root, file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		before[file] = string(data)
+	}
+
+	ctx := jobs.WithToolchainProbeTimeout(context.Background(), testProbeTimeout)
+	var out bytes.Buffer
+	output, err := captureStdout(t, func() error {
+		return prunePlan(ctx, f.root, ws, "", false, &out, env)
+	})
+	if !errors.Is(err, jobs.ErrToolchainProbeTimeout) || errors.Is(err, errGoUnavailable) {
+		t.Fatalf("error = %v, want the probe timeout, not %v\n%s%s", err, errGoUnavailable, out.String(), output)
+	}
+	if !strings.Contains(out.String(), "prune app → tool [putnami-json]") {
+		t.Fatalf("prune output = %q, want the putnami.json finding listed", out.String())
+	}
+	if got, want := protocolcli.SuggestedNext(err), "putnami deps prune"; got != want {
+		t.Fatalf("next command = %q, want %q", got, want)
+	}
+	for _, file := range files {
+		if data, err := os.ReadFile(filepath.Join(f.root, file)); err != nil || string(data) != before[file] {
+			t.Errorf("deps prune changed %s after the probe timed out: %q, %v", file, data, err)
+		}
+	}
+	if calls := f.depsCalls(t); len(calls) != 0 {
+		t.Errorf("go calls = %q, want none", calls)
+	}
 }
 
 // `deps prune` edits every Go module it selected with the go the failed

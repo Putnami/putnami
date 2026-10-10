@@ -26,6 +26,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/publicationoutbox"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 )
 
 // putCustodyMember is one Put registry member of the Put publication
@@ -246,7 +247,8 @@ func writePutPublicationFixture(t *testing.T, self, endpoint string) putPublicat
 		wsproto.ProbeProtocolVersion, strings.Join(probeProjects, ","))
 	info := fmt.Sprintf(`{"extension":"@fixture/publisher","version":"1.0.0","platform":"%s/%s","cliContract":%d,"runtimeProtocol":%d,"runtimeABI":%d}`,
 		runtime.GOOS, runtime.GOARCH, protocolcli.CurrentContract, runtimeproto.MaxKnownProtocolVersion, runtimeproto.RuntimeABIVersion)
-	write("publisher/runtime", fmt.Appendf(nil, `#!/bin/sh
+	// The runtime is warmed for the handshake's deadline (fixtureproc.Script).
+	fixtureproc.Script(t, filepath.Join(fx.wsRoot, "publisher", "runtime"), fmt.Sprintf(`#!/bin/sh
 if [ "$1" = "__putnami" ] && [ "$2" = "runtime-info" ]; then
   printf '%%s\n' %s
   exit 0
@@ -256,10 +258,7 @@ if [ "$1" = "__putnami" ] && [ "$2" = "workspace-probe" ]; then
   exit 0
 fi
 exit 2
-`, shellQuote(info), shellQuote(probe)))
-	if err := os.Chmod(filepath.Join(fx.wsRoot, "publisher", "runtime"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+`, shellQuote(info), shellQuote(probe)), "__putnami", "runtime-info")
 	clitest.InitGitRepo(t, fx.wsRoot)
 	return fx
 }

@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -126,7 +127,8 @@ func TestColdMCPPreparesProviderIndexWithoutInstall(t *testing.T) {
   "runtime": {"executable": "runtime"},
   "workspace": {"markers": ["package.json"], "inputs": ["package.json"]}
 }`, 0o644)
-	write("provider/runtime", fmt.Sprintf(`#!/bin/sh
+	// The runtime is warmed for the handshake's deadline (fixtureproc.Script).
+	fixtureproc.Script(t, filepath.Join(root, "provider", "runtime"), fmt.Sprintf(`#!/bin/sh
 if [ "$1" = "__putnami" ] && [ "$2" = "runtime-info" ]; then
   printf '%%s\n' '{"extension":"@putnami/test-provider","version":"1.0.0","platform":"%s/%s","cliContract":4,"runtimeProtocol":2,"runtimeABI":1}'
   exit 0
@@ -136,7 +138,7 @@ if [ "$1" = "__putnami" ] && [ "$2" = "workspace-probe" ]; then
   exit 0
 fi
 exit 2
-`, runtime.GOOS, runtime.GOARCH), 0o755)
+`, runtime.GOOS, runtime.GOARCH), "__putnami", "runtime-info")
 
 	workspace.InvalidateLoadCache(root)
 	t.Cleanup(func() { workspace.InvalidateLoadCache(root) })
@@ -287,9 +289,8 @@ if [ "$1" = "__putnami" ] && [ "$2" = "workspace-probe" ]; then
 fi
 exit 2
 `, runtime.GOOS, runtime.GOARCH)
-	if err := os.WriteFile(filepath.Join(artifact, "runtime"), []byte(runtimeScript), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	// The runtime is warmed for the handshake's deadline (fixtureproc.Script).
+	fixtureproc.Script(t, filepath.Join(artifact, "runtime"), runtimeScript, "__putnami", "runtime-info")
 	if err := layout.LinkArtifact(root, layout.Extensions, name, version); err != nil {
 		t.Fatal(err)
 	}
