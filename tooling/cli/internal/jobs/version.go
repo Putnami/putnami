@@ -148,10 +148,7 @@ func BuildRunVersions(ws *workspace.Workspace, snapshot *putnamigit.VersionInfo)
 		lineErrs = append(lineErrs, fmt.Errorf("every version line reads each commit as stable: %w", catalogErr))
 	}
 	for _, line := range runVersionLines(ws) {
-		pattern, ok := ws.Lines[line]
-		if !ok {
-			pattern = wsproto.LineTagPattern(line, nil)
-		}
+		pattern := lineTagPattern(ws, line)
 		spec := putnamigit.LineSpec{ScopePath: line, TagPattern: pattern, Stable: stable}
 		if line != "" {
 			spec.Pathspecs = []string{line}
@@ -201,6 +198,15 @@ func DegradedVersionLines(degraded error) []string {
 		lines = append(lines, strings.Join(strings.Fields(reason.Error()), " "))
 	}
 	return lines
+}
+
+// lineTagPattern is the tag pattern of a version line: the one the line's scope
+// declares, or the default for its scope path. "" is the root line.
+func lineTagPattern(ws *workspace.Workspace, line string) string {
+	if pattern, ok := ws.Lines[line]; ok {
+		return pattern
+	}
+	return wsproto.LineTagPattern(line, nil)
 }
 
 // runVersionLines is every line a project of this workspace can belong to: the

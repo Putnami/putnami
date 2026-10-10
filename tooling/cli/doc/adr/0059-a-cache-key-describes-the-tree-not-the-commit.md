@@ -1,7 +1,8 @@
 # ADR 0059 — A cache key describes the tree, not the commit
 
 - **Status**: accepted, amended by
-  [ADR 0060](0060-the-base-version-is-not-a-cache-key-input.md)
+  [ADR 0060](0060-the-base-version-is-not-a-cache-key-input.md) and
+  [ADR 0062](0062-a-release-baseline-input-names-the-baseline-not-the-commit.md)
 - **Scope**: `@putnami/cli` (`internal/store`, `internal/jobs`)
 
 ## Context

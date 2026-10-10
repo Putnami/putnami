@@ -35,7 +35,8 @@ func HostPlatform() string {
 // not. `extensionVersion` resolves to nothing on purpose — every key already
 // names the extension's implementation, by its version or by the digest that
 // replaces it, and answering the version here would move, at every build
-// stamp, the keys that digest keeps stable.
+// stamp, the keys that digest keeps stable. `releaseBaseline` reads git and can
+// fail, so releaseBaselineIdentity resolves it beside this function.
 //
 // The result feeds CacheKey.RuntimeIdentity, which is hashed only when
 // non-empty, so a task that declares no runtime input keeps its exact key.
@@ -829,6 +830,13 @@ func computeJobCacheHashWith(
 	// developer and CI on another platform. Neither is a declaration, so a task
 	// whose output depends on the machine declares the host platform here.
 	policy.RuntimeIdentity = taskRuntimeIdentity(job)
+	baseline, err := releaseBaselineIdentity(ws, job, cache)
+	if err != nil {
+		return "", fmt.Errorf("cache key for %s: %w", job.Key(), err)
+	}
+	if baseline != "" {
+		policy.RuntimeIdentity = append(policy.RuntimeIdentity, baseline)
+	}
 
 	// Collect upstream hashes for dependencies
 	var upstreamHashes []string

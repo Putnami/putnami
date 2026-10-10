@@ -79,7 +79,7 @@ v9                          ← format version (for compatibility)
 + extension version         ← only when the extension has no implementation digest (see below)
 + implementation digest     ← what the extension runs; empty when it has none
 + toolchain                 ← the CLI's Go runtime and each declared runtime toolchain's lock identity
-+ runtime identity          ← declared runtime inputs such as hostPlatform, absent when none
++ runtime identity          ← declared runtime inputs such as hostPlatform or releaseBaseline, absent when none
 + OS class                  ← "windows" on Windows, absent elsewhere
 + source state              ← "unmanaged" where Git does not manage the workspace root, absent inside a repository
 + task name                 ← e.g., "build~transpile"
@@ -107,6 +107,30 @@ base version `0.0.0` and no commit in its job context, and the build stamp's
 `capabilityPackages` name every package at `0.0.0`. See
 [ADR 0059](adr/0059-a-cache-key-describes-the-tree-not-the-commit.md) and
 [ADR 0060](adr/0060-the-base-version-is-not-a-cache-key-input.md).
+
+### Release Baseline
+
+A task whose verdict compares the working tree with its version line's last
+release, such as the Go `validate-api` check, declares the `releaseBaseline`
+runtime input. Before the task runs, the CLI reads the project's baseline from
+git and adds it to the key:
+
+- the repository state: no work tree, no commit, a shallow clone, no reachable
+  tag of the line, or tagged;
+- the line's tag pattern, and for an untagged line whether the repository has
+  a tag of another line;
+- the line's last tag HEAD reaches, and the tree that tag holds at the project
+  directory;
+- whether a commit since that tag that touches the project declares a breaking
+  change.
+
+The baseline names no commit HEAD reaches. A branch and its squash merge share
+the key when they hold one tree and declare the same break. A new tag, other
+content at the tag, a changed breaking marker or a shallow clone moves it. A
+git failure leaves the task without a key, so it runs uncached. One run reads
+each project's baseline once, so a tag created during the run is seen by the
+next run. Declaring the input requires extension contract 7. See
+[ADR 0062](adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md).
 
 ### Extension Implementation
 

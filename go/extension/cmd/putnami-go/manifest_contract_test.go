@@ -2478,3 +2478,40 @@ func TestLintDocsIsKeyedOnTheCandidateCut(t *testing.T) {
 		t.Errorf("lint-docs declares %+v, want no output, no effect and no source rewrite", task.Declares)
 	}
 }
+
+// TestValidateAPIIsKeyedOnTheReleaseBaseline holds the validate-api
+// declaration to what the check reads. The working tree side is the project's
+// non-test Go files with the files their embed directives select, its go.mod
+// and .json files outside dot directories, the root support catalog and the
+// command-surface option in both spellings; the history side is the
+// releaseBaseline runtime input, which the CLI reads from git. The check
+// writes nothing, and a skip is as cacheable as a verdict, so the task is
+// noOutput and deterministic. Declaring the input requires contract 7, and
+// the manifest is stamped with it.
+func TestValidateAPIIsKeyedOnTheReleaseBaseline(t *testing.T) {
+	manifest := loadExtensionManifest(t)
+	task, ok := manifest.Tasks["validate-api"]
+	if !ok {
+		t.Fatal("manifest task \"validate-api\" is missing")
+	}
+	want := map[string]proto.TaskInputPort{
+		"sources":                         {From: proto.TaskInputFromProject, Files: []string{"**/*.go", "!**/*_test.go", "go-embed:build", "**/go.mod", "**/*.json", "!**/.*/**/*"}},
+		"support-catalog":                 {From: proto.TaskInputFromWorkspace, Files: []string{"putnami.support.json"}},
+		"command-surface":                 {From: proto.TaskInputFromParams},
+		"commandSurface":                  {From: proto.TaskInputFromParams},
+		proto.RuntimeInputReleaseBaseline: {From: proto.TaskInputFromRuntime},
+	}
+	if !reflect.DeepEqual(task.Inputs, want) {
+		t.Errorf("validate-api inputs = %+v\nwant %+v", task.Inputs, want)
+	}
+	if !task.Cache.IsEnabled() || !task.Cache.NoOutput || !task.Cache.Deterministic {
+		t.Errorf("validate-api cache = %+v, want enabled, noOutput and deterministic", task.Cache)
+	}
+	if task.Declares == nil || len(task.Declares.Outputs) > 0 || len(task.Declares.Effects) > 0 || task.Declares.MutatesSources {
+		t.Errorf("validate-api declares %+v, want no output, no effect and no source rewrite", task.Declares)
+	}
+	if manifest.CLIContract != proto.RequiredCLIContract(manifest) {
+		t.Errorf("cliContract = %d, want the contract the manifest's vocabulary requires, %d",
+			manifest.CLIContract, proto.RequiredCLIContract(manifest))
+	}
+}

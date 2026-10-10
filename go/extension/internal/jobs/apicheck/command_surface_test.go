@@ -185,10 +185,11 @@ func TestTheCountsTellAPIChangesFromCommandSurfaceChanges(t *testing.T) {
 	f.write("lib/greet/CHANGES.md", "Greet, --loud and --style are gone.\n")
 	f.commit("feat!: less to greet with")
 	status, _, events = f.run()
-	declared := "1 incompatible API change and 2 incompatible command-surface changes since lib/v0.5.0, declared breaking by "
+	declared := "1 incompatible API change and 2 incompatible command-surface changes since lib/v0.5.0; " +
+		"a commit since lib/v0.5.0 declares the breaking change"
 	found := false
 	for _, event := range events {
-		found = found || (event.Type == runtime.EventLog && strings.HasPrefix(event.Message, declared))
+		found = found || (event.Type == runtime.EventLog && event.Message == declared)
 	}
 	if status != "OK" || !found {
 		t.Fatalf("status = %q, events = %+v, want the declared counts", status, events)
@@ -231,13 +232,12 @@ func TestABreakingMarkerAllowsACommandSurfaceChange(t *testing.T) {
 		t.Fatalf("error diagnostics = %+v, want none", found)
 	}
 	infos := diagnostics(events, runtime.SeverityInfo)
-	if len(infos) != 1 || infos[0].Code != Code ||
-		!strings.HasPrefix(infos[0].Message, `command "greet": flag --loud removed since lib/v0.5.0, declared breaking by `) ||
-		!strings.HasSuffix(infos[0].Message, `"feat!: a quieter greet"`) {
-		t.Fatalf("info diagnostics = %+v", infos)
+	want := `command "greet": flag --loud removed since lib/v0.5.0; a commit since lib/v0.5.0 declares the breaking change`
+	if len(infos) != 1 || infos[0].Code != Code || infos[0].Message != want {
+		t.Fatalf("info diagnostics = %+v\nwant one: %q", infos, want)
 	}
-	if data["breakingCommit"] == "" || data["breakingCommit"] == nil {
-		t.Fatalf("data = %v, want the breaking commit", data)
+	if data["breakingDeclared"] != true {
+		t.Fatalf("data = %v, want breakingDeclared", data)
 	}
 }
 
@@ -343,7 +343,7 @@ func TestACommandSurfaceAtTheTagMustBeARegularFileWithinTheBound(t *testing.T) {
 func TestADeclaredCommandSurfaceMustBeAFileOfTheProject(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, catalog("package", "stable"))
-	if err := os.MkdirAll(filepath.Join(f.project, "folder"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(f.project, "folder.json"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	f.write("lib/greet/real/surface.json", surfaceDocument(t, loudFlag()))
@@ -355,7 +355,7 @@ func TestADeclaredCommandSurfaceMustBeAFileOfTheProject(t *testing.T) {
 	}
 	for option, want := range map[string]string{
 		"missing.json":         "the command surface missing.json that option command-surface names does not exist in the project",
-		"folder":               "the command surface folder is not a regular file",
+		"folder.json":          "the command surface folder.json is not a regular file",
 		"greet.go/x.json":      "the command surface greet.go/x.json is not a regular file",
 		"linked.json":          "the command surface linked.json goes through the symbolic link linked.json",
 		"through/surface.json": "the command surface through/surface.json goes through the symbolic link through",
@@ -372,6 +372,38 @@ func TestADeclaredCommandSurfaceMustBeAFileOfTheProject(t *testing.T) {
 	}
 	if report, err := Check(f.root, f.project, projectName, Options{CommandSurface: "./real/../real/surface.json"}); err != nil || report.CommandSurface != "real/surface.json" {
 		t.Errorf("a path with dot segments: report = %+v, err = %v, want it cleaned", report, err)
+	}
+}
+
+// The task's cache key reads the project's .json files outside the directories
+// a run writes and the key's walk skips, so the working-tree document must be
+// one of them: a document the key does not read could change under a stored
+// verdict. The released document has no such rule, because the key reads the
+// whole tree the tag holds.
+func TestADeclaredCommandSurfaceIsAFileTheCacheKeyReads(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t, catalog("package", "stable"))
+	for option, want := range map[string]string{
+		"surface.yaml":           `option command-surface is "surface.yaml", want a .json file`,
+		"surface":                `option command-surface is "surface", want a .json file`,
+		".gen/surface.json":      `option command-surface is ".gen/surface.json", which is inside .gen`,
+		"docs/.cli/surface.json": `option command-surface is "docs/.cli/surface.json", which is inside .cli`,
+		"dist/surface.json":      `option command-surface is "dist/surface.json", which is inside dist`,
+		"out/surface.json":       `option command-surface is "out/surface.json", which is inside out`,
+		"vendor/surface.json":    `option command-surface is "vendor/surface.json", which is inside vendor`,
+		"node_modules/s.json":    `option command-surface is "node_modules/s.json", which is inside node_modules`,
+	} {
+		_, err := Check(f.root, f.project, projectName, Options{CommandSurface: option})
+		if err == nil || !strings.Contains(err.Error(), want) || !errors.Is(err, protocolcli.ErrInvalidConfig) {
+			t.Errorf("option %q: err = %v, want %q as invalid configuration", option, err, want)
+		}
+	}
+	f.write("lib/greet/.surface.json", surfaceDocument(t, loudFlag()))
+	f.write("lib/greet/_docs/surface.json", surfaceDocument(t, loudFlag()))
+	for _, option := range []string{".surface.json", "_docs/surface.json"} {
+		if _, err := Check(f.root, f.project, projectName, Options{CommandSurface: option}); err != nil {
+			t.Errorf("option %q: err = %v, want the keyed document read", option, err)
+		}
 	}
 }
 

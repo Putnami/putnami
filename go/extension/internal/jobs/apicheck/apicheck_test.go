@@ -231,13 +231,58 @@ func TestABreakingMarkerAllowsTheChange(t *testing.T) {
 		t.Fatalf("error diagnostics = %+v, want none", found)
 	}
 	infos := diagnostics(events, runtime.SeverityInfo)
-	if len(infos) != 1 || !strings.Contains(infos[0].Message, "func Greet removed since lib/v0.4.0, declared breaking by") ||
-		!strings.Contains(infos[0].Message, `"feat!: drop the greeting"`) {
-		t.Fatalf("info diagnostics = %+v", infos)
+	want := "go.example.com/lib: func Greet removed since lib/v0.4.0; a commit since lib/v0.4.0 declares the breaking change"
+	if len(infos) != 1 || infos[0].Message != want {
+		t.Fatalf("info diagnostics = %+v\nwant one: %q", infos, want)
 	}
-	if data["breakingCommit"] == "" || data["breakingCommit"] == nil {
-		t.Fatalf("data = %v, want the breaking commit", data)
+	if data["breakingDeclared"] != true {
+		t.Fatalf("data = %v, want breakingDeclared", data)
 	}
+}
+
+// A branch and its squash merge hold one tree and declare one break with
+// different commits. The check names no commit, so both runs give the same
+// status, data and events, and one cached verdict can serve both.
+func TestABranchAndItsSquashMergeGiveTheSameOutput(t *testing.T) {
+	spectest.Proves(t, feature, "api-verdict-names-no-commit", "a-branch-and-its-squash-merge-give-one-verdict")
+	f := newFixture(t, catalog("package", "stable"))
+	f.git("checkout", "-q", "-b", "feature")
+	f.write("lib/greet/greet.go", waveOnlySource)
+	f.commit("feat!: drop the greeting")
+	f.write("lib/greet/README.md", "# lib\n")
+	f.commit("docs: describe the module")
+	branchStatus, branchData, branchEvents := f.run()
+
+	f.git("checkout", "-q", "main")
+	f.git("merge", "-q", "--squash", "feature")
+	f.commit("feat!: drop the greeting (#3)")
+	squashStatus, squashData, squashEvents := f.run()
+
+	if branchStatus != "OK" || branchData["breakingDeclared"] != true {
+		t.Fatalf("branch status = %q, data = %v, want the declared break", branchStatus, branchData)
+	}
+	if squashStatus != branchStatus {
+		t.Fatalf("status = %q on the squash, %q on the branch", squashStatus, branchStatus)
+	}
+	branchJSON, squashJSON := canonicalOutput(t, branchData, branchEvents), canonicalOutput(t, squashData, squashEvents)
+	if branchJSON != squashJSON {
+		t.Fatalf("the squash merge gave another output:\nbranch %s\nsquash %s", branchJSON, squashJSON)
+	}
+}
+
+// canonicalOutput is a run's data and events without their emission times.
+func canonicalOutput(t *testing.T, data map[string]any, events []runtime.Event) string {
+	t.Helper()
+	timeless := make([]runtime.Event, len(events))
+	for i, event := range events {
+		event.Time = ""
+		timeless[i] = event
+	}
+	encoded, err := json.Marshal(map[string]any{"data": data, "events": timeless})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(encoded)
 }
 
 func TestABreakingChangeFooterAllowsTheChange(t *testing.T) {
@@ -246,7 +291,7 @@ func TestABreakingChangeFooterAllowsTheChange(t *testing.T) {
 	f.write("lib/greet/greet.go", waveOnlySource)
 	f.commit("refactor: drop the greeting\n\nBREAKING CHANGE: Greet is gone")
 	report := f.check()
-	if len(report.Changes) != 1 || report.Breaking == nil || report.Breaking.Subject != "refactor: drop the greeting" {
+	if len(report.Changes) != 1 || !report.Breaking {
 		t.Fatalf("report = %+v", report)
 	}
 }
@@ -259,7 +304,7 @@ func TestAMarkerOnACommitOutsideTheProjectDoesNotCount(t *testing.T) {
 	f.write("lib/greet/greet.go", waveOnlySource)
 	f.commit("feat: drop the greeting")
 	report := f.check()
-	if len(report.Changes) != 1 || report.Breaking != nil {
+	if len(report.Changes) != 1 || report.Breaking {
 		t.Fatalf("report = %+v, want one change and no marker", report)
 	}
 }
@@ -269,7 +314,7 @@ func TestAnUncommittedRemovalIsChecked(t *testing.T) {
 	f := newFixture(t, catalog("package", "stable"))
 	f.write("lib/greet/greet.go", waveOnlySource)
 	report := f.check()
-	if len(report.Changes) != 1 || report.Changes[0].Symbol != "func Greet" || report.Breaking != nil {
+	if len(report.Changes) != 1 || report.Changes[0].Symbol != "func Greet" || report.Breaking {
 		t.Fatalf("report = %+v", report)
 	}
 }

@@ -115,7 +115,15 @@ merges them. Workspace options and command-line flags are not read at the
 tag: declare the option in the project's `putnami.json`. Both sides follow the
 CLI's rule for the option's two spellings: a layer can write
 `command-surface` or `commandSurface`, and when one layer writes both,
-`commandSurface` wins. These changes are incompatible:
+`commandSurface` wins.
+
+The document in the working tree must be a `.json` file outside the
+directories the task's [cache key](#caching) does not read: a directory whose
+name starts with `.`, `node_modules`, `out`, `dist` or `vendor`. Any other
+path fails the task, because a change to it would leave a stored verdict in
+place. The document at the tag has no such rule.
+
+These changes are incompatible:
 
 - a command removed;
 - a flag removed, global or of a command, or a short alias removed;
@@ -151,6 +159,7 @@ document adds these cases:
 | The declared document is missing from the project, is a directory, is reached through a symbolic link, or is named in another case than on disk | the task fails |
 | The document does not parse, in the working tree or at the tag, in a protocol version this extension reads | the task fails |
 | The option is an absolute path or a path out of the project | the task fails, even for a project the check skips |
+| The option names a file that is not `.json`, or a file inside a directory the cache key does not read | the task fails, even for a project the check skips |
 
 A warning stands for what no marker could fix: the check cannot read the
 released document, or the project no longer declares the current one, so it
@@ -166,7 +175,14 @@ always shows in the reviewed diff.
 
 The check reads the commits from the tag to HEAD that touch the project
 directory. When one of them is a conventional commit that declares a breaking
-change, every incompatible change passes and is listed as information:
+change, every incompatible change passes and is listed as information, and the
+task's data holds `breakingDeclared: true`. The output names no commit:
+
+```text
+go.example.com/lib: func Greet removed since lib/v0.4.0; a commit since lib/v0.4.0 declares the breaking change
+```
+
+Either form of the marker counts:
 
 ```text
 feat!: drop the greeting
@@ -224,9 +240,30 @@ or the warning that says why.
 
 ## Caching
 
-The task is never cached. Its verdict reads the line's tags, the files at the
-last one, and the messages of the commits since, and a new tag or a new commit
-changes the answer without changing any file a cache key could name.
+The task is cached. Its key holds what the verdict reads:
+
+- the project's non-test Go files, which are the files the API comes from,
+  and the files their `//go:embed` directives select;
+- the project's `go.mod` files and `.json` files;
+- the root `putnami.support.json`;
+- the `command-surface` option, in both spellings;
+- the project's release baseline, which the CLI reads from git before the task
+  runs (the `releaseBaseline` runtime input): the repository state, the line's
+  tag pattern, the last tag of the line HEAD reaches, the tree that tag holds
+  at the project directory, and whether a commit since that tag that touches
+  the project declares a breaking change.
+
+The project's file patterns skip directories whose name starts with `.`, where
+a run writes its generated files.
+
+The key names no commit. A pull request and the commit its squash merge puts
+on the main branch hold one tree and, with the marker in the pull request
+title, declare the same break, so they share the verdict. A new tag, a moved
+tag, a commit that adds or drops a marker, or a shallow clone changes the key.
+A skip for a project the catalog does not list as stable is cached as well.
+The input needs a CLI that implements extension contract 7; an older CLI
+refuses this extension. See CLI
+[ADR 0062](../../../tooling/cli/doc/adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md).
 
 ## Limits
 

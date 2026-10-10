@@ -145,20 +145,24 @@ package` for Go archive extensions and npm extension packages, and the SDK's
 staged manifest strictly and stamps `"cliContract": N` on success, where N is
 the lowest contract whose vocabulary covers the manifest
 (`RequiredCLIContract`): `protocols/cli.CurrentContract` (4),
-`protocols/cli.AgentContentContract` (5) for `agentContent`, or
+`protocols/cli.AgentContentContract` (5) for `agentContent`,
 `protocols/cli.GoEmbedInputsContract` (6) for `go-embed:build` or
-`go-embed:test` task inputs/cache-key files. The gate applies to every non-empty command, command-group, MCP
+`go-embed:test` task inputs/cache-key files, or
+`protocols/cli.ReleaseBaselineInputContract` (7) for a task that declares the
+`releaseBaseline` runtime input. The gate applies to every non-empty command, command-group, MCP
 tool, or agent-content surface. A non-conforming manifest — for example one
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contracts 5 and 6 are **additive**. They add vocabulary a manifest opts into and
-change nothing a manifest without that vocabulary means. An extension without
-agent content or Go embed inputs keeps its contract-4 stamp; one with agent
-content but no Go embed inputs requires contract 5. A manifest with Go embed
-inputs requires contract 6 even if it also declares agent content. The reader
-loads every stamp from the one the manifest's vocabulary requires up to
-`protocols/cli.LatestContract` (6):
+Contracts 5, 6 and 7 are **additive**. They add vocabulary a manifest opts into
+and change nothing a manifest without that vocabulary means. An extension without
+agent content, Go embed inputs or a `releaseBaseline` input keeps its contract-4
+stamp; one with agent content but no Go embed inputs requires contract 5. A
+manifest with Go embed inputs requires contract 6 even if it also declares agent
+content. A manifest with a `releaseBaseline` input requires contract 7 whatever
+else it declares: a reader without the name would key the task without the
+baseline. The reader loads every stamp from the one the manifest's vocabulary
+requires up to `protocols/cli.LatestContract` (7):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|

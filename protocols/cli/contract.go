@@ -56,6 +56,11 @@ package cli
 //	6: ADDITIVE — go-embed:build and go-embed:test task file selectors.
 //	   Older readers would silently treat them as unmatched globs and
 //	   restore outputs against changed embedded bytes.
+//	7: ADDITIVE — the releaseBaseline runtime task input: the project's
+//	   version-line baseline the CLI reads from git and folds into the task's
+//	   cache key. An older reader resolves no value for a runtime input it
+//	   does not know, so it would key the task without the baseline and serve
+//	   a verdict computed against another tag or another breaking marker.
 //	4: dependent commands may declare sessionPrerequisites. The planner must
 //	   execute those prerequisite commands in the same DAG, project their
 //	   selection and invocation-local parameters, and connect their declared
@@ -88,7 +93,12 @@ const AgentContentContract = 5
 // selectors. Older readers refuse its stamp before considering a cache hit.
 const GoEmbedInputsContract = 6
 
+// ReleaseBaselineInputContract is required only by manifests whose tasks
+// declare the releaseBaseline runtime input. Older readers refuse its stamp
+// instead of keying those tasks without the baseline.
+const ReleaseBaselineInputContract = 7
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = GoEmbedInputsContract
+const LatestContract = ReleaseBaselineInputContract

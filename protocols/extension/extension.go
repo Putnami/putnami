@@ -776,9 +776,9 @@ const (
 
 // Recognized `from: "runtime"` input names.
 //
-// A runtime input names an AMBIENT fact — something true of the machine or the
-// running toolchain rather than of the checked-out sources — that a task's
-// output depends on. Declaring one is a statement with two consequences: the
+// A runtime input names an AMBIENT fact — something true of the machine, the
+// running toolchain or the checkout's git history rather than of the
+// checked-out sources — that a task's output depends on. Declaring one is a statement with two consequences: the
 // value enters the task's cache key, and the plan's keys stop being recomputable
 // from a revision alone (CacheKeysRecomputableAtRevision).
 const (
@@ -799,6 +799,17 @@ const (
 	// cache key already names the extension's implementation, by its version
 	// or by the implementation digest that replaces the version.
 	RuntimeInputExtensionVersion = "extensionVersion"
+	// RuntimeInputReleaseBaseline is the project's release baseline, which the
+	// CLI reads from the checkout's git repository before the task runs: the
+	// repository state (no work tree, no commit, a shallow clone, or no tag of
+	// the project's version line), the line's tag pattern, the line's last tag
+	// HEAD reaches, the object that tag holds at the project directory, and
+	// whether a commit since that tag that touches the project directory
+	// declares a breaking change. It names no commit HEAD reaches, so two
+	// histories that share these values share the key. A task declares it when
+	// its verdict compares the working tree with the line's last release.
+	// Declaring it requires protocol/cli ReleaseBaselineInputContract.
+	RuntimeInputReleaseBaseline = "releaseBaseline"
 )
 
 // TaskInputPort declares a task input source.
@@ -863,8 +874,7 @@ type TaskCachePolicy struct {
 	// capturing the shared per-command output directory (which may hold
 	// SIBLING steps' files, making the entry both wrong — a hit restores
 	// stale sibling artifacts — and heavy: tens of MB keyed to a sub-second
-	// task, permanently excluded by the remote break-even guard); and the
-	// remote required-input guard treats the task's files-less hits as
+	// task); and the remote required-input guard treats the task's files-less hits as
 	// legitimate instead of rebuilding them locally on every run.
 	NoOutput bool `json:"noOutput,omitempty"`
 }
