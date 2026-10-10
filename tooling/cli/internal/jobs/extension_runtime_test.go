@@ -1034,11 +1034,9 @@ func TestResolveExtensionRuntimeConcurrentPrepareAndReuse(t *testing.T) {
 }
 
 // TestResolveExtensionRuntimeConcurrentStress is the higher-fan-out variant of
-// the test above: one goroutine's handshake subprocess died on
-// SIGSEGV during a full-suite run, and 30 focused re-runs could not reproduce it
-// — isolation is exactly what hides it. So this variant stays in the DEFAULT
-// suite (no build tag, no -run gate) where it contends with everything else, and
-// it widens the window the single-digest test cannot reach: several distinct
+// the test above. It stays in the DEFAULT suite (no build tag, no -run gate)
+// where it contends with everything else, and it widens the window the
+// single-digest test cannot reach: several distinct
 // digests admit CONCURRENTLY, so one goroutine's staging tree is created,
 // exec'd, published and cleaned up while others exec from already-published
 // trees. It is -count-friendly (all state is per-run temp dirs) and deliberately
@@ -1197,12 +1195,10 @@ func TestRuntimePrepareRetriesTransientTextFileBusy(t *testing.T) {
 	}
 }
 
-// TestRuntimeHandshakeFailureIsSelfDiagnosing pins the diagnostic payload
-// needed on the next occurrence: a handshake subprocess that dies on a
-// SIGNAL reports the executable's on-disk identity, so the report itself says
-// whether the file was intact and which tree it came from — without that, a
-// "signal: segmentation fault" is indistinguishable from a file whose bytes
-// moved under an in-flight exec.
+// TestRuntimeHandshakeFailureIsSelfDiagnosing pins the diagnostic payload of a
+// handshake subprocess that dies on a SIGNAL: the error reports the
+// executable's on-disk identity, so it says whether the file was intact and
+// which tree it came from without a re-run.
 func TestRuntimeHandshakeFailureIsSelfDiagnosing(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell runtime fixture")

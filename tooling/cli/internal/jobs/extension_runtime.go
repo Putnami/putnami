@@ -1384,8 +1384,8 @@ func validateRuntimeExecutable(executable string) error {
 // describeRuntimeExecutable renders the on-disk identity of a runtime
 // executable for handshake-failure diagnostics. A handshake subprocess that
 // dies on a signal (SIGSEGV/SIGBUS) with empty stderr, or returns truncated
-// output, is the signature of a file whose bytes moved under an in-flight exec
-// — so the message must answer two questions without a re-run: WHICH tree the
+// output, can mean a file whose bytes moved under an in-flight exec — so the
+// message must answer two questions without a re-run: WHICH tree the
 // executable came from (an in-stage <store>/tmp/staging-* path vs. the
 // published <store>/sha256/... entry) and whether the file was still intact.
 // size/mode/mtime come from the portable FileInfo; the platform stat carries
