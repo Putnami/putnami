@@ -197,7 +197,8 @@ func collectDefaultFiles(dir string) ([]fileEntry, error) {
 			return nil
 		}
 		name := info.Name()
-		if strings.HasPrefix(name, ".") || name == "node_modules" || name == ".putnami" || name == "out" {
+		// The skip applies below the project root, as in globDoubleStar.
+		if path != dir && (strings.HasPrefix(name, ".") || name == "node_modules" || name == ".putnami" || name == "out") {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
