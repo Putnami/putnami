@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/docslinks"
 	"go.putnami.dev/sdk/extension/infraagg"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
@@ -878,5 +880,27 @@ func TestWorkspaceAdapterDeclaresEdgeAttribution(t *testing.T) {
 	manifest := loadExtensionManifest(t)
 	if manifest.Workspace == nil || !manifest.Workspace.DependencySources {
 		t.Fatal("the workspace adapter must declare dependencySources: the probe attributes its edges")
+	}
+}
+
+// TestLintDocsIsKeyedOnTheCandidateCut holds the lint-docs declaration to the
+// one the SDK's docslinks.Job reads, so every language extension caches the
+// check on the same key. The check reads the workspace's Git candidate cut,
+// which the workspace input `git:**` holds: a deleted or renamed link target
+// moves the key, and an ignored file does not. It writes nothing, so it
+// declares no output, no effect and no source rewrite.
+func TestLintDocsIsKeyedOnTheCandidateCut(t *testing.T) {
+	task, ok := loadExtensionManifest(t).Tasks["lint-docs"]
+	if !ok {
+		t.Fatal("manifest task \"lint-docs\" is missing")
+	}
+	if !reflect.DeepEqual(task.Inputs, docslinks.Inputs()) {
+		t.Errorf("lint-docs inputs = %+v, want docslinks.Inputs() = %+v", task.Inputs, docslinks.Inputs())
+	}
+	if !task.Cache.IsEnabled() || !task.Cache.NoOutput {
+		t.Errorf("lint-docs cache = %+v, want enabled with noOutput", task.Cache)
+	}
+	if task.Declares == nil || len(task.Declares.Outputs) > 0 || len(task.Declares.Effects) > 0 || task.Declares.MutatesSources {
+		t.Errorf("lint-docs declares %+v, want no output, no effect and no source rewrite", task.Declares)
 	}
 }

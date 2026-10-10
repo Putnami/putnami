@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path"
 	"path/filepath"
 	"sort"
@@ -33,13 +32,12 @@ import (
 // files as they are, so the reviewed change a registry demands is literally
 // an edit to that registry in the same diff.
 //
-// It is UNCACHEABLE, and unlike those two that is not a shortcut. A check's
-// read set is whatever its own `files` globs name, and those globs are authored
-// per repository, so no static task-input pattern can cover them. An
-// under-declared key does not merely miss a change: it serves a stale verdict
-// while claiming to have checked, which is the one failure a validation job
-// must not have. That is the same reasoning `features-validate` states (D8),
-// and it is stated the same way in the task manifest.
+// A check's read set is whatever its own `files` globs name, and those globs
+// are authored per repository, so no narrow task-input pattern can cover them.
+// The task therefore reads the workspace through its candidate cut
+// (worktree.go) and is cached on the input `git:**`, which holds every file a
+// glob can match: a registry, an ADR it links, and every file a check reads
+// move the key, and an ignored or generated file is neither read nor keyed.
 //
 // Decisions are SETTLED, not ratcheted, so there is no verification-mode knob.
 // `architecture` has one because a workspace adopts a graph gradually; a
@@ -48,7 +46,7 @@ import (
 // gate exists to prevent.
 
 // excludedDecisionDirectories are never descended into when the matched-file
-// set is walked. They are the same exclusions project discovery uses:
+// set is listed. They are the same exclusions project discovery uses:
 // generated output, vendored code, and every dot directory (which covers
 // `.git`, `.gen` and `.putnami`). A verdict must be a function of the
 // committed tree, and a generated copy of a file would make the same registry
@@ -141,8 +139,8 @@ func decisionScopes(ws *workspace.Workspace) []string {
 
 // readCommittedDecisions loads one scope's registry. Absence is
 // (nil, false, nil): adoption, with nothing settled in that scope yet.
-func readCommittedDecisions(root, registryPath string) (*featureproto.DecisionRegistry, bool, []diag.Diagnostic) {
-	data, err := readOptionalBoundedRegularFile(filepath.Join(root, filepath.FromSlash(registryPath)))
+func readCommittedDecisions(tree *worktree, registryPath string) (*featureproto.DecisionRegistry, bool, []diag.Diagnostic) {
+	data, err := tree.readRegular(registryPath)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, false, nil
 	}
@@ -185,10 +183,14 @@ func unusableDecisions(report DecisionsReport) (DecisionsReport, error) {
 // checks proved against the worktree.
 func BuildDecisionsResult(ws *workspace.Workspace) (DecisionsReport, error) {
 	var report DecisionsReport
+	tree, err := openWorktree(ws.Root)
+	if err != nil {
+		return report, fmt.Errorf("decisions: %w", err)
+	}
 	var registries []scopedDecisionRegistry
 	for _, scope := range decisionScopes(ws) {
 		registryPath := featureproto.DecisionRegistryPath(scope)
-		registry, present, findings := readCommittedDecisions(ws.Root, registryPath)
+		registry, present, findings := readCommittedDecisions(tree, registryPath)
 		report.Diagnostics = append(report.Diagnostics, findings...)
 		if !present {
 			continue
@@ -230,7 +232,7 @@ func BuildDecisionsResult(ws *workspace.Workspace) (DecisionsReport, error) {
 				continue
 			}
 			link := path.Join(scoped.scope, decision.ADR)
-			if info, err := os.Lstat(filepath.Join(ws.Root, filepath.FromSlash(link))); err != nil || !info.Mode().IsRegular() {
+			if !tree.isRegular(link) {
 				report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeInvalidDecisionRegistry,
 					documentField(scoped.path, decision.ID+".adr"),
 					"decision %s links %s, which is not a file in this worktree", decision.ID, link))
@@ -256,14 +258,14 @@ func BuildDecisionsResult(ws *workspace.Workspace) (DecisionsReport, error) {
 				// decision actually carries a check: a review-only registry
 				// reads no tree.
 				var walkFindings []diag.Diagnostic
-				files, walkFindings = walkDecisionFiles(ws.Root)
+				files, walkFindings = listDecisionFiles(tree)
 				report.Diagnostics = append(report.Diagnostics, walkFindings...)
 			}
 			matched, matchFindings := matchDecisionFiles(files, scoped, decision)
 			report.Diagnostics = append(report.Diagnostics, matchFindings...)
 			for _, relative := range matched {
 				checked[relative] = true
-				data, err := readOptionalBoundedRegularFile(filepath.Join(ws.Root, filepath.FromSlash(relative)))
+				data, err := tree.readRegular(relative)
 				if err != nil {
 					// Unreadable is fail-closed for the same reason unparseable
 					// is: a decision must not be defeated by making its evidence
@@ -348,13 +350,23 @@ func matchDecisionFiles(files []string, scoped scopedDecisionRegistry, decision 
 	return matched, nil
 }
 
-// walkDecisionFiles lists every regular workspace file a check may match, as
-// sorted slash-separated workspace-relative paths.
+// listDecisionFiles lists every regular workspace file a check may match, as
+// sorted slash-separated workspace-relative paths: the regular files of the
+// candidate cut inside a Git work tree, and of the disk outside one.
 //
 // Directory symlinks are not followed and file symlinks are left out: a
 // symlink's target may sit outside the worktree, and a verdict about a settled
 // decision must be a function of the committed bytes rather than of what a
 // developer's machine happens to link.
+func listDecisionFiles(tree *worktree) ([]string, []diag.Diagnostic) {
+	if tree.tree != nil {
+		return tree.candidateRegularFiles(excludedDecisionDirectory), nil
+	}
+	return walkDecisionFiles(tree.root)
+}
+
+// walkDecisionFiles is listDecisionFiles outside a Git work tree: one walk of
+// the disk.
 func walkDecisionFiles(root string) ([]string, []diag.Diagnostic) {
 	paths := make([]string, 0)
 	var diagnostics []diag.Diagnostic
@@ -371,7 +383,7 @@ func walkDecisionFiles(root string) ([]string, []diag.Diagnostic) {
 			return nil
 		}
 		if entry.IsDir() {
-			if excludedDecisionDirectories[entry.Name()] || strings.HasPrefix(entry.Name(), ".") {
+			if excludedDecisionDirectory(entry.Name()) {
 				return filepath.SkipDir
 			}
 			return nil

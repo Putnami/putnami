@@ -149,8 +149,12 @@ invocation is pure process and package-listing overhead that buys no analysis.
 files and `doc/` trees. A link to a file that does not exist, a path whose case
 differs from the name on disk, or an anchor that names no heading of its
 Markdown target is an `error` diagnostic coded `docs-links`, and it fails the
-task. Links to web pages and site routes are not checked. The step is
-uncacheable: a link may name any file of the workspace.
+task. Links to web pages and site routes are not checked. Inside a Git work
+tree the step reads the repository's candidate cut, so a link to a file Git
+ignores is broken, as it is in a clone. A link may name any file of the
+workspace, so the step is cached on the input `git:**`: any change to a tracked
+or unignored file reruns it, and an unchanged tree replays it whatever the
+commit or the branch.
 
 Turn it off for one run with `--docs-links=false`, or for a project with
 `"options": { "lint": { "docs-links": false } }` in `putnami.json`, which

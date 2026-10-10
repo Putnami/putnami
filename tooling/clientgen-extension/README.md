@@ -307,11 +307,19 @@ the workspace) fails generation instead of being silently left out of the key.
 | `clientgen-check` and the `validate` guard | No — see below |
 
 The workspace check is not cacheable, and that is a decision rather than an
-omission. Its read set is every production source in the workspace: a new
-handwritten first-party transport anywhere must fail, so the inputs are every
-indexed project's sources plus every project's inventories. No pattern list over that
-can be reviewed as complete, and the first path it misses is a stale verdict
-served for a workspace the check never read.
+omission. Its read set is every production source in the workspace, and it
+reads files the input `git:**` does not hold:
+
+- its source scan walks each project on disk, files Git ignores included;
+- finding the providers reads the project index
+  `.putnami/workspace-index.json`, which Git ignores;
+- it reads each provider's `.gen/clientgen/config.json` and, for a provider
+  that commits no contract sidecar, its built `.gen/schema/openapi.json`,
+  which Git ignores too.
+
+A plain pattern over those files would key the verdict on whichever build last
+ran. Keying the check needs a scan and a discovery that read the Git candidate
+cut only.
 
 So the check pays its cost on every run, and the cost is bounded by doing less
 work rather than by storing the answer:

@@ -280,18 +280,24 @@
       }
     },
     "lint-docs": {
-      "description": "Documentation link check: every relative link and anchor in the project's README.md files and doc/ trees must resolve, with the case of the file on disk. The task body is the SDK's docslinks.Job, shared with every language extension. UNCACHEABLE on purpose: a link may name any file of the workspace, so no file-pattern key covers the read set, and a key that missed a deleted target would serve a green verdict for a broken link. It needs neither uv nor ruff.",
+      "description": "Documentation link check: every relative link and anchor in the project's README.md files and doc/ trees must resolve, with the exact case of the file's name. The task body is the SDK's docslinks.Job, shared with every language extension. A link may name any file of the workspace, so the check reads the workspace's Git candidate cut (the tracked files and the untracked files no ignore rule excludes) and its key is the workspace input `git:**`, which holds that cut: deleting or renaming a link target, or editing a heading an anchor names, moves the key, and an ignored file is neither read nor keyed. The project input names the README.md the check starts from, so the key does not fold the project's ignored build output. Outside a Git work tree the check reads the disk and the task has no key. It needs neither uv nor ruff.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["lint-docs"],
       "cwd": "{projectRoot}",
       "timeoutMs": 120000,
+      "inputs": {
+        "readme": { "from": "project", "files": ["README.md"] },
+        "repository": { "from": "workspace", "files": ["git:**"] },
+        "docs-links": { "from": "params" }
+      },
       "outputs": {
         "data": { "description": "Documentation link result with diagnostics" }
       },
       "reads": ["sources"],
       "cache": {
-        "enabled": false
+        "noOutput": true,
+        "enabled": true
       },
       "declares": {}
     },

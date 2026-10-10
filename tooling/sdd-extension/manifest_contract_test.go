@@ -97,9 +97,11 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 		}).
 		Task("features-validate", proto.TaskDefinition{
 			Description: "Validate one project's durable feature manifest and the evidence backing its requirements. " +
-				"UNCACHEABLE in v1, and deliberately: this verdict depends on evidence source bindings — arbitrary bound files plus their git blob state — " +
-				"so no file-pattern key can cover the read set, and an under-declared key would serve a stale verdict while claiming to have checked. " +
-				"A binding-aware key is a follow-up, not a smaller version of this one.",
+				"Not cached, because its verdict reads three things no declared input holds: an evidence source binding records each bound file's executable bit " +
+				"and each submodule's checked-out commit, which a `git:` input does not read; package-root evidence is matched against the project's version, " +
+				"which the CLI gives a cacheable task as 0.0.0; and the report names the HEAD commit, which a replayed entry would report for another commit. " +
+				"An under-declared key would serve a stale verdict while claiming to have checked. Keying it needs the executable bit and the submodule commit " +
+				"in the `git:` digest, a report without HEAD, and a rule for the version.",
 			Kind:      "command",
 			Command:   "{extensionRuntime}",
 			Args:      []string{"features-validate"},
@@ -237,20 +239,31 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 		Task("decisions-validate", proto.TaskDefinition{
 			Description: "Prove the workspace's committed decisions.json registries, the root one and each project's, against this worktree. Each entry states a settled value with a stable id, the date it was settled and who settled it, " +
 				"and carries either a json-value check validate proves or the reviewOnly mark a reviewer holds. A violation fails naming the decision \u2014 id, statement and settled date \u2014 so the way out is to " +
-				"change the decision, not the code; an absent registry is adoption, never a failure. UNCACHEABLE on purpose, for the same reason features-validate is: a check's read set is whatever its own " +
-				"`files` globs name, those globs are authored per repository, and no static input pattern can cover them, so an under-declared key would serve a stale verdict while claiming to have checked. " +
+				"change the decision, not the code; an absent registry is adoption, never a failure. A check reads the files its own `files` globs name, and a repository authors those globs, " +
+				"so the task reads the workspace's Git candidate cut (the tracked files and the untracked files no ignore rule excludes) and its key is the input `git:**`, which holds that cut: " +
+				"editing, adding, deleting or renaming a file a glob can match moves the key, and an ignored file is neither read nor keyed. " +
 				"There is no verification-mode knob: a decision a repository wrote down and dated is either held or re-decided, and a report mode would be the silent re-decision the registry exists to prevent.",
 			Kind:      "command",
 			Command:   "{extensionRuntime}",
 			Args:      []string{"decisions-validate"},
 			Cwd:       "{workspaceRoot}",
 			TimeoutMs: 120000,
+			// `git:**` holds the whole repository's candidate cut, the set the
+			// task reads. The port is project-scoped because a workspace-once
+			// task's project is rooted at the workspace root: a workspace port
+			// alone would leave the project side of the key empty, and the CLI
+			// keys an empty project side on every file under the root, ignored
+			// build output included.
+			Inputs: map[string]proto.TaskInputPort{
+				"repository": {From: "project", Files: []string{"git:**"}},
+			},
 			// It reads arbitrary committed files a repository's own globs name,
 			// so it is serialized after the tasks that REWRITE the tree: a
 			// formatter reflowing a JSON document while this task parses it
-			// would be a verdict about bytes that no longer exist.
+			// would be a verdict about bytes that no longer exist, keyed on
+			// bytes it did not read.
 			Reads: []proto.ResourceRef{{ID: proto.ResourceIDSources}},
-			Cache: sdkmanifest.NoCache(),
+			Cache: cacheEnabledNoOutput(),
 			Outputs: map[string]proto.TaskOutputPort{
 				"data": {Description: "Decision report: registry presence, the settled/enforced/review-only accounting, the files checked, and one finding per violating file."},
 			},
@@ -259,34 +272,43 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 		Task("recipes-validate", proto.TaskDefinition{
 			Description: "Check every committed <lang>/samples/recipes.json against this worktree. Each recipe maps one intention to the sample that demonstrates it, " +
 				"the framework primitives it uses and the hand-rolled shapes it replaces; a recipe whose sample is not a directory fails naming it, a second recipe for one intention fails, " +
-				"and an absent index is adoption. UNCACHEABLE on purpose: the verdict depends on whether each named sample directory exists, and no file-pattern key can express that.",
+				"and an absent index is adoption. The task reads the workspace's Git candidate cut, where a sample directory exists when it holds a candidate file, " +
+				"and its key is the input `git:**`, which holds that cut: deleting, renaming or emptying a sample directory moves the key, and an ignored file does not.",
 			Kind:      "command",
 			Command:   "{extensionRuntime}",
 			Args:      []string{"recipes-validate"},
 			Cwd:       "{workspaceRoot}",
 			TimeoutMs: 120000,
+			Inputs: map[string]proto.TaskInputPort{
+				"repository": {From: "project", Files: []string{"git:**"}},
+			},
 			// Serialized after the tasks that rewrite the tree, like
 			// decisions-validate: a formatter reflowing an index while this task
 			// parses it would be a verdict about bytes that no longer exist.
 			Reads: []proto.ResourceRef{{ID: proto.ResourceIDSources}},
-			Cache: sdkmanifest.NoCache(),
+			Cache: cacheEnabledNoOutput(),
 			Outputs: map[string]proto.TaskOutputPort{
 				"data": {Description: "Recipe report: the index files read, the recipe count, and sorted diagnostics."},
 			},
 			Declares: sdkmanifest.Declares(),
 		}).
 		Task("docs-links-validate", proto.TaskDefinition{
-			Description: "Check every relative link and anchor in every README.md file and doc/ tree of the workspace, once per run whatever the selection: the documents no project owns, the projects without a language extension, and a link from one project into another that a change to the other breaks. It applies the SDK's docslinks rule, which each language extension's lint-docs task applies inside its project. UNCACHEABLE on purpose: a link may name any file of the workspace, so no file-pattern key covers the read set.",
-			Kind:        "command",
-			Command:     "{extensionRuntime}",
-			Args:        []string{"docs-links-validate"},
-			Cwd:         "{workspaceRoot}",
-			TimeoutMs:   120000,
+			Description: "Check every relative link and anchor in every README.md file and doc/ tree of the workspace, once per run whatever the selection: the documents no project owns, the projects without a language extension, and a link from one project into another that a change to the other breaks. It applies the SDK's docslinks rule, which each language extension's lint-docs task applies inside its project. " +
+				"A link may name any file of the workspace, so the task reads the workspace's Git candidate cut and its key is the input `git:**`, which holds that cut: " +
+				"deleting or renaming a link target, or editing a heading, moves the key, and a link to an ignored file is broken, as it is in a clone.",
+			Kind:      "command",
+			Command:   "{extensionRuntime}",
+			Args:      []string{"docs-links-validate"},
+			Cwd:       "{workspaceRoot}",
+			TimeoutMs: 120000,
+			Inputs: map[string]proto.TaskInputPort{
+				"repository": {From: "project", Files: []string{"git:**"}},
+			},
 			// Serialized after the tasks that rewrite the tree, like
 			// recipes-validate: a formatter rewriting a README while this task
 			// reads it would be a verdict about bytes that no longer exist.
 			Reads: []proto.ResourceRef{{ID: proto.ResourceIDSources}},
-			Cache: sdkmanifest.NoCache(),
+			Cache: cacheEnabledNoOutput(),
 			Outputs: map[string]proto.TaskOutputPort{
 				"data": {Description: "Documentation link report: the number of documents checked and the sorted broken links."},
 			},
@@ -295,8 +317,9 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 		Task("codeowners-sync", proto.TaskDefinition{
 			Description: "Write .github/CODEOWNERS from the owners declared in options.sdd.owners: putnami.workspace.json gives the catch-all rule, a scope or project putnami.json gives its directory a rule, " +
 				"and the spec-governance files stay with the workspace owners. The committed file is rewritten only when it differs, so it follows the declarations without a command of its own; " +
-				"a workspace that declares no owners is left alone. UNCACHEABLE on purpose: it reads the putnami.json of every project and every directory above one, " +
-				"and it rewrites a file that is also its input, so a replayed success over a stale file would skip the rewrite.",
+				"a workspace that declares no owners is left alone. The task reads the workspace's Git candidate cut, which holds the putnami.json of every project and every directory above one " +
+				"and the CODEOWNERS file it rewrites, and its key is the input `git:**`, which holds that cut. A run that rewrote the file is never replayed: " +
+				"the next run is keyed on the new bytes, and only a run that left the tree unchanged is.",
 			Kind:      "command",
 			Command:   "{extensionRuntime}",
 			Args:      []string{"codeowners-sync"},
@@ -310,7 +333,13 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			// with the other source writers, and the scheduler drops its file
 			// digests after it runs, so a later task keys on the new bytes.
 			Writes: []proto.ResourceRef{sdkmanifest.SourcesWrite()},
-			Cache:  sdkmanifest.NoCache(),
+			// The port is project-scoped on purpose: the CLI proves a source
+			// writer left the tree unchanged by rehashing its project-side
+			// key patterns after the run, and only then replays its result.
+			Inputs: map[string]proto.TaskInputPort{
+				"repository": {From: "project", Files: []string{"git:**"}},
+			},
+			Cache: cacheEnabledNoOutput(),
 			Outputs: map[string]proto.TaskOutputPort{
 				"data": {Description: "CODEOWNERS report: whether owners are declared, the rendered rules with their declaring file, whether the file was rewritten, and sorted diagnostics."},
 			},
@@ -629,11 +658,13 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 // REPORTS ON. specs-validate reports on one project and resolves against every
 // authored manifest and spec in the workspace, so it declares both.
 // architecture-validate reads the workspace's ARC declarations, capability
-// evidence, and adoption policy, which is exactly what it declares.
-// features-validate reads
-// evidence source bindings — arbitrary bound files plus their git blob state —
-// which NO file-pattern key can express, so it is uncacheable rather than
-// cached against a key that omits half its inputs.
+// evidence, and adoption policy, which is exactly what it declares. The four
+// workspace steps whose read set no narrow pattern names (decisions, recipes,
+// codeowners and docs links) read the repository's Git candidate cut and
+// declare `git:**`, which holds it. features-validate reads evidence source
+// bindings, which record executable bits and submodule commits no declared
+// input holds, so it is uncacheable rather than cached against a key that
+// omits part of its inputs.
 //
 // It asserts the SCOPE of each port rather than its file list: the lists are
 // held byte-for-byte by TestCommittedManifestIsTheAuthoredOne against the
@@ -644,23 +675,32 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "architecture-adoption-policy", "architecture-policy-is-part-of-cache-key")
 	m := committedManifest(t)
 
-	// The two tasks whose read set NO file-pattern key can express, with the
-	// reason each cannot: features-validate follows evidence source bindings
-	// (arbitrary bound files plus their git blob state), and decisions-validate
-	// follows the globs a repository authors inside its own decisions.json —
-	// content this manifest cannot see, let alone name in a static pattern.
-	// recipes-validate follows the sample directories an index names, whose
-	// existence no file pattern expresses. codeowners-sync rewrites a file that
-	// is also its input, so a replayed success would skip the rewrite.
-	// docs-links-validate follows the links a document writes, which may name
-	// any file of the workspace.
-	for _, name := range []string{"features-validate", "decisions-validate", "recipes-validate", "codeowners-sync", "docs-links-validate"} {
-		if m.Tasks[name].Cache.IsEnabled() {
-			t.Errorf("task %q is cacheable although no declared pattern can name its read set", name)
+	// The one task whose read set no declared input holds: an evidence source
+	// binding records each bound file's executable bit and each submodule's
+	// checked-out commit, which a `git:` input does not read, and the report
+	// names the HEAD commit.
+	features := m.Tasks["features-validate"]
+	if features.Cache.IsEnabled() {
+		t.Error("task \"features-validate\" is cacheable although no declared input holds its read set")
+	}
+	if len(features.Inputs) > 0 {
+		t.Errorf("task \"features-validate\" declares inputs %v; an uncacheable task's ports would read as a key it does not have",
+			sortedKeys(features.Inputs))
+	}
+
+	// The workspace steps whose read set no narrow pattern names. Each reads
+	// the repository's Git candidate cut, and `git:**` holds exactly that cut.
+	// The port is project-scoped because a workspace-once task's project is
+	// rooted at the workspace root, and a project side left empty would key on
+	// every file under the root, ignored build output included.
+	for _, name := range []string{"decisions-validate", "recipes-validate", "codeowners-sync", "docs-links-validate"} {
+		task := m.Tasks[name]
+		if !task.Cache.IsEnabled() || !task.Cache.NoOutput {
+			t.Errorf("task %q cache = %+v, want enabled with noOutput: its key holds the candidate cut it reads", name, task.Cache)
 		}
-		if len(m.Tasks[name].Inputs) > 0 {
-			t.Errorf("task %q declares inputs %v; an uncacheable task's ports would read as a key it does not have",
-				name, sortedKeys(m.Tasks[name].Inputs))
+		want := map[string]proto.TaskInputPort{"repository": {From: "project", Files: []string{"git:**"}}}
+		if !reflect.DeepEqual(task.Inputs, want) {
+			t.Errorf("task %q inputs = %+v, want %+v", name, task.Inputs, want)
 		}
 	}
 
@@ -851,6 +891,12 @@ func cacheEnabled() *proto.TaskCachePolicy {
 // write codeowners-sync performs. Without them the scheduler keeps the digest
 // of the CODEOWNERS it just replaced, and a later task in the same run keys on
 // bytes that no longer exist.
+//
+// It also pins what makes caching the writer sound. The CLI replays a source
+// writer only when rehashing its project-side key patterns after the run finds
+// the bytes unchanged, and it refuses to replay a writer that has none. The
+// task therefore keys on a project-scoped `git:**` port, which holds the
+// CODEOWNERS file it rewrites: a run that rewrote it is never replayed.
 func TestCodeownersSyncDeclaresItWritesSources(t *testing.T) {
 	task := committedManifest(t).Tasks["codeowners-sync"]
 	if task.Declares == nil || !task.Declares.MutatesSources {
@@ -865,7 +911,12 @@ func TestCodeownersSyncDeclaresItWritesSources(t *testing.T) {
 	if !writes {
 		t.Errorf("codeowners-sync writes %+v, want the sources resource", task.Writes)
 	}
-	if task.Cache.IsEnabled() {
-		t.Error("codeowners-sync is cacheable; a replayed success over a stale file would skip the rewrite")
+	if !task.Cache.IsEnabled() || !task.Cache.NoOutput {
+		t.Errorf("codeowners-sync cache = %+v, want enabled with noOutput", task.Cache)
+	}
+	port, found := task.Inputs["repository"]
+	if !found || port.From != "project" || !reflect.DeepEqual(port.Files, []string{"git:**"}) {
+		t.Errorf("codeowners-sync inputs = %+v, want the project-scoped port repository on git:**, "+
+			"the patterns the CLI rehashes to prove a run left CODEOWNERS unchanged", task.Inputs)
 	}
 }

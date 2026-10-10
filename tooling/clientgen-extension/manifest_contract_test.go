@@ -430,7 +430,7 @@ func TestValidateContributesTheWorkspaceGuard(t *testing.T) {
 		t.Fatalf("the guard reads %+v; it answers about the whole workspace and must say so", task.Reads)
 	}
 	if task.Cache.IsEnabled() {
-		t.Fatal("the guard is cacheable; its read set is every project's sources, which no key list can be shown to cover")
+		t.Fatal("the guard is cacheable; its discovery reads the git-ignored project index and .gen build output, which no git: key holds")
 	}
 	if len(task.Toolchains) != 0 {
 		t.Fatalf("the guard binds toolchains %v; it renders nothing, so it needs no emitter", task.Toolchains)
