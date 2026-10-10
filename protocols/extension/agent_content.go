@@ -29,6 +29,7 @@ package extension
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -81,35 +82,56 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: GoEmbedInputsContract for Go embed task inputs/cache-key files,
-// AgentContentContract for an agent-content contribution, CurrentContract otherwise.
+// the manifest: ReleaseBaselineInputContract for a task that declares the
+// releaseBaseline runtime input, GoEmbedInputsContract for Go embed task
+// inputs/cache-key files, AgentContentContract for an agent-content
+// contribution, CurrentContract otherwise. The highest rung any task reaches
+// wins.
 //
 // It is the stamp a packager writes, and the floor LoadManifest enforces. A
 // manifest stamped below it uses vocabulary its stamp does not cover; a
 // manifest stamped at or above it (up to LatestContract) loads.
 func RequiredCLIContract(m *Manifest) int {
-	if m != nil {
-		for _, task := range m.Tasks {
-			for _, input := range task.Inputs {
-				for _, file := range input.Files {
-					if file == "go-embed:build" || file == "go-embed:test" {
-						return protocolcli.GoEmbedInputsContract
-					}
-				}
-			}
-			if task.Cache != nil && task.Cache.Key != nil {
-				for _, file := range append(append([]string{}, task.Cache.Key.Files...), task.Cache.Key.ClosureFiles...) {
-					if file == "go-embed:build" || file == "go-embed:test" {
-						return protocolcli.GoEmbedInputsContract
-					}
-				}
-			}
+	required := protocolcli.CurrentContract
+	if m.DeclaresAgentContent() {
+		required = protocolcli.AgentContentContract
+	}
+	if m == nil {
+		return required
+	}
+	for _, task := range m.Tasks {
+		if declaresReleaseBaseline(task) {
+			return protocolcli.ReleaseBaselineInputContract
+		}
+		if declaresGoEmbedSelector(task) {
+			required = max(required, protocolcli.GoEmbedInputsContract)
 		}
 	}
-	if m.DeclaresAgentContent() {
-		return protocolcli.AgentContentContract
+	return required
+}
+
+// declaresReleaseBaseline reports whether a task keys on the releaseBaseline
+// runtime input, through an input port or its cache key's runtime names.
+func declaresReleaseBaseline(task TaskDefinition) bool {
+	for name, input := range task.Inputs {
+		if input.From == TaskInputFromRuntime && name == RuntimeInputReleaseBaseline {
+			return true
+		}
 	}
-	return protocolcli.CurrentContract
+	return task.Cache != nil && task.Cache.Key != nil && slices.Contains(task.Cache.Key.Runtime, RuntimeInputReleaseBaseline)
+}
+
+// declaresGoEmbedSelector reports whether a task names a Go embed selector in
+// an input port or its cache key's files.
+func declaresGoEmbedSelector(task TaskDefinition) bool {
+	isSelector := func(file string) bool { return file == "go-embed:build" || file == "go-embed:test" }
+	for _, input := range task.Inputs {
+		if slices.ContainsFunc(input.Files, isSelector) {
+			return true
+		}
+	}
+	return task.Cache != nil && task.Cache.Key != nil &&
+		(slices.ContainsFunc(task.Cache.Key.Files, isSelector) || slices.ContainsFunc(task.Cache.Key.ClosureFiles, isSelector))
 }
 
 // ValidateAgentContent checks the agent-content section. It is inert for a

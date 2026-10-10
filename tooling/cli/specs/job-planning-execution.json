@@ -15,7 +15,7 @@
   "requirements": [
     {
       "id": "git-candidate-inputs",
-      "text": "A git: file-pattern input selects tracked and non-ignored untracked candidates from the containing repository, matched against project-relative paths. Its key covers raw file bytes and symlink target text, preserves file type, changes on addition, edit, rename or deletion, excludes ignored untracked state, and refuses unavailable Git enumeration. git:** covers the whole repository. Impact matches the same path grammar without requiring the changed path still to exist."
+      "text": "A git: file-pattern input selects tracked and non-ignored untracked candidates from the containing repository, matched against project-relative paths. Its key covers raw bytes, the executable bit, symlink target text and file type, changes on addition, edit, chmod, rename or deletion, excludes ignored untracked state, and refuses failed Git enumeration, unmerged paths and submodules. git:** covers the whole repository. Impact matches the same path grammar without requiring the changed path still to exist."
     },
     {
       "id": "command-catalog",
@@ -104,6 +104,10 @@
     {
       "id": "tree-keyed-task-cache",
       "text": "Two runs on one tree, at one base version of its release line, compute the same task cache key, whatever the commit, the branch or the checkout directory. A file pattern reads the build stamp without its build-time, commit and publication fields. A generate asset under the workspace root contributes its workspace-relative path and content; a stamp inside it keeps all but its build time. Otherwise, the commit reaches a key only through the publish version of a task with cache.versionAware or version-var."
+    },
+    {
+      "id": "release-baseline-cache-key",
+      "text": "A task that declares the releaseBaseline runtime input keys on its project's release baseline: the repository state, the line's tag pattern, the line's last tag HEAD reaches, the tree that tag holds at the project, and whether a commit since that tag that touches the project declares a breaking change. The key names no commit HEAD reaches: a branch and its squash merge share it, and a new tag, other content at the tag, a changed breaking marker and a shallow clone move it."
     }
   ],
   "decisions": [
@@ -118,6 +122,7 @@
     "tooling/cli/doc/adr/0031-scratch-generations-expire-between-consumers.md",
     "tooling/cli/doc/adr/0034-a-declared-output-polices-its-own-drift.md",
     "tooling/cli/doc/adr/0058-a-hit-no-job-reads-is-restored-without-its-files.md",
-    "tooling/cli/doc/adr/0059-a-cache-key-describes-the-tree-not-the-commit.md"
+    "tooling/cli/doc/adr/0059-a-cache-key-describes-the-tree-not-the-commit.md",
+    "tooling/cli/doc/adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md"
   ]
 }

@@ -291,9 +291,9 @@ func readBlobs(dir string, objects []string) ([][]byte, error) {
 	return contents, nil
 }
 
-// commit is one commit of the range the check reads.
+// commit is the message of one commit of the range the check reads. The check
+// reads what a commit declares, never which commit it is.
 type commit struct {
-	sha     string
 	subject string
 	body    string
 }
@@ -301,21 +301,20 @@ type commit struct {
 // commitsSince returns the commits after tag up to HEAD that touch dir,
 // newest first.
 func commitsSince(dir, tag string) ([]commit, error) {
-	output, err := gitOutput(dir, "log", "--format="+commitRecordSeparator+"%H%x00%s%x00%b",
+	output, err := gitOutput(dir, "log", "--format="+commitRecordSeparator+"%s%x00%b",
 		"--no-show-signature", "refs/tags/"+tag+"..HEAD", "--", ".")
 	if err != nil {
 		return nil, err
 	}
 	var commits []commit
 	for record := range strings.SplitSeq(output, commitRecordSeparator) {
-		fields := strings.SplitN(record, "\x00", 3)
-		if len(fields) != 3 {
+		fields := strings.SplitN(record, "\x00", 2)
+		if len(fields) != 2 {
 			continue
 		}
 		commits = append(commits, commit{
-			sha:     strings.TrimSpace(fields[0]),
-			subject: strings.TrimSpace(fields[1]),
-			body:    strings.TrimRight(fields[2], "\n"),
+			subject: strings.TrimSpace(fields[0]),
+			body:    strings.TrimRight(fields[1], "\n"),
 		})
 	}
 	return commits, nil

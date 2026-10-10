@@ -1641,7 +1641,7 @@
             "env",
             "runtime"
           ],
-          "description": "Input source type."
+          "description": "Input source type. A 'runtime' port's name selects the value the CLI resolves into the cache key: hostPlatform, extensionVersion, or releaseBaseline (the project's release baseline read from git; requires cliContract 7)."
         },
         "files": {
           "$ref": "#/$defs/globArray",
@@ -1755,7 +1755,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Runtime selectors (for example extension version, platform, arch)."
+          "description": "Runtime input names included in the cache key: hostPlatform, extensionVersion, or releaseBaseline (requires cliContract 7)."
         }
       }
     },

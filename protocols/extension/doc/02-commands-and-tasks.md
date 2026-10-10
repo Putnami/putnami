@@ -730,7 +730,16 @@ Tasks declare their inputs explicitly via `inputs`. Each input has a source:
 | `task` | Output from another task in the pipeline |
 | `params` | Command parameters |
 | `env` | Environment variables |
-| `runtime` | Runtime context (platform, arch, versions) |
+| `runtime` | Runtime context the CLI resolves by the port's name (see below) |
+
+A `runtime` port's name selects the value the CLI folds into the task's cache
+key. The CLI resolves these names; any other name contributes nothing:
+
+| Name | Value |
+|------|-------|
+| `hostPlatform` | The host's operating system and architecture |
+| `extensionVersion` | The version of the extension that runs the task |
+| `releaseBaseline` | The project's release baseline, read from git: the repository state (no work tree, no commit, a shallow clone, or no tag of the project's version line), the line's tag pattern, the last line tag HEAD reaches, the object that tag holds at the project directory, and whether a commit since that tag that touches the project declares a breaking change. It names no commit HEAD reaches, so a branch and its squash merge share the key. Declaring it requires `cliContract` 7. |
 
 A `task` input is the typed producer/consumer edge, and `optional` is what
 makes it a requirement or a courtesy:
