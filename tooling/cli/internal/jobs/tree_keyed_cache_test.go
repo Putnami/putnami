@@ -399,16 +399,43 @@ func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
 		if version := dirty.versions[""]; version == nil || !version.IsDirty {
 			t.Fatalf("version after the edit = %+v, want a dirty checkout", version)
 		}
-		_, edited := dirty.keys(t, exts, treeKeyedCommands, nil, treeKeyedMainBuildTime)
+		planned, edited := dirty.keys(t, exts, treeKeyedCommands, nil, treeKeyedMainBuildTime)
+		// A task that keys on the workspace's Git candidate cut reads the edited
+		// file, whichever project declares it: lint-docs checks links into it.
+		readsTheCut := map[string]bool{}
+		for _, job := range planned {
+			readsTheCut[job.Key()] = keysOnTheCandidateCut(job)
+		}
+		cutReaders := 0
 		for _, key := range sortedKeyNames(clean) {
+			if readsTheCut[key] {
+				cutReaders++
+			}
 			switch {
-			case strings.HasPrefix(key, "/site:") && edited[key] == clean[key]:
-				t.Errorf("%s: an edited generate asset kept the key", key)
-			case (strings.HasPrefix(key, "/api:") || strings.HasPrefix(key, "/library:")) && edited[key] != clean[key]:
+			case (strings.HasPrefix(key, "/site:") || readsTheCut[key]) && edited[key] == clean[key]:
+				t.Errorf("%s: an edited file the task reads kept the key", key)
+			case (strings.HasPrefix(key, "/api:") || strings.HasPrefix(key, "/library:")) && !readsTheCut[key] && edited[key] != clean[key]:
 				t.Errorf("%s: another project's generate asset moved the key", key)
 			}
 		}
+		if cutReaders == 0 {
+			t.Fatalf("no task keyed on the candidate cut in %v; the control reads no workspace input", sortedKeyNames(clean))
+		}
 	})
+}
+
+// keysOnTheCandidateCut reports whether job's key holds a workspace `git:`
+// pattern (ADR 0041), so it moves with any candidate file of the repository.
+func keysOnTheCandidateCut(job *ScheduledJob) bool {
+	if job.JobDef == nil || job.JobDef.TaskCachePolicy == nil || job.JobDef.TaskCachePolicy.Key == nil {
+		return false
+	}
+	for _, pattern := range job.JobDef.TaskCachePolicy.Key.WorkspaceFiles {
+		if strings.HasPrefix(pattern, "git:") {
+			return true
+		}
+	}
+	return false
 }
 
 // The scheduler owns a closed set of stamp fields, and each is either a
