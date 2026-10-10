@@ -9,7 +9,6 @@ while IFS= read -r name; do unset "${name%$'\r'}"; done <<<"$git_env_vars"
 unset GIT_NAMESPACE GIT_CEILING_DIRECTORIES GIT_DISCOVERY_ACROSS_FILESYSTEM
 
 ROOT="$(git rev-parse --show-toplevel)"
-FINALIZER="$ROOT/.agents/skills/fix/scripts/finalize-pr.sh"
 TEST_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEST_DIR"' EXIT
 
@@ -19,6 +18,21 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 : "${PUTNAMI_TEST_CLI:?the finalizer test needs PUTNAMI_TEST_CLI, a putnami binary}"
 : "${PUTNAMI_TEST_LOCAL_PROVIDER:?the finalizer test needs PUTNAMI_TEST_LOCAL_PROVIDER, the local provider extension directory}"
 : "${PUTNAMI_TEST_UPSERT_RECONCILE:?the finalizer test needs PUTNAMI_TEST_UPSERT_RECONCILE, the reconcile hint the CLI writes on an unresolved proposals.upsert}"
+
+# The finalizer runs from a copy of the shipped scripts, and every copy below
+# sits under TEST_DIR, whose putnamiw starts the CLI the Go harness built from
+# this tree: each tree fingerprint is that CLI's, without the staleness check
+# this repository's putnamiw runs over the CLI sources first.
+# tree-fingerprint.test.sh runs the script through the real wrapper and
+# through a CLI on PATH.
+mkdir -p "$TEST_DIR/shipped/skills/fix/scripts" "$TEST_DIR/shipped/skills/check/scripts"
+for script in finalize-pr.sh tree-fingerprint.sh machine-load.sh; do
+  cp "$ROOT/.agents/skills/fix/scripts/$script" "$TEST_DIR/shipped/skills/fix/scripts/$script"
+done
+cp "$ROOT/.agents/skills/check/scripts/english-only.sh" "$TEST_DIR/shipped/skills/check/scripts/english-only.sh"
+FINALIZER="$TEST_DIR/shipped/skills/fix/scripts/finalize-pr.sh"
+printf '#!/usr/bin/env bash\nexec "${PUTNAMI_TEST_CLI:?}" "$@"\n' >"$TEST_DIR/putnamiw"
+chmod +x "$TEST_DIR/putnamiw"
 
 mkdir -p "$TEST_DIR/bin" "$TEST_DIR/state"
 # Both generated hosts must defer ownership and naming to the consumer graph.
@@ -110,10 +124,11 @@ set -euo pipefail
 # its reconcile hint is the one the CLI writes, which the Go harness passes in
 # PUTNAMI_TEST_UPSERT_RECONCILE from the CLI's own hint producer.
 case "${1:-}" in
-  # A finalizer copy outside the repository reaches this stub for its tree
-  # fingerprint; answer with the real one, never as a gate run.
   tree)
-    [ "${2:-}" = verify ] || exec bash "${STUB_TREE_FINGERPRINT:?}"
+    if [ "${2:-}" != verify ]; then
+      echo "finalize-pr test: the gate CLI answers only tree verify, not tree ${2:-}" >&2
+      exit 2
+    fi
     shift 2
     # no-tree-verify stands for a CLI older than `tree verify`, which answers
     # the way the published one does.
@@ -313,7 +328,7 @@ export REAL_GIT_BIN
 # The stub CLI stamps its session record with the real fingerprint, the same way
 # the real CLI does: a stub that invented a digest would let the finalizer's
 # comparison pass on a tree nobody measured.
-export STUB_TREE_FINGERPRINT="$ROOT/.agents/skills/fix/scripts/tree-fingerprint.sh"
+export STUB_TREE_FINGERPRINT="$TEST_DIR/shipped/skills/fix/scripts/tree-fingerprint.sh"
 export PATH="$TEST_DIR/bin:$PATH"
 
 # collab <contract> <operation> <request>: a read or setup call through the
@@ -954,8 +969,8 @@ if grep -q '^PROPOSAL_REF=' "$TEST_DIR/unresolved.out"; then
 fi
 
 # Consumer repositories may install only the PATH CLI. Exercise the real
-# finalizer and its retry through that entrypoint, with real git, a local
-# remote and the real collaboration route.
+# finalizer's collaboration calls and its retry through that entrypoint, with
+# real git, a local remote and the real collaboration route.
 cp "$TEST_DIR/work/putnamiw" "$TEST_DIR/bin/putnami"
 git -C "$TEST_DIR/work" rm -q putnamiw
 git -C "$TEST_DIR/work" commit -q -m "fix(test): use the installed CLI"
@@ -977,10 +992,8 @@ installed_output="$(finalize --title "fix(test): portable finalizer" --body-file
 # The verification-mode tests isolate the finalizer/checker boundary. The
 # checker is the CLI's `tree verify`, whose own tests own dossier semantics; the
 # stub CLI's double proves that refusal prevents mutation, accepted evidence
-# avoids a repeated gate, and the finalizer rechecks before publishing. The
-# finalizer runs from a copy outside the repository, so its tree fingerprint
-# also goes through the stub CLI. All Git operations still use a real local
-# remote.
+# avoids a repeated gate, and the finalizer rechecks before publishing. All Git
+# operations still use a real local remote.
 mkdir -p "$TEST_DIR/verified/skills/fix/scripts" "$TEST_DIR/verified/skills/check/scripts"
 cp "$FINALIZER" "$TEST_DIR/verified/skills/fix/scripts/finalize-pr.sh"
 cp "$ROOT/.agents/skills/fix/scripts/tree-fingerprint.sh" "$TEST_DIR/verified/skills/fix/scripts/tree-fingerprint.sh"

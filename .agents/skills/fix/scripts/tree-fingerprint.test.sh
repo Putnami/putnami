@@ -48,6 +48,19 @@ if [ "$cli_direct" != "$clean" ]; then
   echo "  cli:    $cli_direct" >&2
   exit 1
 fi
+# A consumer installs the skill scripts without a putnamiw beside them: the
+# script then runs the putnami on PATH, and prints that CLI's digest.
+CONSUMER="$TEST_DIR/consumer/.agents/skills/fix/scripts"
+mkdir -p "$CONSUMER" "$TEST_DIR/consumer-bin"
+cp "$FINGERPRINT" "$CONSUMER/tree-fingerprint.sh"
+printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$(command -v "${CLI[0]}")" >"$TEST_DIR/consumer-bin/putnami"
+chmod +x "$TEST_DIR/consumer-bin/putnami"
+consumer="$(cd "$WORK" && PATH="$TEST_DIR/consumer-bin:$PATH" bash "$CONSUMER/tree-fingerprint.sh")"
+if [ "$consumer" != "$clean" ]; then
+  echo "tree-fingerprint test: the copy without a putnamiw did not print the PATH CLI's digest" >&2
+  exit 1
+fi
+
 # The script prints ONE line and nothing else: its callers capture it into a
 # variable and compare it as a string, so a label or a trailing line would have
 # to be stripped by every caller.
