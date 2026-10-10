@@ -8,11 +8,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 
 	ciproto "go.putnami.dev/protocol/ci"
+	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
@@ -58,10 +58,44 @@ func TestGateTasksFallsBackWithoutCIDocument(t *testing.T) {
 	}
 }
 
+// extensionManifest returns a loadable putnami.extension.json body for an
+// extension that declares one command per job name, each running one task. It
+// marshals the protocol's manifest type, the shape discovery reads.
+func extensionManifest(t *testing.T, name string, jobs ...string) []byte {
+	t.Helper()
+	manifest := extproto.Manifest{
+		Name:     name,
+		Commands: make(map[string]extproto.CommandDefinition, len(jobs)),
+		Tasks:    make(map[string]extproto.TaskDefinition, len(jobs)),
+	}
+	for _, job := range jobs {
+		manifest.Commands[job] = extproto.CommandDefinition{Run: []extproto.PipelineStep{{ID: job, Task: job + "-exec"}}}
+		manifest.Tasks[job+"-exec"] = extproto.TaskDefinition{Kind: "command", Command: "echo", Args: []string{job}}
+	}
+	manifest.CLIContract = extproto.RequiredCLIContract(&manifest)
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatalf("marshal extension manifest: %v", err)
+	}
+	return data
+}
+
+// writeExtension writes an extension manifest declaring jobs at the
+// workspace-relative path, the shorthand a workspace config uses.
+func writeExtension(t *testing.T, dir, path string, manifest []byte) {
+	t.Helper()
+	manifestDir := filepath.Join(dir, filepath.FromSlash(strings.TrimPrefix(path, "/")))
+	if err := os.MkdirAll(manifestDir, 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", manifestDir, err)
+	}
+	if err := os.WriteFile(filepath.Join(manifestDir, "putnami.extension.json"), manifest, 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+}
+
 // writeWorkspaceExtensions writes a minimal putnami.workspace.json declaring
-// the given extensions, and a manifest for every local path among them, so a
-// fixture can state exactly the declaration the default gate reads.
-func writeWorkspaceExtensions(t *testing.T, dir string, extensions []string, manifestNames map[string]string) {
+// the given extensions, so a fixture states exactly what discovery reads.
+func writeWorkspaceExtensions(t *testing.T, dir string, extensions ...string) {
 	t.Helper()
 	document := struct {
 		Name       string   `json:"name"`
@@ -74,41 +108,63 @@ func writeWorkspaceExtensions(t *testing.T, dir string, extensions []string, man
 	if err := os.WriteFile(filepath.Join(dir, "putnami.workspace.json"), data, 0o644); err != nil {
 		t.Fatalf("write workspace config: %v", err)
 	}
-	for path, name := range manifestNames {
-		manifestDir := filepath.Join(dir, filepath.FromSlash(path))
-		if err := os.MkdirAll(manifestDir, 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", manifestDir, err)
-		}
-		manifest := []byte(`{"name":` + strconv.Quote(name) + `,"version":"0.0.0"}`)
-		if err := os.WriteFile(filepath.Join(manifestDir, "putnami.extension.json"), manifest, 0o644); err != nil {
-			t.Fatalf("write manifest: %v", err)
-		}
-	}
 }
 
-// A workspace without a CI document is told the gate Putnami Cloud's native
-// runner actually executes: the generic trio, plus `validate` exactly when the
-// workspace declares the SDD extension that owns it — by name or as a local
-// path whose manifest carries that name.
-func TestGateTasksWithoutCIDocumentFollowsTheSDDDeclaration(t *testing.T) {
-	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-agent-guidance", "the-default-gate-follows-the-sdd-declaration")
+// validateGateTasks is the default gate of a workspace whose discovered
+// extensions declare a validate job.
+const validateGateTasks = defaultGateTasks + "," + validateTask
+
+// A workspace without a CI document is told lint, test and build, plus
+// validate exactly when an extension the workspace discovers declares a job of
+// that name. An extension name carries no meaning of its own: only a loaded
+// manifest declares a job.
+func TestGateTasksWithoutCIDocumentAddsValidateWhenAnExtensionDeclaresIt(t *testing.T) {
+	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-agent-guidance", "the-default-gate-adds-validate-when-an-extension-declares-it")
 	cases := []struct {
 		name       string
 		extensions []string
-		manifests  map[string]string
+		manifests  map[string][]byte
 		want       string
 	}{
 		{"no workspace file", nil, nil, defaultGateTasks},
-		{"no sdd", []string{"@putnami/typescript", "/go/extension"}, map[string]string{"/go/extension": "@putnami/go"}, defaultGateTasks},
-		{"sdd by name", []string{"@putnami/typescript", "@putnami/sdd"}, nil, sddDefaultGateTasks},
-		{"sdd by local path", []string{"/go/extension", "/tooling/sdd-extension"}, map[string]string{"/go/extension": "@putnami/go", "/tooling/sdd-extension": "@putnami/sdd"}, sddDefaultGateTasks},
-		{"local path without manifest", []string{"/tooling/sdd-extension"}, nil, defaultGateTasks},
+		{
+			"no extension declares validate",
+			[]string{"/lang"},
+			map[string][]byte{"/lang": extensionManifest(t, "@example/lang", "lint", "test", "build")},
+			defaultGateTasks,
+		},
+		{
+			"a declared extension declares validate",
+			[]string{"/lang", "/checks"},
+			map[string][]byte{
+				"/lang":   extensionManifest(t, "@example/lang", "lint", "test", "build"),
+				"/checks": extensionManifest(t, "@example/checks", "validate"),
+			},
+			validateGateTasks,
+		},
+		{
+			"validate alone still keeps lint, test and build",
+			[]string{"/checks"},
+			map[string][]byte{"/checks": extensionManifest(t, "@example/checks", "validate")},
+			validateGateTasks,
+		},
+		{"an uninstalled extension name declares nothing", []string{"@example/checks"}, nil, defaultGateTasks},
+		{"a local path without a manifest declares nothing", []string{"/checks"}, nil, defaultGateTasks},
+		{
+			"an unloadable manifest declares nothing",
+			[]string{"/checks"},
+			map[string][]byte{"/checks": []byte(`{"name":"@example/checks","commands":{"validate":`)},
+			defaultGateTasks,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			if tc.extensions != nil {
-				writeWorkspaceExtensions(t, dir, tc.extensions, tc.manifests)
+				writeWorkspaceExtensions(t, dir, tc.extensions...)
+			}
+			for path, manifest := range tc.manifests {
+				writeExtension(t, dir, path, manifest)
 			}
 			if got := gateTasksForWorkspace(dir); got != tc.want {
 				t.Fatalf("gate = %q, want %q", got, tc.want)
@@ -119,27 +175,73 @@ func TestGateTasksWithoutCIDocumentFollowsTheSDDDeclaration(t *testing.T) {
 		})
 	}
 
-	// A usable document stays authoritative over the declaration: a document
-	// that names only the generic trio runs only the generic trio.
-	t.Run("document wins over the declaration", func(t *testing.T) {
+	// A workspace project that holds an extension manifest is discovered like
+	// a declared extension.
+	t.Run("a project manifest declares validate", func(t *testing.T) {
 		dir := t.TempDir()
-		writeWorkspaceExtensions(t, dir, []string{"@putnami/sdd"}, nil)
+		if err := os.WriteFile(filepath.Join(dir, "putnami.workspace.json"), []byte(`{"name":"fixture","includes":["checks"]}`), 0o644); err != nil {
+			t.Fatalf("write workspace config: %v", err)
+		}
+		writeExtension(t, dir, "/checks", extensionManifest(t, "@example/checks", "validate"))
+		if err := os.WriteFile(filepath.Join(dir, "checks", "putnami.json"), []byte(`{"name":"checks"}`), 0o644); err != nil {
+			t.Fatalf("write project config: %v", err)
+		}
+		if got := gateTasksForWorkspace(dir); got != validateGateTasks {
+			t.Fatalf("gate = %q, want %q", got, validateGateTasks)
+		}
+	})
+
+	// The user's global configuration takes no part: the same workspace
+	// derives the same gate on every machine that installed its extensions.
+	t.Run("the global configuration declares nothing", func(t *testing.T) {
+		home := t.TempDir()
+		global := t.TempDir()
+		writeExtension(t, global, "/checks", extensionManifest(t, "@example/checks", "validate"))
+		if err := os.MkdirAll(filepath.Join(home, ".putnami"), 0o755); err != nil {
+			t.Fatalf("mkdir global config: %v", err)
+		}
+		globalConfig, err := json.Marshal(struct {
+			Extensions []string `json:"extensions"`
+		}{Extensions: []string{filepath.Join(global, "checks")}})
+		if err != nil {
+			t.Fatalf("marshal global config: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(home, ".putnami", "config.json"), globalConfig, 0o644); err != nil {
+			t.Fatalf("write global config: %v", err)
+		}
+		t.Setenv("HOME", home)
+		t.Setenv("USERPROFILE", home)
+
+		dir := t.TempDir()
+		writeWorkspaceExtensions(t, dir)
+		if got := gateTasksForWorkspace(dir); got != defaultGateTasks {
+			t.Fatalf("gate = %q, want %q: the global configuration changed the gate", got, defaultGateTasks)
+		}
+	})
+
+	// A usable document stays authoritative over discovery: a document that
+	// names only the generic trio runs only the generic trio.
+	t.Run("document wins over discovery", func(t *testing.T) {
+		dir := t.TempDir()
+		writeWorkspaceExtensions(t, dir, "/checks")
+		writeExtension(t, dir, "/checks", extensionManifest(t, "@example/checks", "validate"))
 		writeCIDocument(t, dir, "build", "lint", "test")
 		if got := gateTasksForWorkspace(dir); got != defaultGateTasks {
 			t.Fatalf("gate = %q, want the document's %q", got, defaultGateTasks)
 		}
 	})
 
-	// An unusable document falls back to the declaration-derived default, not
-	// to the generic trio.
-	t.Run("unusable document falls back to the declaration", func(t *testing.T) {
+	// An unusable document falls back to the discovered default, not to the
+	// generic trio.
+	t.Run("unusable document falls back to discovery", func(t *testing.T) {
 		dir := t.TempDir()
-		writeWorkspaceExtensions(t, dir, []string{"@putnami/sdd"}, nil)
+		writeWorkspaceExtensions(t, dir, "/checks")
+		writeExtension(t, dir, "/checks", extensionManifest(t, "@example/checks", "validate"))
 		if err := os.WriteFile(filepath.Join(dir, ciproto.Filename), []byte(`{"version":3,"commands":[]}`), 0o644); err != nil {
 			t.Fatalf("write document: %v", err)
 		}
-		if got := gateTasksForWorkspace(dir); got != sddDefaultGateTasks {
-			t.Fatalf("gate = %q, want %q", got, sddDefaultGateTasks)
+		if got := gateTasksForWorkspace(dir); got != validateGateTasks {
+			t.Fatalf("gate = %q, want %q", got, validateGateTasks)
 		}
 	})
 }
@@ -299,29 +401,47 @@ func TestGeneratedGuidanceCarriesDerivedGateAtEverySite(t *testing.T) {
 }
 
 // Regeneration must be a pure function of the workspace, or CI's install stage
-// fails with "worktree mutated" on a clean checkout.
+// fails with "worktree mutated" on a clean checkout. That holds for a gate read
+// from the CI document and for one derived from extension discovery.
 func TestWriteAgentEntrypointsIsIdempotent(t *testing.T) {
-	dir := t.TempDir()
-	writeCIDocument(t, dir, "build", "lint", "test", "validate")
+	fixtures := map[string]func(t *testing.T, dir string){
+		"CI document": func(t *testing.T, dir string) {
+			writeCIDocument(t, dir, "build", "lint", "test", "validate")
+		},
+		"extension discovery": func(t *testing.T, dir string) {
+			writeWorkspaceExtensions(t, dir, "/checks")
+			writeExtension(t, dir, "/checks", extensionManifest(t, "@example/checks", "validate"))
+		},
+	}
+	for name, write := range fixtures {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			write(t, dir)
 
-	first := make(map[string]string)
-	for run := range 3 {
-		if err := WriteAgentEntrypoints(dir); err != nil {
-			t.Fatalf("run %d: WriteAgentEntrypoints: %v", run, err)
-		}
-		for _, path := range []string{ClaudeEntrypointPath, agentEntrypointPath} {
-			data, err := os.ReadFile(filepath.Join(dir, path))
-			if err != nil {
-				t.Fatalf("run %d: read %s: %v", run, path, err)
+			first := make(map[string]string)
+			for run := range 3 {
+				if err := WriteAgentEntrypoints(dir); err != nil {
+					t.Fatalf("run %d: WriteAgentEntrypoints: %v", run, err)
+				}
+				for _, path := range []string{ClaudeEntrypointPath, agentEntrypointPath} {
+					data, err := os.ReadFile(filepath.Join(dir, path))
+					if err != nil {
+						t.Fatalf("run %d: read %s: %v", run, path, err)
+					}
+					if run == 0 {
+						first[path] = string(data)
+						continue
+					}
+					if string(data) != first[path] {
+						t.Errorf("run %d rewrote %s", run, path)
+					}
+				}
 			}
-			if run == 0 {
-				first[path] = string(data)
-				continue
+			const want = "`putnami lint,test,build,validate --impacted --enforce-coverage`"
+			if !strings.Contains(first[agentEntrypointPath], want) {
+				t.Errorf("%s does not carry the derived gate %s:\n%s", agentEntrypointPath, want, first[agentEntrypointPath])
 			}
-			if string(data) != first[path] {
-				t.Errorf("run %d rewrote %s", run, path)
-			}
-		}
+		})
 	}
 }
 
@@ -450,14 +570,14 @@ func TestRepositoryGuidanceBytesUsesTheRightSourceOfTruth(t *testing.T) {
 // stage compares the worktree against a fresh
 // `putnami context generate`. This test moves that detection into
 // `putnami test`, and it fails the moment the workspace's gate declaration
-// (the blocking commands of its CI document when one exists, otherwise its SDD
-// extension declaration) and the committed guidance stop agreeing in either
-// direction.
+// (the blocking commands of its CI document when one exists, otherwise the
+// jobs its discovered extensions declare) and the committed guidance stop
+// agreeing in either direction.
 func TestGeneratedGuidanceMatchesRepositoryCIDocument(t *testing.T) {
 	root := repositoryRootForAIContext(t)
 	gate := gateTasksForWorkspace(root)
 	if gate == defaultGateTasks {
-		t.Fatalf("this workspace derives only %q, so the check is vacuous; it declares @putnami/sdd and should carry the validate task", gate)
+		t.Fatalf("this workspace derives only %q, so the check is vacuous; its CI document declares the validate task", gate)
 	}
 	if exported := GateTasks(root); exported != gate {
 		t.Fatalf("GateTasks(%s) = %q, want %q", root, exported, gate)

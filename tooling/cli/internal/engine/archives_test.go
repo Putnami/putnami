@@ -16,7 +16,7 @@ import (
 )
 
 // archivePublisher is a planned publish job that reads (uploads) a project's
-// package archives — modeling @putnami/cloud's cloud-publish-archives.
+// package archives, the way an extension's archive upload job does.
 func archivePublisher(projID string) *jobs.ScheduledJob {
 	return &jobs.ScheduledJob{
 		Project:   &workspace.Project{ID: projID},
@@ -356,7 +356,7 @@ func TestUnpublishedArchiveFailureAddsResult(t *testing.T) {
 // TestUnpublishedArchiveFailureCitesSkippedExtension pins the root-cause
 // chaining: when the archives guard fires and discovery skipped an
 // extension that would have been the uploader, the failure names the skip and
-// its reason instead of only "ensure @putnami/cloud is installed".
+// its reason instead of only the generic remedy.
 func TestUnpublishedArchiveFailureCitesSkippedExtension(t *testing.T) {
 	t.Parallel()
 	skipped := []extension.SkippedExtension{{
@@ -487,6 +487,31 @@ func TestReportUnpublishedArchivesNamesMissingReleaseSetMember(t *testing.T) {
 	})
 	if strings.Contains(plain, "no extension this run planned announces an archive release-set member") {
 		t.Errorf("the orphaned-archive report must not claim a missing release-set member:\n%s", plain)
+	}
+}
+
+// The remedy names the capability the run lacks, never one extension: any
+// extension whose publish step uploads release archives satisfies the guard.
+// It cannot run in parallel: captureStderr swaps the process-wide os.Stderr.
+func TestUnpublishedArchivesRemedyNamesNoExtension(t *testing.T) {
+	const remedy = "install an extension whose publish step uploads release archives, and check that it is active"
+	projects := []string{"example-cli"}
+	results := map[string]*jobs.JobResult{}
+	unpublishedArchiveFailure(projects, nil, nil)(results)
+	failure := results[unpublishedArchiveFailureKey]
+	if failure == nil || failure.Error == nil {
+		t.Fatalf("missing unpublished archive failure result: %#v", failure)
+	}
+	report := captureStderr(t, func() {
+		reportUnpublishedArchives(projects, nil, nil, GlobalFlags{}, false)
+	})
+	for source, text := range map[string]string{"failure": failure.Error.Message, "report": report} {
+		if !strings.Contains(text, remedy) {
+			t.Errorf("%s does not state the remedy %q:\n%s", source, remedy, text)
+		}
+		if strings.Contains(text, "@putnami/") || strings.Contains(strings.ToLower(text), "cloud") {
+			t.Errorf("%s names a specific extension or service:\n%s", source, text)
+		}
 	}
 }
 
