@@ -697,6 +697,31 @@ func TestRunTests_ScrubsHostPlatformIdentityFromSubprocess(t *testing.T) {
 	}
 }
 
+// On a hosted run the engine describes the job to the extension in two
+// variables. `bun test` must see neither: a repository's tests are not jobs of
+// the run.
+func TestRunTests_ScrubsTheJobVariablesOfAHostedRun(t *testing.T) {
+	dir := t.TempDir()
+	outDir := filepath.Join(dir, "output")
+	fakeBun := envProbeBun(t)
+
+	t.Setenv("PUTNAMI_OFFLINE_DEPENDENCIES", "1")
+	t.Setenv("PUTNAMI_JOB_CREDENTIAL_FD", "7")
+
+	ok, logs, err := RunTests(fakeBun, dir, outDir, TestParams{})
+	if err != nil {
+		t.Fatalf("RunTests: %v", err)
+	}
+	if !ok {
+		t.Fatalf("probe script failed: %s", logs)
+	}
+	for _, name := range []string{"PUTNAMI_OFFLINE_DEPENDENCIES", "PUTNAMI_JOB_CREDENTIAL_FD"} {
+		if want := name + "=[]"; !strings.Contains(logs, want) {
+			t.Errorf("%s leaked into the test subprocess; probe output:\n%s", name, logs)
+		}
+	}
+}
+
 // The scrub must not cost the harness contract: FORCE_COLOR, the database
 // binding credential and the inherited PATH all still reach `bun test`.
 func TestRunTests_PreservesHarnessEnvironment(t *testing.T) {
@@ -747,7 +772,7 @@ func TestMain(m *testing.M) {
 // printEnvProbe ignores its arguments and prints the environment entries the
 // scrub contract is about, an unset entry as an empty value.
 func printEnvProbe() {
-	for _, name := range []string{"K_SERVICE", "K_REVISION", "K_CONFIGURATION", "GAE_ENV", "FORCE_COLOR", "DATABASE_TEST_BINDINGS", "GOOGLE_CLOUD_PROJECT"} {
+	for _, name := range []string{"K_SERVICE", "K_REVISION", "K_CONFIGURATION", "GAE_ENV", "FORCE_COLOR", "DATABASE_TEST_BINDINGS", "GOOGLE_CLOUD_PROJECT", "PUTNAMI_OFFLINE_DEPENDENCIES", "PUTNAMI_JOB_CREDENTIAL_FD"} {
 		fmt.Printf("%s=[%s]\n", name, os.Getenv(name))
 	}
 	pathSet := "no"

@@ -304,6 +304,11 @@ Cloud Run service, say — not the code under test, and application code that
 reads them as a production signal would otherwise refuse test-only behavior
 inside a test.
 
+On a hosted run, `PUTNAMI_OFFLINE_DEPENDENCIES` and `PUTNAMI_JOB_CREDENTIAL_FD`
+are removed too. They describe the job to the extension, and your tests are not
+jobs of the run. Module downloads stay off in the test process: it keeps
+`GOPROXY=off`, `GONOPROXY=none`, and `-mod=readonly` in `GOFLAGS`.
+
 Credentials are **not** scrubbed: `GOOGLE_APPLICATION_CREDENTIALS`, the AWS
 credential variables, `GOOGLE_CLOUD_PROJECT` and `DATABASE_TEST_BINDINGS` all
 survive, so an integration test that talks to a real backend still can. The

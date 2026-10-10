@@ -176,6 +176,10 @@ func buildTestEnv(params TestParams) map[string]string {
 // which application code reads as "I am the deployed production workload".
 // The scrub covers the inherited environment only: buildTestEnv's
 // additions are applied after it and still win.
+//
+// The variables that describe this job to the extension on a hosted run
+// (hostenv.JobVars) are removed too: the repository's tests are not jobs of the
+// run. `bun test` installs nothing, so no offline setting depends on them.
 func RunTests(bunBin, projectPath, outputPath string, params TestParams) (bool, string, error) {
 	os.MkdirAll(outputPath, 0755)
 
@@ -183,7 +187,7 @@ func RunTests(bunBin, projectPath, outputPath string, params TestParams) (bool, 
 
 	result, err := execRunFunc(bunBin, args,
 		exec.Dir(projectPath),
-		exec.UnsetEnv(hostenv.PlatformIdentityVars()...),
+		exec.UnsetEnv(append(hostenv.PlatformIdentityVars(), hostenv.JobVars()...)...),
 		exec.Env(buildTestEnv(params)),
 		exec.Timeout(resolveTestTimeout(params)),
 	)
