@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/client"
+	perrors "go.putnami.dev/errors"
 	"go.putnami.dev/intelligence/agent-readiness/internal/testrepo"
 	"go.putnami.dev/intelligence/agent-readiness/payload"
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -198,9 +200,11 @@ func TestServiceRefusalsAreAPIClassified(t *testing.T) {
 
 func TestSubmissionDeadlineDoesNotRetry(t *testing.T) {
 	release := make(chan struct{})
+	ctx := newArrivalDeadline()
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
+		ctx.expire()
 		<-release
 	}))
 	defer server.Close()
@@ -209,14 +213,42 @@ func TestSubmissionDeadlineDoesNotRetry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
 	_, err = Submit(ctx, server.URL, nil, built.Bytes)
-	if err == nil || requests.Load() != 1 {
+	if !perrors.Is(err, client.CodeClientDeadline) || requests.Load() != 1 {
 		t.Fatalf("deadline: requests=%d error=%v", requests.Load(), err)
 	}
 	if failure := sendFailure(ctx, err, server.URL); protocolcli.ExitCodeForError(failure) != protocolcli.ExitAPI || !strings.Contains(failure.Error(), "raise --timeout") {
 		t.Fatalf("failure=%v", failure)
+	}
+}
+
+// arrivalDeadline is a context whose deadline passes when expire is called:
+// Done closes and Err reports context.DeadlineExceeded. Deadline reports a fixed
+// time one hour ahead, so a client keeps its own budget. A test expires it once
+// its request is in flight, however long the work before the request takes.
+type arrivalDeadline struct {
+	context.Context
+	deadline time.Time
+	once     sync.Once
+	done     chan struct{}
+}
+
+func newArrivalDeadline() *arrivalDeadline {
+	return &arrivalDeadline{Context: context.Background(), deadline: time.Now().Add(time.Hour), done: make(chan struct{})}
+}
+
+func (c *arrivalDeadline) expire() { c.once.Do(func() { close(c.done) }) }
+
+func (c *arrivalDeadline) Deadline() (time.Time, bool) { return c.deadline, true }
+
+func (c *arrivalDeadline) Done() <-chan struct{} { return c.done }
+
+func (c *arrivalDeadline) Err() error {
+	select {
+	case <-c.done:
+		return context.DeadlineExceeded
+	default:
+		return nil
 	}
 }
 
