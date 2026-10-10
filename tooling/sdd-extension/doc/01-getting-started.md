@@ -76,8 +76,9 @@ putnami lint,test,build,validate --impacted --enforce-coverage
 ## If the commands are missing
 
 `putnami features` on a workspace that has not declared the extension is not a
-command. A run that plans zero jobs prints a courtesy hint naming
-`@putnami/sdd`; the hint stays silent once the extension is loaded.
+command. A run that plans zero jobs prints a courtesy hint that the command
+moved from the core CLI to an extension, with where to declare it; the hint
+stays silent once the extension is loaded.
 
 Check what the CLI actually discovered:
 

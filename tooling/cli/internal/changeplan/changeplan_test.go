@@ -2,10 +2,12 @@ package changeplan
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
 	ciproto "go.putnami.dev/protocol/ci"
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
@@ -186,8 +188,59 @@ func TestBuildImpactRefusesWhatTheProtocolRefuses(t *testing.T) {
 		t.Fatalf("BuildImpact error = %v, want the protocol's revision refusal", err)
 	}
 	in.Planned = []*jobs.ScheduledJob{{Project: app}}
-	if _, err := BuildImpact(in); err == nil || err.Error() != "change plan contains incomplete planned task" {
+	if _, err := BuildImpact(in); err == nil || err.Error() != "impact plan contains incomplete planned task" {
 		t.Fatalf("BuildImpact error = %v, want the projection's incomplete-task refusal", err)
+	}
+}
+
+// TestProjectionRefusalsNameTheDocument holds every refusal of the projection
+// to the document it was building: BuildImpact refuses as the impact plan,
+// while Build and ProjectTasks keep the change plan's messages byte for byte.
+func TestProjectionRefusalsNameTheDocument(t *testing.T) {
+	t.Parallel()
+	app := &workspace.Project{ID: "/app", Name: "app", Path: "apps/app"}
+	conflicting := &workspace.Project{ID: "/app", Name: "other", Path: "apps/app"}
+	slower := testJob(app, "lint", 30_000)
+	for _, tc := range []struct {
+		name    string
+		edit    func(*Input)
+		message string
+	}{
+		{"incomplete project identity", func(in *Input) {
+			in.DirectProjects = []*workspace.Project{{ID: "/app"}}
+		}, "%s project identity is incomplete"},
+		{"conflicting project identities", func(in *Input) {
+			in.ImpactedProjects = []*workspace.Project{app, conflicting}
+		}, `%s has conflicting project identities for "/app"`},
+		{"incomplete planned task", func(in *Input) {
+			in.Planned = []*jobs.ScheduledJob{{Project: app}}
+		}, "%s contains incomplete planned task"},
+		{"incomplete task identity", func(in *Input) {
+			job := testJob(app, "lint", 0)
+			job.Identity = &protocolcli.TaskIdentity{}
+			in.Planned = []*jobs.ScheduledJob{job}
+		}, "%s contains incomplete task identity"},
+		{"conflicting tasks", func(in *Input) {
+			in.Planned = []*jobs.ScheduledJob{testJob(app, "lint", 0), slower}
+		}, `%s has conflicting tasks for "` + slower.TypedIdentity().Key + `"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			in := changePlanInput(app, app, []string{"apps/app/main.go"}, ciproto.ChangePlanCache{Status: "disabled"})
+			tc.edit(&in)
+			if _, err := BuildImpact(in); err == nil || err.Error() != fmt.Sprintf(tc.message, "impact plan") {
+				t.Errorf("BuildImpact error = %v, want %q", err, fmt.Sprintf(tc.message, "impact plan"))
+			}
+			if _, err := Build(in, testRepository); err == nil || err.Error() != fmt.Sprintf(tc.message, "change plan") {
+				t.Errorf("Build error = %v, want %q", err, fmt.Sprintf(tc.message, "change plan"))
+			}
+			if !strings.Contains(tc.message, "task") {
+				return
+			}
+			if _, err := ProjectTasks(in.Planned); err == nil || err.Error() != fmt.Sprintf(tc.message, "change plan") {
+				t.Errorf("ProjectTasks error = %v, want %q", err, fmt.Sprintf(tc.message, "change plan"))
+			}
+		})
 	}
 }
 

@@ -22,7 +22,7 @@
     },
     {
       "id": "named-commands",
-      "text": "The one positional argument names the commands, comma-separated, resolved through built-in and workspace aliases in order, and the engine plans exactly that list. A missing or extra list, a command named twice, an alias that expands to several commands, and --baseline, --impacted, --projects or --all are usage errors."
+      "text": "The one positional argument names the commands, comma-separated, resolved through built-in and workspace aliases in order, and the engine plans exactly that list. A missing or extra list, a command named twice, an alias that expands to several commands, a command no discovered extension declares, and --baseline, --impacted, --projects or --all are usage errors. A declared command that plans no task is a valid empty plan; change-plan plans its fixed list whatever is declared."
     },
     {
       "id": "one-structured-result",
@@ -30,6 +30,7 @@
     }
   ],
   "decisions": [
-    "protocols/ci/doc/adr/0005-a-change-plan-projects-an-impact-plan.md"
+    "protocols/ci/doc/adr/0005-a-change-plan-projects-an-impact-plan.md",
+    "tooling/cli/doc/adr/0061-channel-and-ci-commands-leave-the-core-cli.md"
   ]
 }

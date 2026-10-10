@@ -31,6 +31,17 @@ func TestMain(m *testing.M) {
 // declare. It returns the root and the base commit.
 func impactPlanFixture(t *testing.T) (root, baseSHA string) {
 	t.Helper()
+	return impactPlanFixtureWith(t, func(manifest *extensionproto.Manifest) {
+		validate := manifest.Commands["validate"]
+		validate.AlsoRuns = []string{"validate-workspace"}
+		manifest.Commands["validate"] = validate
+	})
+}
+
+// impactPlanFixtureWith is impactPlanFixture with edit applied to the fixture
+// extension's manifest instead of the validate-workspace companion.
+func impactPlanFixtureWith(t *testing.T, edit func(*extensionproto.Manifest)) (root, baseSHA string) {
+	t.Helper()
 	root = clitest.WhereFixture(t, false, false)
 	manifestPath := filepath.Join(root, "extension", "putnami.extension.json")
 	data, err := os.ReadFile(manifestPath)
@@ -41,9 +52,7 @@ func impactPlanFixture(t *testing.T) (root, baseSHA string) {
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	validate := manifest.Commands["validate"]
-	validate.AlsoRuns = []string{"validate-workspace"}
-	manifest.Commands["validate"] = validate
+	edit(&manifest)
 	data, err = json.Marshal(manifest)
 	if err != nil {
 		t.Fatal(err)
@@ -58,12 +67,11 @@ func impactPlanFixture(t *testing.T) (root, baseSHA string) {
 	return root, baseSHA
 }
 
-// runStructured runs one invocation of the real CLI in root and decodes its
-// stdout as exactly one result envelope whose data is a T.
-func runStructured[T any](t *testing.T, root, command string, args ...string) T {
+// run runs one invocation of the real CLI in root and returns its exit code
+// and streams.
+func run(t *testing.T, root, command string, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
-	var code int
-	stdout, stderr := clitest.CaptureStreams(t, func() {
+	stdout, stderr = clitest.CaptureStreams(t, func() {
 		app, err := cli.NewApp()
 		if err != nil {
 			t.Fatalf("NewApp: %v", err)
@@ -71,6 +79,14 @@ func runStructured[T any](t *testing.T, root, command string, args ...string) T 
 		t.Chdir(root)
 		code = app.Run(context.Background(), append([]string{command}, args...))
 	})
+	return code, stdout, stderr
+}
+
+// runStructured runs one invocation of the real CLI in root and decodes its
+// stdout as exactly one result envelope whose data is a T.
+func runStructured[T any](t *testing.T, root, command string, args ...string) T {
+	t.Helper()
+	code, stdout, stderr := run(t, root, command, args...)
 	if code != 0 {
 		t.Fatalf("%s exit = %d\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
 	}
@@ -165,5 +181,64 @@ func TestChangePlanIsTheProjectionOfImpactPlan(t *testing.T) {
 	}
 	if strings.Join(impact.Commands, ",") != "lint,test,build,validate" {
 		t.Errorf("commands = %v, want the requested list", impact.Commands)
+	}
+}
+
+// TestImpactPlanRefusesACommandNoExtensionDeclares holds the seam to the
+// commands the workspace can plan: a command no extension declares is a usage
+// error naming it, never an empty plan that reads as "nothing to run", while a
+// declared command over a range that impacts nothing stays a valid empty plan.
+func TestImpactPlanRefusesACommandNoExtensionDeclares(t *testing.T) {
+	spectest.Proves(t, "cli/impact-plan", "named-commands", "an-undeclared-command-is-refused")
+	root, baseSHA := impactPlanFixture(t)
+	headSHA := strings.TrimSpace(clitest.GitOutput(t, root, "rev-parse", "HEAD"))
+
+	for _, tc := range []struct{ list, undeclared string }{
+		{"typo", "typo"},
+		{"lint,typo,test,missing", "typo, missing"},
+	} {
+		code, stdout, stderr := run(t, root, "impact-plan", tc.list, "--base", baseSHA, "--no-cache", "--output=json")
+		want := "no extension of this workspace declares " + tc.undeclared + ", so impact-plan cannot plan it"
+		if code != 2 || !strings.Contains(stdout+stderr, want) {
+			t.Fatalf("impact-plan %s exit = %d, want 2 and %q\nstdout:\n%s\nstderr:\n%s", tc.list, code, want, stdout, stderr)
+		}
+		if strings.Contains(stdout, `"tasks"`) {
+			t.Fatalf("impact-plan %s emitted a plan:\n%s", tc.list, stdout)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, "app", "calls")); !os.IsNotExist(err) {
+		t.Fatalf("a refused plan ran a task: %v", err)
+	}
+
+	empty := runStructured[ciproto.ImpactPlan](t, root, "impact-plan", "format", "--base", headSHA, "--no-cache", "--output=json")
+	if err := ciproto.ValidateImpactPlan(empty); err != nil {
+		t.Fatalf("the empty plan does not validate: %v", err)
+	}
+	if strings.Join(empty.Commands, ",") != "format" || len(empty.Tasks) != 0 || len(empty.ChangedFiles) != 0 {
+		t.Fatalf("plan = commands %v, %d tasks, changed %v; want an empty plan of format", empty.Commands, len(empty.Tasks), empty.ChangedFiles)
+	}
+}
+
+// TestChangePlanPlansItsListWhateverTheWorkspaceDeclares keeps change-plan's
+// fixed list out of the refusal impact-plan applies: in a workspace that
+// declares no validate job, change-plan still succeeds with the tasks of the
+// commands of its list that are declared.
+func TestChangePlanPlansItsListWhateverTheWorkspaceDeclares(t *testing.T) {
+	spectest.Proves(t, "cli/impact-plan", "named-commands", "change-plan-plans-its-list-whatever-the-workspace-declares")
+	root, baseSHA := impactPlanFixtureWith(t, func(manifest *extensionproto.Manifest) {
+		delete(manifest.Commands, "validate")
+	})
+	clitest.RunGit(t, root, "remote", "add", "origin", "https://example.test/org/repo.git")
+
+	change := runStructured[ciproto.ChangePlan](t, root, "change-plan", "--base", baseSHA, "--no-cache", "--output=json")
+	if err := ciproto.ValidateChangePlan(change); err != nil {
+		t.Fatalf("change plan does not validate: %v", err)
+	}
+	planned := map[string]bool{}
+	for _, task := range change.Tasks {
+		planned[task.Identity.Task.Command] = true
+	}
+	if len(planned) != 3 || !planned["lint"] || !planned["test"] || !planned["build"] {
+		t.Fatalf("planned commands = %v, want lint, test and build", planned)
 	}
 }
