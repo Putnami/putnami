@@ -771,9 +771,9 @@ func TestLoadRemoteCacheProvider_RefusedAuthenticateBuildsLocally(t *testing.T) 
 	}
 }
 
-func TestRemoteRestoreEstimatedCostUsesLeaseBreakEvenFloor(t *testing.T) {
+func TestRemoteRestoreEstimatedCostUsesLeaseCoalescingFloor(t *testing.T) {
 	job := cacheableJob("build", "/proj", "proj", "proj")
-	floor := cache.DefaultBreakEven.MinDurationMs
+	floor := store.CoalescingFloor.Milliseconds()
 
 	job.ExpectedWallMs = floor - 1
 	if store.WorthCoalescing(remoteRestoreEstimatedCost(job)) {
@@ -781,7 +781,7 @@ func TestRemoteRestoreEstimatedCostUsesLeaseBreakEvenFloor(t *testing.T) {
 	}
 	job.ExpectedWallMs = floor
 	if !store.WorthCoalescing(remoteRestoreEstimatedCost(job)) {
-		t.Fatal("a remote restore at the break-even floor should coalesce")
+		t.Fatal("a remote restore at the coalescing floor should coalesce")
 	}
 	job.ExpectedWallMs = 0
 	if !store.WorthCoalescing(remoteRestoreEstimatedCost(job)) {

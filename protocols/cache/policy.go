@@ -4,9 +4,9 @@ import "strings"
 
 // Remote-cache eligibility policy. These helpers operate purely on the wire
 // contract's own fields so the build-system client and the cloud server make
-// the SAME decision about which keys participate in remote caching. They are
-// stricter than local caching: a result that is safe to cache locally may
-// still be ineligible for the shared remote cache.
+// the SAME decision about which keys participate in remote caching. A key is
+// remote-eligible unless its task is side-effecting: no duration or size rule
+// leaves a result out of the shared cache.
 
 // sideEffectingCommands are task commands whose execution has external side
 // effects. Their results must never be served from or written to a shared
@@ -32,62 +32,41 @@ func SideEffectingTask(task string) bool {
 	return sideEffectingCommands[commandOf(task)]
 }
 
-// BreakEvenParams tunes the transfer-vs-rebuild trade-off used to decide
-// whether storing an artifact remotely is worthwhile.
+// BreakEvenParams is the parameter type EligibleForRemote and
+// WorthRemoteCaching accept and ignore.
+//
+// Deprecated: remote eligibility reads only the task (see EligibleForRemote).
+// No function of this package reads these parameters.
 type BreakEvenParams struct {
-	// BandwidthBytesPerSec is the assumed effective remote throughput used to
-	// predict transfer time from artifact size. Non-positive disables the
-	// size check (build duration alone decides).
+	// BandwidthBytesPerSec is ignored.
 	BandwidthBytesPerSec int64
-	// MinDurationMs is the build-time floor below which an artifact is treated
-	// as too cheap to rebuild to be worth remote caching.
+	// MinDurationMs is ignored.
 	MinDurationMs int64
 }
 
-// DefaultBreakEven assumes ~50 MB/s effective throughput and a 200ms
-// build-time floor. Measured cache restores run ~70 MB/s on an ordinary dev
-// link (batched fetches, warm connections), so 50 keeps headroom while not
-// pricing out mid-size artifacts: the previous 10 MB/s assumption permanently
-// excluded cross-compile binaries and generated-site outputs whose rebuild
-// costs seconds on every cold-store run. The asymmetry favors admitting more —
-// an upload the guard wrongly admits costs one bounded async transfer off the
-// critical path, while an entry it wrongly excludes re-executes forever.
+// DefaultBreakEven is a BreakEvenParams value for callers that still pass one.
+//
+// Deprecated: no function of this package reads it; see BreakEvenParams.
 var DefaultBreakEven = BreakEvenParams{
 	BandwidthBytesPerSec: 50 * 1024 * 1024,
 	MinDurationMs:        200,
 }
 
-// WorthRemoteCaching reports whether an entry of sizeBytes produced by a build
-// of durationMs is worth storing remotely.
+// WorthRemoteCaching reports true for every entry, whatever its build duration
+// or size: a result is shared unless its task is side-effecting.
 //
-// A files-less entry (sizeBytes <= 0) always is: there is nothing to transfer
-// — the status result rides the batched negotiate/exchange for free — while
-// excluding it turns its key into a permanent remote miss whose task
-// re-executes on every cold-store run. The break-even guard exists to price
-// artifact transfer, so it only applies when there are bytes to move: the
-// build must then clear the minimum-duration floor, and the predicted transfer
-// time must not exceed the build time it would save. An unknown duration
-// (<= 0) for a bytes-carrying entry is treated as too cheap and returns false.
-func WorthRemoteCaching(durationMs, sizeBytes int64, p BreakEvenParams) bool {
-	if sizeBytes <= 0 {
-		return true
-	}
-	if durationMs < p.MinDurationMs {
-		return false
-	}
-	if p.BandwidthBytesPerSec <= 0 {
-		return true
-	}
-	transferMs := sizeBytes * 1000 / p.BandwidthBytesPerSec
-	return transferMs <= durationMs
+// Deprecated: remote eligibility is !SideEffectingTask(task). The parameters
+// are ignored.
+func WorthRemoteCaching(_, _ int64, _ BreakEvenParams) bool {
+	return true
 }
 
-// EligibleForRemote reports whether key k should participate in remote caching:
-// its task must not be side-effecting and it must clear the break-even guard
-// given its recorded DurationMs and SizeBytes.
-func EligibleForRemote(k KeyRequest, p BreakEvenParams) bool {
-	if SideEffectingTask(k.Task) {
-		return false
-	}
-	return WorthRemoteCaching(k.DurationMs, k.SizeBytes, p)
+// EligibleForRemote reports whether key k participates in remote caching: it
+// does unless its task is side-effecting. The key's DurationMs and SizeBytes
+// do not take part in the decision.
+//
+// Deprecated: use !SideEffectingTask(k.Task). The BreakEvenParams argument is
+// ignored.
+func EligibleForRemote(k KeyRequest, _ BreakEvenParams) bool {
+	return !SideEffectingTask(k.Task)
 }

@@ -53,8 +53,8 @@ without a cycle.
 
 Request (`NegotiateRequest`): the materialization `Mode` plus every cacheable
 `KeyRequest`. Advisory fields (`extension`, `task`, `project`, `durationMs`,
-`sizeBytes`) drive server-side policy (break-even, reporting) and are not part
-of cache identity.
+`sizeBytes`) drive server-side reporting and are not part of cache identity.
+Remote eligibility reads only `task` (see below).
 
 Response (`NegotiateResponse`): one `KeyResult` per key with `hit`, and on a hit
 the `ActionResult`, `Manifest`, and any `Downloads`.
@@ -324,16 +324,18 @@ The table states each mode's intent. The CLI still downloads a hit's files in
 
 ## Remote eligibility policy
 
-Remote caching is stricter than local caching — shared helpers (used by both
-client and server so they agree):
+The remote cache admits every key whose task is not side-effecting, whatever
+its build duration or output size. One shared helper decides it, used by both
+client and server so they agree:
 
 - `SideEffectingTask(task)` — excludes commands with external effects (e.g.
   `publish`) that must always run and must never be served from cache.
-- `WorthRemoteCaching(durationMs, sizeBytes, params)` / `EligibleForRemote(key,
-  params)` — the break-even guard: skip artifacts whose predicted transfer time
-  (from `sizeBytes` at an assumed throughput) exceeds the build time they would
-  save, and anything under a minimum-duration floor. `DefaultBreakEven` provides
-  conservative defaults.
+
+`EligibleForRemote(key, params)` returns `!SideEffectingTask(key.Task)` and
+`WorthRemoteCaching(durationMs, sizeBytes, params)` returns `true`. Both are
+deprecated, as are `BreakEvenParams` and `DefaultBreakEven`: they remain so
+existing callers compile, and the duration, size and parameter inputs are
+ignored.
 
 ## Usage
 

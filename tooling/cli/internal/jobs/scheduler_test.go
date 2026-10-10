@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -715,7 +714,7 @@ func TestScheduler_CoalescedWaiterFallsBackAfterJobTimeout(t *testing.T) {
 	}
 }
 
-func TestScheduler_CoalescingHonorsBreakEvenFloor(t *testing.T) {
+func TestScheduler_CoalescingHonorsCoalescingFloor(t *testing.T) {
 	root := t.TempDir()
 	owner := store.NewCacheManager(store.NewLocalStore(root))
 	cheap := store.NewCacheManager(store.NewLocalStore(root))
@@ -729,7 +728,7 @@ func TestScheduler_CoalescingHonorsBreakEvenFloor(t *testing.T) {
 
 	scheduler := &Scheduler{cache: cheap, cfg: SchedulerConfig{}}
 	job := &ScheduledJob{
-		ExpectedWallMs: cache.DefaultBreakEven.MinDurationMs - 1,
+		ExpectedWallMs: store.CoalescingFloor.Milliseconds() - 1,
 		JobDef:         &extension.JobDefinition{TimeoutMs: 2000},
 	}
 	started := time.Now()
@@ -739,7 +738,7 @@ func TestScheduler_CoalescingHonorsBreakEvenFloor(t *testing.T) {
 		t.Fatalf("cheap job restored result = %+v, want independent execution", result)
 	}
 	if elapsed := time.Since(started); elapsed > 250*time.Millisecond {
-		t.Fatalf("cheap job waited %s despite the %dms break-even floor", elapsed, cache.DefaultBreakEven.MinDurationMs)
+		t.Fatalf("cheap job waited %s despite the %s coalescing floor", elapsed, store.CoalescingFloor)
 	}
 }
 

@@ -12,23 +12,22 @@ type CacheStatsSnapshot struct {
 	LocalRestoreVerifyMs  int64 `json:"localRestoreVerifyMs,omitempty"`
 	LocalSpawnedProcesses int64 `json:"localSpawnedProcesses,omitempty"`
 
-	SetupMs        int64 `json:"setupMs"`
-	NegotiateMs    int64 `json:"negotiateMs"`
-	KeysRequested  int64 `json:"keysRequested"`
-	Hits           int64 `json:"hits"`
-	Misses         int64 `json:"misses"`
-	Restored       int64 `json:"restored"`
-	HintsWarmed    int64 `json:"hintsWarmed"`
-	TimeSavedMs    int64 `json:"timeSavedMs"`
-	BytesFetched   int64 `json:"bytesFetched"`
-	RestoreMs      int64 `json:"restoreMs"`
-	Uploads        int64 `json:"uploads"`
-	BlobsUploaded  int64 `json:"blobsUploaded"`
-	BytesUploaded  int64 `json:"bytesUploaded"`
-	BytesDeduped   int64 `json:"bytesDeduped"`
-	UploadMs       int64 `json:"uploadMs"`
-	UploadErrors   int64 `json:"uploadErrors"`
-	UploadsSkipped int64 `json:"uploadsSkipped"`
+	SetupMs       int64 `json:"setupMs"`
+	NegotiateMs   int64 `json:"negotiateMs"`
+	KeysRequested int64 `json:"keysRequested"`
+	Hits          int64 `json:"hits"`
+	Misses        int64 `json:"misses"`
+	Restored      int64 `json:"restored"`
+	HintsWarmed   int64 `json:"hintsWarmed"`
+	TimeSavedMs   int64 `json:"timeSavedMs"`
+	BytesFetched  int64 `json:"bytesFetched"`
+	RestoreMs     int64 `json:"restoreMs"`
+	Uploads       int64 `json:"uploads"`
+	BlobsUploaded int64 `json:"blobsUploaded"`
+	BytesUploaded int64 `json:"bytesUploaded"`
+	BytesDeduped  int64 `json:"bytesDeduped"`
+	UploadMs      int64 `json:"uploadMs"`
+	UploadErrors  int64 `json:"uploadErrors"`
 
 	// ProviderSummary* are the terminal cache-provider Summary totals. They are
 	// kept separately from the live counters above so callers can distinguish

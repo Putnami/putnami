@@ -462,11 +462,10 @@ func newResultOnlyRun(t *testing.T, server *fakeCacheServer) *resultOnlyRun {
 	}
 	writeProjectFile(t, root, "app", "src.txt", "one")
 	result := `printf '%s\n' '{"v":2,"type":"result","data":{"status":"success"}}'` + "\n"
-	// Each task outlasts the break-even floor, so its entry is shared.
 	build := filepath.Join(root, "build.sh")
-	writeExecutable(t, build, "#!/bin/sh\nsleep 0.3\nprintf 'built\\n' > out.txt\n"+result)
+	writeExecutable(t, build, "#!/bin/sh\nprintf 'built\\n' > out.txt\n"+result)
 	check := filepath.Join(root, "check.sh")
-	writeExecutable(t, check, "#!/bin/sh\nsleep 0.3\n[ \"$(cat out.txt 2>/dev/null)\" = built ] || exit 1\n"+result)
+	writeExecutable(t, check, "#!/bin/sh\n[ \"$(cat out.txt 2>/dev/null)\" = built ] || exit 1\n"+result)
 	ext := &extension.ExtensionDescription{
 		Name:    "@putnami/test",
 		Version: "1.0.0",

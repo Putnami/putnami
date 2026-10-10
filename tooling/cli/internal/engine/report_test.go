@@ -201,25 +201,6 @@ func TestReportCacheSummary_FlagsUploadErrors(t *testing.T) {
 	}
 }
 
-func TestReportCacheSummary_ExplainsBreakEvenSkips(t *testing.T) {
-	t.Parallel()
-	var buf bytes.Buffer
-	// A cold, fast workspace: every miss built but skipped from upload because
-	// it was too cheap — the canonical "cache shows no advantage" case.
-	c := &jobs.CacheStatsSnapshot{
-		NegotiateMs: 60, KeysRequested: 9, Hits: 0, Misses: 9,
-		Uploads: 0, UploadsSkipped: 9,
-	}
-	reportCacheSummary(&buf, &GlobalFlags{}, c)
-	out := buf.String()
-	if !strings.Contains(out, "0 hit") || !strings.Contains(out, "9 miss") {
-		t.Errorf("expected cold-cache hit/miss line: %q", out)
-	}
-	if !strings.Contains(out, "9 miss(es) below break-even") {
-		t.Errorf("expected break-even explanation: %q", out)
-	}
-}
-
 func TestReportCacheSummary_ExplainsWarmedHints(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer

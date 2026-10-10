@@ -452,9 +452,9 @@ func (r *RemoteCache) Restore(ctx context.Context, hash string, job *ScheduledJo
 	// session-private exchange directory. Claim the machine-global action key
 	// before invoking it so sibling worktrees wait for the resulting local entry
 	// instead of each asking its provider session to download the same blobs.
-	// Known-cheap jobs bypass coordination through the same break-even floor as
-	// compute leases; expiry, timeout, cancellation, and store errors fall through
-	// to the previous direct-provider behavior.
+	// Known-cheap jobs bypass coordination through the same coalescing floor as
+	// compute leases (store.CoalescingFloor); expiry, timeout, cancellation, and
+	// store errors fall through to a direct provider restore.
 	winner, release := cm.TryClaim(hash, remoteRestoreEstimatedCost(job))
 	if winner {
 		defer release()
@@ -788,10 +788,9 @@ func (r *RemoteCache) DrainUploads() {
 }
 
 // prepareUpload turns a freshly built local entry into the input to share with
-// the provider, applying the eligibility gates the write path always has: skip
-// side-effecting tasks and entries below the break-even guard (counted so the
-// summary can explain why a cheap miss was not shared). It returns ok=false when
-// the entry should not be uploaded.
+// the provider. Every entry is shared whatever its build duration or size,
+// except a side-effecting task's (cache.SideEffectingTask). It returns ok=false
+// when the entry should not be uploaded.
 func (r *RemoteCache) prepareUpload(hash string, job *ScheduledJob, cm *store.CacheManager) (uploadInput, bool) {
 	entry, err := cm.Lookup(hash)
 	if err != nil || entry == nil || entry.Result == nil {
@@ -817,18 +816,6 @@ func (r *RemoteCache) prepareUpload(hash string, job *ScheduledJob, cm *store.Ca
 	manifest := entry.Manifest
 	if manifest == nil {
 		manifest = &cache.Manifest{Files: []cache.FileEntry{}}
-	}
-	// The break-even guard prices the actual transfer, so it gets the
-	// manifest's bytes — a files-less manifest moves nothing and is always
-	// shared (WorthRemoteCaching), however cheap the task: excluding it made
-	// its key a permanent remote miss that re-executed on every cold-store run.
-	if !cache.EligibleForRemote(cache.KeyRequest{Task: job.JobDef.Name, DurationMs: durationMs, SizeBytes: manifestBytes(manifest)}, cache.DefaultBreakEven) {
-		// Too cheap to be worth sharing: the predicted transfer would cost more than
-		// the rebuild it saves. Counted so the summary can explain why a freshly
-		// built miss never populated the remote cache — otherwise the skip is
-		// invisible and the cache looks like it "does nothing".
-		r.stats.recordUploadSkipped()
-		return uploadInput{}, false
 	}
 
 	in := uploadInput{

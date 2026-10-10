@@ -36,11 +36,13 @@
 //
 // # Eligibility
 //
-// Remote caching is stricter than local caching. SideEffectingTask excludes
-// commands with external effects (e.g. publish) that must always run, and the
-// break-even guard (WorthRemoteCaching / EligibleForRemote) skips artifacts
-// whose predicted transfer time exceeds the build time they would save. Client
-// and server share these helpers so they agree on which keys participate.
+// The remote cache admits every key whose task is not side-effecting, whatever
+// its build duration or output size. SideEffectingTask names the commands with
+// external effects (e.g. publish) that must always run; their keys never
+// participate. Client and server share this helper so they agree. The
+// deprecated WorthRemoteCaching and EligibleForRemote, with BreakEvenParams and
+// DefaultBreakEven, remain for existing callers; they read no duration, size or
+// parameter.
 package cache
 
 import (
@@ -199,7 +201,8 @@ type NegotiateRequest struct {
 
 // KeyRequest is one key in a negotiate request. The advisory fields are not
 // part of the cache identity (the Key already captures inputs); they let the
-// server apply policy (break-even, analytics) and namespace reporting.
+// server attribute a key in analytics and namespace reporting. Remote
+// eligibility reads only Task (SideEffectingTask).
 type KeyRequest struct {
 	// Key is the opaque content-addressed cache key.
 	Key string `json:"key"`
@@ -210,9 +213,8 @@ type KeyRequest struct {
 	Task string `json:"task,omitempty"`
 	// Project is the producing project name (advisory; see Extension).
 	Project string `json:"project,omitempty"`
-	// DurationMs is the locally recorded build time for this task, used by the
-	// server's break-even policy to avoid remote-caching artifacts that are
-	// cheaper to rebuild than to transfer.
+	// DurationMs is the locally recorded build time for this task. Advisory:
+	// reported, never an eligibility input.
 	DurationMs int64 `json:"durationMs,omitempty"`
 	// SizeBytes is the expected output size when known.
 	SizeBytes int64 `json:"sizeBytes,omitempty"`

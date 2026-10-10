@@ -682,9 +682,11 @@ The lease is an optimization, never a correctness dependency. A heartbeat keeps
 long-running owners live; an expired or released lease lets exactly one waiter
 take over, while a bounded wait, cancellation, or coordination error falls back
 to normal local execution. Jobs with a known historical duration below the
-cache policy's 200 ms break-even floor bypass leases because coordinating them
-would cost more than the duplicated work; jobs without history remain eligible
-so fresh worktrees can coalesce their first cold run.
+lease's 200 ms coalescing floor bypass leases because coordinating them would
+cost more than the duplicated work; jobs without history remain eligible so
+fresh worktrees can coalesce their first cold run. The floor only decides
+whether a sibling waits: a cheap job's result is cached, locally and
+remotely, like any other.
 
 The wait ceiling follows the job timeout multiplied by its configured retry
 attempts (five minutes per attempt by default). Lease expiry normally wakes a
@@ -989,10 +991,10 @@ needs them. The mode tunes how much is materialized:
 Concurrent worktrees coalesce an eligible remote restore before invoking their
 session-private cache providers: the first process downloads the entry's missing
 CAS blobs and publishes it into the machine-global store, then waiters restore
-that shared entry without a second provider download. The same 200 ms historical
-job-cost floor as computation leases skips known-cheap work, while an expired
-lease or bounded wait falls back to a direct provider restore so coordination
-cannot make the cache less reliable.
+that shared entry without a second provider download. The same 200 ms
+coalescing floor as computation leases lets known-cheap work restore without
+waiting, while an expired lease or bounded wait falls back to a direct provider
+restore so coordination cannot make the cache less reliable.
 
 | Mode | A remote hit is restored with its files when |
 |------|-----------|
@@ -1054,10 +1056,10 @@ records the design.
 
 ### What is and isn't cached remotely
 
-Remote caching is stricter than local:
+The remote cache admits every entry a task's run publishes to the local cache, whatever its build duration or output size, unless the task is side-effecting. A failure record is never shared (see [Failure replay](#failure-replay-negative-entries)).
 
 - **Side-effecting tasks are never remote-cached** (e.g. `publish`) — their effect must always run.
-- A **break-even guard** skips uploading artifacts whose predicted transfer time would exceed the build time they save (using the recorded build duration and output size).
+- No duration or size rule leaves a result out: a 50 ms generation step that writes files is uploaded like a 5-minute build.
 - All transfers are content-addressed and **digest-verified**; bytes that do not match their digest are rejected.
 
 ### Object cache (for compiler caches)

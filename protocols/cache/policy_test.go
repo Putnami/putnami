@@ -19,65 +19,58 @@ func TestSideEffectingTask(t *testing.T) {
 	}
 }
 
-func TestWorthRemoteCaching(t *testing.T) {
-	p := BreakEvenParams{BandwidthBytesPerSec: 1_000_000, MinDurationMs: 200}
+// paramsVariants are the BreakEvenParams values the deprecated helpers must
+// ignore: the default, the zero value, and one whose floor and bandwidth would
+// exclude every bytes-carrying entry if anything read them.
+var paramsVariants = map[string]BreakEvenParams{
+	"default": DefaultBreakEven,
+	"zero":    {},
+	"extreme": {BandwidthBytesPerSec: 1, MinDurationMs: 1 << 62},
+}
 
-	tests := []struct {
+func TestWorthRemoteCaching_AdmitsEveryEntry(t *testing.T) {
+	entries := []struct {
 		name       string
 		durationMs int64
 		sizeBytes  int64
-		want       bool
 	}{
-		{"files-less below duration floor", 100, 0, true}, // nothing to transfer: always worth sharing
-		{"files-less unknown duration", 0, 0, true},
-		{"unknown duration with bytes", 0, 10, false},
-		{"cheap build, tiny output", 150, 1000, false}, // under floor
-		{"slow build, no size info", 5000, 0, true},
-		{"slow build, small output", 5000, 1_000_000, true}, // 1s transfer <= 5s build
-		{"fast build, huge output", 300, 10_000_000, false}, // 10s transfer > 0.3s build
-		{"transfer equals build", 1000, 1_000_000, true},    // 1000ms == 1000ms
-		{"transfer over build", 1000, 1_500_000, false},     // 1500ms > 1000ms
+		{"files-less, cheap", 100, 0},
+		{"files-less, unknown duration", 0, 0},
+		{"bytes, unknown duration", 0, 10},
+		{"bytes, cheap build", 150, 1000},
+		{"bytes, fast build with huge output", 300, 10_000_000},
+		{"bytes, slow build", 5000, 1_000_000},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := WorthRemoteCaching(tt.durationMs, tt.sizeBytes, p); got != tt.want {
-				t.Errorf("WorthRemoteCaching(%d, %d) = %v, want %v", tt.durationMs, tt.sizeBytes, got, tt.want)
+	for paramsName, p := range paramsVariants {
+		for _, e := range entries {
+			if !WorthRemoteCaching(e.durationMs, e.sizeBytes, p) {
+				t.Errorf("WorthRemoteCaching(%s, params %s) = false, want true", e.name, paramsName)
 			}
-		})
+		}
 	}
 }
 
-func TestWorthRemoteCaching_NoBandwidthDisablesSizeCheck(t *testing.T) {
-	p := BreakEvenParams{BandwidthBytesPerSec: 0, MinDurationMs: 200}
-	if !WorthRemoteCaching(500, 1<<40, p) {
-		t.Error("with bandwidth disabled, any artifact above the floor should be worth caching")
+func TestEligibleForRemote_SideEffectsOnly(t *testing.T) {
+	tests := []struct {
+		name string
+		key  KeyRequest
+		want bool
+	}{
+		// A side-effecting task is never eligible, even with an expensive build.
+		{"publish, slow build", KeyRequest{Task: "publish~npm", DurationMs: 60_000, SizeBytes: 1000}, false},
+		{"publish, files-less", KeyRequest{Task: "publish"}, false},
+		// Every other task is eligible, whatever its duration or size.
+		{"build, cheap with output bytes", KeyRequest{Task: "build~transpile", DurationMs: 50, SizeBytes: 4096}, true},
+		{"build, unknown duration with output bytes", KeyRequest{Task: "build~generate", SizeBytes: 4096}, true},
+		{"build, fast with huge output", KeyRequest{Task: "build~bundle", DurationMs: 100, SizeBytes: 1 << 40}, true},
+		{"build, slow with modest output", KeyRequest{Task: "build~transpile", DurationMs: 60_000, SizeBytes: 5_000_000}, true},
+		{"validate, cheap files-less", KeyRequest{Task: "validate~specs", DurationMs: 50}, true},
 	}
-	if WorthRemoteCaching(100, 1, p) {
-		t.Error("below the floor should still be skipped")
-	}
-}
-
-func TestEligibleForRemote(t *testing.T) {
-	p := DefaultBreakEven
-
-	// Side-effecting task is never eligible, even with an expensive build.
-	if EligibleForRemote(KeyRequest{Task: "publish~npm", DurationMs: 60_000, SizeBytes: 1000}, p) {
-		t.Error("publish task must never be remote-eligible")
-	}
-
-	// A slow, reasonably sized build is eligible.
-	if !EligibleForRemote(KeyRequest{Task: "build~transpile", DurationMs: 60_000, SizeBytes: 5_000_000}, p) {
-		t.Error("a slow build with modest output should be remote-eligible")
-	}
-
-	// A trivially cheap build with bytes to move is not worth it.
-	if EligibleForRemote(KeyRequest{Task: "build~transpile", DurationMs: 50, SizeBytes: 4096}, p) {
-		t.Error("a sub-floor build with output bytes should not be remote-eligible")
-	}
-
-	// A files-less result is always eligible, however cheap: sharing the
-	// status costs nothing and excluding it is a permanent remote miss.
-	if !EligibleForRemote(KeyRequest{Task: "build~config-merge", DurationMs: 50}, p) {
-		t.Error("a files-less result must be remote-eligible regardless of duration")
+	for paramsName, p := range paramsVariants {
+		for _, tt := range tests {
+			if got := EligibleForRemote(tt.key, p); got != tt.want {
+				t.Errorf("EligibleForRemote(%s, params %s) = %v, want %v", tt.name, paramsName, got, tt.want)
+			}
+		}
 	}
 }
