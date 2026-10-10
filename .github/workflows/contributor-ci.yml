@@ -70,10 +70,10 @@ jobs:
       # public one and the credentials are the fixture's own, so the job still
       # reads no secret.
       #
-      # The image is Docker Hub's official `postgres:17-alpine`, pulled from
-      # its Amazon ECR Public mirror. Docker Hub limits anonymous pulls per IP
-      # address, and GitHub-hosted runners share addresses, so a pull from
-      # Docker Hub itself fails with `toomanyrequests` regardless of retries.
+      # The image is Docker Hub's official `postgres:17-alpine`, served by its
+      # Amazon ECR Public mirror. Both registries cap anonymous pulls per IP
+      # address and GitHub-hosted runners share addresses; ECR Public's cap
+      # (1 pull per second) is the one those shared addresses stay under.
       postgres:
         image: public.ecr.aws/docker/library/postgres:17-alpine
         env:
