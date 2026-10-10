@@ -258,38 +258,70 @@ func ValidateChangePlan(plan ChangePlan) error {
 }
 
 func validateChangePlan(plan ChangePlan, requireDigest bool) error {
+	const noun = "change plan"
 	if plan.Version != ChangePlanVersion {
 		return fmt.Errorf("unsupported change plan version %d", plan.Version)
 	}
-	if plan.Generator.Name == "" || plan.Generator.Version == "" {
-		return fmt.Errorf("change plan generator is incomplete")
+	if err := validatePlanGenerator(noun, plan.Generator); err != nil {
+		return err
 	}
 	if plan.Repository.Remote == "" || plan.Repository.URL == "" || strings.Contains(plan.Repository.URL, "@") {
 		return fmt.Errorf("change plan repository identity is incomplete or contains credentials")
 	}
-	if !fullCommitID(plan.BaseSHA) || !fullCommitID(plan.HeadSHA) {
-		return fmt.Errorf("change plan revisions must be full lowercase commit IDs")
-	}
-	if !canonicalStringSlice(plan.ChangedFiles) {
-		return fmt.Errorf("change plan changedFiles is not canonical")
-	}
-	if !canonicalProjectSlice(plan.Impact.DirectProjects) || !canonicalProjectSlice(plan.Impact.Projects) ||
-		!canonicalProjectSlice(plan.Impact.TransitiveDependents) {
-		return fmt.Errorf("change plan project lists are not canonical")
-	}
-	if !equalChangePlanProjects(plan.Impact.TransitiveDependents, plan.Impact.DerivedTransitiveDependents()) {
-		return fmt.Errorf("change plan transitive dependents do not match impact closure")
-	}
-	if !canonicalTaskSlice(plan.Tasks) {
-		return fmt.Errorf("change plan tasks are not canonical")
-	}
-	if err := validateChangePlanCache(plan.Cache); err != nil {
+	body := planBody{BaseSHA: plan.BaseSHA, HeadSHA: plan.HeadSHA, ChangedFiles: plan.ChangedFiles,
+		Impact: plan.Impact, Tasks: plan.Tasks, Cache: plan.Cache}
+	if err := body.validate(noun); err != nil {
 		return err
 	}
 	if requireDigest && !validChangePlanDigest(plan.Digest) {
 		return fmt.Errorf("change plan digest is malformed")
 	}
 	return nil
+}
+
+// validatePlanGenerator refuses a generator without a name or a version. noun
+// names the document in the refusal.
+func validatePlanGenerator(noun string, generator ChangePlanGenerator) error {
+	if generator.Name == "" || generator.Version == "" {
+		return fmt.Errorf("%s generator is incomplete", noun)
+	}
+	return nil
+}
+
+// planBody is the members a ChangePlan and an ImpactPlan share after their
+// identity members: the revision range, the files it changes, the closure they
+// reach, the tasks planned over it, and the advisory cache summary.
+type planBody struct {
+	BaseSHA      string
+	HeadSHA      string
+	ChangedFiles []string
+	Impact       ChangePlanImpact
+	Tasks        []ChangePlanTask
+	Cache        ChangePlanCache
+}
+
+// validate refuses a revision that is not a full lowercase commit ID, a list
+// that is unsorted or holds a duplicate, transitive dependents that differ
+// from the derived ones, and an inconsistent cache summary, in that order.
+// noun names the document in the refusal.
+func (body planBody) validate(noun string) error {
+	if !fullCommitID(body.BaseSHA) || !fullCommitID(body.HeadSHA) {
+		return fmt.Errorf("%s revisions must be full lowercase commit IDs", noun)
+	}
+	if !canonicalStringSlice(body.ChangedFiles) {
+		return fmt.Errorf("%s changedFiles is not canonical", noun)
+	}
+	if !canonicalProjectSlice(body.Impact.DirectProjects) || !canonicalProjectSlice(body.Impact.Projects) ||
+		!canonicalProjectSlice(body.Impact.TransitiveDependents) {
+		return fmt.Errorf("%s project lists are not canonical", noun)
+	}
+	if !equalChangePlanProjects(body.Impact.TransitiveDependents, body.Impact.DerivedTransitiveDependents()) {
+		return fmt.Errorf("%s transitive dependents do not match impact closure", noun)
+	}
+	if !canonicalTaskSlice(body.Tasks) {
+		return fmt.Errorf("%s tasks are not canonical", noun)
+	}
+	return validateChangePlanCache(body.Cache)
 }
 
 // canonicalStringSlice reports whether values are non-empty, strictly

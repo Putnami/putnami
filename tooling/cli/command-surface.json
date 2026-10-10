@@ -582,6 +582,25 @@
       ]
     },
     {
+      "path": "impact-plan",
+      "flags": [
+        {
+          "long": "--base",
+          "type": "value"
+        },
+        {
+          "long": "--head",
+          "type": "value"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "commands",
+          "required": true
+        }
+      ]
+    },
+    {
       "path": "infra",
       "flags": [],
       "positionals": []

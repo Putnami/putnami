@@ -1130,7 +1130,7 @@
             "checks": [
               "generated-bootstrap-routes-to-live-mcp-guidance",
               "stale-or-absent-context-is-reported-for-fallback",
-              "the-default-gate-follows-the-sdd-declaration"
+              "the-default-gate-adds-validate-when-an-extension-declares-it"
             ]
           }
         },
@@ -3193,6 +3193,69 @@
               "probe-version-must-match-the-plan",
               "anonymous-absent-is-a-warning",
               "unexpected-probe-fails"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/impact-plan",
+      "type": "feature",
+      "name": "Impact plan",
+      "outcome": "An extension asks the engine for the impacted plan of a change, for the commands it names, and reads it with the protocol package alone",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "one-projection",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "change-plan-is-the-projection-of-impact-plan",
+              "build-is-the-change-plan-of-build-impact",
+              "the-corpus-is-reproduced",
+              "an-invalid-plan-is-never-emitted"
+            ]
+          }
+        },
+        {
+          "id": "pinned-revisions",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dirty-worktree-is-refused-before-planning",
+              "the-range-is-refused-before-planning",
+              "planning-that-changes-the-checkout-is-refused",
+              "no-remote-is-needed"
+            ]
+          }
+        },
+        {
+          "id": "named-commands",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-command-list-is-required",
+              "aliases-resolve-to-one-command-each",
+              "the-planner-plans-the-named-commands"
+            ]
+          }
+        },
+        {
+          "id": "one-structured-result",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-render-writes-one-envelope",
+              "the-command-writes-one-envelope"
             ]
           }
         }

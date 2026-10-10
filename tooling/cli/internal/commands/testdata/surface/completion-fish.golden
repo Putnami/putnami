@@ -75,6 +75,7 @@ complete -c putnami -n '__fish_use_subcommand' -a 'dev' -d 'Author extensions an
 complete -c putnami -n '__fish_use_subcommand' -a 'doctor' -d 'Preflight production readiness under a deployment profile'
 complete -c putnami -n '__fish_use_subcommand' -a 'extensions' -d 'Manage extensions'
 complete -c putnami -n '__fish_use_subcommand' -a 'help' -d 'Show help for a command'
+complete -c putnami -n '__fish_use_subcommand' -a 'impact-plan' -d 'Emit the impacted plan of a change for a command list'
 complete -c putnami -n '__fish_use_subcommand' -a 'infra' -d 'Plan workspace infrastructure'
 complete -c putnami -n '__fish_use_subcommand' -a 'init' -d 'Initialize a new workspace'
 complete -c putnami -n '__fish_use_subcommand' -a 'install' -d 'Install extensions and dependencies'
@@ -218,6 +219,8 @@ complete -c putnami -n '__putnami_seen_path extensions list' -l 'user' -d 'List 
 complete -c putnami -n '__putnami_seen_path extensions remove' -l 'user' -d 'Remove the extension from the user scope (~/.putnami/user) instead of the workspace'
 complete -c putnami -n '__putnami_seen_path help' -l 'man' -d 'Render the full reference as a man page'
 complete -c putnami -n '__putnami_seen_path help' -l 'markdown' -d 'Render the full reference as Markdown'
+complete -c putnami -n '__putnami_seen_path impact-plan' -l 'base' -d 'Required base commit or ref; emitted as its full immutable commit SHA' -r
+complete -c putnami -n '__putnami_seen_path impact-plan' -l 'head' -d 'Optional head commit or ref; it must resolve to the checked-out HEAD' -r
 complete -c putnami -n '__putnami_seen_path init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
 complete -c putnami -n '__putnami_seen_path init' -l 'extension' -d 'Default extension to install' -r
 complete -c putnami -n '__putnami_seen_path init' -l 'force' -d 'Reinitialize an existing workspace'

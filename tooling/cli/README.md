@@ -95,7 +95,7 @@ putnami build --impacted --plan
 - **[Profiling and Telemetry](doc/12-profiling-and-telemetry.md)** — Chrome trace profiling, anonymous telemetry
 - **[Internals](doc/13-internals.md)** — Go patterns, concurrency, error handling, design decisions
 - **[Version Management](doc/14-version-management.md)** — Binary layout, upgrading, install script
-- **[CI Change Plans](doc/17-ci-change-plans.md)** — Immutable impacted lint/test/build plans for CI admission
+- **[CI Change Plans](doc/17-ci-change-plans.md)** — Immutable impacted lint/test/build plans for CI admission, and the impact plan an extension reads for the commands it names
 - **[Agent Workflows](doc/18-agent-workflows.md)** — Extension agent content materialized into `.agents`/`.claude`/`.codex`, the `init`/`install`/`upgrade` lifecycle, ownership and collision rules, and the migration from separately declared artifacts
 - **[Core Workspace Experience](doc/19-core-workspace-experience.md)** — End-to-end discovery, selection, planning, execution, MCP, diagnostics, and support/maturity guidance
 - **[Release Rehearsal](doc/20-release-rehearsal.md)** — The read-only rehearsal that records an explicit GO/NO-GO for the intended public release, its plan, and its rollback points

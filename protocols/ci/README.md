@@ -1,8 +1,9 @@
 # `go.putnami.dev/protocol/ci`
 
 The versioned contract for a workspace's source-controlled `putnami.ci.json`,
-and for the ChangePlan document `putnami change-plan` emits (see
-[The change plan](#the-change-plan)). The file is discovered beside
+for the ChangePlan document `putnami change-plan` emits (see
+[The change plan](#the-change-plan)), and for the ImpactPlan document
+`putnami impact-plan` emits (see [The impact plan](#the-impact-plan)). The file is discovered beside
 `putnami.workspace.json`. Version 3 is the only version this package reads:
 earlier documents are migrated by hand.
 
@@ -145,8 +146,8 @@ discovered graph jobs.
 
 | Role | Who |
 | --- | --- |
-| Producers | a human authoring `putnami.ci.json`, and `putnami ci init` / `putnami ci fmt` writing the canonical form; `putnami change-plan` emitting a ChangePlan |
-| Consumers | `putnami ci` (validate, fmt, explain); `putnami deploy --env`; a CI plane that reads the document to decide what to run; a CI plane that admits a ChangePlan |
+| Producers | a human authoring `putnami.ci.json`, and `putnami ci init` / `putnami ci fmt` writing the canonical form; `putnami change-plan` emitting a ChangePlan; `putnami impact-plan` emitting an ImpactPlan |
+| Consumers | `putnami ci` (validate, fmt, explain); `putnami deploy --env`; a CI plane that reads the document to decide what to run; a CI plane that admits a ChangePlan; an extension that reads an ImpactPlan, or projects it onto a ChangePlan |
 | Owner of this contract | this project. The CLI validates and explains; the execution plane grants trust and resources, and neither may widen the document locally |
 
 The plane split is part of the contract, not an implementation detail. A
@@ -313,6 +314,40 @@ emitted, so it needs a new version and a new digest domain.
 `TestChangePlanV1IdentityIsUnchanged` pins the golden fixture's digest as a
 literal for that reason.
 
+## The impact plan
+
+`putnami impact-plan <commands> --base <commit> --output=json` emits the
+impacted plan of a checked-out commit range for the commands it names, in the
+structured result's `data` member. It is the document an extension reads when
+it needs the changed files, the impacted projects and the planned tasks of a
+change, without importing the CLI. This package owns the `ImpactPlan` type and
+its validation.
+
+An ImpactPlan holds the members of a ChangePlan that describe the change:
+`generator`, `baseSHA`, `headSHA`, `changedFiles`, `impact`, `tasks` and
+`cache`, with the same types and the same canonical order. It adds
+`commands`, the command list it was planned for, in the requested order. It
+has no `repository` and no `digest`: the document a consumer derives from it
+holds both.
+
+- `ImpactPlanVersion` is `1`, the only version a consumer accepts.
+- `ValidateImpactPlan` refuses an unknown version, an incomplete generator, a
+  command list that is empty, names a command twice, or holds a name that is
+  empty or contains a comma or whitespace, and every defect
+  `ValidateChangePlan` refuses in the shared members.
+- `ChangePlanFromImpactPlan(plan, repository)` is the one projection onto a
+  ChangePlan. It copies the shared members into new lists, derives the
+  transitive dependents from the closure, adds the repository and stamps the
+  digest. It returns only a plan `ValidateChangePlan` accepts. A ChangePlan
+  does not name its commands, so the caller chooses the command list it admits
+  by the ImpactPlan it passes.
+
+`putnami change-plan` is that projection for the fixed command list
+`lint,test,build,validate` and the checkout's `origin` remote: its ChangePlan
+is the projection of the ImpactPlan `putnami impact-plan` emits for that list
+and range. Adding the ImpactPlan changed no ChangePlan byte and no digest. See
+[ADR 0005](doc/adr/0005-a-change-plan-projects-an-impact-plan.md).
+
 ## Schema and fixtures
 
 - Schema: [`schemas/putnami-ci.json`](schemas/putnami-ci.json)
@@ -347,6 +382,16 @@ literal for that reason.
   refused. Every fixture is the exact indented encoding of the plan it holds.
   The protocol tests and the CLI tests both run this corpus: the CLI rebuilds
   each valid plan from its planner data and must emit the same bytes.
+- ImpactPlan conformance corpus:
+  [`fixtures/impact-plan`](fixtures/impact-plan). `expectations.json` maps
+  every `valid/*` plan to the `fixtures/change-plan/valid` plan its projection
+  must equal byte for byte, and every `invalid/*` plan to the refusal
+  `ValidateImpactPlan` returns. Each valid plan is its change-plan counterpart
+  without `repository` and `digest`, with a command list added. Each invalid
+  plan carries one defect: no command, a command named twice, a command
+  holding a comma, an incomplete generator, partial transitive dependents, a
+  short SHA, an unknown version, or unsorted tasks. The CLI tests rebuild each
+  valid plan from its planner data and must emit the same bytes.
 
 ## Versioning and compatibility
 
@@ -416,11 +461,17 @@ second authority beside the schema.
 A spec for a CI change therefore belongs with `putnami ci` or with the plane
 that executes the requests, and would link back to this contract.
 
+The ImpactPlan's outcome, an extension that reads the impacted plan of a
+change without importing the CLI, is carried by the `tooling/cli` feature
+`cli/impact-plan`.
+
 This module records its shape in
 [ADR 0001](doc/adr/0001-commands-rules-environments-distribution.md), which
 replaced `gate` with `commands`, moved deploy off the branch rule, and gave
-`distribution` a home, and the lifetime of a published channel in
-[ADR 0003](doc/adr/0003-published-channel-lifetime.md). Anything not settled there is enforced by the schema and
+`distribution` a home, the lifetime of a published channel in
+[ADR 0003](doc/adr/0003-published-channel-lifetime.md), and the ImpactPlan as
+the document a ChangePlan projects in
+[ADR 0005](doc/adr/0005-a-change-plan-projects-an-impact-plan.md). Anything not settled there is enforced by the schema and
 the tests rather than by a separate record. When a further decision becomes
 contested — the first candidate is whether the canonical digest is part of the
 public contract or an implementation detail — it gets a record under

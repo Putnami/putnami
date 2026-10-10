@@ -98,6 +98,7 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | Command | Description |
 |---------|-------------|
 | `putnami change-plan` | Emit an immutable impacted CI ChangePlan |
+| `putnami impact-plan` | Emit the impacted plan of a change for a command list |
 | `putnami ci init` | Create a safe putnami.ci.json version 3 contract |
 | `putnami ci validate` | Validate CI intent and workspace graph references |
 | `putnami ci fmt` | Canonicalize putnami.ci.json |
@@ -235,6 +236,28 @@ putnami change-plan --base <commit> [--head <commit>] [--no-cache] [--output <fo
 
 - `putnami change-plan --base origin/main --output=json`
 - `putnami change-plan --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl`
+
+### `putnami impact-plan`
+
+Emit the impacted plan of the exact commit delta from --base to the checked-out HEAD for a comma-separated command list: the changed files, the impacted projects, and every task the engine plans for those commands. An extension reads this ImpactPlan instead of importing the CLI, and derives its own document from it, such as a ChangePlan. The worktree must be clean and --base must be a HEAD ancestor. Source contents, environment values, secrets, command arguments, and output paths are never emitted
+
+**Usage**
+
+```
+putnami impact-plan <commands> --base <commit> [--head <commit>] [--no-cache] [--output <format>]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--base` <commit> | Required base commit or ref; emitted as its full immutable commit SHA |
+| `--head` <commit> | Optional head commit or ref; it must resolve to the checked-out HEAD |
+
+**Examples**
+
+- `putnami impact-plan test,build --base origin/main --output=json`
+- `putnami impact-plan lint --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl`
 
 ### `putnami ci init`
 

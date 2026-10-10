@@ -201,7 +201,23 @@ putnami change-plan --base origin/main --output=json
 It rejects dirty trees, a non-checked-out `--head`, and a base that is not an
 ancestor of HEAD. The structured result contains the full immutable document in
 `data`; see [CI Change Plans](17-ci-change-plans.md) for the v1 schema and
-digest rules.
+digest rules. The plan covers the fixed CI gate and is the projection of the
+`impact-plan` document for that gate.
+
+### `impact-plan`
+
+Emit the impacted plan of a checked-out commit range for the commands you name:
+
+```bash
+putnami impact-plan test,build --base origin/main --output=json
+```
+
+It is the document an extension reads to learn the changed files, the impacted
+projects and the planned tasks of a change without importing the CLI. It runs
+the same revision checks as `change-plan` and needs no repository remote. The
+command list is one positional argument, comma-separated, with aliases resolved;
+a command named twice and an alias that expands to several commands are
+refused. See [Impact plans](17-ci-change-plans.md#impact-plans).
 
 ### `projects`
 
