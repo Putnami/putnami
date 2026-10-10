@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"testing"
 )
 
@@ -331,5 +332,130 @@ func TestMirrorGeneratedClients_NoStagedClientKeepsOwnedFiles(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(target, stale)); !os.IsNotExist(err) {
 			t.Errorf("generated entry %s survived, err=%v", stale, err)
 		}
+	}
+}
+
+// A rerun with the same stage leaves an unchanged generated file untouched,
+// replaces a changed one, drops what the stage no longer carries, and leaves no
+// temporary file behind.
+func TestMirrorGeneratedClients_ReplacesOnlyChangedEntries(t *testing.T) {
+	proj := t.TempDir()
+	genDir := filepath.Join(proj, ".gen")
+	stageClient(t, genDir, goTarget, map[string]string{
+		"client.gen.go": "package client\n",
+		"types.gen.go":  "package client\n// v1\n",
+	})
+	target := filepath.Join(proj, "clients", "go")
+	writeTargetFile(t, filepath.Join(target, "old"), "stale.gen.go", "package stale\n")
+	writeTargetFile(t, target, "gone.gen.go", "package stale\n")
+	if _, _, err := mirrorGeneratedClients(proj, genDir); err != nil {
+		t.Fatalf("first mirror: %v", err)
+	}
+	before, err := os.Stat(filepath.Join(target, "client.gen.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Remove(filepath.Join(genDir, "clientgen", "go", "types.gen.go")); err != nil {
+		t.Fatal(err)
+	}
+	stageClient(t, genDir, goTarget, map[string]string{
+		"client.gen.go": "package client\n",
+		"models.gen.go": "package client\n// v2\n",
+	})
+	artifacts, _, err := mirrorGeneratedClients(proj, genDir)
+	if err != nil {
+		t.Fatalf("second mirror: %v", err)
+	}
+	after, err := os.Stat(filepath.Join(target, "client.gen.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(before, after) || !before.ModTime().Equal(after.ModTime()) {
+		t.Errorf("unchanged client.gen.go was rewritten")
+	}
+	want := []string{"clients/go/client.gen.go", "clients/go/models.gen.go"}
+	if !slices.Equal(artifacts, want) {
+		t.Errorf("artifacts = %v, want %v", artifacts, want)
+	}
+	entries, err := os.ReadDir(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	if !slices.Equal(names, []string{"client.gen.go", "models.gen.go"}) {
+		t.Errorf("target entries = %v, want only the staged files", names)
+	}
+}
+
+// A stale directory where a staged file goes, and a stale file where a staged
+// file's parent directory goes, give way to the staged layout.
+func TestMirrorGeneratedClients_ReplacesStaleEntryKinds(t *testing.T) {
+	proj := t.TempDir()
+	genDir := filepath.Join(proj, ".gen")
+	stageClient(t, genDir, goTarget, map[string]string{"client.gen.go": "package client\n"})
+	writeTargetFile(t, filepath.Join(genDir, "clientgen", "go", "sub"), "sub.gen.go", "package sub\n")
+	target := filepath.Join(proj, "clients", "go")
+	writeTargetFile(t, filepath.Join(target, "client.gen.go"), "inner.go", "package stale\n")
+	writeTargetFile(t, target, "sub", "stale\n")
+
+	artifacts, _, err := mirrorGeneratedClients(proj, genDir)
+	if err != nil {
+		t.Fatalf("mirror: %v", err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(target, "client.gen.go")); string(got) != "package client\n" {
+		t.Errorf("client.gen.go = %q", got)
+	}
+	if got, _ := os.ReadFile(filepath.Join(target, "sub", "sub.gen.go")); string(got) != "package sub\n" {
+		t.Errorf("sub/sub.gen.go = %q", got)
+	}
+	want := []string{"clients/go/client.gen.go", "clients/go/sub/sub.gen.go"}
+	if !slices.Equal(artifacts, want) {
+		t.Errorf("artifacts = %v, want %v", artifacts, want)
+	}
+}
+
+// An importer that compiles while describe runs must always find the client
+// file: the mirror replaces it, it never deletes it first.
+func TestMirrorGeneratedClients_ClientFileNeverAbsent(t *testing.T) {
+	proj := t.TempDir()
+	genDir := filepath.Join(proj, ".gen")
+	stageClient(t, genDir, goTarget, map[string]string{"client.gen.go": "package client\n"})
+	if _, _, err := mirrorGeneratedClients(proj, genDir); err != nil {
+		t.Fatalf("first mirror: %v", err)
+	}
+	clientFile := filepath.Join(proj, "clients", "go", "client.gen.go")
+
+	stop := make(chan struct{})
+	missing := make(chan error, 1)
+	go func() {
+		defer close(missing)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			if _, err := os.Lstat(clientFile); err != nil {
+				missing <- err
+				return
+			}
+		}
+	}()
+	for i := range 200 {
+		stageClient(t, genDir, goTarget, map[string]string{
+			"client.gen.go": "package client\n// run " + strconv.Itoa(i) + "\n",
+		})
+		if _, _, err := mirrorGeneratedClients(proj, genDir); err != nil {
+			close(stop)
+			t.Fatalf("mirror %d: %v", i, err)
+		}
+	}
+	close(stop)
+	if err := <-missing; err != nil {
+		t.Fatalf("client.gen.go was absent during a mirror: %v", err)
 	}
 }
