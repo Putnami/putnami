@@ -11,6 +11,11 @@
   "publish": [
     "archives"
   ],
+  "tasks": {
+    "test~test": {
+      "timeoutMs": 1200000
+    }
+  },
   "options": {
     "lint": {
       "fix": false
