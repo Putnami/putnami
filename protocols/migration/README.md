@@ -195,6 +195,38 @@ identical to applying the migrations from source. This is the generic-runner
 core that both local `migrate up --bundle` and remote execution build on; no
 service image is required.
 
+### How bundles are packaged and published
+
+Two sub-packages ship a bundle directory through a package registry. They add
+transport only: the bundle format, its validation and its digest stay in this
+package.
+
+`go.putnami.dev/protocol/migration/bundle` imports only the standard library,
+so a dependency-light publisher can use it.
+
+- `Pack(fsys)` writes every file of a bundle directory into one tar. Entries
+  are sorted by path, with mode `0600` and a zero modification time, so one
+  directory always packs to the same bytes and the same blob digest.
+- `Unpack(tarball, dest)` and `UnpackToDir(tarball, dir)` recreate the
+  directory. They strip a leading slash, refuse an entry that escapes the
+  root, and accept only regular files and directories.
+- `Manifest` is the registry payload that points at the blob: `protocol`,
+  `appName`, `bundleDigest`, and `artifact` (`blob`, `mediaType`, `size`).
+- `BlobMediaType` (`application/vnd.putnami.migration-bundle.v1.tar`),
+  `ManifestMediaType`, the default `Namespace` (`migrations`),
+  `ValidNamespace`, and `PackageName`, which turns a path-style application
+  name into one path segment.
+
+`go.putnami.dev/protocol/migration/bundle/publication` packs the exact bytes a
+registry stores for one publication. `Pack(Input)` loads the files with
+`LoadBundle`, refuses anything outside the publication scope (`CheckScope`:
+`sql` operations only, a valid safety marker and up hash, one canonical
+identity per operation), and returns the tar blob, the
+`putnami.data.migration.v2` manifest, their `sha256:<hex>` digests, and their
+refs. The same input always packs to the same bytes, so a receiver can accept a
+stored publication by repacking it and comparing bytes. Tests pin the blob,
+bundle, and artifact digests of a fixture under `bundle/testdata/`.
+
 ## Producers and consumers
 
 | Shape | Produced by | Consumed by |
@@ -202,6 +234,7 @@ service image is required.
 | Migration state (`migration.migrations`) | the Go runner (`go.putnami.dev/migration` with `go.putnami.dev/database`) and the TypeScript runner (`@putnami/migration` with `@putnami/database`) | the same runners on the next startup, plus migration-aware tooling reading applied state and drift |
 | `Definition` (normalized migration identity) | each framework's authoring source — filesystem SQL in Go, code-registered migrations in TypeScript | the runners, and `BundleContributor` implementations at build time |
 | Bundle (`bundle.json` + `payload/`) | the build/describe phase, from every runner implementing `BundleContributor`; written by `WriteBundle` | `LoadBundle`, `database.LoadBundleSources` / `ApplyBundle`, `migrate up --bundle`, remote execution, and the database test provider's `bundle-template` reuse |
+| Bundle tar blob and registry manifest | a publisher, through `bundle.Pack` or `publication.Pack` | a migration runner, through `bundle.Unpack` / `UnpackToDir`; a receiver that repacks a stored publication to compare bytes |
 
 This package parses, validates, normalizes, and hashes. It opens no connection
 and applies no migration.

@@ -1,0 +1,28 @@
+{
+  "protocol": "migration-bundle.v1",
+  "appName": "publish-v2-fixture",
+  "digest": "4f12fb7c002958eebb90da5d38679d8b794e2522d6d89202f399b4ef955c1955",
+  "operations": [
+    {
+      "kind": "sql",
+      "target": "platform_migrations",
+      "schema": "platform_migrations",
+      "namespace": "publish-v2",
+      "name": "publish-v2/001_fixture",
+      "orderKey": "publish-v2/001_fixture",
+      "up": {
+        "path": "payload/sql/platform_migrations/publish-v2/001_fixture.up.sql",
+        "hash": "81e19b2a77797020f0c77525bfb7cd044d505232f6f8c0c67b9f9153c06a010c"
+      },
+      "down": {
+        "path": "payload/sql/platform_migrations/publish-v2/001_fixture.down.sql",
+        "hash": "26129ebb9c1fc9954a02d2fadbc8ee3d0560fd9cddf8c07b1b0bcb471fe2fb2c"
+      },
+      "safety": "safe-online",
+      "capabilities": {
+        "transactional": true,
+        "reversible": true
+      }
+    }
+  ]
+}
