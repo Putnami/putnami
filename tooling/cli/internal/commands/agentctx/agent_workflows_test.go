@@ -35,12 +35,12 @@ func TestPortableFixFinalizer(t *testing.T) {
 	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "no-publication-names-an-agent")
 	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "a-loaded-machine-gates-on-hosted-checks")
 	skipSourceWrapperOnWindows(t)
-	runSkillScriptTest(t, "fix", "finalize-pr.test.sh", "finalize-pr test: ok", collaborationScriptEnv(t))
+	runSkillScriptTestBesideAForeignRepository(t, "fix", "finalize-pr.test.sh", "finalize-pr test: ok", collaborationScriptEnv(t))
 }
 
 func TestTreeFingerprint(t *testing.T) {
 	skipSourceWrapperOnWindows(t)
-	runSkillScriptTest(t, "fix", "tree-fingerprint.test.sh", "tree-fingerprint test: ok", nil)
+	runSkillScriptTestBesideAForeignRepository(t, "fix", "tree-fingerprint.test.sh", "tree-fingerprint test: ok", nil)
 }
 
 func TestMachineLoad(t *testing.T) {
@@ -50,7 +50,7 @@ func TestMachineLoad(t *testing.T) {
 
 func TestEnglishOnlyDetector(t *testing.T) {
 	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "the-language-rule-reads-tasks-through-the-contract")
-	runSkillScriptTest(t, "check", "english-only.test.sh", "english-only test: ok", collaborationScriptEnv(t))
+	runSkillScriptTestBesideAForeignRepository(t, "check", "english-only.test.sh", "english-only test: ok", collaborationScriptEnv(t))
 }
 
 func TestSessionCapHook(t *testing.T) {
@@ -140,6 +140,74 @@ func runSkillScriptTest(t *testing.T, skill, name, okMarker string, env []string
 	if !strings.Contains(string(output), okMarker) {
 		t.Fatalf("%s did not report success:\n%s", name, output)
 	}
+}
+
+// runSkillScriptTestBesideAForeignRepository runs a skill script's bash test
+// with GIT_DIR naming another repository, the way a git hook or `git bisect
+// run` starts a command, and requires that repository's configuration, HEAD
+// and refs to come out byte for byte unchanged. A nil env inherits the
+// caller's environment.
+func runSkillScriptTestBesideAForeignRepository(t *testing.T, skill, name, okMarker string, env []string) {
+	t.Helper()
+	if env == nil {
+		env = os.Environ()
+	}
+	env = withoutGitRepositoryVariables(t, env)
+	foreign := t.TempDir()
+	foreignGit := func(args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = foreign
+		cmd.Env = env
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v in the foreign repository: %v: %s", args, err, output)
+		}
+		return string(output)
+	}
+	foreignGit("init", "-q", "-b", "main")
+	foreignGit("-c", "user.name=Foreign", "-c", "user.email=foreign@example.com", "commit", "-q", "--allow-empty", "-m", "foreign")
+	gitDir := filepath.Join(foreign, ".git")
+	state := func() string {
+		t.Helper()
+		var snapshot strings.Builder
+		for _, file := range []string{"config", "HEAD"} {
+			data, err := os.ReadFile(filepath.Join(gitDir, file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			snapshot.WriteString(file + ":\n" + string(data))
+		}
+		snapshot.WriteString("refs:\n" + foreignGit("for-each-ref", "--format=%(refname) %(objectname)"))
+		return snapshot.String()
+	}
+	before := state()
+	runSkillScriptTest(t, skill, name, okMarker, append(env, "GIT_DIR="+gitDir))
+	if after := state(); after != before {
+		t.Fatalf("%s changed the repository GIT_DIR named\nbefore:\n%s\nafter:\n%s", name, before, after)
+	}
+}
+
+// withoutGitRepositoryVariables drops every variable that points git at a
+// repository, so a test names its repositories itself.
+func withoutGitRepositoryVariables(t *testing.T, env []string) []string {
+	t.Helper()
+	output, err := exec.Command("git", "rev-parse", "--local-env-vars").Output()
+	if err != nil {
+		t.Fatalf("list git's repository variables: %v", err)
+	}
+	drop := map[string]bool{"GIT_NAMESPACE": true, "GIT_CEILING_DIRECTORIES": true, "GIT_DISCOVERY_ACROSS_FILESYSTEM": true}
+	for _, name := range strings.Fields(string(output)) {
+		drop[name] = true
+	}
+	kept := make([]string, 0, len(env))
+	for _, entry := range env {
+		name, _, _ := strings.Cut(entry, "=")
+		if !drop[name] {
+			kept = append(kept, entry)
+		}
+	}
+	return kept
 }
 
 func lastOutputLine(output []byte) string {
