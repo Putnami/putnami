@@ -84,6 +84,17 @@ discovers sources. Nothing is read at import time.
   per audience until one minute before expiry, with one shared refresh.
   Errors never carry token or provider text.
 
+## Support status
+
+- **Status**: `preview`, recorded in the workspace-root
+  [`putnami.support.json`](../../../putnami.support.json).
+- **Owner**: `@putnami/cloud` (`cloud/runtime/typescript`).
+- **What may still change**: the exported names and the activation call.
+  Stable support requires a version gate on the public surface and shared
+  fixtures that prove parity with the Go runtime destination.
+- **Evidence**: the tests under `test/`, and the `sites/putnami.dev` workload,
+  which activates `@putnami/cloud/runtime`.
+
 ## Hosts
 
 Outside the configured URLs, the package calls Google endpoints only:
