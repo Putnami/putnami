@@ -63,7 +63,7 @@ func TestMain(m *testing.M) {
 	internalextension.ResolveRegistryToken = func(string) (string, string) { return "", "" }
 	// A copy of this race-enabled binary that a test starts, such as a native
 	// runtime, exits without the race runtime's 1 s exit sleep.
-	_ = os.Setenv("GORACE", "atexit_sleep_ms=0")
+	fixtureproc.QuietRaceExit()
 	code := m.Run()
 	fixtureproc.Remove()
 	os.Exit(code)

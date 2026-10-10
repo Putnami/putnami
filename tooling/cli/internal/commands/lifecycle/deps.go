@@ -330,19 +330,10 @@ func goDepsResult(action string, installErr, err error) error {
 		"putnami deps install")
 }
 
-// runGoDeps resolves the target Go module, then edits its requirements and runs
-// `go mod tidy`, both in the module directory with GOWORK pointed at the
-// workspace file so `replace` directives resolve. add runs `go get` with the
-// module specs as given; remove runs `go get <module>@none`; prune runs `go mod
-// edit -droprequire=<module>` (goDepsEdit says why).
-//
-// The go command is the one a task of the workspace's Go extension runs: the
-// release the workspace lock pins, installed first on a host that has none
-// (ensureGoCommand). installErr is the failure of the workspace installers
-// that installed it; err is the failure of the edit. The caller reports both
-// (goDepsResult). When the version probe of a go timed out, that go is there
-// and slow: err names rerun, the deps command the user ran, as the next step.
-// Any other failure to find a go names putnami install.
+// runGoDeps resolves the target Go module and the go command (goDepsCommand),
+// then edits the module's requirements (editGoModule). installErr is the
+// failure of the workspace installers that installed the go; err is the
+// failure of the edit. The caller reports both (goDepsResult).
 func runGoDeps(ctx context.Context, wsRoot, action string, modules []string, projectSelector, rerun string, lifecycleEnv LifecycleEnv) (installErr, err error) {
 	if len(modules) == 0 {
 		return nil, fmt.Errorf("deps %s requires at least one module (e.g. `putnami deps %s golang.org/x/text@latest`)", action, action)
@@ -356,14 +347,38 @@ func runGoDeps(ctx context.Context, wsRoot, action string, modules []string, pro
 	if err != nil {
 		return nil, err
 	}
-	goCmd, err := ensureGoCommand(ctx, wsRoot, proj.Path, "", goToolchainExtension(wsRoot), lifecycleEnv)
+	goCmd, err := goDepsCommand(ctx, wsRoot, proj.Path, action, rerun, lifecycleEnv)
+	if err != nil {
+		return nil, err
+	}
+	return goCmd.installErr, editGoModule(ctx, wsRoot, proj, goCmd, action, modules)
+}
+
+// goDepsCommand returns the go command a deps edit runs: the one a task of the
+// workspace's Go extension runs, the release the workspace lock pins, installed
+// first on a host that has none (ensureGoCommand). A caller resolves it before
+// its first edit, so a failure leaves the workspace as it was. When the version
+// probe of a go timed out, that go is there and slow: the error names rerun, the
+// deps command the user ran, as the next step. Any other failure to find a go
+// names putnami install.
+func goDepsCommand(ctx context.Context, wsRoot, projectPath, action, rerun string, env LifecycleEnv) (goCommand, error) {
+	goCmd, err := ensureGoCommand(ctx, wsRoot, projectPath, "", goToolchainExtension(wsRoot), env)
 	if err != nil {
 		next := "putnami install"
 		if errors.Is(err, jobs.ErrToolchainProbeTimeout) {
 			next = rerun
 		}
-		return nil, protocolcli.WithNext(fmt.Errorf("deps %s: %w", action, err), next)
+		return goCommand{}, protocolcli.WithNext(fmt.Errorf("deps %s: %w", action, err), next)
 	}
+	return goCmd, nil
+}
+
+// editGoModule edits the requirements of proj's Go module with goCmd and runs
+// `go mod tidy`, both in the module directory with GOWORK pointed at the
+// workspace file so `replace` directives resolve. add runs `go get` with the
+// module specs as given; remove runs `go get <module>@none`; prune runs `go mod
+// edit -droprequire=<module>` (goDepsEdit says why).
+func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, goCmd goCommand, action string, modules []string) error {
 	moduleDir := filepath.Join(wsRoot, proj.Path)
 	env := shared.GoCommandEnvFrom(goCmd.env, moduleDir)
 
@@ -372,14 +387,14 @@ func runGoDeps(ctx context.Context, wsRoot, action string, modules []string, pro
 
 	edit, name := goDepsEdit(action, modules)
 	if err := runGoInModule(ctx, goCmd.path, moduleDir, env, edit); err != nil {
-		return goCmd.installErr, fmt.Errorf("%s: %w", name, err)
+		return fmt.Errorf("%s: %w", name, err)
 	}
 	// Reconcile the module graph so the closure and go.sum stay consistent.
 	if err := runGoInModule(ctx, goCmd.path, moduleDir, env, []string{"mod", "tidy"}); err != nil {
-		return goCmd.installErr, fmt.Errorf("go mod tidy: %w", err)
+		return fmt.Errorf("go mod tidy: %w", err)
 	}
 	iox.Fprintf(os.Stdout, "  ✓ updated %s\n", filepath.Join(proj.Path, "go.mod"))
-	return goCmd.installErr, nil
+	return nil
 }
 
 // goDepsEdit returns the go arguments that edit the module's requirements for

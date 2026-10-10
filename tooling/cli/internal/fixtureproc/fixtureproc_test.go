@@ -275,6 +275,55 @@ func TestWarmRunsACopyWithItsArguments(t *testing.T) {
 	}
 }
 
+// A placed script is executable, replaces a file at its path, and its warm run
+// passes it args: the script records them. A script that fails its warm run
+// fails the test.
+func TestScriptPlacesAnExecutableAndWarmsItWithItsArguments(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a #! script runs on unix only")
+	}
+	dir := t.TempDir()
+	record := filepath.Join(dir, "args")
+	path := Script(t, filepath.Join(dir, "bin", "runtime"), "#!/bin/sh\nprintf '%s\\n' \"$*\" >> '"+record+"'\n", "__putnami", "runtime-info")
+	if got, err := os.ReadFile(record); err != nil || string(got) != "__putnami runtime-info\n" {
+		t.Fatalf("the warm run recorded %q, %v; want its arguments", got, err)
+	}
+	if out, err := exec.Command(path).CombinedOutput(); err != nil {
+		t.Fatalf("placed script = %v:\n%s", err, out)
+	}
+	// A second script at the path replaces the first.
+	Script(t, path, "#!/bin/sh\nprintf 'second\\n' >> '"+record+"'\n")
+	if got, err := os.ReadFile(record); err != nil || !strings.HasSuffix(string(got), "second\n") {
+		t.Fatalf("the replacing script recorded %q, %v; want its own line", got, err)
+	}
+	failed := &fatalRecorder{TB: t}
+	Script(failed, filepath.Join(dir, "failing"), "#!/bin/sh\nexit 3\n")
+	if !strings.Contains(failed.fatal, "exit status 3") {
+		t.Fatalf("warm of a script that exits 3 = %q, want a failure that names the status", failed.fatal)
+	}
+}
+
+// The GORACE options a warm run and QuietRaceExit set end with
+// atexit_sleep_ms=0 and keep every other option a developer set.
+func TestQuietRaceOptionsKeepsTheOtherOptions(t *testing.T) {
+	for value, want := range map[string]string{
+		"":                                     "atexit_sleep_ms=0",
+		"halt_on_error=1 log_path=/tmp/race":   "halt_on_error=1 log_path=/tmp/race atexit_sleep_ms=0",
+		"atexit_sleep_ms=0":                    "atexit_sleep_ms=0",
+		"atexit_sleep_ms=500":                  "atexit_sleep_ms=500 atexit_sleep_ms=0",
+		"atexit_sleep_ms=0 log_path=/tmp/race": "atexit_sleep_ms=0 log_path=/tmp/race",
+	} {
+		if got := quietRaceOptions(value); got != want {
+			t.Errorf("quietRaceOptions(%q) = %q, want %q", value, got, want)
+		}
+	}
+	t.Setenv("GORACE", "log_path=/tmp/race")
+	QuietRaceExit()
+	if got, want := os.Getenv("GORACE"), "log_path=/tmp/race atexit_sleep_ms=0"; got != want {
+		t.Errorf("GORACE after QuietRaceExit = %q, want %q", got, want)
+	}
+}
+
 // fatalRecorder keeps the message of a Fatalf instead of ending the test.
 type fatalRecorder struct {
 	testing.TB

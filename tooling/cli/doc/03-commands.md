@@ -675,8 +675,9 @@ a `go` on PATH. On a host with neither, they first pin and install the pinned Go
 as `projects create` does. When the workspace installers fail but still leave a
 Go, `add`, `remove` and `prune` edit the modules with it and exit non-zero with
 the command to run next: `putnami deps install`. A Go that does not answer its
-version probe within 5 seconds is not missing: they install nothing, name the
-timeout, and exit non-zero with the same `deps` command to run next. For
+version probe within 5 seconds is not missing: they install nothing, edit no
+`go.mod` or `putnami.json`, name the timeout, and exit non-zero with the same
+`deps` command to run next. For
 TypeScript, edit `package.json` and run `putnami deps install`.
 
 `prune` reads the provider view that the last install or build recorded. When a

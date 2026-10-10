@@ -29,6 +29,7 @@ import (
 	"go.putnami.dev/sdk/extension/publicationoutbox"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/credentialprovider/providertest"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 )
 
 // The one member a publication fixture publishes, and the project the plan
@@ -382,8 +383,8 @@ func writePublicationFixture(t *testing.T, self, endpoint, gate string) publicat
 		wsproto.ProbeProtocolVersion, publicationCoordinate)
 	info := fmt.Sprintf(`{"extension":"@fixture/publisher","version":"1.0.0","platform":"%s/%s","cliContract":%d,"runtimeProtocol":%d,"runtimeABI":%d}`,
 		runtime.GOOS, runtime.GOARCH, protocolcli.CurrentContract, runtimeproto.MaxKnownProtocolVersion, runtimeproto.RuntimeABIVersion)
-	runtimePath := filepath.Join(fx.wsRoot, "publisher", "runtime")
-	write("publisher/runtime", fmt.Sprintf(`#!/bin/sh
+	// The runtime is warmed for the handshake's deadline (fixtureproc.Script).
+	fixtureproc.Script(t, filepath.Join(fx.wsRoot, "publisher", "runtime"), fmt.Sprintf(`#!/bin/sh
 if [ "$1" = "__putnami" ] && [ "$2" = "runtime-info" ]; then
   printf '%%s\n' %s
   exit 0
@@ -393,10 +394,7 @@ if [ "$1" = "__putnami" ] && [ "$2" = "workspace-probe" ]; then
   exit 0
 fi
 exit 2
-`, shellQuote(info), shellQuote(probe)))
-	if err := os.Chmod(runtimePath, 0o755); err != nil {
-		t.Fatal(err)
-	}
+`, shellQuote(info), shellQuote(probe)), "__putnami", "runtime-info")
 	clitest.InitGitRepo(t, fx.wsRoot)
 	return fx
 }

@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 )
 
 // The extraction acceptance: for every one of the
@@ -399,14 +400,15 @@ func parityExtensionRuntime(t *testing.T) string {
 // server, and the broker wins over every authored route while answering 401
 // to a test archive. Tests that exercise the broker set it with t.Setenv. As
 // the runtime of a fixture extension, this binary answers the runtime-info
-// handshake and exits (answerRuntimeHandshake). GORACE has every copy of this
-// binary the tests start exit without the race runtime's 1 s exit sleep.
+// handshake and exits (answerRuntimeHandshake). Every copy of this binary the
+// tests start exits without the race runtime's 1 s exit sleep
+// (fixtureproc.QuietRaceExit).
 func TestMain(m *testing.M) {
 	if answerRuntimeHandshake() {
 		os.Exit(0)
 	}
 	os.Unsetenv(extension.PrivatePutRegistryURLEnv)
-	_ = os.Setenv("GORACE", "atexit_sleep_ms=0")
+	fixtureproc.QuietRaceExit()
 	code := m.Run()
 	_ = parityRuntimeDir.Remove()
 	_ = parityWorkspaceTemplateScratch.Remove()

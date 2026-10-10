@@ -125,6 +125,21 @@ func TestRuntimeToolchainRequiredFailureNamesEveryCandidateInDeclarationOrder(t 
 	}
 }
 
+// A runtime toolchain probe is bounded by the production 5 s unless its caller
+// sets another deadline (WithToolchainProbeTimeout), as a test does to prove a
+// timeout without waiting 5 s.
+func TestRuntimeToolchainProbeTimeoutIsFiveSecondsUnlessTheCallerSetsOne(t *testing.T) {
+	if got := runtimeToolchainProbeTimeout(context.Background()); got != 5*time.Second {
+		t.Fatalf("probe timeout = %s, want the production 5s", got)
+	}
+	if got := runtimeToolchainProbeTimeout(WithToolchainProbeTimeout(context.Background(), 100*time.Millisecond)); got != 100*time.Millisecond {
+		t.Fatalf("probe timeout = %s, want the 100ms the caller set", got)
+	}
+	if got := runtimeToolchainProbeTimeout(WithToolchainProbeTimeout(context.Background(), 0)); got != 5*time.Second {
+		t.Fatalf("probe timeout = %s, want the production 5s for a deadline of zero", got)
+	}
+}
+
 // A required toolchain whose probe timed out fails with the text of any other
 // mismatch, and unwraps to ErrToolchainProbeTimeout: a caller tells a slow
 // toolchain from an absent one by the error, never by its text.

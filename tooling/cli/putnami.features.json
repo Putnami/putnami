@@ -1630,7 +1630,8 @@
             "checks": [
               "deps-add-and-remove-run-the-pinned-go",
               "deps-add-installs-the-pinned-go-first",
-              "deps-add-reports-a-go-probe-that-timed-out"
+              "deps-add-reports-a-go-probe-that-timed-out",
+              "deps-prune-changes-nothing-when-the-go-probe-times-out"
             ]
           }
         },

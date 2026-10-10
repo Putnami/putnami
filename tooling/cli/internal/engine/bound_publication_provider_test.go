@@ -27,6 +27,7 @@ import (
 	"go.putnami.dev/sdk/extension/publicationoutbox"
 	"go.putnami.dev/tooling/cli/internal/credentialprovider"
 	"go.putnami.dev/tooling/cli/internal/credentialprovider/providertest"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -153,7 +154,8 @@ func boundPublicationFixture(t *testing.T, endpoint string) string {
 		`{"path":"app","metadata":{"releaseSet":{"ecosystems":[`+
 		`{"ecosystem":"npm","coordinate":%q,"packageStep":"artifact","publishStep":"artifact"}]}}}]}`,
 		wsproto.ProbeProtocolVersion, boundPublicationCoordinate)
-	write("provider/runtime", fmt.Sprintf(`#!/bin/sh
+	// The runtime is warmed for the handshake's deadline (fixtureproc.Script).
+	fixtureproc.Script(t, filepath.Join(root, "provider", "runtime"), fmt.Sprintf(`#!/bin/sh
 if [ "$1" = "__putnami" ] && [ "$2" = "runtime-info" ]; then
   printf '%%s\n' '{"extension":"@fixture/provider","version":"1.0.0","platform":"%s/%s","cliContract":4,"runtimeProtocol":2,"runtimeABI":1}'
   exit 0
@@ -163,7 +165,7 @@ if [ "$1" = "__putnami" ] && [ "$2" = "workspace-probe" ]; then
   exit 0
 fi
 exit 2
-`, runtime.GOOS, runtime.GOARCH, probe), 0o755)
+`, runtime.GOOS, runtime.GOARCH, probe), "__putnami", "runtime-info")
 
 	initCLISelectionGitRepo(t, root)
 	runCLISelectionGit(t, root, "tag", "v1.0.0")

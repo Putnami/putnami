@@ -187,10 +187,21 @@ func (f goCreateFixture) goCalls(t *testing.T) []string {
 
 func (f goCreateFixture) create(t *testing.T, env LifecycleEnv) (string, error) {
 	t.Helper()
+	return f.createUnder(t, context.Background(), env)
+}
+
+// createUnder creates the Go project under ctx.
+func (f goCreateFixture) createUnder(t *testing.T, ctx context.Context, env LifecycleEnv) (string, error) {
+	t.Helper()
 	return captureStdout(t, func() error {
-		return ProjectsCreate(context.Background(), f.root, wsproto.Load(f.root), []string{"app", "--template", "go-app"}, false, env)
+		return ProjectsCreate(ctx, f.root, wsproto.Load(f.root), []string{"app", "--template", "go-app"}, false, env)
 	})
 }
+
+// testProbeTimeout bounds the go version probe of a test that proves how a
+// timed-out probe is reported, in place of the production 5 s
+// (jobs.WithToolchainProbeTimeout).
+const testProbeTimeout = 100 * time.Millisecond
 
 // A consumer who installed only Putnami creates a Go project in a workspace
 // whose lock pins no Go yet: create writes go.work, pins the Go it declares,
@@ -422,19 +433,19 @@ func TestProjectsCreateNamesTheRetryWhenNoGoCanBeInstalled(t *testing.T) {
 
 // A go whose version probe does not exit within its deadline is there and
 // slow, not missing: create installs nothing, stops naming the timeout, and
-// names the command that creates the project again. The probe runs under its
-// production deadline of 5 s.
+// names the command that creates the project again.
 func TestProjectsCreateReportsAGoProbeThatTimedOut(t *testing.T) {
 	f := newGoCreateFixture(t)
 	spectest.Proves(t, "cli/toolchain-lock", "create-installs-a-missing-go", "create-reports-a-go-probe-that-timed-out")
 	f.pin(t)
 	f.writeSlowGo(t)
 
-	output, err := f.create(t, f.refusingGoInstall(t))
+	ctx := jobs.WithToolchainProbeTimeout(context.Background(), testProbeTimeout)
+	output, err := f.createUnder(t, ctx, f.refusingGoInstall(t))
 	if !errors.Is(err, jobs.ErrToolchainProbeTimeout) || errors.Is(err, errGoUnavailable) {
 		t.Fatalf("error = %v, want the probe timeout, not %v\n%s", err, errGoUnavailable, output)
 	}
-	if want := "probe timed out after 5s"; !strings.Contains(err.Error(), want) {
+	if want := "probe timed out after " + testProbeTimeout.String(); !strings.Contains(err.Error(), want) {
 		t.Errorf("error = %v, want it to name %q", err, want)
 	}
 	if strings.Contains(output, "No go command found") {

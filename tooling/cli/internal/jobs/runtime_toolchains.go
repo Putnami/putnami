@@ -629,7 +629,7 @@ func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirem
 			probeEnv = setEnv(probeEnv, name, strings.ReplaceAll(value, extensionproto.RuntimeToolchainVersionToken, version))
 		}
 		probeEnv = prependEnvPath(probeEnv, filepath.Dir(realExecutable))
-		got, err := probeRuntimeToolchain(ctx, realExecutable, requirement.Probe.Args, probeEnv, toolVersionProbeTimeout)
+		got, err := probeRuntimeToolchain(ctx, realExecutable, requirement.Probe.Args, probeEnv, runtimeToolchainProbeTimeout(ctx))
 		if err != nil {
 			rejections = append(rejections, runtimeToolchainRejection{candidate: label, reason: err.Error(), err: err})
 			continue
@@ -835,6 +835,27 @@ func runtimeExecutable(path string) bool {
 // within its deadline. The candidate is there and may only be slow, so a
 // caller does not take the failure for an absent toolchain.
 var ErrToolchainProbeTimeout = errors.New("probe timed out")
+
+// toolchainProbeTimeoutKey is the context key WithToolchainProbeTimeout sets.
+type toolchainProbeTimeoutKey struct{}
+
+// WithToolchainProbeTimeout returns ctx with every runtime toolchain probe that
+// runs under it bounded by timeout instead of toolVersionProbeTimeout. A test
+// uses it to prove how a caller reports a probe that timed out without waiting
+// out the production deadline.
+func WithToolchainProbeTimeout(ctx context.Context, timeout time.Duration) context.Context {
+	return context.WithValue(ctx, toolchainProbeTimeoutKey{}, timeout)
+}
+
+// runtimeToolchainProbeTimeout is the deadline of a runtime toolchain probe
+// that runs under ctx: the one WithToolchainProbeTimeout set, else
+// toolVersionProbeTimeout.
+func runtimeToolchainProbeTimeout(ctx context.Context) time.Duration {
+	if timeout, ok := ctx.Value(toolchainProbeTimeoutKey{}).(time.Duration); ok && timeout > 0 {
+		return timeout
+	}
+	return toolVersionProbeTimeout
+}
 
 // probeRuntimeToolchain runs the declared probe under timeout and returns its
 // trimmed one-line output. The error states why the output cannot identify a

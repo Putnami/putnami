@@ -271,17 +271,26 @@ func manualManifestEdit(entry routedFinding) string {
 }
 
 // applyPrune edits the files the routed findings name and refuses the rest.
-// rerun is the prune command the user ran (runGoDeps).
+// rerun is the prune command the user ran (goDepsCommand).
+//
+// The go the Go module edits run with is resolved once, before the first edit
+// of any file. A go that cannot be found, or whose version probe timed out,
+// stops the command with the workspace as it was, so the rerun it names reads
+// the provider view this one read.
 func applyPrune(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 	routed []routedFinding, pruned int, rerun string, out io.Writer, env LifecycleEnv) error {
 	byProject := make(map[string][]routedFinding)
 	var kept []routedFinding
+	var goImporter *workspace.Project
 	for _, entry := range routed {
 		if entry.route == pruneRouteKeep {
 			kept = append(kept, entry)
 			continue
 		}
 		byProject[entry.finding.Project] = append(byProject[entry.finding.Project], entry)
+		if entry.route == pruneRouteGoModule && goImporter == nil {
+			goImporter = ws.ProjectByID(entry.finding.Project)
+		}
 	}
 
 	projects := make([]string, 0, len(byProject))
@@ -291,9 +300,16 @@ func applyPrune(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 	sort.Strings(projects)
 
 	// installErr is the failure of the workspace installers that installed the
-	// go the Go module edits run with. Only the first edit installs it; the
-	// edits go on with that go, and the command fails at the end.
-	var installErr error
+	// go the Go module edits run with. The edits go on with that go, and the
+	// command fails at the end.
+	var goCmd goCommand
+	if goImporter != nil {
+		var err error
+		if goCmd, err = goDepsCommand(ctx, wsRoot, goImporter.Path, "prune", rerun, env); err != nil {
+			return err
+		}
+	}
+	installErr := goCmd.installErr
 	for _, id := range projects {
 		project := ws.ProjectByID(id)
 		if project == nil {
@@ -302,11 +318,7 @@ func applyPrune(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 		if err := pruneProjectConfig(wsRoot, project, byProject[id]); err != nil {
 			return goDepsResult("prune", installErr, err)
 		}
-		projectInstallErr, err := pruneGoModule(ctx, wsRoot, ws, project, byProject[id], rerun, env)
-		if installErr == nil {
-			installErr = projectInstallErr
-		}
-		if err != nil {
+		if err := pruneGoModule(ctx, wsRoot, ws, project, byProject[id], goCmd); err != nil {
 			return goDepsResult("prune", installErr, err)
 		}
 	}
@@ -372,11 +384,9 @@ func pruneProjectConfig(wsRoot string, project *workspace.Project, routed []rout
 }
 
 // pruneGoModule drops the unimported workspace requirements from one project's
-// Go module, with the go `deps remove` runs. installErr is the failure of the
-// workspace installers that installed the go it ran, and rerun is the prune
-// command the user ran (runGoDeps).
+// Go module with goCmd, the go `deps remove` runs (applyPrune resolves it).
 func pruneGoModule(ctx context.Context, wsRoot string, ws *workspace.Workspace,
-	project *workspace.Project, routed []routedFinding, rerun string, env LifecycleEnv) (installErr, err error) {
+	project *workspace.Project, routed []routedFinding, goCmd goCommand) error {
 	modules := make([]string, 0, len(routed))
 	for _, entry := range routed {
 		if entry.route != pruneRouteGoModule {
@@ -384,16 +394,16 @@ func pruneGoModule(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 		}
 		module := goModulePathOf(ws.ProjectByID(entry.finding.Target))
 		if module == "" {
-			return nil, fmt.Errorf("cannot name the module of %s to remove it from %s",
+			return fmt.Errorf("cannot name the module of %s to remove it from %s",
 				entry.finding.TargetName, project.Name)
 		}
 		modules = append(modules, module)
 	}
 	if len(modules) == 0 {
-		return nil, nil
+		return nil
 	}
 	sort.Strings(modules)
-	return runGoDeps(ctx, wsRoot, "prune", modules, project.Name, rerun, env)
+	return editGoModule(ctx, wsRoot, project, goCmd, "prune", modules)
 }
 
 // goModulePathOf is a project's module path: the identity its own manifest

@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -213,7 +214,8 @@ func releaseSetSessionFixture(t *testing.T) (string, Request) {
 		`{"path":"app","metadata":{"releaseSet":{"ecosystems":[`+
 		`{"ecosystem":"fixture","coordinate":"fixture-app","packageStep":"artifact","publishStep":"artifact"}]}}},`+
 		`{"path":"lib"},{"path":"other"}]}`, wsproto.ProbeProtocolVersion)
-	write("provider/runtime", fmt.Sprintf(`#!/bin/sh
+	// The runtime is warmed for the handshake's deadline (fixtureproc.Script).
+	fixtureproc.Script(t, filepath.Join(root, "provider", "runtime"), fmt.Sprintf(`#!/bin/sh
 if [ "$1" = "__putnami" ] && [ "$2" = "runtime-info" ]; then
   printf '%%s\n' '{"extension":"@fixture/provider","version":"1.0.0","platform":"%s/%s","cliContract":4,"runtimeProtocol":2,"runtimeABI":1}'
   exit 0
@@ -223,7 +225,7 @@ if [ "$1" = "__putnami" ] && [ "$2" = "workspace-probe" ]; then
   exit 0
 fi
 exit 2
-`, runtime.GOOS, runtime.GOARCH, probe), 0o755)
+`, runtime.GOOS, runtime.GOARCH, probe), "__putnami", "runtime-info")
 
 	// initCLISelectionGitRepo commits the whole tree, so the fixture's baseline
 	// is a clean checkout and the only diff is what a test then touches.

@@ -167,14 +167,57 @@ func Write(t testing.TB, path string, p Program) string {
 // a run, writes output or waits, whatever args are. Any other program, such as
 // a copy Binary placed or a script, must answer args and do nothing else; the
 // TestMain of a copy answers them without running the tests. GORACE has a
-// race-enabled copy exit without the race runtime's 1 s exit sleep.
+// race-enabled copy exit without the race runtime's 1 s exit sleep
+// (quietRaceOptions).
 func Warm(t testing.TB, path string, args ...string) {
 	t.Helper()
 	cmd := exec.Command(path, args...)
-	cmd.Env = append(os.Environ(), warmEnv+"=1", "GORACE=atexit_sleep_ms=0")
+	cmd.Env = append(os.Environ(), warmEnv+"=1", "GORACE="+quietRaceOptions(os.Getenv("GORACE")))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("fixtureproc: warm %s: %v\n%s", path, err, out)
 	}
+}
+
+// Script places content at path as a new executable file, in place of any file
+// there, warms it with args (Warm), and returns path. The script must answer
+// args and do nothing else. A #! script runs on unix only.
+func Script(t testing.TB, path, content string, args ...string) string {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("fixtureproc: %v", err)
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("fixtureproc: %v", err)
+	}
+	if err := writeExecutable(path, strings.NewReader(content)); err != nil {
+		t.Fatalf("fixtureproc: write %s: %v", path, err)
+	}
+	Warm(t, path, args...)
+	return path
+}
+
+// QuietRaceExit appends atexit_sleep_ms=0 to this process's GORACE
+// (quietRaceOptions), so every race-enabled copy of a test binary it starts
+// exits without the race runtime's 1 s exit sleep. Call it in TestMain, before
+// m.Run.
+func QuietRaceExit() {
+	_ = os.Setenv("GORACE", quietRaceOptions(os.Getenv("GORACE")))
+}
+
+// quietRaceOptions returns the GORACE options value with atexit_sleep_ms=0
+// last, so it wins over any earlier setting, and every other option a
+// developer set, such as log_path or halt_on_error, stays.
+func quietRaceOptions(value string) string {
+	fields := strings.Fields(value)
+	for i := len(fields) - 1; i >= 0; i-- {
+		if strings.HasPrefix(fields[i], "atexit_sleep_ms=") {
+			if fields[i] == "atexit_sleep_ms=0" {
+				return value
+			}
+			break
+		}
+	}
+	return strings.Join(append(fields, "atexit_sleep_ms=0"), " ")
 }
 
 // Prepare builds the helper program Write places, unless a call already built
@@ -265,21 +308,27 @@ func executablePath(path string) string {
 }
 
 func copyExecutable(source, target string) error {
-	// Hold off this process's forks while target is open for writing: a child
-	// forked meanwhile inherits the descriptor until it execs, and Linux refuses
-	// to start a program any process holds open for writing (ETXTBSY).
-	syscall.ForkLock.RLock()
-	defer syscall.ForkLock.RUnlock()
 	in, err := os.Open(source)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = in.Close() }()
+	return writeExecutable(target, in)
+}
+
+// writeExecutable creates target, which must not exist, as an executable file
+// that holds what content reads.
+func writeExecutable(target string, content io.Reader) error {
+	// Hold off this process's forks while target is open for writing: a child
+	// forked meanwhile inherits the descriptor until it execs, and Linux refuses
+	// to start a program any process holds open for writing (ETXTBSY).
+	syscall.ForkLock.RLock()
+	defer syscall.ForkLock.RUnlock()
 	out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o755)
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, in); err != nil {
+	if _, err := io.Copy(out, content); err != nil {
 		_ = out.Close()
 		return err
 	}

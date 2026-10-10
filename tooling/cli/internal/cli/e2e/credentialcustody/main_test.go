@@ -106,9 +106,9 @@ const (
 // without running any test. As the
 // runtime of a fixture extension, this binary first answers the CLI's
 // runtime-info handshake and workspace probe, which inherit the engine's
-// environment and so its role. The tests set GORACE so that every copy they
-// start, an engine or a runtime it starts, exits without the race runtime's
-// 1 s exit sleep.
+// environment and so its role. Every copy the tests start, an engine or a
+// runtime it starts, exits without the race runtime's 1 s exit sleep
+// (fixtureproc.QuietRaceExit).
 func TestMain(m *testing.M) {
 	if len(os.Args) == 3 && os.Args[1] == "__putnami" && os.Args[2] == "runtime-info" {
 		fmt.Println(fixtureRuntimeInfo())
@@ -119,7 +119,7 @@ func TestMain(m *testing.M) {
 	}
 	switch role := os.Getenv(custodyRoleEnv); role {
 	case "":
-		_ = os.Setenv("GORACE", "atexit_sleep_ms=0")
+		fixtureproc.QuietRaceExit()
 		os.Exit(clitest.Main(m))
 	case "engine":
 		os.Exit(runEngineRole())

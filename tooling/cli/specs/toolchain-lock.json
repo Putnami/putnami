@@ -62,7 +62,7 @@
     },
     {
       "id": "deps-run-the-pinned-go",
-      "text": "putnami deps add and deps remove run go get and go mod tidy with the go command the Go extension's tasks resolve: the release the lock pins, else a go on PATH. On a host with neither, they pin and install the Go the lock pins the way projects create does, and fail naming putnami install when no go results. A go whose version probe times out is not missing: they install nothing and fail naming the timeout and the same deps command."
+      "text": "putnami deps add and deps remove run go get and go mod tidy with the go command the Go extension's tasks resolve: the release the lock pins, else a go on PATH. On a host with neither, they pin and install the Go the lock pins the way projects create does, and fail naming putnami install when no go results. A go whose version probe times out is not missing: deps add, remove and prune install nothing, edit no go.mod or putnami.json, and fail naming the timeout and the same deps command."
     },
     {
       "id": "deps-report-a-failed-install",
