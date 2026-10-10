@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -280,6 +281,7 @@ func TestFingerprintMovesWithWhatAGitKeyReads(t *testing.T) {
 			}
 		}, false},
 		{"the cut is staged", func() { git(t, root, "add", "-A") }, false},
+		{"a candidate becomes executable", func() { makeExecutable(t, root, "doc/x.md") }, true},
 		{"a candidate changes", func() { write(t, root, "doc/x.md", "# y\n") }, true},
 		{"a candidate appears", func() { write(t, root, "doc/new.md", "# new\n") }, true},
 		{"a link changes its target", func() {
@@ -300,5 +302,110 @@ func TestFingerprintMovesWithWhatAGitKeyReads(t *testing.T) {
 			t.Errorf("%s: fingerprint moved = %v, want %v", step.name, moved, step.moves)
 		}
 		before = after
+	}
+}
+
+// makeExecutable sets the executable bit of rel where the host reads it: the
+// file's mode, or on Windows, which stores none, the mode the index records.
+func makeExecutable(t *testing.T, root, rel string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		git(t, root, "update-index", "--chmod=+x", rel)
+		return
+	}
+	if err := os.Chmod(filepath.Join(root, filepath.FromSlash(rel)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A `git:` key produces no key over a submodule, whose checked-out commit it
+// does not read, nor over an unmerged path, which has no single mode, so the
+// fingerprint that mirrors it fails there too rather than claim a key exists.
+func TestFingerprintFailsWhereAGitKeyDoes(t *testing.T) {
+	root := repository(t, map[string]string{"README.md": "# a\n"})
+	if _, err := open(t, root).Fingerprint(); err != nil {
+		t.Fatalf("a plain cut: %v", err)
+	}
+	nested := filepath.Join(root, "nested")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(t, nested, "init", "-q")
+	write(t, root, "nested/inner.md", "# inner\n")
+	if _, err := open(t, root).Fingerprint(); err == nil {
+		t.Fatal("a nested repository produced a fingerprint; no key holds its commit")
+	}
+	if err := os.RemoveAll(nested); err != nil {
+		t.Fatal(err)
+	}
+
+	write(t, root, "conflict.md", "# conflict\n")
+	cmd := exec.Command("git", "hash-object", "-w", "conflict.md")
+	cmd.Dir = root
+	object, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	blob := strings.TrimSpace(string(object))
+	stages := exec.Command("git", "update-index", "--index-info")
+	stages.Dir = root
+	stages.Stdin = strings.NewReader("100644 " + blob + " 1\tconflict.md\n100644 " + blob + " 2\tconflict.md\n")
+	if out, err := stages.CombinedOutput(); err != nil {
+		t.Fatalf("git update-index --index-info: %v\n%s", err, out)
+	}
+	if _, err := open(t, root).Fingerprint(); err == nil {
+		t.Fatal("an unmerged path produced a fingerprint; no key holds it")
+	}
+	git(t, root, "add", "conflict.md")
+	if _, err := open(t, root).Fingerprint(); err != nil {
+		t.Fatalf("the resolved path still produced no fingerprint: %v", err)
+	}
+}
+
+// The index read keeps each merged path's mode and sets every unmerged path
+// apart, and a record it cannot parse is an error, never an omitted path.
+func TestReadIndexModes(t *testing.T) {
+	root := repository(t, map[string]string{"tool.sh": "#!/bin/sh\n", "plain.txt": "plain\n"})
+	git(t, root, "add", "tool.sh", "plain.txt")
+	git(t, root, "update-index", "--chmod=+x", "tool.sh")
+	index, err := readIndexModes(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if index.Modes["tool.sh"] != "100755" || index.Modes["plain.txt"] != "100644" || len(index.Unmerged) != 0 {
+		t.Fatalf("index modes = %+v", index)
+	}
+	if _, err := readIndexModes(t.TempDir()); err == nil {
+		t.Fatal("an index read outside a repository succeeded")
+	}
+
+	const object = "0000000000000000000000000000000000000000"
+	parsed, err := parseIndexModes([]byte(
+		"100644 " + object + " 1\tconflict.txt\x00" +
+			"100644 " + object + " 2\tconflict.txt\x00" +
+			"120000 " + object + " 0\tlink\x00" +
+			"100644 " + object + " 0\tname\twith tab.txt\x00"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := indexModes{
+		Modes:    map[string]string{"link": "120000", "name\twith tab.txt": "100644"},
+		Unmerged: map[string]bool{"conflict.txt": true},
+	}
+	if !reflect.DeepEqual(parsed, want) {
+		t.Fatalf("parsed = %+v, want %+v", parsed, want)
+	}
+	for _, malformed := range []string{
+		"100644 " + object + " 0\tunterminated",
+		"100644 " + object + " 0 no-tab\x00",
+		"100644 0\tmissing-object\x00",
+		"100644 " + object + " 0\t\x00",
+	} {
+		if _, err := parseIndexModes([]byte(malformed)); err == nil {
+			t.Errorf("parseIndexModes(%q) succeeded", malformed)
+		}
+	}
+	if empty, err := parseIndexModes(nil); err != nil || len(empty.Modes) != 0 || len(empty.Unmerged) != 0 {
+		t.Fatalf("an empty index = %+v, %v", empty, err)
 	}
 }

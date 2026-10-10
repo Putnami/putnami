@@ -41,3 +41,36 @@ func CandidatePaths(root string) ([]string, error) {
 	}
 	return unique, nil
 }
+
+// IndexModes is what the index records for each tracked path of a repository:
+// the mode of each merged path, and the paths that are unmerged, which have no
+// single mode.
+type IndexModes struct {
+	Modes    map[string]string
+	Unmerged map[string]bool
+}
+
+// ReadIndexModes reads the index of the repository at root once, as a source
+// binding reads it (ReadSourceBindingSnapshot). A `git:` cache key needs it for
+// two answers a binding gives: on a host that does not store the executable
+// bit, a tracked file takes its bit from the index mode, and an unmerged path
+// is refused (ADR 0061).
+func ReadIndexModes(root string) (IndexModes, error) {
+	output, err := run(root, "ls-files", "--stage", "-z")
+	if err != nil {
+		return IndexModes{}, fmt.Errorf("read the index modes: %w", err)
+	}
+	index := IndexModes{Modes: map[string]string{}, Unmerged: map[string]bool{}}
+	for _, entry := range splitNUL(output) {
+		mode, _, stage, path, ok := parseStageEntry(entry)
+		if !ok {
+			return IndexModes{}, fmt.Errorf("read the index modes: malformed ls-files stage entry")
+		}
+		if stage != "0" {
+			index.Unmerged[path] = true
+			continue
+		}
+		index.Modes[path] = mode
+	}
+	return index, nil
+}

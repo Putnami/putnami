@@ -7,8 +7,8 @@ contract.
 
 | Command | Activation | Steps | Cached |
 |---|---|---|---|
-| `validate` | project-scoped, on `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | features: **no**; specs: yes |
-| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate` | architecture and ratchet: yes; decisions, recipes, CODEOWNERS and docs links: **no** |
+| `validate` | project-scoped, on `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
+| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS and docs links on the Git candidate cut |
 
 Two commands rather than one, because one command carries one activation and
 these two have different subjects. A project's features and specs are a
@@ -361,20 +361,54 @@ the same reason `architecture-validate` reads none. The reviewed policy change
 the rule demands is an edit to a `specs.baseline.json`, which changes an input
 and re-keys the task.
 
-### `features-validate` — uncached
+### `features-validate` — cached on the Git candidate cut
+
+```json
+"inputs": {
+  "repository": { "from": "workspace", "files": ["git:**"] },
+  "manifest": { "from": "project", "files": ["putnami.features.json"] }
+}
+```
 
 Its verdict depends on evidence **source bindings**, which is what the
 `source-binding-unavailable` and `source-binding-mismatch` stale reasons
-compare. A binding records each bound file's executable bit and each
-submodule's checked-out commit, which a `git:` input does not hold.
-Package-root evidence is matched against the project's version, which the CLI
-gives a cacheable task as `0.0.0`. The report names the HEAD commit, which a
-replayed entry would report for another commit. An under-declared key does not
-merely miss a change — it serves a stale verdict while reporting that the check
-ran.
+compare, so it reads every file a binding hashes, as well as the feature
+manifests, evidence fragments and capability manifests at every root. The task
+reads them from the workspace's candidate cut and nothing else, and `git:**`
+holds that cut:
 
-Caching it needs the executable bit and the submodule commit in the `git:`
-digest, a report without HEAD, and a rule for the version.
+- A binding records each bound file's bytes or link text and its executable
+  bit. The `git:` key holds the bit too, read where the binding reads it: from
+  the file's mode, or on Windows, which stores none, from the mode the index
+  records (ADR 0061 of the CLI). A `chmod +x` of a bound file moves the key.
+- A binding records a submodule's checked-out commit and refuses an unmerged
+  path. The `git:` key holds neither and produces no key for either, so the
+  task then runs uncached instead of replaying a verdict about another commit.
+- An ignored evidence fragment, an ignored artifact and ignored build output
+  are neither read nor keyed, and staging changes nothing.
+- Package-root evidence matches a project by name and version. Every project
+  is read at the tree base version `0.0.0`, the version the CLI gives a task
+  the cache can serve (ADR 0060 of the CLI) and every build stamp records, so
+  no Git tag and no missing commit changes a verdict the key cannot see.
+- The report names the worktree and no commit, and its selection names no
+  baseline ref, so a replayed entry is true of the run that replays it.
+
+Two runs on one tree therefore share one entry, whatever the commit, the ref
+or the checkout. The cut is a workspace port, so one digest of it serves every
+project's key in a run. The project port names the project's own manifest
+only so that the project side of the key is not empty: the CLI keys an empty
+project side on every file under the project root, ignored build output
+included. Outside a Git work tree the task reads the disk, and the `git:` input
+has no key, so it runs every time.
+
+The `specs` step does not depend on this one. A step's key holds the key of
+every step it depends on, so an edge to a task keyed on the whole cut would
+move every project's `specs-validate` key on any edit anywhere in the
+repository. `specs-validate` reads the feature manifests itself and reports one
+that fails to parse, so the two steps run side by side.
+
+`putnami features validate`, the interactive command, still reads the disk,
+the version Git resolved, and the HEAD commit it reports.
 
 ### The four steps cached on the Git candidate cut
 
@@ -391,8 +425,8 @@ names, every `putnami.json` above a project, and any file a link names. Each
 reads the repository's **candidate cut** and nothing else: the tracked files
 and the untracked files no ignore rule excludes, as
 `git ls-files --cached --others --exclude-standard` lists them. The input
-`git:**` holds exactly that cut: each candidate's path and bytes, and a
-symbolic link's target text.
+`git:**` holds exactly that cut: each candidate's path, bytes and executable
+bit, and a symbolic link's target text.
 
 - Editing, adding, deleting or renaming a candidate moves the key, so a
   deleted link target or an emptied sample directory is never served a stale

@@ -295,6 +295,75 @@ func BuildFeatureValidationResult(ws *workspace.Workspace, selection Selection) 
 	if err != nil {
 		return FeatureValidationReport{}, err
 	}
+	return featureValidationResult(selection, result, revision)
+}
+
+// treeBaseVersion is the base version the CLI gives every project reference
+// of a task the cache can serve (ADR 0060 of the CLI), and the version every
+// build stamp records for a capability package.
+const treeBaseVersion = "0.0.0"
+
+// BuildFeatureTaskValidationResult is BuildFeatureValidationResult for the
+// cached `validate` step, whose key is the input `git:**`. Its verdict is a
+// function of the candidate cut that key holds, and of nothing else:
+//
+//   - It reads the cut (features.NewTaskReader): an ignored file is absent,
+//     and a source binding records what the key holds, the executable bit
+//     included (ADR 0061 of the CLI).
+//   - Every project carries the tree base version, whatever the wire says. A
+//     package-root selector matches a project by name and version, and the
+//     CLI gives a cacheable task 0.0.0, or no version at all where Git has no
+//     commit to resolve one from; a key that does not read the version cannot
+//     let the two answer differently.
+//   - The revision names the worktree and no commit. The HEAD commit labels
+//     the run, a replayed entry would report it for another commit, and the
+//     key reads no commit.
+func BuildFeatureTaskValidationResult(ws *workspace.Workspace, selection Selection) (FeatureValidationReport, error) {
+	if ws == nil {
+		return FeatureValidationReport{}, protocolcli.Classify(
+			errors.New("workspace is required to evaluate features"),
+			protocolcli.ErrInvalidConfig,
+		)
+	}
+	reader, err := featureengine.NewTaskReader(ws.Root)
+	if err != nil {
+		return FeatureValidationReport{}, fmt.Errorf("features validate: %w", err)
+	}
+	ws = atTreeBaseVersion(ws)
+	revision := featureengine.Revision{Kind: featureengine.RevisionKindWorktree}
+	result := featureengine.Aggregate(featureengine.Request{
+		Workspace: ws,
+		Reader:    reader,
+		Revision:  revision,
+		Scope:     selectedScope(ws, selection),
+	})
+	return featureValidationResult(selection, result, revision)
+}
+
+// atTreeBaseVersion returns a view of ws in which every project carries the
+// tree base version. ws itself is not changed.
+func atTreeBaseVersion(ws *workspace.Workspace) *workspace.Workspace {
+	projects := make([]*workspace.Project, 0, len(ws.Projects))
+	for _, project := range ws.Projects {
+		if project == nil {
+			projects = append(projects, nil)
+			continue
+		}
+		atTree := *project
+		atTree.Version = treeBaseVersion
+		projects = append(projects, &atTree)
+	}
+	view := workspace.NewWorkspace(ws.Root, ws.Config, projects)
+	view.Name = ws.Name
+	view.Version = ws.Version
+	view.Warnings = append([]string(nil), ws.Warnings...)
+	view.WarningCodes = append([]workspace.WarningCode(nil), ws.WarningCodes...)
+	return view
+}
+
+// featureValidationResult is the report and verdict both validation entry
+// points return for one evaluation.
+func featureValidationResult(selection Selection, result featureengine.Result, revision featureengine.Revision) (FeatureValidationReport, error) {
 	report := FeatureValidationReport{
 		Valid:       result.Snapshot != nil && !diag.HasErrors(result.Diagnostics),
 		Revision:    revision,

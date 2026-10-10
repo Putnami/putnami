@@ -1,6 +1,7 @@
 # ADR 0041 — Repository scanners declare Git candidate inputs
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0061](0061-a-git-input-keys-the-executable-bit.md)
 - **Scope**: CLI cache inputs (`internal/store`, `internal/git`), workspace
   impact, repository document gates
 

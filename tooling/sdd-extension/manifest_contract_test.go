@@ -74,11 +74,12 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			AlsoRuns:        []string{"validate-workspace"},
 			Run: []proto.PipelineStep{
 				{ID: "features", Task: "features-validate"},
-				// Specs resolve against the features that mint them, so the
-				// order is a data dependency and not a preference: a spec
-				// verdict read before the manifest verdict would report an
-				// unauthored feature for a manifest that simply failed to parse.
-				{ID: "specs", Task: "specs-validate", DependsOn: []string{"features"}},
+				// No dependsOn orders the two steps. specs-validate reads the
+				// manifests itself and reports one that fails to parse, and a
+				// step's key holds the key of every step it depends on: an
+				// edge to features-validate, keyed on the whole candidate cut,
+				// would move every project's specs key on any edit anywhere.
+				{ID: "specs", Task: "specs-validate"},
 			},
 		}).
 		Command("validate-workspace", proto.CommandDefinition{
@@ -97,23 +98,35 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 		}).
 		Task("features-validate", proto.TaskDefinition{
 			Description: "Validate one project's durable feature manifest and the evidence backing its requirements. " +
-				"Not cached, because its verdict reads three things no declared input holds: an evidence source binding records each bound file's executable bit " +
-				"and each submodule's checked-out commit, which a `git:` input does not read; package-root evidence is matched against the project's version, " +
-				"which the CLI gives a cacheable task as 0.0.0; and the report names the HEAD commit, which a replayed entry would report for another commit. " +
-				"An under-declared key would serve a stale verdict while claiming to have checked. Keying it needs the executable bit and the submodule commit " +
-				"in the `git:` digest, a report without HEAD, and a rule for the version.",
+				"It reads the workspace's Git candidate cut and nothing else: the tracked files and the untracked files no ignore rule excludes, which the input `git:**` holds, " +
+				"so editing, adding, deleting or renaming any file it reads moves the key, and an ignored file is neither read nor keyed. " +
+				"An evidence source binding records each bound file's bytes or link text and its executable bit, and the key holds the bit too; " +
+				"a submodule or an unmerged path produces no key, so the task then runs uncached. " +
+				"Every project is read at the tree base version 0.0.0, the version the CLI gives a task the cache can serve, and the report names no commit, " +
+				"so two runs on one tree share one entry whatever the commit, the ref or the checkout. " +
+				"The project port names the project's own manifest so that the project side of the key reads no ignored build output.",
 			Kind:      "command",
 			Command:   "{extensionRuntime}",
 			Args:      []string{"features-validate"},
 			Cwd:       "{projectRoot}",
 			TimeoutMs: 120000,
+			Inputs: map[string]proto.TaskInputPort{
+				// The read set: manifests and evidence at every root, the
+				// capability manifests evidence reaches, and every file a source
+				// binding hashes. Workspace-scoped, so one digest of the cut
+				// serves every project's key in a run.
+				"repository": {From: "workspace", Files: []string{"git:**"}},
+				// A project side left empty would key on every file under the
+				// project root, ignored build output included.
+				"manifest": {From: "project", Files: []string{"putnami.features.json"}},
+			},
 			// It reads the project's own source tree — the durable manifest and
 			// every evidence fragment beside it — so it is serialized after the
 			// tasks that REWRITE that tree. A formatter that reflows a JSON
 			// document while this task parses it is a verdict about bytes that
 			// no longer exist.
 			Reads: []proto.ResourceRef{{ID: proto.ResourceIDSources}},
-			Cache: sdkmanifest.NoCache(),
+			Cache: cacheEnabledNoOutput(),
 			Outputs: map[string]proto.TaskOutputPort{
 				"data": {Description: "Feature validation report: counts, assessments and sorted diagnostics."},
 			},
@@ -606,14 +619,16 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 	if want := []string{"putnami.features.json", "specs/*.json"}; !reflect.DeepEqual(project.ActivationFiles, want) {
 		t.Errorf("validate activationFiles = %v, want %v", project.ActivationFiles, want)
 	}
-	// Order is a data dependency: specs resolve against the features that mint
-	// them, so a spec verdict read before the manifest verdict would report an
-	// unauthored feature for a manifest that merely failed to parse.
+	// No dependsOn orders the two steps: a step's key holds the key of every
+	// step it depends on, and features-validate keys on the whole candidate
+	// cut, so an edge would move specs-validate's key with every file of the
+	// repository. specs-validate reads and reports the manifests itself.
 	if len(project.Run) != 2 ||
 		project.Run[0].Task != "features-validate" ||
 		project.Run[1].Task != "specs-validate" ||
-		!reflect.DeepEqual(project.Run[1].DependsOn, []string{"features"}) {
-		t.Errorf("validate pipeline = %+v, want features-validate then specs-validate", project.Run)
+		len(project.Run[0].DependsOn) != 0 ||
+		len(project.Run[1].DependsOn) != 0 {
+		t.Errorf("validate pipeline = %+v, want features-validate and specs-validate side by side", project.Run)
 	}
 
 	workspace, found := m.Commands["validate-workspace"]
@@ -661,10 +676,10 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 // evidence, and adoption policy, which is exactly what it declares. The four
 // workspace steps whose read set no narrow pattern names (decisions, recipes,
 // codeowners and docs links) read the repository's Git candidate cut and
-// declare `git:**`, which holds it. features-validate reads evidence source
-// bindings, which record executable bits and submodule commits no declared
-// input holds, so it is uncacheable rather than cached against a key that
-// omits part of its inputs.
+// declare `git:**`, which holds it. features-validate reads the same cut,
+// evidence source bindings included: a binding records each bound file's
+// executable bit, which a `git:` key holds, and a submodule commit, over which
+// a `git:` key refuses to exist.
 //
 // It asserts the SCOPE of each port rather than its file list: the lists are
 // held byte-for-byte by TestCommittedManifestIsTheAuthoredOne against the
@@ -675,17 +690,21 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "architecture-adoption-policy", "architecture-policy-is-part-of-cache-key")
 	m := committedManifest(t)
 
-	// The one task whose read set no declared input holds: an evidence source
-	// binding records each bound file's executable bit and each submodule's
-	// checked-out commit, which a `git:` input does not read, and the report
-	// names the HEAD commit.
+	// features-validate reads the workspace's Git candidate cut: manifests,
+	// evidence, capability manifests and every file a source binding hashes,
+	// the executable bit included, which `git:**` holds (ADR 0061 of the CLI).
+	// The cut is workspace-scoped so one digest serves every project's key;
+	// the project port keeps the project side off ignored build output.
 	features := m.Tasks["features-validate"]
-	if features.Cache.IsEnabled() {
-		t.Error("task \"features-validate\" is cacheable although no declared input holds its read set")
+	if !features.Cache.IsEnabled() || !features.Cache.NoOutput {
+		t.Errorf("task \"features-validate\" cache = %+v, want enabled with noOutput: its key holds the candidate cut it reads", features.Cache)
 	}
-	if len(features.Inputs) > 0 {
-		t.Errorf("task \"features-validate\" declares inputs %v; an uncacheable task's ports would read as a key it does not have",
-			sortedKeys(features.Inputs))
+	wantFeatures := map[string]proto.TaskInputPort{
+		"repository": {From: "workspace", Files: []string{"git:**"}},
+		"manifest":   {From: "project", Files: []string{"putnami.features.json"}},
+	}
+	if !reflect.DeepEqual(features.Inputs, wantFeatures) {
+		t.Errorf("task \"features-validate\" inputs = %+v, want %+v", features.Inputs, wantFeatures)
 	}
 
 	// The workspace steps whose read set no narrow pattern names. Each reads

@@ -1,6 +1,8 @@
 package store
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -257,5 +259,153 @@ func TestGitInputsBatchGuardUsesTheCandidateSet(t *testing.T) {
 	gitInputWrite(t, root, "tools/reader.md", "candidate outside the project")
 	if matched, err := HasMatchingFiles(project, []string{"git:**/*.md"}); err != nil || !matched {
 		t.Fatalf("external candidate input matched=%v, error=%v", matched, err)
+	}
+}
+
+// A source binding records each regular file's executable bit, so a task that
+// compares one reads the bit, and the key must move with it: chmod +x of a
+// candidate is a change, on the host's own reading of the bit.
+func TestGitInputsHoldTheExecutableBit(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "git-candidate-inputs", "candidate-bytes-and-membership-determine-the-key")
+	root := gitInputPhysicalRoot(t)
+	gitInputWrite(t, root, "tool.sh", "#!/bin/sh\n")
+	gitInputWrite(t, root, "untracked.sh", "#!/bin/sh\n")
+	gitInputRun(t, root, "add", "tool.sh")
+	key := func() string { return gitInputKey(t, root, "git:**") }
+	before := key()
+	if runtime.GOOS == "windows" {
+		// Windows stores no executable bit; a tracked file takes it from the
+		// index, as a source binding does.
+		gitInputRun(t, root, "update-index", "--chmod=+x", "tool.sh")
+	} else if err := os.Chmod(filepath.Join(root, "tool.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	executable := key()
+	if executable == before {
+		t.Fatal("making a tracked candidate executable kept the key")
+	}
+	if runtime.GOOS == "windows" {
+		gitInputRun(t, root, "update-index", "--chmod=-x", "tool.sh")
+	} else if err := os.Chmod(filepath.Join(root, "tool.sh"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if key() != before {
+		t.Fatal("restoring the mode did not restore the key: the bit is not all the change held")
+	}
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(filepath.Join(root, "untracked.sh"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if key() == before {
+			t.Fatal("making an untracked candidate executable kept the key")
+		}
+	}
+}
+
+// fixedModeInfo is a file's stat with a chosen mode, so both readings of the
+// executable bit are tested on any host.
+type fixedModeInfo struct {
+	os.FileInfo
+	mode os.FileMode
+}
+
+func (info fixedModeInfo) Mode() os.FileMode { return info.mode }
+
+// The digest reads the bit where the binding reads it: from the stat where the
+// host stores it, from the index mode where it does not, and an untracked file
+// is regular there. Its preimage is not the one earlier keys used, so a key
+// over a regular candidate cannot land on an entry written before the bit was
+// keyed (ADR 0061).
+func TestGitCandidateDigestReadsTheBitWhereTheBindingDoes(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "git-candidate-inputs", "candidate-bytes-and-membership-determine-the-key")
+	dir := t.TempDir()
+	gitInputWrite(t, dir, "tool.sh", "#!/bin/sh\n")
+	path := filepath.Join(dir, "tool.sh")
+	stat, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := func(perm os.FileMode, indexMode string, statsExecBit bool) string {
+		entry := fileEntry{path: path, info: fixedModeInfo{FileInfo: stat, mode: perm}, gitCandidate: true, indexMode: indexMode}
+		sum := gitCandidateDigest(entry, make([]byte, 64), statsExecBit)
+		if sum == nil {
+			t.Fatal("digest of a readable candidate is nil")
+		}
+		return hex.EncodeToString(sum)
+	}
+	regular, executable := digest(0o644, "100644", true), digest(0o755, "100644", true)
+	if regular == executable {
+		t.Fatal("a stat that stores the bit: the executable bit did not change the digest")
+	}
+	if digest(0o644, "100755", true) != regular {
+		t.Fatal("a stat that stores the bit: the index mode changed the digest")
+	}
+	if digest(0o644, "100755", false) != executable {
+		t.Fatal("a stat without the bit: an executable index mode is not the executable digest")
+	}
+	if digest(0o755, "100644", false) != regular || digest(0o755, "", false) != regular {
+		t.Fatal("a stat without the bit: the stat's bit changed the digest of a regular or untracked file")
+	}
+	previous := sha256.New()
+	writeField(previous, "git-file")
+	previous.Write([]byte("#!/bin/sh\n"))
+	if hex.EncodeToString(previous.Sum(nil)) == regular {
+		t.Fatal("the regular digest kept the preimage keys used before the bit was keyed; an old entry could be served")
+	}
+}
+
+// An unmerged path has no single mode, and a source binding refuses one, so a
+// selected unmerged candidate produces no key. A submodule is a directory
+// candidate: no key holds its checked-out commit, so none is produced either,
+// and a task keyed on the cut runs uncached instead of replaying a verdict
+// about another commit.
+func TestGitInputsRefuseUnmergedAndSubmoduleCandidates(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "git-candidate-inputs", "candidate-enumeration-failure-never-produces-a-key")
+	root := gitInputPhysicalRoot(t)
+	gitInputWrite(t, root, "conflict.txt", "base\n")
+	gitInputRun(t, root, "add", "conflict.txt")
+	gitInputRun(t, root, "commit", "-m", "base")
+	gitInputRun(t, root, "checkout", "-b", "other")
+	gitInputWrite(t, root, "conflict.txt", "other\n")
+	gitInputRun(t, root, "commit", "-am", "other")
+	gitInputRun(t, root, "checkout", "main")
+	gitInputWrite(t, root, "conflict.txt", "main\n")
+	gitInputRun(t, root, "commit", "-am", "main")
+	merge := exec.Command("git", "merge", "other")
+	merge.Dir = root
+	if out, err := merge.CombinedOutput(); err == nil {
+		t.Fatalf("the merge did not conflict:\n%s", out)
+	}
+	if _, err := CollectKeyFiles(root, []string{"git:**"}); err == nil {
+		t.Fatal("an unmerged candidate produced a key")
+	}
+	if files, err := CollectKeyFiles(root, []string{"git:f"}); err != nil || len(files) != 1 {
+		t.Fatalf("an unmerged path outside the pattern blocked its key: files %v, error %v", files, err)
+	}
+	gitInputWrite(t, root, "conflict.txt", "resolved\n")
+	gitInputRun(t, root, "add", "conflict.txt")
+	if _, err := CollectKeyFiles(root, []string{"git:**"}); err != nil {
+		t.Fatalf("the resolved candidate still produced no key: %v", err)
+	}
+	gitInputRun(t, root, "commit", "-m", "resolve")
+
+	sub := filepath.Join(root, "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"init"}, {"config", "user.email", "t@t.com"}, {"config", "user.name", "T"}, {"config", "commit.gpgsign", "false"},
+	} {
+		gitInputRun(t, sub, args...)
+	}
+	gitInputWrite(t, sub, "inner.txt", "inner")
+	gitInputRun(t, sub, "add", "inner.txt")
+	gitInputRun(t, sub, "commit", "-m", "inner")
+	gitInputRun(t, root, "-c", "advice.addEmbeddedRepo=false", "add", "sub")
+	if _, err := CollectKeyFiles(root, []string{"git:**"}); err == nil {
+		t.Fatal("a submodule candidate produced a key that cannot hold its commit")
+	}
+	if digest, err := (&CacheKey{ProjectRoot: root, FilePatterns: []string{"git:**"}}).ComputeHashUsing(NewCacheManager(nil)); err == nil || digest != "" {
+		t.Fatalf("a submodule candidate returned digest %q, error %v", digest, err)
 	}
 }

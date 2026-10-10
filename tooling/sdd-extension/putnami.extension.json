@@ -267,10 +267,7 @@
         },
         {
           "id": "specs",
-          "task": "specs-validate",
-          "dependsOn": [
-            "features"
-          ]
+          "task": "specs-validate"
         }
       ],
       "alsoRuns": [
@@ -859,7 +856,7 @@
       "declares": {}
     },
     "features-validate": {
-      "description": "Validate one project's durable feature manifest and the evidence backing its requirements. Not cached, because its verdict reads three things no declared input holds: an evidence source binding records each bound file's executable bit and each submodule's checked-out commit, which a `git:` input does not read; package-root evidence is matched against the project's version, which the CLI gives a cacheable task as 0.0.0; and the report names the HEAD commit, which a replayed entry would report for another commit. An under-declared key would serve a stale verdict while claiming to have checked. Keying it needs the executable bit and the submodule commit in the `git:` digest, a report without HEAD, and a rule for the version.",
+      "description": "Validate one project's durable feature manifest and the evidence backing its requirements. It reads the workspace's Git candidate cut and nothing else: the tracked files and the untracked files no ignore rule excludes, which the input `git:**` holds, so editing, adding, deleting or renaming any file it reads moves the key, and an ignored file is neither read nor keyed. An evidence source binding records each bound file's bytes or link text and its executable bit, and the key holds the bit too; a submodule or an unmerged path produces no key, so the task then runs uncached. Every project is read at the tree base version 0.0.0, the version the CLI gives a task the cache can serve, and the report names no commit, so two runs on one tree share one entry whatever the commit, the ref or the checkout. The project port names the project's own manifest so that the project side of the key reads no ignored build output.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -867,6 +864,20 @@
       ],
       "cwd": "{projectRoot}",
       "timeoutMs": 120000,
+      "inputs": {
+        "manifest": {
+          "from": "project",
+          "files": [
+            "putnami.features.json"
+          ]
+        },
+        "repository": {
+          "from": "workspace",
+          "files": [
+            "git:**"
+          ]
+        }
+      },
       "outputs": {
         "data": {
           "description": "Feature validation report: counts, assessments and sorted diagnostics."
@@ -876,7 +887,8 @@
         "sources"
       ],
       "cache": {
-        "enabled": false
+        "enabled": true,
+        "noOutput": true
       },
       "declares": {}
     },
