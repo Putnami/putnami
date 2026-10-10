@@ -30,8 +30,6 @@ func TestCacheStats_SnapshotAggregates(t *testing.T) {
 	})
 	s.recordUploadWall((30 * time.Millisecond).Nanoseconds())
 	s.recordUploadFailure()
-	s.recordUploadSkipped()
-	s.recordUploadSkipped()
 
 	snap := s.Snapshot()
 	if snap.SetupMs != 90 || snap.NegotiateMs != 60 || snap.UploadMs != 30 {
@@ -61,8 +59,8 @@ func TestCacheStats_SnapshotAggregates(t *testing.T) {
 	if snap.RestoreMs != 40 {
 		t.Errorf("RestoreMs = %d, want 40", snap.RestoreMs)
 	}
-	if snap.Uploads != 1 || snap.UploadErrors != 1 || snap.UploadsSkipped != 2 {
-		t.Errorf("upload = %d uploads / %d errors / %d skipped", snap.Uploads, snap.UploadErrors, snap.UploadsSkipped)
+	if snap.Uploads != 1 || snap.UploadErrors != 1 {
+		t.Errorf("upload = %d uploads / %d errors", snap.Uploads, snap.UploadErrors)
 	}
 	// Overhead is the cache's own wall cost: setup + negotiate + restore + upload.
 	if got := snap.OverheadMs(); got != 220 {

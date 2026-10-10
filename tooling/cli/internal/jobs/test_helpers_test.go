@@ -120,7 +120,7 @@ func TestFixtureJobsCarryNoIncidentalWallClockBudget(t *testing.T) {
 		"TestRuntimeSynchronizationPrecedesTaskTimeoutAndInvocation":     true,
 		"TestScheduler_CoalescedWaiterReclaimsAbandonedLease":            true,
 		"TestScheduler_CoalescedWaiterFallsBackAfterJobTimeout":          true,
-		"TestScheduler_CoalescingHonorsBreakEvenFloor":                   true,
+		"TestScheduler_CoalescingHonorsCoalescingFloor":                  true,
 		"TestFinalizerCleanupContext_IsIndependentOnlyAfterCancellation": true,
 		"TestBatchLeaderDeadlineDoesNotMutateMembers":                    true,
 	}

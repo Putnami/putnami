@@ -146,11 +146,6 @@ func reportCacheSummary(w io.Writer, g *GlobalFlags, c *jobs.CacheStatsSnapshot)
 	if c.UploadErrors > 0 {
 		iox.Fprintf(w, "         %d upload error(s) — entries not shared (build unaffected)\n", c.UploadErrors)
 	}
-	// Explain misses that never populated the remote cache because they were too
-	// cheap to be worth storing — the usual reason a fast workspace sees no hits.
-	if c.UploadsSkipped > 0 {
-		iox.Fprintf(w, "         %d miss(es) below break-even — not stored remotely\n", c.UploadsSkipped)
-	}
 	if c.HintsWarmed > 0 {
 		iox.Fprintf(w, "         %d hint(s) warmed — jobs re-executed by cache trust policy\n", c.HintsWarmed)
 	}
