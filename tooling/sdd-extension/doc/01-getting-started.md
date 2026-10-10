@@ -73,12 +73,34 @@ putnami specs validate --projects @acme/billing
 putnami lint,test,build,validate --impacted --enforce-coverage
 ```
 
+### Keep `validate` in the agent gate
+
+`putnami install` and `putnami context generate` write the gate into the agent
+guidance of `AGENTS.md` and `CLAUDE.md`. That gate is the blocking commands of
+`putnami.ci.json`, or `lint,test,build` when the workspace has no such file.
+Declaring this extension does not add `validate` to it, so an agent that follows
+the guidance skips spec validation. To keep `validate` in the gate, commit a
+`putnami.ci.json` beside `putnami.workspace.json`:
+
+```json
+{
+  "$schema": "https://putnami.dev/schemas/putnami-ci.json",
+  "version": 3,
+  "commands": ["lint", "test", "build", "validate"]
+}
+```
+
+Then run `putnami context generate`. With Putnami Cloud, `putnami cloud ci init`
+writes a `putnami.ci.json` for you; check that its `commands` list `validate`.
+[`protocols/ci`](../../../protocols/ci/README.md) documents every field.
+
 ## If the commands are missing
 
 `putnami features` on a workspace that has not declared the extension is not a
 command. A run that plans zero jobs prints a courtesy hint that the command
-moved from the core CLI to an extension, with where to declare it; the hint
-stays silent once the extension is loaded.
+moved from the core CLI to an extension, with a link to the CLI reference that
+names this extension and where to declare it; the hint stays silent once the
+extension is loaded.
 
 Check what the CLI actually discovered:
 

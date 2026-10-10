@@ -13,6 +13,7 @@ import (
 
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/commands/cachecmd"
 	"go.putnami.dev/tooling/cli/internal/commands/ci"
@@ -268,7 +269,8 @@ func refuseUndeclaredCommands(commands []string, run changePlanEngineRun) change
 				return nil
 			}
 			return usageErrorf("no extension of this workspace declares %s, so impact-plan cannot plan it; "+
-				"`putnami extensions list` names the extensions installed here", strings.Join(undeclared, ", "))
+				"`putnami extensions list` shows the commands the installed extensions declare, and %s lists the commands that moved to an extension",
+				strings.Join(undeclared, ", "), commandmeta.CommandsThatLeftTheCoreURL)
 		}
 		return run(ctx, req, sink)
 	}
@@ -1057,6 +1059,9 @@ func cmdHelp(env *CommandEnv) error {
 			nestedSub = env.Args[0]
 		}
 		command := resolveAliasOrSelf(env.Sub, env.Cfg.Aliases)
+		if err := refuseHelpOfRemovedCoreRoot(env, command); err != nil {
+			return err
+		}
 		if isStructuredCommand(command) || nestedSub != "" {
 			PrintSubcommandHelp(command, nestedSub)
 		} else {

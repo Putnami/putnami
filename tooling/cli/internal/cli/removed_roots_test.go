@@ -6,6 +6,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
@@ -30,11 +31,16 @@ func TestRefuseRemovedCoreRootRefusesOnlyWhatNoExtensionDeclares(t *testing.T) {
 			}
 			message := err.Error()
 			if !strings.Contains(message, "`putnami "+root+"` is no longer a core command") ||
-				!strings.Contains(message, "`putnami extensions list`") {
-				t.Fatalf("message = %q, want the root and the command that lists the installed extensions", message)
+				!strings.Contains(message, commandmeta.CommandsThatLeftTheCoreURL) {
+				t.Fatalf("message = %q, want the root and the reference that lists where it moved", message)
 			}
 			if strings.Contains(message, "@putnami/") || strings.Contains(message, "cloud") {
 				t.Fatalf("message = %q names an extension", message)
+			}
+			// The refusal also fires outside a workspace, where no extension
+			// is installed and `putnami extensions list` fails.
+			if strings.Contains(message, "extensions list") || strings.Contains(message, " here") {
+				t.Fatalf("message = %q assumes a workspace", message)
 			}
 			if err := refuseRemovedCoreRoot(root, map[string]bool{root: true}, nil); err != nil {
 				t.Fatalf("an extension command group named %s is refused: %v", root, err)
@@ -73,5 +79,18 @@ func TestRemovedCoreRootIsReadAfterAliases(t *testing.T) {
 	}
 	if err := refuseRemovedCoreRoot(parsed.Commands[0], nil, nil); err == nil {
 		t.Fatal("`putnami ci validate` is not refused")
+	}
+}
+
+// TestHelpChecksOnlyTheRemovedRoots keeps `putnami help <command>` free of
+// extension discovery for every command that is not a removed root. The
+// refusal of `putnami help ci` and `putnami help channel` runs a whole CLI
+// session, so e2e/removedroots holds it.
+func TestHelpChecksOnlyTheRemovedRoots(t *testing.T) {
+	t.Parallel()
+	for _, command := range []string{"lint", "cloud", "help", ""} {
+		if err := refuseHelpOfRemovedCoreRoot(&CommandEnv{}, command); err != nil {
+			t.Errorf("help %q is refused: %v", command, err)
+		}
 	}
 }

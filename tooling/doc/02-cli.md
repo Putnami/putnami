@@ -174,6 +174,32 @@ A version is derived from git, never declared: there is no `version set` and no
 than one version line. To update installed CLI binaries, use
 `putnami upgrade --cli` (workspace pin) or `putnami upgrade --global`.
 
+## Commands that left the core CLI
+
+These commands moved out of the core CLI into the extension that owns their
+domain. Each one works once a workspace declares that extension.
+
+| Former command | Command now | Extension that serves it |
+|---|---|---|
+| `putnami channel set`, `putnami channel status` | `putnami cloud channels set`, `putnami cloud channels status` | `@putnami/cloud`, which owns hosted delivery |
+| `putnami ci init`, `ci validate`, `ci fmt`, `ci explain` | `putnami cloud ci init`, `cloud ci validate`, `cloud ci fmt`, `cloud ci explain` | `@putnami/cloud` |
+| `putnami features`, `specs`, `architecture`, `contracts` | Unchanged | `@putnami/sdd` |
+
+To get a moved command, add its extension to `extensions` in
+`putnami.workspace.json`, then run `putnami install`:
+
+```json
+{
+  "extensions": ["@putnami/cloud"]
+}
+```
+
+The CLI refuses `putnami channel …` and `putnami ci …`, and `putnami help` of
+either, with exit code 2, unless an installed extension declares that root. A
+run of a moved SDD command that plans no job prints a hint. Both messages link
+to this section, and so does the `impact-plan` refusal of a command that no
+installed extension declares.
+
 ## Project targeting
 
 ### Target expressions

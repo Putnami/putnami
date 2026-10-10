@@ -15,6 +15,8 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
+	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
 // bootstrappedEnv is the variable the workspace bootstrap sets before it runs
@@ -26,9 +28,10 @@ func TestMain(m *testing.M) {
 }
 
 // TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap holds every former
-// spelling of the removed roots to one usage error, raised before the
-// implicit install and before any planning. The job command run last proves
-// the bootstrap does start in the same fixture, so its absence is evidence.
+// spelling of the removed roots, and `putnami help` of each, to one usage
+// error, raised before the implicit install and before any planning. The job
+// command run last proves the bootstrap does start in the same fixture, so its
+// absence is evidence.
 func TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "command-catalog", "a-root-that-left-the-core-is-refused-unless-an-extension-declares-it")
 	clitest.RequireShell(t)
@@ -39,6 +42,9 @@ func TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap(t *testing.T) {
 		{"ci", "validate"},
 		{"ci", "init", "--force", "--output=json"},
 		{"ci", "--help"},
+		{"help", "ci"},
+		{"help", "ci", "validate"},
+		{"help", "channel"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Setenv(bootstrappedEnv, "")
@@ -47,9 +53,7 @@ func TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap(t *testing.T) {
 			if code != 2 {
 				t.Fatalf("exit = %d, want 2:\n%s", code, output)
 			}
-			if want := "putnami: `putnami " + args[0] + "` is no longer a core command"; !strings.Contains(output, want) {
-				t.Fatalf("output does not carry %q:\n%s", want, output)
-			}
+			requireRefusal(t, removedRoot(args), output)
 			if strings.Contains(output, "no project matched") || strings.Contains(output, "no job matched") {
 				t.Fatalf("the root reached selection or planning:\n%s", output)
 			}
@@ -75,6 +79,56 @@ func TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap(t *testing.T) {
 			t.Fatalf("%s is unset after a job command: the refusal's evidence is vacuous", bootstrappedEnv)
 		}
 	})
+}
+
+// TestRemovedRootsAreRefusedOutsideAWorkspace holds the refusal, and the
+// help of a removed root, to the same message outside any workspace, where an
+// empty user scope declares nothing.
+func TestRemovedRootsAreRefusedOutsideAWorkspace(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "command-catalog", "a-root-that-left-the-core-is-refused-unless-an-extension-declares-it")
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv(extension.UserScopeRepairEnv, "")
+	t.Setenv(extension.PrivatePutRegistryURLEnv, "")
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(home, "artifacts"))
+	for _, args := range [][]string{
+		{"ci", "validate"},
+		{"channel", "status", "latest"},
+		{"help", "ci"},
+		{"help", "channel"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			code, output := clitest.RunGateArgs(t, t.TempDir(), args...)
+			if code != 2 {
+				t.Fatalf("exit = %d, want 2:\n%s", code, output)
+			}
+			requireRefusal(t, removedRoot(args), output)
+		})
+	}
+}
+
+// removedRoot is the root an invocation names: the first argument, or the
+// command `putnami help` is asked about.
+func removedRoot(args []string) string {
+	if args[0] == "help" {
+		return args[1]
+	}
+	return args[0]
+}
+
+// requireRefusal fails unless output carries the refusal of root with the
+// reference that lists where it moved, and no remedy that needs a workspace.
+func requireRefusal(t *testing.T, root, output string) {
+	t.Helper()
+	if want := "putnami: `putnami " + root + "` is no longer a core command"; !strings.Contains(output, want) {
+		t.Fatalf("output does not carry %q:\n%s", want, output)
+	}
+	if !strings.Contains(output, commandmeta.CommandsThatLeftTheCoreURL) {
+		t.Fatalf("output does not cite %s:\n%s", commandmeta.CommandsThatLeftTheCoreURL, output)
+	}
+	if strings.Contains(output, "extensions list") {
+		t.Fatalf("output points at a command that lists only installed extensions:\n%s", output)
+	}
 }
 
 // TestAnExtensionThatDeclaresARemovedRootServesIt keeps dispatch unchanged for
@@ -119,6 +173,13 @@ func TestAnExtensionThatDeclaresARemovedRootServesIt(t *testing.T) {
 		calls, err := os.ReadFile(filepath.Join(root, "app", "calls"))
 		if err != nil || strings.Count(string(calls), "ran\n") != runs+1 {
 			t.Fatalf("%s: calls = %q (%v), want %d task executions", strings.Join(args, " "), calls, err, runs+1)
+		}
+	}
+
+	for _, args := range [][]string{{"help", "ci"}, {"help", "channel"}} {
+		code, output := clitest.RunGateArgs(t, root, args...)
+		if code != 0 || strings.Contains(output, "is no longer a core command") {
+			t.Fatalf("%s exit = %d, want 0 and no refusal, because the extension declares the root:\n%s", strings.Join(args, " "), code, output)
 		}
 	}
 }
