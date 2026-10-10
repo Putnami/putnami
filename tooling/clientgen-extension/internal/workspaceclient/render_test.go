@@ -3,10 +3,12 @@ package workspaceclient
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
 
+	clientcontract "go.putnami.dev/protocol/clientcontract"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
@@ -233,6 +235,102 @@ func TestTypeScriptEmitterKeepsTheTranspilerCacheOfAnInstalledBunUnderItsInstall
 			t.Errorf("%s: environment grew from %d to %d entries", name, len(environment), len(got))
 		}
 	}
+}
+
+// The TypeScript emitter reads the workspace root package.json to decide how a
+// client depends on @putnami/client. The emitter double below copies that file
+// into its output, so the fresh render matches the build's render only when
+// the mirror holds the root bytes the workspace holds.
+func TestFreshRenderWritesTheBytesTheBuildWrites(t *testing.T) {
+	spectest.Proves(t, clientgenFeature, "drift-closure", "the-fresh-render-reads-the-workspace-root-inputs-the-build-reads")
+	if runtime.GOOS == "windows" {
+		t.Skip("fixture uses a POSIX executable")
+	}
+	cases := map[string]string{
+		"a catalog entry":      `{"name":"consumer","catalog":{"@putnami/client":"0.4.0"}}`,
+		"a pinned dependency":  `{"name":"consumer","dependencies":{"@putnami/client":"0.4.0"}}`,
+		"no root package.json": "",
+	}
+	for name, rootPackage := range cases {
+		t.Run(name, func(t *testing.T) {
+			const runtimeEnv = "PUTNAMI_CLIENTGEN_TYPESCRIPT_RUNTIME"
+			t.Setenv(runtimeEnv, "")
+			if err := os.Unsetenv(runtimeEnv); err != nil {
+				t.Fatal(err)
+			}
+			root := t.TempDir()
+			writeWorkspaceFile(t, root, "putnami.workspace.json", `{"name":"consumer"}`)
+			if rootPackage != "" {
+				writeWorkspaceFile(t, root, "package.json", rootPackage)
+			}
+			writeWorkspaceFile(t, root, "tsconfig.base.json", `{}`)
+			writeWorkspaceFile(t, root, ".putnami/workspace-index.json", `{"version":4,"projects":[{"path":"services/catalog"}]}`)
+			writeWorkspaceFile(t, root, "services/catalog/.gen/clientgen/config.json", `{"targets":["ts"],"ts":{"output":"clients/ts"}}`)
+			writeWorkspaceFile(t, root, "services/catalog/.gen/schema/openapi.json", string(catalogContractForFixture(t)))
+			emitter := filepath.Join(root, "node_modules", ".bin", "putnami-client-generate")
+			writeWorkspaceFile(t, root, "node_modules/.bin/putnami-client-generate", rootReadingEmitter)
+			if err := os.Chmod(emitter, 0o755); err != nil {
+				t.Fatal(err)
+			}
+
+			provider := filepath.Join(root, "services", "catalog")
+			output, generated, err := SynchronizeTarget(root, provider, clientcontract.GeneratedLanguageTypeScript)
+			if err != nil || !generated || output != "clients/ts" {
+				t.Fatalf("build render = (%q, %v, %v), want clients/ts", output, generated, err)
+			}
+			mirror, cleanup, err := RenderExpected(root)
+			if err != nil {
+				t.Fatalf("fresh render: %v", err)
+			}
+			defer cleanup()
+
+			built := readTree(t, filepath.Join(provider, "clients", "ts"))
+			fresh := readTree(t, filepath.Join(mirror, "services", "catalog", "clients", "ts"))
+			if len(built) == 0 {
+				t.Fatal("the build render wrote no file")
+			}
+			if !reflect.DeepEqual(built, fresh) {
+				t.Fatalf("fresh render differs from the build render\n  build: %q\n  fresh: %q", built, fresh)
+			}
+		})
+	}
+}
+
+// rootReadingEmitter writes the workspace root package.json it reads, or a
+// marker when there is none, into the TypeScript target.
+const rootReadingEmitter = `#!/bin/sh
+set -eu
+project=$2
+mkdir -p "$project/clients/ts"
+if [ -f "$PUTNAMI_WORKSPACE_ROOT/package.json" ]; then
+  cp "$PUTNAMI_WORKSPACE_ROOT/package.json" "$project/clients/ts/root-package.json"
+else
+  printf 'no root package.json\n' > "$project/clients/ts/root-package.json"
+fi
+`
+
+func readTree(t *testing.T, root string) map[string]string {
+	t.Helper()
+	files := map[string]string{}
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil || entry.IsDir() {
+			return walkErr
+		}
+		data, err := os.ReadFile(path) //nolint:gosec // test-owned temporary tree
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		files[filepath.ToSlash(rel)] = string(data)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return files
 }
 
 func writeExecutableFixture(t *testing.T, root, name, label string) string {

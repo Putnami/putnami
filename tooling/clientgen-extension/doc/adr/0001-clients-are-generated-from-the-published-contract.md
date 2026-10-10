@@ -60,8 +60,10 @@ regenerate every target in place, rebuild every project as a compile gate, then
 verify the worktree against a fresh isolated render.
 
 The isolated render copies only generator inputs: the provider contract and
-configuration, the provider package or module identity, and scaffold-once Go
-target metadata. It never seeds the mirror with generated source or its
+configuration, the provider package or module identity, scaffold-once Go
+target metadata, and the workspace-root files whose presence or bytes decide
+what an emitter writes (`putnami.workspace.json`, `package.json`,
+`tsconfig.base.json`). It never seeds the mirror with generated source or its
 manifest. The TypeScript emitter runs with `--format-project` naming the real
 provider root, so Biome resolves against the provider's own configuration.
 

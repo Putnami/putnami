@@ -133,17 +133,34 @@ func requireNoCommittedTarget(workspaceRoot, projectRoot string, language client
 		"no longer generates one", projectRoot, language, output)
 }
 
+// mirrorRootInputs are the workspace-root files whose presence or bytes decide
+// what the TypeScript emitter writes; the Go emitter reads none. The mirror
+// holds each one byte for byte, so a render there writes the bytes a render in
+// the workspace writes:
+//
+//   - putnami.workspace.json marks the root the emitter resolves;
+//   - package.json decides how a TypeScript client depends on
+//     @putnami/client: `catalog:` when a root catalog lists it, the pinned
+//     version when the root dependencies pin it, `workspace:*` otherwise;
+//   - tsconfig.base.json is the file the TypeScript client's tsconfig extends;
+//     the emitter writes its path, not its bytes.
+//
+// The formatter configuration is not a root input of the mirror: the
+// TypeScript emitter resolves it from the real provider (--format-project).
+var mirrorRootInputs = []string{"putnami.workspace.json", "package.json", "tsconfig.base.json"}
+
 func writeMirrorRoot(workspaceRoot, tempRoot string) error {
-	workspaceManifest := filepath.Join(workspaceRoot, "putnami.workspace.json")
-	if err := copyOptional(workspaceManifest, filepath.Join(tempRoot, "putnami.workspace.json")); err != nil {
-		return err
+	for _, name := range mirrorRootInputs {
+		if err := copyOptional(filepath.Join(workspaceRoot, name), filepath.Join(tempRoot, name)); err != nil {
+			return err
+		}
 	}
 	if _, err := os.Stat(filepath.Join(tempRoot, "putnami.workspace.json")); os.IsNotExist(err) {
 		if writeErr := os.WriteFile(filepath.Join(tempRoot, "putnami.workspace.json"), []byte("{\"name\":\"clientgen-check\"}\n"), 0o600); writeErr != nil {
 			return writeErr
 		}
 	}
-	return copyOptional(filepath.Join(workspaceRoot, "tsconfig.base.json"), filepath.Join(tempRoot, "tsconfig.base.json"))
+	return nil
 }
 
 func copyProviderInputs(workspaceRoot, tempRoot string, provider provider) error {
