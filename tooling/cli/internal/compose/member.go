@@ -40,14 +40,23 @@ func isServeReadyEvent(event jobs.RawJobEvent) bool {
 	return data.Target == runtimeproto.ReadyTargetServer || data.Target == runtimeproto.ReadyTargetWorkload
 }
 
-// readyPort is the port of the claim's first endpoint, or 0 for a workload
-// that binds nothing.
-func readyPort(event jobs.RawJobEvent) int {
+// readyClaim is the target of a readiness claim and the port the proxy should
+// forward to: the first http or https endpoint, because the proxy speaks HTTP,
+// else the first endpoint, else 0 for a claim that carries none.
+func readyClaim(event jobs.RawJobEvent) (target string, port int) {
 	data, err := runtimeproto.ExtractReadyData(event.Data)
-	if err != nil || data == nil || len(data.Endpoints) == 0 {
-		return 0
+	if err != nil || data == nil {
+		return "", 0
 	}
-	return data.Endpoints[0].Port
+	if len(data.Endpoints) == 0 {
+		return data.Target, 0
+	}
+	for _, endpoint := range data.Endpoints {
+		if endpoint.Scheme == runtimeproto.ReadySchemeHTTP || endpoint.Scheme == runtimeproto.ReadySchemeHTTPS {
+			return data.Target, endpoint.Port
+		}
+	}
+	return data.Target, data.Endpoints[0].Port
 }
 
 // memberRuntime is a running member: its proxy, the environment its serve step
@@ -79,6 +88,14 @@ type memberRuntime struct {
 	// the ready timeout.
 	stoppedBeforeReady chan struct{}
 	stoppedOnce        sync.Once
+	// startupCompleted closes on the first workload claim: the member's
+	// application reports that its whole startup finished, which a server claim
+	// (a listening port) does not. stoppedBeforeStartup is its counterpart of
+	// stoppedBeforeReady.
+	startupCompleted     chan struct{}
+	startupOnce          sync.Once
+	stoppedBeforeStartup chan struct{}
+	stoppedStartupOnce   sync.Once
 
 	mu        sync.Mutex
 	tail      tailLines
@@ -95,7 +112,9 @@ func newMemberRuntime(member *Member, p *proxy, env, sections []string, watchMod
 		ready:    make(chan struct{}),
 		exited:   make(chan struct{}),
 
-		stoppedBeforeReady: make(chan struct{}),
+		stoppedBeforeReady:   make(chan struct{}),
+		startupCompleted:     make(chan struct{}),
+		stoppedBeforeStartup: make(chan struct{}),
 	}
 }
 
@@ -105,8 +124,11 @@ func newMemberRuntime(member *Member, p *proxy, env, sections []string, watchMod
 func serveParams() map[string]any { return map[string]any{serveParamPort: serveParamEphemeral} }
 
 // observe captures what a member's event stream says about it: its output
-// tail, and every typed readiness claim, which moves the proxy to the announced
-// port.
+// tail, and every typed readiness claim. A claim with an endpoint moves the
+// proxy to the announced port; a claim without one (a workload claim) leaves
+// the backend where an earlier claim put it, because it says nothing about
+// where the member listens. A workload claim also records that the member's
+// application completed its startup.
 func (rt *memberRuntime) observe(event jobs.RawJobEvent) {
 	if event.Type == jobs.EventTypeLog && event.Message != "" {
 		rt.mu.Lock()
@@ -116,15 +138,18 @@ func (rt *memberRuntime) observe(event jobs.RawJobEvent) {
 	if !isServeReadyEvent(event) {
 		return
 	}
-	port := readyPort(event)
-	rt.proxy.setBackend(port)
+	target, port := readyClaim(event)
 	if port > 0 {
+		rt.proxy.setBackend(port)
 		rt.lastPort.Store(int64(port))
 	}
 	rt.readyOnce.Do(func() {
 		rt.readyMs.Store(time.Since(rt.startedAt).Milliseconds())
 		close(rt.ready)
 	})
+	if target == runtimeproto.ReadyTargetWorkload {
+		rt.startupOnce.Do(func() { close(rt.startupCompleted) })
+	}
 }
 
 // runOnce executes the member's serve step once and returns its result. The
@@ -192,6 +217,11 @@ func (rt *memberRuntime) runOnce(ctx context.Context, sink jobs.Renderer) (*jobs
 	case <-rt.ready:
 	default:
 		rt.stoppedOnce.Do(func() { close(rt.stoppedBeforeReady) })
+	}
+	select {
+	case <-rt.startupCompleted:
+	default:
+		rt.stoppedStartupOnce.Do(func() { close(rt.stoppedBeforeStartup) })
 	}
 	return result, err
 }
@@ -274,13 +304,44 @@ func (rt *memberRuntime) waitReady(ctx context.Context, timeout time.Duration) e
 // exitedBeforeReady is the failure of a serve step that ended without a ready
 // event, with its exit status and the tail of its output.
 func (rt *memberRuntime) exitedBeforeReady(id string) error {
+	return rt.exitedBefore(id, "its ready event")
+}
+
+// exitedBefore is the failure of a serve step that ended before what, with its
+// exit status and the tail of its output.
+func (rt *memberRuntime) exitedBefore(id, what string) error {
 	status, tail := rt.exitDetail()
-	err := newError(CodeMemberExited, id, PhaseReadiness, "the serve step exited before its ready event")
+	err := newError(CodeMemberExited, id, PhaseReadiness, "the serve step exited before "+what)
 	if status != "" {
 		err.Message += " (" + status + ")"
 	}
 	err.Detail = tail
 	return err
+}
+
+// waitStartup blocks until the member's application reported completed
+// startup (a workload claim), its serve step stopped first, or ctx is done. A
+// claim observed before the stop counts: the member did complete its startup.
+func (rt *memberRuntime) waitStartup(ctx context.Context) error {
+	select {
+	case <-rt.startupCompleted:
+		return nil
+	default:
+	}
+	select {
+	case <-rt.startupCompleted:
+		return nil
+	case <-rt.stoppedBeforeStartup:
+	case <-rt.exited:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	select {
+	case <-rt.startupCompleted:
+		return nil
+	default:
+	}
+	return rt.exitedBefore(rt.member.Project.ID, "its application reported completed startup")
 }
 
 // memberEnv is the process environment of a member's serve step: an

@@ -1,3 +1,4 @@
+import type { ReadyEndpoint } from '@putnami/runtime/jobs';
 import type { Promisable } from '@putnami/utils';
 import type { GeneratedHttpRoute } from '../http-routes/generation';
 import type { Module } from './module';
@@ -47,7 +48,7 @@ export interface GenerateResult {
  * Plugin interface for extending Module/Application functionality.
  * Plugins can hook into the application lifecycle.
  *
- * Lifecycle: generate() → postGenerate() → warmup() → migrate() → start() → stop()
+ * Lifecycle: generate() → postGenerate() → warmup() → migrate() → start() → startupCompleted() → stop()
  */
 export interface Plugin {
   /**
@@ -102,6 +103,22 @@ export interface Plugin {
    * Use this to start servers, subscribe to queues, etc.
    */
   start?(owner: Module): Promisable<void>;
+
+  /**
+   * Called once the application completed startup: every plugin `start()`
+   * resolved. Runs in plugin order, right before the application logs its ready
+   * record, and never when startup failed. Must not block. Go twin:
+   * `app.StartupObserver`.
+   */
+  startupCompleted?(): void;
+
+  /**
+   * The addresses this plugin accepts traffic on, bound while it started, such
+   * as an HTTP server's listener. The application's ready record carries the
+   * endpoints of every plugin. Returns only addressable endpoints, and none
+   * before `start()` or after `stop()`. Go twin: `app.EndpointReporter`.
+   */
+  readyEndpoints?(): ReadyEndpoint[];
 
   /**
    * Called during graceful shutdown.

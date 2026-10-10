@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/migration"
 	protocaps "go.putnami.dev/protocol/capabilities"
 	protofeatures "go.putnami.dev/protocol/features"
+	runtimeproto "go.putnami.dev/protocol/runtime"
 )
 
 // Plugin participates in the application lifecycle. Each method is optional —
@@ -371,6 +372,26 @@ type ReadinessChecker interface {
 type Starter interface {
 	Plugin
 	Start(ctx context.Context, owner *Module) error
+}
+
+// StartupObserver plugins act once the application completed startup: every
+// Starter and every module OnStart hook returned without an error. Start calls
+// StartupCompleted on each, in plugin order, right before it writes its ready
+// record, and never when startup failed or timed out. StartupCompleted must not
+// block.
+type StartupObserver interface {
+	Plugin
+	StartupCompleted()
+}
+
+// EndpointReporter plugins accept traffic on addresses they bound while
+// starting, such as an HTTP server's listener. The ready record's workload
+// claim carries the endpoints of every EndpointReporter. ReadyEndpoints returns
+// only addressable endpoints (a scheme from the runtime protocol's vocabulary,
+// a host, and a port in [1,65535]), and none before Start or after Stop.
+type EndpointReporter interface {
+	Plugin
+	ReadyEndpoints() []runtimeproto.ReadyEndpoint
 }
 
 // Stopper plugins clean up during shutdown.

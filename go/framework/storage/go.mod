@@ -22,6 +22,7 @@ require (
 	go.putnami.dev/protocol/database v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
 	go.putnami.dev/protocol/migration v0.0.0 // indirect
+	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
@@ -56,3 +57,5 @@ replace go.putnami.dev/protocol/features => ../../../protocols/features
 retract [v0.1.0-0, v0.1.99999] // Pre-open-source builds; public history starts at v0.2.0.
 
 replace go.putnami.dev/protocol/architecture => ../../../protocols/architecture
+
+replace go.putnami.dev/protocol/runtime => ../../../protocols/runtime

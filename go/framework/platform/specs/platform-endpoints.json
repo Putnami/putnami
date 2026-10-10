@@ -29,7 +29,7 @@
     },
     {
       "id": "lifecycle-state",
-      "text": "The health and readiness aggregates report unavailable before the application starts and after it stops, and report degraded with per-probe detail when any probe fails."
+      "text": "The health and readiness aggregates report unavailable before the application starts and after it stops, and report degraded with per-probe detail when any probe fails. Readiness also reports unavailable until the application completed startup: every plugin Starter and every module OnStart hook returned without an error. A starter or hook that is still running keeps it unavailable, and a failed startup never makes it ready."
     },
     {
       "id": "deferred-discovery",

@@ -2241,7 +2241,8 @@
             "kind": "acceptance",
             "checks": [
               "a-member-starts-only-after-the-one-before-it-announced-readiness",
-              "a-member-that-never-announces-readiness-fails-naming-member-and-phase"
+              "a-member-that-never-announces-readiness-fails-naming-member-and-phase",
+              "a-claim-without-an-endpoint-keeps-the-backend"
             ]
           }
         },
@@ -2311,6 +2312,21 @@
               "a-composition-failure-names-the-member-and-still-tears-down",
               "canceling-a-local-run-tears-the-composition-down",
               "expect-sha-with-a-local-target-is-a-usage-error"
+            ]
+          }
+        },
+        {
+          "id": "local-readiness-is-completed-startup",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-member-records-completed-startup-from-a-workload-claim-alone",
+              "a-member-that-exits-before-completed-startup-fails-the-wait",
+              "a-local-target-without-a-readiness-route-passes-on-completed-startup",
+              "completed-startup-that-never-arrives-times-out-without-smoke",
+              "a-declared-readiness-route-is-polled"
             ]
           }
         },

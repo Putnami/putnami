@@ -272,7 +272,7 @@ description: Derive the smoke contract from the workload's route inventory, exec
 usage: putnami qualify <project> --target <local|url> [--expect-sha <sha>] [--platform-prefix <path>] [--ready-timeout <duration>] [--request-timeout <duration>] [--print-contract] [--output <format>]
 flag: --target | <local|url> | local composes the workload on this machine; an http(s) URL is a running deployment
 flag: --expect-sha | <sha> | Required with a URL target: the git sha the deployment must report on /version
-flag: --platform-prefix | <path> | Prefix under which /readyz and /version are mounted; default: where the route inventory declares both, else the root
+flag: --platform-prefix | <path> | Prefix under which /readyz and /version are mounted; setting it makes local readiness poll <path>/readyz instead of waiting for the startup claim; default: where the route inventory declares both, else the root
 flag: --ready-timeout | <duration> | Deadline for readiness; default 60s
 flag: --request-timeout | <duration> | Deadline per smoke request; default 5s
 flag: --print-contract |  | Print the derived contract and exit without a target

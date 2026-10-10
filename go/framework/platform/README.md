@@ -10,7 +10,7 @@ It does not replace `go.putnami.dev/http`'s `HealthPlugin`; it is a separate plu
 | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `/livez`    | Lightweight liveness — returns `200 {"status":"ok"}` whenever the handler can run. No probes, no flags. Safe to use as a Kubernetes liveness probe. |
 | `/healthz`  | Liveness aggregate — `200` when running and every `app.HealthChecker` probe passes; `503 {"status":"unavailable"}` before `Start` and after `Stop`; `503 {"status":"degraded","checks":{…}}` when any probe fails. |
-| `/readyz`   | Readiness aggregate — same shape as `/healthz` but driven by `app.ReadinessChecker` probes. The right endpoint for a Kubernetes readiness probe. |
+| `/readyz`   | Readiness aggregate — same shape as `/healthz` but driven by `app.ReadinessChecker` probes, and `503 {"status":"unavailable"}` until the application completed startup: every `Starter` and module `OnStart` hook returned. The right endpoint for a Kubernetes readiness probe. |
 | `/version`  | Build metadata as JSON. Returns the `VersionInfo` you configure; empty fields fall back to `runtime/debug.ReadBuildInfo` (module path, VCS revision and time when built with `-buildvcs`). |
 | `/debug/pprof/*` | `net/http/pprof` index and profile handlers. Disabled by default — set `Config.EnablePprof = true` to expose them. |
 

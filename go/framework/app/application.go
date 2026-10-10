@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -16,6 +17,7 @@ import (
 	"go.putnami.dev/inject"
 	"go.putnami.dev/logger"
 	"go.putnami.dev/migration"
+	runtimeproto "go.putnami.dev/protocol/runtime"
 )
 
 // DefaultStartTimeout is the maximum time allowed for the plugin start phase.
@@ -270,7 +272,13 @@ func (a *Application) Start(ctx context.Context) error {
 		return err
 	}
 
-	a.log.Info("🤖 ready", slog.Int64("durationMs", time.Since(startedAt).Milliseconds()))
+	// Startup completed: the StartupObservers learn it, then the ready record
+	// announces it.
+	notifyStartupCompleted(allPlugins)
+	durationMs := time.Since(startedAt).Milliseconds()
+	a.log.Info("🤖 ready",
+		slog.Int64("durationMs", durationMs),
+		slog.Any(runtimeproto.ReadyLogKey, startedMarker(durationMs, a.readyEndpoints(allPlugins))))
 
 	if a.runner != nil {
 		if err := a.runner(ctx); err != nil && ctx.Err() == nil {
@@ -281,6 +289,60 @@ func (a *Application) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// startedMarker is the readiness payload the ready record carries under the
+// reserved key runtimeproto.ReadyLogKey: a workload claim, which states that
+// the whole application finished startup, with the endpoints its plugins bound
+// in canonical order and listed once. An application that bound none claims
+// workload without an endpoint. Start writes that record only after every
+// Starter and every module OnStart hook returned without an error, so a
+// consumer that needs more than a listening port (a server claim) waits for
+// this one. The serve extension's forwarder turns it into the typed `ready`
+// event (protocols/runtime/ready_marker.go).
+func startedMarker(durationMs int64, endpoints []runtimeproto.ReadyEndpoint) runtimeproto.ReadyData {
+	marker := runtimeproto.ReadyMarker(runtimeproto.ReadyData{
+		Target:     runtimeproto.ReadyTargetWorkload,
+		Endpoints:  endpoints,
+		DurationMs: durationMs,
+	})
+	marker.Endpoints = slices.CompactFunc(marker.Endpoints, func(a, b runtimeproto.ReadyEndpoint) bool {
+		return runtimeproto.CompareReadyEndpoints(a, b) == 0
+	})
+	return marker
+}
+
+// readyEndpoints gathers the endpoints of every EndpointReporter, in plugin
+// order. An endpoint the runtime protocol rejects is dropped with a warning:
+// kept, it would void the whole ready record, and a consumer waiting for
+// completed startup would never learn it.
+func (a *Application) readyEndpoints(plugins []PluginOwner) []runtimeproto.ReadyEndpoint {
+	var endpoints []runtimeproto.ReadyEndpoint
+	for _, po := range plugins {
+		reporter, ok := po.Plugin.(EndpointReporter)
+		if !ok {
+			continue
+		}
+		for _, endpoint := range reporter.ReadyEndpoints() {
+			if !runtimeproto.ValidReadyEndpoint(endpoint) {
+				a.log.Warn("dropped an invalid ready endpoint",
+					slog.String("plugin", reflect.TypeOf(po.Plugin).String()),
+					slog.String("endpoint", endpoint.URL()))
+				continue
+			}
+			endpoints = append(endpoints, endpoint)
+		}
+	}
+	return endpoints
+}
+
+// notifyStartupCompleted calls every StartupObserver, in plugin order.
+func notifyStartupCompleted(plugins []PluginOwner) {
+	for _, po := range plugins {
+		if observer, ok := po.Plugin.(StartupObserver); ok {
+			observer.StartupCompleted()
+		}
+	}
 }
 
 // buildContainer always creates the DI container, propagates it to modules,

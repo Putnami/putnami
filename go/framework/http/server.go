@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -89,6 +90,7 @@ type ServerPlugin struct {
 	composedChain   func(Handler) Handler
 	log             *logger.Logger
 	server          *http.Server
+	readyEndpoints  []runtimeproto.ReadyEndpoint
 	cc              *inject.ContainerContext
 	pending         []*InjectedHandler
 	routesWrapped   bool
@@ -348,10 +350,11 @@ func (p *ServerPlugin) Start(_ context.Context, owner *app.Module) error {
 		return errors.Wrapf(err, CodeListen, "listen failed", errors.String("addr", addr))
 	}
 
-	durationMs := time.Since(startedAt).Milliseconds()
-	p.log.Info(fmt.Sprintf("⚡️ listening http://localhost%s", addr),
-		slog.Int64("durationMs", durationMs),
-		slog.Any(runtimeproto.ReadyLogKey, readyMarker(ln, durationMs)))
+	attrs, endpoints := listening(ln, time.Since(startedAt).Milliseconds())
+	p.mu.Lock()
+	p.readyEndpoints = endpoints
+	p.mu.Unlock()
+	p.log.Info(fmt.Sprintf("⚡️ listening http://localhost%s", addr), attrs...)
 
 	go func() {
 		if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
@@ -362,37 +365,52 @@ func (p *ServerPlugin) Start(_ context.Context, owner *app.Module) error {
 	return nil
 }
 
-// readyMarker builds the machine-readable readiness payload attached to the
-// listening log record under the reserved key runtimeproto.ReadyLogKey.
+// listening returns the attributes of the listening log record and the
+// endpoints the listener accepts traffic on.
 //
-// A served workload's stdout is a LOG stream — the extension that spawned it
-// re-emits each line as a log event — so this is how the framework reaches the
-// runtime event stream it does not own: the extension's forwarder recognizes
-// the key and emits the typed `ready` event
-// (protocols/runtime/ready_marker.go). The human message is untouched, so the
-// marker is the ONLY readiness path since B6b deleted the log probe.
+// An addressable listener adds a server claim under the reserved key
+// runtimeproto.ReadyLogKey. A served workload's stdout is a LOG stream — the
+// extension that spawned it re-emits each line as a log event — so this is how
+// the framework reaches the runtime event stream it does not own: the
+// extension's forwarder recognizes the key and emits the typed `ready` event
+// (protocols/runtime/ready_marker.go). The human message is untouched.
 //
 // The port comes from the LISTENER, not from the configured address: `PORT=0`
 // binds an ephemeral port, and a readiness claim carrying the requested port
-// instead of the bound one would send a client to the wrong address. When the
-// bound address is not addressable, the marker degrades to a workload claim —
-// startup did finish — rather than emitting a server claim nobody can act on.
-func readyMarker(ln net.Listener, durationMs int64) runtimeproto.ReadyData {
-	data := runtimeproto.ReadyData{Target: runtimeproto.ReadyTargetWorkload, DurationMs: durationMs}
+// instead of the bound one would send a client to the wrong address. A listener
+// whose bound address is not an addressable TCP port adds no marker and reports
+// no endpoint; the application's own ready record announces completed startup.
+func listening(ln net.Listener, durationMs int64) ([]slog.Attr, []runtimeproto.ReadyEndpoint) {
+	attrs := []slog.Attr{slog.Int64("durationMs", durationMs)}
 	tcpAddr, ok := ln.Addr().(*net.TCPAddr)
 	if !ok || tcpAddr.Port < 1 || tcpAddr.Port > 65535 {
-		return data
+		return attrs, nil
 	}
-	data.Target = runtimeproto.ReadyTargetServer
 	// "localhost" matches the address the log message prints and the one a
 	// developer can actually open; the listener binds every interface.
-	data.Endpoints = []runtimeproto.ReadyEndpoint{{
+	endpoints := []runtimeproto.ReadyEndpoint{{
 		Scheme: runtimeproto.ReadySchemeHTTP,
 		Host:   "localhost",
 		Port:   tcpAddr.Port,
 	}}
-	return runtimeproto.ReadyMarker(data)
+	claim := runtimeproto.ReadyMarker(runtimeproto.ReadyData{
+		Target:     runtimeproto.ReadyTargetServer,
+		Endpoints:  endpoints,
+		DurationMs: durationMs,
+	})
+	return append(attrs, slog.Any(runtimeproto.ReadyLogKey, claim)), endpoints
 }
+
+// ReadyEndpoints implements app.EndpointReporter: the address the server's
+// listener bound, from Start until Stop. A listener that is not addressable
+// reports none.
+func (p *ServerPlugin) ReadyEndpoints() []runtimeproto.ReadyEndpoint {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return slices.Clone(p.readyEndpoints)
+}
+
+var _ app.EndpointReporter = (*ServerPlugin)(nil)
 
 func (p *ServerPlugin) wrapRoutesOnce() {
 	p.mu.Lock()
@@ -672,9 +690,10 @@ func (p *ServerPlugin) Stop(ctx context.Context, _ *app.Module) error {
 	// Hijacked WebSocket connections are not drained by http.Server.Shutdown,
 	// so they are told first and end their conversations themselves.
 	p.beginDrain()
-	p.mu.RLock()
+	p.mu.Lock()
 	server := p.server
-	p.mu.RUnlock()
+	p.readyEndpoints = nil
+	p.mu.Unlock()
 	if server == nil {
 		return nil
 	}

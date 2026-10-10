@@ -16,6 +16,15 @@ import {
   registerContributedConfig,
   useLogger,
 } from '@putnami/runtime';
+import {
+  compareReadyEndpoints,
+  isValidReadyEndpoint,
+  READY_LOG_KEY,
+  type ReadyData,
+  type ReadyEndpoint,
+  readyMarker,
+  readyEndpointUrl,
+} from '@putnami/runtime/jobs';
 import { getProjectRoot } from '@putnami/utils';
 import { markStartupFailureLogged } from './app-bootstrap';
 import { emitDesignGraph } from '../features/design-graph';
@@ -40,6 +49,37 @@ export {
   type Plugin,
   type ResolvedTokenTuple,
 } from './module';
+
+/**
+ * The readiness payload of the ready record: a workload claim, with the
+ * endpoints every plugin bound in canonical order and listed once. An
+ * application that bound none claims workload without an endpoint. Go twin:
+ * `startedMarker` in go/framework/app.
+ */
+function startedMarker(plugins: Array<{ plugin: Plugin }>, durationMs: number): ReadyData {
+  // An endpoint the runtime protocol rejects is dropped with a warning: kept,
+  // it would void the whole ready record, and a consumer waiting for completed
+  // startup would never learn it.
+  const endpoints = plugins.flatMap(({ plugin }) =>
+    (plugin.readyEndpoints?.() ?? []).filter((endpoint: ReadyEndpoint) => {
+      if (isValidReadyEndpoint(endpoint)) return true;
+      useLogger('putnami').warn('dropped an invalid ready endpoint', {
+        plugin: plugin.constructor.name,
+        endpoint: readyEndpointUrl(endpoint),
+      });
+      return false;
+    }),
+  );
+  const marker = readyMarker({ target: 'workload', endpoints, durationMs });
+  if (marker.endpoints) {
+    const sorted = marker.endpoints;
+    marker.endpoints = sorted.filter((endpoint, index) => {
+      const previous = sorted[index - 1];
+      return previous === undefined || compareReadyEndpoints(previous, endpoint) !== 0;
+    });
+  }
+  return marker;
+}
 
 /**
  * Unified Application class for services, workers, and jobs.
@@ -188,10 +228,15 @@ export class Application extends Module {
 
   /**
    * Mark the application as running without going through the full lifecycle.
-   * Useful in tests that manually call warmup/start on individual plugins.
+   * Useful in tests that manually call warmup/start on individual plugins: it
+   * stands for completed startup, so the plugins learn it as they would from
+   * {@link start}, and a mounted platform plugin's /readyz can turn ready.
    */
   markAsRunning(): void {
     this.running = true;
+    for (const { plugin } of this.collectPlugins()) {
+      plugin.startupCompleted?.();
+    }
   }
 
   /**
@@ -365,7 +410,9 @@ export class Application extends Module {
    * 2. Migrate phase: invoke plugin.migrate hooks, then registry.applyAll
    *    (source-only metadata is tolerated; runners no-op unless their
    *    AutoApply is set or Force is passed)
-   * 3. Start all plugins (in parallel)
+   * 3. Start all plugins (in parallel), then call every plugin's
+   *    `startupCompleted()` and log the ready record with its workload
+   *    readiness marker
    * 4. Execute the runner (if defined)
    */
   async start(): Promise<void> {
@@ -417,7 +464,16 @@ export class Application extends Module {
         }
         throw firstFailure.reason;
       }
-      logger.info(`🤖 ready`, { durationMs: Date.now() - startedAt });
+      // Every plugin start() has resolved, so the whole application finished
+      // startup: the plugins learn it, then the ready record carries it as a
+      // workload readiness claim. A listening HTTP server announces only itself
+      // (a server claim), so a consumer that needs the application started
+      // waits for this one.
+      for (const { plugin } of allPlugins) {
+        plugin.startupCompleted?.();
+      }
+      const durationMs = Date.now() - startedAt;
+      logger.info(`🤖 ready`, { durationMs, [READY_LOG_KEY]: startedMarker(allPlugins, durationMs) });
 
       // Install global exception handlers so uncaught errors include context
       this._removeExceptionHandler = installExceptionHandler(logger);

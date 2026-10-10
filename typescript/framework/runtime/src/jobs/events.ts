@@ -329,7 +329,7 @@ export function validateReadyData(data: ReadyData): EventDiagnostic[] {
     if (!endpoint.host) {
       err('required-field', field('host'), 'endpoint requires a host');
     }
-    if (typeof endpoint.port !== 'number' || endpoint.port < 1 || endpoint.port > MAX_PORT) {
+    if (!Number.isInteger(endpoint.port) || endpoint.port < 1 || endpoint.port > MAX_PORT) {
       err('invalid-value', field('port'), `endpoint port ${endpoint.port} out of range [1,${MAX_PORT}]`);
     }
     if (endpoint.path && !endpoint.path.startsWith('/')) {
@@ -353,6 +353,16 @@ export function validateReadyData(data: ReadyData): EventDiagnostic[] {
   }
 
   return diags;
+}
+
+/**
+ * Reports whether one endpoint satisfies the rules a readiness payload holds
+ * each of its endpoints to. A producer that gathers endpoints from several
+ * sources drops one that fails them, instead of voiding the whole claim it
+ * would otherwise invalidate. Mirrors the Go `ValidReadyEndpoint`.
+ */
+export function isValidReadyEndpoint(endpoint: ReadyEndpoint): boolean {
+  return !hasEventErrors(validateReadyData({ target: 'server', endpoints: [endpoint] }));
 }
 
 /**

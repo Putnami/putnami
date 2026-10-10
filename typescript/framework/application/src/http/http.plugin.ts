@@ -1,7 +1,7 @@
 import type { ServerWebSocket } from 'bun';
 import { type Server, serve } from 'bun';
 import { type ContainerContext, HttpException, runInContext, useConfig, useLogger } from '@putnami/runtime';
-import { READY_LOG_KEY, type ReadyData, readyMarker } from '@putnami/runtime/jobs';
+import { READY_LOG_KEY, type ReadyEndpoint, readyMarker } from '@putnami/runtime/jobs';
 import type { WsDataType } from '../api/ws-context.type';
 import { WebSocketDispatcher } from '../api/ws-dispatcher';
 import { Application, type GenerateResult, type Module, type Plugin } from '../application';
@@ -42,33 +42,40 @@ type BunNativeRoute =
 const TIMEOUT_SENTINEL = Symbol('request-timeout');
 
 /**
- * Builds the machine-readable readiness payload attached to the listening log
- * record under the reserved key {@link READY_LOG_KEY}.
+ * The address a bound server accepts traffic on, or `undefined` when it is not
+ * addressable.
+ *
+ * The port comes from the BOUND server (`server.port`), not from the requested
+ * one, so `PORT=0` still announces an address a client can reach. A port that
+ * is absent (a unix-socket listener) or outside `[1,65535]` is not addressable:
+ * the listening record then carries no readiness marker, and the application's
+ * own ready record announces completed startup.
+ */
+function boundHttpEndpoint(port: number | undefined): ReadyEndpoint | undefined {
+  if (port === undefined || !Number.isInteger(port) || port < 1 || port > 65_535) {
+    return undefined;
+  }
+  // "localhost" matches the address the log message prints and the one a
+  // developer can actually open; Bun binds every interface.
+  return { scheme: 'http', host: 'localhost', port };
+}
+
+/**
+ * The attributes of the listening log record. An addressable server adds a
+ * server claim under the reserved key {@link READY_LOG_KEY}.
  *
  * A served app's stdout is a LOG stream — the `@putnami/typescript` extension
  * re-emits each line as a log event — so this is how the framework reaches the
  * runtime event stream it does not own: the extension's forwarder recognizes
  * the key and emits the typed `ready` event
- * (`protocols/runtime/ready_marker.go`). The human message is untouched, so the
- * marker is the ONLY readiness path since B6b deleted the log probe.
- *
- * The port comes from the BOUND server (`server.port`), not from the requested
- * one, so `PORT=0` still announces an address a client can reach. A port that
- * is absent (a unix-socket listener) or outside `[1,65535]` degrades to a
- * workload claim — startup did finish — rather than a server claim nobody can
- * act on, which the protocol rejects outright.
+ * (`protocols/runtime/ready_marker.go`). The human message is untouched.
  */
-function buildReadyMarker(port: number | undefined, durationMs: number): ReadyData {
-  if (port === undefined || !Number.isInteger(port) || port < 1 || port > 65_535) {
-    return readyMarker({ target: 'workload', durationMs });
+export function listeningRecord(port: number | undefined, durationMs: number): Record<string, unknown> {
+  const endpoint = boundHttpEndpoint(port);
+  if (!endpoint) {
+    return { durationMs };
   }
-  return readyMarker({
-    target: 'server',
-    // "localhost" matches the address the log message prints and the one a
-    // developer can actually open; Bun binds every interface.
-    endpoints: [{ scheme: 'http', host: 'localhost', port }],
-    durationMs,
-  });
+  return { durationMs, [READY_LOG_KEY]: readyMarker({ target: 'server', endpoints: [endpoint], durationMs }) };
 }
 
 /**
@@ -429,11 +436,10 @@ export class HttpPlugin implements Plugin {
       },
     });
 
-    const durationMs = Date.now() - startedAt;
-    logger.info(`⚡️ listening http://localhost:${this.server.port}`, {
-      durationMs,
-      [READY_LOG_KEY]: buildReadyMarker(this.server.port, durationMs),
-    });
+    logger.info(
+      `⚡️ listening http://localhost:${this.server.port}`,
+      listeningRecord(this.server.port, Date.now() - startedAt),
+    );
 
     app.onStop(async () => {
       await this.drainServer();
@@ -590,6 +596,16 @@ export class HttpPlugin implements Plugin {
 
   async stop(): Promise<void> {
     await this.drainServer();
+  }
+
+  /**
+   * The address this server's listener bound, from `start()` until it stops.
+   * A listener that is not addressable reports none. Go twin:
+   * `ServerPlugin.ReadyEndpoints`.
+   */
+  readyEndpoints(): ReadyEndpoint[] {
+    const endpoint = boundHttpEndpoint(this.server?.port);
+    return endpoint ? [endpoint] : [];
   }
 
   getServer(): Server<WsDataType> | undefined {

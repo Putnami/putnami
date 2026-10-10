@@ -43,6 +43,10 @@
       "text": "A startup failure stops only the plugins whose start() resolved, closes the container, leaves the application not running, and re-throws to the caller; every additional concurrent start failure is logged rather than discarded."
     },
     {
+      "id": "completed-startup-readiness",
+      "text": "start() calls every plugin's startupCompleted(), then writes its ready record: a runtime-protocol workload readiness claim under the reserved putnami.ready key, with the endpoints every plugin's readyEndpoints() reports, such as the HTTP listener. Both happen only after every plugin start() resolved and before the runner runs, and the platform plugin's /readyz answers ready only from then on. A start() that is still pending delays all of it, and a start() that rejects means none of it happens."
+    },
+    {
       "id": "bootstrap-guard",
       "text": "bootstrapServe builds the application inside its failure guard and reports a construction-time or start-time failure as exactly one structured log line before exiting non-zero, never logging the same failure twice."
     },

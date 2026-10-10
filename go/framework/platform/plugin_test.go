@@ -20,6 +20,13 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 )
 
+// startUp drives p through what an application does when it starts: Start,
+// then StartupCompleted once every Starter and module OnStart hook returned.
+func startUp(p *Plugin) {
+	_ = p.Start(context.Background(), nil)
+	p.StartupCompleted()
+}
+
 // --- test stubs ---
 
 type fakeHealthPlugin struct {
@@ -289,7 +296,7 @@ func TestHealthz_200_WhenRunningWithNoProbes(t *testing.T) {
 func TestHealthzAndReadyz_UnavailableAfterStop(t *testing.T) {
 	spectest.Proves(t, "go/platform-endpoints", "lifecycle-state", "the-aggregates-are-unavailable-after-stop")
 	p := NewPlugin(Config{})
-	_ = p.Start(context.Background(), nil)
+	startUp(p)
 	_ = p.Stop(context.Background(), nil)
 
 	health := invoke(p.healthzHandler(), "/healthz")
@@ -534,7 +541,7 @@ func TestReadyz_ProbeMetrics_TaggedReadiness(t *testing.T) {
 	if err := p.Configure(context.Background(), root); err != nil {
 		t.Fatalf("Configure: %v", err)
 	}
-	_ = p.Start(context.Background(), nil)
+	startUp(p)
 
 	_ = invoke(p.readyzHandler(), "/readyz")
 
@@ -783,6 +790,172 @@ func TestStart_RejectsInvalidRequiredProbeName(t *testing.T) {
 
 // --- /readyz ---
 
+// startupHangDetector bounds every wait on an application start. It detects a
+// hang; it is never a latency assertion.
+const startupHangDetector = 30 * time.Second
+
+// probeStatus answers path through server's composed request handler. Unlike
+// statusOn it never fails the test, so a Starter's goroutine may call it.
+func probeStatus(server *http.ServerPlugin, path string) (int, error) {
+	ts := httptest.NewServer(server.Handler())
+	defer ts.Close()
+	resp, err := stdhttp.Get(ts.URL + path) //nolint:noctx,gosec // local test server
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return resp.StatusCode, nil
+}
+
+// awaitStatus polls path until it answers want.
+func awaitStatus(t *testing.T, server *http.ServerPlugin, path string, want int) {
+	t.Helper()
+	deadline := time.Now().Add(startupHangDetector)
+	for {
+		status, err := probeStatus(server, path)
+		if err == nil && status == want {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("GET %s = %d (%v), want %d", path, status, err, want)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// gatedStartup is an application whose server mounts a platform plugin, and
+// whose startup holds at a gate: a Starter, or a module OnStart hook, that
+// closes entered, then returns err once release is called.
+type gatedStartup struct {
+	app      *app.Application
+	server   *http.ServerPlugin
+	platform *Plugin
+	entered  chan struct{}
+	release  func()
+	started  chan error
+}
+
+// gatedStarter is the Starter of a gatedStartup.
+type gatedStarter struct {
+	gate func(ctx context.Context) error
+}
+
+func (g *gatedStarter) Name() string                                   { return "gated" }
+func (g *gatedStarter) Start(ctx context.Context, _ *app.Module) error { return g.gate(ctx) }
+
+// startGated starts an application gated at a "starter" or a "start hook" in
+// the background.
+func startGated(t *testing.T, at string, err error) *gatedStartup {
+	t.Helper()
+	t.Setenv("PORT", "0")
+	opened := make(chan struct{})
+	var once sync.Once
+	g := &gatedStartup{
+		server:   http.NewServerPlugin(http.ServerConfig{}),
+		platform: NewPlugin(Config{}),
+		entered:  make(chan struct{}),
+		release:  func() { once.Do(func() { close(opened) }) },
+		started:  make(chan error, 1),
+	}
+	gate := func(ctx context.Context) error {
+		close(g.entered)
+		select {
+		case <-opened:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	g.app = app.New("platform-gated-startup")
+	g.app.Use(g.server)
+	g.app.Use(g.platform)
+	if at == "starter" {
+		g.app.Use(&gatedStarter{gate: gate})
+	} else {
+		g.app.OnStart(gate)
+	}
+	g.app.Run(func(context.Context) error { return nil })
+	go func() { g.started <- g.app.Start(context.Background()) }()
+	t.Cleanup(func() {
+		g.release()
+		_ = g.app.Stop(context.Background())
+	})
+
+	select {
+	case <-g.entered:
+	case <-time.After(startupHangDetector):
+		t.Fatalf("the gated %s never ran", at)
+	}
+	// The platform plugin started: health answers, so the server routes to it.
+	awaitStatus(t, g.server, "/healthz", 200)
+	return g
+}
+
+// finish releases the gate and returns what Start returned.
+func (g *gatedStartup) finish(t *testing.T) error {
+	t.Helper()
+	g.release()
+	select {
+	case err := <-g.started:
+		return err
+	case <-time.After(startupHangDetector):
+		t.Fatal("Start did not return once the gate was released")
+		return nil
+	}
+}
+
+func TestReadyz_UnavailableUntilStartupCompleted(t *testing.T) {
+	spectest.Proves(t, "go/platform-endpoints", "lifecycle-state", "readiness-is-unavailable-until-startup-completed")
+	t.Run("plugin", func(t *testing.T) {
+		p := NewPlugin(Config{})
+		_ = p.Start(context.Background(), nil)
+		assertStatus(t, invoke(p.healthzHandler(), "/healthz"), 200)
+		resp := invoke(p.readyzHandler(), "/readyz")
+		assertStatus(t, resp, 503)
+		assertBodyContains(t, resp, `"status":"unavailable"`)
+		p.StartupCompleted()
+		assertStatus(t, invoke(p.readyzHandler(), "/readyz"), 200)
+	})
+	for _, at := range []string{"starter", "start hook"} {
+		t.Run("a delayed "+at, func(t *testing.T) {
+			g := startGated(t, at, nil)
+			if status := statusOn(t, g.server, "/readyz"); status != 503 {
+				t.Errorf("GET /readyz while a %s is still running = %d, want 503", at, status)
+			}
+			if err := g.finish(t); err != nil {
+				t.Fatalf("Start: %v", err)
+			}
+			if status := statusOn(t, g.server, "/readyz"); status != 200 {
+				t.Errorf("GET /readyz once startup completed = %d, want 200", status)
+			}
+		})
+	}
+}
+
+func TestReadyz_AFailedStartupNeverReportsReady(t *testing.T) {
+	spectest.Proves(t, "go/platform-endpoints", "lifecycle-state", "a-failed-startup-never-reports-ready")
+	for _, at := range []string{"starter", "start hook"} {
+		t.Run("a failing "+at, func(t *testing.T) {
+			g := startGated(t, at, fmt.Errorf("boom"))
+			if status := statusOn(t, g.server, "/readyz"); status != 503 {
+				t.Errorf("GET /readyz while a %s is still running = %d, want 503", at, status)
+			}
+			if err := g.finish(t); err == nil {
+				t.Fatal("Start succeeded, want the startup failure")
+			}
+			// The failed start stopped the application: neither its server nor
+			// the platform plugin answers ready.
+			if status := statusOn(t, g.server, "/readyz"); status == 200 {
+				t.Errorf("GET /readyz after a failed startup = %d, want a non-ready answer", status)
+			}
+			resp := invoke(g.platform.readyzHandler(), "/readyz")
+			assertStatus(t, resp, 503)
+			assertBodyContains(t, resp, `"status":"unavailable"`)
+		})
+	}
+}
+
 func TestReadyz_503_BeforeStart(t *testing.T) {
 	spectest.Proves(t, "go/platform-endpoints", "lifecycle-state", "readiness-is-unavailable-before-start")
 	p := NewPlugin(Config{})
@@ -801,7 +974,7 @@ func TestReadyz_AutoDiscoversReadinessChecker(t *testing.T) {
 	if err := p.Configure(context.Background(), root); err != nil {
 		t.Fatalf("Configure: %v", err)
 	}
-	_ = p.Start(context.Background(), nil)
+	startUp(p)
 
 	resp := invoke(p.readyzHandler(), "/readyz")
 	assertStatus(t, resp, 200)
@@ -818,7 +991,7 @@ func TestReadyz_DegradedWhenProbeFails(t *testing.T) {
 	if err := p.Configure(context.Background(), root); err != nil {
 		t.Fatalf("Configure: %v", err)
 	}
-	_ = p.Start(context.Background(), nil)
+	startUp(p)
 
 	resp := invoke(p.readyzHandler(), "/readyz")
 	assertStatus(t, resp, 503)
@@ -836,7 +1009,7 @@ func TestPlugin_BothInterfaces_ContributesToBothEndpoints(t *testing.T) {
 	if err := p.Configure(context.Background(), root); err != nil {
 		t.Fatalf("Configure: %v", err)
 	}
-	_ = p.Start(context.Background(), nil)
+	startUp(p)
 
 	hResp := invoke(p.healthzHandler(), "/healthz")
 	assertStatus(t, hResp, 200)
@@ -860,7 +1033,7 @@ func TestReadyz_MissingRequiredProbe_Degraded(t *testing.T) {
 	root := rootWithServer()
 	root.Use(p)
 	_ = p.Configure(context.Background(), root)
-	_ = p.Start(context.Background(), nil)
+	startUp(p)
 
 	resp := invoke(p.readyzHandler(), "/readyz")
 	assertStatus(t, resp, 503)
@@ -896,7 +1069,7 @@ func TestReadyz_RequiredProbe_Registered_RunsNormally(t *testing.T) {
 	root.Use(p)
 	root.Use(&fakeReadyPlugin{name: "leader-elect", err: nil})
 	_ = p.Configure(context.Background(), root)
-	_ = p.Start(context.Background(), nil)
+	startUp(p)
 
 	resp := invoke(p.readyzHandler(), "/readyz")
 	assertStatus(t, resp, 200)
@@ -914,7 +1087,7 @@ func TestReadyz_MissingRequired_AlongsidePassingProbe(t *testing.T) {
 	root.Use(p)
 	root.Use(&fakeReadyPlugin{name: "warm", err: nil})
 	_ = p.Configure(context.Background(), root)
-	_ = p.Start(context.Background(), nil)
+	startUp(p)
 
 	resp := invoke(p.readyzHandler(), "/readyz")
 	assertStatus(t, resp, 503)
@@ -1120,7 +1293,7 @@ func TestConformance_ReadyzEnvelopeMatchesProtocol(t *testing.T) {
 	root.Use(p)
 	root.Use(&fakeReadyPlugin{name: "warm", err: fmt.Errorf("loading")})
 	_ = p.Configure(context.Background(), root)
-	_ = p.Start(context.Background(), nil)
+	startUp(p)
 
 	resp := invoke(p.readyzHandler(), "/readyz")
 	body, _ := resp.BodyBytes()
@@ -1140,14 +1313,14 @@ func TestRegisterOn_MountsCoreEndpointsAtRoot(t *testing.T) {
 	p := NewPlugin(Config{})
 	server := http.NewServerPlugin(http.ServerConfig{Port: 0})
 	p.RegisterOn(server)
-	_ = p.Start(context.Background(), nil)
+	startUp(p)
 
 	ts := server.TestServer()
 	defer ts.Close()
 
 	for _, path := range []string{"/livez", "/healthz", "/readyz", "/version"} {
 		status, _ := getStatus(t, ts.URL+path)
-		// /healthz and /readyz return 200 here (Start was called and
+		// /healthz and /readyz return 200 here (startup completed and
 		// there are no probes); /livez and /version always 200.
 		if status != 200 {
 			t.Errorf("%s status = %d, want 200", path, status)

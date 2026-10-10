@@ -34,14 +34,25 @@ import (
 // temporary git repository holds a workspace whose in-tree extension serves
 // every project by re-executing this test binary in fixture mode. Each member is
 // then a process that binds a real ephemeral port, announces it with the runtime
-// protocol's typed ready event, and answers HTTP.
+// protocol's typed ready event, reports completed startup the way an
+// application framework does, and answers HTTP.
 const localFixtureEnv = "PUTNAMI_QUALIFY_LOCAL_FIXTURE"
 
 // Fixture member behaviors, read from fixture.json in the member's directory.
 const (
-	fixtureServe      = "serve"       // bind, announce, serve
+	fixtureServe      = "serve"       // bind, announce, report completed startup, serve
 	fixtureNeverReady = "never-ready" // start, log, never announce
 	fixtureWriteTree  = "write-tree"  // write a file into the worktree, then serve
+	// fixtureListenOnly announces its listener and answers /readyz, but never
+	// reports completed startup.
+	fixtureListenOnly = "listen-only"
+	// fixtureGatedStart announces its listener, then reports completed startup
+	// once the test creates its release marker.
+	fixtureGatedStart = "gated-start"
+	// fixtureFailAfterListen announces its listener, then exits 3 without
+	// completed startup once the test creates its release marker, as an
+	// application whose start hook fails after its HTTP server bound does.
+	fixtureFailAfterListen = "fail-after-listen"
 )
 
 func TestMain(m *testing.M) {
@@ -140,6 +151,7 @@ func runLocalFixtureWorkload() int {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
+		appendLine(marker(".readyz"), "GET /readyz")
 		_, _ = io.WriteString(w, `{"status":"ok"}`)
 	})
 	mux.HandleFunc("/items", func(w http.ResponseWriter, _ *http.Request) {
@@ -161,6 +173,44 @@ func runLocalFixtureWorkload() int {
 			Scheme: runtimeproto.ReadySchemeHTTP, Host: "127.0.0.1", Port: listener.Addr().(*net.TCPAddr).Port,
 		}},
 	}})
+	_ = os.WriteFile(marker(".listening"), nil, 0o600)
+	// released waits for the release marker the test creates; false means the
+	// member was stopped first.
+	released := func() bool {
+		for {
+			if _, err := os.Stat(marker(".release")); err == nil {
+				return true
+			}
+			select {
+			case <-stop:
+				return false
+			case <-time.After(20 * time.Millisecond):
+				if parentGone() {
+					return false
+				}
+			}
+		}
+	}
+	reportStartup := func() {
+		emitFixtureEvent(localFixtureEvent{Type: "ready", Data: &runtimeproto.ReadyData{Target: runtimeproto.ReadyTargetWorkload}})
+	}
+	switch config.Mode {
+	case fixtureListenOnly:
+	case fixtureGatedStart, fixtureFailAfterListen:
+		if !released() {
+			_ = server.Close()
+			return 0
+		}
+		if config.Mode == fixtureFailAfterListen {
+			emitFixtureLog("error", "fixture "+name+" failed after it started listening")
+			_ = server.Close()
+			return 3
+		}
+		appendLine(marker(".requests"), "started")
+		reportStartup()
+	default:
+		reportStartup()
+	}
 	code := wait()
 	_ = server.Close()
 	return code
@@ -332,6 +382,28 @@ func (f *localFixture) record(t *testing.T, name string) (localFixtureRecord, bo
 func (f *localFixture) requests(name string) string {
 	data, _ := os.ReadFile(filepath.Join(f.markers, name+".requests"))
 	return strings.TrimSpace(string(data))
+}
+
+// readinessPolls counts the GET /readyz requests a member answered.
+func (f *localFixture) readinessPolls(name string) int {
+	data, _ := os.ReadFile(filepath.Join(f.markers, name+".readyz"))
+	return strings.Count(string(data), "\n")
+}
+
+// releaseOnceListening creates a member's release marker once the member
+// announced its listener and pause elapsed.
+func (f *localFixture) releaseOnceListening(name string, pause time.Duration) {
+	go func() {
+		deadline := time.Now().Add(hangDetector)
+		for time.Now().Before(deadline) {
+			if _, err := os.Stat(filepath.Join(f.markers, name+".listening")); err == nil {
+				time.Sleep(pause)
+				_ = os.WriteFile(filepath.Join(f.markers, name+".release"), nil, 0o600)
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}()
 }
 
 // assertStopped fails when a member that started is still running, or when a
@@ -538,4 +610,146 @@ func TestNewLocalTarget_RefusesAWorktreeItCannotFingerprint(t *testing.T) {
 	if _, err := NewLocalTarget(LocalOptions{WorkspaceRoot: root}); err == nil {
 		t.Error("a local target without a project was accepted")
 	}
+}
+
+// derivedRun derives a member's contract and its platform the way the qualify
+// command does, so readiness follows the member's own route inventory.
+func derivedRun(t *testing.T, fixture *localFixture, name string) (*qualifyproto.Contract, Options) {
+	t.Helper()
+	project := fixture.project(t, name)
+	platform, err := ResolvePlatform(fixture.ws, project, "")
+	if err != nil {
+		t.Fatalf("ResolvePlatform: %v", err)
+	}
+	contract, unsupported, err := Derive(fixture.ws, project, platform.Prefix)
+	if err != nil || unsupported != nil {
+		t.Fatalf("Derive: %v %+v", err, unsupported)
+	}
+	opts := fastOptions()
+	opts.PlatformPrefix, opts.ReadinessRoute = platform.Prefix, platform.ReadinessRoute
+	return contract, opts
+}
+
+func TestLocalTarget_ReadinessIsTheApplicationsCompletedStartup(t *testing.T) {
+	spectest.Proves(t, "cli/workload-qualification", "local-readiness-is-completed-startup",
+		"a-local-target-without-a-readiness-route-passes-on-completed-startup")
+	provenance := httproutes.Provenance{Project: "app", SourceKind: httproutes.SourceManual}
+	// The inventory declares no readiness route, and the member serves an
+	// undeclared /readyz that answers ok at once: only the startup report may
+	// let the smoke through.
+	fixture := newLocalFixture(t, localMember{name: "app", mode: fixtureGatedStart, routes: []httproutes.Route{
+		{Match: httproutes.MatchExact, Path: "/items", Methods: []string{"GET"}, PublicEdge: true, Provenance: provenance},
+	}})
+	contract, opts := derivedRun(t, fixture, "app")
+	if opts.ReadinessRoute {
+		t.Fatal("the inventory declares no readiness route, yet one was resolved")
+	}
+	fixture.releaseOnceListening("app", 300*time.Millisecond)
+
+	verdict := execute(t, context.Background(), contract, fixture.target(t, "app", hangDetector), opts)
+
+	if verdict.State != qualifyproto.StatePassed {
+		t.Fatalf("state = %s (%s)\n%+v", verdict.State, phaseStates(verdict), verdict.Phases)
+	}
+	// "started" is written just before the startup report: a smoke request
+	// recorded ahead of it was sent to a workload still starting.
+	if got := fixture.requests("app"); got != "started\nGET /items" {
+		t.Errorf("member log = %q, want the startup report before the smoke", got)
+	}
+	if polls := fixture.readinessPolls("app"); polls != 0 {
+		t.Errorf("the undeclared /readyz was polled %d times", polls)
+	}
+	if verdict.Cleanup == nil || verdict.Cleanup.State != qualifyproto.CleanupClean {
+		t.Errorf("cleanup = %+v", verdict.Cleanup)
+	}
+	fixture.assertStopped(t, "app")
+}
+
+func TestLocalTarget_NoCompletedStartupIsTimedOutWithoutSmoke(t *testing.T) {
+	spectest.Proves(t, "cli/workload-qualification", "local-readiness-is-completed-startup",
+		"completed-startup-that-never-arrives-times-out-without-smoke")
+	spectest.Proves(t, "cli/workload-qualification", "local-readiness-is-completed-startup",
+		"a-declared-readiness-route-is-polled")
+	provenance := httproutes.Provenance{Project: "app", SourceKind: httproutes.SourceManual}
+	items := httproutes.Route{Match: httproutes.MatchExact, Path: "/items", Methods: []string{"GET"}, PublicEdge: true, Provenance: provenance}
+	platformRoute := func(path string) httproutes.Route {
+		return httproutes.Route{Match: httproutes.MatchExact, Path: path, Methods: []string{"GET"}, Provenance: provenance}
+	}
+
+	// A listening member that answers /readyz but never reports completed
+	// startup, with an inventory that does not declare /readyz.
+	silent := newLocalFixture(t, localMember{name: "app", mode: fixtureListenOnly, routes: []httproutes.Route{items}})
+	contract, opts := derivedRun(t, silent, "app")
+	opts.ReadyTimeout = time.Second
+	verdict := execute(t, context.Background(), contract, silent.target(t, "app", hangDetector), opts)
+	if verdict.State != qualifyproto.StateTimedOut {
+		t.Fatalf("state = %s (%s)", verdict.State, phaseStates(verdict))
+	}
+	if got := phaseStates(verdict); got != "resolve-target=passed readiness=timed_out version-binding=not_run smoke=not_run teardown=passed" {
+		t.Errorf("phases = %s", got)
+	}
+	if diagnostics := verdict.Phases[1].Diagnostics; len(diagnostics) != 1 || diagnostics[0].Code != qualifyproto.PhaseCodeNotReady ||
+		!strings.Contains(diagnostics[0].Message, "never reported completed startup") {
+		t.Errorf("readiness diagnostics = %+v", diagnostics)
+	}
+	if got, polls := silent.requests("app"), silent.readinessPolls("app"); got != "" || polls != 0 {
+		t.Errorf("requests %q and %d readiness polls reached a workload that never completed startup", got, polls)
+	}
+	if verdict.Cleanup == nil || verdict.Cleanup.State != qualifyproto.CleanupClean {
+		t.Errorf("cleanup = %+v", verdict.Cleanup)
+	}
+	silent.assertStopped(t, "app")
+
+	// The same member with an inventory that declares GET /readyz and
+	// /version: readiness polls the declared route, locally as for a URL.
+	declared := newLocalFixture(t, localMember{name: "app", mode: fixtureListenOnly, routes: []httproutes.Route{
+		items, platformRoute("/readyz"), platformRoute("/version"),
+	}})
+	contract, opts = derivedRun(t, declared, "app")
+	if !opts.ReadinessRoute || opts.PlatformPrefix != "" {
+		t.Fatalf("options = %+v, want the declared readiness route at the root", opts)
+	}
+	polled := execute(t, context.Background(), contract, declared.target(t, "app", hangDetector), opts)
+	if polled.State != qualifyproto.StatePassed {
+		t.Fatalf("declared route: state = %s (%s)", polled.State, phaseStates(polled))
+	}
+	if got, polls := declared.requests("app"), declared.readinessPolls("app"); got != "GET /items" || polls == 0 {
+		t.Errorf("declared route: requests %q after %d readiness polls, want the smoke after a poll", got, polls)
+	}
+	declared.assertStopped(t, "app")
+}
+
+func TestLocalTarget_ATargetThatExitsBeforeCompletedStartupIsCompositionFailed(t *testing.T) {
+	spectest.Proves(t, "cli/workload-qualification", "local-verdict-binds-to-the-exact-worktree",
+		"a-composition-failure-names-the-member-and-still-tears-down")
+	fixture := newLocalFixture(t, localMember{name: "app", mode: fixtureFailAfterListen})
+	fixture.releaseOnceListening("app", 0)
+
+	verdict := execute(t, context.Background(), contractFor(t, "/app", "GET /items"), fixture.target(t, "app", hangDetector), fastOptions())
+
+	if verdict.State != qualifyproto.StateCompositionFailed {
+		t.Fatalf("state = %s (%s)", verdict.State, phaseStates(verdict))
+	}
+	if got := phaseStates(verdict); got != "resolve-target=passed readiness=composition_failed version-binding=not_run smoke=not_run teardown=passed" {
+		t.Errorf("phases = %s", got)
+	}
+	readiness := verdict.Phases[1]
+	if len(readiness.Diagnostics) != 1 || readiness.Diagnostics[0].Code != qualifyproto.PhaseCodeCompositionFailed {
+		t.Fatalf("readiness diagnostics = %+v", readiness.Diagnostics)
+	}
+	for _, want := range []string{compose.CodeMemberExited, "/app", "completed startup", "(phase " + compose.PhaseReadiness + ")"} {
+		if !strings.Contains(readiness.Diagnostics[0].Message, want) {
+			t.Errorf("the diagnostic does not name %q: %s", want, readiness.Diagnostics[0].Message)
+		}
+	}
+	if strings.Contains(readiness.Diagnostics[0].Message, "failed after it started listening") {
+		t.Errorf("the verdict diagnostic carries member output: %s", readiness.Diagnostics[0].Message)
+	}
+	if got := fixture.requests("app"); got != "" {
+		t.Errorf("requests %q reached a workload whose startup failed", got)
+	}
+	if verdict.Cleanup == nil || verdict.Cleanup.State != qualifyproto.CleanupClean {
+		t.Errorf("cleanup = %+v", verdict.Cleanup)
+	}
+	fixture.assertStopped(t, "app")
 }

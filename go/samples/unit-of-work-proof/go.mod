@@ -26,6 +26,7 @@ require (
 	go.putnami.dev/protocol/features v0.0.0 // indirect
 	go.putnami.dev/protocol/infra v0.0.0 // indirect
 	go.putnami.dev/protocol/migration v0.0.0 // indirect
+	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
@@ -54,3 +55,5 @@ replace (
 replace go.putnami.dev/protocol/features => ../../../protocols/features
 
 replace go.putnami.dev/protocol/architecture => ../../../protocols/architecture
+
+replace go.putnami.dev/protocol/runtime => ../../../protocols/runtime

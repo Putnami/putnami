@@ -29,7 +29,7 @@
     },
     {
       "id": "typed-readiness-bounds-every-member",
-      "text": "A member is ready when its serve step emits a typed v2 ready event, whose first endpoint port the proxy forwards to; a member starts only once the one before it is ready. A member that exits first, or stays silent past --ready-timeout, fails the composition with a code naming the member and the phase, and everything already started is torn down."
+      "text": "A member is ready when its serve step emits a typed v2 ready event; the proxy forwards to the first http or https endpoint port, else the first endpoint port, of the latest claim that carries one, and a claim without an endpoint leaves it where it was. A member starts only once the one before it is ready. A member that exits first, or stays silent past --ready-timeout, fails the composition with a code naming the member and the phase, and everything already started is torn down."
     },
     {
       "id": "ungraceful-death-is-reaped-by-the-next-invocation",
@@ -54,6 +54,10 @@
     {
       "id": "local-verdict-binds-to-the-exact-worktree",
       "text": "--target local composes the workload with the workloads it runs with, production-mode without watch, and binds the verdict to the worktree fingerprint read before anything is prepared. Version-binding passes only when the worktree still has that fingerprint once every member is ready; otherwise digest_mismatch and no request is sent. --expect-sha with local exits 2. A composition failure is composition_failed naming the member and phase; teardown always runs and cleanup.state is recorded."
+    },
+    {
+      "id": "local-readiness-is-completed-startup",
+      "text": "Go and TypeScript applications report completed startup, once every plugin starter and module start hook returned, two ways: a typed v2 ready event with target workload, which compose records per member, and a platform /readyz that answers 200 only from then on. --target local polls GET <prefix>/readyz when the inventory declares it or --platform-prefix is set, else waits for the claim; a server claim never counts. No claim in time is timed_out with no request sent; an early exit is composition_failed."
     },
     {
       "id": "every-non-pass-state-exits-non-zero",

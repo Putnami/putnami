@@ -75,6 +75,23 @@
           }
         },
         {
+          "id": "completed-startup-readiness",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-ready-record-follows-every-starter-and-start-hook",
+              "a-delayed-starter-or-start-hook-delays-the-ready-record",
+              "a-failed-starter-or-start-hook-writes-no-ready-record",
+              "startup-observers-learn-completed-startup-before-the-ready-record",
+              "the-ready-record-carries-the-endpoints-the-plugins-bound"
+            ]
+          }
+        },
+        {
           "id": "darc-runtime-evidence",
           "stage": "coded",
           "evidenceKinds": [

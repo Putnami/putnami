@@ -32,7 +32,7 @@ a.ListenAndServe()
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/livez`         | Lightweight liveness. Returns `200 {"status":"ok"}` whenever the handler can run. No probes, no flags. Safe to use as a Kubernetes liveness probe.                   |
 | `/healthz`       | Liveness aggregate. `200` when running and every `app.HealthChecker` probe passes. `503 {"status":"unavailable"}` before `Start` and after `Stop`. `503 {"status":"degraded","checks":{…}}` when any probe fails. |
-| `/readyz`        | Readiness aggregate. Same shape as `/healthz`, driven by `app.ReadinessChecker` probes. The endpoint to use as a Kubernetes readiness probe.                         |
+| `/readyz`        | Readiness aggregate. Same shape as `/healthz`, driven by `app.ReadinessChecker` probes, and `503 {"status":"unavailable"}` until the application completed startup: every `Starter` and module `OnStart` hook returned. The endpoint to use as a Kubernetes readiness probe. |
 | `/version`       | Build metadata as JSON. Caller-supplied `VersionInfo` wins; empty fields fall back to `runtime/debug.ReadBuildInfo`.                                                 |
 | `/debug/pprof/*` | `net/http/pprof` index, named profiles (`heap`, `goroutine`, `allocs`, …) and on-demand collectors (`profile`, `trace`, `cmdline`, `symbol`). Disabled by default.   |
 

@@ -20,6 +20,7 @@ require (
 	go.putnami.dev/protocol/diagnostic v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
 	go.putnami.dev/protocol/migration v0.0.0 // indirect
+	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
@@ -43,3 +44,5 @@ replace (
 )
 
 replace go.putnami.dev/protocol/architecture => ../../../protocols/architecture
+
+replace go.putnami.dev/protocol/runtime => ../../../protocols/runtime

@@ -48,7 +48,8 @@ Planning refuses, before anything starts:
 5. Members start in topological order, dependencies first, target last. Each
    member starts only after the one before it emitted the runtime protocol's
    typed `ready` event (v2, target `server` or `workload`). The proxy forwards to
-   the port of the event's first endpoint.
+   the port of the event's first `http` or `https` endpoint, else of its first
+   endpoint.
 
 Readiness is never inferred from a log line or a TCP poll. A member that exits
 before its ready event fails the composition at once (`compose.member_exited`);
@@ -180,7 +181,9 @@ the flag, the same inventory decides: the prefix is the one under which it
 declares both `GET <prefix>/readyz` and `GET <prefix>/version` as exact routes, so
 a site that serves them at `/_/readyz` and `/_/version` needs no flag. With no
 such pair it is the root; with pairs under two prefixes the command fails and asks
-for the flag.
+for the flag. The inventory also says whether `<prefix>/readyz` is served at all,
+which decides how a local target proves readiness (see
+[Readiness](#readiness)).
 
 Requests are sorted by path and capped at 25. Each request passes when the target
 answers with a status below `500`; redirects are recorded, never followed. Only
@@ -235,8 +238,32 @@ putnami qualify @example/go-items-consumer --target local --output=json
 3. It runs the contract against the target's proxy URL.
 4. It tears the composition down, whatever happened before.
 
-`--ready-timeout` bounds each member's typed ready event and then the `/readyz`
-poll.
+`--ready-timeout` bounds each member's typed ready event and then the readiness
+phase.
+
+#### Readiness
+
+A local target is ready when its application reports that its startup completed:
+a typed `ready` event with target `workload`. The Go and TypeScript application
+frameworks write it on their `🤖 ready` log record, only after every plugin
+starter and every module start hook returned. It lists the endpoints the
+application's plugins bound, such as the HTTP listener, and a worker without a
+listener writes none. The composition records it for every member. A member's
+first ready event, which is all compose waits for before it starts the next
+member, is usually a server claim: an HTTP plugin writes one as
+soon as it listens, before the rest of the application started. That claim is
+not a completed startup, and neither is an answer from a route: an auth denial
+or a `404` comes from a listener whatever state the application is in.
+
+A target that never reports completed startup within `--ready-timeout` is
+`timed_out`, and nothing is requested. A target that exits first is
+`composition_failed`, naming the member and the phase.
+
+When the route inventory declares `GET <prefix>/readyz` as an exact route, or
+`--platform-prefix` names where the platform endpoints are mounted, readiness
+polls `<prefix>/readyz` through the target's proxy instead, as it does for a URL
+target. The platform plugin of both frameworks answers `503` there until the
+same completed startup, so a `200` proves the same thing as the claim.
 
 Serve logs are not part of the verdict. Human output shows them, with the
 preparation's task output, only with `--verbose`, on stderr. Without `--verbose`,
@@ -266,6 +293,8 @@ run itself writes.
 A composition that cannot start makes `resolve-target` `composition_failed`. Its
 diagnostic carries compose's code, the member and the compose phase, for example
 `compose.ready_timeout: /go/samples/service-to-service: no typed ready event within 60s (phase readiness)`.
+A target that exits before it reports completed startup makes `readiness`
+`composition_failed` the same way, with `compose.member_exited`.
 The member's own output never enters the verdict, because a workload may print the
 configuration it received. Nothing is requested.
 
@@ -299,7 +328,7 @@ phase passed; the others are `not_run`.
 | Phase | URL target | Local target | Non-pass state |
 | --- | --- | --- | --- |
 | `resolve-target` | one `HEAD` on the base URL, bounded at 5s | compose the workload | `target_unreachable` (URL: connection refused, DNS, TLS, timeout); `composition_failed` (local) |
-| `readiness` | `GET <prefix>/readyz` every 250 ms until `200` with `status: ok` | same, through the target's proxy | `timed_out` after `--ready-timeout` (default `60s`) |
+| `readiness` | `GET <prefix>/readyz` every 250 ms until `200` with `status: ok` | the application's completed-startup report (a typed `ready` event with target `workload`); `GET <prefix>/readyz` through the target's proxy when the inventory declares it | `timed_out` after `--ready-timeout` (default `60s`); `composition_failed` when a local target exits first |
 | `version-binding` | `GET <prefix>/version`, compare `sha` with `--expect-sha` | read the worktree fingerprint again | `digest_mismatch` when the sha differs or is absent, or when the worktree changed |
 | `smoke` | each request in order, `--request-timeout` each (default `5s`), bodies capped at 1 MiB | same | `failed` when any request answers `>= 500`, fails in transport or times out |
 | `teardown` | nothing to release | stop the composition | `failed` when resources are left behind |
@@ -316,7 +345,7 @@ The verdict state is the first phase state that is neither `passed` nor `not_run
 | `canceled` | The run was interrupted while a phase was active. |
 | `target_unreachable` | No HTTP exchange with a URL target completed. |
 | `digest_mismatch` | The target is not the build the binding names: another sha on `/version`, no sha, or a worktree that changed. |
-| `composition_failed` | A local target could not be composed. |
+| `composition_failed` | A local target could not be composed, or exited before it reported completed startup. |
 
 **Only `passed` exits `0`.** Every other state exits `1`. Usage errors exit `2`
 before anything is contacted.

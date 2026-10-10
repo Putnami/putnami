@@ -5,9 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"os"
+	"os/exec"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"go.putnami.dev/app"
 	"go.putnami.dev/logger"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 
@@ -102,21 +107,23 @@ func TestServerPlugin_ListeningLogStaysHumanReadable(t *testing.T) {
 	}
 }
 
-// TestReadyMarker_DegradesToWorkloadWithoutAddressableListener pins the
-// fail-closed direction: a listener whose address is not an addressable TCP
-// port yields a workload claim (startup did finish) instead of a server claim
-// with no address, which the protocol rejects outright.
-func TestReadyMarker_DegradesToWorkloadWithoutAddressableListener(t *testing.T) {
-	spectest.Proves(t, "go/http-services", "readiness-marker", "readiness-degrades-to-a-workload-claim")
-	data := readyMarker(unaddressableListener{}, 12)
-	if data.Target != runtimeproto.ReadyTargetWorkload {
-		t.Errorf("target = %q, want %q", data.Target, runtimeproto.ReadyTargetWorkload)
+// TestListening_AnUnaddressableListenerWritesNoMarker pins the fail-closed
+// direction: a listener whose address is not an addressable TCP port writes
+// its listening record without a readiness marker and reports no endpoint. The
+// application's own ready record announces completed startup.
+func TestListening_AnUnaddressableListenerWritesNoMarker(t *testing.T) {
+	spectest.Proves(t, "go/http-services", "readiness-marker", "an-unaddressable-listener-writes-no-marker")
+	attrs, endpoints := listening(unaddressableListener{}, 12)
+	for _, attr := range attrs {
+		if attr.Key == runtimeproto.ReadyLogKey {
+			t.Errorf("the listening record carries a readiness marker: %v", attr.Value)
+		}
 	}
-	if len(data.Endpoints) != 0 {
-		t.Errorf("endpoints = %+v, want none", data.Endpoints)
+	if len(attrs) != 1 || attrs[0].Key != "durationMs" || attrs[0].Value.Int64() != 12 {
+		t.Errorf("attrs = %v, want durationMs alone", attrs)
 	}
-	if data.DurationMs != 12 {
-		t.Errorf("durationMs = %d, want 12", data.DurationMs)
+	if len(endpoints) != 0 {
+		t.Errorf("endpoints = %+v, want none", endpoints)
 	}
 }
 
@@ -131,21 +138,134 @@ func TestReadyMarker_IsCanonical(t *testing.T) {
 	}
 	defer func() { _ = ln.Close() }()
 
-	first := readyMarker(ln, 7)
-	second := readyMarker(ln, 7)
-	firstJSON, err := json.Marshal(first)
-	if err != nil {
-		t.Fatal(err)
-	}
-	secondJSON, err := json.Marshal(second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(firstJSON) != string(secondJSON) {
+	firstJSON := listeningMarkerJSON(t, ln)
+	secondJSON := listeningMarkerJSON(t, ln)
+	if firstJSON != secondJSON {
 		t.Errorf("marker is not deterministic:\n%s\n%s", firstJSON, secondJSON)
 	}
-	if strings.Contains(string(firstJSON), `"url"`) {
+	if strings.Contains(firstJSON, `"url"`) {
 		t.Errorf("the endpoint address is derived, never emitted: %s", firstJSON)
+	}
+}
+
+// listeningMarkerJSON returns the encoded readiness marker of ln's listening
+// record.
+func listeningMarkerJSON(t *testing.T, ln net.Listener) string {
+	t.Helper()
+	attrs, _ := listening(ln, 7)
+	for _, attr := range attrs {
+		if attr.Key == runtimeproto.ReadyLogKey {
+			encoded, err := json.Marshal(attr.Value.Any())
+			if err != nil {
+				t.Fatal(err)
+			}
+			return string(encoded)
+		}
+	}
+	t.Fatalf("the listening record of an addressable listener carries no marker: %v", attrs)
+	return ""
+}
+
+// TestServerPlugin_ReportsTheEndpointItBound pins the server's half of the
+// application's workload claim: from Start until Stop, ReadyEndpoints is
+// exactly the address the server claim announced.
+func TestServerPlugin_ReportsTheEndpointItBound(t *testing.T) {
+	spectest.Proves(t, "go/http-services", "readiness-marker", "the-server-reports-the-endpoint-it-bound")
+	t.Setenv("PORT", "0")
+	var out bytes.Buffer
+	plugin := NewServerPlugin(ServerConfig{})
+	plugin.log = logger.New("http", logger.LevelDebug, logger.NewJSONSinkWriter(&out))
+	if endpoints := plugin.ReadyEndpoints(); len(endpoints) != 0 {
+		t.Errorf("endpoints before Start = %+v, want none", endpoints)
+	}
+
+	if err := plugin.Start(context.Background(), nil); err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	var claim *runtimeproto.ReadyData
+	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+		var record map[string]any
+		if json.Unmarshal([]byte(line), &record) != nil {
+			continue
+		}
+		if data, ok := runtimeproto.ReadyMarkerFromLogRecord(record); ok {
+			claim = data
+		}
+	}
+	if claim == nil {
+		t.Fatalf("no server claim in the server output:\n%s", out.String())
+	}
+	if endpoints := plugin.ReadyEndpoints(); !slices.Equal(endpoints, claim.Endpoints) {
+		t.Errorf("endpoints after Start = %+v, want the server claim's %+v", endpoints, claim.Endpoints)
+	}
+
+	if err := plugin.Stop(context.Background(), nil); err != nil {
+		t.Fatalf("stop server: %v", err)
+	}
+	if endpoints := plugin.ReadyEndpoints(); len(endpoints) != 0 {
+		t.Errorf("endpoints after Stop = %+v, want none", endpoints)
+	}
+}
+
+// readyChildEnv makes the test binary run one application that holds a server,
+// with the production log sink on its stdout, instead of the test.
+const readyChildEnv = "PUTNAMI_HTTP_READY_CHILD"
+
+// readyChildHangDetector bounds the child application. It detects a hang; it
+// is never a latency assertion.
+const readyChildHangDetector = 60 * time.Second
+
+// TestApplication_ReadyRecordCarriesTheServerEndpoint runs an application with
+// a server in a child process and reads its stdout, the stream an extension's
+// forwarder reads: the application's workload claim carries the address the
+// server claim announced.
+func TestApplication_ReadyRecordCarriesTheServerEndpoint(t *testing.T) {
+	if os.Getenv(readyChildEnv) == "1" {
+		runReadyChild(t)
+		return
+	}
+	spectest.Proves(t, "go/http-services", "readiness-marker", "the-application-ready-record-carries-the-bound-endpoint")
+	ctx, cancel := context.WithTimeout(context.Background(), readyChildHangDetector)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestApplication_ReadyRecordCarriesTheServerEndpoint$")
+	cmd.Env = append(os.Environ(), readyChildEnv+"=1", "PORT=0", "LOG_LEVEL=info")
+	stdout, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("child application: %v\n%s", err, stdout)
+	}
+
+	claims := map[string]*runtimeproto.ReadyData{}
+	for _, line := range bytes.Split(stdout, []byte("\n")) {
+		var record map[string]any
+		if json.Unmarshal(line, &record) != nil {
+			continue
+		}
+		if data, ok := runtimeproto.ReadyMarkerFromLogRecord(record); ok {
+			if _, seen := claims[data.Target]; seen {
+				t.Errorf("the child wrote more than one %s claim:\n%s", data.Target, stdout)
+			}
+			claims[data.Target] = data
+		}
+	}
+	server, workload := claims[runtimeproto.ReadyTargetServer], claims[runtimeproto.ReadyTargetWorkload]
+	if server == nil || workload == nil {
+		t.Fatalf("claims = %v, want a server and a workload claim:\n%s", claims, stdout)
+	}
+	if len(workload.Endpoints) != 1 || !slices.Equal(workload.Endpoints, server.Endpoints) {
+		t.Errorf("workload claim endpoints = %+v, want the server claim's %+v", workload.Endpoints, server.Endpoints)
+	}
+}
+
+// runReadyChild starts and stops an application that holds one server.
+func runReadyChild(t *testing.T) {
+	a := app.New("ready-child")
+	a.Use(NewServerPlugin(ServerConfig{}))
+	a.Run(func(context.Context) error { return nil })
+	if err := a.Start(context.Background()); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if err := a.Stop(context.Background()); err != nil {
+		t.Fatalf("stop: %v", err)
 	}
 }
 

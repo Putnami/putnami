@@ -16,7 +16,7 @@ The default routes are:
 | --- | --- |
 | `GET /livez` | Lightweight liveness response |
 | `GET /healthz` | Aggregate health checks |
-| `GET /readyz` | Aggregate readiness checks |
+| `GET /readyz` | Aggregate readiness checks; `503` until every plugin `start()` resolved |
 | `GET /version` | Build metadata |
 
 Set `prefix` when an operational namespace is required:

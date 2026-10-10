@@ -43,6 +43,13 @@ const (
 	fixtureExitEarly   = "exit-early"   // log, then exit 3
 	fixtureIgnoreTerm  = "ignore-term"  // used by the reap tests: survive SIGTERM
 	fixtureRecordFirst = "record-first" // serve, after recording what its first dependency answers
+	// fixtureStarted serves, then reports completed startup with a workload
+	// claim that carries no endpoint, as an application framework does.
+	fixtureStarted = "started"
+	// fixtureListenThenExit announces its listener, then exits 3 without
+	// completed startup once GET /exit asks it to, as an application whose
+	// start hook fails after its HTTP server bound does.
+	fixtureListenThenExit = "listen-then-exit"
 )
 
 func TestMain(m *testing.M) {
@@ -141,16 +148,26 @@ func runFixtureWorkload(mode string) int {
 		return 1
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
+	exit := make(chan struct{})
 	mux := http.NewServeMux()
 	mux.HandleFunc("/whoami", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, member+" host="+r.Host)
 	})
+	if mode == fixtureListenThenExit {
+		mux.HandleFunc("/exit", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = io.WriteString(w, "exiting")
+			close(exit)
+		})
+	}
 	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	go func() { _ = server.Serve(listener) }()
 	emit(fixtureEvent{V: 2, Type: "ready", Data: &runtimeproto.ReadyData{
 		Target:    runtimeproto.ReadyTargetServer,
 		Endpoints: []runtimeproto.ReadyEndpoint{{Scheme: runtimeproto.ReadySchemeHTTP, Host: "127.0.0.1", Port: port}},
 	}})
+	if mode == fixtureStarted {
+		emit(fixtureEvent{V: 2, Type: "ready", Data: &runtimeproto.ReadyData{Target: runtimeproto.ReadyTargetWorkload}})
+	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
@@ -159,6 +176,13 @@ func runFixtureWorkload(mode string) int {
 		case <-stop:
 			_ = server.Close()
 			return 0
+		case <-exit:
+			emitLog("error", "fixture "+member+" failed after it started listening")
+			// Shutdown lets the answer to GET /exit finish first.
+			shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_ = server.Shutdown(shutdown)
+			cancel()
+			return 3
 		case <-time.After(50 * time.Millisecond):
 			if parentGone() {
 				return 0

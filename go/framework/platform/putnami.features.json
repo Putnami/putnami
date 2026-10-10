@@ -88,7 +88,9 @@
               "the-aggregates-are-unavailable-after-stop",
               "health-is-ok-while-running-with-no-probes",
               "health-is-degraded-with-per-probe-detail-when-a-probe-fails",
-              "readiness-is-degraded-with-per-probe-detail-when-a-probe-fails"
+              "readiness-is-degraded-with-per-probe-detail-when-a-probe-fails",
+              "readiness-is-unavailable-until-startup-completed",
+              "a-failed-startup-never-reports-ready"
             ]
           }
         },

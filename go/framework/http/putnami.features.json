@@ -112,8 +112,10 @@
             "kind": "acceptance",
             "checks": [
               "listening-log-carries-the-readiness-marker",
-              "readiness-degrades-to-a-workload-claim",
-              "readiness-marker-is-canonical"
+              "an-unaddressable-listener-writes-no-marker",
+              "readiness-marker-is-canonical",
+              "the-server-reports-the-endpoint-it-bound",
+              "the-application-ready-record-carries-the-bound-endpoint"
             ]
           }
         },

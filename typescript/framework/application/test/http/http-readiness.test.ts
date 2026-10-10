@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { buildJsonRecord, resetDefaultLogger, setRootLogger } from '@putnami/runtime';
 import { READY_LOG_KEY, readyEndpointUrl, readyMarkerFromLogRecord } from '@putnami/runtime/jobs';
+import { specTest } from '@putnami/runtime/spectest';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import type { Application } from '../../src/application';
 import { application } from '../../src/application';
-import { http, type HttpPlugin } from '../../src/http/http.plugin';
+import { http, type HttpPlugin, listeningRecord } from '../../src/http/http.plugin';
 
 /**
  * The TypeScript half of first-party readiness emission.
@@ -30,7 +31,11 @@ afterEach(async () => {
   resetDefaultLogger();
 });
 
-async function startAndCaptureListeningRecord(): Promise<Record<string, unknown>> {
+/** An application with one HTTP server, started, and its log records. */
+async function startHttpApplication(): Promise<{
+  plugin: HttpPlugin;
+  record: (message: string) => Record<string, unknown>;
+}> {
   const memory = new MemoryLogger();
   setRootLogger(memory);
 
@@ -38,11 +43,20 @@ async function startAndCaptureListeningRecord(): Promise<Record<string, unknown>
   app = application().use(plugin);
   await app.start();
 
-  const entry = memory.entries.find((e) => e.message.includes('listening http://'));
-  if (!entry) {
-    throw new Error(`no listening record among ${memory.entries.length} entries`);
-  }
-  return buildJsonRecord(entry);
+  return {
+    plugin,
+    record: (message) => {
+      const entry = memory.entries.find((e) => e.message.includes(message));
+      if (!entry) {
+        throw new Error(`no ${message} record among ${memory.entries.length} entries`);
+      }
+      return buildJsonRecord(entry);
+    },
+  };
+}
+
+async function startAndCaptureListeningRecord(): Promise<Record<string, unknown>> {
+  return (await startHttpApplication()).record('listening http://');
 }
 
 describe('http readiness marker', () => {
@@ -87,4 +101,43 @@ describe('http readiness marker', () => {
     expect(record[READY_LOG_KEY]).toBeDefined();
     expect(record['data']).toBeUndefined();
   });
+
+  it('writes no marker for a listener that is not addressable', () => {
+    for (const port of [undefined, 0, 65_536, 1.5]) {
+      const record = listeningRecord(port, 12);
+      expect(record[READY_LOG_KEY]).toBeUndefined();
+      expect(record).toEqual({ durationMs: 12 });
+    }
+  });
+
+  it('reports the bound endpoint from start until stop', async () => {
+    expect(http({ port: 0 }).readyEndpoints()).toEqual([]);
+    const { plugin, record } = await startHttpApplication();
+    const claim = readyMarkerFromLogRecord(record('listening http://'));
+    expect(claim?.endpoints).toHaveLength(1);
+    expect(plugin.readyEndpoints()).toEqual(claim?.endpoints ?? []);
+
+    await app?.stop();
+    app = undefined;
+    expect(plugin.readyEndpoints()).toEqual([]);
+  });
+
+  specTest(
+    'puts the bound endpoint in the application ready record',
+    {
+      feature: 'typescript/application-lifecycle',
+      requirement: 'completed-startup-readiness',
+      check: 'the-ready-record-carries-the-http-endpoint',
+    },
+    async () => {
+      const { record } = await startHttpApplication();
+
+      const server = readyMarkerFromLogRecord(record('listening http://'));
+      const workload = readyMarkerFromLogRecord(record('🤖 ready'));
+      expect(server?.target).toBe('server');
+      expect(workload?.target).toBe('workload');
+      expect(workload?.endpoints).toHaveLength(1);
+      expect(workload?.endpoints).toEqual(server?.endpoints ?? []);
+    },
+  );
 });

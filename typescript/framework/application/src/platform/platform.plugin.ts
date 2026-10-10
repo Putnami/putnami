@@ -115,6 +115,9 @@ export interface PlatformOptions {
  * ```
  */
 export class PlatformPlugin implements Plugin {
+  /** Set from `start()` until `stop()`; gates `/healthz`. */
+  private running = false;
+  /** Set from `startupCompleted()` until `stop()`; with `running`, gates `/readyz`. */
   private ready = false;
   private readonly prefix: string;
   private readonly probeTimeoutMs: number;
@@ -176,11 +179,11 @@ export class PlatformPlugin implements Plugin {
       }
       if (path === joinPrefix(this.prefix, PATH_HEALTHZ)) {
         this.discoverHealthContributions();
-        return this.aggregate(this.healthCheckers);
+        return this.aggregate(this.running, this.healthCheckers);
       }
       if (path === joinPrefix(this.prefix, PATH_READYZ)) {
         this.discoverHealthContributions();
-        return this.aggregate(this.readinessCheckers, this.required);
+        return this.aggregate(this.running && this.ready, this.readinessCheckers, this.required);
       }
       if (path === joinPrefix(this.prefix, PATH_VERSION)) {
         return HttpResponse.json(this.version);
@@ -195,7 +198,7 @@ export class PlatformPlugin implements Plugin {
     }
     this.discoverHealthContributions();
     // Name-check every probe that can surface as a /healthz or /readyz checks
-    // key before flipping ready: a non-conforming name would make the envelope
+    // key before flipping running: a non-conforming name would make the envelope
     // fail the protocol's own validator. Mirrors go/framework/platform Start —
     // discovered/registered probe names AND the required list are validated, so
     // a misconfigured name fails fast here instead of at request time.
@@ -208,10 +211,21 @@ export class PlatformPlugin implements Plugin {
     for (const name of this.required) {
       assertProbeName(name);
     }
+    this.running = true;
+  }
+
+  /**
+   * The application calls this once every plugin `start()` resolved, right
+   * before its ready record. `/readyz` answers ready only from then on, so a
+   * readiness probe never passes while a sibling plugin is still starting, and
+   * never after a failed startup. Go twin: `Plugin.StartupCompleted`.
+   */
+  startupCompleted(): void {
     this.ready = true;
   }
 
   async stop(): Promise<void> {
+    this.running = false;
     this.ready = false;
   }
 
@@ -225,10 +239,11 @@ export class PlatformPlugin implements Plugin {
   }
 
   private async aggregate(
+    available: boolean,
     checkers: Map<string, ProbeFunction>,
     required: readonly string[] = [],
   ): Promise<HttpResponse> {
-    if (!this.ready) {
+    if (!available) {
       return HttpResponse.json({ status: STATUS_UNAVAILABLE } satisfies Envelope, {
         status: HTTP_STATUS_UNAVAILABLE,
       });
