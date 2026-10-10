@@ -1,6 +1,21 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-scope.json",
   "includes": [
+    "extension",
+    "clients/auth-server",
+    "clients/cache-server",
+    "clients/config-api",
+    "clients/control-api",
+    "clients/data-api",
+    "clients/db-gateway",
+    "clients/delivery-api",
+    "clients/distribution-api",
+    "clients/identity-api",
+    "clients/observability-api",
+    "clients/oci-server",
+    "clients/put-server",
+    "clients/runtime-api",
+    "clients/source-api",
     "runtime/typescript"
   ],
   "line": {}

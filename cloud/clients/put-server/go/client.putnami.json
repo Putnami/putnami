@@ -1,0 +1,236 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "put-server",
+    "audience": "put-server"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/put-server/go",
+    "clients": [
+      {
+        "service": "put-server",
+        "clientSymbol": "PutClient",
+        "bindingSymbol": "RegisterPutClient"
+      }
+    ]
+  },
+  "contractSha256": "022bd3edb3ba1e015ae6e18288775d21febcc83abe9b5072ae981c441b1a8d99",
+  "operations": [
+    {
+      "operationId": "deletePut___Release-sets_Workspaces_Workspace_Grants_Id",
+      "service": "put-server",
+      "methodSymbol": "DeletePutReleaseSetsWorkspacesGrants",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/_/release-sets/workspaces/{workspace}/grants/{id}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "deletePut___Release-sets_Workspaces_Workspace_Mirrors_Id",
+      "service": "put-server",
+      "methodSymbol": "DeletePutReleaseSetsWorkspacesMirrors",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/_/release-sets/workspaces/{workspace}/mirrors/{id}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getNamespace_Package_Download",
+      "service": "put-server",
+      "methodSymbol": "GetDownload",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/{namespace}/{package}/download",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getPut_Namespace_Package_Versions_Version_Manifest",
+      "service": "put-server",
+      "methodSymbol": "GetPutVersionsManifest",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/{namespace}/{package}/versions/{version}/manifest",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getPut___Release-sets_Workspaces_Workspace_Grants",
+      "service": "put-server",
+      "methodSymbol": "GetPutReleaseSetsWorkspacesGrants",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/_/release-sets/workspaces/{workspace}/grants",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getPut___Release-sets_Workspaces_Workspace_Mirrors",
+      "service": "put-server",
+      "methodSymbol": "GetPutReleaseSetsWorkspacesMirrors",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/_/release-sets/workspaces/{workspace}/mirrors",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postPut_Namespace_Package_Blobs",
+      "service": "put-server",
+      "methodSymbol": "CreatePutBlobs",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/{namespace}/{package}/blobs",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postPut_Namespace_Package_Publish",
+      "service": "put-server",
+      "methodSymbol": "CreatePutPublish",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/{namespace}/{package}/publish",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postPut___Release-sets_Channel-set",
+      "service": "put-server",
+      "methodSymbol": "CreatePutReleaseSetsChannelSet",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/_/release-sets/channel-set",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postPut___Release-sets_Channel-status",
+      "service": "put-server",
+      "methodSymbol": "CreatePutReleaseSetsChannelStatus",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/_/release-sets/channel-status",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postPut___Release-sets_Release",
+      "service": "put-server",
+      "methodSymbol": "CreatePutReleaseSetsRelease",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/_/release-sets/release",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postPut___Release-sets_Resolve",
+      "service": "put-server",
+      "methodSymbol": "CreatePutReleaseSetsResolve",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/_/release-sets/resolve",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postPut___Release-sets_Workspaces_Workspace_Grants",
+      "service": "put-server",
+      "methodSymbol": "CreatePutReleaseSetsWorkspacesGrants",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/_/release-sets/workspaces/{workspace}/grants",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postPut___Release-sets_Workspaces_Workspace_Mirrors",
+      "service": "put-server",
+      "methodSymbol": "CreatePutReleaseSetsWorkspacesMirrors",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/_/release-sets/workspaces/{workspace}/mirrors",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "putPut_Namespace_Package_Channels_Channel",
+      "service": "put-server",
+      "methodSymbol": "UpdatePutChannels",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/{namespace}/{package}/channels/{channel}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "putPut___Release-sets_Workspaces_Workspace_Mirrors_Id_Credential",
+      "service": "put-server",
+      "methodSymbol": "UpdatePutReleaseSetsWorkspacesMirrorsCredential",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/put/_/release-sets/workspaces/{workspace}/mirrors/{id}/credential",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "467fb0eedea4a42c0ef313d73b516abe6f3fdfa5a96c88a4d2263b386ee7c341"
+    }
+  ]
+}

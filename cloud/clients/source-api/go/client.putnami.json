@@ -1,0 +1,119 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "source-api",
+    "audience": "source-api"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/source-api/go",
+    "clients": [
+      {
+        "service": "source-api",
+        "clientSymbol": "SourceClient",
+        "bindingSymbol": "RegisterSourceClient"
+      }
+    ]
+  },
+  "contractSha256": "3de8a7898ce82892bc67738092a9850e713001e073239042011f7ccacdc06e44",
+  "operations": [
+    {
+      "operationId": "deleteV1_Workspaces_Workspace_Source_Github",
+      "service": "source-api",
+      "methodSymbol": "DeleteV1WorkspacesSourceGithub",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/source/github",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "deleteV1_Workspaces_Workspace_Source_Github_Sessions_Session",
+      "service": "source-api",
+      "methodSymbol": "DeleteV1WorkspacesSourceGithubSessions",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/source/github/sessions/{session}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Source_Github",
+      "service": "source-api",
+      "methodSymbol": "GetV1WorkspacesSourceGithub",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/source/github",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Source_Github_Pull-requests",
+      "service": "source-api",
+      "methodSymbol": "GetV1WorkspacesSourceGithubPullRequests",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/source/github/pull-requests",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Source_Github_Sessions_Session",
+      "service": "source-api",
+      "methodSymbol": "GetV1WorkspacesSourceGithubSessions",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/source/github/sessions/{session}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Source_Github_Sessions",
+      "service": "source-api",
+      "methodSymbol": "CreateV1WorkspacesSourceGithubSessions",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/source/github/sessions",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Source_Github_Sessions_Session_Complete",
+      "service": "source-api",
+      "methodSymbol": "CreateV1WorkspacesSourceGithubSessionsComplete",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/source/github/sessions/{session}/complete",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "5bf9d03a54c4616cf27f7512f8df87e968e4ae26cd004c3416104a4ff1b8fbc2"
+    }
+  ]
+}

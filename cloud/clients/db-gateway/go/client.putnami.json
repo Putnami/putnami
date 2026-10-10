@@ -1,0 +1,45 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "db-gateway",
+    "audience": "db-gateway"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/db-gateway/go",
+    "clients": [
+      {
+        "service": "db-gateway",
+        "clientSymbol": "DbGatewayClient",
+        "bindingSymbol": "RegisterDbGatewayClient"
+      }
+    ]
+  },
+  "contractSha256": "8b1dc514650cba9580f84e02bbd4803170adfc616e5a7d07a84be93bc7edbf7b",
+  "operations": [
+    {
+      "operationId": "getV1_Databases_Connect",
+      "service": "db-gateway",
+      "methodSymbol": "ListV1DatabasesConnect",
+      "stream": "bidirectional",
+      "transports": [
+        {
+          "protocol": "websocket",
+          "path": "/v1/databases/connect",
+          "encoding": "binary",
+          "websocket": {
+            "resume": false,
+            "wire": "provider"
+          }
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "80ea91b16af60faaaa659bf8b840fc6deb7503b7ce64340e350f38b40df29391"
+    }
+  ]
+}

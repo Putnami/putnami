@@ -65,8 +65,24 @@ var declaredDomains = []string{
 // project consumes its anonymous payload, and no existing domain owns the
 // external report's assessment semantics. The Cloud runtime destination is
 // excluded the same way: no repository project links it from the workspace,
-// and no existing domain owns the hosted platform's wire contracts.
+// and no existing domain owns the hosted platform's wire contracts. The Cloud
+// CLI extension and its generated service clients follow the same rule.
 var excludedProjects = map[string]string{
+	"/cloud/extension":                                     reasonCloudCLIExtension,
+	"/cloud/clients/auth-server":                           reasonCloudCLIClient,
+	"/cloud/clients/cache-server":                          reasonCloudCLIClient,
+	"/cloud/clients/config-api":                            reasonCloudCLIClient,
+	"/cloud/clients/control-api":                           reasonCloudCLIClient,
+	"/cloud/clients/data-api":                              reasonCloudCLIClient,
+	"/cloud/clients/db-gateway":                            reasonCloudCLIClient,
+	"/cloud/clients/delivery-api":                          reasonCloudCLIClient,
+	"/cloud/clients/distribution-api":                      reasonCloudCLIClient,
+	"/cloud/clients/identity-api":                          reasonCloudCLIClient,
+	"/cloud/clients/observability-api":                     reasonCloudCLIClient,
+	"/cloud/clients/oci-server":                            reasonCloudCLIClient,
+	"/cloud/clients/put-server":                            reasonCloudCLIClient,
+	"/cloud/clients/runtime-api":                           reasonCloudCLIClient,
+	"/cloud/clients/source-api":                            reasonCloudCLIClient,
 	"/cloud/runtime/typescript":                            reasonCloudRuntimeDestination,
 	"/go/samples/application":                              reasonSample,
 	"/go/samples/capabilities-proof":                       reasonSample,
@@ -115,6 +131,8 @@ const (
 	reasonTemplateProof           = "template proof: renders the templates beside it against the workspace framework and runs their tests, owned by the language vertical"
 	reasonAgentReadinessCollector = "standalone Intelligence repository collector: no repository project consumes its anonymous payload or owns the external report's assessment semantics, owned by intelligence"
 	reasonCloudRuntimeDestination = "Cloud runtime destination: a client library of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"
+	reasonCloudCLIExtension       = "Cloud CLI extension: the @putnami/cloud extension binary, a client of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"
+	reasonCloudCLIClient          = "generated client: produced by @putnami/clientgen from the published Cloud CLI schema, consumed only by the Cloud CLI extension, owned by cloud"
 )
 
 // expectedEvidenceRows is every DARC evidence row this repository commits, as the

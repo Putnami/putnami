@@ -163,6 +163,17 @@
       "reversal": "Repoint the agent-readiness archive channel at the previous version. Installed workspaces keep their pinned archive digest, so the rollback changes only what a new resolve returns."
     },
     {
+      "id": "cloud-extensions",
+      "channels": [
+        "archives"
+      ],
+      "artifacts": [
+        "@putnami/cloud-extension"
+      ],
+      "rollbackPoint": "the previous Cloud CLI extension archive channel pointer",
+      "reversal": "Repoint the Cloud CLI extension archive channel at the previous version. Installed workspaces keep their pinned archive digest, so the rollback changes only what a new resolve returns."
+    },
+    {
       "id": "cli",
       "channels": [
         "archives"

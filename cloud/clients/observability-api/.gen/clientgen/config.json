@@ -1,0 +1,11 @@
+{
+  "targets": [
+    "go"
+  ],
+  "go": {
+    "output": "go",
+    "modulePath": "",
+    "packageName": "observabilityapiclient",
+    "clientName": "ObservabilityClient"
+  }
+}

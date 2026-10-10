@@ -1,0 +1,2370 @@
+{
+  "components": {
+    "schemas": {
+      "ChannelFollowResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/FollowedChannel"
+            },
+            "type": "array"
+          },
+          "definition_revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ChannelMoveReceipt": {
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "disposition": {
+            "type": "string"
+          },
+          "generation": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "moved_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "received_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "release_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "release_set_id": {
+            "type": "string"
+          },
+          "settled": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "CloudFailureDetails": {
+        "additionalProperties": false,
+        "properties": {
+          "gcp_response_body": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeployConflictDetails": {
+        "additionalProperties": false,
+        "properties": {
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "DeployMigrationStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeployPostRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "commit": {
+            "$ref": "#/components/schemas/DeployReleaseCommit",
+            "nullable": true
+          },
+          "environment": {
+            "type": "string"
+          },
+          "publish_v2": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "release_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeployPostResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "async": {
+            "type": "boolean"
+          },
+          "attempt_number": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "attempt_status": {
+            "type": "string"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/DeployReleaseAttempt"
+            },
+            "type": "array"
+          },
+          "cloud_workload_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "execution_backend": {
+            "type": "string"
+          },
+          "held_workload_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "managed_events": {
+            "$ref": "#/components/schemas/ManagedEventDeployPreviewV1",
+            "nullable": true
+          },
+          "manifest_hash": {
+            "type": "string"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/DeployReleaseProjectResponse"
+            },
+            "type": "array"
+          },
+          "release_id": {
+            "type": "string"
+          },
+          "requested_workload_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "reused_workload_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "serving_new_revision_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "state": {
+            "type": "string"
+          },
+          "sync": {
+            "$ref": "#/components/schemas/EnvironmentSyncResult",
+            "nullable": true
+          },
+          "terminal_classification": {
+            "type": "string"
+          },
+          "timings": {
+            "$ref": "#/components/schemas/DeployReleaseTimings",
+            "nullable": true
+          },
+          "url": {
+            "type": "string"
+          },
+          "worker_revision": {
+            "type": "string"
+          },
+          "worker_service": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeployRejectionDetails": {
+        "additionalProperties": false,
+        "properties": {
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/RejectionDetail"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "DeployReleaseAttempt": {
+        "additionalProperties": false,
+        "properties": {
+          "backend": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": "string"
+          },
+          "finished_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "number": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "started_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "worker_revision": {
+            "type": "string"
+          },
+          "worker_service": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeployReleaseCommit": {
+        "additionalProperties": false,
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "repository_url": {
+            "type": "string"
+          },
+          "sha": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeployReleaseProjectResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "candidate_revision": {
+            "type": "string"
+          },
+          "commit_sha": {
+            "type": "string"
+          },
+          "config_fingerprint": {
+            "type": "string"
+          },
+          "config_version": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "hold_reason": {
+            "type": "string"
+          },
+          "image_digest": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "provenance": {
+            "type": "string"
+          },
+          "ready": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "repository_url": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "serving_config_fingerprint": {
+            "type": "string"
+          },
+          "serving_revision": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "timings": {
+            "additionalProperties": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "traffic_percent": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeployReleaseTimings": {
+        "additionalProperties": false,
+        "properties": {
+          "build_ms": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "provisioning_tiers_ms": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "publish_ms": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "queue_wait_ms": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "readiness_ms": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "release_submit_ms": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "total_wall_clock_ms": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "traffic_convergence_ms": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "worker_preflight_ms": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "DeployRunListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "next_offset": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "offset": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/DeployRunSummary"
+            },
+            "type": "array"
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeployRunSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "async": {
+            "type": "boolean"
+          },
+          "attempt_number": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "attempt_status": {
+            "type": "string"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/DeployReleaseAttempt"
+            },
+            "type": "array"
+          },
+          "cloud_workload_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "execution_backend": {
+            "type": "string"
+          },
+          "held_workload_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "managed_events": {
+            "$ref": "#/components/schemas/ManagedEventDeployPreviewV1",
+            "nullable": true
+          },
+          "manifest_hash": {
+            "type": "string"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/DeployReleaseProjectResponse"
+            },
+            "type": "array"
+          },
+          "release_id": {
+            "type": "string"
+          },
+          "requested_workload_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "reused_workload_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "serving_new_revision_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "state": {
+            "type": "string"
+          },
+          "sync": {
+            "$ref": "#/components/schemas/EnvironmentSyncResult",
+            "nullable": true
+          },
+          "terminal_classification": {
+            "type": "string"
+          },
+          "timings": {
+            "$ref": "#/components/schemas/DeployReleaseTimings",
+            "nullable": true
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/DeployTrigger",
+            "nullable": true
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "worker_revision": {
+            "type": "string"
+          },
+          "worker_service": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeployStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "async": {
+            "type": "boolean"
+          },
+          "attempt_number": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "attempt_status": {
+            "type": "string"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/DeployReleaseAttempt"
+            },
+            "type": "array"
+          },
+          "cloud_workload_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "execution_backend": {
+            "type": "string"
+          },
+          "held_workload_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "managed_events": {
+            "$ref": "#/components/schemas/ManagedEventDeployPreviewV1",
+            "nullable": true
+          },
+          "manifest_hash": {
+            "type": "string"
+          },
+          "migrations": {
+            "items": {
+              "$ref": "#/components/schemas/DeployMigrationStatus"
+            },
+            "type": "array"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/DeployReleaseProjectResponse"
+            },
+            "type": "array"
+          },
+          "release_id": {
+            "type": "string"
+          },
+          "requested_workload_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "reused_workload_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "serving_new_revision_count": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "state": {
+            "type": "string"
+          },
+          "sync": {
+            "$ref": "#/components/schemas/EnvironmentSyncResult",
+            "nullable": true
+          },
+          "terminal_classification": {
+            "type": "string"
+          },
+          "timings": {
+            "$ref": "#/components/schemas/DeployReleaseTimings",
+            "nullable": true
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/DeployTrigger",
+            "nullable": true
+          },
+          "worker_revision": {
+            "type": "string"
+          },
+          "worker_service": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeployTrigger": {
+        "additionalProperties": false,
+        "properties": {
+          "cause": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "fact_revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "generation": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "moved_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "release_set_id": {
+            "type": "string"
+          },
+          "retry_actor": {
+            "type": "string"
+          },
+          "retry_attempt": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "retry_of": {
+            "type": "string"
+          },
+          "retry_reason": {
+            "type": "string"
+          },
+          "source_revision": {
+            "type": "string"
+          },
+          "source_tree": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeploymentSummaryEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "commit_sha": {
+            "type": "string"
+          },
+          "config_version": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "last_deployed_at": {
+            "type": "string"
+          },
+          "last_release_id": {
+            "type": "string"
+          },
+          "last_run_reason": {
+            "type": "string"
+          },
+          "last_run_status": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "repository_url": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/DeployTrigger",
+            "nullable": true
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeploymentsSummaryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "deployments": {
+            "items": {
+              "$ref": "#/components/schemas/DeploymentSummaryEntry"
+            },
+            "type": "array"
+          },
+          "triggers_unavailable": {
+            "type": "boolean"
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EnvironmentDefinitionAcceptance": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "source_revision": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EnvironmentReadinessResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted_revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "caller_can_manage": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "required_callers": {
+            "items": {
+              "$ref": "#/components/schemas/RequiredCaller"
+            },
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentReadinessRow"
+            },
+            "type": "array"
+          },
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EnvironmentReadinessRow": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "fix": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EnvironmentSyncAction": {
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "destructive": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EnvironmentSyncCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "changed": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "failed": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "held": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "in_sync": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "unexpected": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "EnvironmentSyncDrift": {
+        "additionalProperties": false,
+        "properties": {
+          "desired": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string"
+          },
+          "observed": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EnvironmentSyncProjectResult": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentSyncAction"
+            },
+            "type": "array"
+          },
+          "after_fingerprint": {
+            "type": "string"
+          },
+          "before_fingerprint": {
+            "type": "string"
+          },
+          "candidate_revision": {
+            "type": "string"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "classification": {
+            "type": "string"
+          },
+          "config_committed": {
+            "type": "string"
+          },
+          "config_published": {
+            "type": "string"
+          },
+          "config_serving": {
+            "type": "string"
+          },
+          "config_serving_fingerprint": {
+            "type": "string"
+          },
+          "desired_image_digest": {
+            "type": "string"
+          },
+          "drift": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentSyncDrift"
+            },
+            "type": "array"
+          },
+          "error": {
+            "type": "string"
+          },
+          "hold_reason": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "observed_image": {
+            "type": "string"
+          },
+          "ready_revision": {
+            "type": "string"
+          },
+          "release_id": {
+            "type": "string"
+          },
+          "serving_revision": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EnvironmentSyncResult": {
+        "additionalProperties": false,
+        "properties": {
+          "after_fingerprint": {
+            "type": "string"
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "before_fingerprint": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/EnvironmentSyncCounts"
+          },
+          "desired_fingerprint": {
+            "type": "string"
+          },
+          "dirty": {
+            "type": "boolean"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentSyncProjectResult"
+            },
+            "type": "array"
+          },
+          "prune": {
+            "type": "boolean"
+          },
+          "unexpected": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentSyncUnexpectedResult"
+            },
+            "type": "array"
+          },
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EnvironmentSyncUnexpectedResult": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "classification": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "destructive": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "owned": {
+            "type": "boolean"
+          },
+          "ownership_evidence": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FollowedChannel": {
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/ChannelMoveReceipt",
+            "nullable": true
+          }
+        },
+        "type": "object"
+      },
+      "ManagedEventCapabilityPreviewV1": {
+        "additionalProperties": false,
+        "properties": {
+          "consumer_group": {
+            "type": "string"
+          },
+          "delivery": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "topic": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ManagedEventDeployPreviewV1": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_contract_version": {
+            "type": "string"
+          },
+          "contract_version": {
+            "type": "string"
+          },
+          "topology_contract_version": {
+            "type": "string"
+          },
+          "workloads": {
+            "items": {
+              "$ref": "#/components/schemas/ManagedEventWorkloadPreviewV1"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ManagedEventTopologyActionV1": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "binding_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "logical_topic": {
+            "type": "string"
+          },
+          "provider_resource_name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "subscription_filter": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ManagedEventWorkloadPreviewV1": {
+        "additionalProperties": false,
+        "properties": {
+          "activation_actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "activation_confirmation": {
+            "type": "string"
+          },
+          "already_activated": {
+            "type": "boolean"
+          },
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/ManagedEventCapabilityPreviewV1"
+            },
+            "type": "array"
+          },
+          "config_actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "desired_hash": {
+            "type": "string"
+          },
+          "no_op": {
+            "type": "boolean"
+          },
+          "resolved_publish_transport": {
+            "type": "string"
+          },
+          "rollout_eligible": {
+            "type": "boolean"
+          },
+          "rollout_holds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "selector_scope": {
+            "type": "string"
+          },
+          "subscription_filter": {
+            "type": "string"
+          },
+          "topology_actions": {
+            "items": {
+              "$ref": "#/components/schemas/ManagedEventTopologyActionV1"
+            },
+            "type": "array"
+          },
+          "topology_generation_id": {
+            "type": "string"
+          },
+          "workload": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RejectionDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "index": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "project": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RequiredCaller": {
+        "additionalProperties": false,
+        "properties": {
+          "caller": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SourceAcceptInput": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "sourceRevision": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Control's public deploy surface: deploy submit, run reads, and workspace deployment projections.",
+    "title": "Putnami Control API",
+    "version": "dev"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/v1/workspaces/{workspace}/deploy": {
+      "get": {
+        "description": "List a workspace's deploy runs newest-first, offset-paginated (limit/offset query params). Optional environment and project query params compose and are filtered server-side BEFORE pagination. Project participation comes from the requested release, so an in-flight run remains visible before its per-project result materializes; when available, that matching result is attached. The read side of the deploy history the console run views render. Requires platform.workspace.read resolved at the target workspace.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Deploy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": false,
+            "schema": {
+              "maxLength": 63,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployRunListResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid environment, project, limit, or offset"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions or workspace scope mismatch"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/deploy",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "post": {
+        "description": "Submit a continuous deploy of a workspace environment. The body is {environment, release_id, commit?, publish_v2}: publish_v2 names the release set and the members to roll, and the answer is 202 accepted (poll GET .../deploy/{release}). The success (200/202) schema is DeployPostResponse, the field-union of the release response and the removed hand deploy response (all fields optional). A body without publish_v2 (the classic release {environment, release_id, projects[]} or the hand deploy {app, env, image_version}) answers 410 classic_release_removed: deploy with putnami cloud deploy publish-v2. Requires platform.workspace.deploy resolved at the target workspace.\n\nRequired scopes: platform.workspace.deploy.",
+        "operationId": "postV1_Workspaces_Workspace_Deploy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeployPostRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployPostResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployPostResponse"
+                }
+              }
+            },
+            "description": "Accepted for asynchronous rollout; poll GET .../deploy/{release}. Body is DeployPostResponse; see the operation description."
+          },
+          "400": {
+            "description": "Invalid or missing body fields, or a malformed publish_v2 payload"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions or workspace scope mismatch"
+          },
+          "409": {
+            "description": "Release id already used for a different deploy"
+          },
+          "410": {
+            "description": "The body is a classic release or a hand deploy, which Control no longer runs; deploy with putnami cloud deploy publish-v2"
+          },
+          "500": {
+            "description": "Provisioning error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "control.deploy.rejected",
+              "schema": {
+                "$ref": "#/components/schemas/DeployRejectionDetails"
+              },
+              "status": 400
+            },
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "control.deploy.release_conflict",
+              "schema": {
+                "$ref": "#/components/schemas/DeployConflictDetails"
+              },
+              "status": 409
+            },
+            {
+              "code": "classic_release_removed",
+              "status": 410
+            },
+            {
+              "code": "control.cloud_failure",
+              "schema": {
+                "$ref": "#/components/schemas/CloudFailureDetails"
+              },
+              "status": 500
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "attemptTimeoutMs": 3600000,
+            "timeoutMs": 3600000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.deploy"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/deploy",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/deploy/{release}": {
+      "get": {
+        "description": "Status of one release: the persisted run (state + per-project URLs/revisions/failure detail) plus the migration rollout summary. The read side of the async deploy — the CLI polls it after the POST returns a release id. Requires platform.workspace.deploy resolved at the target workspace.\n\nRequired scopes: platform.workspace.deploy.",
+        "operationId": "getV1_Workspaces_Workspace_Deploy_Release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployStatusResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions or workspace scope mismatch"
+          },
+          "404": {
+            "description": "No deploy found for this release"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "$ref": "#/components/schemas/CloudFailureDetails"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "control.cloud_failure",
+              "schema": {
+                "$ref": "#/components/schemas/CloudFailureDetails"
+              },
+              "status": 500
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.deploy"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/deploy/{release}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/deployments": {
+      "get": {
+        "description": "Current deployment state for every project × environment in a workspace: revision, URL, health/state, and last-deploy provenance in one call (the J3 CLI status and console Overview read side). Requires platform.workspace.read resolved at the target workspace.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Deployments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentsSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions or workspace scope mismatch"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/deployments",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/environment-definitions/accept": {
+      "post": {
+        "description": "Accept the workspace repository's fixed putnami.ci.json declaration at one immutable source revision. An absent or empty sourceRevision selects the repository's default-branch head, which Source resolves to a commit before the read; the receipt names that commit. expectedRevision is the newest accepted revision (0 for none): a stale value is refused with 409. The caller supplies no bytes or repository coordinates. Requires platform.workspace.deploy resolved at the target workspace.\n\nRequired scopes: platform.workspace.deploy.",
+        "operationId": "postV1_Workspaces_Workspace_Environment-definitions_Accept",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceAcceptInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentDefinitionAcceptance"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed selector or invalid source declaration"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions or workspace scope mismatch"
+          },
+          "409": {
+            "description": "Source identity or accepted revision conflicts"
+          },
+          "500": {
+            "description": "Source or persistence unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.deploy"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/environment-definitions/accept",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/environments/{environment}/channel-follow": {
+      "get": {
+        "description": "Continuous-delivery state of one environment: every channel it follows in the workspace's accepted environment definition (its own channel first, then each distinct per-workload override) and, for each, the newest channel-move receipt — namespace, generation, release set, moved and received times, disposition, reason, the release ids the move opened, and whether it is settled. Newest is the highest generation within a (namespace, channel); across namespaces the head received most recently wins. A channel with no receipt yet is listed without one, and an environment that follows no channel answers an empty list. Requires platform.workspace.read resolved at the target workspace.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Environments_Environment_Channel-follow",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelFollowResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions or workspace scope mismatch"
+          },
+          "404": {
+            "description": "The workspace has no accepted environment definition, or the environment is not declared in it"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "The channel-move ledger is not available or could not be read"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/environments/{environment}/channel-follow",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/environments/{environment}/readiness": {
+      "get": {
+        "description": "Read-only first-deploy preflight of one environment: one row per server-side prerequisite — the Put and OCI namespace bindings, the accepted environment definition, Runtime's operation grants for each control caller and its binding grant for config-api, the object ownership of each migrated database, and ledger rows still keyed by a manifest name — in the order they fail during a first deploy. Each row is ok, missing or unknown, and every row that is not ok carries its fix. A source that cannot be read turns its own rows unknown; the response stays a 200. The workloads query lists the environment's workloads as comma-separated `<path>` or `<path>=<manifest name>` entries, and migrated lists the ones that ship a migration bundle; without workloads, the accepted definition's selection is used. Runtime's grants are read with the caller's own bearer. The response also carries required_callers (each identity the grant rows check, with its grant route) and accepted_revision (the expectedRevision the next acceptance must carry), the inputs `putnami cloud env enable` converges from; probe=manage adds caller_can_manage, whether the caller holds platform.workspace.manage in the workspace. Requires platform.workspace.read resolved at the target workspace.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Environments_Environment_Readiness",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "migrated",
+            "required": false,
+            "schema": {
+              "maxLength": 65536,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "probe",
+            "required": false,
+            "schema": {
+              "maxLength": 16,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workloads",
+            "required": false,
+            "schema": {
+              "maxLength": 65536,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid environment, workloads or migrated"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions or workspace scope mismatch"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/environments/{environment}/readiness",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "x-putnami-client": {
+    "credentials": {
+      "service": {
+        "kind": "service-token"
+      },
+      "user": {
+        "kind": "forwarded-user-token"
+      }
+    },
+    "protocolVersion": 1,
+    "service": {
+      "audience": "control-api",
+      "id": "control-api"
+    }
+  }
+}

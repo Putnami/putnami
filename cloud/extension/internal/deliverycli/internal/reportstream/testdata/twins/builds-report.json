@@ -1,0 +1,12 @@
+{
+  "tasks": [
+    {
+      "project": "libs/cli",
+      "task": "build~cross-compile",
+      "status": "success",
+      "reuse": "none",
+      "durationMs": 211,
+      "cacheHit": false
+    }
+  ]
+}

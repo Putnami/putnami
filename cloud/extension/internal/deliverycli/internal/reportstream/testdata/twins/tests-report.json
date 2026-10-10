@@ -1,0 +1,19 @@
+{
+  "projects": [
+    {
+      "project": "libs/cli",
+      "passed": 40,
+      "failed": 1,
+      "skipped": 2,
+      "total": 43,
+      "failingCases": [
+        {
+          "name": "TestThing",
+          "message": "boom",
+          "file": "thing_test.go",
+          "line": 12
+        }
+      ]
+    }
+  ]
+}

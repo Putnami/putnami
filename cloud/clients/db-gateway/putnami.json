@@ -1,0 +1,28 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/cloud/clients/db-gateway",
+  "description": "Generated Go client of the db-gateway operations the Putnami Cloud CLI calls, from the published Cloud CLI schema package.",
+  "type": "library",
+  "tags": [
+    "go",
+    "generated-client"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/clientgen-extension"
+  ],
+  "disable": {
+    "jobs": [
+      "serve"
+    ]
+  },
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    }
+  },
+  "featureAuthority": {
+    "none": "Generated client code mirrors provider-owned operations and does not own a separate user outcome."
+  }
+}

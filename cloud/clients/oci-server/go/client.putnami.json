@@ -1,0 +1,41 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "oci-server",
+    "audience": "oci-server"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/oci-server/go",
+    "clients": [
+      {
+        "service": "oci-server",
+        "clientSymbol": "OCIClient",
+        "bindingSymbol": "RegisterOCIClient"
+      }
+    ]
+  },
+  "contractSha256": "9870691b19585bd22332257b5e17054b15dcd12597b4f21c2c1e89c61d6694a2",
+  "operations": [
+    {
+      "operationId": "getV2__putnami_Capabilities",
+      "service": "oci-server",
+      "methodSymbol": "ListV2PutnamiCapabilities",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v2/_putnami/capabilities",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "81c94ed8d38c5cc5a08ea7422c1bd0f7673677556daaf10f93c3dcb401742be9"
+    }
+  ]
+}
