@@ -265,7 +265,7 @@ func reportMissingExtensions(missing []string, skipped []extension.SkippedExtens
 }
 
 // sddExtensionCommands are the four command groups that moved out of the CLI
-// into @putnami/sdd.
+// into an extension.
 //
 // They were built in for two years, so `putnami features` is in muscle memory,
 // in shell history and in checked-in scripts. Without this list, a workspace
@@ -280,12 +280,14 @@ func reportMissingExtensions(missing []string, skipped []extension.SkippedExtens
 var sddExtensionCommands = []string{"architecture", "contracts", "features", "specs"}
 
 // sddExtensionHintRemedy is the one-line answer, stated once so the two callers
-// below cannot drift into two different instructions.
-const sddExtensionHintRemedy = "provided by @putnami/sdd; " +
-	"add /tooling/sdd-extension (or @putnami/sdd) to workspace extensions"
+// below cannot drift into two different instructions. It names no extension and
+// no path: the engine does not know which extension a workspace installs for
+// these commands, and a path of one repository means nothing in another.
+const sddExtensionHintRemedy = "moved from the core CLI to an extension that is not loaded; " +
+	"declare that extension under \"extensions\" in putnami.workspace.json, then run `putnami install`"
 
 // reportUnservedSDDCommands writes the courtesy hint for every selected command
-// that @putnami/sdd would serve and no loaded extension does.
+// that moved into an extension and that no loaded extension serves.
 //
 // It is a HINT, never a verdict: it changes no exit code and prints nothing
 // when the extension is loaded. The "no loaded extension declares it" condition
@@ -310,7 +312,7 @@ func reportUnservedSDDCommands(commands []string, extensions []*extension.Extens
 		return
 	}
 	sort.Strings(unserved)
-	iox.Fprintf(os.Stderr, "putnami: %s is %s\n", strings.Join(unserved, ", "), sddExtensionHintRemedy)
+	iox.Fprintf(os.Stderr, "putnami: %s %s\n", strings.Join(unserved, ", "), sddExtensionHintRemedy)
 }
 
 // skipReasonFor finds the discovery skip record for a configured extension

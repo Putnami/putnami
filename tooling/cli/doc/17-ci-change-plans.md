@@ -115,12 +115,16 @@ putnami impact-plan test,build --base origin/main --output=json
 1. The one positional argument is the command list, comma-separated. Aliases
    resolve as they do for `putnami <command>`. A command named twice, and an
    alias that expands to several commands, are usage errors.
-2. `--base`, `--head` and `--no-cache` mean what they mean for
+2. A command that no discovered extension declares is a usage error that names
+   it, so a misspelled or uninstalled command never yields an empty plan. A
+   declared command that plans no task over the range gives a valid empty
+   plan.
+3. `--base`, `--head` and `--no-cache` mean what they mean for
    `change-plan`, and the same revision checks apply: a clean worktree, a head
    that is the checked-out `HEAD`, and a base that is its ancestor.
-3. `--baseline`, `--impacted`, `--projects` and `--all` are refused: the range
+4. `--baseline`, `--impacted`, `--projects` and `--all` are refused: the range
    selects the projects.
-4. No repository remote is needed.
+5. No repository remote is needed.
 
 The structured result's `data` member is the ImpactPlan:
 

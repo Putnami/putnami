@@ -132,7 +132,7 @@ func cmdImpactPlan(env *CommandEnv) error {
 	if err != nil {
 		return err
 	}
-	planner := newImpactPlanPlanner("impact-plan", env.WsRoot, env.Cfg, commands, engine.New().Run)
+	planner := newImpactPlanPlanner("impact-plan", env.WsRoot, env.Cfg, commands, refuseUndeclaredCommands(commands, engine.New().Run))
 	document, err := ci.EmitImpactPlan(env.Ctx, env.WsRoot, ci.PlanOptions{
 		Base:       parsed.value("--base"),
 		Head:       parsed.value("--head"),
@@ -239,6 +239,38 @@ func newImpactPlanPlanner(command, wsRoot string, cfg *wsproto.Config, commands 
 			Jobs:     result.Plan,
 			Versions: versions,
 		}, nil
+	}
+}
+
+// refuseUndeclaredCommands is the engine run of impact-plan. It refuses, with a
+// usage error, every command of commands that no discovered extension declares
+// as a job. The core declares no job, so such a command plans zero tasks, and a
+// caller that admits a change from the plan would read "nothing to run". The
+// check reads the job map the engine plans from, after extension discovery and
+// before selection. A declared command that plans zero tasks because nothing it
+// serves is impacted stays a valid empty plan. change-plan does not use it.
+func refuseUndeclaredCommands(commands []string, run changePlanEngineRun) changePlanEngineRun {
+	requested := append([]string(nil), commands...)
+	return func(ctx context.Context, req engine.Request, sink engine.EventSink) (engine.SessionResult, error) {
+		req.ValidateCommandFlags = func(discovered *extension.DiscoveryResult, _ GlobalFlags) error {
+			var extensions []*extension.ExtensionDescription
+			if discovered != nil {
+				extensions = discovered.Extensions
+			}
+			jobMap := extension.BuildJobMap(extensions)
+			var undeclared []string
+			for _, command := range requested {
+				if len(jobMap[command]) == 0 {
+					undeclared = append(undeclared, command)
+				}
+			}
+			if len(undeclared) == 0 {
+				return nil
+			}
+			return usageErrorf("no extension of this workspace declares %s, so impact-plan cannot plan it; "+
+				"`putnami extensions list` names the extensions installed here", strings.Join(undeclared, ", "))
+		}
+		return run(ctx, req, sink)
 	}
 }
 

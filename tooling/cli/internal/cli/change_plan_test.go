@@ -32,6 +32,11 @@ func TestChangePlanPlannerRoutesThroughEngine(t *testing.T) {
 			if request.WorkspaceRoot != "/workspace" || !reflect.DeepEqual(request.Commands, changePlanCommands) {
 				t.Fatalf("request = %#v, want the change-plan workspace and commands %v", request, changePlanCommands)
 			}
+			// change-plan plans its fixed list whatever the workspace declares:
+			// the refusal of undeclared commands belongs to impact-plan.
+			if request.ValidateCommandFlags != nil {
+				t.Fatal("change-plan refuses commands: its fixed list must plan whatever the workspace declares")
+			}
 			if !request.Global.Impacted || request.Global.Baseline != "0123456789012345678901234567890123456789" || !request.Global.NoCache || !request.Global.Plan || !request.Global.Quiet {
 				t.Fatalf("global = %#v, want immutable impacted plan flags", request.Global)
 			}
@@ -94,7 +99,7 @@ func TestChangePlanDocNamesTheChangePlanCommands(t *testing.T) {
 //
 // The generated guidance says what CI runs for this workspace: the blocking
 // commands of its CI document when one is usable, otherwise lint, test and
-// build, plus validate when an extension of the workspace declares that job.
+// build.
 // changePlanCommands says what `putnami change-plan` shows a reviewer it will
 // run. A command in one and not the other is either a check nobody
 // reviewed or a review of a check nobody performs, and both are silent — the

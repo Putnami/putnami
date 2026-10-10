@@ -52,7 +52,14 @@ packages, which an extension cannot do.
 
 - A change to a shared member changes both documents, and is a new ChangePlan
   version as before.
-- An extension pins a CLI release that has `impact-plan`. An older CLI refuses
-  the command as unknown.
+- An extension pins a CLI release that has `impact-plan`. An older CLI does
+  not refuse the command as unknown: it reads `impact-plan` as a job name,
+  may run the implicit workspace install, warns that `--base` is not
+  declared, and fails with a project selection error (exit 2). An extension
+  reads the CLI version from `putnami --version --output=json` before it
+  calls `impact-plan`.
+- `impact-plan` refuses, as a usage error, a command that no discovered
+  extension declares, so a misspelled or uninstalled command never yields an
+  empty plan.
 - `impact-plan` refuses an alias that expands to several commands: the plan
   names each command once, by its own name.

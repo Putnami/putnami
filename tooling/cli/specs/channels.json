@@ -41,6 +41,7 @@
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md"
+    "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md",
+    "tooling/cli/doc/adr/0061-channel-and-ci-commands-leave-the-core-cli.md"
   ]
 }

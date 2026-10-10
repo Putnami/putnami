@@ -488,7 +488,8 @@
             "kind": "acceptance",
             "checks": [
               "the-catalog-is-unique-rooted-and-well-formed",
-              "the-registry-and-catalog-agree"
+              "the-registry-and-catalog-agree",
+              "a-root-that-left-the-core-is-refused-unless-an-extension-declares-it"
             ]
           }
         },
@@ -1130,7 +1131,7 @@
             "checks": [
               "generated-bootstrap-routes-to-live-mcp-guidance",
               "stale-or-absent-context-is-reported-for-fallback",
-              "the-default-gate-adds-validate-when-an-extension-declares-it"
+              "the-default-gate-is-lint-test-build-whatever-the-extensions-declare"
             ]
           }
         },
@@ -3159,7 +3160,9 @@
             "checks": [
               "the-command-list-is-required",
               "aliases-resolve-to-one-command-each",
-              "the-planner-plans-the-named-commands"
+              "the-planner-plans-the-named-commands",
+              "an-undeclared-command-is-refused",
+              "change-plan-plans-its-list-whatever-the-workspace-declares"
             ]
           }
         },

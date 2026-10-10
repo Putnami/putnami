@@ -1,6 +1,6 @@
 # ADR 0021 — Publish, version, and deploy follow the distribution v2 model
 
-- **Status**: accepted
+- **Status**: accepted, superseded in part by [ADR 0061](0061-channel-and-ci-commands-leave-the-core-cli.md)
 - **Scope**: `@putnami/cli` (`tooling/cli`), `@putnami/extension-sdk`
   (`tooling/extension-sdk`), and the publishers of `@putnami/typescript`,
   `@putnami/go`, `@putnami/cloud`

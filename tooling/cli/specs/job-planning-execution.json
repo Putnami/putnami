@@ -19,7 +19,7 @@
     },
     {
       "id": "command-catalog",
-      "text": "One command catalog defines public command paths, aliases, flags, help, completion, structured-output capability, and workspace requirements."
+      "text": "One command catalog defines public command paths, aliases, flags, help, completion, structured-output capability, and workspace requirements. A root that left the core, channel or ci, is a usage error raised before the workspace bootstrap and planning, and names no extension, unless an installed extension declares that exact root as a command group or as a job."
     },
     {
       "id": "selection-before-plan",
@@ -118,6 +118,7 @@
     "tooling/cli/doc/adr/0031-scratch-generations-expire-between-consumers.md",
     "tooling/cli/doc/adr/0034-a-declared-output-polices-its-own-drift.md",
     "tooling/cli/doc/adr/0058-a-hit-no-job-reads-is-restored-without-its-files.md",
-    "tooling/cli/doc/adr/0059-a-cache-key-describes-the-tree-not-the-commit.md"
+    "tooling/cli/doc/adr/0059-a-cache-key-describes-the-tree-not-the-commit.md",
+    "tooling/cli/doc/adr/0061-channel-and-ci-commands-leave-the-core-cli.md"
   ]
 }

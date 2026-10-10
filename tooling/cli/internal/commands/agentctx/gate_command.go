@@ -7,20 +7,15 @@ import (
 	"strings"
 
 	ciproto "go.putnami.dev/protocol/ci"
-	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/commands/shared"
-	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
-// defaultGateTasks is the part of the default gate every workspace without a
-// usable CI document receives, whatever its extensions declare. It equals the
-// gate of the protocol's default CI document.
+// defaultGateTasks is the gate of every workspace without a usable CI
+// document, whatever its extensions declare. It equals the gate of the
+// protocol's default CI document. It reads no extension, so the generated
+// guidance is a function of the committed tree alone: it does not change with
+// the extensions installed on a machine or with the host a regeneration runs
+// on.
 const defaultGateTasks = "lint,test,build"
-
-// validateTask joins the default gate when an extension the workspace
-// discovers declares a job of that name. The gate names it alone: the
-// manifest that declares it plans its companions (`alsoRuns`) with it.
-const validateTask = "validate"
 
 // gateTaskPrefix is the conventional putnami verification order: lint gives the
 // fastest signal, test the strongest, build the slowest. The generated guidance
@@ -40,20 +35,21 @@ var gateTaskPrefix = []string{"lint", "test", "build"}
 // generated files stable: a regeneration that does not change the document
 // cannot change them.
 //
-// Every failure to read a usable command falls back to the workspace default
-// (defaultGateTasksForWorkspace).
+// Every failure to read a usable command falls back to defaultGateTasks. A
+// workspace whose gate runs more than lint, test and build says so in its CI
+// document.
 func gateTasksForWorkspace(wsRoot string) string {
 	data, err := os.ReadFile(filepath.Join(wsRoot, ciproto.Filename))
 	if err != nil {
-		return defaultGateTasksForWorkspace(wsRoot)
+		return defaultGateTasks
 	}
 	document, err := ciproto.Parse(data)
 	if err != nil {
-		return defaultGateTasksForWorkspace(wsRoot)
+		return defaultGateTasks
 	}
 	tasks := orderGateTasks(blockingCommandNames(document))
 	if tasks == "" {
-		return defaultGateTasksForWorkspace(wsRoot)
+		return defaultGateTasks
 	}
 	// A usable document is authoritative, even when it names only the generic
 	// trio: its blocking commands are what every push and pull request runs.
@@ -77,40 +73,6 @@ func blockingCommandNames(document ciproto.Document) []string {
 // the documented contributor recipe are both compared against it.
 func GateTasks(wsRoot string) string {
 	return gateTasksForWorkspace(wsRoot)
-}
-
-// defaultGateTasksForWorkspace returns the gate of a workspace without a
-// usable CI document: lint, test and build always, then validate when an
-// extension the workspace discovers declares a job of that name. Any failure
-// to discover the extensions keeps lint, test and build.
-func defaultGateTasksForWorkspace(wsRoot string) string {
-	if workspaceDeclaresJob(wsRoot, validateTask) {
-		return defaultGateTasks + "," + validateTask
-	}
-	return defaultGateTasks
-}
-
-// workspaceDeclaresJob reports whether an extension the workspace discovers
-// declares the named job. Discovery reads the workspace's own
-// putnami.workspace.json and never the global configuration, so the answer
-// depends on the workspace and the extensions installed for it, not on the
-// machine's user settings. A workspace without that file runs no discovery.
-// An extension that discovery skips declares nothing.
-func workspaceDeclaresJob(wsRoot, name string) bool {
-	data, err := os.ReadFile(filepath.Join(wsRoot, wsproto.WorkspaceConfigFilename))
-	if err != nil {
-		return false
-	}
-	cfg, diagnostics := wsproto.ParseWorkspaceConfig(data)
-	if cfg == nil || len(diagnostics) != 0 {
-		return false
-	}
-	discovered, err := shared.DiscoverWorkspaceExtensions(wsRoot, cfg)
-	if err != nil || discovered == nil {
-		return false
-	}
-	_, declared := extension.BuildJobMap(discovered.Extensions)[name]
-	return declared
 }
 
 // orderGateTasks renders the gate as the comma-joined argument list a
