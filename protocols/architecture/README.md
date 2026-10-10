@@ -197,8 +197,8 @@ Published schemas:
 
 ## Current repository adoption
 
-The Putnami repository maps **94 of its 133 projects to 10 domains** and
-excludes the other 39 with a reason and an owner each. There is no workspace-root
+The Putnami repository maps **94 of its 134 projects to 10 domains** and
+excludes the other 40 with a reason and an owner each. There is no workspace-root
 baseline and no waiver file: adoption started clean and every wave landed with
 its declarations complete, so there has never been debt to record.
 
@@ -228,15 +228,15 @@ its declarations complete, so there has never been debt to record.
 | `observability` | observability | 1 | Anonymous CLI-usage aggregates |
 | `public-docs` | public-docs | 1 | What the public documentation site publishes |
 
-The excluded 39 are the 28 samples, 7 templates, 2 template proofs, the
-standalone agent-readiness repository collector, and the Cloud runtime
-destination. Samples and templates prove or
+The excluded 40 are the 28 samples, 7 templates, 2 template proofs, the
+standalone agent-readiness repository collector, and the 2 Cloud runtime
+destinations. Samples and templates prove or
 seed the public API without owning a fact another repository project consumes.
 The collector produces an optional anonymous payload for an external report;
 no repository project consumes it, and no existing domain owns the assessment
 semantics. Mapping it now would imply an authority that domain does not hold.
-The Cloud runtime destination is hosted-platform client code that no repository
-project links from the workspace.
+The Cloud runtime destinations are hosted-platform client code that no
+repository project links from the workspace.
 The full inventory, the reason for every exclusion, and the completion rule live
 in [`doc/repository-adoption-matrix.md`](doc/repository-adoption-matrix.md), and
 `TestEveryWorkspaceProjectIsClassified` in

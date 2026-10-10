@@ -1,6 +1,7 @@
 go 1.26.9
 
 use (
+	./cloud/runtime/go
 	./go/extension
 	./go/framework/api
 	./go/framework/app

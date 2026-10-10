@@ -1,0 +1,89 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "go.putnami.dev/cloud/runtime",
+      "status": "pending-provider-contract",
+      "adapter": "cloud/runtime/go/boot.go",
+      "callsites": [
+        {
+          "path": "cloud/runtime/go/boot.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "467b483f0323661fdb841df6a38176240f396cac0d0e40a298f6381ff546bd20"
+        },
+        {
+          "path": "cloud/runtime/go/boot.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "8bb117dbf52f00966c053c82842dcaca74a481c8d948cb3f6a7e9373792b2c28"
+        }
+      ],
+      "owner": "go.putnami.dev/cloud/runtime",
+      "tests": ["cloud/runtime/go/boot_test.go"],
+      "reason": "Workload boot fetch of the prepared configuration tree from the Putnami Cloud configuration service. The source owns the boot budget: its own attempt loop bounded by CONFIG_SERVER_TIMEOUT inside CONFIG_SERVER_RETRY_BUDGET. A generated client call carries its own declared retries, which would nest inside every attempt. No provider in this repository declares a client for the configuration service.",
+      "operations": ["config.prepared-configuration.boot"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    },
+    {
+      "runtime": "go.putnami.dev/cloud/runtime",
+      "status": "pending-provider-contract",
+      "adapter": "cloud/runtime/go/remote.go",
+      "callsites": [
+        {
+          "path": "cloud/runtime/go/remote.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "0e9b13743474bcd180747ccb54f24f8f0710a04af82fb93a5ba72f083a9d2b6a"
+        },
+        {
+          "path": "cloud/runtime/go/remote.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "6070e0496b17cf1463ee882642b297ece2b7e11c585036f933f459cf0fc67ccd"
+        },
+        {
+          "path": "cloud/runtime/go/remote.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "62239238a6f4667ff69bb94b37dee608d13847f70e2bac9eb631f5ea5cbe50bb"
+        },
+        {
+          "path": "cloud/runtime/go/remote.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "fd31fb7531402dd02691c4177982deeff8ebf8b7198a6e7f37ca2fcb37c48378"
+        }
+      ],
+      "owner": "go.putnami.dev/cloud/runtime",
+      "tests": ["cloud/runtime/go/remote_test.go"],
+      "reason": "Remote configuration source against the Putnami Cloud configuration service. The exact-URL form fetches an operator-configured resolve URL with its query kept verbatim, and a request without a bearer is sent anonymously so the service's 401 falls the source back to local config. No provider in this repository declares a client for the configuration service.",
+      "operations": ["config.configs.resolve"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    },
+    {
+      "runtime": "go.putnami.dev/cloud/runtime",
+      "status": "pending-provider-contract",
+      "adapter": "cloud/runtime/go/remote_secrets.go",
+      "callsites": [
+        {
+          "path": "cloud/runtime/go/remote_secrets.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "0e9b13743474bcd180747ccb54f24f8f0710a04af82fb93a5ba72f083a9d2b6a"
+        },
+        {
+          "path": "cloud/runtime/go/remote_secrets.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "0da7c436bb598afb6ad3649c00765f5a2b9fa6eb65277f61cb9f1884e890e706"
+        }
+      ],
+      "owner": "go.putnami.dev/cloud/runtime",
+      "tests": ["cloud/runtime/go/remote_secrets_test.go"],
+      "reason": "Remote secrets source against the Putnami Cloud configuration service, sharing the remote configuration source's retry loop, token source and failure classification. No provider in this repository declares a client for the configuration service.",
+      "operations": ["config.secrets.resolve"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    }
+  ]
+}

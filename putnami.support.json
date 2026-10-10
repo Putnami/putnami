@@ -182,6 +182,11 @@
       "status": "stable"
     },
     {
+      "id": "go.putnami.dev/cloud/runtime",
+      "kind": "package",
+      "status": "preview"
+    },
+    {
       "id": "go.putnami.dev/config",
       "kind": "package",
       "status": "stable"
