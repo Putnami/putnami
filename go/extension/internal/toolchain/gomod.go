@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -63,6 +64,12 @@ type GoModFile struct {
 	Indirect map[string]bool
 	// Replaces are the replace directives, in file order.
 	Replaces []GoModReplace
+	// Ignores are the `ignore` directive paths (Go 1.25), in file order, as
+	// written: a path that starts with `./` names one directory under the
+	// module root, any other path a directory at any depth. The go command
+	// loads no package from an ignored directory, so `go mod tidy` reads none
+	// of its imports.
+	Ignores []string
 }
 
 // GoModReplace is a single `replace` directive. Old is the replaced module
@@ -93,8 +100,8 @@ func ReadGoMod(path string) (*GoModFile, error) {
 // exercised without touching the filesystem.
 func ParseGoMod(content string) (*GoModFile, error) {
 	mod := &GoModFile{}
-	// block tracks which directive block we are inside: "", "require" or
-	// "replace". Directives appear both as single lines and as parenthesized
+	// block tracks which directive block we are inside: "", "require",
+	// "replace" or "ignore". Directives appear both as single lines and as parenthesized
 	// blocks; go.mod blocks do not nest, so no stack is needed.
 	block := ""
 	haveModule := false
@@ -126,6 +133,8 @@ func ParseGoMod(content string) (*GoModFile, error) {
 					if r, ok := goModReplace(line); ok {
 						mod.Replaces = append(mod.Replaces, r)
 					}
+				case "ignore":
+					mod.recordIgnore(line)
 				}
 				continue
 			}
@@ -142,6 +151,8 @@ func ParseGoMod(content string) (*GoModFile, error) {
 			block = "require"
 		case line == "replace (":
 			block = "replace"
+		case line == "ignore (":
+			block = "ignore"
 		case strings.HasPrefix(line, "require ("):
 			// Defensive: `require (` with trailing content on the same line is
 			// not valid go.mod, but treat the paren as opening a block rather
@@ -161,6 +172,8 @@ func ParseGoMod(content string) (*GoModFile, error) {
 			if r, ok := goModReplace(strings.TrimPrefix(line, "replace ")); ok {
 				mod.Replaces = append(mod.Replaces, r)
 			}
+		case strings.HasPrefix(line, "ignore "):
+			mod.recordIgnore(strings.TrimPrefix(line, "ignore "))
 		}
 	}
 
@@ -185,7 +198,7 @@ func (m *GoModFile) ReplacedModules() map[string]bool {
 // listed anyway: it is no more valid as a require or replace entry than the
 // others, so treating it as a stanza opener can only end a block that was
 // already broken.
-var goModDirectiveKeywords = []string{"module", "go", "require", "replace", "use"}
+var goModDirectiveKeywords = []string{"module", "go", "require", "replace", "ignore", "use"}
 
 // startsGoModDirective reports whether a line opens a top-level directive.
 //
@@ -296,6 +309,25 @@ func (m *GoModFile) recordRequire(module string, indirect bool) {
 		m.Indirect = make(map[string]bool)
 	}
 	m.Indirect[module] = true
+}
+
+// recordIgnore collects one `ignore` path. The go command reads the path as a
+// single, possibly quoted, argument; an entry it would reject is dropped.
+func (m *GoModFile) recordIgnore(entry string) {
+	ignored := strings.TrimSpace(entry)
+	if strings.HasPrefix(ignored, `"`) || strings.HasPrefix(ignored, "`") {
+		unquoted, err := strconv.Unquote(ignored)
+		if err != nil {
+			return
+		}
+		ignored = unquoted
+	} else if len(strings.Fields(ignored)) != 1 {
+		return
+	}
+	if ignored == "" {
+		return
+	}
+	m.Ignores = append(m.Ignores, ignored)
 }
 
 // goModIndirect reads the marker off the RAW line, before the comment is

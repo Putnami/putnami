@@ -413,6 +413,7 @@
               "a-project-is-identified-by-its-module-path",
               "dependency-edges-are-repo-relative-paths-from-require-and-replace",
               "an-unrequired-import-of-a-workspace-module-is-an-edge-and-a-warning",
+              "an-import-in-a-directory-the-go-mod-ignores-is-no-edge",
               "repository-edges-are-backed-by-the-module-graph",
               "a-directory-without-the-marker-is-not-a-project",
               "a-manifest-with-no-module-warns-and-is-skipped",

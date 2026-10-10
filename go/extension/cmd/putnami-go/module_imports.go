@@ -34,6 +34,8 @@ import (
 //     are skipped, because the go command loads no package from them — `.gen`
 //     is one of them, so a generated tree a build wrote never changes the
 //     answer between a cold clone and a warm checkout;
+//   - a directory the go.mod's `ignore` directive names is skipped with its
+//     whole subtree, because the go command matches no package in it;
 //   - a subdirectory holding its own go.mod is a different module.
 //
 // The scan is read-only and toolchain-free: no `go list`, no module download,
@@ -65,17 +67,19 @@ func (s moduleImportScan) importsModule(module string) bool {
 }
 
 // scanModuleImports reads the module rooted at moduleDir and reports which of
-// providers its sources import.
+// providers its sources import. ignores are the module go.mod's `ignore`
+// paths.
 //
 // An import is credited to the longest provider that provides it, so a module
 // nested under another one is credited alone for its own packages. An
 // unreadable directory or an unparsable file leaves the scan incomplete, and
 // the walk reads every other file.
-func scanModuleImports(moduleDir string, providers []string) moduleImportScan {
+func scanModuleImports(moduleDir string, ignores, providers []string) moduleImportScan {
 	scan := moduleImportScan{imported: make(map[string]bool), packages: make(map[string]string), complete: true}
 	if len(providers) == 0 {
 		return scan
 	}
+	ignored := newGoIgnoreRule(ignores)
 	fset := token.NewFileSet()
 	_ = filepath.WalkDir(moduleDir, func(current string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -83,7 +87,7 @@ func scanModuleImports(moduleDir string, providers []string) moduleImportScan {
 			return nil
 		}
 		if entry.IsDir() {
-			return skipGoDirectory(current, moduleDir, entry.Name())
+			return skipGoDirectory(current, moduleDir, entry.Name(), ignored)
 		}
 		if !strings.HasSuffix(entry.Name(), ".go") || skipGoFile(entry.Name()) {
 			return nil
@@ -177,18 +181,74 @@ func tidyAdmits(expr constraint.Expr, prefer bool) bool {
 
 // skipGoDirectory applies the go command's package-loading rule to one
 // directory: the module root is always entered, a nested module is a different
-// module, and the names the toolchain never loads a package from are skipped.
-func skipGoDirectory(current, moduleDir, name string) error {
+// module, and the names the toolchain never loads a package from are skipped,
+// like the directories the go.mod ignores.
+func skipGoDirectory(current, moduleDir, name string, ignored goIgnoreRule) error {
 	if current == moduleDir {
 		return nil
 	}
 	if name == "testdata" || name == "vendor" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
 		return fs.SkipDir
 	}
+	if rel, err := filepath.Rel(moduleDir, current); err == nil && ignored.ignores(rel) {
+		return fs.SkipDir
+	}
 	if info, err := os.Stat(filepath.Join(current, "go.mod")); err == nil && !info.IsDir() {
 		return fs.SkipDir
 	}
 	return nil
+}
+
+// goIgnoreRule matches a module-relative directory against a go.mod's `ignore`
+// paths under the go command's rule (cmd/go/internal/search.IgnorePatterns).
+// Both sides are compared with a slash added at each end, so a path matches
+// whole directory names only: a path that starts with `./` matches the
+// directory it names under the module root and everything below it, and any
+// other path matches the same directories at any depth.
+type goIgnoreRule struct {
+	rooted   []string
+	anywhere []string
+}
+
+func newGoIgnoreRule(paths []string) goIgnoreRule {
+	var rule goIgnoreRule
+	for _, ignored := range paths {
+		if rest, rooted := strings.CutPrefix(ignored, "./"); rooted {
+			rule.rooted = append(rule.rooted, slashEnclosed(rest))
+		} else {
+			rule.anywhere = append(rule.anywhere, slashEnclosed(ignored))
+		}
+	}
+	return rule
+}
+
+// ignores reports that the go command skips the directory at rel, relative to
+// the module root.
+func (r goIgnoreRule) ignores(rel string) bool {
+	dir := slashEnclosed(rel)
+	for _, pattern := range r.rooted {
+		if strings.HasPrefix(dir, pattern) {
+			return true
+		}
+	}
+	for _, pattern := range r.anywhere {
+		if strings.Contains(dir, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// slashEnclosed returns p with forward slashes and a slash at each end.
+func slashEnclosed(p string) string {
+	p = filepath.ToSlash(p)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	if !strings.HasSuffix(p, "/") {
+		p += "/"
+	}
+	return p
 }
 
 // longestModuleMatch resolves an import path to the module that provides it:
