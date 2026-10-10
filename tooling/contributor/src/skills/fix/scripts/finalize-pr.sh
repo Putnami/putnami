@@ -198,12 +198,13 @@ cd "$ROOT"
 
 # A Conventional Commit title names what the diff changes, not the skill that
 # produced it: a change that touches only tests is `test`, not `fix` or `feat`.
+# The title is the squash commit title, so the change is every path the squash
+# carries: the branch's commits against the base and the enumerated files.
 if [[ "$TITLE" =~ ^(fix|feat)(\([^\)]*\))?!?: ]]; then
-  if [ "${#FILES[@]}" -gt 0 ]; then
-    CHANGED_PATHS="$(printf '%s\n' "${FILES[@]}")"
-  else
-    CHANGED_PATHS="$(git diff --name-only "$REVISION_BASE...HEAD" 2>/dev/null || true)"
-  fi
+  CHANGED_PATHS="$(
+    git diff --name-only "$REVISION_BASE...HEAD" 2>/dev/null || true
+    [ "${#FILES[@]}" -eq 0 ] || printf '%s\n' "${FILES[@]}"
+  )"
   TEST_PATH_PATTERN='(^|/)(testdata|__tests__|tests?)/|_test\.(go|py)$|(^|/)test_[^/]*\.py$|\.(test|spec)\.[cm]?[jt]sx?$|\.test\.sh$'
   if [ -n "$CHANGED_PATHS" ] && ! grep -Evq "$TEST_PATH_PATTERN" <<<"$CHANGED_PATHS"; then
     echo "finalize-pr: every changed path is a test, so the title type is test, not ${BASH_REMATCH[1]}: retitle it \"test${TITLE#"${BASH_REMATCH[1]}"}\"" >&2

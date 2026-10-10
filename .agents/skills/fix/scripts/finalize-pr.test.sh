@@ -474,6 +474,43 @@ done
 grep -Fq 'retitle it "test!: cover the parser"' "$TEST_DIR/test-only.err"
 assert_no_proposal
 
+# The title is the squash commit title, so the type follows every path of the
+# branch, committed or enumerated. Run on another branch, each call stops at
+# the branch check that follows the title check, before any mutation.
+git -C "$TEST_DIR/work" checkout -q -b fix/title-scope
+mkdir -p "$TEST_DIR/work/internal/run"
+printf 'package run\n' >"$TEST_DIR/work/internal/run/attempt_test.go"
+git -C "$TEST_DIR/work" add internal/run/attempt_test.go
+git -C "$TEST_DIR/work" commit -q -m "test(cli): cover the attempt record"
+printf 'package run\n' >"$TEST_DIR/work/internal/run/restart_test.go"
+if finalize --title "fix(cli): wait for the attempt record" --body-file "$TEST_DIR/body.md" \
+  --proof-status passed --proof "real harness observed the expected behavior" \
+  --project test/project --file internal/run/restart_test.go \
+  >"$TEST_DIR/test-branch.out" 2>"$TEST_DIR/test-branch.err"; then
+  echo "finalize-pr test: expected a branch of tests only to be refused" >&2
+  exit 1
+fi
+grep -Fq "every changed path is a test, so the title type is test" "$TEST_DIR/test-branch.err"
+printf 'package run\n' >"$TEST_DIR/work/internal/run/attempt.go"
+git -C "$TEST_DIR/work" add internal/run/attempt.go
+git -C "$TEST_DIR/work" commit -q -m "fix(cli): wait for the attempt record"
+if finalize --title "fix(cli): wait for the attempt record" --body-file "$TEST_DIR/body.md" \
+  --proof-status passed --proof "real harness observed the expected behavior" \
+  --project test/project --file internal/run/restart_test.go \
+  >"$TEST_DIR/product-branch.out" 2>"$TEST_DIR/product-branch.err"; then
+  echo "finalize-pr test: expected the branch check to stop the finalizer" >&2
+  exit 1
+fi
+if grep -Fq "every changed path is a test" "$TEST_DIR/product-branch.err"; then
+  echo "finalize-pr test: a branch that changes product code was refused a fix title" >&2
+  exit 1
+fi
+grep -Fq "current branch 'fix/title-scope' is not expected branch 'fix/portable'" "$TEST_DIR/product-branch.err"
+git -C "$TEST_DIR/work" checkout -q fix/portable
+rm -r "$TEST_DIR/work/internal"
+git -C "$TEST_DIR/work" branch -q -D fix/title-scope
+assert_no_proposal
+
 # The body is the squash commit message: no heading, no agent trailer or
 # "Generated with" line, and no longer than the policy allows. Each is refused
 # before the gate.
