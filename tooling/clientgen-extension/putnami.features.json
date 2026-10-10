@@ -286,7 +286,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-guard-declares-a-workspace-read-and-no-cache",
+              "the-guard-reads-the-git-candidate-cut-and-keys-on-it",
               "the-guard-task-is-reachable-only-from-validate-and-the-explicit-check-command",
               "validate-contributes-exactly-one-workspace-guard-for-any-selection",
               "validate-waits-for-the-selected-providers-generation"

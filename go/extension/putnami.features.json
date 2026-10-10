@@ -185,6 +185,19 @@
           }
         },
         {
+          "id": "api-verdict-names-no-commit",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-branch-and-its-squash-merge-give-one-verdict"
+            ]
+          }
+        },
+        {
           "id": "cli-compatibility-marker",
           "stage": "coded",
           "evidenceKinds": [

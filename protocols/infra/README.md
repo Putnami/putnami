@@ -197,7 +197,7 @@ Every workload's aggregated manifest carries a `runtime` block, even when the de
 }
 ```
 
-Resolution is developer-first: when `<workload>/infra/runtime.json` exists, it wins and the defaults sidecar at `<workload>/.gen/infra/runtime.json` is removed so two competing values never sit on disk. The defaults sidecar is re-emitted on every build, so changes to `infra.DefaultRuntime()` propagate without any developer action.
+Resolution is developer-first: when `<workload>/infra/runtime.json` exists, it wins, and an aggregator run removes the defaults sidecar at `<workload>/.gen/infra/runtime.json` so it does not compete with the authored file. A cache hit of the build step that aggregates restores no sidecar and removes none, so a sidecar an earlier build left stays until the aggregator runs again; the runtime block of `<workload>/.gen/requirements.json` is the value that applies. The defaults sidecar is re-emitted on every build, so changes to `infra.DefaultRuntime()` propagate without any developer action.
 
 Language runtime compatibility defaults may further specialize the runtime block
 before it is emitted. TypeScript/Bun workloads set `runtime.protocols.http2` to
@@ -222,11 +222,16 @@ the project's type and its in-workspace dependency closure, on the job context
 the task after the steps that make the workload's committed requirements
 current. It decides nothing about the artifact's content.
 
-The task is deliberately **uncached**: its inputs are other projects' committed
-manifests, which no per-project cache key covers, so a cache hit could replay a
-stale deployability manifest. It is also **workload-only**: a project whose
-resolved type is not `application` is skipped, because a library is consumed,
-never deployed.
+The task is **cached**. Its key holds every file it reads: the committed
+`infra/requirements.json` of every project in the dependency closure, with that
+project's path, and the workload's `infra/runtime.json` and
+`infra/overrides.json`. A change to a library's requirements, or a project that
+joins or leaves the closure, moves the key. The aggregated manifest is the
+task's required output: a run that writes none (a library, a workload that
+declares nothing, a failed write) caches nothing, so a cache hit never replays a
+manifest the current files do not produce. It is also **workload-only**: a
+project whose resolved type is not `application` is skipped, because a library
+is consumed, never deployed.
 
 ### Deployment declaration
 
@@ -257,7 +262,7 @@ the workload needs to run without a build in the loop.
   extensions (`package-deployment`) writes `<workload>/.gen/deployment.json`.
   The step is off until a project turns on the `deployment` package channel
   (the `--deployment` flag, a `deployment` entry in its `publish` list, or the
-  `deployment` option of its language extension). Unlike
+  `deployment` option of its language extension). Like
   `build~infra`, it is **cached**: its key covers `infra/requirements.json` of
   every project in the dependency closure and the workload's `infra/runtime.json`
   and `infra/overrides.json`, so a change to a library's requirements moves the

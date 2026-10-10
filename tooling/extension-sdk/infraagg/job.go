@@ -28,20 +28,36 @@ const PhaseName = "infra"
 // finding on the task that produced it — which is strictly better than the
 // end-of-run block, because a finding now names the workload whose build
 // surfaced it.
+//
+// It reports OK only when the run wrote the manifest and kept the runtime
+// defaults sidecar in step with it, so the files on disk are the ones the
+// inputs determine. Every other run reports SKIP and never fails:
+//
+//   - a project that is not a workload, which writes nothing;
+//   - a workload that declares nothing, whose run removes an earlier manifest;
+//   - a failed write or removal (Result.Err), which can leave an earlier
+//     manifest or sidecar in place.
+//
+// A language that caches the task declares the manifest as a required output,
+// so a SKIP is never cached and the next run executes again: it removes or
+// rewrites the files itself. A failed write does not fail the task, for the
+// same reason a finding does not.
 func Job(opts Options) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 		emit.PhaseStart(PhaseName)
 		result := Aggregate(ctx, opts)
 		reportDiagnostics(emit, result.Diagnostics)
 
-		if result.Outcome == OutcomeSkipped {
+		switch {
+		case result.Err != nil:
+			emit.PhaseEnd(PhaseName, "failed")
+			return "SKIP", result.Data(), nil
+		case result.Outcome != OutcomeEmitted:
 			emit.PhaseEnd(PhaseName, "skipped")
 			return "SKIP", result.Data(), nil
 		}
 		emit.PhaseEnd(PhaseName, "success")
-		if result.Outcome == OutcomeEmitted {
-			emit.Artifact("infra-requirements", "requirements.json", "manifest", result.ManifestPath)
-		}
+		emit.Artifact("infra-requirements", "requirements.json", "manifest", result.ManifestPath)
 		return "OK", result.Data(), nil
 	}
 }

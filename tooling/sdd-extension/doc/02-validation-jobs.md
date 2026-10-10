@@ -7,8 +7,8 @@ contract.
 
 | Command | Activation | Steps | Cached |
 |---|---|---|---|
-| `validate` | project-scoped, on `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | features: **no**; specs: yes |
-| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate` | architecture and ratchet: yes; decisions, recipes, CODEOWNERS and docs links: **no** |
+| `validate` | project-scoped, on `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
+| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS and docs links on the Git candidate cut |
 
 Two commands rather than one, because one command carries one activation and
 these two have different subjects. A project's features and specs are a
@@ -120,9 +120,9 @@ its existing admission gate; the shared absent-policy default remains `report`.
   `sample` is not a directory in this worktree fails with
   `sdd.recipe_sample_missing`, naming the sample. A second recipe for one
   intention, an unknown member, or an empty or multi-line field fails with
-  `sdd.invalid_recipe_index`. An **absent** index is adoption. It is
-  uncacheable: the verdict depends on whether each sample directory exists, and
-  no file pattern expresses that.
+  `sdd.invalid_recipe_index`. An **absent** index is adoption. A sample
+  directory exists when it holds a tracked or unignored file, and the step is
+  cached on the input `git:**` (see [Caching](#the-four-steps-cached-on-the-git-candidate-cut)).
 
 - **`codeowners-sync`** — the CODEOWNERS step. It writes
   `.github/CODEOWNERS` from `options.sdd.owners`: `putnami.workspace.json`
@@ -136,8 +136,8 @@ its existing admission gate; the shared absent-policy default remains `report`.
   declaration without a catch-all (`sdd.codeowners_no_default`), or a
   `putnami.json` the step cannot read (`sdd.codeowners_read_failed`) fails
   without writing. A workspace that declares no owners and has no such file is
-  left alone. It is uncacheable: it
-  rewrites a file that is also its input.
+  left alone. It is cached on the input `git:**`, which also holds the file it
+  rewrites: the CLI never replays a run that rewrote `CODEOWNERS`.
 - **`docs-links-validate`** — the documentation link gate. Each
   language extension's `lint` checks the `README.md` files and `doc/` trees
   inside its project, which is the feedback you get while working on it. This
@@ -153,8 +153,10 @@ its existing admission gate; the shared absent-policy default remains `report`.
   such as a nested Go module, belongs to that project. It applies the same
   rule, from the extension SDK's
   [`docslinks`](../../extension-sdk/docslinks/README.md) package, and fails with
-  one `docs-links` diagnostic per broken link, located at the link. It is
-  uncacheable: a link may name any file of the workspace.
+  one `docs-links` diagnostic per broken link, located at the link. A link may
+  name any file of the workspace, so it reads the Git candidate cut and is
+  cached on the input `git:**`: a link to a file Git ignores is broken, as it
+  is in a clone.
 
 Selection narrows what a run **owns**, never what it **reads**: durable
 manifests and canonical spec documents are read at every root under any
@@ -359,37 +361,97 @@ the same reason `architecture-validate` reads none. The reviewed policy change
 the rule demands is an edit to a `specs.baseline.json`, which changes an input
 and re-keys the task.
 
-### `features-validate` — uncacheable in v1
+### `features-validate` — cached on the Git candidate cut
 
-Its verdict depends on evidence **source bindings**: arbitrary bound files plus
-their git blob state, which is what the `source-binding-unavailable` and
-`source-binding-mismatch` stale reasons compare. No file-pattern key can express
-that read set, and an under-declared key does not merely miss a change — it
-serves a stale verdict while reporting that the check ran.
+```json
+"inputs": {
+  "repository": { "from": "workspace", "files": ["git:**"] },
+  "manifest": { "from": "project", "files": ["putnami.features.json"] }
+}
+```
 
-Caching it needs a **binding-aware** key: the resolved binding set plus each
-bound blob's content digest, folded in after the bindings resolve. That is a
-follow-up, not a smaller version of this one.
+Its verdict depends on evidence **source bindings**, which is what the
+`source-binding-unavailable` and `source-binding-mismatch` stale reasons
+compare, so it reads every file a binding hashes, as well as the feature
+manifests, evidence fragments and capability manifests at every root. The task
+reads them from the workspace's candidate cut and nothing else, and `git:**`
+holds that cut:
 
-### `decisions-validate` — uncacheable, for the same reason
+- A binding records each bound file's bytes or link text and its executable
+  bit. The `git:` key holds the bit too, read where the binding reads it: from
+  the file's mode, or on Windows, which stores none, from the mode the index
+  records (ADR 0061 of the CLI). A `chmod +x` of a bound file moves the key.
+- A binding records a submodule's checked-out commit and refuses an unmerged
+  path. The `git:` key holds neither and produces no key for either, so the
+  task then runs uncached instead of replaying a verdict about another commit.
+- An ignored evidence fragment, an ignored artifact and ignored build output
+  are neither read nor keyed, and staging changes nothing.
+- Package-root evidence matches a project by name and version. Every project
+  is read at the tree base version `0.0.0`, the version the CLI gives a task
+  the cache can serve (ADR 0060 of the CLI) and every build stamp records, so
+  no Git tag and no missing commit changes a verdict the key cannot see.
+- The report names the worktree and no commit, and its selection names no
+  baseline ref, so a replayed entry is true of the run that replays it.
 
-A check's read set is whatever its own `files` globs name, and those globs are
-authored inside each repository's `decisions.json` files — content this manifest
-cannot see, let alone name in a static input pattern. Declaring a broad pattern
-to make the task cacheable would key it on a superset it does not read and a
-subset it does, which is the under-declared key again in a friendlier shape.
+Two runs on one tree therefore share one entry, whatever the commit, the ref
+or the checkout. The cut is a workspace port, so one digest of it serves every
+project's key in a run. The project port names the project's own manifest
+only so that the project side of the key is not empty: the CLI keys an empty
+project side on every file under the project root, ignored build output
+included. Outside a Git work tree the task reads the disk, and the `git:` input
+has no key, so it runs every time.
 
-The walk it does instead is bounded and deterministic: workspace-relative paths
-in sorted order, never descending into `node_modules`, `vendor`, or any dot
-directory (`.git`, `.gen`, `.putnami`), and never following a symlink — a
+The `specs` step does not depend on this one. A step's key holds the key of
+every step it depends on, so an edge to a task keyed on the whole cut would
+move every project's `specs-validate` key on any edit anywhere in the
+repository. `specs-validate` reads the feature manifests itself and reports one
+that fails to parse, so the two steps run side by side.
+
+`putnami features validate`, the interactive command, still reads the disk,
+the version Git resolved, and the HEAD commit it reports.
+
+### The four steps cached on the Git candidate cut
+
+```json
+"inputs": {
+  "repository": { "from": "project", "files": ["git:**"] }
+}
+```
+
+`decisions-validate`, `recipes-validate`, `codeowners-sync` and
+`docs-links-validate` read files no narrow pattern names: the globs a
+repository authors in its `decisions.json`, the sample directories an index
+names, every `putnami.json` above a project, and any file a link names. Each
+reads the repository's **candidate cut** and nothing else: the tracked files
+and the untracked files no ignore rule excludes, as
+`git ls-files --cached --others --exclude-standard` lists them. The input
+`git:**` holds exactly that cut: each candidate's path, bytes and executable
+bit, and a symbolic link's target text.
+
+- Editing, adding, deleting or renaming a candidate moves the key, so a
+  deleted link target or an emptied sample directory is never served a stale
+  green verdict.
+- An ignored file is neither read nor keyed, and staging changes nothing.
+  A directory that holds no candidate does not exist for these steps, as it
+  does not exist in a clone.
+- The port is project-scoped because a workspace-once task's project is rooted
+  at the workspace root. A workspace port alone would leave the project side of
+  the key empty, and the CLI keys an empty project side on every file under the
+  root, ignored build output included.
+- Outside a Git work tree the steps read the disk, and the `git:` input has no
+  key, so they run every time.
+
+`codeowners-sync` rewrites `.github/CODEOWNERS`, which the cut holds. The CLI
+replays a source writer only when rehashing its project-side key after the run
+finds the bytes unchanged, so a run that rewrote the file is never replayed:
+the next run is keyed on the new bytes, and its clean result is the one a later
+run replays.
+
+The `decisions-validate` walk stays bounded and deterministic: workspace-relative
+paths in sorted order, never inside `node_modules`, `vendor`, or any dot
+directory (`.git`, `.gen`, `.putnami`), and never through a symlink — a
 generated or linked copy of a matched file would make the same registry answer
 differently before and after a build.
-
-### `docs-links-validate` — uncacheable, for the same reason
-
-A link may name any file of the workspace, so no static input pattern covers
-what the step reads. A key that missed a deleted link target would replay a
-green verdict for a link that no longer resolves.
 
 ## Exit codes
 

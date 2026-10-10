@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -44,9 +42,13 @@ import (
 // A workspace that declares no owners anywhere is not adopted: the step reads
 // nothing further and leaves any committed CODEOWNERS alone.
 //
-// The task is UNCACHEABLE. It reads the putnami.json of every project and of
-// every directory above one, and it rewrites a file that is also its input: a
-// cached success replayed over a stale file would skip the rewrite.
+// The step reads the putnami.json of every project and of every directory
+// above one, the committed spec floors, and the file it rewrites, all through
+// the workspace's candidate cut (worktree.go). It is cached on the input
+// `git:**`, which holds each of them, under the CLI's rule for a task that
+// rewrites its sources: a run that rewrote .github/CODEOWNERS is never
+// replayed, and the next run, keyed on the rewritten bytes, stores the clean
+// result a later run may replay.
 
 // CodeownersPath is the workspace-relative file the step writes.
 const CodeownersPath = ".github/CODEOWNERS"
@@ -129,6 +131,10 @@ type CodeownersReport struct {
 // committed workspace option blocks the job context carries.
 func BuildCodeownersResult(ws *workspace.Workspace, workspaceOptions map[string]map[string]any) (CodeownersReport, error) {
 	report := CodeownersReport{Path: CodeownersPath, Rules: []CodeownersRule{}}
+	tree, err := openWorktree(ws.Root)
+	if err != nil {
+		return report, fmt.Errorf("codeowners: %w", err)
+	}
 
 	defaults, findings := ownersFromOptions(wsproto.WorkspaceConfigFilename, workspaceOptions["sdd"])
 	report.Diagnostics = append(report.Diagnostics, findings...)
@@ -138,7 +144,7 @@ func BuildCodeownersResult(ws *workspace.Workspace, workspaceOptions map[string]
 	// declaration, and passing over it would drop that directory's rule.
 	var directoryRules []CodeownersRule
 	declared := false
-	if owners, findings := readDirectoryOwners(ws.Root, wsproto.ConfigFilename); owners != nil {
+	if owners, findings := readDirectoryOwners(tree, wsproto.ConfigFilename); owners != nil {
 		declared = true
 		report.Diagnostics = append(report.Diagnostics, diag.Errorf(ErrorCodeInvalidOwners,
 			wsproto.ConfigFilename+"#options.sdd.owners",
@@ -148,7 +154,7 @@ func BuildCodeownersResult(ws *workspace.Workspace, workspaceOptions map[string]
 	}
 	for _, dir := range ownerDirectories(ws) {
 		source := path.Join(dir, wsproto.ConfigFilename)
-		owners, findings := readDirectoryOwners(ws.Root, source)
+		owners, findings := readDirectoryOwners(tree, source)
 		if findings != nil {
 			report.Diagnostics = append(report.Diagnostics, findings...)
 			continue
@@ -181,7 +187,7 @@ func BuildCodeownersResult(ws *workspace.Workspace, workspaceOptions map[string]
 
 	report.Rules = append(report.Rules, CodeownersRule{Pattern: "*", Owners: defaults, Source: wsproto.WorkspaceConfigFilename})
 	report.Rules = append(report.Rules, directoryRules...)
-	governed, err := specGateAdopted(ws)
+	governed, err := specGateAdopted(ws, tree)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, diag.Errorf(ErrorCodeCodeownersRead,
 			featureproto.SpecsBaselineFilename, "check the enforced spec floor: %v", err))
@@ -196,7 +202,7 @@ func BuildCodeownersResult(ws *workspace.Workspace, workspaceOptions map[string]
 	}
 
 	rendered := renderCodeowners(report.Rules[0], directoryRules, governance)
-	written, err := writeIfChanged(filepath.Join(ws.Root, filepath.FromSlash(CodeownersPath)), rendered)
+	written, err := writeIfChanged(tree, CodeownersPath, rendered)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, diag.Errorf(ErrorCodeCodeownersWrite, CodeownersPath, "%v", err))
 		return codeownersVerdict(report)
@@ -238,18 +244,10 @@ func ownerDirectories(ws *workspace.Workspace) []string {
 // absent file, a leading byte order mark, and an absent or null sdd member
 // declare nothing. Anything else this step cannot read is a finding.
 // A symlink is followed, as the CLI follows it when it loads the file.
-func readDirectoryOwners(root, source string) ([]string, []diag.Diagnostic) {
-	file := filepath.Join(root, filepath.FromSlash(source))
-	info, err := os.Stat(file)
+func readDirectoryOwners(tree *worktree, source string) ([]string, []diag.Diagnostic) {
+	data, err := tree.readFollowing(source)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
-	}
-	var data []byte
-	if err == nil && !info.Mode().IsRegular() {
-		err = errors.New("file is not regular")
-	}
-	if err == nil {
-		data, err = readBoundedFile(file, info)
 	}
 	if err != nil {
 		return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeCodeownersRead, source, "read: %v", err)}
@@ -314,20 +312,13 @@ func describeOwnerValue(value any) string {
 // floor: a baseline at the root or in any project directory. Only a file's
 // presence matters, so none is read. A symlink counts when it resolves to a
 // file, because the ratchet follows it too.
-func specGateAdopted(ws *workspace.Workspace) (bool, error) {
+func specGateAdopted(ws *workspace.Workspace, tree *worktree) (bool, error) {
 	scopes, _ := specsBaselineScopes(ws)
 	for _, scope := range scopes {
-		info, err := os.Stat(filepath.Join(ws.Root, filepath.FromSlash(featureproto.SpecsBaselinePath(scope))))
-		if errors.Is(err, fs.ErrNotExist) {
-			continue
+		exists, err := tree.fileExists(featureproto.SpecsBaselinePath(scope))
+		if err != nil || exists {
+			return exists, err
 		}
-		if err != nil {
-			return false, err
-		}
-		if !info.Mode().IsRegular() {
-			return false, errors.New("not a regular file")
-		}
-		return true, nil
 	}
 	return false, nil
 }
@@ -364,10 +355,12 @@ func writeCodeownersRule(out *bytes.Buffer, rule CodeownersRule) {
 	out.WriteString("\n")
 }
 
-// writeIfChanged writes data to file unless the file already holds exactly
-// those bytes. It reports whether it wrote.
-func writeIfChanged(file string, data []byte) (bool, error) {
-	current, err := readOptionalBoundedRegularFile(file)
+// writeIfChanged writes data to the workspace-relative file rel unless the
+// committed file already holds exactly those bytes. It reports whether it
+// wrote.
+func writeIfChanged(tree *worktree, rel string, data []byte) (bool, error) {
+	file := tree.path(rel)
+	current, err := tree.readRegular(rel)
 	if err == nil && bytes.Equal(current, data) {
 		return false, nil
 	}

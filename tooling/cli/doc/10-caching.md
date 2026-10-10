@@ -79,7 +79,7 @@ v9                          ← format version (for compatibility)
 + extension version         ← only when the extension has no implementation digest (see below)
 + implementation digest     ← what the extension runs; empty when it has none
 + toolchain                 ← the CLI's Go runtime and each declared runtime toolchain's lock identity
-+ runtime identity          ← declared runtime inputs such as hostPlatform, absent when none
++ runtime identity          ← declared runtime inputs such as hostPlatform or releaseBaseline, absent when none
 + OS class                  ← "windows" on Windows, absent elsewhere
 + source state              ← "unmanaged" where Git does not manage the workspace root, absent inside a repository
 + task name                 ← e.g., "build~transpile"
@@ -97,9 +97,10 @@ v9                          ← format version (for compatibility)
 Apart from a build stamp that a generate asset copies into the output, no input
 names the commit, the branch, the checkout directory or the base version of the
 project's release line. Two runs on one tree compute the same key, whatever
-tags their checkouts hold. A pull request and the commit its
-squash merge puts on the main branch share their entries, and so do two
-checkouts of one commit in two directories. Otherwise the commit reaches a key
+tags their checkouts hold, except for a task that declares the release
+baseline (see [Release Baseline](#release-baseline)). A pull request and the
+commit its squash merge puts on the main branch share their entries, and so do
+two checkouts of one commit in two directories. Otherwise the commit reaches a key
 only through the publish version, for a task that opts in (see
 [Version-Aware Tasks](#version-aware-tasks)). A task the cache can serve reads
 a line's version only when its key carries it. Every other cached task reads
@@ -107,6 +108,32 @@ base version `0.0.0` and no commit in its job context, and the build stamp's
 `capabilityPackages` name every package at `0.0.0`. See
 [ADR 0059](adr/0059-a-cache-key-describes-the-tree-not-the-commit.md) and
 [ADR 0060](adr/0060-the-base-version-is-not-a-cache-key-input.md).
+
+### Release Baseline
+
+A task whose verdict compares the working tree with its version line's last
+release, such as the Go `validate-api` check, declares the `releaseBaseline`
+runtime input. Before the task runs, the CLI reads the project's baseline from
+git and adds it to the key:
+
+- the repository state: no work tree, no commit, a shallow clone, no reachable
+  tag of the line, or tagged;
+- the line's tag pattern, and for an untagged line whether the repository has
+  a tag of another line;
+- the line's last tag HEAD reaches, and the tree that tag holds at the project
+  directory;
+- whether a commit since that tag that touches the project declares a breaking
+  change.
+
+The baseline names no commit HEAD reaches. A branch and its squash merge share
+the key when they hold one tree and declare the same break. A new tag, other
+content at the tag, a changed breaking marker or a shallow clone moves it, and
+so does a squash title that adds or drops the breaking marker (`!` or a
+`BREAKING CHANGE:` footer): the verdict reads that marker. A git failure leaves
+the task without a key, so it runs uncached. One run reads each project's
+baseline once, so a tag created during the run is seen by the next run.
+Declaring the input requires CLI contract 7. See
+[ADR 0062](adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md).
 
 ### Extension Implementation
 
@@ -338,20 +365,37 @@ A `git:` pattern enumerates `git ls-files -z --cached --others
 project-relative matching and exclusions. `git:**` covers every candidate,
 including files outside the project's directory. It never walks ignored local
 directories. Missing tracked files are absent from the candidate; additions,
-edits, renames and deletions change the key. Staging unchanged bytes does not.
+edits, a change of the executable bit, renames and deletions change the key.
+Staging unchanged bytes does not.
 
 Candidate inputs hash raw file bytes and symlink target text, with separate
-file-type markers. They do not follow symlinks or normalize project-config
-task tuning or the fields of the version stamp: a repository scanner can read
-those bytes. When ordinary and Git patterns select the same file, the raw
-candidate digest wins. Git enumeration errors and unsupported non-regular
-candidate files prevent key computation. Ordinary patterns keep their existing
-behavior; adding `git:**` does not filter files an ordinary pattern separately
-selects.
+file-type markers, and each regular file's executable bit as a source binding
+reads it: from the file's permission bits, or on Windows, which stores no bit,
+from the mode the index records for a tracked file. They do not follow symlinks
+or normalize project-config task tuning or the fields of the version stamp: a
+repository scanner can read those bytes. When ordinary and Git patterns select
+the same file, the raw candidate digest wins. Git enumeration errors,
+unsupported non-regular candidate files, a selected unmerged candidate and a
+candidate Git lists as a directory (a submodule or a nested repository) prevent
+key computation. Ordinary patterns keep their existing behavior; adding
+`git:**` does not filter files an ordinary pattern separately selects.
+
+A task that declares a `git:` input, from the project, the workspace or the
+dependency closure, also keys on the workspace membership its job context
+carries: each project's identity, path, configuration, extensions and
+dependency edges, without the line's base version or the absolute path. Such a
+task judges the workspace from that membership, and user config or a scope
+manifest Git ignores can change it without changing a candidate.
+
+An extension manifest whose task declares a `git:` input requires CLI contract
+7: a CLI before it keys a candidate's bytes without its executable bit and
+without the membership. An older CLI refuses the manifest instead of replaying a
+verdict across a `chmod` or a membership change.
 
 The document gates declare `git:**` instead of a fixed list of repository
 documents, so the public-cut scanner and its cache key cover the same tree.
-See [ADR 0041](adr/0041-git-candidate-file-inputs.md).
+See [ADR 0041](adr/0041-git-candidate-file-inputs.md) and
+[ADR 0061](adr/0061-a-git-input-keys-the-executable-bit.md).
 
 ### Environment Variable Hashing
 
@@ -682,9 +726,11 @@ The lease is an optimization, never a correctness dependency. A heartbeat keeps
 long-running owners live; an expired or released lease lets exactly one waiter
 take over, while a bounded wait, cancellation, or coordination error falls back
 to normal local execution. Jobs with a known historical duration below the
-cache policy's 200 ms break-even floor bypass leases because coordinating them
-would cost more than the duplicated work; jobs without history remain eligible
-so fresh worktrees can coalesce their first cold run.
+lease's 200 ms coalescing floor bypass leases because coordinating them would
+cost more than the duplicated work; jobs without history remain eligible so
+fresh worktrees can coalesce their first cold run. The floor only decides
+whether a sibling waits: a cheap job's result is cached, locally and
+remotely, like any other.
 
 The wait ceiling follows the job timeout multiplied by its configured retry
 attempts (five minutes per attempt by default). Lease expiry normally wakes a
@@ -989,10 +1035,10 @@ needs them. The mode tunes how much is materialized:
 Concurrent worktrees coalesce an eligible remote restore before invoking their
 session-private cache providers: the first process downloads the entry's missing
 CAS blobs and publishes it into the machine-global store, then waiters restore
-that shared entry without a second provider download. The same 200 ms historical
-job-cost floor as computation leases skips known-cheap work, while an expired
-lease or bounded wait falls back to a direct provider restore so coordination
-cannot make the cache less reliable.
+that shared entry without a second provider download. The same 200 ms
+coalescing floor as computation leases lets known-cheap work restore without
+waiting, while an expired lease or bounded wait falls back to a direct provider
+restore so coordination cannot make the cache less reliable.
 
 | Mode | A remote hit is restored with its files when |
 |------|-----------|
@@ -1054,10 +1100,10 @@ records the design.
 
 ### What is and isn't cached remotely
 
-Remote caching is stricter than local:
+The remote cache admits every entry a task's run publishes to the local cache, whatever its build duration or output size, unless the task is side-effecting. A failure record is never shared (see [Failure replay](#failure-replay-negative-entries)).
 
 - **Side-effecting tasks are never remote-cached** (e.g. `publish`) — their effect must always run.
-- A **break-even guard** skips uploading artifacts whose predicted transfer time would exceed the build time they save (using the recorded build duration and output size).
+- No duration or size rule leaves a result out: a 50 ms generation step that writes files is uploaded like a 5-minute build.
 - All transfers are content-addressed and **digest-verified**; bytes that do not match their digest are rejected.
 
 ### Object cache (for compiler caches)
@@ -1228,10 +1274,10 @@ and runs tasks serially so each task's filesystem observation has one owner:
    one-owner-per-output model the manifests declare: `build-generate` is the
    single producer of `<project>/.gen` and declares that subtree whole minus
    the subpaths it cedes (to `build-describe`, `.gen/conf` to the two
-   `config-merge` tasks, which declare the merged file inside it, and
-   `.gen/deployment.json` to `package-deployment`, which declares it), while
-   `build-describe`'s staging and `build-infra`'s requirements write inside it
-   and declare nothing. What the
+   `config-merge` tasks, which declare the merged file inside it,
+   `.gen/deployment.json` to `package-deployment`, and `.gen/requirements.json`
+   and `.gen/infra/runtime.json` to `build-infra`, which declare them), while
+   `build-describe`'s staging writes inside it and declares nothing. What the
    check still catches is a write that escapes the project's declared surface
    entirely, or one project's task writing into another project's tree. A task
    that declares `mutatesSources` may also change its own keyed source inputs —
@@ -1318,19 +1364,15 @@ not move when the thing it is supposed to describe changes. Name the settled
 sources that derive the input, or nothing.
 
 **An unbounded read set.** A workspace-wide verifier reads every project's
-sources. `cache.key.workspaceFiles` can express that — the patterns resolve
-against the workspace root, and `lookupFileHash` memoizes the digest per CLI
-invocation, so the hashing itself is affordable. What is not affordable is the
-review: a pattern list over a whole workspace cannot be shown complete, and the
-first file it misses is a silently stale verdict.
-
-`@putnami/clientgen`'s `clientgen-workspace-check` — the task `putnami validate`
-runs as `clientgen-guard` — has the third, and is `cache: false` for that
-reason. It used to have all three: a per-run pre-session capture and a
-contract its own child build produced. Both are gone: drift is the
-generator task's verdict under "Declared-output drift", and the guard reads
-committed inputs only. Its cost is bounded by doing less work, not by storing
-the answer.
+sources. A hand-written pattern list over a whole workspace cannot be shown
+complete, and the first file it misses is a silently stale verdict. Such a task
+reads the Git candidate cut instead, the tracked files and the untracked files
+no ignore rule excludes, and keys on `git:**`, which hashes exactly that set
+(ADR [0041](adr/0041-git-candidate-file-inputs.md)): its read set and its key
+are then one list. `lint-docs`, the `validate-workspace` checks,
+`@putnami/sdd`'s `features-validate` (the `features` step of `putnami
+validate`) and `@putnami/clientgen`'s `clientgen-workspace-check` (the
+`clientgen-guard` task of `putnami validate`) do this.
 
 ### Version-Aware Tasks
 

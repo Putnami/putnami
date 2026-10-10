@@ -120,6 +120,10 @@
       "text": "Validate holds the breaking-change marker for every Go project the root support catalog lists as stable, or every Go project when there is no catalog: an incompatible change to the exported API since the last tag of the project's line fails, naming the package and the symbol, unless a commit since that tag that touches the project declares it with \"!\" or a breaking-change footer. Additions, renamed parameters and renamed imports are compatible; an unlisted, preview or experimental project is not checked."
     },
     {
+      "id": "api-verdict-names-no-commit",
+      "text": "The API check names no commit: a break a commit since the line's last tag declares is reported as declared since that tag, without the commit's SHA or subject, for the exported API and the command surface alike. A branch and its squash merge, which hold one tree and declare one break, give one verdict, so one cache entry serves both. A squash title that adds or drops the breaking marker declares another break, so it moves the key and the verdict."
+    },
+    {
       "id": "cli-compatibility-marker",
       "text": "Validate holds the breaking-change marker for the command-surface document a stable Go project declares for the CLI it ships: since the last tag of the project's line, a removed command, flag, short alias or accepted value, or a flag that starts or stops taking a value, fails naming the command and the flag unless a commit since that tag declares it breaking. An added flag is compatible. A tag at which the project declared no document gives a note, and the API is still compared."
     },

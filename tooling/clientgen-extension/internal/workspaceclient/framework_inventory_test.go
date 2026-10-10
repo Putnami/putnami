@@ -51,11 +51,11 @@ func TestFrameworkRuntimeAuthorityRequiresIndexedRuntimeIdentity(t *testing.T) {
 		Callsites: []ExternalCallsite{externalIdentity(calls[0].callsite)}, Owner: "framework",
 		Tests: []string{"runtime/http.test.ts"}, Reason: "implements generated client bindings",
 	}})
-	_, findings := loadAndValidateFrameworkInventory(root)
+	_, findings := loadAndValidateFrameworkInventory(indexedView(root))
 	assertFindingCodeList(t, findings, "clientgen.invalid-framework-inventory")
 
 	writeTestFile(t, root, "runtime/putnami.json", `{"name":"@putnami/client"}`)
-	transports, findings := loadAndValidateFrameworkInventory(root)
+	transports, findings := loadAndValidateFrameworkInventory(indexedView(root))
 	if len(findings) != 0 || len(transports) != 1 {
 		t.Fatalf("framework transports=%+v findings=%+v", transports, findings)
 	}
@@ -72,7 +72,7 @@ func TestFrameworkCallsiteValidationUsesFrameworkDiagnostics(t *testing.T) {
 		Callsites: []ExternalCallsite{{Path: "runtime/http.ts", Transport: "http", Symbol: "fetch", Fingerprint: "invalid"}},
 		Owner:     "framework", Tests: []string{"runtime/http.test.ts"}, Reason: "implements generated client bindings",
 	}})
-	_, findings := loadAndValidateFrameworkInventory(root)
+	_, findings := loadAndValidateFrameworkInventory(indexedView(root))
 	if len(findings) == 0 {
 		t.Fatal("invalid framework callsite was accepted")
 	}
@@ -94,7 +94,7 @@ func TestFrameworkInventoryRejectsUnknownDuplicateAndNullFields(t *testing.T) {
 	for name, document := range cases {
 		t.Run(name, func(t *testing.T) {
 			writeTestFile(t, root, "runtime/"+frameworkInventoryFile, document)
-			_, findings := loadAndValidateFrameworkInventory(root)
+			_, findings := loadAndValidateFrameworkInventory(indexedView(root))
 			assertFindingCodeList(t, findings, "clientgen.invalid-framework-inventory")
 		})
 	}
@@ -201,7 +201,7 @@ func TestFrameworkInventoryIsReadPerProject(t *testing.T) {
 		})
 	}
 	writeFrameworkInventory(t, root, entries)
-	transports, findings := loadAndValidateFrameworkInventory(root)
+	transports, findings := loadAndValidateFrameworkInventory(indexedView(root))
 	if len(findings) != 0 || len(transports) != 2 || transports[0].Project != "primitive" || transports[1].Project != "web" {
 		t.Fatalf("two project inventories did not merge: transports=%+v findings=%+v", transports, findings)
 	}
@@ -215,14 +215,14 @@ func TestFrameworkInventoryIsReadPerProject(t *testing.T) {
 	}
 	webFile := "web/" + frameworkInventoryFile
 	writeTestFile(t, root, webFile, strings.Replace(string(rootLayout), `"protocolVersion":1`, `"protocolVersion":2`, 1))
-	transports, findings = loadAndValidateFrameworkInventory(root)
+	transports, findings = loadAndValidateFrameworkInventory(indexedView(root))
 	if len(transports) != 1 || len(findings) != 1 || findings[0].Path != webFile ||
 		!strings.Contains(findings[0].Message, `unknown field "project"`) {
 		t.Fatalf("a version 2 entry naming its project was accepted: transports=%+v findings=%+v", transports, findings)
 	}
 
 	writeTestFile(t, root, webFile, string(rootLayout))
-	transports, findings = loadAndValidateFrameworkInventory(root)
+	transports, findings = loadAndValidateFrameworkInventory(indexedView(root))
 	if len(transports) != 1 || len(findings) != 1 || findings[0].Path != webFile ||
 		!strings.Contains(findings[0].Message, "remove project from every entry") {
 		t.Fatalf("a version 1 document in a project directory was accepted: transports=%+v findings=%+v", transports, findings)
@@ -231,7 +231,7 @@ func TestFrameworkInventoryIsReadPerProject(t *testing.T) {
 	writeTestFile(t, root, "primitive/"+frameworkInventoryFile, `{"protocolVersion":2,"transports":[]}`)
 	writeTestFile(t, root, webFile, `{"protocolVersion":2,"transports":[]}`)
 	writeTestFile(t, root, frameworkInventoryFile, string(rootLayout))
-	transports, findings = loadAndValidateFrameworkInventory(root)
+	transports, findings = loadAndValidateFrameworkInventory(indexedView(root))
 	if len(transports) != 0 || len(findings) != 1 || findings[0].Path != frameworkInventoryFile ||
 		findings[0].Code != "clientgen.invalid-framework-inventory" ||
 		!strings.Contains(findings[0].Message, "(primitive/clientgen.framework.json, web/clientgen.framework.json)") {

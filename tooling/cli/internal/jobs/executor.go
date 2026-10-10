@@ -3,6 +3,7 @@ package jobs
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -10,10 +11,12 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
 	extproto "go.putnami.dev/protocol/extension"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -35,7 +38,8 @@ func HostPlatform() string {
 // not. `extensionVersion` resolves to nothing on purpose — every key already
 // names the extension's implementation, by its version or by the digest that
 // replaces it, and answering the version here would move, at every build
-// stamp, the keys that digest keeps stable.
+// stamp, the keys that digest keeps stable. `releaseBaseline` reads git and can
+// fail, so releaseBaselineIdentity resolves it beside this function.
 //
 // The result feeds CacheKey.RuntimeIdentity, which is hashed only when
 // non-empty, so a task that declares no runtime input keeps its exact key.
@@ -829,6 +833,13 @@ func computeJobCacheHashWith(
 	// developer and CI on another platform. Neither is a declaration, so a task
 	// whose output depends on the machine declares the host platform here.
 	policy.RuntimeIdentity = taskRuntimeIdentity(job)
+	baseline, err := releaseBaselineIdentity(ws, job, cache)
+	if err != nil {
+		return "", fmt.Errorf("cache key for %s: %w", job.Key(), err)
+	}
+	if baseline != "" {
+		policy.RuntimeIdentity = append(policy.RuntimeIdentity, baseline)
+	}
 
 	// Collect upstream hashes for dependencies
 	var upstreamHashes []string
@@ -881,6 +892,20 @@ func computeJobCacheHashWith(
 		return "", err
 	}
 	if digest != "" {
+		upstreamHashes = append(upstreamHashes, digest)
+	}
+
+	// A task that keys on the Git candidate cut judges the workspace, and it
+	// reads the membership from its context: which projects there are, their
+	// names, paths, configs, extensions and edges. User config or an ignored
+	// scope manifest can change that membership without changing one candidate
+	// file, so the cut alone would replay a verdict about another set of
+	// projects.
+	if keysOnCandidateCut(job) {
+		digest, err := workspaceMembershipDigest(ws)
+		if err != nil {
+			return "", err
+		}
 		upstreamHashes = append(upstreamHashes, digest)
 	}
 
@@ -973,6 +998,41 @@ func computeJobCacheHashWith(
 	}
 
 	return hash, nil
+}
+
+// keysOnCandidateCut reports whether the job's task declares a key input on
+// the Git candidate cut (a `git:` pattern, ADR 0041), from the project, the
+// workspace or the dependency closure.
+func keysOnCandidateCut(job *ScheduledJob) bool {
+	if job == nil || job.JobDef == nil ||
+		job.JobDef.TaskCachePolicy == nil || job.JobDef.TaskCachePolicy.Key == nil {
+		return false
+	}
+	key := job.JobDef.TaskCachePolicy.Key
+	isGitPattern := func(pattern string) bool {
+		_, ok := wsproto.GitFilePattern(pattern)
+		return ok
+	}
+	return slices.ContainsFunc(key.Files, isGitPattern) ||
+		slices.ContainsFunc(key.WorkspaceFiles, isGitPattern) ||
+		slices.ContainsFunc(key.ClosureFiles, isGitPattern)
+}
+
+// workspaceMembershipDigest hashes the membership a job context carries
+// (workspaceProjectsContext), less what differs between two checkouts of one
+// tree: the line's base version and the absolute path.
+func workspaceMembershipDigest(ws *workspace.Workspace) (string, error) {
+	members := workspaceProjectsContext(ws, nil)
+	for i := range members {
+		members[i].Version = ""
+		members[i].FullPath = ""
+	}
+	encoded, err := json.Marshal(members)
+	if err != nil {
+		return "", fmt.Errorf("encode the workspace membership: %w", err)
+	}
+	sum := sha256.Sum256(encoded)
+	return "workspaceMembership:" + hex.EncodeToString(sum[:]), nil
 }
 
 // closureKeyPatterns returns the project-relative globs this job's task

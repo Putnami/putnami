@@ -169,8 +169,6 @@ func primeGenerationEntry(
 	if err != nil {
 		t.Fatalf("compute generation key: %v", err)
 	}
-	// The duration clears the remote break-even floor so the entry is genuinely
-	// shareable rather than silently skipped as too cheap.
 	if !f.sched.storeDeclaredCapture(job, &JobResult{Status: "success", Duration: 2 * time.Second}, hash) {
 		t.Fatal("the producing run published no generation entry")
 	}

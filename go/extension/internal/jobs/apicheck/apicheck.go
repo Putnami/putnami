@@ -25,6 +25,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"go.putnami.dev/go/extension/internal/apisurface"
@@ -84,9 +85,12 @@ type Report struct {
 	// CommandChanges are the incompatible changes to the command surface
 	// since Tag.
 	CommandChanges []protocolcli.CommandChange
-	// Breaking is a commit since Tag that declares a breaking change; nil when
-	// none does.
-	Breaking *Commit
+	// Breaking reports whether a commit since Tag that touches the project
+	// declares a breaking change. The report names no commit: a branch and its
+	// squash merge that declare the same break with different commits give
+	// the same verdict. A squash title that adds or drops the marker declares
+	// another break, and gives another verdict.
+	Breaking bool
 }
 
 // surfaceCompared reports whether the command surface was compared with Tag.
@@ -99,12 +103,6 @@ func (r *Report) surfaceCompared() bool {
 // declared at Tag, or may have, is not compared.
 func (r *Report) surfaceReported() bool {
 	return r.CommandSurface != "" || r.SurfaceWarning != ""
-}
-
-// Commit identifies the commit that declares a breaking change.
-type Commit struct {
-	SHA     string
-	Subject string
 }
 
 // Run is the task body: it checks the project and reports each incompatible
@@ -135,6 +133,9 @@ func Check(workspaceRoot, projectDir, name string, options Options) (*Report, er
 	if options.CommandSurface != "" {
 		var err error
 		if surfacePath, err = surfaceDocumentPath(options.CommandSurface); err != nil {
+			return nil, err
+		}
+		if err := surfaceDocumentKeyed(surfacePath); err != nil {
 			return nil, err
 		}
 	}
@@ -227,12 +228,7 @@ func Check(workspaceRoot, projectDir, name string, options Options) (*Report, er
 	if err != nil {
 		return nil, err
 	}
-	for _, commit := range commits {
-		if declaresBreaking(commit.subject, commit.body) {
-			report.Breaking = &Commit{SHA: commit.sha, Subject: commit.subject}
-			break
-		}
-	}
+	report.Breaking = slices.ContainsFunc(commits, func(c commit) bool { return declaresBreaking(c.subject, c.body) })
 	return report, nil
 }
 
@@ -240,7 +236,8 @@ func Check(workspaceRoot, projectDir, name string, options Options) (*Report, er
 // projectDir, with slash paths relative to it. A directory that holds its own
 // go.mod is another module: its go.mod is returned so the surface knows to
 // leave it out, and nothing below it is read. Directories the surface never
-// reads are not walked.
+// reads are not walked, and neither are the directories the task's cache key
+// does not read (unkeyedDirectory), which filesAtTag leaves out too.
 func filesInTree(projectDir string) ([]apisurface.File, error) {
 	var files []apisurface.File
 	err := filepath.WalkDir(projectDir, func(file string, entry fs.DirEntry, walkErr error) error {
@@ -257,8 +254,7 @@ func filesInTree(projectDir string) ([]apisurface.File, error) {
 				return nil
 			}
 			name := entry.Name()
-			if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") ||
-				name == "testdata" || name == "vendor" || name == "internal" || name == "node_modules" {
+			if unkeyedDirectory(name) || strings.HasPrefix(name, "_") || name == "testdata" || name == "internal" {
 				return filepath.SkipDir
 			}
 			if _, err := os.Stat(filepath.Join(file, "go.mod")); err == nil {
@@ -357,19 +353,19 @@ func render(emit *jsonl.Emitter, workspaceRoot, projectDir string, report *Repor
 		return "OK", data, nil
 	}
 
-	if report.Breaking != nil {
-		data["breakingCommit"] = report.Breaking.SHA
-		declared := fmt.Sprintf("declared breaking by %s %q", shortSHA(report.Breaking.SHA), report.Breaking.Subject)
+	if report.Breaking {
+		data["breakingDeclared"] = true
+		declared := fmt.Sprintf("a commit since %s declares the breaking change", report.Tag)
 		for _, change := range report.Changes {
 			file, line := location(workspaceRoot, projectDir, change.Pos)
-			emit.DiagnosticWithCode("info", fmt.Sprintf("%s: %s since %s, %s",
+			emit.DiagnosticWithCode("info", fmt.Sprintf("%s: %s since %s; %s",
 				change.Package, change.Message, report.Tag, declared), file, line, 0, Code)
 		}
 		for _, change := range report.CommandChanges {
-			emit.DiagnosticWithCode("info", fmt.Sprintf("%s since %s, %s",
+			emit.DiagnosticWithCode("info", fmt.Sprintf("%s since %s; %s",
 				change.Message, report.Tag, declared), surfaceFile, 0, 0, Code)
 		}
-		emit.Info(fmt.Sprintf("%s since %s, %s", changeCounts(report), report.Tag, declared))
+		emit.Info(fmt.Sprintf("%s since %s; %s", changeCounts(report), report.Tag, declared))
 		emit.PhaseEnd(phase, "success")
 		return "OK", data, nil
 	}
@@ -417,13 +413,6 @@ func location(workspaceRoot, projectDir string, pos apisurface.Position) (string
 		file = rel
 	}
 	return filepath.ToSlash(file), pos.Line
-}
-
-func shortSHA(sha string) string {
-	if len(sha) > 12 {
-		return sha[:12]
-	}
-	return sha
 }
 
 func plural(n int) string {

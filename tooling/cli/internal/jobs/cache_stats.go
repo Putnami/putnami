@@ -69,9 +69,6 @@ type CacheStats struct {
 	// honest "spent on upload" figure now that uploads run off the worker path.
 	uploadWallNanos atomic.Int64
 	uploadFailures  atomic.Int64
-	// uploadsSkipped counts freshly built misses NOT stored remotely because
-	// they fell below the break-even guard (too cheap to be worth the transfer).
-	uploadsSkipped atomic.Int64
 
 	// providerSummary* preserves the exact totals returned by the cache
 	// provider's terminal Summary operation. The aggregate counters above are
@@ -331,12 +328,6 @@ func (s *CacheStats) recordUploadFailure() {
 	s.uploadFailures.Add(1)
 }
 
-// recordUploadSkipped counts one built miss that was not stored remotely
-// because it fell below the break-even guard.
-func (s *CacheStats) recordUploadSkipped() {
-	s.uploadsSkipped.Add(1)
-}
-
 func (s *CacheStats) recordProviderSummary(sum *cache.SummaryResult) {
 	if sum == nil {
 		return
@@ -392,23 +383,22 @@ func (s *CacheStats) Snapshot() *CacheStatsSnapshot {
 		LocalRestoreVerifyMs:  local.restoreVerify / 1e6,
 		LocalSpawnedProcesses: s.localSpawnedProcesses.Load(),
 
-		SetupMs:        s.setupNanos.Load() / 1e6,
-		NegotiateMs:    s.negotiateNanos.Load() / 1e6,
-		KeysRequested:  s.keysRequested.Load(),
-		Hits:           s.hits.Load(),
-		Misses:         s.misses.Load(),
-		Restored:       s.restored.Load(),
-		HintsWarmed:    s.hintsWarmed.Load(),
-		TimeSavedMs:    s.timeSavedMs.Load(),
-		BytesFetched:   s.bytesFetched.Load(),
-		RestoreMs:      s.restoreWallNanos() / 1e6,
-		Uploads:        s.uploads.Load(),
-		BlobsUploaded:  s.blobsUploaded.Load(),
-		BytesUploaded:  s.bytesUploaded.Load(),
-		BytesDeduped:   s.bytesDeduped.Load(),
-		UploadMs:       s.uploadWallNanos.Load() / 1e6,
-		UploadErrors:   s.uploadFailures.Load(),
-		UploadsSkipped: s.uploadsSkipped.Load(),
+		SetupMs:       s.setupNanos.Load() / 1e6,
+		NegotiateMs:   s.negotiateNanos.Load() / 1e6,
+		KeysRequested: s.keysRequested.Load(),
+		Hits:          s.hits.Load(),
+		Misses:        s.misses.Load(),
+		Restored:      s.restored.Load(),
+		HintsWarmed:   s.hintsWarmed.Load(),
+		TimeSavedMs:   s.timeSavedMs.Load(),
+		BytesFetched:  s.bytesFetched.Load(),
+		RestoreMs:     s.restoreWallNanos() / 1e6,
+		Uploads:       s.uploads.Load(),
+		BlobsUploaded: s.blobsUploaded.Load(),
+		BytesUploaded: s.bytesUploaded.Load(),
+		BytesDeduped:  s.bytesDeduped.Load(),
+		UploadMs:      s.uploadWallNanos.Load() / 1e6,
+		UploadErrors:  s.uploadFailures.Load(),
 
 		ProviderSummaryRestoredCount: s.providerSummaryRestoredCount.Load(),
 		ProviderSummaryRestoredBytes: s.providerSummaryRestoredBytes.Load(),

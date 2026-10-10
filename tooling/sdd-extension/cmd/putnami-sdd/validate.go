@@ -32,18 +32,20 @@ import (
 // runFeaturesValidate is the first step of the project-scoped `validate`
 // pipeline: the durable feature manifest and the evidence that backs it.
 //
-// The task it belongs to is UNCACHEABLE on purpose (D8). This verdict depends
-// on evidence source bindings — arbitrary bound files plus their git blob state
-// — and a key built from file patterns cannot cover that read set. An
-// under-declared key does not merely miss a change; it serves a stale verdict
-// while claiming to have checked, which is the one failure a validation job
-// must not have.
+// The task is cached (D8) on the input `git:**`, the workspace's Git candidate
+// cut, and its verdict reads that cut and nothing else
+// (sdd.BuildFeatureTaskValidationResult). An evidence source binding records
+// each bound file's bytes or link text and its executable bit, which the key
+// holds too (ADR 0061 of the CLI); a submodule or an unmerged path produces no
+// key, so a run that meets one is never served. Every project carries the
+// tree base version, and the report names no commit, so two runs on one tree
+// write one report whatever the commit, the ref or the checkout.
 func runFeaturesValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	ws, selection, err := projectValidationView(ctx)
 	if err != nil {
 		return "", nil, err
 	}
-	report, verdict := sdd.BuildFeatureValidationResult(ws, selection)
+	report, verdict := sdd.BuildFeatureTaskValidationResult(ws, selection)
 	publishDiagnostics(emit, report.Diagnostics)
 	emit.Summary(fmt.Sprintf("features: %d feature(s), %d requirement(s), %d evidence record(s)",
 		report.Summary.Features, report.Summary.Requirements, report.Summary.Evidence))
@@ -213,12 +215,11 @@ func runSpecsRatchetValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string)
 // `validate-workspace` command: every committed decisions.json — the root one
 // and each project's — and the files each of their checks names.
 //
-// The task it belongs to is UNCACHEABLE on purpose, and for the same reason
-// `features-validate` is (D8). A check's read set is whatever its own `files`
-// globs name, and those globs are authored per repository, so no static
-// task-input pattern can cover them. An under-declared key does not merely miss
-// a change; it serves a stale verdict while claiming to have checked, which is
-// the one failure a validation job must not have.
+// A check's read set is whatever its own `files` globs name, and those globs
+// are authored per repository, so no narrow task-input pattern can cover them.
+// The step reads the workspace through its candidate cut, and the task is
+// cached on the input `git:**`, which holds that cut: every file a glob can
+// match moves the key, and an ignored file is neither read nor keyed.
 //
 // There is no verification-mode knob. `architecture` has one because a
 // workspace adopts a graph gradually; a decision a repository has written down
@@ -249,8 +250,9 @@ func runDecisionsValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (s
 // A recipe that names a sample the worktree does not contain, or a
 // second recipe for one intention, fails naming the index entry.
 //
-// Like decisions-validate it is UNCACHEABLE: the verdict depends on whether
-// each named sample directory exists, and no file-pattern key expresses that.
+// Like decisions-validate it reads the candidate cut and is cached on the input
+// `git:**`: a sample directory exists when it holds a candidate file, so
+// renaming, emptying or deleting one moves the key.
 func runRecipesValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	ws, err := workspaceValidationView(ctx)
 	if err != nil {
@@ -270,9 +272,10 @@ func runRecipesValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (str
 // A stale or missing committed file is written on CI too, where the rule that
 // fails a run whose gate changed the tree reports it.
 //
-// Like decisions-validate it is UNCACHEABLE: it reads the putnami.json of every
-// project and of every directory above one, and it rewrites a file that is also
-// its input, so a replayed success over a stale file would skip the rewrite.
+// Like decisions-validate it reads the candidate cut and is cached on the input
+// `git:**`, which holds every putnami.json it reads and the file it rewrites.
+// The CLI never replays a run that rewrote the file: the next run is keyed on
+// the rewritten bytes, and only its clean result is replayed.
 func runCodeownersSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	workspaceOptions, err := wsview.WorkspaceOptionsFromContext(ctx)
 	if err != nil {
@@ -305,9 +308,10 @@ func runCodeownersSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (stri
 // document of the workspace, whatever the selection, with the rule each
 // language extension's `lint-docs` task applies inside its project.
 //
-// Like recipes-validate it is UNCACHEABLE: a link may name any file of the
-// workspace, and a file's existence is not something a file-pattern key can
-// express.
+// A link may name any file of the workspace, so the step reads the candidate
+// cut through one docslinks.Reader and the task is cached on the input
+// `git:**`: deleting or renaming a link target moves the key, and an ignored
+// file is neither read nor keyed.
 func runDocsLinksValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	workspaceOptions, err := wsview.WorkspaceOptionsFromContext(ctx)
 	if err != nil {
@@ -343,6 +347,10 @@ func runDocsLinksValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (s
 // projects the invocation acts on; this task acts on exactly one of them, and
 // scoping it to the rest would make its verdict depend on how many siblings
 // happened to be selected beside it — the same key, two answers.
+//
+// The selection report names no baseline either. Both tasks that read this
+// view are cached, and no key reads the ref an impacted run measured against:
+// a replayed report would name another run's ref.
 func projectValidationView(ctx *pctx.Context) (*wsview.Workspace, sdd.Selection, error) {
 	ws, _ := wsview.FromContext(ctx)
 	if ws == nil || len(ws.Projects) == 0 {
@@ -362,13 +370,6 @@ func projectValidationView(ctx *pctx.Context) (*wsview.Workspace, sdd.Selection,
 		Mode:       pctx.SelectionModeProjects,
 		Scoped:     true,
 		ProjectIDs: []string{own},
-	}
-	if ctx.Selection != nil {
-		// The baseline is evidence about the RUN, reported verbatim so a reader
-		// can join this verdict to the invocation that scheduled it. It never
-		// changes what was evaluated.
-		selection.Baseline = ctx.Selection.Baseline
-		selection.BaselineSource = ctx.Selection.BaselineSource
 	}
 	return ws, selection, nil
 }

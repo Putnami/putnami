@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/tooling/cli/internal/flock"
 )
 
@@ -27,6 +26,13 @@ const (
 	leaseWaitCancelPoll   = 100 * time.Millisecond
 	leaseRecordVersion    = 1
 )
+
+// CoalescingFloor is the known operation cost below which a cache miss is
+// computed independently instead of coordinated through a lease: waiting on a
+// sibling worktree would cost more than duplicating the work. It decides only
+// whether a sibling waits, never whether a result is cached locally or
+// remotely.
+const CoalescingFloor = 200 * time.Millisecond
 
 var (
 	// ErrLeaseExpired means the current owner released its lease without
@@ -63,17 +69,16 @@ type leaseRecord struct {
 	ExpiresAtNano int64  `json:"expiresAt"`
 }
 
-// WorthCoalescing applies the same 200ms minimum-duration floor used by the
-// remote-cache break-even policy. A known-cheap operation bypasses all lease
-// I/O and computes independently. A non-positive estimate means "unknown" and
-// remains eligible: a brand-new key in a fresh worktree is the primary cold-
-// start stampede this primitive exists to prevent.
+// WorthCoalescing reports whether an operation of estimatedCost is worth
+// coordinating through a lease: a known cost below CoalescingFloor bypasses all
+// lease I/O and computes independently. A non-positive estimate means
+// "unknown" and remains eligible: a brand-new key in a fresh worktree is the
+// primary cold-start stampede this primitive exists to prevent.
 func WorthCoalescing(estimatedCost time.Duration) bool {
 	if estimatedCost <= 0 {
 		return true
 	}
-	floor := time.Duration(cache.DefaultBreakEven.MinDurationMs) * time.Millisecond
-	return estimatedCost >= floor
+	return estimatedCost >= CoalescingFloor
 }
 
 // TryClaim delegates cache-miss ownership to the machine-global local store.
@@ -120,9 +125,9 @@ func (cm *CacheManager) WaitForPublish(ctx context.Context, key string, timeout 
 // function and a heartbeat keeps its ownership alive until release. A loser
 // should call WaitForPublish, then look the entry up normally. estimatedCost is
 // optional for callers without a prediction; when supplied, only its first
-// value is used to apply the break-even floor.
+// value is used to apply CoalescingFloor.
 //
-// Any filesystem/locking failure and any known cost below the break-even floor
+// Any filesystem/locking failure and any known cost below CoalescingFloor
 // return winner=true with a no-op release. Leasing must never make a build less
 // reliable than computing the key independently.
 func (s *LocalStore) TryClaim(key string, estimatedCost ...time.Duration) (winner bool, release func()) {

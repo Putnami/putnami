@@ -399,14 +399,27 @@ func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
 		if version := dirty.versions[""]; version == nil || !version.IsDirty {
 			t.Fatalf("version after the edit = %+v, want a dirty checkout", version)
 		}
-		_, edited := dirty.keys(t, exts, treeKeyedCommands, nil, treeKeyedMainBuildTime)
+		planned, edited := dirty.keys(t, exts, treeKeyedCommands, nil, treeKeyedMainBuildTime)
+		// A task that keys on the workspace's Git candidate cut reads the edited
+		// file, whichever project declares it: lint-docs checks links into it.
+		readsTheCut := map[string]bool{}
+		for _, job := range planned {
+			readsTheCut[job.Key()] = keysOnCandidateCut(job)
+		}
+		cutReaders := 0
 		for _, key := range sortedKeyNames(clean) {
+			if readsTheCut[key] {
+				cutReaders++
+			}
 			switch {
-			case strings.HasPrefix(key, "/site:") && edited[key] == clean[key]:
-				t.Errorf("%s: an edited generate asset kept the key", key)
-			case (strings.HasPrefix(key, "/api:") || strings.HasPrefix(key, "/library:")) && edited[key] != clean[key]:
+			case (strings.HasPrefix(key, "/site:") || readsTheCut[key]) && edited[key] == clean[key]:
+				t.Errorf("%s: an edited file the task reads kept the key", key)
+			case (strings.HasPrefix(key, "/api:") || strings.HasPrefix(key, "/library:")) && !readsTheCut[key] && edited[key] != clean[key]:
 				t.Errorf("%s: another project's generate asset moved the key", key)
 			}
+		}
+		if cutReaders == 0 {
+			t.Fatalf("no task keyed on the candidate cut in %v; the control reads no workspace input", sortedKeyNames(clean))
 		}
 	})
 }

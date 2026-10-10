@@ -74,7 +74,7 @@ func ApplySafeBindingAdoptions(workspaceRoot, baselineRoot string) ([]Adaptation
 	if err != nil || len(importMoves)+len(symbolMoves) == 0 {
 		return nil, err
 	}
-	records, err := discoverSourceRecords(workspaceRoot, generated)
+	records, err := discoverSourceRecords(indexedView(workspaceRoot), generated)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func validGeneratedManifests(root string) (map[string]bool, map[string]*clientco
 		}
 		rel = filepath.ToSlash(rel)
 		base := filepath.ToSlash(filepath.Dir(rel))
-		if !manifestFilesMatch(root, base, manifest.Files) {
+		if !manifestFilesMatch(workspaceFiles{root: root}, base, manifest.Files) {
 			return nil
 		}
 		manifests[rel] = manifest

@@ -135,23 +135,34 @@ func TestWorkspaceHandlerRejectsMissingRootIndexAndSpawner(t *testing.T) {
 		t.Fatalf("missing root result = status %q err %v", status, err)
 	}
 
-	// The check reads committed inputs only, so a missing project index is a
-	// finding the run exits on, reported like every other verdict: through the
-	// report and the diagnostics, never as a bare error that loses the count.
+	// The check takes the membership from the job context and never from the
+	// ignored project index, so a context without one is a finding the run
+	// exits on, reported like every other verdict: through the report and the
+	// diagnostics, never as a bare error that loses the count. An index on
+	// disk does not stand in for it.
 	root := t.TempDir()
+	writeMainTestFile(t, root, ".putnami/workspace-index.json", `{"version":4,"projects":[{"path":"services/catalog"}]}`)
+	writeMainTestFile(t, root, "services/catalog/putnami.json", `{"name":"catalog"}`)
 	status, _, err = runWorkspace(workspaceclient.ModeCheck)(&pctx.Context{WorkspaceRoot: root}, emitter, nil)
 	if status != "FAILED" || err == nil {
-		t.Fatalf("missing index result = status %q err %v", status, err)
+		t.Fatalf("missing membership result = status %q err %v", status, err)
 	}
-	report := workspaceclient.InspectCommitted(root)
-	indexReported := false
+	report := workspaceclient.InspectCommitted(root, memberPaths(nil))
+	membershipReported := false
 	for _, finding := range report.Findings {
-		if finding.Code == "clientgen.discovery" && strings.Contains(finding.Message, "workspace project index") {
-			indexReported = true
+		if finding.Code == "clientgen.discovery" && strings.Contains(finding.Message, "workspace membership") {
+			membershipReported = true
 		}
 	}
-	if !indexReported {
-		t.Fatalf("a missing project index was not reported as a discovery finding: %+v", report.Findings)
+	if !membershipReported {
+		t.Fatalf("a missing workspace membership was not reported as a discovery finding: %+v", report.Findings)
+	}
+
+	// With the membership the context carries, the same workspace is clean.
+	members := []pctx.ProjectRef{{Name: "catalog", Path: "services/catalog"}}
+	status, _, err = runWorkspace(workspaceclient.ModeCheck)(&pctx.Context{WorkspaceRoot: root, WorkspaceProjects: members}, emitter, nil)
+	if status != "OK" || err != nil {
+		t.Fatalf("context membership result = status %q err %v", status, err)
 	}
 
 	writeMainTestFile(t, root, ".putnami/workspace-index.json", `{"version":1,"projects":[]}`)

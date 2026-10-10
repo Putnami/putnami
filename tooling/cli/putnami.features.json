@@ -854,6 +854,19 @@
               "a-version-aware-task-still-keys-on-the-commit"
             ]
           }
+        },
+        {
+          "id": "release-baseline-cache-key",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-release-baseline-keys-on-the-line-tag-and-the-breaking-marker"
+            ]
+          }
         }
       ]
     },

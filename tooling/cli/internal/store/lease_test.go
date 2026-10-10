@@ -91,12 +91,15 @@ func TestLease_KnownCheapWorkBypassesCoalescing(t *testing.T) {
 	a := NewLocalStore(root)
 	b := NewLocalStore(root)
 
-	floor := time.Duration(200) * time.Millisecond
+	floor := 200 * time.Millisecond
+	if CoalescingFloor != floor {
+		t.Fatalf("CoalescingFloor = %s, want %s", CoalescingFloor, floor)
+	}
 	if WorthCoalescing(floor - time.Millisecond) {
 		t.Fatal("known sub-floor work must not be coalesced")
 	}
 	if !WorthCoalescing(floor) {
-		t.Fatal("work at the break-even floor should be coalesced")
+		t.Fatal("work at the coalescing floor should be coalesced")
 	}
 	if !WorthCoalescing(0) {
 		t.Fatal("unknown cold-key cost should remain eligible for coalescing")

@@ -18,6 +18,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/sdk/extension/goembed"
+	"go.putnami.dev/sdk/extension/sourcebinding"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -67,7 +68,11 @@ type fileEntry struct {
 	path         string
 	info         os.FileInfo
 	gitCandidate bool
-	rawEmbed     bool
+	// indexMode is the mode the index records for a tracked Git candidate, and
+	// empty for an untracked one. A host that does not store the executable
+	// bit reads it from here (gitCandidateDigest).
+	indexMode string
+	rawEmbed  bool
 	// sweptByGlob is set when a pattern whose last segment is a glob selected
 	// the file (`**/*.json`, `*.json`, `doc/**`). Such a pattern selects files by
 	// type or by directory, so the task reads what it selects as text, and a
@@ -95,6 +100,11 @@ func globDoubleStar(dir, pattern string) []string {
 			return nil
 		}
 		if d.IsDir() {
+			// The skip applies below the search root: a project whose own
+			// directory is named dist or vendor still keys on its files.
+			if p == searchRoot {
+				return nil
+			}
 			switch d.Name() {
 			case "node_modules", ".git", ".putnami", "out", "dist", "vendor":
 				return filepath.SkipDir
@@ -187,7 +197,8 @@ func collectDefaultFiles(dir string) ([]fileEntry, error) {
 			return nil
 		}
 		name := info.Name()
-		if strings.HasPrefix(name, ".") || name == "node_modules" || name == ".putnami" || name == "out" {
+		// The skip applies below the project root, as in globDoubleStar.
+		if path != dir && (strings.HasPrefix(name, ".") || name == "node_modules" || name == ".putnami" || name == "out") {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
@@ -386,6 +397,12 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 // collectGitFiles enumerates only candidate names, never walks ignored local
 // directories, and uses Lstat so a link's target text is the input. The scanner
 // reads exactly this candidate surface, including tracked ignored files.
+//
+// It also reads the index once, as a source binding reads it, for two answers
+// a binding gives (go.putnami.dev/sdk/extension/sourcebinding): a host that
+// does not store the executable bit takes a tracked file's bit from the index
+// mode, and an unmerged path has no single mode, so a selected one produces no
+// key.
 func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, error) {
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
 	cmd.Dir = dir
@@ -398,6 +415,10 @@ func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, erro
 	if err != nil {
 		return nil, err
 	}
+	index, err := gitutil.ReadIndexModes(root)
+	if err != nil {
+		return nil, err
+	}
 	var files []fileEntry
 	for _, path := range paths {
 		rel, err := filepath.Rel(dir, filepath.Join(root, filepath.FromSlash(path)))
@@ -406,6 +427,9 @@ func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, erro
 		}
 		if !wsproto.MatchesAnyFilePattern(rel, includes) || wsproto.MatchesAnyFilePattern(rel, excludes) {
 			continue
+		}
+		if index.Unmerged[path] {
+			return nil, fmt.Errorf("git candidate %q has an unmerged index entry", path)
 		}
 		full := filepath.Join(dir, rel)
 		info, err := os.Lstat(full)
@@ -418,7 +442,7 @@ func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, erro
 		if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
 			return nil, fmt.Errorf("git candidate %q is not a regular file or symlink", path)
 		}
-		files = append(files, fileEntry{path: full, info: info, gitCandidate: true})
+		files = append(files, fileEntry{path: full, info: info, gitCandidate: true, indexMode: index.Modes[path]})
 	}
 	return files, nil
 }
@@ -426,7 +450,16 @@ func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, erro
 // Candidate readers inspect raw bytes: project-config task tuning and every
 // field of the version stamp are visible too. Domain-separate types so replacing
 // a file with a symlink holding the same bytes also invalidates its verdict.
-func gitCandidateDigest(file fileEntry, buf []byte) []byte {
+//
+// A regular file's digest also holds its source-v1 mode, regular or
+// executable, read as a source binding reads it (sourcebinding.FileMode): a
+// task that compares a recorded binding reads the executable bit, so a chmod +x
+// must move its key. statsExecBit says whether the host stores the bit
+// (sourcebinding.HostStatsExecBit). The mode marker differs from the bare
+// "git-file" marker earlier keys used, so every key over a regular candidate
+// moved to an address no earlier entry occupies, and no cacheKeyVersion bump
+// was needed (ADR 0061).
+func gitCandidateDigest(file fileEntry, buf []byte, statsExecBit bool) []byte {
 	h := sha256.New()
 	if file.info.Mode()&os.ModeSymlink != 0 {
 		target, err := os.Readlink(file.path)
@@ -442,7 +475,8 @@ func gitCandidateDigest(file fileEntry, buf []byte) []byte {
 		return nil
 	}
 	defer input.Close()
-	writeField(h, "git-file")
+	writeField(h, "git-file-mode")
+	writeField(h, string(sourcebinding.FileMode(file.info.Mode(), file.indexMode, statsExecBit)))
 	if _, err := io.CopyBuffer(h, input, buf); err != nil {
 		return nil
 	}
@@ -735,7 +769,7 @@ func hashFileContents(files []fileEntry, scope ProjectConfigScope, projectDir st
 						digests[i] = h.Sum(nil)
 					}
 				} else if files[i].gitCandidate {
-					digests[i] = gitCandidateDigest(files[i], buf)
+					digests[i] = gitCandidateDigest(files[i], buf, sourcebinding.HostStatsExecBit)
 				} else {
 					digests[i] = fileContentDigest(files[i].path, buf, scopeFor(files[i]))
 				}

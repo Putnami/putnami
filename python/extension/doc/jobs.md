@@ -104,7 +104,7 @@ is written.
 The root `pyproject.toml`'s `[tool.uv.workspace]` and `[tool.uv.sources]` tables
 stay with `workspace-install`: splitting one file's tables across two tasks is
 how two writers start flipping it on alternate runs.
-- `lint` and `test` results are cached against source files, `pyproject.toml`, and `uv.lock`. The `lint-docs` phase is not cached: a link may name any file of the workspace.
+- `lint` and `test` results are cached against source files, `pyproject.toml`, and `uv.lock`. The `lint-docs` phase is cached on the input `git:**`, because a link may name any file of the workspace: it reads the Git candidate cut, and any change to a tracked or unignored file reruns it.
 - The Ruff phases are batchable: compatible projects share one Ruff invocation while keeping independent per-project caches.
 - Each Ruff phase is split into a fixing and a read-only task (`lint-format-fix`/`lint-format-readonly`, `lint-check-fix`/`lint-check-readonly`); the pipeline schedules one half based on `--fix`, and only the fixing half declares source mutation.
 - `serve` has no timeout (runs until killed or the process exits).

@@ -100,9 +100,7 @@ type TaskEntryTransfer struct {
 	Manifest *cache.Manifest
 
 	// Payload is the CAS-backed subset of Manifest — the entry's own manifest,
-	// unchanged. It is what ExportManifestBlobs can serve and what the
-	// break-even guard prices, since the descriptor is fixed overhead every
-	// task-owned entry pays.
+	// unchanged. It is what ExportManifestBlobs can serve.
 	Payload *cache.Manifest
 
 	// Descriptor is the exact entry.json bytes, and DescriptorDigest their CAS

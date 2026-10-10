@@ -591,10 +591,12 @@ func classify(item string, contracts []jobs.VerificationContract, opts overrides
 // owner's territory rather than claiming a slice of it. The Go extension
 // states it at length — `build-generate` is the single producer of
 // `<project>/.gen` and declares that subtree WHOLE minus the subpaths it cedes
-// (to `build-describe`, and `.gen/conf` to the two `config-merge` tasks, which
-// declare the merged file inside it), while `build-describe`'s staging,
-// `config-extract`'s fallback and `build-infra`'s requirements all write inside
-// it and declare nothing (go/extension/putnami.extension.json). Scoring each
+// (to `build-describe`, `.gen/conf` to the two `config-merge` tasks, which
+// declare the merged file inside it, `.gen/deployment.json` to
+// `package-deployment`, and `.gen/requirements.json` and
+// `.gen/infra/runtime.json` to `build-infra`, which declare them), while
+// `build-describe`'s staging and `config-extract`'s fallback write inside it
+// and declare nothing (go/extension/putnami.extension.json). Scoring each
 // task against only its own outputs contradicted that and made this check fail
 // by construction on every Go project.
 //

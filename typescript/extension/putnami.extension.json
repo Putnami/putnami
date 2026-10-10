@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 4,
+  "cliContract": 7,
   "runtime": {
     "executable": "compiled/putnami-ts",
     "toolchains": {
@@ -1034,7 +1034,7 @@
       }
     },
     "build-generate": {
-      "description": "Generate code into the project's .gen subtree (and, when the project generates one, the configured TypeScript client directory). Ownership decision: build-generate is the SINGLE producer of <project>/.gen, minus the .gen/deployment.json it cedes to package-deployment — every other task that writes inside it (config-extract-exec's .gen/config-schema.json fallback) writes into generate-owned territory rather than claiming a slice of it. Its v3 `declares` block is deliberately still absent: six commands (build, test, serve, run, package, config-extract) schedule this one task, and the plan-time owner check counts each of those plan nodes as a separate owner of <project>/.gen, so declaring it today makes every multi-command TypeScript plan (`putnami lint,test,build`) unplannable. The declaration lands with the CLI change that treats repeated scheduling of ONE task for ONE project as one owner; until then this task keeps v2 inferred capture via its gen/clients write resources.",
+      "description": "Generate code into the project's .gen subtree (and, when the project generates one, the configured TypeScript client directory). Ownership decision: build-generate is the SINGLE producer of <project>/.gen, minus the .gen/deployment.json it cedes to package-deployment and the .gen/requirements.json and .gen/infra/runtime.json it cedes to build-infra, which write them after this task's snapshot — every other task that writes inside it (config-extract-exec's .gen/config-schema.json fallback) writes into generate-owned territory rather than claiming a slice of it. This task deletes the .gen/infra fragments at the start of every run, the runtime defaults file with them, which build-infra writes again after this task. Its v3 `declares` block is deliberately still absent: six commands (build, test, serve, run, package, config-extract) schedule this one task, and the plan-time owner check counts each of those plan nodes as a separate owner of <project>/.gen, so declaring it today makes every multi-command TypeScript plan (`putnami lint,test,build`) unplannable. The declaration lands with the CLI change that treats repeated scheduling of ONE task for ONE project as one owner; until then this task keeps v2 inferred capture via its gen/clients write resources.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1120,9 +1120,11 @@
             "root": "project",
             "path": ".gen",
             "excludes": [
-              ".gen/deployment.json"
+              ".gen/deployment.json",
+              ".gen/infra/runtime.json",
+              ".gen/requirements.json"
             ],
-            "description": "Generated sources: the whole project-rooted .gen subtree, owned exclusively by this task (config-extract's schema fallback inside .gen is this task's output, not a second owner), minus .gen/deployment.json, which it cedes to package-deployment: that task writes the file after this task's snapshot and declares it."
+            "description": "Generated sources: the whole project-rooted .gen subtree, owned exclusively by this task (config-extract's schema fallback inside .gen is this task's output, not a second owner), minus .gen/deployment.json, which it cedes to package-deployment, and .gen/requirements.json and .gen/infra/runtime.json, which it cedes to build-infra: those tasks write the files after this task's snapshot and declare them."
           },
           "client": {
             "kind": "directory",
@@ -1410,24 +1412,61 @@
       }
     },
     "build-infra": {
-      "description": "Aggregate the workload's deployability requirements into <project>/.gen/requirements.json: every project in the workload's dependency closure contributes its committed infra/requirements.json, the workload's infra/overrides.json suppresses what it does not want, and its infra/runtime.json (or the framework defaults sidecar) supplies the runtime block. Extension-owned since an earlier migration — the CLI used to gate and write this artifact itself, and to decide, by matching project tags and extension names, that a TypeScript workload must run without HTTP/2. That compatibility statement now lives HERE, where Bun's h2c support is a fact this extension owns. Libraries are skipped: they are consumed, never deployed. Ownership decision: it declares NO outputs, for the same reason as config-extract-exec's schema fallback — everything it writes lands under <project>/.gen, which build-generate owns whole as its single producer. Never cached: its inputs are OTHER projects' committed manifests, which no per-project cache key can cover, and it is a few small file reads.",
+      "description": "Aggregate the workload's deployability requirements into <project>/.gen/requirements.json: every project in the workload's dependency closure contributes its committed infra/requirements.json, the workload's infra/overrides.json suppresses what it does not want, and its infra/runtime.json, or the framework runtime defaults, supplies the runtime block. Without an authored infra/runtime.json it also writes those defaults to <project>/.gen/infra/runtime.json for operators to read; a run with one removes that file. A cache hit with one restores nothing at that path and removes nothing, so a defaults file an earlier build left there stays until build-infra runs again; the runtime block of .gen/requirements.json is the value that applies. Nothing reads the file back. Extension-owned since an earlier migration — the CLI used to gate and write this artifact itself, and to decide, by matching project tags and extension names, that a TypeScript workload must run without HTTP/2. That compatibility statement now lives HERE, where Bun's h2c support is a fact this extension owns. Libraries are skipped: they are consumed, never deployed. Cached, and the key holds everything a run reads: the closure input folds every closure project's committed infra/requirements.json with that project's path, seed included, so a requirements-only change in a dependency, or a project that joins or leaves the closure, moves the key; the intent input folds the workload's infra/runtime.json and infra/overrides.json; the project metadata digest carries the project type the library skip reads; the extension implementation digest carries the runtime defaults, the HTTP/2 compatibility hook and the merge code; and the upstream generate, transpile, types and compile keys cover the sources the committed requirements are generated from. No param or environment input reaches the key, so no commit, ref or checkout path does. Ownership decision: build-generate cedes .gen/requirements.json and .gen/infra/runtime.json because this task writes them after generate's snapshot, and this task declares both. The manifest is REQUIRED, and only a run that writes it reports OK: a library, a workload that declares nothing (its run removes an earlier manifest) and a run whose write or removal failed report SKIP, and a skip with a required output caches nothing, so a cache hit never restores a manifest the current inputs do not produce. The runtime defaults file is optionalEmpty, because a workload that authors its runtime has none. Findings are warnings and never fail the build; a cache hit does not replay them.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
         "build-infra"
       ],
       "cwd": "{projectRoot}",
-      "cache": false,
       "timeoutMs": 60000,
-      "outputs": {
-        "data": {
-          "description": "Aggregation outcome (emitted, cleared, skipped), the manifest path, and the number of contributing projects"
+      "inputs": {
+        "requirements": {
+          "from": "closure",
+          "files": [
+            "infra/requirements.json"
+          ]
+        },
+        "intent": {
+          "from": "project",
+          "files": [
+            "infra/runtime.json",
+            "infra/overrides.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
         }
       },
-      "declares": {}
+      "outputs": {
+        "data": {
+          "description": "Aggregation outcome (emitted, cleared, skipped), the project-relative manifest path, and the number of contributing projects"
+        }
+      },
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "requirements": {
+            "kind": "file",
+            "root": "project",
+            "path": ".gen/requirements.json",
+            "description": "The workload's aggregated infra manifest, the artifact a deployer reads. Required: a run that writes none caches nothing."
+          },
+          "runtimeDefaults": {
+            "kind": "file",
+            "root": "project",
+            "path": ".gen/infra/runtime.json",
+            "optionalEmpty": true,
+            "description": "The framework runtime defaults the workload runs under, after the HTTP/2 compatibility hook, written when it authors no infra/runtime.json. Empty for a workload that authors one."
+          }
+        }
+      }
     },
     "package-deployment": {
-      "description": "Write the workload's deployment declaration to <project>/.gen/deployment.json: the aggregate build-infra resolves from the same committed files (every closure project's infra/requirements.json, the workload's infra/overrides.json, and its infra/runtime.json or the framework runtime defaults), under the same HTTP/2 compatibility hook, in the canonical bytes of infra.MarshalDeployment. It is the payload of a release-set member of kind deployment, so its key is that member's selection fingerprint. Scheduled only when the deployment channel is enabled (params.deployment), so no other package plan changes. Cached, unlike build-infra: the closure input folds every closure project's committed infra/requirements.json into the key, so a requirements-only change in a dependency moves it, and the upstream generate key covers the sources those files are generated from. The output is REQUIRED: a library (skipped) and an aggregate with an error finding (withheld, its findings reported as warnings) write no declaration and remove an earlier one, so such a run caches nothing and a cache hit never restores a declaration the current inputs do not produce. build-generate cedes the path because this task writes it after generate's snapshot. It never writes or removes the runtime defaults sidecar build-infra keeps.",
+      "description": "Write the workload's deployment declaration to <project>/.gen/deployment.json: the aggregate build-infra resolves from the same committed files (every closure project's infra/requirements.json, the workload's infra/overrides.json, and its infra/runtime.json or the framework runtime defaults), under the same HTTP/2 compatibility hook, in the canonical bytes of infra.MarshalDeployment. It is the payload of a release-set member of kind deployment, so its key is that member's selection fingerprint. Scheduled only when the deployment channel is enabled (params.deployment), so no other package plan changes. Cached like build-infra: the closure input folds every closure project's committed infra/requirements.json into the key, so a requirements-only change in a dependency moves it, and the upstream generate key covers the sources those files are generated from. The output is REQUIRED: a library (skipped) and an aggregate with an error finding (withheld, its findings reported as warnings) write no declaration and remove an earlier one, so such a run caches nothing and a cache hit never restores a declaration the current inputs do not produce. build-generate cedes the path because this task writes it after generate's snapshot. It never writes or removes the runtime defaults sidecar build-infra keeps.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1455,7 +1494,7 @@
       },
       "outputs": {
         "data": {
-          "description": "Declaration outcome (emitted, withheld, skipped), the declaration path, and the number of contributing projects"
+          "description": "Declaration outcome (emitted, withheld, skipped), the project-relative declaration path, and the number of contributing projects"
         }
       },
       "cache": {
@@ -1639,7 +1678,7 @@
       }
     },
     "lint-docs": {
-      "description": "Documentation link check: every relative link and anchor in the project's README.md files and doc/ trees must resolve, with the case of the file on disk. The task body is the SDK's docslinks.Job, shared with every language extension. UNCACHEABLE on purpose: a link may name any file of the workspace, so no file-pattern key covers the read set, and a key that missed a deleted target would serve a green verdict for a broken link.",
+      "description": "Documentation link check: every relative link and anchor in the project's README.md files and doc/ trees must resolve, with the exact case of the file's name. The task body is the SDK's docslinks.Job, shared with every language extension. A link may name any file of the workspace, so the check reads the workspace's Git candidate cut (the tracked files and the untracked files no ignore rule excludes) and its key is the workspace input `git:**`, which holds that cut: deleting or renaming a link target, or editing a heading an anchor names, moves the key, and an ignored file is neither read nor keyed. The project input names the README.md the check starts from, so the key does not fold the project's ignored build output. Outside a Git work tree the check reads the disk and the task has no key.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1647,6 +1686,11 @@
       ],
       "cwd": "{projectRoot}",
       "timeoutMs": 120000,
+      "inputs": {
+        "readme": { "from": "project", "files": ["README.md"] },
+        "repository": { "from": "workspace", "files": ["git:**"] },
+        "docs-links": { "from": "params" }
+      },
       "outputs": {
         "data": {
           "description": "Documentation link result with diagnostics"
@@ -1656,7 +1700,8 @@
         "sources"
       ],
       "cache": {
-        "enabled": false
+        "noOutput": true,
+        "enabled": true
       },
       "declares": {}
     },

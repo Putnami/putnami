@@ -306,8 +306,8 @@ activation:
 
 | Command | Scope | Steps | Cached? |
 |---|---|---|---|
-| `validate` | one project, activated by `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | features: **no**; specs: yes |
-| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate` | architecture and ratchet: yes; decisions, recipes, CODEOWNERS and docs links: **no** |
+| `validate` | one project, activated by `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
+| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS and docs links on the Git candidate cut |
 
 Both are in the canonical gate:
 
@@ -330,7 +330,7 @@ silent way to escape the gate, so `workspace_adoption_test.go` asserts that
 every project in THIS repository which authors a feature manifest or a spec
 declares `/tooling/sdd-extension`.
 
-### Why two tasks are uncached and three are not
+### What each task's key reads
 
 A task may be cacheable only when its declared inputs COVER what it reads.
 
@@ -348,16 +348,28 @@ A task may be cacheable only when its declared inputs COVER what it reads.
 - `specs-ratchet-validate` keys on the manifests, specs, options and every
   committed `specs.baseline.json` — both sides of its shrink-only comparison
   are committed files its patterns name.
-- `features-validate` is **uncacheable in v1**. Its verdict depends on evidence
-  source bindings: arbitrary bound files plus their git blob state. No
-  file-pattern key can express that read set, and an under-declared key does not
-  merely miss a change — it serves a stale verdict while claiming to have
-  checked. A binding-aware key is a follow-up, not a smaller version of this
-  one.
-- `decisions-validate` is **uncacheable for the same reason**. A check's read
-  set is whatever its own `files` globs name, and those globs are authored
-  inside each repository's `decisions.json` files, so no static pattern in this
-  manifest can cover them.
+- `decisions-validate`, `recipes-validate`, `codeowners-sync` and
+  `docs-links-validate` read files no narrow pattern names: the globs a
+  repository authors in its `decisions.json`, the sample directories an index
+  names, every `putnami.json` above a project, and any file a link names. Each
+  reads the repository's Git candidate cut and nothing else: the tracked files
+  and the untracked files no ignore rule excludes. Each declares the input
+  `git:**`, which holds exactly that cut, so editing, adding, deleting or
+  renaming a candidate moves the key, and an ignored file is neither read nor
+  keyed. Outside a Git work tree the steps read the disk, and the `git:` input
+  has no key, so they run every time.
+- `features-validate` reads the same Git candidate cut: the feature manifests
+  and evidence at every root, the capability manifests evidence reaches, and
+  every file a source binding hashes. A binding records each bound file's bytes
+  or link text and its executable bit, and the `git:` key holds the bit too
+  (ADR 0061 of the CLI). A submodule or an unmerged path produces no key, so the
+  task then runs uncached rather than replay a verdict about another commit.
+  Every project is read at the tree base version `0.0.0`, the version the CLI
+  gives a task the cache can serve (ADR 0060 of the CLI), and the report names
+  no commit and no baseline ref. Two runs on one tree share one entry, whatever
+  the commit, the ref or the checkout. The cut is a workspace port, so one
+  digest serves every project's key; a project port naming
+  `putnami.features.json` keeps the project side off ignored build output.
 
 ### The decision gate
 
@@ -394,9 +406,10 @@ uses, the hand-rolled shapes it replaces, and the version it was recorded at.
 A recipe whose `sample` is not a directory in this worktree fails with
 `sdd.recipe_sample_missing`, naming the sample; a second recipe for one
 intention, an unknown member, or a field that is empty or longer than one line
-fails with `sdd.invalid_recipe_index`. An absent index is adoption. The task is
-uncacheable: its verdict depends on whether each sample directory exists, and
-no file pattern expresses that. `putnami context generate` renders the indexes
+fails with `sdd.invalid_recipe_index`. An absent index is adoption. A sample
+directory exists when it holds a tracked or unignored file, and the task is
+cached on the input `git:**`, so emptying, renaming or deleting a sample
+directory moves the key. `putnami context generate` renders the indexes
 into the `putnami-plan` skill's `references/recipes.md`.
 
 ### CODEOWNERS
@@ -433,9 +446,12 @@ declaration without a catch-all fails with `sdd.codeowners_no_default`. A
 with `sdd.invalid_owners`, whether or not the workspace declares owners: either
 file may hide a declaration. No failure writes the file. A workspace that
 declares no owners is not adopted, and its `CODEOWNERS`, if any, stays as
-written. The task is uncacheable: it rewrites a file that is also its input.
+written. The task reads the Git candidate cut and is cached on the input
+`git:**`, which also holds the file it rewrites. The CLI never replays a run
+that rewrote `CODEOWNERS`: the next run is keyed on the new bytes, and only a
+run that left the tree unchanged is replayed.
 
-### The job path never reads git
+### The job path never reads git history
 
 `architecture-validate` evaluates the current worktree and does not compare
 against the frozen adoption baseline. The comparison resolves a commit — which

@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/sdk/extension/docslinks"
 )
 
 // The v3 task contract makes this extension's manifest
@@ -533,4 +535,33 @@ func sortedTaskNames(m *proto.Manifest) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// TestLintDocsIsKeyedOnTheCandidateCut holds the lint-docs declaration to the
+// one the SDK's docslinks.Job reads, so every language extension caches the
+// check on the same key. The check reads the workspace's Git candidate cut,
+// which the workspace input `git:**` holds: a deleted or renamed link target
+// moves the key, and an ignored file does not. It writes nothing, so it
+// declares no output, no effect and no source rewrite. A `git:` input needs
+// the CLI contract whose key holds the executable bit, and the manifest
+// carries the stamp the packager earns for it.
+func TestLintDocsIsKeyedOnTheCandidateCut(t *testing.T) {
+	manifest := loadExtensionManifest(t)
+	task, ok := manifest.Tasks["lint-docs"]
+	if !ok {
+		t.Fatal("manifest task \"lint-docs\" is missing")
+	}
+	if manifest.CLIContract != proto.RequiredCLIContract(manifest) {
+		t.Errorf("cliContract = %d, want the contract the manifest's vocabulary requires, %d",
+			manifest.CLIContract, proto.RequiredCLIContract(manifest))
+	}
+	if !reflect.DeepEqual(task.Inputs, docslinks.Inputs()) {
+		t.Errorf("lint-docs inputs = %+v, want docslinks.Inputs() = %+v", task.Inputs, docslinks.Inputs())
+	}
+	if !task.Cache.IsEnabled() || !task.Cache.NoOutput {
+		t.Errorf("lint-docs cache = %+v, want enabled with noOutput", task.Cache)
+	}
+	if task.Declares == nil || len(task.Declares.Outputs) > 0 || len(task.Declares.Effects) > 0 || task.Declares.MutatesSources {
+		t.Errorf("lint-docs declares %+v, want no output, no effect and no source rewrite", task.Declares)
+	}
 }
