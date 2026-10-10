@@ -87,7 +87,7 @@
     },
     {
       "id": "native-validation-gate",
-      "text": "The check is contributed to validate as a workspace-once command, so one guard runs per session whatever the selection resolves to and no project opts out by not declaring the extension. The guard task is reachable only from validate and the explicit check command. Validate depends on the !clientgen session barrier: each selected provider regenerates in place, the engine judging drift, before the guard reads it; a consumer-only selection plans no generation. The guard declares a workspace read and no cache."
+      "text": "The check joins validate as a workspace-once command: one guard runs per session whatever the selection, and no project opts out by not declaring the extension. Only validate and the explicit check command reach the guard. Validate depends on the !clientgen barrier: each selected provider regenerates in place, the engine judging drift, before the guard reads it; a consumer-only selection plans no generation. The guard declares a workspace read, reads only the Git candidate cut and is keyed on `git:**`."
     },
     {
       "id": "censused-pending-transports",
@@ -111,6 +111,7 @@
     "tooling/clientgen-extension/doc/adr/0003-drift-is-the-generator-tasks-verdict.md",
     "tooling/clientgen-extension/doc/adr/0004-an-empty-first-party-contract-is-a-declaration.md",
     "tooling/clientgen-extension/doc/adr/0005-each-project-commits-its-own-client-inventories.md",
+    "tooling/clientgen-extension/doc/adr/0006-the-guard-reads-and-keys-on-the-git-candidate-cut.md",
     "protocols/clientcontract/doc/adr/0007-a-response-cache-is-declared-per-operation.md"
   ]
 }

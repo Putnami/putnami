@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -86,9 +84,9 @@ func (p PendingTransport) key() string { return pendingKey(p.Code, p.Path, p.Tra
 // loadPendingCensus reads and validates the census. An absent document is a
 // valid empty census: a workspace that never had a bypass must not have to
 // declare one, and every handwritten callsite then fails.
-func loadPendingCensus(workspaceRoot string) *pendingCensus {
+func loadPendingCensus(files workspaceFiles) *pendingCensus {
 	census := &pendingCensus{counts: map[string]int{}, observed: map[string]int{}, source: PendingTransportCensusFile}
-	data, err := os.ReadFile(filepath.Join(workspaceRoot, PendingTransportCensusFile)) //nolint:gosec // fixed workspace-root document
+	data, err := files.Read(PendingTransportCensusFile)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
 			census.invalid = append(census.invalid, Finding{Code: "clientgen.invalid-pending-census", Path: census.source,

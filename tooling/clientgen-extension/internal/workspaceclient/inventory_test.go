@@ -69,7 +69,7 @@ func TestExternalInventoryRequiresConcreteAuthorityAndCannotExemptFirstParty(t *
 	writeWorkspaceFile(t, root, "vendors/payments/adapter_test.go", "package payments\n")
 	thirdParty := provider{rel: "vendors/payments", classification: ClassificationThirdParty}
 
-	_, findings := loadAndValidateExternalInventory(root, []provider{thirdParty})
+	_, findings := loadAndValidateExternalInventory(indexedView(root), []provider{thirdParty})
 	assertFindingCodeList(t, findings, "clientgen.unclassified-external-contract")
 
 	writeWorkspaceFile(t, root, "vendors/payments/"+externalInventoryFile, `{
@@ -83,7 +83,7 @@ func TestExternalInventoryRequiresConcreteAuthorityAndCannotExemptFirstParty(t *
     "reason": "External vendor API maintained outside this workspace"
   }]
 }`)
-	contracts, findings := loadAndValidateExternalInventory(root, []provider{thirdParty})
+	contracts, findings := loadAndValidateExternalInventory(indexedView(root), []provider{thirdParty})
 	if len(findings) != 0 || len(contracts) != 1 {
 		t.Fatalf("valid external inventory contracts=%+v findings=%+v", contracts, findings)
 	}
@@ -104,7 +104,7 @@ func TestExternalInventoryRequiresConcreteAuthorityAndCannotExemptFirstParty(t *
     "reason": "claimed external"
   }]
 }`)
-		contracts, findings = loadAndValidateExternalInventory(root, []provider{thirdParty, catalog})
+		contracts, findings = loadAndValidateExternalInventory(indexedView(root), []provider{thirdParty, catalog})
 		assertFindingCodeList(t, findings, "clientgen.first-party-external-bypass")
 		if len(contracts) != 0 || findings[0].ServiceID != "catalog" {
 			t.Fatalf("authority %q: contracts=%+v findings=%+v", authority, contracts, findings)
@@ -145,7 +145,7 @@ func export(endpoint string) { _, _ = http.Post(endpoint, "application/x-protobu
 	events := provider{rel: "services/events", classification: ClassificationFirstParty, document: &clientcontract.DocumentV1{
 		ProtocolVersion: 1, Service: clientcontract.Service{ID: "events"}, Credentials: map[string]clientcontract.CredentialProfile{},
 	}}
-	contracts, findings := loadAndValidateExternalInventory(root, []provider{events})
+	contracts, findings := loadAndValidateExternalInventory(indexedView(root), []provider{events})
 	if len(findings) != 0 || len(contracts) != 1 {
 		t.Fatalf("provider-owned external adapter contracts=%+v findings=%+v", contracts, findings)
 	}
@@ -172,7 +172,7 @@ func TestExternalInventoryOwnsAnSDKAdapterWithoutSyntheticOpenAPI(t *testing.T) 
     "reason": "Vendor SDK has no OpenAPI document"
   }]
 }`)
-	contracts, findings := loadAndValidateExternalInventory(root, nil)
+	contracts, findings := loadAndValidateExternalInventory(indexedView(root), nil)
 	if len(findings) != 0 || len(contracts) != 1 {
 		t.Fatalf("SDK-only external inventory contracts=%+v findings=%+v", contracts, findings)
 	}
@@ -190,7 +190,7 @@ func TestExternalInventoryCannotClaimAFrameworkRuntime(t *testing.T) {
     "callsites":[{"path":"runtime/http.ts","transport":"http","symbol":"fetch","fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}],
     "owner":"framework","tests":["runtime/http.test.ts"],"reason":"claimed external"}]
 }`)
-	_, findings := loadAndValidateExternalInventory(root, nil)
+	_, findings := loadAndValidateExternalInventory(indexedView(root), nil)
 	assertFindingCodeList(t, findings, "clientgen.framework-external-bypass")
 }
 
@@ -212,7 +212,7 @@ func TestExternalInventoryAllowsSeveralExactAdaptersButRejectsDuplicateCallsites
      "owner":"integrations","tests":["integrations/vendor/client.test.ts"],"reason":"vendor b"}
   ]
 }`)
-	contracts, findings := loadAndValidateExternalInventory(root, nil)
+	contracts, findings := loadAndValidateExternalInventory(indexedView(root), nil)
 	if len(findings) != 0 || len(contracts) != 2 {
 		t.Fatalf("several exact external adapters contracts=%+v findings=%+v", contracts, findings)
 	}
@@ -229,7 +229,7 @@ func TestExternalInventoryRejectsUnknownDuplicateAndNullFields(t *testing.T) {
 	for name, document := range cases {
 		t.Run(name, func(t *testing.T) {
 			writeWorkspaceFile(t, root, "integrations/vendor/"+externalInventoryFile, document)
-			_, findings := loadAndValidateExternalInventory(root, nil)
+			_, findings := loadAndValidateExternalInventory(indexedView(root), nil)
 			assertFindingCodeList(t, findings, "clientgen.invalid-external-inventory")
 		})
 	}
@@ -296,7 +296,7 @@ func TestEachProjectCommitsItsOwnInventories(t *testing.T) {
 	// Entries spread across two project files merge, each named by its directory.
 	writeWorkspaceFile(t, root, fileA, `{"protocolVersion":2,"contracts":[`+a+`]}`)
 	writeWorkspaceFile(t, root, fileB, `{"protocolVersion":2,"contracts":[`+b+`]}`)
-	contracts, findings := loadAndValidateExternalInventory(root, nil)
+	contracts, findings := loadAndValidateExternalInventory(indexedView(root), nil)
 	if len(findings) != 0 || len(contracts) != 2 ||
 		contracts[0].Project != "integrations/a" || contracts[1].Project != "integrations/b" {
 		t.Fatalf("two project inventories did not merge: contracts=%+v findings=%+v", contracts, findings)
@@ -304,7 +304,7 @@ func TestEachProjectCommitsItsOwnInventories(t *testing.T) {
 
 	// A project's file names no project: the strict decoder refuses the member.
 	writeWorkspaceFile(t, root, fileB, `{"protocolVersion":2,"contracts":[`+rootLayoutEntry("integrations/b", b)+`]}`)
-	contracts, findings = loadAndValidateExternalInventory(root, nil)
+	contracts, findings = loadAndValidateExternalInventory(indexedView(root), nil)
 	if len(contracts) != 1 || len(findings) != 1 || findings[0].Path != fileB ||
 		!strings.Contains(findings[0].Message, `unknown field "project"`) {
 		t.Fatalf("a version 2 entry naming its project was accepted: contracts=%+v findings=%+v", contracts, findings)
@@ -312,7 +312,7 @@ func TestEachProjectCommitsItsOwnInventories(t *testing.T) {
 
 	// The older root layout in a project directory fails closed.
 	writeWorkspaceFile(t, root, fileB, `{"protocolVersion":1,"contracts":[`+rootLayoutEntry("integrations/b", b)+`]}`)
-	contracts, findings = loadAndValidateExternalInventory(root, nil)
+	contracts, findings = loadAndValidateExternalInventory(indexedView(root), nil)
 	if len(contracts) != 1 || len(findings) != 1 || findings[0].Path != fileB ||
 		!strings.Contains(findings[0].Message, "remove project from every entry") {
 		t.Fatalf("a version 1 document in a project directory was accepted: contracts=%+v findings=%+v", contracts, findings)
@@ -323,7 +323,7 @@ func TestEachProjectCommitsItsOwnInventories(t *testing.T) {
 	writeWorkspaceFile(t, root, fileB, `{"protocolVersion":2,"contracts":[]}`)
 	writeWorkspaceFile(t, root, externalInventoryFile, `{"protocolVersion":1,"contracts":[`+
 		rootLayoutEntry("integrations/a", a)+`,`+rootLayoutEntry("integrations/b", b)+`]}`)
-	contracts, findings = loadAndValidateExternalInventory(root, nil)
+	contracts, findings = loadAndValidateExternalInventory(indexedView(root), nil)
 	want := "move each entry into the clientgen.external.json of the project it names (" +
 		"integrations/a/clientgen.external.json, integrations/b/clientgen.external.json) as a protocolVersion 2 file"
 	if len(contracts) != 0 || len(findings) != 1 || findings[0].Path != externalInventoryFile ||
@@ -333,7 +333,7 @@ func TestEachProjectCommitsItsOwnInventories(t *testing.T) {
 
 	// A version 2 file at a root that is not a project belongs to no project.
 	writeWorkspaceFile(t, root, externalInventoryFile, `{"protocolVersion":2,"contracts":[`+a+`]}`)
-	contracts, findings = loadAndValidateExternalInventory(root, nil)
+	contracts, findings = loadAndValidateExternalInventory(indexedView(root), nil)
 	if len(contracts) != 0 || len(findings) != 1 || findings[0].Path != externalInventoryFile ||
 		!strings.Contains(findings[0].Message, "the workspace root is not a Putnami project") {
 		t.Fatalf("a version 2 root file outside a root project was read: contracts=%+v findings=%+v", contracts, findings)
@@ -350,14 +350,14 @@ func TestAWorkspaceRootProjectOwnsTheRootInventory(t *testing.T) {
      "callsites":[{"path":"a.ts","transport":"http","symbol":"fetch","fingerprint":"` + strings.Repeat("a", 64) + `"}],
      "owner":"integrations","tests":["a.test.ts"],"reason":"vendor wire"}`
 	writeWorkspaceFile(t, root, externalInventoryFile, `{"protocolVersion":2,"contracts":[`+entry+`]}`)
-	contracts, findings := loadAndValidateExternalInventory(root, nil)
+	contracts, findings := loadAndValidateExternalInventory(indexedView(root), nil)
 	if len(findings) != 0 || len(contracts) != 1 || contracts[0].Project != "." {
 		t.Fatalf("the root project's inventory was refused: contracts=%+v findings=%+v", contracts, findings)
 	}
 
 	// The root project's file is still a project file: the older layout fails there.
 	writeWorkspaceFile(t, root, externalInventoryFile, `{"protocolVersion":1,"contracts":[`+rootLayoutEntry(".", entry)+`]}`)
-	contracts, findings = loadAndValidateExternalInventory(root, nil)
+	contracts, findings = loadAndValidateExternalInventory(indexedView(root), nil)
 	if len(contracts) != 0 || len(findings) != 1 || !strings.Contains(findings[0].Message, "older workspace-root layout") {
 		t.Fatalf("an older root layout was read in a root project: contracts=%+v findings=%+v", contracts, findings)
 	}

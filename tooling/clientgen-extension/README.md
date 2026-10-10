@@ -53,8 +53,9 @@ the registration function and resolve the client through dependency injection.
 
 ## Workspace lifecycle
 
-The workspace commands operate on every project in the Putnami project index,
-regardless of an impacted consumer-only selection:
+The workspace commands operate on every project of the workspace, regardless
+of an impacted consumer-only selection. Sync and adopt read the Putnami project
+index; the check reads the membership the job context carries:
 
 | Command | Result |
 | --- | --- |
@@ -103,14 +104,19 @@ judged when it is selected explicitly (`validate --projects <provider>`,
 `clientgen-sync`); the guard still judges its committed bytes against its
 committed manifest and contract on every run.
 
-**What the guard reads.** Committed inputs only: the project index, each
-provider's committed `schema/openapi.json` (over whatever a build last wrote
-under `.gen`), the committed `client.putnami.json` manifests under each
-provider — which also name its targets on a cold clone, where no build has
-written a generation contract yet — and the two root inventories. That is what
-makes a cold clone and a tree the session just built reach one verdict, and
-what removed the nested provider build and the mirror render that cost ~10 s
-of every `putnami validate`.
+**What the guard reads.** The workspace's Git candidate cut and nothing else:
+the tracked files and the untracked files no ignore rule excludes. Its member
+projects are the ones the job context names, which the CLI resolves from
+`putnami.workspace.json` and the scope manifests its includes name; the guard
+never reads the project index. For each provider it reads the committed
+`schema/openapi.json`, the committed `client.putnami.json` manifests under it —
+which name its targets, since no build has written a generation contract on a
+cold clone — and the inventories each project commits. A file Git ignores, such
+as a provider's built `.gen/clientgen/config.json` or `.gen/schema/openapi.json`
+or an ignored source, is absent, as it is from a clone; a project that commits
+those `.gen` files has them read. That is what makes a cold clone and a tree the
+session just built reach one verdict, and what removed the nested provider
+build and the mirror render that cost ~10 s of every `putnami validate`.
 
 **The same manifest is the workspace graph's contract edge.** A project whose
 root commits a `client.putnami.json` is a generated client target, and the
@@ -146,17 +152,18 @@ client that cannot exist.
 See [`ADR 0004`](doc/adr/0004-an-empty-first-party-contract-is-a-declaration.md).
 
 **What is cached and what is not.** The guard task itself
-(`clientgen-workspace-check`) declares `cache: {enabled: false}` and stays that
-way: its verdict depends on every consumer source in the workspace, which is
-not a read the CLI can put in a key. A key over a hand-listed approximation of
-that set would be a guard that can be served a stale verdict, which is worse
-than a slow one. Its measured cost is the scan (see the execution model).
+(`clientgen-workspace-check`) is keyed on the input `git:**`, which holds the
+candidate cut it reads, and declares `cache: {enabled: true, noOutput: true}`.
+Editing, adding, deleting or renaming a candidate moves the key; an ignored
+file is neither read nor keyed. The key holds no commit, ref or absolute path,
+so the same files at another commit or in another checkout replay the verdict.
+See [`ADR 0006`](doc/adr/0006-the-guard-reads-and-keys-on-the-git-candidate-cut.md).
 
 Every transport callsite the scanner finds is either associated with a
 first-party provider — which fails, because a generated binding must replace it
 — or claimed by one of the two inventories the project that holds the callsite
 commits in its own directory: `<project>/clientgen.framework.json` and
-`<project>/clientgen.external.json`. The guard reads the files of every indexed
+`<project>/clientgen.external.json`. The guard reads the files of every member
 project and merges them. A project's file is `protocolVersion: 2`, and its
 entries name no project: the directory does, and the strict decoder refuses a
 `project` member. `protocolVersion: 1`, one root file whose entries each name
@@ -263,7 +270,7 @@ names a first-party service still fails as a handwritten first-party client.
 Low-level calls that implement the generated binding runtimes use the separate
 `clientgen.framework.json` inventory of the runtime project, defined by
 [`clientgen-framework-v2.json`](../../protocols/clientcontract/schemas/clientgen-framework-v2.json).
-Its `runtime` must match the exact indexed project identity (`@putnami/client`
+Its `runtime` must match the exact project identity (`@putnami/client`
 or `go.putnami.dev/client`), and every adapter and callsite is verified with the
 same exact identity rules. This keeps low-level runtime APIs available without
 creating a project or file exemption that a consumer could copy.
@@ -304,24 +311,27 @@ the workspace) fails generation instead of being silently left out of the key.
 | --- | --- |
 | `clientgen-go`, `clientgen-ts` | Yes — the keys above |
 | `clientgen-sync`, `clientgen-adopt` | No — they rewrite the workspace |
-| `clientgen-check` and the `validate` guard | No — see below |
+| `clientgen-check` and the `validate` guard | Yes — the input `git:**` |
 
-The workspace check is not cacheable, and that is a decision rather than an
-omission. Its read set is every production source in the workspace, and it
-reads files the input `git:**` does not hold:
+The workspace check reads the Git candidate cut and nothing else, and its key
+is the input `git:**`, which holds that cut. Its read set is every production
+source in the workspace, so no hand-written pattern list could be shown to cover
+it; the cut can, because the check reads through it:
 
-- its source scan walks each project on disk, files Git ignores included;
-- finding the providers reads the project index
-  `.putnami/workspace-index.json`, which Git ignores;
-- it reads each provider's `.gen/clientgen/config.json` and, for a provider
-  that commits no contract sidecar, its built `.gen/schema/openapi.json`,
-  which Git ignores too.
+- the source scan visits the candidates each member project owns, skipping the
+  build, install and dot-directories as before;
+- the member projects come from the job context, resolved from committed
+  workspace and scope manifests, never from the ignored
+  `.putnami/workspace-index.json`;
+- discovery reads a provider's `.gen/clientgen/config.json` and
+  `.gen/schema/openapi.json` only when the project commits them; otherwise the
+  committed sidecar and manifests decide, as they do on a cold clone.
 
-A plain pattern over those files would key the verdict on whichever build last
-ran. Keying the check needs a scan and a discovery that read the Git candidate
-cut only.
+A file Git ignores therefore changes neither the key nor the verdict, and every
+candidate the verdict depends on moves the key. Outside a Git work tree the
+check reads the disk, and no `git:` key exists to replay a verdict from.
 
-So the check pays its cost on every run, and the cost is bounded by doing less
+On a miss the check pays its full cost, and the cost is bounded by doing less
 work rather than by storing the answer:
 
 - it builds nothing and renders nothing: drift is the generator task's own
@@ -348,9 +358,10 @@ The versioned metadata and manifest formats are documented in
 [`protocols/clientcontract`](../../protocols/clientcontract/README.md). The
 accepted decisions are recorded in
 [`ADR 0001`](doc/adr/0001-clients-are-generated-from-the-published-contract.md),
-[`ADR 0003`](doc/adr/0003-drift-is-the-generator-tasks-verdict.md)
+[`ADR 0003`](doc/adr/0003-drift-is-the-generator-tasks-verdict.md),
+[`ADR 0004`](doc/adr/0004-an-empty-first-party-contract-is-a-declaration.md)
 and
-[`ADR 0004`](doc/adr/0004-an-empty-first-party-contract-is-a-declaration.md).
+[`ADR 0006`](doc/adr/0006-the-guard-reads-and-keys-on-the-git-candidate-cut.md).
 
 ## Support status
 

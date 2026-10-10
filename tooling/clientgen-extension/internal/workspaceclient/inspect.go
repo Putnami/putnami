@@ -5,10 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -24,57 +21,26 @@ type artifactReader interface {
 	List(prefix string) ([]string, error)
 }
 
-type worktreeReader struct{ root string }
-
-func (r worktreeReader) Read(path string) ([]byte, error) {
-	clean, err := safeWorkspacePath(path)
-	if err != nil {
-		return nil, err
-	}
-	return os.ReadFile(filepath.Join(r.root, filepath.FromSlash(clean))) //nolint:gosec // validated workspace-relative path
-}
-
-func (r worktreeReader) List(prefix string) ([]string, error) {
-	clean, err := safeWorkspacePath(prefix)
-	if err != nil {
-		return nil, err
-	}
-	base := filepath.Join(r.root, filepath.FromSlash(clean))
-	var paths []string
-	err = filepath.WalkDir(base, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			if errors.Is(walkErr, fs.ErrNotExist) {
-				return nil
-			}
-			return walkErr
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		rel, relErr := filepath.Rel(r.root, path)
-		if relErr != nil {
-			return relErr
-		}
-		paths = append(paths, filepath.ToSlash(rel))
-		return nil
-	})
-	sort.Strings(paths)
-	return paths, err
-}
-
 // Inspect discovers provider contracts from the built tree and verifies the
 // generated target closure of the worktree against itself: manifests parse,
 // hashes match bytes, operations cover the contract. It renders nothing.
 func Inspect(workspaceRoot string, mode Mode) Report {
-	return inspect(workspaceRoot, discover, "", mode)
+	return inspect(indexedView(workspaceRoot), discover, "", mode)
 }
 
 // InspectCommitted is the guard's inspection (`clientgen-check`, and the
-// `validate` contribution): every input is a COMMITTED file — the project
-// index, each provider's committed contract sidecar, its committed
-// client.putnami.json manifests and the two inventories — so a cold tree and a
-// tree the session has just built reach the same verdict, and no provider is
-// built or rendered to reach it.
+// `validate` contribution). members are the workspace-relative directories of
+// the projects the orchestrator resolved as workspace members. Inside a Git
+// work tree every file it reads is read through the repository's candidate
+// cut — the tracked files and the untracked files no ignore rule excludes —
+// which is exactly what its cache input `git:**` holds: each provider's
+// contract sidecar, its client.putnami.json manifests and generated files, a
+// generation configuration a project commits, the inventories, the census and
+// every production source the scan reads. What Git ignores, the project index
+// and a build's .gen output included, is absent, as it is from a clone, so a
+// cold clone and a tree the session has just built reach the same verdict and
+// no provider is built or rendered to reach it. Outside a Git work tree it
+// reads the disk, and no `git:` key exists to serve its verdict from.
 //
 // What it judges is what no generator task can: a manifest whose recorded
 // hashes no longer match the bytes beside it (a hand edit), a manifest cut from
@@ -86,8 +52,15 @@ func Inspect(workspaceRoot string, mode Mode) Report {
 // each generator's declared output with the bytes present before it wrote
 // (protocols/extension ADR 0004), which is why this check no longer needs a
 // fresh render or a pre-session capture to compare against (ADR 0003).
-func InspectCommitted(workspaceRoot string) Report {
-	return inspect(workspaceRoot, discoverCommitted, "", ModeCheck)
+func InspectCommitted(workspaceRoot string, members []string) Report {
+	view, err := committedView(workspaceRoot, members)
+	if err != nil {
+		report := Report{ProtocolVersion: 1, Mode: ModeCheck,
+			Findings: []Finding{{Code: "clientgen.discovery", Path: workspaceRoot, Message: err.Error()}}}
+		canonicalizeReport(&report)
+		return report
+	}
+	return inspect(view, discoverCommitted, "", ModeCheck)
 }
 
 // InspectRendered compares a fresh ephemeral generator render with the worktree
@@ -95,24 +68,25 @@ func InspectCommitted(workspaceRoot string) Report {
 // sync and adopt commands' verification: they regenerated in place, so the
 // worktree and the render are expected to agree byte for byte.
 func InspectRendered(workspaceRoot, expectedRoot string, mode Mode) Report {
-	return inspect(workspaceRoot, discover, expectedRoot, mode)
+	return inspect(indexedView(workspaceRoot), discover, expectedRoot, mode)
 }
 
-func inspect(workspaceRoot string, discovery func(string) ([]provider, []Finding), expectedRoot string, mode Mode) (report Report) {
+func inspect(view workspaceView, discovery func(workspaceView) ([]provider, []Finding), expectedRoot string, mode Mode) (report Report) {
 	inspectStarted := time.Now()
-	providers, findings := discovery(workspaceRoot)
-	var committed artifactReader = worktreeReader{root: workspaceRoot}
+	workspaceRoot := view.root
+	providers, findings := discovery(view)
+	var committed artifactReader = view.workspaceFiles
 	expected := committed
 	if expectedRoot != "" {
-		expected = worktreeReader{root: expectedRoot}
+		expected = workspaceFiles{root: expectedRoot}
 	}
 	report = inspectWithReader(workspaceRoot, mode, providers, findings, committed, expected)
-	report.ExternalContracts, findings = loadAndValidateExternalInventory(workspaceRoot, providers)
+	report.ExternalContracts, findings = loadAndValidateExternalInventory(view, providers)
 	report.Findings = append(report.Findings, findings...)
-	report.FrameworkTransports, findings = loadAndValidateFrameworkInventory(workspaceRoot)
+	report.FrameworkTransports, findings = loadAndValidateFrameworkInventory(view)
 	report.Findings = append(report.Findings, findings...)
 	// ONE workspace source scan answers both questions below. The scan reads
-	// and parses every indexed project's production sources, which is the
+	// and parses every member project's production sources, which is the
 	// single most expensive thing this check does; running it twice doubled
 	// that for nothing, because both callers asked for the same set. The set
 	// is a function of the worktree and of the generated-file inventory, and
@@ -125,7 +99,7 @@ func inspect(workspaceRoot string, discovery func(string) ([]provider, []Finding
 	// because a scan that failed still cost what it cost.
 	scanStarted := time.Now()
 	defer func() { report.recordTiming(PhaseScan, time.Since(scanStarted)) }()
-	records, scanErr := workspaceSourceRecords(workspaceRoot, report)
+	records, scanErr := workspaceSourceRecords(view, report)
 	if scanErr != nil {
 		// A scan that failed read NO source, which is not the same fact as a
 		// workspace that contains no transport. Every verdict below is about
@@ -140,18 +114,18 @@ func inspect(workspaceRoot string, discovery func(string) ([]provider, []Finding
 		// document itself is valid.
 		report.Findings = append(report.Findings, Finding{Code: "clientgen.source-scan",
 			Path: workspaceRoot, Message: scanErr.Error()})
-		report.Findings = append(report.Findings, loadPendingCensus(workspaceRoot).invalid...)
+		report.Findings = append(report.Findings, loadPendingCensus(view.workspaceFiles).invalid...)
 		canonicalizeReport(&report)
 		return report
 	}
 	report.ConsumerEdges = scanConsumerEdges(records, providers, report)
-	manual, manualFindings := scanManualClients(workspaceRoot, providers, records, report)
+	manual, manualFindings := scanManualClients(view.workspaceFiles, providers, records, report)
 	report.AdaptationQueue = manual
 	// The census splits handwritten-transport verdicts into the ones this
 	// workspace already carried when the guard landed and the ones this change
 	// introduced. Only the second kind fails; the first is reported so the
 	// remaining debt stays visible and countable (see pending.go).
-	blocking, pending := classifyPendingTransports(manualFindings, callsiteIndex(manual), loadPendingCensus(workspaceRoot))
+	blocking, pending := classifyPendingTransports(manualFindings, callsiteIndex(manual), loadPendingCensus(view.workspaceFiles))
 	report.Findings = append(report.Findings, blocking...)
 	report.PendingTransports = pending
 	canonicalizeReport(&report)

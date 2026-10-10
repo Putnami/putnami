@@ -377,14 +377,15 @@ func TestProjectGeneratorsReadTheGeneratedTree(t *testing.T) {
 // command waits on the `!clientgen` session barrier, which is what plans every
 // selected provider's generation — the engine judging drift on the generators'
 // declared outputs — before the guard reads the tree. The task declares a
-// workspace-scoped read (it answers about the whole workspace) and no cache
-// (its read set is the whole workspace, which no key describes). The planning
+// workspace-scoped read (it answers about the whole workspace) and is keyed on
+// the input `git:**`: it reads the workspace's Git candidate cut and nothing
+// else, so that cut is its whole read set, and it stores no output. The planning
 // half — exactly one node for any selection, the barrier's edges, and none
 // for another command — is asserted against the real planner in
 // tooling/cli/internal/jobs/clientgen_native_gate_test.go.
 func TestValidateContributesTheWorkspaceGuard(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "native-validation-gate", "validate-contributes-exactly-one-workspace-guard-for-any-selection")
-	spectest.Proves(t, clientgenFeature, "native-validation-gate", "the-guard-declares-a-workspace-read-and-no-cache")
+	spectest.Proves(t, clientgenFeature, "native-validation-gate", "the-guard-reads-the-git-candidate-cut-and-keys-on-it")
 	spectest.Proves(t, clientgenFeature, "native-validation-gate", "the-guard-task-is-reachable-only-from-validate-and-the-explicit-check-command")
 	spectest.Proves(t, clientgenFeature, "native-validation-gate", "validate-waits-for-the-selected-providers-generation")
 	manifest := loadExtensionManifest(t)
@@ -429,8 +430,26 @@ func TestValidateContributesTheWorkspaceGuard(t *testing.T) {
 	if !workspaceScoped {
 		t.Fatalf("the guard reads %+v; it answers about the whole workspace and must say so", task.Reads)
 	}
-	if task.Cache.IsEnabled() {
-		t.Fatal("the guard is cacheable; its discovery reads the git-ignored project index and .gen build output, which no git: key holds")
+	if !task.Cache.IsEnabled() || !task.Cache.NoOutput {
+		t.Fatalf("the guard cache policy is %+v, want enabled with noOutput: it is a pure verdict over the candidate cut "+
+			"its key holds, and it writes nothing to restore", task.Cache)
+	}
+	// The port is project-scoped because a workspace-once task's project is
+	// rooted at the workspace root, so `git:**` holds the whole repository's
+	// candidate cut. A workspace port, a narrower glob or a second port would
+	// key on a set other than the one the check reads.
+	wantInputs := map[string]proto.TaskInputPort{"repository": {From: "project", Files: []string{"git:**"}}}
+	if !reflect.DeepEqual(task.Inputs, wantInputs) {
+		t.Fatalf("the guard inputs are %+v, want %+v: the check reads the candidate cut, and `git:**` is the key that holds it",
+			task.Inputs, wantInputs)
+	}
+	if task.Cache.Key != nil {
+		t.Fatalf("the guard declares the cache key %+v; its key is its `git:**` input and nothing else", task.Cache.Key)
+	}
+	for _, phrase := range []string{"Git candidate cut", "`git:**`", "neither read nor keyed"} {
+		if !strings.Contains(task.Description, phrase) {
+			t.Fatalf("the guard description does not say what its key reads (%q): %s", phrase, task.Description)
+		}
 	}
 	if len(task.Toolchains) != 0 {
 		t.Fatalf("the guard binds toolchains %v; it renders nothing, so it needs no emitter", task.Toolchains)

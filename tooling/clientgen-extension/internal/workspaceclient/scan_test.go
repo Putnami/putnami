@@ -15,16 +15,16 @@ import (
 
 func scanManualClientsFromWorkspace(t *testing.T, workspaceRoot string, providers []provider, report Report) ([]Adaptation, []Finding) {
 	t.Helper()
-	records, err := workspaceSourceRecords(workspaceRoot, report)
+	records, err := workspaceSourceRecords(indexedView(workspaceRoot), report)
 	if err != nil {
 		t.Fatalf("scan workspace sources: %v", err)
 	}
-	return scanManualClients(workspaceRoot, providers, records, report)
+	return scanManualClients(workspaceFiles{root: workspaceRoot}, providers, records, report)
 }
 
 func scanConsumerEdgesFromWorkspace(t *testing.T, workspaceRoot string, providers []provider, report Report) []ConsumerEdge {
 	t.Helper()
-	records, err := workspaceSourceRecords(workspaceRoot, report)
+	records, err := workspaceSourceRecords(indexedView(workspaceRoot), report)
 	if err != nil {
 		t.Fatalf("scan workspace sources: %v", err)
 	}
@@ -107,7 +107,7 @@ func call(endpoint string) { _, _ = http.Get(endpoint) }
 	writeTestFile(t, root, "consumer/call.ts", "export const call = (url: string) => fetch(url);\n")
 
 	base := Report{Providers: []ProviderReport{{Project: "services/catalog"}}}
-	before, err := workspaceSourceRecords(root, base)
+	before, err := workspaceSourceRecords(indexedView(root), base)
 	if err != nil {
 		t.Fatalf("scan workspace sources: %v", err)
 	}
@@ -116,7 +116,7 @@ func call(endpoint string) { _, _ = http.Get(endpoint) }
 	between.FrameworkTransports = []FrameworkTransport{{Project: "consumer", Adapter: "consumer/call.go"}}
 	between.ConsumerEdges = []ConsumerEdge{{ConsumerProject: "consumer"}}
 	between.Findings = []Finding{{Code: "clientgen.example"}}
-	after, err := workspaceSourceRecords(root, between)
+	after, err := workspaceSourceRecords(indexedView(root), between)
 	if err != nil {
 		t.Fatalf("rescan workspace sources: %v", err)
 	}
@@ -276,7 +276,7 @@ func register(r any) { RegisterCatalogClient(r) }
 	// registration of that binding, before and after the gate.
 	writeTestFile(t, root, "no-import/main.ts", "registerCatalogClient(registry);\n")
 
-	records, err := workspaceSourceRecords(root, Report{})
+	records, err := workspaceSourceRecords(indexedView(root), Report{})
 	if err != nil {
 		t.Fatalf("scan workspace sources: %v", err)
 	}
