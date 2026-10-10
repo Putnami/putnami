@@ -1,0 +1,3355 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "cliContract": 4,
+  "name": "@putnami/cloud",
+  "version": "0.1.0",
+  "ecosystems": [
+    {
+      "id": "archive",
+      "coordinate": {
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,127}/[a-z0-9][a-z0-9._-]{0,127}$"
+      },
+      "version": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,254}$",
+        "ordering": "string"
+      },
+      "channel": "native",
+      "registries": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "registry": { "type": "string" }
+        }
+      },
+      "publish": "publish"
+    },
+    {
+      "id": "put",
+      "coordinate": {
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,127}/[a-z0-9][a-z0-9._-]{0,127}$"
+      },
+      "version": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,254}$",
+        "ordering": "string"
+      },
+      "channel": "native",
+      "registries": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "registry": { "type": "string" }
+        }
+      },
+      "publish": "publish"
+    }
+  ],
+  "runtime": {
+    "executable": "compiled/putnami-cloud",
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare-runtime",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare-runtime",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "internal/**"
+      ]
+    }
+  },
+  "workspace": {
+    "markers": ["putnami.json"],
+    "inputs": ["putnami.extension.json", "putnami.json"]
+  },
+  "commandGroups": {
+    "cloud": {
+      "description": "Putnami Cloud: sign-in, workspace setup, registries, packages, CI, configuration, databases, environments and deploys.",
+      "subcommands": {
+        "login": {
+          "description": "Sign in to Putnami Cloud with OAuth device authorization.",
+          "command": "cloud-login",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud login",
+              "description": "Sign in via the browser device flow"
+            }
+          ]
+        },
+        "logout": {
+          "description": "Clear stored Putnami Cloud credentials.",
+          "command": "cloud-logout",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud logout",
+              "description": "Clear stored credentials"
+            }
+          ]
+        },
+        "whoami": {
+          "description": "Show who you are signed in as and the linked workspace.",
+          "command": "cloud-whoami",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud whoami",
+              "description": "Show the session and the linked workspace"
+            },
+            {
+              "command": "putnami cloud whoami --output=jsonl",
+              "description": "Machine-readable for scripts/agents"
+            }
+          ]
+        },
+        "setup": {
+          "description": "Configure this repository for Putnami Cloud.",
+          "command": "cloud-setup",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud setup",
+              "description": "Interactively link this repo to a workspace"
+            },
+            {
+              "command": "putnami cloud setup --slug acme",
+              "description": "Create the workspace with the slug acme"
+            },
+            {
+              "command": "putnami cloud setup --auto",
+              "description": "Ensure-mode config only if already linked"
+            }
+          ]
+        },
+        "status": {
+          "description": "Show one line per entry that has a status: ok, degraded, failing or unknown, with the command that shows more. Exits 1 when an entry is failing, and with --strict on degraded and unknown too (supports --output).",
+          "command": "cloud-status",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud status",
+              "description": "One line per entry, with the command that shows more"
+            },
+            {
+              "command": "putnami cloud status --output=jsonl",
+              "description": "Every entry as data: its state, detail, fix, metrics and checks"
+            },
+            {
+              "command": "putnami cloud status --strict",
+              "description": "Gate a CI job: fail on any entry that is not ok"
+            }
+          ]
+        },
+        "token": {
+          "description": "Check machine tokens (status), mint a bearer for a script (cache, npm, go, oci, put), or manage workspace machine tokens (create, list, revoke).",
+          "command": "cloud-token",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud token cache",
+              "description": "Mint a bearer for the build cache"
+            },
+            {
+              "command": "putnami cloud token npm",
+              "description": "Mint your npm registry bearer; the registry decides per namespace"
+            },
+            {
+              "command": "putnami cloud token go --materialize",
+              "description": "Write the Go registry credential to ~/.netrc for one immediate invocation"
+            },
+            {
+              "command": "putnami cloud token create --name ci-cache --scopes cache.read,cache.write",
+              "description": "Create a workspace machine token (the raw pkt_* is shown once)"
+            },
+            {
+              "command": "putnami cloud token list --output=jsonl",
+              "description": "List workspace machine tokens (never the secret)"
+            },
+            {
+              "command": "putnami cloud token status",
+              "description": "Machine tokens that expired without being revoked, or expire within 7 days"
+            }
+          ]
+        },
+        "registries": {
+          "description": "The npm, Go, OCI and put registries on this machine: check (status), set up (setup) or remove (logout).",
+          "command": "cloud-registries",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud registries status",
+              "description": "Check each registry on this machine"
+            },
+            {
+              "command": "putnami cloud registries status npm --output=json",
+              "description": "One registry as data for scripts and agents"
+            }
+          ]
+        },
+        "packages": {
+          "description": "Packages and images: status, namespaces, read grants, public mirrors, image copy, retag and revert, archive publication.",
+          "command": "cloud-packages",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud packages namespaces activate --protocol npm --namespace @owner --idempotency-key npm-owner",
+              "description": "Activate the linked owner workspace's immutable npm namespace"
+            },
+            {
+              "command": "putnami cloud packages grants create --grantee-workspace-id <uuid> --channel latest --idempotency-key latest-reader",
+              "description": "Grant a workspace read access to release history through latest"
+            },
+            {
+              "command": "putnami cloud packages copy source:tag dest:tag",
+              "description": "Copy an image server-side"
+            },
+            {
+              "command": "putnami cloud packages revert repo:channel",
+              "description": "Move a channel tag back to its recorded prior target"
+            },
+            {
+              "command": "putnami cloud packages publish my-app --dry-run",
+              "description": "Show the immutable archive uploads a publication would make"
+            },
+            {
+              "command": "putnami cloud packages status",
+              "description": "Check that the linked workspace binds each package namespace this checkout needs"
+            }
+          ]
+        },
+        "channels": {
+          "description": "Show channel heads (status), publish a channel (set), or follow a producer's channel (follow).",
+          "command": "cloud-channels",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud channels set stable --from canary",
+              "description": "Promote: point stable at the release set canary names now"
+            },
+            {
+              "command": "putnami cloud channels set stable --from rs_0123abcd",
+              "description": "Roll back: point stable at an earlier release set"
+            },
+            {
+              "command": "putnami cloud channels status --wait 5m",
+              "description": "Every declared channel, polling until each registry applied its head"
+            },
+            {
+              "command": "putnami cloud channels follow putnami stable --runner-channel stable",
+              "description": "Follow the stable framework channel while holding the runner stable"
+            }
+          ]
+        },
+        "ci": {
+          "description": "Operate workspace CI runs and recovery (list, view <run>, logs <run>, start, cancel <run>, retry <run>, status, usage, repair, pause|drain|resume), report an outcome (report), and author putnami.ci.json (init, validate, fmt, explain). Run ids abbreviate: any unambiguous prefix works wherever <run> appears, and `list` prints ids at that width. `putnami cloud ci help` prints every verb with its flags.",
+          "command": "cloud-ci",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud ci list",
+              "description": "The 20 most recent runs (--limit N, or --limit 0 for the whole window)"
+            },
+            {
+              "command": "putnami cloud ci view 3cb50fe5ff0e",
+              "description": "One run: timing, cache, phases, and — when it failed — the failing tasks and their file:line diagnostics"
+            },
+            {
+              "command": "putnami cloud ci logs 3cb50fe5ff0e --level error",
+              "description": "Only the failing lines of a run's log (--raw keeps the runner's protocol JSON)"
+            },
+            {
+              "command": "putnami cloud ci logs 3cb50fe5ff0e --q \"task failed\"",
+              "description": "Every failed task of a finished run, with its error"
+            },
+            {
+              "command": "putnami cloud ci logs 3cb50fe5ff0e --q \"task-output /apps/api\"",
+              "description": "The last output lines of one project's failed tasks (--project <project> lists every task of that project)"
+            },
+            {
+              "command": "putnami cloud ci status",
+              "description": "CI readiness checks, queue, last run reuse, and runs and spend over 7 days"
+            },
+            {
+              "command": "putnami cloud ci insights 3cb50fe5ff0e",
+              "description": "One run's gate report: CPU actual vs allocated, cache economics, scheduler shape, per-command and per-job detail"
+            },
+            {
+              "command": "putnami cloud ci timings 3cb50fe5ff0e",
+              "description": "One run's per-task timeline, longest wall first: absolute start, end and CPU share per task (--limit 0 for every row)"
+            },
+            {
+              "command": "putnami cloud ci timings 3cb50fe5ff0e --against 9d03da1d4cc8",
+              "description": "Why each task of the run executed instead of being served by the cache, read against a run that could have filled it"
+            },
+            {
+              "command": "putnami cloud ci results 3cb50fe5ff0e",
+              "description": "What one run's gate found: failed tests with their output, coverage per project against its threshold, diagnostics by file and line, and what it published"
+            },
+            {
+              "command": "putnami cloud ci retry 3cb50fe5ff0e --phase lint --reason \"flaky\"",
+              "description": "Open a fresh attempt on the same commit: one phase plus its invalidated dependents"
+            },
+            {
+              "command": "putnami cloud ci report --conclusion success",
+              "description": "Report a successful delivery run for the current pushed commit"
+            },
+            {
+              "command": "putnami cloud ci init",
+              "description": "Write a putnami.ci.json that runs the jobs the workspace declares"
+            },
+            {
+              "command": "putnami cloud ci validate",
+              "description": "Check putnami.ci.json against its schema and the workspace's jobs"
+            },
+            {
+              "command": "putnami cloud ci fmt --check",
+              "description": "Fail when putnami.ci.json is not in canonical form"
+            },
+            {
+              "command": "putnami cloud ci explain --event push --branch main",
+              "description": "Show the rule a push to main matches and what the run would publish"
+            }
+          ]
+        },
+        "cache": {
+          "description": "Check or disable the remote build cache.",
+          "command": "cloud-cache",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud cache status",
+              "description": "Check the cache config, its identity, and the reuse of the last CI run"
+            },
+            {
+              "command": "putnami cloud cache disable --remove",
+              "description": "Disable the remote build cache by deleting .putnami/cache.json"
+            }
+          ]
+        },
+        "source": {
+          "description": "Check, connect or disconnect the workspace GitHub repository.",
+          "command": "cloud-source",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud source connect --repo my-org/my-repo",
+              "description": "Authorize GitHub in the browser and connect an exact repository"
+            },
+            {
+              "command": "putnami cloud source status --output=json",
+              "description": "The connected repository, its health and permissions, as data"
+            }
+          ]
+        },
+        "config": {
+          "description": "Project configuration: status, show, validate, drift, put and publish.",
+          "command": "cloud-config",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud config show --env prod",
+              "description": "Show the resolved config of the current project for an environment"
+            },
+            {
+              "command": "putnami cloud config show my-app --declared",
+              "description": "Every declared key of a project and whether it is set"
+            },
+            {
+              "command": "putnami cloud config validate apps/api --env prod",
+              "description": "Validate one project's generated schema, authored fields, production values, link, and version"
+            },
+            {
+              "command": "putnami cloud config publish --app my-app --env prod",
+              "description": "Publish an app's config for an environment"
+            },
+            {
+              "command": "putnami cloud config status",
+              "description": "Every project's declared keys against what each environment sets"
+            }
+          ]
+        },
+        "secrets": {
+          "description": "Workspace and project secrets: status, list, set, reveal and delete.",
+          "command": "cloud-secrets",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud secrets --env prod",
+              "description": "List secrets for an environment"
+            },
+            {
+              "command": "putnami cloud secrets --env prod --output=jsonl",
+              "description": "Machine-readable for scripts/agents"
+            },
+            {
+              "command": "putnami cloud secrets status",
+              "description": "Every project's declared secrets against what each environment sets; never reads a value"
+            }
+          ]
+        },
+        "db": {
+          "description": "Databases: status, access grants, a localhost bridge, and migration publication (status, list, info, grant, connect, migrations publish).",
+          "command": "cloud-db",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud db grant request --database my-app --level read --reason 'debug prod incident'",
+              "description": "Open a time-boxed grant and print the one-time connection string"
+            },
+            {
+              "command": "putnami cloud db connect --database my-app",
+              "description": "Bridge a localhost port to the database (zero GCP credentials)"
+            },
+            {
+              "command": "putnami cloud db migrations publish my-app --namespace workspace-native",
+              "description": "Publish an app's migration bundle"
+            },
+            {
+              "command": "putnami cloud db status",
+              "description": "Every database against the workloads putnami.ci.json selects"
+            },
+            {
+              "command": "putnami cloud db status my-app",
+              "description": "One database: its bindings, its grant and, with an active grant, its size, tables and connections"
+            }
+          ]
+        },
+        "env": {
+          "description": "Environments: what runs where (status) and the prerequisites continuous delivery needs (doctor, enable).",
+          "command": "cloud-env",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud env status prod",
+              "description": "What putnami.ci.json declares against what runs in prod, and each channel's newest move"
+            },
+            {
+              "command": "putnami cloud env status prod --health",
+              "description": "Is prod on main and healthy: errors in the last 10 minutes, the top error, and whether each served commit is on main"
+            },
+            {
+              "command": "putnami cloud env status --provenance",
+              "description": "The commit, release, serving revision and config version of each workload"
+            },
+            {
+              "command": "putnami cloud env doctor",
+              "description": "Check the linked environment (prod when the link names none) before its first deploy"
+            },
+            {
+              "command": "putnami cloud env doctor prod --strict",
+              "description": "Gate a CI job: fail on any row that is not ok, including rows that could not be checked"
+            },
+            {
+              "command": "putnami cloud env enable prod",
+              "description": "Apply every workspace-owned prerequisite of prod, then print the doctor table; a second run writes nothing"
+            }
+          ]
+        },
+        "deploy": {
+          "description": "Show one release (`deploy status <release-id>`), or submit a release set as an operator continuous-delivery request (`deploy publish-v2 --request-file <path>`).",
+          "command": "cloud-deploy",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud deploy status rel_123",
+              "description": "One release and the state of each workload; exits 1 when it failed"
+            },
+            {
+              "command": "putnami cloud deploy publish-v2 --request-file request.json --wait",
+              "description": "Submit a release set for one environment and wait until each workload settles"
+            }
+          ]
+        },
+        "logs": {
+          "description": "Query a workspace app's logs (supports --output=jsonl).",
+          "command": "cloud-logs",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud logs my-app --since deploy:last --level error",
+              "description": "Errors since the last deploy"
+            },
+            {
+              "command": "putnami cloud logs my-app --follow --output=jsonl",
+              "description": "Machine-readable for scripts/agents"
+            }
+          ]
+        },
+        "traces": {
+          "description": "Query a workspace app's traces, with --slow to filter by latency (supports --output=jsonl).",
+          "command": "cloud-traces",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud traces my-app --slow 500ms",
+              "description": "Traces slower than a threshold"
+            },
+            {
+              "command": "putnami cloud traces my-app --output=jsonl",
+              "description": "Machine-readable for scripts/agents"
+            }
+          ]
+        },
+        "metrics": {
+          "description": "Query a workspace app's metric series, with --window for the lookback (supports --output=jsonl).",
+          "command": "cloud-metrics",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud metrics my-app --window 1h",
+              "description": "Metric series over a lookback window"
+            },
+            {
+              "command": "putnami cloud metrics my-app --window 1h --output=jsonl",
+              "description": "Machine-readable for scripts/agents"
+            }
+          ]
+        },
+        "tokens": {
+          "description": "Alias of `putnami cloud token create|list|revoke`.",
+          "command": "cloud-tokens",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud tokens create --name ci-cache --scopes cache.read,cache.write",
+              "description": "Create a workspace machine token (the raw pkt_* is shown once)"
+            },
+            {
+              "command": "putnami cloud tokens list --output=jsonl",
+              "description": "List workspace machine tokens (machine-readable)"
+            },
+            {
+              "command": "putnami cloud tokens revoke ci-deploy",
+              "description": "Revoke a workspace machine token by id or name"
+            }
+          ]
+        },
+        "distribution": {
+          "description": "Alias of `putnami cloud packages namespaces|grants|mirrors`.",
+          "command": "cloud-distribution",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud distribution bindings activate --protocol npm --namespace @owner --idempotency-key npm-owner",
+              "description": "Activate the linked owner workspace's immutable npm namespace"
+            },
+            {
+              "command": "putnami cloud distribution grants create --grantee-workspace-id <uuid> --channel latest --idempotency-key latest-reader",
+              "description": "Grant a workspace read access to release history through latest"
+            },
+            {
+              "command": "putnami cloud distribution grants list --output=jsonl",
+              "description": "List the linked owner workspace's grants"
+            }
+          ]
+        },
+        "oci": {
+          "description": "Alias of `putnami cloud packages copy|retag|revert`.",
+          "command": "cloud-oci",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud oci copy source:tag dest:tag",
+              "description": "Copy an image server-side"
+            },
+            {
+              "command": "putnami cloud oci revert repo:channel",
+              "description": "Re-point a channel to its recorded prior target"
+            }
+          ]
+        },
+        "publish-archives": {
+          "description": "Alias of `putnami cloud packages publish`.",
+          "command": "cloud-publish-archives",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud publish-archives --app my-app",
+              "description": "Publish pre-built immutable archives without moving a native channel"
+            }
+          ]
+        },
+        "track": {
+          "description": "Alias of `putnami cloud channels follow`.",
+          "command": "cloud-track",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud track --namespace putnami --channel stable --runner-channel stable",
+              "description": "Track the stable framework channel while holding the runner stable."
+            }
+          ]
+        },
+        "report": {
+          "description": "Alias of `putnami cloud ci report`.",
+          "command": "cloud-report",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud report --status completed --conclusion success",
+              "description": "Report a successful delivery run"
+            },
+            {
+              "command": "putnami cloud report --status completed --conclusion failure --output=jsonl",
+              "description": "Machine-readable for scripts/agents"
+            }
+          ]
+        },
+        "validate-config": {
+          "description": "Alias of `putnami cloud config validate`.",
+          "command": "cloud-validate-config",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud validate-config apps/api --env prod",
+              "description": "Validate one project's generated schema, authored fields, production values, link, and version"
+            }
+          ]
+        },
+        "publish-config": {
+          "description": "Alias of `putnami cloud config publish`.",
+          "command": "cloud-publish-config",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud publish-config --app my-app --env prod",
+              "description": "Publish an app's config for an environment"
+            }
+          ]
+        },
+        "publish-migration": {
+          "description": "Alias of `putnami cloud db migrations publish`.",
+          "command": "cloud-publish-migration",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud publish-migration --app my-app --namespace workspace-native",
+              "description": "Publish an app's migration bundle"
+            }
+          ]
+        },
+        "release-set": {
+          "description": "Machine command: the distribution/release-set/v2 provider the engine calls.",
+          "command": "cloud-release-set",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud release-set resolve --request-file /absolute/path/request.json",
+              "description": "Resolve one channel or immutable release id from a mode-0600 request file"
+            }
+          ]
+        },
+        "registry-token": {
+          "description": "Machine command: mint your registry bearer for one known registry host.",
+          "command": "cloud-registry-token",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud registry-token --host oci.putnami.dev",
+              "description": "Mint your OCI registry bearer by host"
+            }
+          ]
+        },
+        "image-layers": {
+          "description": "Machine command: produce an image project's declared layer tarballs, deterministically.",
+          "command": "cloud-image-layers",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud image-layers",
+              "description": "Produce every layer declared by the project's image-layers.json"
+            },
+            {
+              "command": "putnami cloud image-layers --project images/ci-runner --output=json",
+              "description": "Machine-readable: each layer's sha256 and resolved version"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "commands": {
+    "cloud": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Show Putnami Cloud command help.",
+      "run": [
+        {
+          "id": "cloud",
+          "task": "cloud-help"
+        }
+      ]
+    },
+    "cloud-login": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Sign in to Putnami Cloud with OAuth device authorization.",
+      "flags": {
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "open": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open the verification URL in the default browser. Use --no-open to disable."
+        },
+        "poll-interval-ms": {
+          "type": "number",
+          "description": "Override device-code polling interval in milliseconds."
+        },
+        "poll-timeout-ms": {
+          "type": "number",
+          "description": "Override device-code polling timeout in milliseconds."
+        },
+        "scope": {
+          "type": "string",
+          "default": "openid profile email apikeys:write intelligence.read intelligence.audit intelligence.review.read intelligence.review.manage",
+          "description": "OAuth scopes to request. apikeys:write enables registry token minting; intelligence.read enables hosted MCP tools; intelligence.audit enables shared audit attestations; intelligence.review.read and intelligence.review.manage enable the workspace review controls."
+        },
+        "workspace": {
+          "type": "string",
+          "description": "Deprecated and ignored. Use `putnami cloud setup --workspace <id>`."
+        }
+      },
+      "run": [
+        {
+          "id": "login",
+          "task": "cloud-login"
+        }
+      ]
+    },
+    "cloud-logout": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Clear stored Putnami Cloud credentials.",
+      "flags": {
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        }
+      },
+      "run": [
+        {
+          "id": "logout",
+          "task": "cloud-logout"
+        }
+      ]
+    },
+    "cloud-whoami": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Show who this machine is signed in as and which workspace this repository is linked to; exits 1 when either is missing (supports --output).",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "Exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        }
+      },
+      "run": [
+        {
+          "id": "whoami",
+          "task": "cloud-whoami"
+        }
+      ]
+    },
+    "cloud-setup": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Configure this repository for Putnami Cloud.",
+      "flags": {
+        "auto": {
+          "type": "boolean",
+          "default": false,
+          "description": "Ensure mode for automation: configure Cloud only when a workspace is already linked and you are signed in. Never creates a workspace and never fails the run. Without it, setup auto-creates and links a workspace."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL."
+        },
+        "cache": {
+          "type": "boolean",
+          "default": true,
+          "description": "Provision the remote build cache config. Use --no-cache to skip it and leave any existing .putnami/cache.json untouched."
+        },
+        "cache-mode": {
+          "type": "string",
+          "default": "full",
+          "description": "Build cache negotiate mode: minimal, toplevel, or full."
+        },
+        "cache-url": {
+          "type": "string",
+          "description": "Remote build cache base URL (default https://cache.putnami.cloud)."
+        },
+        "environment": {
+          "type": "string",
+          "default": "prod",
+          "description": "Default Cloud environment."
+        },
+        "repository": {
+          "type": "string",
+          "description": "Repository URL to persist in the cloud workspace config."
+        },
+        "slug": {
+          "type": "string",
+          "description": "Slug of the workspace that setup creates: at most 12 characters, lowercase letters, digits and single dashes, starting with a letter. The workspace holds the event topic names that start with the slug and a dot. A workspace keeps its slug. Without the flag, the platform derives one."
+        },
+        "workspace": {
+          "type": "string",
+          "description": "Cloud workspace to link: id, slug, or display name."
+        },
+        "workspace-name": {
+          "type": "string",
+          "description": "Display name for the cloud workspace."
+        }
+      },
+      "run": [
+        {
+          "id": "setup",
+          "task": "cloud-setup"
+        }
+      ]
+    },
+    "cloud-token": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Check the workspace machine tokens (status), mint a workspace, cache or registry bearer for a script, or create, list and revoke workspace machine tokens.",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `status`: exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "for": {
+          "type": "string",
+          "description": "Token purpose: cache, npm, go, oci, or put."
+        },
+        "host": {
+          "type": "string",
+          "description": "Known Putnami registry host; selects the registry kind, exactly like --for."
+        },
+        "materialize": {
+          "type": "boolean",
+          "default": false,
+          "description": "Write the bearer to the registry's native credential store for one immediate invocation; no bearer is printed."
+        },
+        "name": {
+          "type": "string",
+          "description": "For `token create`: a human label for the token, shown in list output."
+        },
+        "scopes": {
+          "type": "string",
+          "description": "For `token create`: comma- or space-separated permission scopes granted to the token."
+        },
+        "allowed-client-ids": {
+          "type": "string",
+          "description": "For `token create`: comma-separated OAuth client row UUIDs restricting token audiences (not client names). Review workers require the review-worker client alone (`--allowed-clients review-worker`)."
+        },
+        "allowed-clients": {
+          "type": "string",
+          "description": "For `token create`: comma- or space-separated OAuth client names (public client ids) restricting token audiences; combined with --allowed-client-ids. Review workers require the review-worker client alone (`--allowed-clients review-worker`)."
+        },
+        "expires": {
+          "type": "string",
+          "description": "For `token create`: optional lifetime (e.g. 30d, 12h) or an explicit RFC3339 expiry."
+        }
+      },
+      "run": [
+        {
+          "id": "token",
+          "task": "cloud-token"
+        }
+      ]
+    },
+    "cloud-tokens": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Create, list, and revoke workspace-owned machine tokens (create, list, revoke).",
+      "flags": {
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "name": {
+          "type": "string",
+          "description": "For `tokens create`: a human label for the token, shown in list output."
+        },
+        "scopes": {
+          "type": "string",
+          "description": "For `tokens create`: comma- or space-separated permission scopes granted to the token."
+        },
+        "allowed-client-ids": {
+          "type": "string",
+          "description": "For `tokens create`: comma-separated OAuth client row UUIDs restricting token audiences (not client names). Review workers require the review-worker client alone (`--allowed-clients review-worker`)."
+        },
+        "allowed-clients": {
+          "type": "string",
+          "description": "For `tokens create`: comma- or space-separated OAuth client names (public client ids) restricting token audiences; combined with --allowed-client-ids. Review workers require the review-worker client alone (`--allowed-clients review-worker`)."
+        },
+        "expires": {
+          "type": "string",
+          "description": "For `tokens create`: optional lifetime (e.g. 30d, 12h) or an explicit RFC3339 expiry."
+        }
+      },
+      "run": [
+        {
+          "id": "tokens",
+          "task": "cloud-tokens"
+        }
+      ]
+    },
+    "cloud-db": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Databases: compare them with the workloads putnami.ci.json selects (status [<db>]), list them and show one (list, info), request, list or revoke ephemeral access grants (grant request|list|revoke), open a localhost psql bridge over the db-gateway (connect), and publish a migration bundle through the Data owner API (migrations publish).",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `status`: exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        },
+        "workspace": {
+          "type": "string",
+          "description": "Target workspace: id, slug, or display name. Defaults to the linked workspace."
+        },
+        "database": {
+          "type": "string",
+          "description": "Target database name (required for grant and connect)."
+        },
+        "level": {
+          "type": "string",
+          "default": "read",
+          "description": "Grant level for `grant request`: read, write, or maintain."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Mandatory audit reason for `grant request`."
+        },
+        "ttl": {
+          "type": "number",
+          "description": "Grant lifetime in seconds for `grant request` (0 = server default; server clamps to the policy max)."
+        },
+        "port": {
+          "type": "number",
+          "description": "Local port for `db connect` (default 5432)."
+        },
+        "gateway-url": {
+          "type": "string",
+          "description": "db-gateway WebSocket origin override for `db connect` (default wss://db-gateway.putnami.cloud)."
+        },
+        "app": {
+          "type": "string",
+          "description": "For `db migrations publish`: app name; defaults to the workspace-root putnami.json name."
+        },
+        "bundle-from": {
+          "type": "string",
+          "description": "For `db migrations publish`: path to a .gen/migration-bundle directory overriding auto-discovery."
+        },
+        "namespace": {
+          "type": "string",
+          "description": "For `db migrations publish`: expected workspace-owned Put namespace. Required explicitly and revalidated by Data against Distribution authority."
+        },
+        "bundle-version": {
+          "type": "string",
+          "description": "For `db migrations publish`: version (default: the bundle's own version, then the image version from .gen/version.json)."
+        },
+        "registry-put-url": {
+          "type": "string",
+          "description": "For `db migrations publish`: Put registry base URL override."
+        },
+        "source-revision": {
+          "type": "string",
+          "description": "For `db migrations publish`: exact source revision for a direct local publication. Managed publication takes this from the selected release-set member."
+        },
+        "selection-fingerprint": {
+          "type": "string",
+          "description": "For `db migrations publish`: exact selection fingerprint for a direct local publication. Managed publication takes this from the selected release-set member."
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `db migrations publish`: show the planned Data publication without credentials or network requests."
+        }
+      },
+      "run": [
+        {
+          "id": "db",
+          "task": "cloud-db"
+        }
+      ]
+    },
+    "cloud-registries": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "The npm, Go, OCI and put registries on this machine: check each one (status), set them up (setup), or remove them (logout).",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `status`: exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "registry": {
+          "type": "string",
+          "description": "Limit the action to a single registry (npm, gomod, oci, put). Only meaningful for `logout`."
+        }
+      },
+      "run": [
+        {
+          "id": "registries",
+          "task": "cloud-registries"
+        }
+      ]
+    },
+    "cloud-distribution": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Manage Distribution namespace bindings and workspace access to release history.",
+      "flags": {
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "protocol": {
+          "type": "string",
+          "description": "Registry protocol for bindings activate: gomod, npm, put, oci."
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Exact immutable namespace for bindings activate."
+        },
+        "channel": {
+          "type": "string",
+          "description": "Optional release channel whose history the workspace grant covers."
+        },
+        "grantee-workspace-id": {
+          "type": "string",
+          "description": "Canonical workspace UUID receiving release-history read access."
+        },
+        "registry-put-url": {
+          "type": "string",
+          "description": "Put registry URL for the owner-backed workspace grant operations."
+        },
+        "idempotency-key": {
+          "type": "string",
+          "description": "Caller-stable command key required for activate and create retries."
+        },
+        "include-revoked": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include revoked rows in grants list and mirrors list."
+        },
+        "ecosystem": {
+          "type": "string",
+          "description": "Ecosystem for mirrors add: npm, oci, archive (put platform archives copied to GitHub Release assets)."
+        },
+        "id": {
+          "type": "string",
+          "description": "Stable id of the public mirror target for mirrors add."
+        },
+        "destination": {
+          "type": "string",
+          "description": "Public destination for mirrors add: an npm registry URL, an OCI repository prefix, or github.com/<owner>/<repository>."
+        },
+        "alias": {
+          "type": "string",
+          "description": "Exact alternate destination spelling for mirrors add; comma-separate several."
+        },
+        "username": {
+          "type": "string",
+          "description": "Basic-credential username for an oci mirror target; the password is read from standard input."
+        },
+        "package": {
+          "type": "string",
+          "description": "The one <namespace>/<name> package an archive mirror target copies."
+        }
+      },
+      "run": [
+        {
+          "id": "distribution",
+          "task": "cloud-distribution"
+        }
+      ]
+    },
+    "cloud-packages": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Packages and images: check that the linked workspace binds each package namespace this checkout needs (status), bind package namespaces (namespaces activate|list), grant other workspaces read access to the release history (grants create|list|revoke), copy public packages to an outside target (mirrors add|list|remove|rotate-credential), copy, retag or revert images on the Putnami OCI registry server-side (copy, retag, revert), and publish pre-built archives as one immutable version (publish).",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `status`: exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "protocol": {
+          "type": "string",
+          "description": "Registry protocol for `namespaces activate` and `status`: gomod, npm, put, oci."
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Exact immutable namespace for `namespaces activate`."
+        },
+        "channel": {
+          "type": "string",
+          "description": "Optional release channel whose history the workspace grant covers."
+        },
+        "grantee-workspace-id": {
+          "type": "string",
+          "description": "Canonical workspace UUID receiving release-history read access."
+        },
+        "registry-put-url": {
+          "type": "string",
+          "description": "Put registry base URL override."
+        },
+        "idempotency-key": {
+          "type": "string",
+          "description": "Caller-stable command key required for activate and create retries."
+        },
+        "include-revoked": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include revoked rows in grants list and mirrors list."
+        },
+        "ecosystem": {
+          "type": "string",
+          "description": "Ecosystem for mirrors add: npm, oci, archive (put platform archives copied to GitHub Release assets)."
+        },
+        "id": {
+          "type": "string",
+          "description": "Stable id of the public mirror target for mirrors add."
+        },
+        "destination": {
+          "type": "string",
+          "description": "Public destination for mirrors add: an npm registry URL, an OCI repository prefix, or github.com/<owner>/<repository>."
+        },
+        "alias": {
+          "type": "string",
+          "description": "Exact alternate destination spelling for mirrors add; comma-separate several."
+        },
+        "username": {
+          "type": "string",
+          "description": "Basic-credential username for an oci mirror target; the password is read from standard input."
+        },
+        "package": {
+          "type": "string",
+          "description": "The one <namespace>/<name> package an archive mirror target copies."
+        },
+        "registry-oci-url": {
+          "type": "string",
+          "description": "OCI registry (oci.putnami.dev) base URL override."
+        },
+        "source-ref": {
+          "type": "string",
+          "description": "Opaque provenance ref recorded on the channel move (e.g. run/<run-id> or release/<release-id>)."
+        },
+        "app": {
+          "type": "string",
+          "description": "App name; defaults to the workspace-root putnami.json name."
+        },
+        "archives-from": {
+          "type": "string",
+          "description": "Path to a package/archives directory overriding auto-discovery."
+        },
+        "binary-name": {
+          "type": "string",
+          "description": "Override the artifact/package name derived from metadata (e.g. publish the CLI as 'putnami')."
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "For publish: show the planned immutable archive uploads without hitting the network."
+        }
+      },
+      "run": [
+        {
+          "id": "packages",
+          "task": "cloud-packages"
+        }
+      ]
+    },
+    "cloud-release-set": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Serve the exact immutable distribution/release-set/v2 provider operations.",
+      "flags": {
+        "request-file": {
+          "type": "string",
+          "description": "Absolute path to a regular, non-symlink, mode-0600 protocol request file."
+        }
+      },
+      "run": [
+        {
+          "id": "release-set",
+          "task": "cloud-release-set"
+        }
+      ]
+    },
+    "cloud-registry-token": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Mint your registry bearer for one known registry host.",
+      "flags": {
+        "host": {
+          "type": "string",
+          "description": "Known Putnami registry host; selects the registry kind, exactly like --for."
+        },
+        "materialize": {
+          "type": "boolean",
+          "default": false,
+          "description": "Write the bearer to the registry's native credential store for one immediate invocation; no bearer is printed."
+        }
+      },
+      "run": [
+        {
+          "id": "registry-token",
+          "task": "cloud-registry-token"
+        }
+      ]
+    },
+    "cloud-cache": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Check the remote build cache: its config, the identity it signs in with, and the reuse of the last CI run (status); or disable it (disable).",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `status`: exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "remove": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `cache disable`, delete .putnami/cache.json instead of setting enabled:false."
+        }
+      },
+      "run": [
+        {
+          "id": "cache",
+          "task": "cloud-cache"
+        }
+      ]
+    },
+    "cloud-report": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Submit a delivery run conclusion for the current pushed commit to the Delivery ingest. Refuses on a dirty working tree or an unpushed HEAD.",
+      "flags": {
+        "conclusion": {
+          "type": "string",
+          "description": "Pre-captured run conclusion: success, failure, canceled, skipped, neutral, or timed_out."
+        },
+        "exit-code": {
+          "type": "string",
+          "description": "Derive the conclusion from an exit code (0 = success, else failure)."
+        },
+        "status": {
+          "type": "string",
+          "default": "completed",
+          "description": "Run status to record (default completed)."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        }
+      },
+      "run": [
+        {
+          "id": "report",
+          "task": "cloud-report"
+        }
+      ]
+    },
+    "cloud-track": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Change a workspace producer track and optional runner channel atomically.",
+      "flags": {
+        "workspace": {
+          "type": "string",
+          "description": "any verb: workspace id (override the linked workspace)."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "any verb: Putnami control-plane API base URL (override the linked URL)."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "any verb: Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "any verb: OAuth client ID."
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Producer namespace; ownership is resolved by the server."
+        },
+        "channel": {
+          "type": "string",
+          "description": "Live producer channel: stable or canary."
+        },
+        "release-set": {
+          "type": "string",
+          "description": "Exact immutable release-set pin; mutually exclusive with channel."
+        },
+        "runner-channel": {
+          "type": "string",
+          "description": "Optionally set the runner channel in the same update: stable or canary."
+        }
+      },
+      "run": [
+        {
+          "id": "track",
+          "task": "cloud-track"
+        }
+      ]
+    },
+    "cloud-channels": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Release channels: show the head of each channel and how far each registry applied it (status); point a channel at a release set that already exists, for promotion and rollback (set); make the workspace's CI follow a producer's channel or pin one release set (follow).",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `status`: exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "workspace": {
+          "type": "string",
+          "description": "any verb: workspace id (override the linked workspace)."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "any verb: Putnami control-plane API base URL (override the linked URL)."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "any verb: Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "any verb: OAuth client ID."
+        },
+        "from": {
+          "type": "string",
+          "description": "set: the channel or rs_ release-set id the channel moves to."
+        },
+        "expected": {
+          "type": "string",
+          "description": "set: the release-set id the channel must name now; the move fails otherwise."
+        },
+        "wait": {
+          "type": "string",
+          "description": "status: poll until every registry applied the head, up to this duration (e.g. 5m)."
+        },
+        "namespace": {
+          "type": "string",
+          "description": "follow: producer namespace; the server resolves its owner."
+        },
+        "channel": {
+          "type": "string",
+          "description": "follow: producer channel to follow, stable or canary."
+        },
+        "release-set": {
+          "type": "string",
+          "description": "follow: exact immutable release-set pin; excludes --channel."
+        },
+        "runner-channel": {
+          "type": "string",
+          "description": "follow: also set the runner channel in the same update, stable or canary."
+        }
+      },
+      "run": [
+        {
+          "id": "channels",
+          "task": "cloud-channels"
+        }
+      ]
+    },
+    "cloud-ci": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Operate workspace CI runs and recovery (status, list, view, start, cancel, retry, logs, usage, insights, repair, pause, drain, resume), report a run outcome (report), and author putnami.ci.json (init, validate, fmt, explain).",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `status`: exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "runner-channel": {
+          "type": "string",
+          "description": "Optionally set the runner channel in the same update: stable or canary."
+        },
+        "reason": {
+          "type": "string",
+          "description": "mutating verbs: audit reason. Required, and recorded with the action."
+        },
+        "yes": {
+          "type": "boolean",
+          "description": "mutating verbs: skip the confirmation prompt (required in non-interactive environments)."
+        },
+        "workspace": {
+          "type": "string",
+          "description": "any verb: workspace id (override the linked workspace)."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "any verb: Putnami control-plane API base URL (override the linked URL)."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "any verb: Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "any verb: OAuth client ID."
+        },
+        "repo": {
+          "type": "string",
+          "description": "list, start: repository owner/name. Required by start."
+        },
+        "branch": {
+          "type": "string",
+          "description": "list, start, explain: branch name — a list filter, start's target branch, or the branch of the explained event."
+        },
+        "ref": {
+          "type": "string",
+          "description": "list, start: Git ref — a list filter, or start's target ref."
+        },
+        "sha": {
+          "type": "string",
+          "description": "list, start: commit SHA — a list filter or start's target. Required by start."
+        },
+        "pr": {
+          "type": "string",
+          "description": "list, start, explain: pull request number — a list filter, start's target PR, or the explained pull request."
+        },
+        "status": {
+          "type": "string",
+          "description": "list: run status or conclusion. report: run status to record (default completed)."
+        },
+        "phase": {
+          "type": "string",
+          "description": "list, retry, logs: phase name — a list filter, the retry target, or a logs filter."
+        },
+        "age": {
+          "type": "string",
+          "description": "list: only runs newer than this Go duration, e.g. 24h."
+        },
+        "provider": {
+          "type": "string",
+          "description": "start: source provider for start (defaults to the workspace's connected provider)."
+        },
+        "phases": {
+          "type": "string",
+          "description": "start: comma-separated phase selection for start."
+        },
+        "cache": {
+          "type": "boolean",
+          "default": true,
+          "description": "start, retry: use the build cache on retry; --no-cache opens a clean attempt."
+        },
+        "max-parallel": {
+          "type": "string",
+          "description": "start, retry: gate fan-out for THIS run (CI_MAX_PARALLEL), from 1 to 32; omitted uses the resolved allocation width. The fan-out also sizes the runner's test PostgreSQL ceiling."
+        },
+        "size": {
+          "type": "string",
+          "description": "start, retry: version 2 runner profile override (xsmall, small, standard, large, or xlarge); omitted resolves the plan class, then the workspace default. The five sizes allocate exact 2/4/8/16/32 vCPU on GCE Spot."
+        },
+        "window": {
+          "type": "string",
+          "description": "usage: reporting window as a Go duration (e.g. 168h for 7 days, the default); below 1h is rejected, above 90 days is clamped, and the value is truncated to the hour so the reported window is the one actually scanned."
+        },
+        "raw": {
+          "type": "boolean",
+          "description": "logs: print the runner's protocol records verbatim instead of the human rendering."
+        },
+        "follow": {
+          "type": "boolean",
+          "description": "logs: tail run logs live over SSE."
+        },
+        "project": {
+          "type": "string",
+          "description": "logs: project filter for logs."
+        },
+        "q": {
+          "type": "string",
+          "description": "logs: free-text log query."
+        },
+        "level": {
+          "type": "string",
+          "description": "logs: minimum severity, matched against each entry's OWN findings (trace|debug|info|warn|error|fatal)."
+        },
+        "from": {
+          "type": "string",
+          "description": "logs: log window start (RFC3339)."
+        },
+        "to": {
+          "type": "string",
+          "description": "logs: log window end (RFC3339)."
+        },
+        "cursor": {
+          "type": "string",
+          "description": "logs: opaque log pagination cursor."
+        },
+        "against": {
+          "type": "string",
+          "description": "timings: a second run id. Prints why each task of the run executed instead of being served by the cache: no cache key, a key that differs from the other run's, or the same key with no entry."
+        },
+        "limit": {
+          "type": "string",
+          "description": "list, logs, timings: maximum rows to print — runs for list (default 20; --limit 0 prints the whole window), log entries per page for logs, task rows for timings (default 40; --limit 0 prints every row, and --output=json emits the whole table unless --limit asks for fewer)."
+        },
+        "cancel-running": {
+          "type": "boolean",
+          "description": "pause: cancel in-flight runs when pausing the pipeline."
+        },
+        "review-ref": {
+          "type": "string",
+          "description": "pause, drain, resume: review reference recorded with a pipeline mode change."
+        },
+        "incident-ref": {
+          "type": "string",
+          "description": "pause, drain, resume: incident reference recorded with a pipeline mode change."
+        },
+        "conclusion": {
+          "type": "string",
+          "description": "report: pre-captured run conclusion: success, failure, canceled, skipped, neutral, or timed_out."
+        },
+        "exit-code": {
+          "type": "string",
+          "description": "report: derive the conclusion from an exit code (0 = success, else failure)."
+        },
+        "event": {
+          "type": "string",
+          "description": "explain: event to match: push, tag or pull_request."
+        },
+        "git-tag": {
+          "type": "string",
+          "description": "explain: Git tag of a tag event."
+        },
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "init: replace an existing putnami.ci.json."
+        },
+        "check": {
+          "type": "boolean",
+          "default": false,
+          "description": "fmt: report a non-canonical putnami.ci.json instead of rewriting it."
+        }
+      },
+      "run": [
+        {
+          "id": "ci",
+          "task": "cloud-ci"
+        }
+      ]
+    },
+    "cloud-image-layers": {
+      "activationFiles": [
+        "image-layers.json"
+      ],
+      "description": "Produce the layers an image project declares in image-layers.json, byte-deterministically: tarballs get fixed epoch mtimes, sorted entries, numeric root ownership and explicit modes, and an image-owned tool layer is cross-compiled with the pinned Go toolchain under -trimpath, so the same inputs hash to the same layer on any host, and a tool the @putnami/go artifact already ships for linux/amd64 is restored from that verified store instead. Nothing becomes a layer unverified — a downloaded artifact is checked against its publisher's checksum or the workspace lock's integrity, and a compiled or restored tool against its own embedded build info (module version, main package and toolchain, read without executing it). Run it before `putnami package`: the image project's content key is a hash of these bytes, and --check (the package-verb precondition) refuses a set the workspace no longer describes.",
+      "flags": {
+        "project": {
+          "type": "string",
+          "description": "Image project directory (default: the resolved project root)."
+        },
+        "check": {
+          "type": "boolean",
+          "default": false,
+          "description": "Verify an already-produced layer set instead of producing one: every declared layer has a record, its file still hashes to what that record claims, and its identity is the one this checkout declares today — the whole set of inputs that select the artifact (a tool's module/version/package, an image's repository, rendered tag and pinned digest, the CLI's version and lock integrity), not the version alone. Reads only."
+        }
+      },
+      "run": [
+        {
+          "id": "image-layers",
+          "task": "cloud-image-layers",
+          "heavy": true,
+          "cpuWeight": 2
+        }
+      ]
+    },
+    "cache-provider": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Run as the remote build-cache provider over the JSONL provider RPC (machine protocol; launched once per build run by the scheduler, not for interactive use). The explicit task identity selects this provider; command-name and extension-version capability probes are not used.",
+      "run": [
+        {
+          "id": "cache-provider",
+          "task": "cloud-cache-provider"
+        }
+      ]
+    },
+    "credential-provider": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Run as the engine's registry credential provider over the protocol/registry credential-provider JSONL RPC (machine protocol; launched by the engine when --providers install enables the read purpose, not for interactive use). On a hosted run the read credential comes from the run's Delivery install capability under the run credential; on a developer machine it is one short-lived registry bearer for the signed-in user of a linked checkout. The publish purpose answers absence.",
+      "run": [
+        {
+          "id": "credential-provider",
+          "task": "cloud-credential-provider"
+        }
+      ]
+    },
+    "session-reporter": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Run as the engine's session reporter over the protocol/cli session-reporting JSONL wire (machine protocol; launched by the engine when PUTNAMI_SESSION_REPORTER selects @putnami/cloud, not for interactive use). Each frame is one POST of the original session.json / events.jsonl bytes to the Delivery run-session ingest under the run credential.",
+      "run": [
+        {
+          "id": "session-reporter",
+          "task": "cloud-session-reporter"
+        }
+      ]
+    },
+    "log-reporter": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Run as the engine's log reporter over the protocol/cli session-reporting JSONL wire (machine protocol; launched by the engine when PUTNAMI_LOG_REPORTER selects @putnami/cloud, not for interactive use). Each frame is one POST of events.jsonl bytes to the Delivery run-log ingest under the run credential, while tasks run.",
+      "run": [
+        {
+          "id": "log-reporter",
+          "task": "cloud-log-reporter"
+        }
+      ]
+    },
+    "workspace-install": {
+      "description": "Replay declared local wiring and caches for a linked workspace, offline and without changing the session. An unlinked workspace is a successful skip; never creates, links, subscribes or activates.",
+      "quiet": true,
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "cloud-install",
+          "task": "cloud-install"
+        }
+      ]
+    },
+    "build": {
+      "activationFiles": [
+        "image-layers.json"
+      ],
+      "description": "Materialize an image project's declared generated layers as ordinary build outputs. This keeps a cold monorepo CI run self-bootstrapping: build --impacted produces the runner bytes before the trusted post-gate stage packages and publishes the runner-backed worker from the same checkout. The package contribution still re-verifies the exact bytes and current pins immediately before assembly.",
+      "run": [
+        {
+          "id": "cloud-image-layers",
+          "task": "cloud-image-layers",
+          "dependsOn": ["^compile"],
+          "heavy": true,
+          "cpuWeight": 2
+        }
+      ]
+    },
+    "validate": {
+      "activation": "workspace",
+      "activationFiles": ["putnami.json"],
+      "traits": {"injectPublishChannels": true},
+      "description": "Validate existing authored production Config inputs and declared site-content source metadata without packaging.",
+      "run": [
+        {
+          "id": "cloud-config-member",
+          "task": "cloud-validate-config-project"
+        },
+        {
+          "id": "cloud-site-content",
+          "if": "params.site-content",
+          "task": "cloud-validate-site-content"
+        }
+      ]
+    },
+    "package": {
+      "activation": "workspace",
+      "sessionPrerequisites": [
+        {
+          "command": "build",
+          "if": "params.image"
+        }
+      ],
+      "activationFiles": [
+        "*/index.md",
+        ".gen/config-schema.json",
+        "image-layers.json",
+        "schema/config.json"
+      ],
+      "description": "Verify declared image layers when present, build a canonical secret-free Config member for schema-bearing projects, and assemble the site-content bundles of a docs site project (activated by a section landing page, <section>/index.md). Every package step is local and produces immutable inputs for the selected release-set publication.",
+      "flags": {
+        "env": {
+          "type": "string",
+          "default": "prod",
+          "description": "Environment to package; native Config members currently support prod only."
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Explicit intended Put namespace for native Config publication."
+        }
+      },
+      "run": [
+        {
+          "id": "cloud-image-layers-check",
+          "if": "params.image",
+          "task": "cloud-image-layers-check"
+        },
+        {
+          "id": "cloud-config-member",
+          "task": "cloud-package-config-member"
+        },
+        {
+          "id": "cloud-site-content",
+          "if": "params.site-content",
+          "task": "cloud-package-site-content"
+        }
+      ]
+    },
+    "test": {
+      "activationFiles": [
+        "tests/run.sh"
+      ],
+      "description": "Run a project's committed shell test harness (tests/run.sh). Activation is the harness file itself, so this only ever schedules for a project that HAS one, such as an image whose subject under test is a bash entrypoint and therefore has no language extension to provide `test`. Exit status is the verdict.",
+      "run": [
+        {
+          "id": "cloud-shell-test",
+          "task": "cloud-shell-test"
+        }
+      ]
+    },
+    "publish": {
+      "activation": "workspace",
+      "dependsOn": [
+        "build",
+        "package"
+      ],
+      "description": "Publish Putnami Cloud config schema, environment values, migration bundles, a workload's deployment declaration, immutable archives, and the site-content bundles of a docs project. Archive, deployment and site-content publication emit a native release-set member only after Put accepts or byte-confirms the exact manifest.",
+      "flags": {
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        },
+        "env": {
+          "type": "string",
+          "default": "prod",
+          "description": "Environment to target."
+        },
+        "schema-from": {
+          "type": "string",
+          "description": "Path to a schema/config.json artifact (workspace-root relative or absolute) overriding auto-discovery."
+        },
+        "skip-publish-config": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip the config schema/values publish step (other publish channels still run)."
+        },
+        "skip-publish-migration": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip the migration bundle publish step (other publish channels still run)."
+        },
+        "skip-publish-doc": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip the site-content bundle publish step of a docs project (other publish channels still run)."
+        },
+        "skip-publish-deployment": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip the deployment declaration publish step (other publish channels still run)."
+        },
+        "archives": {
+          "type": "boolean",
+          "default": false,
+          "description": "Publish extension archives to the Putnami registry"
+        },
+        "binary-name": {
+          "type": "string",
+          "description": "Override archive artifact name (e.g. publish as 'putnami' instead of 'putnami-cli')"
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Explicit intended Put namespace for migration publication; Data revalidates it against the active Distribution workspace binding."
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Build and report every selected publish artifact without writing config or registries"
+        }
+      },
+      "run": [
+        {
+          "id": "cloud-publish-config",
+          "if": "!params.skip-publish-config && !params.skipPublishConfig",
+          "task": "cloud-publish-config-project"
+        },
+        {
+          "id": "cloud-publish-migration",
+          "if": "!params.skip-publish-migration && !params.skipPublishMigration",
+          "task": "cloud-publish-migration-project"
+        },
+        {
+          "id": "cloud-publish-archives",
+          "if": "params.archives",
+          "task": "cloud-publish-archives-project"
+        },
+        {
+          "id": "cloud-publish-site-content",
+          "if": "params.site-content && !params.skip-publish-doc && !params.skipPublishDoc",
+          "task": "cloud-publish-site-content-project"
+        },
+        {
+          "id": "cloud-publish-deployment",
+          "if": "!params.skip-publish-deployment && !params.skipPublishDeployment",
+          "task": "cloud-publish-deployment-project"
+        }
+      ]
+    },
+    "cloud-deploy": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "`deploy status <release-id>` shows one release and the state of each workload; it exits 1 when the release failed or ended partial. `deploy publish-v2 --request-file <path>` submits a release set to one environment as an operator continuous-delivery request; a rollback names an older release set.",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `status`: exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        },
+        "env": {
+          "type": "string",
+          "default": "prod",
+          "description": "Environment to deploy."
+        },
+        "request-file": {
+          "type": "string",
+          "description": "Closed Publish v2 deployment document used by `deploy publish-v2`; carries an immutable source revision, release-set reference, and exact image/config member selectors plus each workload's ordered migration members."
+        },
+        "timeout": {
+          "type": "string",
+          "default": "5m",
+          "description": "Total time the CLI keeps polling after a 202 (used with --wait)."
+        },
+        "wait": {
+          "type": "boolean",
+          "default": false,
+          "description": "Block until every workload of the release settles or --timeout fires."
+        }
+      },
+      "run": [
+        {
+          "id": "deploy",
+          "task": "cloud-deploy"
+        }
+      ]
+    },
+    "cloud-status": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Show one line per entry that has a status (whoami, token, registries, packages, channels, ci, cache, source, config, secrets, db, env): ok, degraded, failing or unknown, with the command that shows more. Exits 1 when an entry is failing; --strict also fails on degraded and unknown (supports --output). `putnami cloud <entry> status` shows one entry with its metrics; `putnami cloud env status --health` prints the deployment table.",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "Exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        },
+        "workspace": {
+          "type": "string",
+          "description": "Target workspace: id, slug, or display name. Defaults to the linked workspace."
+        },
+        "env": {
+          "type": "string",
+          "description": "Environment the env line checks. Without it, the env line checks every declared environment."
+        },
+        "health": {
+          "type": "boolean",
+          "default": false,
+          "description": "Moved: run `putnami cloud env status --health`."
+        },
+        "provenance": {
+          "type": "boolean",
+          "default": false,
+          "description": "Moved: run `putnami cloud env status --provenance`."
+        }
+      },
+      "run": [
+        {
+          "id": "status",
+          "task": "cloud-status"
+        }
+      ]
+    },
+    "cloud-env": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Environments: `env status [<env>]` compares what putnami.ci.json declares with what runs, per environment and workload (--health and --provenance print the deployment table); `env doctor [<env>]` checks each continuous-delivery prerequisite and prints the fix for every row that is not ok. Both exit 1 when a row is failing; --strict also fails on degraded and unknown; `env enable [<env>]` applies every workspace-owned fix (supports --output).",
+      "flags": {
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        },
+        "env": {
+          "type": "string",
+          "description": "Environment to check when no positional names one. Defaults to the linked environment, then prod."
+        },
+        "source-revision": {
+          "type": "string",
+          "description": "For env enable: the full commit id to accept the environment definition at. Defaults to the default-branch head resolved by the control plane, never the local checkout."
+        },
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `status` and `doctor`: exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "workspace": {
+          "type": "string",
+          "description": "Target workspace: id, slug, or display name. Defaults to the linked workspace."
+        },
+        "health": {
+          "type": "boolean",
+          "default": false,
+          "description": "Add ERRORS (10m), TOP ERROR, and ON MAIN to the rows of the --env environment: one logs read at ERROR and above over the last 10 minutes, and each served commit checked against origin/main (else main) in the local checkout, without fetching."
+        },
+        "provenance": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the per-workload deploy provenance chain: git commit → release → serving revision → config version."
+        }
+      },
+      "run": [
+        {
+          "id": "env",
+          "task": "cloud-env"
+        }
+      ]
+    },
+    "cloud-logs": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Query a workspace app's logs (supports --output=jsonl).",
+      "flags": {
+        "app": {
+          "type": "string",
+          "description": "App name; defaults to the cwd project or the workspace-root putnami.json name."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        },
+        "env": {
+          "type": "string",
+          "default": "prod",
+          "description": "Environment to query."
+        },
+        "since": {
+          "type": "string",
+          "description": "Start of the time window: an RFC3339 timestamp, a Go duration lookback (e.g. 1h, 15m), or deploy:last."
+        },
+        "level": {
+          "type": "string",
+          "description": "Minimum severity: trace, debug, info, warn, error, or fatal."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum entries per page (server-clamped to its ceiling)."
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Opaque pagination cursor from a previous page's next-cursor hint."
+        },
+        "all": {
+          "type": "boolean",
+          "default": false,
+          "description": "Follow pagination and print every page instead of one page plus the next cursor."
+        },
+        "follow": {
+          "type": "boolean",
+          "default": false,
+          "description": "Live-tail new log lines over SSE until interrupted (Ctrl-C), instead of a bounded query."
+        }
+      },
+      "run": [
+        {
+          "id": "logs",
+          "task": "cloud-logs"
+        }
+      ]
+    },
+    "cloud-traces": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Query a workspace app's traces (supports --output=jsonl).",
+      "flags": {
+        "app": {
+          "type": "string",
+          "description": "App name; defaults to the cwd project or the workspace-root putnami.json name."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        },
+        "env": {
+          "type": "string",
+          "default": "prod",
+          "description": "Environment to query."
+        },
+        "slow": {
+          "type": "string",
+          "description": "Only return traces slower than this Go duration (e.g. 500ms, 2s)."
+        },
+        "from": {
+          "type": "string",
+          "description": "Start of the time window: an RFC3339 timestamp or a Go duration lookback (e.g. 1h, 15m)."
+        },
+        "to": {
+          "type": "string",
+          "description": "End of the time window: an RFC3339 timestamp or a Go duration lookback (e.g. 5m)."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum traces per page (server-clamped to its ceiling)."
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Opaque pagination cursor from a previous page's next-cursor hint."
+        },
+        "all": {
+          "type": "boolean",
+          "default": false,
+          "description": "Follow pagination and print every page instead of one page plus the next cursor."
+        }
+      },
+      "run": [
+        {
+          "id": "traces",
+          "task": "cloud-traces"
+        }
+      ]
+    },
+    "cloud-metrics": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Query a workspace app's metric series (supports --output=jsonl).",
+      "flags": {
+        "app": {
+          "type": "string",
+          "description": "App name; defaults to the cwd project or the workspace-root putnami.json name."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        },
+        "env": {
+          "type": "string",
+          "default": "prod",
+          "description": "Environment to query."
+        },
+        "window": {
+          "type": "string",
+          "description": "Lookback window as a Go duration (e.g. 1h, 15m); sets from = now - window unless --from is given."
+        },
+        "from": {
+          "type": "string",
+          "description": "Start of the time window: an RFC3339 timestamp or a Go duration lookback (e.g. 1h, 15m)."
+        },
+        "to": {
+          "type": "string",
+          "description": "End of the time window: an RFC3339 timestamp or a Go duration lookback (e.g. 5m)."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum series per page (server-clamped to its ceiling)."
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Opaque pagination cursor from a previous page's next-cursor hint."
+        }
+      },
+      "run": [
+        {
+          "id": "metrics",
+          "task": "cloud-metrics"
+        }
+      ]
+    },
+    "cloud-publish-config": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Register the app schema and push conf/env.<env>.yaml values to control-plane-api.",
+      "flags": {
+        "app": {
+          "type": "string",
+          "description": "App name; defaults to the workspace-root putnami.json name."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the planned schema and config writes without hitting the network."
+        },
+        "env": {
+          "type": "string",
+          "default": "prod",
+          "description": "Environment to target."
+        },
+        "schema-from": {
+          "type": "string",
+          "description": "Path to a schema/config.json artifact (workspace-root relative or absolute) overriding auto-discovery."
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Explicit intended Put namespace for native Config publication."
+        }
+      },
+      "run": [
+        {
+          "id": "publish-config",
+          "task": "cloud-publish-config"
+        }
+      ]
+    },
+    "cloud-validate-config": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Validate a project's local authored Config inputs without writing package artifacts or using the network.",
+      "flags": {
+        "env": {
+          "type": "string",
+          "default": "prod",
+          "description": "Environment to validate; native authored Config currently supports prod only."
+        },
+        "schema-from": {
+          "type": "string",
+          "description": "Path to an existing schema/config.json artifact (workspace-root relative or absolute) overriding auto-discovery."
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Explicit intended Put namespace when the project manifest does not declare one."
+        }
+      },
+      "run": [
+        {
+          "id": "validate-config",
+          "task": "cloud-validate-config"
+        }
+      ]
+    },
+    "cloud-publish-migration": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Publish a workload's migration bundle through the Data owner API.",
+      "flags": {
+        "app": {
+          "type": "string",
+          "description": "App name; defaults to the workspace-root putnami.json name."
+        },
+        "bundle-from": {
+          "type": "string",
+          "description": "Path to a .gen/migration-bundle directory overriding auto-discovery."
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Expected workspace-owned Put namespace. Required explicitly and revalidated by Data against Distribution authority."
+        },
+        "bundle-version": {
+          "type": "string",
+          "description": "Version (default: the bundle's own version, then the image version from .gen/version.json)."
+        },
+        "registry-put-url": {
+          "type": "string",
+          "description": "Put registry base URL override."
+        },
+        "source-revision": {
+          "type": "string",
+          "description": "Exact source revision for a direct local publication. Managed publication takes this from the selected release-set member."
+        },
+        "selection-fingerprint": {
+          "type": "string",
+          "description": "Exact selection fingerprint for a direct local publication. Managed publication takes this from the selected release-set member."
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the planned Data publication without credentials or network requests."
+        }
+      },
+      "run": [
+        {
+          "id": "publish-migration",
+          "task": "cloud-publish-migration"
+        }
+      ]
+    },
+    "cloud-publish-archives": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Publish a workload's pre-built archives as one immutable Put version and emit its native archive member.",
+      "flags": {
+        "app": {
+          "type": "string",
+          "description": "App name; defaults to the workspace-root putnami.json name."
+        },
+        "archives-from": {
+          "type": "string",
+          "description": "Path to a package/archives directory overriding auto-discovery."
+        },
+        "binary-name": {
+          "type": "string",
+          "description": "Override the artifact/package name derived from metadata (e.g. publish the CLI as 'putnami')."
+        },
+        "registry-put-url": {
+          "type": "string",
+          "description": "Put registry base URL override."
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the planned immutable archive uploads without hitting the network."
+        }
+      },
+      "run": [
+        {
+          "id": "publish-archives",
+          "task": "cloud-publish-archives"
+        }
+      ]
+    },
+    "cloud-secrets": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Workspace and project secrets: compare each project's declared secrets with what each environment sets, without reading a value (status), and list, set, reveal or delete them.",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `status`: exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "block": {
+          "type": "string",
+          "description": "Schema block path. Pair with --field as the explicit alternative to the dotted key form."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        },
+        "env": {
+          "type": "string",
+          "default": "prod",
+          "description": "Environment to target."
+        },
+        "field": {
+          "type": "string",
+          "description": "Schema field name within --block."
+        },
+        "from-file": {
+          "type": "string",
+          "description": "Read the secret value from a file. Trailing newline is trimmed."
+        },
+        "from-stdin": {
+          "type": "boolean",
+          "default": false,
+          "description": "Read the secret value from stdin (set only)."
+        },
+        "reveal": {
+          "type": "boolean",
+          "default": false,
+          "description": "Decrypt and print plaintext (get only). Prompts on a TTY."
+        },
+        "value": {
+          "type": "string",
+          "description": "Inline secret value (set only)."
+        },
+        "yes": {
+          "type": "boolean",
+          "default": false,
+          "description": "Confirm plaintext reveal in non-interactive scripts."
+        }
+      },
+      "run": [
+        {
+          "id": "secrets",
+          "task": "cloud-secrets"
+        }
+      ]
+    },
+    "cloud-config": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Project configuration: `config status [<project>]` compares each project's declared keys with what each environment sets, `config show` prints the resolved values (--declared, --keys, --metadata, --schema, --key, --secret-keys select another view), `config validate` checks the local authored inputs offline, `config drift` compares them with what is published, `config put` writes values, and `config publish` registers the schema and pushes conf/env.<env>.yaml.",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `status`: exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        },
+        "config-from": {
+          "type": "string",
+          "description": "YAML file or glob to write with `cloud config put`."
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `cloud config put`, show planned writes without calling the control plane."
+        },
+        "env": {
+          "type": "string",
+          "default": "prod",
+          "description": "Environment to target."
+        },
+        "include-secrets": {
+          "type": "boolean",
+          "default": false,
+          "description": "Merge decrypted secrets into the resolved config. Requires secret read scope."
+        },
+        "format": {
+          "type": "string",
+          "description": "Output format for --schema: table, json, or yaml."
+        },
+        "key": {
+          "type": "string",
+          "description": "Show one resolved config key from the published schema."
+        },
+        "schema": {
+          "type": "boolean",
+          "default": false,
+          "description": "Print the published config schema."
+        },
+        "secret-keys": {
+          "type": "boolean",
+          "default": false,
+          "description": "List secret keys declared by the published schema with set/missing status."
+        },
+        "reveal-secrets": {
+          "type": "boolean",
+          "default": false,
+          "description": "Merge plaintext secrets into the resolved config after confirmation or --yes."
+        },
+        "app-version": {
+          "type": "string",
+          "description": "Optional app version dimension."
+        },
+        "with-secrets": {
+          "type": "boolean",
+          "default": false,
+          "description": "Merge secrets into the resolved config with every secret value redacted."
+        },
+        "yes": {
+          "type": "boolean",
+          "default": false,
+          "description": "Confirm plaintext reveal in non-interactive scripts."
+        },
+        "declared": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `config show`: list every declared key and whether it is set."
+        },
+        "keys": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `config show`: print only the resolved key names."
+        },
+        "metadata": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `config show`: print the merge metadata of each resolved key."
+        },
+        "schema-from": {
+          "type": "string",
+          "description": "For `config validate`: path to an existing schema/config.json artifact (workspace-root relative or absolute) overriding auto-discovery."
+        },
+        "namespace": {
+          "type": "string",
+          "description": "For `config validate` and `config publish`: the intended Put namespace when the project manifest does not declare one."
+        },
+        "app": {
+          "type": "string",
+          "description": "For `config publish`: app name; defaults to the workspace-root putnami.json name."
+        }
+      },
+      "run": [
+        {
+          "id": "config",
+          "task": "cloud-config"
+        }
+      ]
+    },
+    "cloud-source": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Check, connect or disconnect the workspace GitHub repository (status, connect, disconnect).",
+      "flags": {
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "For `status`: exit 1 on degraded and unknown too, not only on failing. Use it to gate CI."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami Cloud API base URL override."
+        },
+        "repo": {
+          "type": "string",
+          "description": "For connect, the exact GitHub owner/name."
+        },
+        "open": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open GitHub authorization in the default browser. Use --no-open to disable."
+        },
+        "poll-interval-ms": {
+          "type": "number",
+          "description": "Override the server-provided onboarding polling interval in milliseconds."
+        },
+        "poll-timeout-ms": {
+          "type": "number",
+          "description": "Override the onboarding polling timeout in milliseconds."
+        },
+        "replace": {
+          "type": "boolean",
+          "default": false,
+          "description": "Replace the workspace's current GitHub repository when completing onboarding."
+        },
+        "workspace": {
+          "type": "string",
+          "description": "Target workspace: id, slug, or display name. Defaults to the linked workspace."
+        },
+        "yes": {
+          "type": "boolean",
+          "default": false,
+          "description": "Confirm source disconnect without prompting."
+        }
+      },
+      "run": [
+        {
+          "id": "source",
+          "task": "cloud-source"
+        }
+      ]
+    },
+    "cloud-oci": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Copy, retag, or revert images on the Putnami OCI registry server-side (copy <src-ref> <dst-ref>, retag <ref> <tag...>, revert <repo>:<channel>).",
+      "flags": {
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        },
+        "registry-oci-url": {
+          "type": "string",
+          "description": "OCI registry (oci.putnami.dev) base URL override."
+        },
+        "source-ref": {
+          "type": "string",
+          "description": "Opaque provenance ref recorded on the channel move (e.g. run/<run-id> or release/<release-id>)."
+        }
+      },
+      "run": [
+        {
+          "id": "oci",
+          "task": "cloud-oci"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "cloud": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Show Putnami Cloud command help.",
+      "timeoutMs": 30000
+    },
+    "cloud-help": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "help"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Show Putnami Cloud command help.",
+      "timeoutMs": 30000
+    },
+    "cloud-login": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "login"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Sign in to Putnami Cloud.",
+      "timeoutMs": 900000
+    },
+    "cloud-logout": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "logout"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Clear Putnami Cloud credentials.",
+      "timeoutMs": 30000
+    },
+    "cloud-whoami": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "whoami"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Show the active Putnami Cloud identity.",
+      "timeoutMs": 30000
+    },
+    "cloud-setup": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "setup"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Configure this repository for Putnami Cloud.",
+      "timeoutMs": 30000
+    },
+    "cloud-token": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "token"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Mint a workspace, cache or registry bearer, or manage workspace machine tokens.",
+      "timeoutMs": 30000
+    },
+    "cloud-tokens": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "tokens"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Create, list, and revoke workspace-owned machine tokens.",
+      "timeoutMs": 30000
+    },
+    "cloud-registries": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "registries"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Manage per-registry personal access tokens.",
+      "timeoutMs": 120000
+    },
+    "cloud-distribution": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "distribution"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Manage immutable registry namespace bindings and exact owner grants.",
+      "timeoutMs": 30000
+    },
+    "cloud-packages": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "packages"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Manage package namespaces, grants, mirrors, OCI image moves and archive publication.",
+      "timeoutMs": 600000
+    },
+    "cloud-release-set": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "release-set"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Serve immutable release-set resolve, release, channel-set, and channel-status provider operations.",
+      "timeoutMs": 90000
+    },
+    "cloud-registry-token": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "registry-token"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Mint your registry bearer for one known registry host.",
+      "timeoutMs": 30000
+    },
+    "cloud-oci": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "oci"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Copy or retag images on the Putnami OCI registry server-side.",
+      "timeoutMs": 120000
+    },
+    "cloud-cache": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "cache"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Show or disable the remote build cache config.",
+      "timeoutMs": 30000
+    },
+    "cloud-report": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "report"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Submit a delivery run conclusion for the current pushed commit.",
+      "timeoutMs": 900000
+    },
+    "cloud-track": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "track"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Change a workspace producer track and optional runner channel atomically.",
+      "timeoutMs": 900000
+    },
+    "cloud-channels": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "channels"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Set, show or follow release channels.",
+      "timeoutMs": 1800000
+    },
+    "cloud-ci": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "ci"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Operate workspace CI runs and recovery.",
+      "timeoutMs": 3600000
+    },
+    "cloud-image-layers": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "image-layers"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "declares": {
+        "effects": [
+          "network"
+        ]
+      },
+      "description": "Produce the project's declared image layers under .gen/layers (normalized tarballs plus a checksum sidecar). Uncached on purpose: the producer downloads upstream artifacts and writes into the project's own .gen, and a cross-worktree cache hit would serve one checkout's layer bytes to another.",
+      "timeoutMs": 1800000
+    },
+    "cloud-image-layers-check": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "image-layers",
+        "--check"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "description": "Verify the project's produced layers against image-layers.json and the workspace sources that derive their versions: every declared layer has a record, its produced file still hashes to what that record claims, and its version is the one the workspace declares today. Reads only — no network, no registry, no execution. Uncached on purpose: it exists to observe the CURRENT state of a .gen tree the producer writes outside any cache key, so a hit would report a verdict about bytes this checkout may no longer have.",
+      "timeoutMs": 120000
+    },
+    "cloud-shell-test": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "shell-test"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "declares": {
+        "effects": [
+          "process"
+        ]
+      },
+      "description": "Execute the project's committed shell test harness at tests/run.sh; its exit status is the verdict. Uncached on purpose: the harness drives real git and process fixtures, so its inputs are wider than any declarable file set and a stale hit would report a green gate for an unexercised entrypoint. The limit is 900 s because the harness runs a cold `putnami test` of the libs it covers.",
+      "timeoutMs": 900000
+    },
+    "cloud-cache-provider": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "cache-provider"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "declares": {
+        "effects": [
+          "process"
+        ]
+      },
+      "description": "Remote build-cache provider RPC server: reads/writes provider-RPC JSONL on stdin/stdout. Started by its explicit provider task identity, not command-name or extension-version feature detection."
+    },
+    "cloud-credential-provider": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "credential-provider"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "declares": {
+        "effects": [
+          "process",
+          "network"
+        ]
+      },
+      "description": "Registry credential provider: reads protocol/registry credential-provider JSONL on stdin and writes one answer per request on stdout. A read credential on a hosted run is a POST to ${PUTNAMI_CLOUD_INGEST_URL}/capabilities/install under the run credential the engine sends at initialize; on a developer machine it is minted for the signed-in user. Started by the engine's reserved credential-provider discovery as the extension's native runtime."
+    },
+    "cloud-session-reporter": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "session-reporter"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "declares": {
+        "effects": [
+          "process",
+          "network"
+        ]
+      },
+      "description": "Session reporter provider: reads protocol/cli SessionReportingChunk JSONL on stdin, POSTs each frame to ${PUTNAMI_CLOUD_INGEST_URL}/sessions under the run credential, and writes one SessionReportingAck per frame on stdout. A hosted run hands the run credential over the session reporting protocol 2 handshake (initialize, then authenticate) before the first chunk; otherwise it is PUTNAMI_SESSION_REPORTER_TOKEN. Started by the engine's reserved session-reporter discovery on the explicitly selected extension."
+    },
+    "cloud-log-reporter": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "log-reporter"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "declares": {
+        "effects": [
+          "process",
+          "network"
+        ]
+      },
+      "description": "Log reporter provider: reads protocol/cli SessionReportingChunk JSONL on stdin, POSTs each events.jsonl frame to ${PUTNAMI_CLOUD_INGEST_URL}/logs under the run credential with its sequence, offset and digest, and writes one SessionReportingAck per frame on stdout. A hosted run hands the run credential over the session reporting protocol 2 handshake (initialize, then authenticate) before the first chunk; otherwise it is PUTNAMI_LOG_REPORTER_TOKEN. Started by the engine's reserved log-reporter discovery on the explicitly selected extension."
+    },
+    "cloud-install": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "install"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Replay declared local wiring and caches for a linked workspace, offline and without changing the session. An unlinked workspace is a successful skip; never creates, links, subscribes or activates.",
+      "timeoutMs": 120000
+    },
+    "cloud-db": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "db"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Request/list/revoke ephemeral database access grants and open a localhost psql bridge over the db-gateway.",
+      "timeoutMs": 604800000
+    },
+    "cloud-secrets": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "secrets"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Manage workspace and project secrets.",
+      "timeoutMs": 60000
+    },
+    "cloud-config": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "config"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Inspect resolved project config.",
+      "timeoutMs": 60000
+    },
+    "cloud-validate-site-content": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["validate-site-content"],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "inputs": {
+        "declaration": {"from": "project", "files": ["putnami.json"]}
+      },
+      "description": "Inspect declared site sections, mounts, regular-file policy and paths using fresh directory metadata; never read or hash payloads, generate artifacts or assemble archives. Uncached: it checks directory metadata (empty section directories, symlink vs regular file) that the file hasher does not key.",
+      "timeoutMs": 60000
+    },
+    "cloud-validate-config-project": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["validate-config-project"],
+      "cwd": "{projectRoot}",
+      "cache": {"enabled": true, "noOutput": true},
+      "declares": {},
+      "reads": ["gen"],
+      "inputs": {
+        "manifest": {"from": "project", "files": ["putnami.jso[n]"]},
+        "schema": {"from": "project", "files": ["schema/config.json", "schema/config-authored-fields.json", ".gen/config-schema.json"]},
+        "values": {"from": "project", "files": ["conf/env.yaml", "conf/.env.yaml", "conf/env.prod.yaml", "conf/.env.prod.yaml", ".gen/conf/env.prod.yaml", ".gen/conf/.env.prod.yaml"]},
+        "cloud-link": {"from": "workspace", "files": ["putnami.workspace.json", "putnami.json", ".putnami/cloud-link.json"]},
+        "app": {"from": "params"},
+        "appName": {"from": "params"},
+        "schema-from": {"from": "params"},
+        "schemaFrom": {"from": "params"}
+      },
+      "description": "Validate the declared native Config member from existing local artifacts; skip projects without a Config namespace. Cached on the files and parameters the extension README lists; refuses --schema-from and any project other than the one in its working directory.",
+      "timeoutMs": 60000
+    },
+    "cloud-validate-config": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "validate-config"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Validate an authored Config member from existing local artifacts only; writes no package artifact and performs no network request.",
+      "timeoutMs": 60000
+    },
+    "cloud-source": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "source"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Connect, inspect, or disconnect a workspace GitHub repository.",
+      "timeoutMs": 1800000
+    },
+    "cloud-publish-config": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-config"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "inputs": {
+        "schema": {
+          "from": "task",
+          "optional": true
+        }
+      },
+      "writes": [
+        "sources"
+      ],
+      "declares": {
+        "effects": [
+          "cloud",
+          "network"
+        ],
+        "mutatesSources": true
+      },
+      "description": "Publish app schema + per-env config values.",
+      "timeoutMs": 120000
+    },
+    "cloud-package-config-member": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-config-member",
+        "--if-present"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "description": "Build the canonical secret-free production Config member consumed by native publication. Uncached: the member embeds the full HEAD commit, the origin repository and the linked workspace id, and is written outside the project under .putnami/out.",
+      "timeoutMs": 120000
+    },
+    "cloud-publish-migration": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-migration"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Publish a workload's migration bundle to the Put registry.",
+      "timeoutMs": 120000
+    },
+    "cloud-publish-config-project": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-config",
+        "--if-present"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "inputs": {
+        "schema": {
+          "from": "task",
+          "optional": true
+        }
+      },
+      "writes": [
+        "sources"
+      ],
+      "declares": {
+        "effects": [
+          "cloud",
+          "network"
+        ],
+        "mutatesSources": true
+      },
+      "description": "Publish selected project schema + per-env config values.",
+      "timeoutMs": 120000
+    },
+    "cloud-publish-migration-project": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-migration",
+        "--if-present"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "declares": {
+        "effects": [
+          "network",
+          "registry"
+        ]
+      },
+      "description": "Send the selected project's migration bundle to Data when one was built; an existing bundle requires an explicit project namespace.",
+      "timeoutMs": 120000
+    },
+    "cloud-publish-archives": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-archives"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "declares": {
+        "effects": [
+          "network",
+          "registry"
+        ]
+      },
+      "description": "Publish a workload's pre-built archives to the Put registry.",
+      "timeoutMs": 600000
+    },
+    "cloud-package-site-content": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-site-content",
+        "--if-present"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "description": "Assemble and contract-verify every section bundle of a site project, with no network. Its task identity keys on the project tree and is the selection fingerprint of the project's site-content members. Uncached: bundle.json embeds the short HEAD commit and the task identity is the release selection fingerprint.",
+      "timeoutMs": 120000
+    },
+    "cloud-publish-site-content-project": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-site-content",
+        "--if-present"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "declares": {
+        "effects": [
+          "network",
+          "registry"
+        ]
+      },
+      "description": "Publish exactly the site-content members the release-set plan selected for this site project, at the planned version, moving the plan's first channel in the same atomic Put publish.",
+      "timeoutMs": 600000
+    },
+    "cloud-publish-deployment-project": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-deployment"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "declares": {
+        "effects": [
+          "network",
+          "registry"
+        ]
+      },
+      "description": "Publish exactly the deployment member the release-set plan selected for this workload: the canonical <project>/.gen/deployment.json its language package step wrote, byte for byte, at the planned version. A selected member whose declaration is missing or invalid fails the step; without a selected member the step publishes nothing.",
+      "timeoutMs": 120000
+    },
+    "cloud-publish-archives-project": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-archives",
+        "--if-present"
+      ],
+      "cwd": "{projectRoot}",
+      "cache": false,
+      "declares": {
+        "effects": [
+          "network",
+          "registry"
+        ]
+      },
+      "description": "Publish the selected project's pre-built archives to the Put registry when present.",
+      "timeoutMs": 600000
+    },
+    "cloud-deploy": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "deploy"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "declares": {
+        "effects": [
+          "cloud",
+          "network"
+        ]
+      },
+      "description": "Show one release, or submit a release set with `deploy publish-v2`. The budget covers a whole release set, optionally awaited with --wait --timeout, not a single project.",
+      "timeoutMs": 1800000
+    },
+    "cloud-status": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "status"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Summarize the workspace: one line per entry with its state and the command that shows more.",
+      "timeoutMs": 60000
+    },
+    "cloud-env": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "env"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Check or converge one environment's continuous-delivery prerequisites.",
+      "timeoutMs": 300000
+    },
+    "cloud-logs": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "logs"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Query or follow a workspace app's logs.",
+      "timeoutMs": 86400000
+    },
+    "cloud-traces": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "traces"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Query a workspace app's traces.",
+      "timeoutMs": 120000
+    },
+    "cloud-metrics": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "metrics"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Query a workspace app's metric series.",
+      "timeoutMs": 120000
+    }
+  }
+}

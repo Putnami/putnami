@@ -1,0 +1,67 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "distribution-api",
+    "audience": "distribution-api"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/distribution-api/go",
+    "clients": [
+      {
+        "service": "distribution-api",
+        "clientSymbol": "DistributionClient",
+        "bindingSymbol": "RegisterDistributionClient"
+      }
+    ]
+  },
+  "contractSha256": "d005988d23d48a237bd769da9713d72c3404741760efbb0991fa5a5c9bc09447",
+  "operations": [
+    {
+      "operationId": "getV1_Workspaces_Workspace_Distribution_Bindings",
+      "service": "distribution-api",
+      "methodSymbol": "GetV1WorkspacesDistributionBindings",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/distribution/bindings",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Distribution_Package-shares_Received",
+      "service": "distribution-api",
+      "methodSymbol": "GetV1WorkspacesDistributionPackageSharesReceived",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/distribution/package-shares/received",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Workspaces_Workspace_Distribution_Bindings",
+      "service": "distribution-api",
+      "methodSymbol": "CreateV1WorkspacesDistributionBindings",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/distribution/bindings",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "d6cb8e0f6fbedd653b2a9e7126bdabf84be1c09dbbc1f5769de56fe24740568a"
+    }
+  ]
+}

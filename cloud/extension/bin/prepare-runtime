@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+# Build the @putnami/cloud runtime into the output directory assigned by the
+# contract-v3 runtime preparer. This intentionally uses the module's own
+# replace closure instead of the caller's Go workspace.
+set -eu
+
+if [ "$#" -ne 2 ] || [ "$1" != "--output" ] || [ -z "$2" ]; then
+  echo "usage: prepare-runtime --output <runtime-output>" >&2
+  exit 2
+fi
+
+output=$2
+case "$output" in
+  /*) ;;
+  *) output="$(pwd)/$output" ;;
+esac
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+extension_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
+cd "$extension_root"
+
+mkdir -p "$output/compiled"
+GOWORK=off exec go build -o "$output/compiled/putnami-cloud" ./cmd/putnami-cloud

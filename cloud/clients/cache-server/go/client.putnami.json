@@ -1,0 +1,171 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "cache-server",
+    "audience": "cache-server"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/cache-server/go",
+    "clients": [
+      {
+        "service": "cache-server",
+        "clientSymbol": "CacheClient",
+        "bindingSymbol": "RegisterCacheClient"
+      }
+    ]
+  },
+  "contractSha256": "73bdcf7f2359730069780ae4288b7b7d2466c92a2b08e3600536dcbf02698bf7",
+  "operations": [
+    {
+      "operationId": "getV1_Cache_Capabilities",
+      "service": "cache-server",
+      "methodSymbol": "ListV1CacheCapabilities",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/cache/capabilities",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Cache_Commit",
+      "service": "cache-server",
+      "methodSymbol": "CreateV1CacheCommit",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/cache/commit",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Cache_Commit-batch",
+      "service": "cache-server",
+      "methodSymbol": "CreateV1CacheCommitBatch",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/cache/commit-batch",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Cache_Download-batch",
+      "service": "cache-server",
+      "methodSymbol": "CreateV1CacheDownloadBatch",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/cache/download-batch",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Cache_Find-missing",
+      "service": "cache-server",
+      "methodSymbol": "CreateV1CacheFindMissing",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/cache/find-missing",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Cache_Negotiate",
+      "service": "cache-server",
+      "methodSymbol": "CreateV1CacheNegotiate",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/cache/negotiate",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Cache_Objects_Lookup",
+      "service": "cache-server",
+      "methodSymbol": "CreateV1CacheObjectsLookup",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/cache/objects/lookup",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Cache_Objects_Store",
+      "service": "cache-server",
+      "methodSymbol": "CreateV1CacheObjectsStore",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/cache/objects/store",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Cache_Run-marker_Lookup",
+      "service": "cache-server",
+      "methodSymbol": "CreateV1CacheRunMarkerLookup",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/cache/run-marker/lookup",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Cache_Run-marker_Publish",
+      "service": "cache-server",
+      "methodSymbol": "CreateV1CacheRunMarkerPublish",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/cache/run-marker/publish",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "postV1_Cache_Store",
+      "service": "cache-server",
+      "methodSymbol": "CreateV1CacheStore",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/cache/store",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "42429f9045ef6c1722ad412827925321c7119ae36ac01b5bb838b82cc2b7ecad"
+    }
+  ]
+}

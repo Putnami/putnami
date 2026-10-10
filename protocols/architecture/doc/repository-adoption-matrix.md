@@ -1,10 +1,10 @@
 # Repository adoption matrix
 
-This repository maps **94 of its 133 projects** to **10 architecture domains**.
-The other **39 are excluded on purpose**: 28 samples, 7 templates, 2 template
-proofs, the standalone agent-readiness CLI, and the Cloud runtime destination.
-Every one of the 133 appears in a table below, mapped or excluded, with a
-reason.
+This repository maps **94 of its 148 projects** to **10 architecture domains**.
+The other **54 are excluded on purpose**: 28 samples, 7 templates, 2 template
+proofs, the standalone agent-readiness CLI, the Cloud runtime destination, and
+the Cloud CLI extension with its 14 generated clients. Every one of the 148
+appears in a table below, mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
 `putnami architecture validate` proves that every mapped project's cross-domain
@@ -276,6 +276,36 @@ to the frontier.
 | Project | Class | Owner |
 |---|---|---|
 | `/cloud/runtime/typescript` | Hosted-platform client library | `cloud` |
+
+### Cloud CLI extension — 15 projects
+
+**Why excluded:** `@putnami/cloud-extension` builds the `@putnami/cloud`
+extension binary, a client of the hosted platform. Its 14 generated clients
+come from the published Cloud CLI schema, and only the extension consumes
+them. No repository project links the extension from the workspace, and no
+existing domain owns the hosted platform's wire contracts.
+
+**What would change it:** if a repository project links it from the workspace,
+review a Cloud domain and the exact cross-domain permissions before adding it
+to the frontier.
+
+| Project | Class | Owner |
+|---|---|---|
+| `/cloud/extension` | Hosted-platform CLI extension | `cloud` |
+| `/cloud/clients/auth-server` | Generated client | `cloud` |
+| `/cloud/clients/cache-server` | Generated client | `cloud` |
+| `/cloud/clients/config-api` | Generated client | `cloud` |
+| `/cloud/clients/control-api` | Generated client | `cloud` |
+| `/cloud/clients/data-api` | Generated client | `cloud` |
+| `/cloud/clients/db-gateway` | Generated client | `cloud` |
+| `/cloud/clients/delivery-api` | Generated client | `cloud` |
+| `/cloud/clients/distribution-api` | Generated client | `cloud` |
+| `/cloud/clients/identity-api` | Generated client | `cloud` |
+| `/cloud/clients/observability-api` | Generated client | `cloud` |
+| `/cloud/clients/oci-server` | Generated client | `cloud` |
+| `/cloud/clients/put-server` | Generated client | `cloud` |
+| `/cloud/clients/runtime-api` | Generated client | `cloud` |
+| `/cloud/clients/source-api` | Generated client | `cloud` |
 
 ### Samples — 28 projects
 

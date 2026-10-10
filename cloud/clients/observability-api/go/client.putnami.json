@@ -1,0 +1,80 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "@putnami/clientgen",
+  "language": "go",
+  "service": {
+    "id": "observability-api",
+    "audience": "observability-api"
+  },
+  "binding": {
+    "importPath": "go.putnami.dev/cloud/clients/observability-api/go",
+    "clients": [
+      {
+        "service": "observability-api",
+        "clientSymbol": "ObservabilityClient",
+        "bindingSymbol": "RegisterObservabilityClient"
+      }
+    ]
+  },
+  "contractSha256": "8d780c09c25c6dd4d30b7ca7f215f019a8447b453efeb9ed5f5cd7cc31bd7094",
+  "operations": [
+    {
+      "operationId": "getV1_Workspaces_Workspace_Logs",
+      "service": "observability-api",
+      "methodSymbol": "GetV1WorkspacesLogs",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/logs",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Logs_Tail",
+      "service": "observability-api",
+      "methodSymbol": "GetV1WorkspacesLogsTail",
+      "stream": "server",
+      "transports": [
+        {
+          "protocol": "sse",
+          "path": "/v1/workspaces/{workspace}/logs/tail",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Metrics",
+      "service": "observability-api",
+      "methodSymbol": "GetV1WorkspacesMetrics",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/metrics",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
+      "operationId": "getV1_Workspaces_Workspace_Traces",
+      "service": "observability-api",
+      "methodSymbol": "GetV1WorkspacesTraces",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/traces",
+          "encoding": "json"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client.gen.go",
+      "sha256": "e63a2f7c843ddb0f8ef280d1e945acef4e90ecf7c34b0c2886d823b926d3d96c"
+    }
+  ]
+}
