@@ -38,7 +38,6 @@ func hostWithoutBun(t *testing.T) (home, putnamiHome string) {
 	t.Setenv("PATH", t.TempDir())
 	t.Setenv("BUN_INSTALL", "")
 	t.Setenv("BUN_RUNTIME_TRANSPILER_CACHE_PATH", "")
-	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
 	return home, putnamiHome
 }
 

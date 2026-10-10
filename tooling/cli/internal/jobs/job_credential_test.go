@@ -571,7 +571,6 @@ func TestOfflineSignalKeysADeclaringTaskApart(t *testing.T) {
 		return got
 	}
 
-	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
 	localDeclaring, localOther := key(declaring), key(other)
 	// What runcredential.Capture leaves in the environment of a hosted run.
 	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")

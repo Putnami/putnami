@@ -12,10 +12,6 @@ import (
 func TestReadJobCredential_AbsentVariableHandsNothing(t *testing.T) {
 	resetJobCredentialForTest()
 	t.Cleanup(resetJobCredentialForTest)
-	t.Setenv(extensionproto.JobCredentialFDEnv, "")
-	if err := os.Unsetenv(extensionproto.JobCredentialFDEnv); err != nil {
-		t.Fatal(err)
-	}
 
 	credential, err := ReadJobCredential()
 	if credential != nil || err != nil {

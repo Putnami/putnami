@@ -13,6 +13,7 @@ import (
 
 	"go.putnami.dev/go/extension/internal/workspacejob/jobtest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
+	"go.putnami.dev/sdk/extension/localrun"
 )
 
 // mainHelperArgs holds, as a JSON array, the arguments TestMainHelperProcess
@@ -45,7 +46,8 @@ func runPutnamiGo(t *testing.T, env []string, args ...string) ([]*runtimeproto.E
 }
 
 // runPutnamiGoWithFiles is runPutnamiGo with files inherited as descriptors 3
-// and up, the way the engine hands a job a descriptor.
+// and up, the way the engine hands a job a descriptor. The binary keeps the
+// hosted-run variables of env (localrun.StartedEntry).
 func runPutnamiGoWithFiles(t *testing.T, env []string, files []*os.File, args ...string) ([]*runtimeproto.Event, string, int) {
 	t.Helper()
 	encoded, err := json.Marshal(args)
@@ -53,7 +55,7 @@ func runPutnamiGoWithFiles(t *testing.T, env []string, files []*os.File, args ..
 		t.Fatal(err)
 	}
 	cmd := exec.Command(os.Args[0], "-test.run=^TestMainHelperProcess$")
-	cmd.Env = slices.Concat(env, []string{mainHelperArgs + "=" + string(encoded)})
+	cmd.Env = slices.Concat(env, []string{mainHelperArgs + "=" + string(encoded), localrun.StartedEntry})
 	cmd.ExtraFiles = files
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

@@ -25,8 +25,6 @@ func hostedHookTest(t *testing.T, hosted bool) {
 	}
 	t.Cleanup(runcredential.SetForTest(bearer))
 	t.Setenv(runcredential.CacheTokenEnv, "cache-token")
-	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
-	_ = os.Unsetenv(extensionproto.OfflineDependenciesEnv)
 }
 
 // wantHostedEnv checks what a hook of a hosted run, or of a local one, sees:

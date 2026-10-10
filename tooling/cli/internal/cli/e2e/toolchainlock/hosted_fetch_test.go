@@ -142,8 +142,6 @@ func TestDepsInstallFetchesThroughTheEngineOnAHostedRun(t *testing.T) {
 			if tc.bearer != "" {
 				// What runcredential.Capture leaves in a hosted run's environment.
 				t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
-			} else {
-				t.Setenv(extensionproto.OfflineDependenciesEnv, "")
 			}
 
 			var done []string

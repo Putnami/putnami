@@ -377,7 +377,6 @@ func installArgv(t *testing.T, force bool) ([]string, []string) {
 func TestRunWorkspaceInstall_OutsideAHostedRunKeepsTodaysArgv(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "hosted-install-fetches-first",
 		"the-hosted-install-is-frozen-and-materializes-no-credential")
-	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
 	argv, refreshed := installArgv(t, false)
 	if !slices.Equal(argv, []string{"install"}) {
 		t.Errorf("argv = %v, want [install]", argv)

@@ -110,11 +110,6 @@ func TestAHandedDescriptorStartsNoCredentialChild(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			count := filepath.Join(t.TempDir(), "count")
 			fakeMaterializeCLI(t, fakeCLI{CountFile: count, Stdout: "pkt_seam_token\n"})
-			t.Setenv(extensionproto.OfflineDependenciesEnv, "")
-			t.Setenv(extensionproto.JobCredentialFDEnv, "")
-			if err := os.Unsetenv(extensionproto.JobCredentialFDEnv); err != nil {
-				t.Fatal(err)
-			}
 			resetJobCredentialForTest()
 			t.Cleanup(resetJobCredentialForTest)
 			if tc.hand {

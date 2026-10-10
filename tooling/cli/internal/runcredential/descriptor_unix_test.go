@@ -148,7 +148,7 @@ type helperResult struct {
 
 // runHelper starts this test binary in role, with args, content on descriptor
 // 3 when content is not nil, and env on top of an environment that carries no
-// cache token, no cloud token and no offline signal.
+// cache token and no cloud token.
 func runHelper(t *testing.T, role string, args []string, content []byte, env ...string) helperResult {
 	t.Helper()
 	encoded, err := json.Marshal(args)
@@ -157,8 +157,7 @@ func runHelper(t *testing.T, role string, args []string, content []byte, env ...
 	}
 	cmd := exec.Command(os.Args[0], helperRun)
 	for _, entry := range os.Environ() {
-		if !strings.HasPrefix(entry, CacheTokenEnv+"=") && !strings.HasPrefix(entry, CloudTokenEnv+"=") &&
-			!strings.HasPrefix(entry, extensionproto.OfflineDependenciesEnv+"=") {
+		if !strings.HasPrefix(entry, CacheTokenEnv+"=") && !strings.HasPrefix(entry, CloudTokenEnv+"=") {
 			cmd.Env = append(cmd.Env, entry)
 		}
 	}

@@ -79,12 +79,9 @@ func TestRunWorkspaceFetch_AHandedEmptyCredentialStartsNoCredentialChild(t *test
 
 			var env []string
 			for _, entry := range os.Environ() {
-				name, _, _ := strings.Cut(entry, "=")
-				switch name {
-				case extensionproto.OfflineDependenciesEnv, extensionproto.JobCredentialFDEnv, registry.CLIExecutableEnv:
-					continue
+				if name, _, _ := strings.Cut(entry, "="); name != registry.CLIExecutableEnv {
+					env = append(env, entry)
 				}
-				env = append(env, entry)
 			}
 			resultPath := filepath.Join(dir, "result")
 			env = append(env, emptyDescriptorHelperEnv+"="+resultPath, registry.CLIExecutableEnv+"="+cli)
