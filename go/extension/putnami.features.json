@@ -629,7 +629,8 @@
             "checks": [
               "the-host-platform-identity-is-scrubbed-from-the-test-subprocess",
               "every-other-inherited-variable-is-preserved",
-              "the-scrub-is-a-noop-when-there-is-no-platform-identity"
+              "the-scrub-is-a-noop-when-there-is-no-platform-identity",
+              "a-test-process-runs-offline-and-sees-no-job-variable"
             ]
           }
         },

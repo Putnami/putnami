@@ -136,6 +136,22 @@ func TestMakeTestEnv_ScrubsHostPlatformIdentity(t *testing.T) {
 	}
 }
 
+// On a hosted run the engine describes the job to the extension in two
+// variables. pytest must see neither: a repository's tests are not jobs of the
+// run.
+func TestMakeTestEnv_ScrubsTheJobVariablesOfAHostedRun(t *testing.T) {
+	t.Setenv("PUTNAMI_OFFLINE_DEPENDENCIES", "1")
+	t.Setenv("PUTNAMI_JOB_CREDENTIAL_FD", "7")
+
+	env := MakeTestEnv("/ws", "/ws/pkg", nil)
+
+	for _, name := range []string{"PUTNAMI_OFFLINE_DEPENDENCIES", "PUTNAMI_JOB_CREDENTIAL_FD"} {
+		if value, found := envValue(env, name); found {
+			t.Errorf("%s leaked into the pytest environment as %q", name, value)
+		}
+	}
+}
+
 // The scrub must cost nothing else: the harness wiring, the caller's extras,
 // credentials and the capability-bearing GCP project selector all survive.
 func TestMakeTestEnv_PreservesEverythingElse(t *testing.T) {

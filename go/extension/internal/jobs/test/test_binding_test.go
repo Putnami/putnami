@@ -127,6 +127,40 @@ func TestBuildTestEnv_ScrubsHostPlatformIdentity(t *testing.T) {
 	}
 }
 
+// On a hosted run the engine tells the job that its dependencies are already
+// downloaded. The `go test` process, and the tests it runs, keep the go settings
+// that forbid a download and see neither variable that describes the job: a
+// repository's tests are not jobs of the run.
+func TestBuildTestEnv_HostedRunKeepsDownloadsOffAndScrubsTheJobVariables(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "test-host-identity-scrub",
+		"a-test-process-runs-offline-and-sees-no-job-variable")
+	proj := filepath.Join(t.TempDir(), "svc")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PUTNAMI_OFFLINE_DEPENDENCIES", "1")
+	t.Setenv("PUTNAMI_JOB_CREDENTIAL_FD", "7")
+	t.Setenv("GOPROXY", "https://proxy.golang.org,direct")
+	t.Setenv("GONOPROXY", "corp.example/*")
+	t.Setenv("GOFLAGS", "-trimpath")
+
+	env, err := buildTestEnv(nil, proj, false, "")
+	if err != nil {
+		t.Fatalf("buildTestEnv: %v", err)
+	}
+	names := envNames(env)
+	for _, name := range hostenv.JobVars() {
+		if slices.Contains(names, name) {
+			t.Errorf("%s leaked into the `go test` environment", name)
+		}
+	}
+	for _, want := range []string{"GOPROXY=off", "GONOPROXY=none", "GOFLAGS=-trimpath -mod=readonly", "GOTOOLCHAIN=local"} {
+		if !slices.Contains(env, want) {
+			t.Errorf("the `go test` environment lacks %s: a test process could download a module", want)
+		}
+	}
+}
+
 // The scrub must cost nothing the test env already guaranteed: the harness
 // wiring, the toolchain env, credentials, and the capability-bearing GCP
 // project selector all survive.
@@ -180,7 +214,7 @@ func TestBuildTestEnv_ScrubIsNoopWithoutPlatformIdentity(t *testing.T) {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range hostenv.PlatformIdentityVars() {
+	for _, name := range append(hostenv.PlatformIdentityVars(), hostenv.JobVars()...) {
 		if _, ok := os.LookupEnv(name); ok {
 			t.Setenv(name, "")
 			os.Unsetenv(name)

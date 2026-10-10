@@ -69,9 +69,24 @@
 // launched it. The list is sorted and duplicate-free (pinned by a test) so a
 // diff to it is reviewable. Matching is exact and case-sensitive, matching
 // POSIX environment semantics on the container platforms this describes.
+//
+// JOB VARIABLES. A hosted run also describes each job to the extension that
+// runs it, in two variables of go.putnami.dev/protocol/extension:
+// OfflineDependenciesEnv and JobCredentialFDEnv. They are addressed to the
+// extension, not to the repository's tests. A test process that inherits them
+// takes the paths of a job of a hosted run (it refuses to refresh a credential,
+// it treats every dependency as already downloaded) and fails there and nowhere
+// else. JobVars lists them and ScrubJobVars removes them. The extension applies
+// its offline policy first: the scrub removes the two names only, so the
+// package manager settings that forbid a download stay in the test process.
 package hostenv
 
-import "strings"
+import (
+	"slices"
+	"strings"
+
+	extensionproto "go.putnami.dev/protocol/extension"
+)
 
 // platformIdentityVars is the sorted, duplicate-free set of host deployment
 // identity variables. Grouped by the platform that injects them; kept sorted
@@ -165,6 +180,41 @@ func ScrubPlatformIdentity(env []string) []string {
 	for _, entry := range env {
 		name, _, ok := strings.Cut(entry, "=")
 		if ok && IsPlatformIdentity(name) {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+// jobVars is the sorted set of variables the engine sets to describe a job of
+// a hosted run to the extension that runs it. Neither holds a secret.
+var jobVars = []string{
+	extensionproto.JobCredentialFDEnv,
+	extensionproto.OfflineDependenciesEnv,
+}
+
+// JobVars returns the names of the variables that describe a job of a hosted
+// run, in sorted order. The returned slice is a fresh copy.
+func JobVars() []string {
+	return append([]string(nil), jobVars...)
+}
+
+// ScrubJobVars returns a copy of env, `KEY=VALUE` entries, with every job
+// variable removed (JobVars). A test launcher calls it after it applied its own
+// offline policy to env, so the test process keeps the settings that forbid a
+// dependency download and loses only the two names.
+//
+// An entry with no "=" is passed through untouched. Passing a nil or empty env
+// returns nil.
+func ScrubJobVars(env []string) []string {
+	if len(env) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(env))
+	for _, entry := range env {
+		name, _, ok := strings.Cut(entry, "=")
+		if ok && slices.Contains(jobVars, name) {
 			continue
 		}
 		out = append(out, entry)

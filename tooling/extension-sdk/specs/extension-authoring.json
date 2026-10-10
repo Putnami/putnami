@@ -50,7 +50,7 @@
     },
     {
       "id": "host-identity-scrub",
-      "text": "The platform-identity variable list covers the managed-runtime identity variables, excludes credential- and endpoint-bearing variables, is sorted and unique, is matched case-sensitively, and is returned as an independent copy that a caller cannot mutate in place."
+      "text": "The platform-identity variable list covers the managed-runtime identity variables, excludes credential- and endpoint-bearing variables, is sorted and unique, is matched case-sensitively, and is returned as an independent copy that a caller cannot mutate in place. A second scrub removes the two variables that describe a job of a hosted run and nothing else."
     },
     {
       "id": "checkout-independent-generation-paths",
