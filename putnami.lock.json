@@ -17,14 +17,14 @@
       "source": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/"
     },
     "go": {
-      "version": "1.26.1",
+      "version": "1.26.9",
       "integrities": {
-        "darwin/amd64": "65773dab2f8cc4cd23d93ba6d0a805de150ca0b78378879292be0b903b8cdd08",
-        "darwin/arm64": "353df43a7811ce284c8938b5f3c7df40b7bfb6f56cb165b150bc40b5e2dd541f",
-        "linux/amd64": "031f088e5d955bab8657ede27ad4e3bc5b7c1ba281f05f245bcc304f327c987a",
-        "linux/arm64": "a290581cfe4fe28ddd737dde3095f3dbeb7f2e4065cab4eae44dfc53b760c2f7",
-        "windows/amd64": "9b68112c913f45b7aebbf13c036721264bbba7e03a642f8f7490c561eebd1ecc",
-        "windows/arm64": "c17e09676be0faad3cbed1c81bb02f38fb73e2f93d048571cc13730fe23f2d5b"
+        "darwin/amd64": "00c29e3d4c8562f547410daa18d2959b641bd691ab00c4a525ea817a0253d4bd",
+        "darwin/arm64": "f9bb7c0a02506c5d9bf0d1eb1f7ee6c7684f844ae49558308a0427b830e022cc",
+        "linux/amd64": "42d158b4d8f7b61ac0a830567c940a86098fb7aac52e467a5ebec03ef5cc2f8d",
+        "linux/arm64": "4a97373d49fcacdcf3694fea368a500b00ee3e963974f3e7514132717632f052",
+        "windows/amd64": "d722201a9c0c086d1610e111c48203009af690892ed708072bd5ae20160e7a59",
+        "windows/arm64": "05215f9e71ea27c9e843409314b1e6bf12dc6a5516318126b2357d497fed42c5"
       },
       "source": "https://go.dev/dl/"
     }
