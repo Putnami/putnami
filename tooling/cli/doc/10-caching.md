@@ -380,10 +380,12 @@ candidate Git lists as a directory (a submodule or a nested repository) prevent
 key computation. Ordinary patterns keep their existing behavior; adding
 `git:**` does not filter files an ordinary pattern separately selects.
 
-A task that declares a `git:` input also keys on the workspace's probe digest:
-its projects, their paths, extensions and dependency edges. Such a task judges
-the workspace from the membership in its context, and user config or a scope
-manifest Git ignores can change that membership without changing a candidate.
+A task that declares a `git:` input, from the project, the workspace or the
+dependency closure, also keys on the workspace membership its job context
+carries: each project's identity, path, configuration, extensions and
+dependency edges, without the line's base version or the absolute path. Such a
+task judges the workspace from that membership, and user config or a scope
+manifest Git ignores can change it without changing a candidate.
 
 An extension manifest whose task declares a `git:` input requires CLI contract
 7: a CLI before it keys a candidate's bytes without its executable bit and
