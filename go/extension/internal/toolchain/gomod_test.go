@@ -235,6 +235,11 @@ func TestParseGoMod_IgnoreForms(t *testing.T) {
 			want:    []string{"c"},
 		},
 		{
+			name:    "an empty block opens nothing",
+			content: "module m\n\nignore ()\n\ntool (\n\texample.com/cmd/x\n)\n\nignore c\n",
+			want:    []string{"c"},
+		},
+		{
 			name:    "a tab or a paren follows the verb",
 			content: "module m\n\nignore\t./tools\nignore(\n\tstatic\n)\n",
 			want:    []string{"./tools", "static"},

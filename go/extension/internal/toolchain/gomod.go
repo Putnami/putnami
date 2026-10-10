@@ -173,10 +173,14 @@ func ParseGoMod(content string) (*GoModFile, error) {
 		case goModVerb(line, "ignore"):
 			// The go lexer splits on any whitespace and reads `(` as a token of
 			// its own, so `ignore(` opens a block and `ignore<TAB>x` is a line.
-			// A paren with trailing content opens a block too, like `require (`.
-			if rest := strings.TrimSpace(strings.TrimPrefix(line, "ignore")); strings.HasPrefix(rest, "(") {
+			// A paren with trailing content opens a block too, like `require (`,
+			// except the empty block `()`.
+			rest := strings.TrimSpace(strings.TrimPrefix(line, "ignore"))
+			switch {
+			case strings.Join(strings.Fields(rest), "") == "()":
+			case strings.HasPrefix(rest, "("):
 				block = "ignore"
-			} else {
+			default:
 				mod.recordIgnore(rest)
 			}
 		}
@@ -203,7 +207,9 @@ func (m *GoModFile) ReplacedModules() map[string]bool {
 // listed anyway: it is no more valid as a require or replace entry than the
 // others, so treating it as a stanza opener can only end a block that was
 // already broken.
-var goModDirectiveKeywords = []string{"module", "go", "require", "replace", "ignore", "use"}
+var goModDirectiveKeywords = []string{
+	"module", "go", "toolchain", "godebug", "require", "exclude", "replace", "retract", "tool", "ignore", "use",
+}
 
 // startsGoModDirective reports whether a line opens a top-level directive.
 //
