@@ -170,8 +170,6 @@ var spawnSites = map[string]spawnSite{
 		why: "sysctl"},
 	"jobs/runtime_toolchains.go:probeRuntimeToolchain": {spawns: 1, verdict: noRepositoryCode,
 		why: "the version probe of a pinned toolchain"},
-	"jobs/toolchain_cache.go:probeToolVersion": {spawns: 1, verdict: noRepositoryCode,
-		why: "the --version of a toolchain"},
 	"launch/credential_probe.go:credentialProbe": {spawns: 1, verdict: noRepositoryCode,
 		why: "the --help of the pinned CLI, which receives no credential"},
 	"launch/launch_windows.go:reexec": {spawns: 1, verdict: noRepositoryCode,

@@ -59,15 +59,6 @@ func TestMain(m *testing.M) {
 		runObjectCacheClientJob(os.Getenv(objectCacheJobResultEnv))
 		return
 	}
-	// The ambient-tool version probe re-execs this binary as a stand-in for the
-	// toolchain it identifies. It runs here, before m.Run parses flags, because
-	// the probe passes `--version` — which the testing flag set would reject —
-	// and because a child that must never return cannot be a test the harness
-	// waits on.
-	if mode, ok := toolProbeHelperMode(os.Args[0]); ok {
-		runToolProbeHelper(mode)
-		return
-	}
 	code := m.Run()
 	fixtureproc.Remove()
 	os.Exit(code)
