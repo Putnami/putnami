@@ -184,7 +184,9 @@ func TestServiceRefusalsAreAPIClassified(t *testing.T) {
 		{http.StatusTooManyRequests, `{}`, "try again in a minute"},
 		{http.StatusServiceUnavailable, `{}`, "answered 503"},
 	} {
+		var requests atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requests.Add(1)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(tc.status)
 			_, _ = io.WriteString(w, tc.body)
@@ -192,13 +194,16 @@ func TestServiceRefusalsAreAPIClassified(t *testing.T) {
 		_, err := Submit(context.Background(), server.URL, nil, built.Bytes)
 		failure := sendFailure(context.Background(), err, server.URL)
 		server.Close()
+		if requests.Load() != 1 {
+			t.Errorf("status %d: the create was sent %d times", tc.status, requests.Load())
+		}
 		if protocolcli.ExitCodeForError(failure) != protocolcli.ExitAPI || !strings.Contains(failure.Error(), tc.detail) || !strings.Contains(failure.Error(), InspectCommand) {
 			t.Errorf("status %d: %v", tc.status, failure)
 		}
 	}
 }
 
-func TestSubmissionDeadlineDoesNotRetry(t *testing.T) {
+func TestSubmissionPastTheCallerDeadlineAsksToRaiseTimeout(t *testing.T) {
 	release := make(chan struct{})
 	ctx := newArrivalDeadline()
 	var requests atomic.Int32
