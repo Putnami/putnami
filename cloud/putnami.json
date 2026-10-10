@@ -1,0 +1,7 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-scope.json",
+  "includes": [
+    "runtime/typescript"
+  ],
+  "line": {}
+}

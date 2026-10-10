@@ -24,6 +24,7 @@
     "extension:@putnami/intelligence"
   ],
   "includes": [
+    "cloud",
     "go",
     "intelligence",
     "protocols",

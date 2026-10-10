@@ -30,6 +30,7 @@
     "members": [
       {
         "select": [
+          "/cloud/...",
           "/protocols/...",
           "/tooling/...",
           "/intelligence/...",

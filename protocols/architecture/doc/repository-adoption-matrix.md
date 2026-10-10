@@ -1,9 +1,10 @@
 # Repository adoption matrix
 
-This repository maps **94 of its 132 projects** to **10 architecture domains**.
-The other **38 are excluded on purpose**: 28 samples, 7 templates, 2 template
-proofs, and the standalone agent-readiness CLI. Every one of the 132 appears in
-a table below, mapped or excluded, with a reason.
+This repository maps **94 of its 133 projects** to **10 architecture domains**.
+The other **39 are excluded on purpose**: 28 samples, 7 templates, 2 template
+proofs, the standalone agent-readiness CLI, and the Cloud runtime destination.
+Every one of the 133 appears in a table below, mapped or excluded, with a
+reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
 `putnami architecture validate` proves that every mapped project's cross-domain
@@ -258,6 +259,23 @@ cross-domain permissions before adding it to the frontier.
 | Project | Class | Owner |
 |---|---|---|
 | `/intelligence/agent-readiness` | Standalone repository collector | `intelligence` |
+
+### Cloud runtime destination — 1 project
+
+**Why excluded:** `@putnami/cloud` is client code of the hosted platform. It
+adds config, secrets and Event Server destinations to the TypeScript framework
+through the framework's registration seam. No repository project links it from
+the workspace, and no existing domain owns the hosted platform's wire
+contracts. Mapping it to `typescript-framework` would give that domain an
+authority it does not hold.
+
+**What would change it:** if a repository project links it from the workspace,
+review a Cloud domain and the exact cross-domain permissions before adding it
+to the frontier.
+
+| Project | Class | Owner |
+|---|---|---|
+| `/cloud/runtime/typescript` | Hosted-platform client library | `cloud` |
 
 ### Samples — 28 projects
 
