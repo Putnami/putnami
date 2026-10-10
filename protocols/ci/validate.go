@@ -191,7 +191,7 @@ func validateRulePublish(add func(diag.Diagnostic), field string, rule Rule, eve
 		}
 		if distribution != nil && distribution.Channels[channel].Protected {
 			add(diag.Errorf("ci.protected_channel_in_rule", channelField,
-				"channel %q is protected; only `putnami channel set` by a user moves it", channel))
+				"channel %q is protected; only a user moves it, with the release-set provider's channel command", channel))
 		}
 	}
 }

@@ -19,57 +19,6 @@ flag: --base | <commit> | Required base commit or ref; emitted as its full immut
 flag: --head | <commit> | Optional head commit or ref; it must resolve to the checked-out HEAD
 example: putnami change-plan --base origin/main --output=json
 example: putnami change-plan --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl
-═══ channel ═══
-description: Move a channel to a release set that already exists, and report the head each registry has applied. Both are metadata operations: they publish nothing, build nothing, and check nothing out
-usage: putnami channel <set|status>
-example: putnami channel set latest --from canary
-example: putnami channel status latest --wait 2m
-═══ channel set ═══
-description: Point a channel at a release set that already exists, taken from another channel or named by its immutable id. Promotion and rollback are this one command: no publisher runs, no artifact is uploaded, and the move is compare-and-swapped against the channel's current head
-usage: putnami channel set <channel> --from <channel|rs_id> [--expected <rs_id>]
-flag: --from | <channel|rs_id> | The channel whose head is re-released, or the immutable release-set id to point at
-flag: --expected | <rs_id> | The id the channel must currently name; without it the channel's current head is read and used
-example: putnami channel set latest --from canary
-example: putnami channel set latest --from rs_<64-lowercase-hex>
-example: putnami channel set canary --from ts-v0.3.0 --expected rs_<64-lowercase-hex>
-═══ channel status ═══
-description: Report a channel's accepted head and the generation each registry has applied. It exits non-zero while any registry is behind, so a pipeline waits for the channel to be served instead of assuming it
-usage: putnami channel status <channel> [--wait <duration>]
-flag: --wait | <duration> | Poll every 2s until every registry has applied the accepted head, or this Go duration elapses
-example: putnami channel status latest
-example: putnami channel status canary --wait 2m
-═══ ci ═══
-description: Strictly validate putnami.ci.json, resolve its command references against discovered workspace jobs, refuse distribution and envs without an installed release-set provider, and report its canonical digest without contacting Putnami Cloud
-usage: putnami ci validate [--output <format>]
-example: putnami ci validate
-example: putnami ci validate --output=json
-═══ ci explain ═══
-description: Evaluate ordered rules locally and report the commands and flags the run executes, the matching rule or the implicit tag convention, the channels a publish advances, and the environments that follow each of them. Trust, entitlements, secrets, and remote authorization remain explicitly unresolved
-usage: putnami ci explain --event <push|tag|pull_request> [--branch <branch>] [--tag <tag>] [--pr <number>] [--output <format>]
-flag: --event | <push|tag|pull_request> | Normalized Source event assumption
-flag: --branch | <branch> | Updated push branch or pull-request head branch
-flag: --tag | <tag> | Created tag, for --event tag
-flag: --pr | <number> | Pull-request number used to render the closed channel placeholder
-example: putnami ci explain --event push --branch main --output=json
-example: putnami ci explain --event tag --tag ts/v0.3.0
-example: putnami ci explain --event pull_request --branch feature/x --pr 42
-═══ ci fmt ═══
-description: Validate and canonicalize putnami.ci.json while preserving semantic rule order; --check is read-only and fails when bytes differ
-usage: putnami ci fmt [--check] [--output <format>]
-flag: --check |  | Check canonical formatting without writing
-example: putnami ci fmt
-example: putnami ci fmt --check
-═══ ci init ═══
-description: Create putnami.ci.json beside putnami.workspace.json using discovered framework graph jobs, with no distribution and no environment, so it requests no publish or deploy authority
-usage: putnami ci init [--force] [--output <format>]
-flag: --force |  | Replace an existing putnami.ci.json
-example: putnami ci init
-example: putnami ci init --output=json
-═══ ci validate ═══
-description: Strictly validate putnami.ci.json, resolve its command references against discovered workspace jobs, refuse distribution and envs without an installed release-set provider, and report its canonical digest without contacting Putnami Cloud
-usage: putnami ci validate [--output <format>]
-example: putnami ci validate
-example: putnami ci validate --output=json
 ═══ completion ═══
 description: Generate a shell completion script for bash, zsh, or fish; source it or install it where the shell looks for completions
 usage: putnami completion <bash|zsh|fish>
@@ -175,6 +124,13 @@ example: putnami help
 example: putnami help projects list
 example: putnami help --man
 example: putnami help --markdown
+═══ impact-plan ═══
+description: Emit the impacted plan of the exact commit delta from --base to the checked-out HEAD for a comma-separated command list: the changed files, the impacted projects, and every task the engine plans for those commands. An extension reads this ImpactPlan instead of importing the CLI, and derives its own document from it, such as a ChangePlan. The worktree must be clean and --base must be a HEAD ancestor. Source contents, environment values, secrets, command arguments, and output paths are never emitted
+usage: putnami impact-plan <commands> --base <commit> [--head <commit>] [--no-cache] [--output <format>]
+flag: --base | <commit> | Required base commit or ref; emitted as its full immutable commit SHA
+flag: --head | <commit> | Optional head commit or ref; it must resolve to the checked-out HEAD
+example: putnami impact-plan test,build --base origin/main --output=json
+example: putnami impact-plan lint --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl
 ═══ infra ═══
 description: Show the aggregated infrastructure plan inferred from project descriptors
 usage: putnami infra plan [--output <format>]

@@ -47,10 +47,7 @@ func LoadDistributionPolicy(wsRoot string) (*ciproto.Distribution, error) {
 }
 
 // distributionNamespace is THE rule that turns a repository into a provider
-// identity: the namespace it declared, else its own workspace name. It is a
-// function of the POLICY and not of the workspace object so that a reader who
-// holds neither a loaded workspace nor a loaded policy can still apply the
-// identical rule through DistributionNamespace below.
+// identity: the namespace it declared, else its own workspace name.
 func distributionNamespace(policy *ciproto.Distribution, workspaceName string) string {
 	if policy != nil && policy.Namespace != "" {
 		return policy.Namespace
@@ -58,31 +55,10 @@ func distributionNamespace(policy *ciproto.Distribution, workspaceName string) s
 	return workspaceName
 }
 
-// DistributionNamespace is the namespace a repository publishes to and reads
-// back from, resolved from the CI document at wsRoot with workspaceName as the
-// fallback.
-//
-// It exists because the publisher and the channel commands must not disagree.
-// `putnami channel set` addressed the workspace's LOCAL name while every publish
-// addressed `distribution.namespace`, so on any repository that declares one —
-// a workspace named `cloud-workspace` that declares the namespace `cloud` —
-// the promotion asked the provider about a namespace nothing had ever written,
-// and the only symptom was the provider's opaque non-zero exit.
-//
-// An unreadable or invalid CI document is an ERROR rather than a silent fallback
-// to the workspace name: guessing would move a channel in the wrong namespace,
-// which is the one failure mode a compare-and-swap cannot catch.
-func DistributionNamespace(wsRoot, workspaceName string) (string, error) {
-	policy, err := LoadDistributionPolicy(wsRoot)
-	if err != nil {
-		return "", err
-	}
-	return distributionNamespace(policy, workspaceName), nil
-}
-
 // ProtectedChannel reports whether the repository declared this channel
 // protected. A protected channel is never advanced by a publish or a branch
-// rule; only `putnami channel set` from a user moves it (D31).
+// rule; only a user moves it, with the release-set provider's channel command
+// (D31).
 func ProtectedChannel(policy *ciproto.Distribution, name string) bool {
 	if policy == nil {
 		return false

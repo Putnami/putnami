@@ -42,6 +42,7 @@
         "../../putnami.workspace.json",
         "../../putnami.ci.json",
         "../../protocols/ci/fixtures/change-plan/**",
+        "../../protocols/ci/fixtures/impact-plan/**",
         "../../go/framework/config/*.go",
         "../../**/putnami.extension.json",
         "../local-collaboration/**",

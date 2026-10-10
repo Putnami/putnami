@@ -1,0 +1,36 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/impact-plan",
+  "outcomes": [
+    "An extension asks the engine for the impacted plan of a change, for the commands it names, and reads it with the protocol package alone",
+    "The ChangePlan change-plan emits and the ImpactPlan impact-plan emits for the same range never disagree, because one is the projection of the other"
+  ],
+  "nonGoals": [
+    "Changing ChangePlan v1: change-plan keeps its command list, its checks, its errors and its bytes",
+    "Naming a repository or binding the plan with a digest: the document a consumer derives from the plan holds both",
+    "Running any planned task: the command plans and executes nothing"
+  ],
+  "requirements": [
+    {
+      "id": "one-projection",
+      "text": "The ChangePlan change-plan emits is ChangePlanFromImpactPlan of the ImpactPlan impact-plan emits for lint,test,build,validate over the same range, with the origin remote as the repository. Every plan the CLI emits reproduces the protocol corpus byte for byte, and the CLI never emits a plan the protocol refuses."
+    },
+    {
+      "id": "pinned-revisions",
+      "text": "impact-plan plans only the checked-out HEAD of a clean worktree, from a --base that is its ancestor, and refuses each other range before it plans. It refuses a plan whose planning changed the checkout. It needs no repository remote."
+    },
+    {
+      "id": "named-commands",
+      "text": "The one positional argument names the commands, comma-separated, resolved through built-in and workspace aliases in order, and the engine plans exactly that list. A missing or extra list, a command named twice, an alias that expands to several commands, a command no discovered extension declares, and --baseline, --impacted, --projects or --all are usage errors. A declared command that plans no task is a valid empty plan; change-plan plans its fixed list whatever is declared."
+    },
+    {
+      "id": "one-structured-result",
+      "text": "With --output=json, impact-plan writes one result envelope whose command is impact-plan and whose data is the ImpactPlan, which ValidateImpactPlan accepts. The human output is a short summary."
+    }
+  ],
+  "decisions": [
+    "protocols/ci/doc/adr/0005-a-change-plan-projects-an-impact-plan.md",
+    "tooling/cli/doc/adr/0061-channel-and-ci-commands-leave-the-core-cli.md"
+  ]
+}

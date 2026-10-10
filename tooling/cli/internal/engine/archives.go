@@ -19,7 +19,7 @@ import (
 // its download channel while the run still reported success.
 //
 // Detection is provider-agnostic and uses the final dependency graph: any
-// archive uploader (e.g. @putnami/cloud's cloud-publish-archives) reads the
+// archive uploader, whichever extension declares it, reads the
 // project's package-archives output and so lists
 // "<projectID>:package~archives" in DependsOn. A selected project that declares
 // archive-publish intent (the "archives" publish channel or
@@ -125,7 +125,7 @@ func unpublishedArchiveProjects(commands []string, commandParams extension.Param
 // archiveDepProject reports whether a dependency key refers to a package
 // archives build and, if so, returns the project ID. This is the edge every
 // archive uploader has on the archives it reads. Two families qualify, both
-// uploaded by the same cloud-publish-archives job:
+// read by the same archive upload job:
 //   - release archives: "<projectID>:package~archives" (a Go binary) or
 //     "<projectID>:package~<ext>~archives" (another extension driving the Go
 //     packager).
@@ -133,9 +133,8 @@ func unpublishedArchiveProjects(commands []string, commandParams extension.Param
 //     step for a `type:"template"` project published on the template-archives
 //     channel) or "<projectID>:package~agent-content" (its step for a
 //     content-only extension, whose manifest declares agentContent).
-//     Without this, scaffold content projects — which set
-//     options.publish.archives to build their archive — trip the unpublished
-//     warning even though cloud-publish-archives does upload them.
+//     Scaffold content projects set options.publish.archives to build their
+//     archive, and an upload job that consumes this key uploads them.
 func archiveDepProject(depKey string) (string, bool) {
 	projID, plan, ok := strings.Cut(depKey, ":")
 	if !ok {
@@ -184,7 +183,7 @@ func reportUnpublishedArchives(projects, unannounced []string, skipped []extensi
 		level = "error"
 	}
 	iox.Fprintf(os.Stderr, "putnami: %s: %s declares a release-archives publish but no publish step uploaded them\n", level, strings.Join(projects, ", "))
-	iox.Fprintln(os.Stderr, "  the binary will not reach its download channel — ensure @putnami/cloud (or another archives publisher) is installed and active")
+	iox.Fprintln(os.Stderr, "  the binary will not reach its download channel — install an extension whose publish step uploads release archives, and check that it is active")
 	if len(unannounced) > 0 {
 		iox.Fprintf(os.Stderr, "  %s%s\n", strings.Join(unannounced, ", "), unannouncedArchiveMembersNote)
 	}
@@ -232,7 +231,7 @@ func unpublishedArchiveFailure(projects, unannounced []string, skipped []extensi
 		if len(projects) == 0 {
 			return
 		}
-		msg := strings.Join(projects, ", ") + " declares a release-archives publish but no publish step uploaded them; ensure @putnami/cloud (or another archives publisher) is installed and active"
+		msg := strings.Join(projects, ", ") + " declares a release-archives publish but no publish step uploaded them; install an extension whose publish step uploads release archives, and check that it is active"
 		if len(unannounced) > 0 {
 			msg += " (" + strings.Join(unannounced, ", ") + unannouncedArchiveMembersNote + ")"
 		}

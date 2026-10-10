@@ -272,7 +272,7 @@ local run and a hosted run of one commit state the same ancestry.
 
 | Channel | Resolves to |
 |---|---|
-| `latest` | The set a user promoted with `putnami channel set latest --from <channel or rs_id>`; the repository declares it `protected`, so no publish advances it |
+| `latest` | The set a user promoted with the release-set provider's channel command, such as `putnami cloud channels set latest --from <channel or rs_id>`; the repository declares it `protected`, so no publish advances it |
 | `stable` | Alias for the latest stable release (`upgrade`'s default) |
 | `canary` | The newest publication of the `canary` channel |
 | `<tag>` | The immutable channel a tagged publish created, in the portable encoding (`ts/v0.3.0` becomes `ts-v0.3.0`); it never moves again |

@@ -9,13 +9,7 @@ Build (from extensions):
 
 CI:
   change-plan                  Emit an immutable impacted CI ChangePlan
-  ci init                      Create a safe putnami.ci.json version 3 contract
-  ci validate                  Validate CI intent and workspace graph references
-  ci fmt                       Canonicalize putnami.ci.json
-  ci explain                   Explain first-match CI intent for local Source assumptions
-
-Distribution:
-  channel set|status           Move a distribution channel and report how far it is served
+  impact-plan                  Emit the impacted plan of a change for a command list
 
 Projects:
   projects list                List canonical workspace projects

@@ -7,13 +7,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
-	ciproto "go.putnami.dev/protocol/ci"
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/commands/cachecmd"
 	"go.putnami.dev/tooling/cli/internal/commands/ci"
@@ -71,142 +71,13 @@ func init() {
 	registerCommand("pin", cmdPin)
 	registerCommand("doctor", cmdDoctor)
 	registerCommand("change-plan", cmdChangePlan)
-	registerCommand("ci", cmdCI)
-	registerCommand("channel", cmdChannel)
-}
-
-// cmdChannel dispatches the two metadata-only channel operations. Neither
-// builds, publishes, or checks anything out: `set` moves a channel to a set
-// that already exists, `status` reports how far that move has been applied.
-func cmdChannel(env *CommandEnv) error {
-	if err := env.requireWorkspace(); err != nil {
-		return err
-	}
-	if env.Sub != "set" && env.Sub != "status" {
-		return usageErrorf("unknown subcommand: channel %s\n  Available: set, status", env.Sub)
-	}
-	path := "channel " + env.Sub
-	parsed, err := parseCatalogCommandFlags(path, env.Args)
-	if err != nil {
-		return err
-	}
-	if len(parsed.positionals) != 1 {
-		return usageErrorf("%s takes exactly one channel name", path)
-	}
-	channel := parsed.positionals[0]
-	if env.Sub == "set" {
-		return lifecycle.ChannelSet(env.Ctx, env.WsRoot, env.Cfg, channel, lifecycle.ChannelSetFlags{
-			From: parsed.value("--from"), Expected: parsed.value("--expected"),
-		})
-	}
-	wait, err := parseChannelWait(parsed.value("--wait"))
-	if err != nil {
-		return err
-	}
-	return lifecycle.ChannelStatus(env.Ctx, env.WsRoot, env.Cfg, channel, lifecycle.ChannelStatusFlags{Wait: wait})
-}
-
-// parseChannelWait reads --wait as a Go duration. A negative value is refused
-// rather than treated as "report once", because it almost always means the
-// caller computed the remaining budget and got it wrong.
-func parseChannelWait(raw string) (time.Duration, error) {
-	if strings.TrimSpace(raw) == "" {
-		return 0, nil
-	}
-	wait, err := time.ParseDuration(raw)
-	if err != nil || wait < 0 {
-		return 0, usageErrorf("channel status: --wait must be a Go duration such as 90s or 2m")
-	}
-	return wait, nil
-}
-
-func cmdCI(env *CommandEnv) error {
-	if err := env.requireWorkspace(); err != nil {
-		return err
-	}
-	path := "ci " + env.Sub
-	if env.Sub == "" {
-		path = "ci validate"
-	}
-	parsed, err := parseCatalogCommandFlags(path, env.Args)
-	if err != nil {
-		return err
-	}
-	if len(parsed.positionals) != 0 {
-		return usageErrorf("%s takes no positional arguments", path)
-	}
-	switch env.Sub {
-	case "init":
-		return ci.CIInit(env.WsRoot, env.Cfg, parsed.has("--force"), env.OutputFormat)
-	case "validate", "":
-		return ci.CIValidate(env.WsRoot, env.Cfg, env.OutputFormat)
-	case "fmt":
-		return ci.CIFormat(env.WsRoot, env.Cfg, parsed.has("--check"), env.OutputFormat)
-	case "explain":
-		input, inputErr := parseCIExplainInput(parsed, env.Global)
-		if inputErr != nil {
-			return inputErr
-		}
-		return ci.CIExplain(env.WsRoot, env.Cfg, input, env.OutputFormat)
-	default:
-		return usageErrorf("unknown subcommand: ci %s\n  Available: init, validate, fmt, explain", env.Sub)
-	}
-}
-
-// parseCIExplainInput turns the explain flags into the protocol's assumption.
-// Each event names exactly the fact it is evaluated against, so a tag with a
-// branch or a push with a pull-request number is a usage error rather than a
-// silently ignored flag.
-//
-// `--tag` is also the CLI-wide project-tag selection filter, and the global
-// pass consumes it before any command sees it, so the tag is read from
-// GlobalFlags.FilterTag. `ci explain` selects no project, so the two meanings
-// never both apply to one invocation, and the spelling stays the one the
-// catalog documents.
-func parseCIExplainInput(parsed commandFlagValues, global GlobalFlags) (ciproto.ExplainInput, error) {
-	tag := parsed.value("--tag")
-	if tag == "" {
-		tag = global.FilterTag
-	}
-	input := ciproto.ExplainInput{
-		Event:  ciproto.Event(parsed.value("--event")),
-		Branch: parsed.value("--branch"),
-		Tag:    tag,
-	}
-	if !input.Event.Valid() {
-		return input, usageErrorf("ci explain requires --event <push|tag|pull_request>")
-	}
-	if raw := parsed.value("--pr"); raw != "" {
-		number, err := strconv.Atoi(raw)
-		if err != nil || number <= 0 {
-			return input, usageErrorf("ci explain: --pr must be a positive integer")
-		}
-		if input.Event != ciproto.EventPullRequest {
-			return input, usageErrorf("ci explain: --pr is valid only for pull_request")
-		}
-		input.PullRequestNumber = number
-	}
-	if input.Event == ciproto.EventTag {
-		if input.Tag == "" {
-			return input, usageErrorf("ci explain --event tag requires --tag <tag>")
-		}
-		if input.Branch != "" {
-			return input, usageErrorf("ci explain: --branch is not evaluated for a tag")
-		}
-		return input, nil
-	}
-	if input.Tag != "" {
-		return input, usageErrorf("ci explain: --tag is valid only for --event tag")
-	}
-	if input.Branch == "" {
-		return input, usageErrorf("ci explain requires --branch <branch>")
-	}
-	return input, nil
+	registerCommand("impact-plan", cmdImpactPlan)
 }
 
 // cmdChangePlan emits the immutable, exact-revision CI admission document.
 // It deliberately owns no impact or task planning logic: ci.EmitChangePlan
-// routes through Engine.Run with the same impacted planner as lint/test/build.
+// routes through Engine.Run with the same impacted planner as lint/test/build,
+// and projects the ImpactPlan impact-plan would emit for changePlanCommands.
 func cmdChangePlan(env *CommandEnv) error {
 	if err := env.requireWorkspace(); err != nil {
 		return err
@@ -225,7 +96,7 @@ func cmdChangePlan(env *CommandEnv) error {
 		return usageErrorf("change-plan owns impact selection; use --base instead of --baseline, --impacted, --projects, or --all")
 	}
 	planner := newChangePlanPlanner(env.WsRoot, env.Cfg, engine.New().Run)
-	document, err := ci.EmitChangePlan(env.Ctx, env.WsRoot, ci.ChangePlanOptions{
+	document, err := ci.EmitChangePlan(env.Ctx, env.WsRoot, ci.PlanOptions{
 		Base:       parsed.value("--base"),
 		Head:       parsed.value("--head"),
 		NoCache:    env.Global.NoCache,
@@ -237,20 +108,84 @@ func cmdChangePlan(env *CommandEnv) error {
 	return ci.RenderChangePlan(env.OutputFormat, document)
 }
 
+// cmdImpactPlan emits the impacted plan of the exact commit range from --base
+// to the checked-out HEAD for the command list its one positional names. It is
+// the document an extension reads instead of importing the CLI. Like
+// change-plan, it owns no impact or task planning logic: ci.EmitImpactPlan
+// routes through Engine.Run with the impacted planner. The command list is
+// parsed by impactPlanCommands; impact-plan is a positional leaf
+// (commandmeta.PositionalLeaf), so the list arrives in env.Args.
+func cmdImpactPlan(env *CommandEnv) error {
+	if err := env.requireWorkspace(); err != nil {
+		return err
+	}
+	parsed, err := parseCatalogCommandFlags("impact-plan", env.Args)
+	if err != nil {
+		return err
+	}
+	if env.Sub != "" || len(parsed.positionals) != 1 {
+		return usageErrorf("impact-plan takes exactly one command list: run `putnami impact-plan <commands> --base <commit>`")
+	}
+	if env.Global.Baseline != "" || env.Global.Impacted || env.Global.Projects != "" || env.Global.All {
+		return usageErrorf("impact-plan owns impact selection; use --base instead of --baseline, --impacted, --projects, or --all")
+	}
+	commands, err := impactPlanCommands(parsed.positionals[0], env.Cfg)
+	if err != nil {
+		return err
+	}
+	planner := newImpactPlanPlanner("impact-plan", env.WsRoot, env.Cfg, commands, refuseUndeclaredCommands(commands, engine.New().Run))
+	document, err := ci.EmitImpactPlan(env.Ctx, env.WsRoot, ci.PlanOptions{
+		Base:       parsed.value("--base"),
+		Head:       parsed.value("--head"),
+		NoCache:    env.Global.NoCache,
+		CLIVersion: Version,
+	}, planner)
+	if err != nil {
+		return err
+	}
+	return ci.RenderImpactPlan(env.OutputFormat, document)
+}
+
+// impactPlanCommands parses the command list of impact-plan the way the CLI
+// parses `putnami <command[,command...]>`: comma-separated, with built-in and
+// workspace aliases resolved, in order. A command named twice, and an alias
+// that expands to several commands, are usage errors: the plan names each
+// command once, by its own name.
+func impactPlanCommands(list string, cfg *wsproto.Config) ([]string, error) {
+	var aliases map[string]string
+	if cfg != nil {
+		aliases = cfg.Aliases
+	}
+	commands, err := resolveCommands(list, aliases)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]bool, len(commands))
+	for _, command := range commands {
+		if strings.ContainsFunc(command, func(r rune) bool { return r == ',' || unicode.IsSpace(r) }) {
+			return nil, usageErrorf("impact-plan: %q in %q is not one command; name each command of the alias instead", command, list)
+		}
+		if seen[command] {
+			return nil, usageErrorf("impact-plan names %s twice in %q", command, list)
+		}
+		seen[command] = true
+	}
+	return commands, nil
+}
+
 // changePlanEngineRun names the adapter seam so the exact Engine.Run request
 // can be tested without making commands depend on the engine package.
 type changePlanEngineRun func(context.Context, engine.Request, engine.EventSink) (engine.SessionResult, error)
 
-// changePlanCommands is the quality gate the change plan projects: the same
-// command list maintainer CI runs — Putnami Cloud's native runner executes one
-// fixed gate for every workspace — in the same order.
+// changePlanCommands is the quality gate the change plan projects: the
+// command list CI runs, in the same order.
 //
 // The two must not drift. The change plan is what a reviewer reads to decide
 // what CI will do with a revision, so a command CI runs and the plan omits is a
 // task nobody reviewed, and a command the plan shows and CI skips is a check
-// nobody performed. `validate-workspace` is not listed: the @putnami/sdd
-// manifest that declares both commands plans it from `validate` through
-// `alsoRuns`, so the planned session runs it all the same.
+// nobody performed. `validate-workspace` is not listed: the manifest that
+// declares both commands plans it from `validate` through `alsoRuns`, so the
+// planned session runs it all the same.
 //
 // It stays a literal here rather than a read of a CI document: the planner
 // must answer for a workspace whose CI document is absent or unreadable, and
@@ -259,18 +194,25 @@ type changePlanEngineRun func(context.Context, engine.Request, engine.EventSink)
 // to the gate the generated guidance derives for this workspace.
 var changePlanCommands = []string{"lint", "test", "build", "validate"}
 
-// newChangePlanPlanner maps the command's immutable base revision onto the
-// ordinary impacted engine plan for the quality gate. The CLI owns this
-// adapter: commands receives only its typed result and cannot form an engine
-// cycle. The result and every error it returns name changePlanCommands, the
-// set it planned.
-func newChangePlanPlanner(wsRoot string, cfg *wsproto.Config, run changePlanEngineRun) ci.ChangePlanPlanner {
-	gate := strings.Join(changePlanCommands, ",")
-	return func(ctx context.Context, baseSHA string, noCache bool) (ci.ChangePlanPlannerResult, error) {
+// newChangePlanPlanner is the impact planner of changePlanCommands, the one
+// change-plan runs.
+func newChangePlanPlanner(wsRoot string, cfg *wsproto.Config, run changePlanEngineRun) ci.Planner {
+	return newImpactPlanPlanner("change-plan", wsRoot, cfg, changePlanCommands, run)
+}
+
+// newImpactPlanPlanner maps the immutable base revision of command (impact-plan
+// or change-plan) onto the ordinary impacted engine plan for commands. The CLI
+// owns this adapter: commands receives only its typed result and cannot form
+// an engine cycle. The result and every error it returns name commands, the
+// list it planned.
+func newImpactPlanPlanner(command, wsRoot string, cfg *wsproto.Config, commands []string, run changePlanEngineRun) ci.Planner {
+	planned := append([]string(nil), commands...)
+	gate := strings.Join(planned, ",")
+	return func(ctx context.Context, baseSHA string, noCache bool) (ci.PlannerResult, error) {
 		result, err := run(ctx, engine.Request{
 			WorkspaceRoot: wsRoot,
 			Config:        cfg,
-			Commands:      append([]string(nil), changePlanCommands...),
+			Commands:      append([]string(nil), planned...),
 			Global: engine.GlobalFlags{
 				Impacted: true,
 				Baseline: baseSHA,
@@ -281,23 +223,56 @@ func newChangePlanPlanner(wsRoot string, cfg *wsproto.Config, run changePlanEngi
 			Stdout: io.Discard,
 		}, nil)
 		if err != nil {
-			return ci.ChangePlanPlannerResult{}, fmt.Errorf("plan %s: %w", gate, err)
+			return ci.PlannerResult{}, fmt.Errorf("plan %s: %w", gate, err)
 		}
 		ws, err := workspace.Load(wsRoot)
 		if err != nil {
-			return ci.ChangePlanPlannerResult{}, fmt.Errorf("plan %s: load workspace for change-plan versions: %w", gate, err)
+			return ci.PlannerResult{}, fmt.Errorf("plan %s: load workspace for %s versions: %w", gate, command, err)
 		}
 		versions, err := engine.BuildVersionInfo(ws)
 		if err != nil {
-			return ci.ChangePlanPlannerResult{}, fmt.Errorf("plan %s: change-plan versions: %w", gate, err)
+			return ci.PlannerResult{}, fmt.Errorf("plan %s: %s versions: %w", gate, command, err)
 		}
-		return ci.ChangePlanPlannerResult{
-			Commands: append([]string(nil), changePlanCommands...),
+		return ci.PlannerResult{
+			Commands: append([]string(nil), planned...),
 			Complete: result.ExitCode == engine.ExitSuccess,
 			Projects: result.Projects,
 			Jobs:     result.Plan,
 			Versions: versions,
 		}, nil
+	}
+}
+
+// refuseUndeclaredCommands is the engine run of impact-plan. It refuses, with a
+// usage error, every command of commands that no discovered extension declares
+// as a job. The core declares no job, so such a command plans zero tasks, and a
+// caller that admits a change from the plan would read "nothing to run". The
+// check reads the job map the engine plans from, after extension discovery and
+// before selection. A declared command that plans zero tasks because nothing it
+// serves is impacted stays a valid empty plan. change-plan does not use it.
+func refuseUndeclaredCommands(commands []string, run changePlanEngineRun) changePlanEngineRun {
+	requested := append([]string(nil), commands...)
+	return func(ctx context.Context, req engine.Request, sink engine.EventSink) (engine.SessionResult, error) {
+		req.ValidateCommandFlags = func(discovered *extension.DiscoveryResult, _ GlobalFlags) error {
+			var extensions []*extension.ExtensionDescription
+			if discovered != nil {
+				extensions = discovered.Extensions
+			}
+			jobMap := extension.BuildJobMap(extensions)
+			var undeclared []string
+			for _, command := range requested {
+				if len(jobMap[command]) == 0 {
+					undeclared = append(undeclared, command)
+				}
+			}
+			if len(undeclared) == 0 {
+				return nil
+			}
+			return usageErrorf("no extension of this workspace declares %s, so impact-plan cannot plan it; "+
+				"%s lists the commands that moved to an extension",
+				strings.Join(undeclared, ", "), commandmeta.CommandsThatLeftTheCoreURL)
+		}
+		return run(ctx, req, sink)
 	}
 }
 
@@ -1084,6 +1059,9 @@ func cmdHelp(env *CommandEnv) error {
 			nestedSub = env.Args[0]
 		}
 		command := resolveAliasOrSelf(env.Sub, env.Cfg.Aliases)
+		if err := refuseHelpOfRemovedCoreRoot(env, command); err != nil {
+			return err
+		}
 		if isStructuredCommand(command) || nestedSub != "" {
 			PrintSubcommandHelp(command, nestedSub)
 		} else {

@@ -67,8 +67,6 @@ var spawnSites = map[string]spawnSite{
 		why: "the checkout runs the post-checkout hook and smudge filters"},
 	"commands/completion/completion_install.go:writeCompletionFromBinary": {spawns: 1, verdict: marked, by: "commands/completion/completion_install.go:writeCompletionFromBinary",
 		why: "the workspace's CLI may be a build of its source"},
-	"commands/lifecycle/channel.go:newChannelClient": {spawns: 1, verdict: marked, by: "commands/lifecycle/channel.go:newChannelClient",
-		why: "putnami cloud release-set, a CLI without the run credential that loads the workspace's extensions"},
 	"commands/lifecycle/deps.go:runGoInModule": {spawns: 1, verdict: marked, by: "commands/lifecycle/deps.go:runGoInModule",
 		why: "go in a workspace module"},
 	"commands/lifecycle/upgrade.go:newUpgradeReleaseSetResolver": {spawns: 1, verdict: marked, by: "commands/lifecycle/upgrade.go:newUpgradeReleaseSetResolver",

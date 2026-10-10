@@ -151,7 +151,9 @@ func HasInternalReleaseSetProviderCapability() bool {
 
 // ValidateReleaseSetProviderInvocation validates the coordinator-owned raw
 // argv before App reads aliases, installs artifacts, bootstraps the workspace,
-// or dispatches any child. It returns true only for provider-only mode.
+// or dispatches any child. It returns true only for provider-only mode. The
+// operations it accepts are the ones the coordinator calls, resolve and
+// release; every other operation is refused in provider-only mode.
 func ValidateReleaseSetProviderInvocation(ctx context.Context, args []string) (bool, error) {
 	capabilities := processCapabilitiesFromContext(ctx)
 	if capabilities == nil || capabilities.releaseSetProvider == nil {
@@ -168,8 +170,7 @@ func ValidateReleaseSetProviderInvocation(ctx context.Context, args []string) (b
 		return true, fmt.Errorf("internal release-set provider invocation has unexpected argv")
 	}
 	switch args[2] {
-	case distribution.ResolveCommand, distribution.ReleaseCommand,
-		distribution.ChannelSetCommand, distribution.ChannelStatusCommand:
+	case distribution.ResolveCommand, distribution.ReleaseCommand:
 		return true, nil
 	default:
 		return true, fmt.Errorf("internal release-set provider invocation has unexpected operation %q", args[2])

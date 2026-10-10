@@ -1,0 +1,16 @@
+{
+  "valid": {
+    "golden.json": "golden.json",
+    "sha256-no-tasks.json": "sha256-no-tasks.json"
+  },
+  "invalid": {
+    "comma-in-command.json": "impact plan commands are not canonical",
+    "duplicate-commands.json": "impact plan commands are not canonical",
+    "incomplete-generator.json": "impact plan generator is incomplete",
+    "no-commands.json": "impact plan commands are not canonical",
+    "partial-transitive-dependents.json": "impact plan transitive dependents do not match impact closure",
+    "short-sha.json": "impact plan revisions must be full lowercase commit IDs",
+    "unknown-version.json": "unsupported impact plan version 2",
+    "unsorted-tasks.json": "impact plan tasks are not canonical"
+  }
+}

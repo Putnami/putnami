@@ -1,5 +1,16 @@
 # CI Change Plans
 
+Two commands report the impacted plan of a checked-out commit range:
+
+| Command | Document | Commands planned | Use it when |
+| --- | --- | --- | --- |
+| `putnami impact-plan <commands>` | ImpactPlan | the list you name | an extension needs the changed files, impacted projects and tasks of a change |
+| `putnami change-plan` | ChangePlan v1 | the fixed gate `lint,test,build,validate` | a CI plane admits a change and must bind it to a repository and a digest |
+
+Both run the same revision checks and the same engine plan. The ChangePlan is
+the projection of the ImpactPlan for the fixed gate: see
+[Impact plans](#impact-plans).
+
 `putnami change-plan` produces a deterministic, immutable v1 admission plan
 for a checked-out commit range. CI and Cloud use it to decide which quality-gate
 tasks must run without reimplementing Putnami's impact graph.
@@ -90,3 +101,59 @@ Cache keys are emitted only when they can be recomputed from the checked-out
 revision and the CLI's declared state. Environment values, source contents,
 command arguments, working directories, output paths, invocation locators, and
 secrets are never included in the document.
+
+## Impact plans
+
+`putnami impact-plan` is the seam an extension uses to ask the engine what a
+change impacts, for the commands the extension names, without importing the
+CLI:
+
+```bash
+putnami impact-plan test,build --base origin/main --output=json
+```
+
+1. The one positional argument is the command list, comma-separated. Aliases
+   resolve as they do for `putnami <command>`. A command named twice, and an
+   alias that expands to several commands, are usage errors.
+2. A command that no discovered extension declares is a usage error that names
+   it, so a misspelled or uninstalled command never yields an empty plan. A
+   declared command that plans no task over the range gives a valid empty
+   plan.
+3. `--base`, `--head` and `--no-cache` mean what they mean for
+   `change-plan`, and the same revision checks apply: a clean worktree, a head
+   that is the checked-out `HEAD`, and a base that is its ancestor.
+4. `--baseline`, `--impacted`, `--projects` and `--all` are refused: the range
+   selects the projects.
+5. No repository remote is needed.
+
+The structured result's `data` member is the ImpactPlan:
+
+```json
+{
+  "version": 1,
+  "generator": {"name": "putnami", "version": "..."},
+  "commands": ["test", "build"],
+  "baseSHA": "...",
+  "headSHA": "...",
+  "changedFiles": ["..."],
+  "impact": {"directProjects": ["..."], "projects": ["..."], "transitiveDependents": ["..."]},
+  "tasks": ["..."],
+  "cache": {"status": "available", "entries": []}
+}
+```
+
+Every member except `commands` has the type, order and meaning it has in a
+ChangePlan. `commands` is the list you named, in your order. The tasks are
+every task the engine plans for that list over the impacted closure, including
+the tasks of a companion command that an extension's `alsoRuns` adds to a
+command you named. The document has no `repository` and
+no `digest`; the document you derive from it holds both. Without `--output`,
+the command prints a short summary: the command list, the range, and the
+number of changed files, impacted projects and tasks.
+
+Go consumers import `ImpactPlan` and `ValidateImpactPlan` from
+`go.putnami.dev/protocol/ci`. `ChangePlanFromImpactPlan(plan, repository)`
+projects a plan onto the ChangePlan of the same range: `putnami change-plan`
+is that projection for the fixed gate and the `origin` remote, so the two
+documents never disagree about one range. The conformance corpus is
+`protocols/ci/fixtures/impact-plan`.

@@ -65,7 +65,7 @@ Who implements or consumes each protocol today, and how conformance is verified.
 | `workspace` | ✅ types + loaders | — | — | — | — |
 | `extension` | ✅ manifest loading | — | — | — | — |
 | `template` | ✅ scaffolding | — | — | — | — |
-| `ci` | ✅ `putnami ci` (`init`, `validate`, `fmt`, `migrate`, `explain`) | — | — | — | — *(the execution plane reads the document; it never widens it)* |
+| `ci` | ✅ reader (`publish`, `deploy --env`, generated guidance); producer of `change-plan` and `impact-plan` | — | — | — | — *(the execution plane reads the document; it never widens it)* |
 | `job` | ✅ producer (round-trip conformance test) | ✅ type aliases | — | — | — |
 | `cli` | ✅ producer of all four machine surfaces + exit codes | ✅ exit codes + reserved flags | — | ✅ `@putnami/cli-protocol` (shared conformance corpus) | — |
 | `clientcontract` | — | — | — *(defined, not yet adopted)* | — *(defined, not yet adopted)* | — |
