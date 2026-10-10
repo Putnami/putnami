@@ -181,14 +181,17 @@
       }
     },
     "clientgen-workspace-check": {
-      "description": "Judge every committed generated client against its committed manifest and the committed provider contract (hashes, coverage, forged markers), validate the two inventories, and scan all consumer sources for handwritten first-party transports. It builds nothing, renders nothing and spawns no Putnami: whether a committed client is what the current contract generates is the generator task's own verdict (declared-output drift), so this check judges committed inputs, and its verdict is meant to be the same on a cold clone and on a tree the session just built. It is not cached, because it reads files a `git:**` key does not hold: its source scan walks each project on disk, git-ignored files included, and finding the providers reads the git-ignored project index .putnami/workspace-index.json, each provider's .gen/clientgen/config.json and, for a provider that commits no contract sidecar, its built .gen/schema/openapi.json. A plain pattern over those would key on whichever build last ran. Keying the check needs a scan and a discovery that read the Git candidate cut only.",
+      "description": "Judge every committed generated client against its committed manifest and the committed provider contract (hashes, coverage, forged markers), validate the two inventories, and scan all consumer sources for handwritten first-party transports. It builds nothing, renders nothing and spawns no Putnami: whether a committed client is what the current contract generates is the generator task's own verdict (declared-output drift). It reads the workspace's Git candidate cut (the tracked files and the untracked files no ignore rule excludes) and the member projects the job context names, which the CLI resolves from the committed workspace and scope manifests, and its key is the input `git:**`, which holds that cut. A file Git ignores is neither read nor keyed: the project index .putnami/workspace-index.json, a provider's built .gen/clientgen/config.json and .gen/schema/openapi.json, and an ignored source are absent, as they are from a clone, so a provider's contract is its committed sidecar schema/openapi.json and its targets are its committed client.putnami.json manifests, unless the project commits those .gen files. Editing, adding, deleting or renaming a candidate moves the key, so a cached verdict is replayed only for the bytes it judged, and the verdict is the same on a cold clone and on a tree the session just built.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["workspace-check"],
       "cwd": "{workspaceRoot}",
       "timeoutMs": 900000,
+      "inputs": {
+        "repository": { "from": "project", "files": ["git:**"] }
+      },
       "reads": [{ "id": "workspace-sources", "scope": "workspace" }],
-      "cache": { "enabled": false },
+      "cache": { "enabled": true, "noOutput": true },
       "declares": {}
     },
     "clientgen-workspace-adopt": {

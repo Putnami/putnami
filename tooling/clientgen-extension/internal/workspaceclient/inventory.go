@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -64,20 +62,20 @@ func projectInventoryPath(project, name string) string {
 	return project + "/" + name
 }
 
-// readProjectInventories reads the inventory file named name in every indexed
+// readProjectInventories reads the inventory file named name in every member
 // project directory, in project order. A project without the file declares
 // nothing. A protocolVersion 1 document is the older workspace-root layout:
 // at the root it is a finding that lists the project file each entry moves
 // to, and in a project directory it fails. A root file of any other version
-// is read only when an indexed project lives at the root.
-func readProjectInventories(workspaceRoot string, projects []string, name, readCode, invalidCode string) ([]inventoryFile, []Finding) {
+// is read only when a member project lives at the root.
+func readProjectInventories(workspace workspaceFiles, projects []string, name, readCode, invalidCode string) ([]inventoryFile, []Finding) {
 	var files []inventoryFile
 	var findings []Finding
 	rootIsProject := false
 	for _, project := range projects {
 		rootIsProject = rootIsProject || project == "."
 		rel := projectInventoryPath(project, name)
-		data, err := os.ReadFile(filepath.Join(workspaceRoot, filepath.FromSlash(rel))) //nolint:gosec // indexed project inventory path
+		data, err := workspace.Read(rel)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
@@ -100,7 +98,7 @@ func readProjectInventories(workspaceRoot string, projects []string, name, readC
 	if rootIsProject {
 		return files, findings
 	}
-	data, err := os.ReadFile(filepath.Join(workspaceRoot, name)) //nolint:gosec // fixed workspace-root inventory path
+	data, err := workspace.Read(name)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 	case err != nil:
@@ -155,12 +153,12 @@ func rootLayoutMessage(name string, data []byte) string {
 		"then delete the root file", rootLayoutProtocolVersion, name, name, destination, inventoryProtocolVersion)
 }
 
-func loadAndValidateExternalInventory(workspaceRoot string, providers []provider) ([]ExternalContract, []Finding) {
-	projectPaths, indexErr := indexedProjectPaths(workspaceRoot)
+func loadAndValidateExternalInventory(view workspaceView, providers []provider) ([]ExternalContract, []Finding) {
+	projectPaths, indexErr := view.members()
 	if indexErr != nil {
 		return nil, []Finding{{Code: "clientgen.invalid-external-inventory", Path: externalInventoryFile, Message: indexErr.Error()}}
 	}
-	files, findings := readProjectInventories(workspaceRoot, projectPaths, externalInventoryFile,
+	files, findings := readProjectInventories(view.workspaceFiles, projectPaths, externalInventoryFile,
 		"clientgen.external-inventory-read", "clientgen.invalid-external-inventory")
 
 	providerByProject := make(map[string]provider, len(providers))
@@ -191,8 +189,8 @@ func loadAndValidateExternalInventory(workspaceRoot string, providers []provider
 				Callsites: entry.Callsites, Owner: entry.Owner, Tests: entry.Tests, Reason: entry.Reason}
 			findingCount := len(findings)
 			field := fmt.Sprintf("contracts[%d]", i)
-			if generatedBindingRuntimeIdentity(workspaceRoot, contract.Project, "@putnami/client") ||
-				generatedBindingRuntimeIdentity(workspaceRoot, contract.Project, "go.putnami.dev/client") {
+			if generatedBindingRuntimeIdentity(view.workspaceFiles, contract.Project, "@putnami/client") ||
+				generatedBindingRuntimeIdentity(view.workspaceFiles, contract.Project, "go.putnami.dev/client") {
 				findings = append(findings, Finding{Code: "clientgen.framework-external-bypass", Path: file.path,
 					Message: "generated binding runtimes must claim their callsites in " +
 						projectInventoryPath(contract.Project, frameworkInventoryFile)})
@@ -205,7 +203,7 @@ func loadAndValidateExternalInventory(workspaceRoot string, providers []provider
 					findings = append(findings, file.finding(field+"."+name, name+" is required"))
 				}
 			}
-			findings = append(findings, validateInventoryFile(workspaceRoot, file, field+".adapter", contract.Adapter)...)
+			findings = append(findings, validateInventoryFile(view.workspaceFiles, file, field+".adapter", contract.Adapter)...)
 			if contract.Adapter != "" && !pathOwnedByProject(contract.Adapter, contract.Project) {
 				findings = append(findings, file.finding(field+".adapter", "adapter must sit in the directory of the project that holds this file"))
 			}
@@ -224,7 +222,7 @@ func loadAndValidateExternalInventory(workspaceRoot string, providers []provider
 			lastCallsite := ""
 			for callsiteIndex, callsite := range contract.Callsites {
 				callsiteField := fmt.Sprintf("%s.callsites[%d]", field, callsiteIndex)
-				findings = append(findings, validateAuthorityCallsite(workspaceRoot, file, contract.Adapter, callsiteField, callsite)...)
+				findings = append(findings, validateAuthorityCallsite(view.workspaceFiles, file, contract.Adapter, callsiteField, callsite)...)
 				callsiteKey := externalCallsiteKey(callsite)
 				if callsiteIndex > 0 && callsiteKey <= lastCallsite {
 					findings = append(findings, file.finding(callsiteField,
@@ -242,7 +240,7 @@ func loadAndValidateExternalInventory(workspaceRoot string, providers []provider
 			}
 			lastTest := ""
 			for testIndex, testPath := range contract.Tests {
-				findings = append(findings, validateInventoryFile(workspaceRoot, file,
+				findings = append(findings, validateInventoryFile(view.workspaceFiles, file,
 					fmt.Sprintf("%s.tests[%d]", field, testIndex), testPath)...)
 				if testIndex > 0 && testPath <= lastTest {
 					findings = append(findings, file.finding(fmt.Sprintf("%s.tests[%d]", field, testIndex),
@@ -308,8 +306,8 @@ func firstPartyAuthority(authority string, providers []provider) (string, bool) 
 	return "", false
 }
 
-func validateAuthorityCallsite(workspaceRoot string, file inventoryFile, adapter, field string, callsite ExternalCallsite) []Finding {
-	findings := validateInventoryFile(workspaceRoot, file, field+".path", callsite.Path)
+func validateAuthorityCallsite(files workspaceFiles, file inventoryFile, adapter, field string, callsite ExternalCallsite) []Finding {
+	findings := validateInventoryFile(files, file, field+".path", callsite.Path)
 	if callsite.Path != adapter {
 		findings = append(findings, file.finding(field+".path", "callsite path must equal the declared adapter file"))
 	}
@@ -340,7 +338,7 @@ func safeInventoryProject(value string) (string, error) {
 	return safeWorkspacePath(value)
 }
 
-func validateInventoryFile(workspaceRoot string, file inventoryFile, field, value string) []Finding {
+func validateInventoryFile(files workspaceFiles, file inventoryFile, field, value string) []Finding {
 	if blank(value) {
 		return []Finding{file.finding(field, "path is required")}
 	}
@@ -351,8 +349,7 @@ func validateInventoryFile(workspaceRoot string, file inventoryFile, field, valu
 		}
 		return []Finding{file.finding(field, err.Error())}
 	}
-	info, err := os.Stat(filepath.Join(workspaceRoot, filepath.FromSlash(clean))) //nolint:gosec // validated relative path
-	if err != nil || !info.Mode().IsRegular() {
+	if !files.isRegularFile(clean) {
 		return []Finding{file.finding(field, "path must name an existing regular file")}
 	}
 	return nil

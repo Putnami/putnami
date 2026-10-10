@@ -17,7 +17,7 @@ import (
 // RenderExpected creates an ephemeral mirror and runs the real language
 // generators there. The returned cleanup must be called by the caller.
 func RenderExpected(workspaceRoot string) (string, func(), error) {
-	providers, findings := discover(workspaceRoot)
+	providers, findings := discover(indexedView(workspaceRoot))
 	if len(findings) > 0 {
 		return "", func() {}, fmt.Errorf("cannot render invalid workspace contracts: %s", findings[0].Message)
 	}
@@ -49,7 +49,7 @@ func RenderExpected(workspaceRoot string) (string, func(), error) {
 
 // Synchronize runs the real configured generators against provider projects.
 func Synchronize(workspaceRoot string) error {
-	providers, findings := discover(workspaceRoot)
+	providers, findings := discover(indexedView(workspaceRoot))
 	if len(findings) > 0 {
 		return fmt.Errorf("cannot synchronize invalid workspace contracts: %s", findings[0].Message)
 	}
@@ -117,7 +117,11 @@ func SynchronizeTarget(workspaceRoot, projectRoot string, language clientcontrac
 // contract is missing. It reads the committed manifests through the same
 // decoder discovery uses for a cold tree.
 func requireNoCommittedTarget(workspaceRoot, projectRoot string, language clientcontract.GeneratedLanguage) error {
-	committed, findings := configFromCommittedManifests(workspaceRoot, projectRoot)
+	projectRel, err := filepath.Rel(workspaceRoot, projectRoot)
+	if err != nil {
+		return err
+	}
+	committed, findings := configFromCommittedManifests(workspaceFiles{root: workspaceRoot}, filepath.ToSlash(projectRel))
 	if len(findings) > 0 {
 		return fmt.Errorf("%s has no .gen/clientgen/config.json and %s: %s", projectRoot, findings[0].Path, findings[0].Message)
 	}

@@ -67,7 +67,7 @@ type detectedTransport struct {
 // found. It receives the records rather than scanning for them, because the
 // consumer-edge scan needs the identical set and the scan is the check's
 // dominant cost (see inspect).
-func scanManualClients(workspaceRoot string, providers []provider, records []sourceRecord, report Report) ([]Adaptation, []Finding) {
+func scanManualClients(files workspaceFiles, providers []provider, records []sourceRecord, report Report) ([]Adaptation, []Finding) {
 	externalCallsites := map[string]bool{}
 	for _, contract := range report.ExternalContracts {
 		for _, callsite := range contract.Callsites {
@@ -165,7 +165,7 @@ func scanManualClients(workspaceRoot string, providers []provider, records []sou
 			if matched {
 				continue
 			}
-			candidates := projectFirstPartyCandidates(workspaceRoot, record.project, providers, report)
+			candidates := projectFirstPartyCandidates(files, record.project, providers, report)
 			if len(candidates) == 1 {
 				serviceID := candidates[0]
 				bindings := adaptationBindings(report, record.language, serviceID)
@@ -231,8 +231,8 @@ func externalCallsitePath(key string) string {
 	return path
 }
 
-func projectFirstPartyCandidates(workspaceRoot, project string, providers []provider, report Report) []string {
-	dependencies := projectDependencies(workspaceRoot, project)
+func projectFirstPartyCandidates(files workspaceFiles, project string, providers []provider, report Report) []string {
+	dependencies := projectDependencies(files, project)
 	candidates := map[string]bool{}
 	for _, item := range providers {
 		if item.classification != ClassificationFirstParty || item.document == nil {
@@ -256,8 +256,8 @@ func projectFirstPartyCandidates(workspaceRoot, project string, providers []prov
 	return result
 }
 
-func projectDependencies(workspaceRoot, project string) map[string]bool {
-	data, err := os.ReadFile(filepath.Join(workspaceRoot, filepath.FromSlash(project), "putnami.json")) //nolint:gosec // indexed project metadata
+func projectDependencies(files workspaceFiles, project string) map[string]bool {
+	data, err := files.Read(projectInventoryPath(project, "putnami.json"))
 	if err != nil {
 		return nil
 	}
@@ -362,17 +362,17 @@ func languageName(language string) string {
 	return language
 }
 
-func generatedSourceInventory(workspaceRoot string, report Report) map[string]bool {
+func generatedSourceInventory(files workspaceFiles, report Report) map[string]bool {
 	generated := map[string]bool{}
 	for _, providerReport := range report.Providers {
 		for _, target := range providerReport.Targets {
-			data, err := os.ReadFile(filepath.Join(workspaceRoot, filepath.FromSlash(target.Manifest))) //nolint:gosec
+			data, err := files.Read(target.Manifest)
 			if err != nil {
 				continue
 			}
 			manifest, valid := parseManifestWithoutDiagnostics(data)
 			base := filepath.ToSlash(filepath.Dir(target.Manifest))
-			if !valid || !manifestFilesMatch(workspaceRoot, base, manifest.Files) {
+			if !valid || !manifestFilesMatch(files, base, manifest.Files) {
 				continue
 			}
 			for _, file := range manifest.Files {
@@ -383,9 +383,9 @@ func generatedSourceInventory(workspaceRoot string, report Report) map[string]bo
 	return generated
 }
 
-func manifestFilesMatch(workspaceRoot, base string, files []clientcontract.GeneratedFile) bool {
+func manifestFilesMatch(workspace workspaceFiles, base string, files []clientcontract.GeneratedFile) bool {
 	for _, file := range files {
-		content, err := os.ReadFile(filepath.Join(workspaceRoot, filepath.FromSlash(joinRel(base, file.Path)))) //nolint:gosec // validated generated manifest path
+		content, err := workspace.Read(joinRel(base, file.Path))
 		if err != nil {
 			return false
 		}
@@ -400,19 +400,52 @@ func manifestFilesMatch(workspaceRoot, base string, files []clientcontract.Gener
 // workspaceSourceRecords is the one production-source scan a check performs. It
 // derives the generated-file exclusion set from the report's providers, which is
 // the only report field discoverSourceRecords depends on.
-func workspaceSourceRecords(workspaceRoot string, report Report) ([]sourceRecord, error) {
-	return discoverSourceRecords(workspaceRoot, generatedSourceInventory(workspaceRoot, report))
+func workspaceSourceRecords(view workspaceView, report Report) ([]sourceRecord, error) {
+	return discoverSourceRecords(view, generatedSourceInventory(view.workspaceFiles, report))
 }
 
-func discoverSourceRecords(workspaceRoot string, generated map[string]bool) ([]sourceRecord, error) {
-	projects, err := indexedProjectPaths(workspaceRoot)
+// discoverSourceRecords reads every production source of the member projects:
+// each file a member owns (the deepest member whose directory holds it), outside
+// the build, install and dot-directories between that member's directory and
+// the file, and outside the generated files the report's verified manifests
+// list. In the candidate cut an ignored file is not a source, as it is not one
+// on a clone.
+func discoverSourceRecords(view workspaceView, generated map[string]bool) ([]sourceRecord, error) {
+	projects, err := view.members()
 	if err != nil {
 		return nil, err
 	}
 	var records []sourceRecord
+	add := func(rel, project string, read func() ([]byte, error)) error {
+		if generated[rel] || excludedManualScanPath(rel) {
+			return nil
+		}
+		language, supported := sourceLanguage(rel)
+		if !supported {
+			return nil
+		}
+		content, readErr := read()
+		if readErr != nil {
+			return readErr
+		}
+		records = append(records, newSourceRecord(rel, filepath.Join(view.root, filepath.FromSlash(rel)), project, language, content))
+		return nil
+	}
+	if view.tree != nil {
+		for _, rel := range view.tree.Paths() {
+			project := sourceProjectFromIndex(rel, projects)
+			if project == "" || excludedBetween(project, rel) {
+				continue
+			}
+			if err := add(rel, project, func() ([]byte, error) { return view.Read(rel) }); err != nil {
+				return nil, err
+			}
+		}
+		return records, nil
+	}
 	seen := map[string]bool{}
 	for _, project := range projects {
-		projectRoot := filepath.Join(workspaceRoot, filepath.FromSlash(project))
+		projectRoot := filepath.Join(view.root, filepath.FromSlash(project))
 		walkErr := filepath.WalkDir(projectRoot, func(path string, entry fs.DirEntry, pathErr error) error {
 			if pathErr != nil {
 				return pathErr
@@ -423,43 +456,16 @@ func discoverSourceRecords(workspaceRoot string, generated map[string]bool) ([]s
 				}
 				return nil
 			}
-			rel, relErr := filepath.Rel(workspaceRoot, path)
+			rel, relErr := filepath.Rel(view.root, path)
 			if relErr != nil {
 				return relErr
 			}
 			rel = filepath.ToSlash(rel)
-			if seen[rel] || sourceProjectFromIndex(rel, projects) != project || generated[rel] || excludedManualScanPath(rel) {
+			if seen[rel] || sourceProjectFromIndex(rel, projects) != project {
 				return nil
 			}
 			seen[rel] = true
-			language, supported := sourceLanguage(rel)
-			if !supported {
-				return nil
-			}
-			content, readErr := os.ReadFile(path) //nolint:gosec // indexed project production source
-			if readErr != nil {
-				return readErr
-			}
-			text := string(content)
-			record := sourceRecord{path: rel, project: project, language: language, content: text}
-			if language == "ts" {
-				record.code = tsCodeMask(text)
-				record.calls, record.imports = tsScanSource(rel, text, record.code)
-			} else {
-				record.imports = goImportPaths(path, content)
-				// A file that imports no transport package cannot produce a
-				// transport callsite: every branch of goTransportCallsites is
-				// gated on an alias or dot-import of one. Deciding that from
-				// the import block alone — which the real Go parser reads and
-				// then stops — skips the full parse of the ~90 % of Go files
-				// that could never have matched, and skips nothing the full
-				// parse would have found.
-				if goImportsTransport(record.imports) {
-					record.calls = goTransportCallsites(rel, path, content)
-				}
-			}
-			records = append(records, record)
-			return nil
+			return add(rel, project, func() ([]byte, error) { return os.ReadFile(path) }) //nolint:gosec // member project production source
 		})
 		if walkErr != nil {
 			return nil, walkErr
@@ -467,6 +473,40 @@ func discoverSourceRecords(workspaceRoot string, generated map[string]bool) ([]s
 	}
 	sort.Slice(records, func(i, j int) bool { return records[i].path < records[j].path })
 	return records, nil
+}
+
+// excludedBetween reports whether a directory the production scan skips lies
+// between the directory of the member project and the slash path rel it owns.
+func excludedBetween(project, rel string) bool {
+	inner := rel
+	if project != "." {
+		inner = strings.TrimPrefix(rel, project+"/")
+	}
+	return skipsADirectory(inner, excludedProductionDirectory)
+}
+
+// newSourceRecord scans one production source. path is the file name the Go
+// parser positions it with.
+func newSourceRecord(rel, path, project, language string, content []byte) sourceRecord {
+	text := string(content)
+	record := sourceRecord{path: rel, project: project, language: language, content: text}
+	if language == "ts" {
+		record.code = tsCodeMask(text)
+		record.calls, record.imports = tsScanSource(rel, text, record.code)
+		return record
+	}
+	record.imports = goImportPaths(path, content)
+	// A file that imports no transport package cannot produce a
+	// transport callsite: every branch of goTransportCallsites is
+	// gated on an alias or dot-import of one. Deciding that from
+	// the import block alone — which the real Go parser reads and
+	// then stops — skips the full parse of the ~90 % of Go files
+	// that could never have matched, and skips nothing the full
+	// parse would have found.
+	if goImportsTransport(record.imports) {
+		record.calls = goTransportCallsites(rel, path, content)
+	}
+	return record
 }
 
 func excludedProductionDirectory(name string) bool {

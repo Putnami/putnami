@@ -106,7 +106,7 @@ func TestAnIntentionalSyncPassesBeforeCommit(t *testing.T) {
 	// The committed contract the manifest was cut from.
 	writeWorkspaceFile(t, root, "services/catalog/schema/openapi.json", string(catalogContractForFixture(t)))
 
-	report := InspectCommitted(root)
+	report := InspectCommitted(root, fixtureMembers(t, root))
 	if !report.Clean() {
 		t.Fatalf("a synced, uncommitted worktree produced findings: %+v", report.Findings)
 	}
@@ -239,7 +239,7 @@ func TestAnUnparseableCommittedManifestIsAFinding(t *testing.T) {
 	manifestPath := "services/catalog/clients/go/client.putnami.json"
 	writeWorkspaceFile(t, root, manifestPath, "{ this is not a generated client manifest")
 
-	report := InspectCommitted(root)
+	report := InspectCommitted(root, fixtureMembers(t, root))
 	assertFindingCodes(t, report, "clientgen.invalid-manifest")
 	if report.Clean() {
 		t.Fatal("a report carrying an invalid manifest must not be clean")

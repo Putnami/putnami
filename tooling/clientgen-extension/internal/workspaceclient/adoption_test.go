@@ -27,7 +27,7 @@ func TestClassifiedInventoryClaimsEveryDetectedCallsiteOrFails(t *testing.T) {
 		Tests: []string{"primitive/form.test.ts"}, Reason: "the caller supplies the URL",
 	}
 	writeFrameworkInventory(t, root, []FrameworkTransport{entry})
-	transports, findings := loadAndValidateFrameworkInventory(root)
+	transports, findings := loadAndValidateFrameworkInventory(indexedView(root))
 	if len(findings) != 0 {
 		t.Fatalf("a valid transport-primitive entry was refused: %+v", findings)
 	}
@@ -39,7 +39,7 @@ func TestClassifiedInventoryClaimsEveryDetectedCallsiteOrFails(t *testing.T) {
 	entry.Callsites = append(entry.Callsites, externalIdentity(calls[1].callsite))
 	sortExternalCallsites(entry.Callsites)
 	writeFrameworkInventory(t, root, []FrameworkTransport{entry})
-	transports, findings = loadAndValidateFrameworkInventory(root)
+	transports, findings = loadAndValidateFrameworkInventory(indexedView(root))
 	if len(findings) != 0 {
 		t.Fatalf("the completed entry was refused: %+v", findings)
 	}
@@ -48,7 +48,7 @@ func TestClassifiedInventoryClaimsEveryDetectedCallsiteOrFails(t *testing.T) {
 		t.Fatalf("a fully claimed adapter still reported findings: %+v", findings)
 	}
 	writeTestFile(t, root, "primitive/form.ts", "export const load = (url: string) => fetch(url);\n")
-	transports, _ = loadAndValidateFrameworkInventory(root)
+	transports, _ = loadAndValidateFrameworkInventory(indexedView(root))
 	_, findings = scanManualClientsFromWorkspace(t, root, nil, Report{FrameworkTransports: transports})
 	assertFindingCodeList(t, findings, "clientgen.stale-framework-callsite")
 }
@@ -70,7 +70,7 @@ func TestPendingProviderContractNamesItsOperationsAndItsClosingWork(t *testing.T
 		Reason: "the provider declaration is owned by Putnami Cloud",
 	}
 	writeFrameworkInventory(t, root, []FrameworkTransport{base})
-	if _, findings := loadAndValidateFrameworkInventory(root); len(findings) == 0 {
+	if _, findings := loadAndValidateFrameworkInventory(indexedView(root)); len(findings) == 0 {
 		t.Fatal("a pending entry without operations or closing work was accepted")
 	}
 
@@ -79,7 +79,7 @@ func TestPendingProviderContractNamesItsOperationsAndItsClosingWork(t *testing.T
 	settled.Operations = []string{"eventserver.publish"}
 	settled.PendingWork = "Putnami Cloud provider-side client declaration"
 	writeFrameworkInventory(t, root, []FrameworkTransport{settled})
-	if _, findings := loadAndValidateFrameworkInventory(root); len(findings) == 0 {
+	if _, findings := loadAndValidateFrameworkInventory(indexedView(root)); len(findings) == 0 {
 		t.Fatal("a settled status was allowed to claim a pending state")
 	}
 
@@ -87,7 +87,7 @@ func TestPendingProviderContractNamesItsOperationsAndItsClosingWork(t *testing.T
 	pending.Operations = []string{"eventserver.publish"}
 	pending.PendingWork = "Putnami Cloud provider-side client declaration"
 	writeFrameworkInventory(t, root, []FrameworkTransport{pending})
-	transports, findings := loadAndValidateFrameworkInventory(root)
+	transports, findings := loadAndValidateFrameworkInventory(indexedView(root))
 	if len(findings) != 0 || len(transports) != 1 {
 		t.Fatalf("a complete pending entry was refused: transports=%+v findings=%+v", transports, findings)
 	}
@@ -109,20 +109,20 @@ func TestAStatusIsBoundToTheExactProjectIdentity(t *testing.T) {
 		Tests: []string{"web/form.test.ts"}, Reason: "borrowed identity",
 	}
 	writeFrameworkInventory(t, root, []FrameworkTransport{entry})
-	if _, findings := loadAndValidateFrameworkInventory(root); len(findings) == 0 {
+	if _, findings := loadAndValidateFrameworkInventory(indexedView(root)); len(findings) == 0 {
 		t.Fatal("a project claimed a generated-binding runtime identity it does not declare")
 	}
 
 	entry.Runtime = "@putnami/webb"
 	entry.Status = StatusTransportPrimitive
 	writeFrameworkInventory(t, root, []FrameworkTransport{entry})
-	if _, findings := loadAndValidateFrameworkInventory(root); len(findings) == 0 {
+	if _, findings := loadAndValidateFrameworkInventory(indexedView(root)); len(findings) == 0 {
 		t.Fatal("a transport primitive was accepted under a name its manifest does not declare")
 	}
 
 	entry.Runtime = "@putnami/web"
 	writeFrameworkInventory(t, root, []FrameworkTransport{entry})
-	if _, findings := loadAndValidateFrameworkInventory(root); len(findings) != 0 {
+	if _, findings := loadAndValidateFrameworkInventory(indexedView(root)); len(findings) != 0 {
 		t.Fatalf("the exact project identity was refused: %+v", findings)
 	}
 }
@@ -142,7 +142,7 @@ func TestAnInventoryEntryCannotSilenceAFirstPartyServiceReference(t *testing.T) 
 		Callsites: []ExternalCallsite{externalIdentity(calls[0].callsite)}, Owner: "@putnami/web",
 		Tests: []string{"consumer/call.test.ts"}, Reason: "claims to be a primitive",
 	}})
-	transports, findings := loadAndValidateFrameworkInventory(root)
+	transports, findings := loadAndValidateFrameworkInventory(indexedView(root))
 	if len(findings) != 0 {
 		t.Fatalf("the entry itself is invalid, which is not what this proves: %+v", findings)
 	}

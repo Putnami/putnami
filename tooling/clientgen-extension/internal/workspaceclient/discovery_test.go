@@ -21,7 +21,7 @@ func TestDiscoveryUsesWorkspaceIndexAndPrefersBuiltContract(t *testing.T) {
 	writeWorkspaceFile(t, root, ".gen/schema/openapi.json", markedOpenAPI("built"))
 	writeWorkspaceFile(t, root, "schema/openapi.json", markedOpenAPI("stale"))
 
-	providers, findings := discover(root)
+	providers, findings := discover(indexedView(root))
 	if len(findings) != 0 {
 		t.Fatalf("discovery findings = %+v", findings)
 	}
@@ -47,14 +47,14 @@ func TestDiscoveryIgnoresUnindexedFixturesAndRequiresExplicitThirdParty(t *testi
 	writeWorkspaceFile(t, root, ".context/fixture/.gen/clientgen/config.json", `{"thirdParty":true,"targets":["ts"]}`)
 	writeWorkspaceFile(t, root, ".context/fixture/.gen/schema/openapi.json", `{"openapi":"3.1.0","paths":{}}`)
 
-	providers, findings := discover(root)
+	providers, findings := discover(indexedView(root))
 	if len(providers) != 1 || providers[0].rel != "providers/external" || providers[0].classification == ClassificationThirdParty {
 		t.Fatalf("unmarked provider was implicitly classified or fixture leaked into graph: %+v", providers)
 	}
 	assertFindingCodeList(t, findings, "clientgen.missing-first-party-marker")
 
 	writeWorkspaceFile(t, root, "providers/external/.gen/clientgen/config.json", `{"thirdParty":true,"targets":["ts"]}`)
-	providers, findings = discover(root)
+	providers, findings = discover(indexedView(root))
 	if len(findings) != 0 || len(providers) != 1 || providers[0].classification != ClassificationThirdParty {
 		t.Fatalf("explicit third-party config providers=%+v findings=%+v", providers, findings)
 	}
@@ -98,7 +98,7 @@ func TestTheCheckReadsTheCommittedContractAndNamesTargetsFromCommittedManifests(
 	writeWorkspaceFile(t, root, "services/catalog/clients/ts/client.putnami.json", committedManifest("ts"))
 	writeWorkspaceFile(t, root, "services/catalog/node_modules/dep/client.putnami.json", committedManifest("ts"))
 
-	providers, findings := discoverCommitted(root)
+	providers, findings := discoverCommitted(indexedView(root))
 	if len(findings) != 0 {
 		t.Fatalf("cold discovery findings = %+v", findings)
 	}
@@ -113,11 +113,11 @@ func TestTheCheckReadsTheCommittedContractAndNamesTargetsFromCommittedManifests(
 	// A stale build's contract does not outrank the committed sidecar for the
 	// check, while sync keeps preferring what the build wrote.
 	writeWorkspaceFile(t, root, "services/catalog/.gen/schema/openapi.json", markedOpenAPI("built"))
-	providers, _ = discoverCommitted(root)
+	providers, _ = discoverCommitted(indexedView(root))
 	if providers[0].document.Service.ID != "committed" {
 		t.Fatalf("the check preferred a built contract over the committed sidecar: %+v", providers[0].specPath)
 	}
-	providers, _ = discover(root)
+	providers, _ = discover(indexedView(root))
 	if providers[0].document.Service.ID != "built" {
 		t.Fatalf("sync no longer prefers the built contract: %+v", providers[0].specPath)
 	}
@@ -136,7 +136,7 @@ func TestACommittedManifestThatNamesNoFirstPartyTargetIsAFinding(t *testing.T) {
 	writeWorkspaceFile(t, root, "services/catalog/clients/go/client.putnami.json",
 		`{"protocolVersion":1,"generatedBy":"somebody-else","language":"go"}`)
 
-	providers, findings := discoverCommitted(root)
+	providers, findings := discoverCommitted(indexedView(root))
 	assertFindingCodeList(t, findings, "clientgen.invalid-manifest")
 	if len(providers) != 1 {
 		t.Fatalf("providers = %+v, want the provider itself", providers)
@@ -155,7 +155,7 @@ func TestCommittedManifestsWithoutAContractAreAFinding(t *testing.T) {
 	writeWorkspaceFile(t, root, "services/catalog/putnami.json", `{"name":"catalog","extensions":["@putnami/clientgen"]}`)
 	writeWorkspaceFile(t, root, "services/catalog/clients/go/client.putnami.json", committedManifest("go"))
 
-	providers, findings := discoverCommitted(root)
+	providers, findings := discoverCommitted(indexedView(root))
 	if len(providers) != 0 {
 		t.Fatalf("a provider without a contract was admitted: %+v", providers)
 	}
@@ -168,7 +168,7 @@ func TestCommittedManifestsWithoutAContractAreAFinding(t *testing.T) {
 		`{"version":4,"projects":[{"path":"services/catalog"},{"path":"services/catalog/clients/go"}]}`)
 	writeWorkspaceFile(t, root, "services/catalog/schema/openapi.json", markedOpenAPI("catalog"))
 	writeWorkspaceFile(t, root, "services/catalog/clients/go/putnami.json", `{"name":"catalog-go-client"}`)
-	providers, findings = discoverCommitted(root)
+	providers, findings = discoverCommitted(indexedView(root))
 	if len(findings) != 0 || len(providers) != 1 || providers[0].rel != "services/catalog" {
 		t.Fatalf("nested client package handling: providers=%+v findings=%+v", providers, findings)
 	}
@@ -214,7 +214,7 @@ func TestDiscoveryLeavesOperationsAnExternalAuthorityOwnsOutOfTheProvider(t *tes
 
 	writeWorkspaceFile(t, root, ".gen/schema/openapi.json", document(`,
       "x-putnami-external-contract": "OCI Distribution Specification v1.1"`))
-	providers, findings := discover(root)
+	providers, findings := discover(indexedView(root))
 	if len(findings) != 0 {
 		t.Fatalf("discovery findings = %+v", findings)
 	}
@@ -224,13 +224,13 @@ func TestDiscoveryLeavesOperationsAnExternalAuthorityOwnsOutOfTheProvider(t *tes
 
 	writeWorkspaceFile(t, root, ".gen/schema/openapi.json", document(`,
       "x-putnami-external-contract": " "`))
-	_, findings = discover(root)
+	_, findings = discover(indexedView(root))
 	if len(findings) != 1 || findings[0].Code != "clientgen.invalid-operation-contract" ||
 		!strings.Contains(findings[0].Message, "GET /v2/{name}/manifests/{reference}") || findings[0].ServiceID != "oci-server" {
 		t.Fatalf("findings = %+v, want one invalid-operation-contract naming the route and the service", findings)
 	}
 
 	writeWorkspaceFile(t, root, ".gen/schema/openapi.json", document(``))
-	_, findings = discover(root)
+	_, findings = discover(indexedView(root))
 	assertFindingCodeList(t, findings, "clientgen.missing-operation-contract")
 }

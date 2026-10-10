@@ -176,7 +176,7 @@ func TestTheCheckSpawnsNoPutnami(t *testing.T) {
 	t.Setenv(registry.CLIExecutableEnv, executable)
 	t.Setenv("CLIENTGEN_CAPTURE", capture)
 
-	report := InspectCommitted(root)
+	report := InspectCommitted(root, fixtureMembers(t, root))
 	if len(report.Providers) != 1 {
 		t.Fatalf("the committed provider was not discovered: %+v", report.Providers)
 	}

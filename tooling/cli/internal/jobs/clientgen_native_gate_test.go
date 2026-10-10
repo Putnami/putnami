@@ -37,11 +37,12 @@ import (
 //     Putnami. The pre-session artifact baseline it used to earn through a
 //     workspace-scoped, uncacheable declaration is gone with the render it
 //     served (ADR 0034); the workspace-scoped read stays, because the guard
-//     still answers about the whole workspace, and so does `cache: false`.
+//     still answers about the whole workspace. Its key is `git:**`, the
+//     candidate cut the guard reads and nothing else (clientgen ADR 0006).
 //
 // These assertions read the REAL manifest. A guard that stops being planned,
-// loses its barrier, or becomes cacheable would keep passing its own unit tests
-// while silently verifying the wrong tree.
+// loses its barrier, or loses its key would keep passing its own unit tests
+// while silently verifying the wrong tree or re-running on every invocation.
 
 const clientgenExtensionName = "@putnami/clientgen"
 
@@ -154,8 +155,8 @@ func TestNativeValidateGuardWaitsForTheSelectedProvidersGeneration(t *testing.T)
 	if !workspaceScoped {
 		t.Fatalf("guard reads = %+v; the guard answers about the whole workspace and must say so", guard.JobDef.Reads)
 	}
-	if guard.JobDef.Cache {
-		t.Fatal("the guard is cacheable; its read set is the whole workspace, which no key describes (10-caching.md)")
+	if !guard.JobDef.Cache {
+		t.Fatal("the guard is not cacheable; it reads the Git candidate cut its git:** key hashes (clientgen ADR 0006)")
 	}
 
 	// A selected provider: its clientgen tasks are planned and the guard waits

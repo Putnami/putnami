@@ -346,7 +346,7 @@ func TestSourceInventoryIgnoresContextOutputsAndUnindexedTrees(t *testing.T) {
 	writeTestFile(t, root, "scratch/call.ts", `export const scratch = () => fetch(url);`)
 	writeTestFile(t, root, "consumer/out/call.ts", `export const output = () => fetch(url);`)
 
-	records, err := discoverSourceRecords(root, nil)
+	records, err := discoverSourceRecords(indexedView(root), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
