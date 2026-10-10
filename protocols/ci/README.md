@@ -138,17 +138,17 @@ steps — and sorts every map.
 release-set provider, because without one there is no channel, no environment,
 no visibility, and no grant.
 
-Consumers should call `Parse` for a normalized document. CLI validation uses
-`ParseWithDiagnostics`, then `ValidateTaskReferences` with the workspace's
+Consumers should call `Parse` for a normalized document. A validating command
+uses `ParseWithDiagnostics`, then `ValidateTaskReferences` with the workspace's
 discovered graph jobs.
 
 ## Producers and consumers
 
 | Role | Who |
 | --- | --- |
-| Producers | a human authoring `putnami.ci.json`, and `putnami ci init` / `putnami ci fmt` writing the canonical form; `putnami change-plan` emitting a ChangePlan; `putnami impact-plan` emitting an ImpactPlan |
-| Consumers | `putnami ci` (validate, fmt, explain); `putnami deploy --env`; a CI plane that reads the document to decide what to run; a CI plane that admits a ChangePlan; an extension that reads an ImpactPlan, or projects it onto a ChangePlan |
-| Owner of this contract | this project. The CLI validates and explains; the execution plane grants trust and resources, and neither may widen the document locally |
+| Producers | a human authoring `putnami.ci.json`, and `putnami cloud ci init` / `putnami cloud ci fmt` writing the canonical form; `putnami change-plan` emitting a ChangePlan; `putnami impact-plan` emitting an ImpactPlan |
+| Consumers | `putnami cloud ci` (validate, fmt, explain); `putnami publish`; `putnami deploy --env`; the generated agent guidance; a CI plane that reads the document to decide what to run; a CI plane that admits a ChangePlan; an extension that reads an ImpactPlan, or projects it onto a ChangePlan |
+| Owner of this contract | this project. The `putnami cloud ci` commands validate and explain; the execution plane grants trust and resources, and neither may widen the document locally |
 
 The plane split is part of the contract, not an implementation detail. A
 `runner` object is a **request** for an execution envelope, not an allocation;
@@ -176,8 +176,8 @@ measures impact against each channel head and releases the snapshot in one call
 Deploy left the rule. An environment follows a channel, and when that channel
 moves the runner synchronizes the environments that follow it, honoring their
 constraints; `putnami deploy --env <name>` from a laptop does the same.
-`putnami ci explain` reports, for each channel a rule advances, the
-environments that follow it directly or through one of their workload rules.
+`Explain` reports, for each channel a rule advances, the environments that
+follow it directly or through one of their workload rules.
 
 When a deploy must consume the exact artifact a publish produced, Delivery
 authorizes it only from the single successful runtime `data.releaseSet`
@@ -260,14 +260,14 @@ members the branch actually changed, plus their dependents.
   already its own baseline, so naming it twice would state two different things
   about one head.
 - A **protected** channel is a valid baseline. Protection forbids advancing a
-  channel (`putnami channel set` alone moves it); reading its head is exactly
-  what a first publish needs.
+  channel (only a user moves it, with the release-set provider's channel
+  command); reading its head is exactly what a first publish needs.
 - A `baseline` on a rule that publishes nothing is refused, like a `retain`
   with no channel to apply to: it is an authoring mistake, not a silent no-op.
 
 Every refusal carries the stable code `ci.invalid_baseline` on the field path
-`rules[i].baseline`. `putnami ci explain` reports the baseline with the rule it
-matched, and resolves nothing: which head that channel holds, and whether the
+`rules[i].baseline`. `Explain` reports the baseline with the rule it matched,
+and resolves nothing: which head that channel holds, and whether the
 publication is authorized to read it, are remote decisions this report labels
 unresolved. See [ADR 0004](doc/adr/0004-a-rule-names-its-baseline-channel.md)
 and `protocols/distribution` ADR 0006.
@@ -277,7 +277,7 @@ pointed at are immutable and content-addressed, and other channels or
 deployments may still reference them. Whether, when, and how a provider
 retracts is the provider's part of the contract; this module validates the
 declaration, carries it through canonicalization, and reports it in
-`putnami ci explain`, which resolves no authority. See
+`Explain`, which resolves no authority. See
 [ADR 0003](doc/adr/0003-published-channel-lifetime.md).
 
 ## The change plan
@@ -431,7 +431,7 @@ only implementation; there is no TypeScript or Python parser of
   authority for support status (contract:
   [`protocols/support/README.md`](../support/README.md)).
 - **Owner**: this project (`protocols/ci`). It owns the schema, the parser and
-  the digest; `putnami ci` is a consumer of that authority.
+  the digest; `putnami cloud ci` is a consumer of that authority.
 - **Evidence for `preview` rather than `stable`**: the version token is pinned
   in both directions — the schema's `version` const against the Go `Version`
   constant by `TestSchemaVersionMatchesContractVersion` — the schema root is
@@ -450,16 +450,18 @@ only implementation; there is no TypeScript or Python parser of
 ## Specs and durable decisions
 
 There is deliberately **no user-facing feature or spec for this module**. The
-user-visible outcome is "my workspace's CI intent is reviewed in git and the CLI
-tells me what it will do" — and that outcome is owned by the `putnami ci`
-command surface (`validate`, `init`, `fmt`, `explain`) together with the
-execution plane, not by the document's byte layout, and it is carried by the
-`tooling/cli` feature `cli/ci-document`. Minting a second product feature per
-technical wire contract would create a promise with no user behind it and a
-second authority beside the schema.
+user-visible outcome is "my workspace's CI intent is reviewed in git and a
+command tells me what it will do" — and that outcome is owned by the
+`putnami cloud ci` command surface (`init`, `validate`, `fmt`, `explain`)
+together with the execution plane, not by the document's byte layout. The
+`tooling/cli` feature `cli/ci-document` carries the part the core CLI owns: the
+generated agent guidance names the document's blocking commands as the gate.
+Minting a second product feature per technical wire contract would create a
+promise with no user behind it and a second authority beside the schema.
 
-A spec for a CI change therefore belongs with `putnami ci` or with the plane
-that executes the requests, and would link back to this contract.
+A spec for a CI change therefore belongs with the command surface that serves
+the document or with the plane that executes the requests, and would link back
+to this contract.
 
 The ImpactPlan's outcome, an extension that reads the impacted plan of a
 change without importing the CLI, is carried by the `tooling/cli` feature

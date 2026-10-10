@@ -312,8 +312,8 @@ func TestGateTasksDerivesFromDocumentGate(t *testing.T) {
 }
 
 // A gate that declares only the conventional trio must render the same string
-// as the fallback, so adopting `putnami ci init` does not churn the generated
-// guidance.
+// as the fallback, so adopting the protocol's default CI document does not
+// churn the generated guidance.
 func TestGateTasksForDefaultDocumentMatchesFallback(t *testing.T) {
 	if got := orderGateTasks(blockingCommandNames(ciproto.DefaultDocument())); got != defaultGateTasks {
 		t.Fatalf("gate for the scaffolded document = %q, want %q", got, defaultGateTasks)

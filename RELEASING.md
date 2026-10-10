@@ -221,8 +221,8 @@ Promotion is one provider call by a person, with no publisher, no build and no
 checkout:
 
 ```sh
-putnami channel set latest --from ts-v0.3.0   # promote the tag's immutable channel
-putnami channel status latest --wait 5m       # desired versus observed per registry
+putnami cloud channels set latest --from ts-v0.3.0   # promote the tag's immutable channel
+putnami cloud channels status --wait 5m              # desired versus observed per registry
 ```
 
 Rolling back is the same command pointed at the previous immutable channel or at

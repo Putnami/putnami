@@ -199,7 +199,8 @@ type ChannelPolicy struct {
 	// Visibility is the channel level of the inheritance chain.
 	Visibility string `json:"visibility,omitempty"`
 	// Protected marks a channel no rule may target and no CI principal may
-	// move: only `putnami channel set` by a user moves it.
+	// move: only a user moves it, with the release-set provider's channel
+	// command.
 	Protected bool `json:"protected,omitempty"`
 }
 

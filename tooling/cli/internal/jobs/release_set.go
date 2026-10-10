@@ -368,8 +368,8 @@ func BuildReleaseSetOptions(request ReleaseSetRequest) (ReleaseSetOptions, error
 		return ReleaseSetOptions{}, cmderr.Usagef("%v", err)
 	}
 	// The declared policy is read by the runs that distribute, and by them
-	// alone. An invalid CI document must fail `ci validate` and every publish,
-	// not the lint/test/build gate that never consults it.
+	// alone. An invalid CI document fails every publish, not the
+	// lint/test/build gate that never consults it.
 	var policy *ciproto.Distribution
 	if distributingRun(request.Commands) {
 		if policy, err = LoadDistributionPolicy(request.WorkspaceRoot); err != nil {
@@ -571,7 +571,7 @@ func ValidateReleaseSetSelection(options ReleaseSetOptions) error {
 	}
 	for _, name := range options.Channels {
 		if ProtectedChannel(options.Policy, name) {
-			return cmderr.Usagef("channel %s is protected; use putnami channel set", name)
+			return cmderr.Usagef("channel %s is protected; only a user moves it, with the release-set provider's channel command", name)
 		}
 	}
 	if options.Tagged {
@@ -1066,9 +1066,7 @@ var requireFullClone = RequireFullClone
 
 // releaseSetNamespace is the declared provider identity, independent of the
 // workspace's local name. Repositories without a policy retain the name default.
-// The rule itself lives in release_set_visibility.go beside the policy loader,
-// because a reader — `putnami channel set`, `putnami channel status` — has to
-// address the SAME namespace this publisher writes to.
+// The rule itself lives in release_set_visibility.go beside the policy loader.
 func releaseSetNamespace(ws *workspace.Workspace, policy *ciproto.Distribution) string {
 	return distributionNamespace(policy, ws.Name)
 }

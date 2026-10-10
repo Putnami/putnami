@@ -2699,9 +2699,9 @@ func TestTaggedPublishRefusesADirtyTree(t *testing.T) {
 	}
 }
 
-// D31: a protected channel is refused up front. Only `putnami channel set`
-// from a user moves it, so a publish naming it is a mistake worth naming
-// before anything is packaged.
+// D31: a protected channel is refused up front. Only a user moves it, with the
+// release-set provider's channel command, so a publish naming it is a mistake
+// worth naming before anything is packaged.
 func TestPublishRefusesAProtectedChannel(t *testing.T) {
 	spectest.Proves(t, "cli/channels", "protected-channels", "publish-refuses-a-protected-channel")
 	options := releaseSetRequest()
@@ -2716,7 +2716,10 @@ func TestPublishRefusesAProtectedChannel(t *testing.T) {
 	err := ValidateReleaseSetSelection(options)
 	if err == nil || !strings.Contains(err.Error(), "channel latest is protected") ||
 		!errors.Is(err, protocolcli.ErrUsage) {
-		t.Fatalf("protected-channel publish = %v, want a usage refusal naming channel set", err)
+		t.Fatalf("protected-channel publish = %v, want a usage refusal naming the protected channel", err)
+	}
+	if strings.Contains(err.Error(), "putnami channel") {
+		t.Fatalf("protected-channel refusal = %v, names a command the CLI does not have", err)
 	}
 	// The same refusal reaches the coordinator, before any provider call.
 	ws, _, _ := releaseSetWorkspace(t)
@@ -2779,8 +2782,8 @@ func TestBuildReleaseSetOptionsReadsTheTagAndThePolicy(t *testing.T) {
 	}
 
 	// An ordinary build on a tagged commit is still an ordinary build, and
-	// never consults the distribution policy: an invalid CI document must fail
-	// `ci validate` and every publish, not the lint/test/build gate.
+	// never consults the distribution policy: an invalid CI document fails
+	// every publish, not the lint/test/build gate.
 	build, err := BuildReleaseSetOptions(ReleaseSetRequest{
 		Commands: []string{"build"}, WorkspaceRoot: root, Versions: taggedLineVersions(),
 	})

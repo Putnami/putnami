@@ -92,11 +92,11 @@ func TestChangePlanDocNamesTheChangePlanCommands(t *testing.T) {
 // TestChangePlanCommandsMatchTheCIQualityJob is the drift guard between the two
 // declarations of one gate.
 //
-// The generated guidance says what CI runs for this workspace — derived from
-// its CI document when one exists, otherwise from its SDD extension
-// declaration, which is the fixed gate Putnami Cloud's native runner executes.
-// changePlanCommands says what `putnami ci change-plan` shows a reviewer it
-// will run. A command in one and not the other is either a check nobody
+// The generated guidance says what CI runs for this workspace: the blocking
+// commands of its CI document when one is usable, otherwise lint, test and
+// build, plus validate when an extension of the workspace declares that job.
+// changePlanCommands says what `putnami change-plan` shows a reviewer it will
+// run. A command in one and not the other is either a check nobody
 // reviewed or a review of a check nobody performs, and both are silent — the
 // plan renders fine either way.
 func TestChangePlanCommandsMatchTheCIQualityJob(t *testing.T) {
@@ -107,7 +107,7 @@ func TestChangePlanCommandsMatchTheCIQualityJob(t *testing.T) {
 	}
 	gate := agentctx.GateTasks(root)
 	if gate == "lint,test,build" {
-		t.Fatal("the workspace derives only the generic gate; it declares @putnami/sdd and the comparison would be vacuous")
+		t.Fatal("the workspace derives only the generic gate; its gate also runs validate, so the comparison would be vacuous")
 	}
 	want := append([]string(nil), changePlanCommands...)
 	got := strings.Split(gate, ",")

@@ -7,12 +7,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
-	ciproto "go.putnami.dev/protocol/ci"
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
@@ -73,137 +71,6 @@ func init() {
 	registerCommand("doctor", cmdDoctor)
 	registerCommand("change-plan", cmdChangePlan)
 	registerCommand("impact-plan", cmdImpactPlan)
-	registerCommand("ci", cmdCI)
-	registerCommand("channel", cmdChannel)
-}
-
-// cmdChannel dispatches the two metadata-only channel operations. Neither
-// builds, publishes, or checks anything out: `set` moves a channel to a set
-// that already exists, `status` reports how far that move has been applied.
-func cmdChannel(env *CommandEnv) error {
-	if err := env.requireWorkspace(); err != nil {
-		return err
-	}
-	if env.Sub != "set" && env.Sub != "status" {
-		return usageErrorf("unknown subcommand: channel %s\n  Available: set, status", env.Sub)
-	}
-	path := "channel " + env.Sub
-	parsed, err := parseCatalogCommandFlags(path, env.Args)
-	if err != nil {
-		return err
-	}
-	if len(parsed.positionals) != 1 {
-		return usageErrorf("%s takes exactly one channel name", path)
-	}
-	channel := parsed.positionals[0]
-	if env.Sub == "set" {
-		return lifecycle.ChannelSet(env.Ctx, env.WsRoot, env.Cfg, channel, lifecycle.ChannelSetFlags{
-			From: parsed.value("--from"), Expected: parsed.value("--expected"),
-		})
-	}
-	wait, err := parseChannelWait(parsed.value("--wait"))
-	if err != nil {
-		return err
-	}
-	return lifecycle.ChannelStatus(env.Ctx, env.WsRoot, env.Cfg, channel, lifecycle.ChannelStatusFlags{Wait: wait})
-}
-
-// parseChannelWait reads --wait as a Go duration. A negative value is refused
-// rather than treated as "report once", because it almost always means the
-// caller computed the remaining budget and got it wrong.
-func parseChannelWait(raw string) (time.Duration, error) {
-	if strings.TrimSpace(raw) == "" {
-		return 0, nil
-	}
-	wait, err := time.ParseDuration(raw)
-	if err != nil || wait < 0 {
-		return 0, usageErrorf("channel status: --wait must be a Go duration such as 90s or 2m")
-	}
-	return wait, nil
-}
-
-func cmdCI(env *CommandEnv) error {
-	if err := env.requireWorkspace(); err != nil {
-		return err
-	}
-	path := "ci " + env.Sub
-	if env.Sub == "" {
-		path = "ci validate"
-	}
-	parsed, err := parseCatalogCommandFlags(path, env.Args)
-	if err != nil {
-		return err
-	}
-	if len(parsed.positionals) != 0 {
-		return usageErrorf("%s takes no positional arguments", path)
-	}
-	switch env.Sub {
-	case "init":
-		return ci.CIInit(env.WsRoot, env.Cfg, parsed.has("--force"), env.OutputFormat)
-	case "validate", "":
-		return ci.CIValidate(env.WsRoot, env.Cfg, env.OutputFormat)
-	case "fmt":
-		return ci.CIFormat(env.WsRoot, env.Cfg, parsed.has("--check"), env.OutputFormat)
-	case "explain":
-		input, inputErr := parseCIExplainInput(parsed, env.Global)
-		if inputErr != nil {
-			return inputErr
-		}
-		return ci.CIExplain(env.WsRoot, env.Cfg, input, env.OutputFormat)
-	default:
-		return usageErrorf("unknown subcommand: ci %s\n  Available: init, validate, fmt, explain", env.Sub)
-	}
-}
-
-// parseCIExplainInput turns the explain flags into the protocol's assumption.
-// Each event names exactly the fact it is evaluated against, so a tag with a
-// branch or a push with a pull-request number is a usage error rather than a
-// silently ignored flag.
-//
-// `--tag` is also the CLI-wide project-tag selection filter, and the global
-// pass consumes it before any command sees it, so the tag is read from
-// GlobalFlags.FilterTag. `ci explain` selects no project, so the two meanings
-// never both apply to one invocation, and the spelling stays the one the
-// catalog documents.
-func parseCIExplainInput(parsed commandFlagValues, global GlobalFlags) (ciproto.ExplainInput, error) {
-	tag := parsed.value("--tag")
-	if tag == "" {
-		tag = global.FilterTag
-	}
-	input := ciproto.ExplainInput{
-		Event:  ciproto.Event(parsed.value("--event")),
-		Branch: parsed.value("--branch"),
-		Tag:    tag,
-	}
-	if !input.Event.Valid() {
-		return input, usageErrorf("ci explain requires --event <push|tag|pull_request>")
-	}
-	if raw := parsed.value("--pr"); raw != "" {
-		number, err := strconv.Atoi(raw)
-		if err != nil || number <= 0 {
-			return input, usageErrorf("ci explain: --pr must be a positive integer")
-		}
-		if input.Event != ciproto.EventPullRequest {
-			return input, usageErrorf("ci explain: --pr is valid only for pull_request")
-		}
-		input.PullRequestNumber = number
-	}
-	if input.Event == ciproto.EventTag {
-		if input.Tag == "" {
-			return input, usageErrorf("ci explain --event tag requires --tag <tag>")
-		}
-		if input.Branch != "" {
-			return input, usageErrorf("ci explain: --branch is not evaluated for a tag")
-		}
-		return input, nil
-	}
-	if input.Tag != "" {
-		return input, usageErrorf("ci explain: --tag is valid only for --event tag")
-	}
-	if input.Branch == "" {
-		return input, usageErrorf("ci explain requires --branch <branch>")
-	}
-	return input, nil
 }
 
 // cmdChangePlan emits the immutable, exact-revision CI admission document.
@@ -309,16 +176,15 @@ func impactPlanCommands(list string, cfg *wsproto.Config) ([]string, error) {
 // can be tested without making commands depend on the engine package.
 type changePlanEngineRun func(context.Context, engine.Request, engine.EventSink) (engine.SessionResult, error)
 
-// changePlanCommands is the quality gate the change plan projects: the same
-// command list maintainer CI runs — Putnami Cloud's native runner executes one
-// fixed gate for every workspace — in the same order.
+// changePlanCommands is the quality gate the change plan projects: the
+// command list CI runs, in the same order.
 //
 // The two must not drift. The change plan is what a reviewer reads to decide
 // what CI will do with a revision, so a command CI runs and the plan omits is a
 // task nobody reviewed, and a command the plan shows and CI skips is a check
-// nobody performed. `validate-workspace` is not listed: the @putnami/sdd
-// manifest that declares both commands plans it from `validate` through
-// `alsoRuns`, so the planned session runs it all the same.
+// nobody performed. `validate-workspace` is not listed: the manifest that
+// declares both commands plans it from `validate` through `alsoRuns`, so the
+// planned session runs it all the same.
 //
 // It stays a literal here rather than a read of a CI document: the planner
 // must answer for a workspace whose CI document is absent or unreadable, and
