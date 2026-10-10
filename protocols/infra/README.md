@@ -222,11 +222,16 @@ the project's type and its in-workspace dependency closure, on the job context
 the task after the steps that make the workload's committed requirements
 current. It decides nothing about the artifact's content.
 
-The task is deliberately **uncached**: its inputs are other projects' committed
-manifests, which no per-project cache key covers, so a cache hit could replay a
-stale deployability manifest. It is also **workload-only**: a project whose
-resolved type is not `application` is skipped, because a library is consumed,
-never deployed.
+The task is **cached**. Its key holds every file it reads: the committed
+`infra/requirements.json` of every project in the dependency closure, with that
+project's path, and the workload's `infra/runtime.json` and
+`infra/overrides.json`. A change to a library's requirements, or a project that
+joins or leaves the closure, moves the key. The aggregated manifest is the
+task's required output: a run that writes none (a library, a workload that
+declares nothing, a failed write) caches nothing, so a cache hit never replays a
+manifest the current files do not produce. It is also **workload-only**: a
+project whose resolved type is not `application` is skipped, because a library
+is consumed, never deployed.
 
 ### Deployment declaration
 
@@ -257,7 +262,7 @@ the workload needs to run without a build in the loop.
   extensions (`package-deployment`) writes `<workload>/.gen/deployment.json`.
   The step is off until a project turns on the `deployment` package channel
   (the `--deployment` flag, a `deployment` entry in its `publish` list, or the
-  `deployment` option of its language extension). Unlike
+  `deployment` option of its language extension). Like
   `build~infra`, it is **cached**: its key covers `infra/requirements.json` of
   every project in the dependency closure and the workload's `infra/runtime.json`
   and `infra/overrides.json`, so a change to a library's requirements moves the

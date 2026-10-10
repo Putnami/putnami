@@ -1230,10 +1230,10 @@ and runs tasks serially so each task's filesystem observation has one owner:
    one-owner-per-output model the manifests declare: `build-generate` is the
    single producer of `<project>/.gen` and declares that subtree whole minus
    the subpaths it cedes (to `build-describe`, `.gen/conf` to the two
-   `config-merge` tasks, which declare the merged file inside it, and
-   `.gen/deployment.json` to `package-deployment`, which declares it), while
-   `build-describe`'s staging and `build-infra`'s requirements write inside it
-   and declare nothing. What the
+   `config-merge` tasks, which declare the merged file inside it,
+   `.gen/deployment.json` to `package-deployment`, and `.gen/requirements.json`
+   and `.gen/infra/runtime.json` to `build-infra`, which declare them), while
+   `build-describe`'s staging writes inside it and declares nothing. What the
    check still catches is a write that escapes the project's declared surface
    entirely, or one project's task writing into another project's tree. A task
    that declares `mutatesSources` may also change its own keyed source inputs —
@@ -1320,19 +1320,14 @@ not move when the thing it is supposed to describe changes. Name the settled
 sources that derive the input, or nothing.
 
 **An unbounded read set.** A workspace-wide verifier reads every project's
-sources. `cache.key.workspaceFiles` can express that — the patterns resolve
-against the workspace root, and `lookupFileHash` memoizes the digest per CLI
-invocation, so the hashing itself is affordable. What is not affordable is the
-review: a pattern list over a whole workspace cannot be shown complete, and the
-first file it misses is a silently stale verdict.
-
-`@putnami/clientgen`'s `clientgen-workspace-check` — the task `putnami validate`
-runs as `clientgen-guard` — has the third, and is `cache: false` for that
-reason. It used to have all three: a per-run pre-session capture and a
-contract its own child build produced. Both are gone: drift is the
-generator task's verdict under "Declared-output drift", and the guard reads
-committed inputs only. Its cost is bounded by doing less work, not by storing
-the answer.
+sources. A hand-written pattern list over a whole workspace cannot be shown
+complete, and the first file it misses is a silently stale verdict. Such a task
+reads the Git candidate cut instead, the tracked files and the untracked files
+no ignore rule excludes, and keys on `git:**`, which hashes exactly that set
+(ADR [0041](adr/0041-git-candidate-file-inputs.md)): its read set and its key
+are then one list. `lint-docs`, the `validate-workspace` checks and
+`@putnami/clientgen`'s `clientgen-workspace-check` (the `clientgen-guard` task of
+`putnami validate`) do this.
 
 ### Version-Aware Tasks
 

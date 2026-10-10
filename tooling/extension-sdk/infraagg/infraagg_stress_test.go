@@ -117,9 +117,9 @@ func TestAggregate_ConcurrentReadWriteStress(t *testing.T) {
 				}
 			}()
 			for n := 0; n < perReader; n++ {
-				if result := Aggregate(ctx, Options{}); diag.HasErrors(result.Diagnostics) {
-					t.Errorf("Aggregate(%s) iteration %d surfaced error diagnostics (torn read?): %v",
-						ctx.Project.Name, n, result.Diagnostics)
+				if result := Aggregate(ctx, Options{}); result.Err != nil || diag.HasErrors(result.Diagnostics) {
+					t.Errorf("Aggregate(%s) iteration %d failed a write or surfaced error diagnostics (torn read?): %v, %v",
+						ctx.Project.Name, n, result.Err, result.Diagnostics)
 					return
 				}
 			}
