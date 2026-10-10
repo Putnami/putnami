@@ -36,4 +36,8 @@ func TestAdditiveContractsAreOrdered(t *testing.T) {
 		t.Fatalf("additive contract ladder = base %d, agent %d, embed %d, release baseline %d, latest %d",
 			CurrentContract, AgentContentContract, GoEmbedInputsContract, ReleaseBaselineInputContract, LatestContract)
 	}
+	// Rung 7 names two meanings that one CLI release added together.
+	if GitInputModeContract != ReleaseBaselineInputContract {
+		t.Fatalf("GitInputModeContract = %d, want rung %d with the release baseline", GitInputModeContract, ReleaseBaselineInputContract)
+	}
 }

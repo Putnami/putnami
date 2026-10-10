@@ -135,7 +135,7 @@ func discoverWith(view workspaceView, specPathFor func(files workspaceFiles, pro
 	workspaceRoot := view.root
 	projectPaths, err := view.members()
 	if err != nil {
-		return nil, append(findings, Finding{Code: "clientgen.discovery", Path: workspaceRoot, Message: err.Error()})
+		return nil, append(findings, Finding{Code: "clientgen.discovery", Path: ".", Message: workspaceErrorMessage(workspaceRoot, err)})
 	}
 
 	providers := make([]provider, 0, len(projectPaths))

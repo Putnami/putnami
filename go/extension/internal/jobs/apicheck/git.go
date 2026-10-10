@@ -155,8 +155,10 @@ func withoutGitTrace(env []string) []string {
 // holds them, with paths relative to dir. It lists the tree first and loads
 // only the files apisurface.Reads selects, so the Go files of internal,
 // testdata and vendor directories and of nested modules are never loaded.
-// Symbolic links and submodules are not files of the package and are left
-// out.
+// Files below a directory the working-tree reading skips because the task's
+// cache key does not read it (unkeyedDirectory) are left out as well, so both
+// sides compare the same packages. Symbolic links and submodules are not files
+// of the package and are left out.
 func filesAtTag(dir, tag string) ([]apisurface.File, error) {
 	entries, err := treeAtTag(dir, tag, ".", treeListing{recursive: true})
 	if err != nil {
@@ -165,7 +167,7 @@ func filesAtTag(dir, tag string) ([]apisurface.File, error) {
 	blobs := map[string]string{}
 	var listed []string
 	for _, entry := range entries {
-		if !entry.regular {
+		if !entry.regular || inUnkeyedDirectory(entry.name) {
 			continue
 		}
 		blobs[entry.name] = entry.object

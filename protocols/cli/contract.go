@@ -38,13 +38,30 @@ package cli
 // contract a manifest without additive vocabulary is stamped with, and the
 // contract an extension runtime reports in its handshake.
 //
-// Changelog — every increment MUST list what changed. Up to contract 2 an
-// increment also had to ship adaptation for contract N-1; contract 3 retires
-// that rule with the adaptation itself (see below), so from here on a
-// non-additive increment ships a MIGRATION instead of a silent downgrade. An
-// additive increment needs none: a manifest that does not use its vocabulary
-// keeps the stamp it already carries.
+// Changelog, newest first — every increment MUST list what changed. Up to
+// contract 2 an increment also had to ship adaptation for contract N-1;
+// contract 3 retires that rule with the adaptation itself (see below), so from
+// here on a non-additive increment ships a MIGRATION instead of a silent
+// downgrade. An additive increment needs none: a manifest that does not use
+// its vocabulary keeps the stamp it already carries.
 //
+//	7: ADDITIVE — two task-input meanings that one CLI release added
+//	   together, and a manifest that uses either is stamped 7:
+//	   - the releaseBaseline runtime task input: the project's version-line
+//	     baseline the CLI reads from git and folds into the task's cache
+//	     key. An older reader resolves no value for a runtime input it does
+//	     not know, so it would key the task without the baseline and serve a
+//	     verdict computed against another tag or another breaking marker.
+//	   - a `git:` task file pattern. From 7 on, its key holds each regular
+//	     candidate's executable bit, and a selected unmerged candidate
+//	     produces no key. An older reader keys a candidate's bytes alone, so
+//	     a task whose verdict reads the bit (an evidence source binding)
+//	     would replay a verdict across a chmod. The pattern itself is older
+//	     than 7, but no manifest declared one on a task before it; the floor
+//	     makes a reader that keys the old meaning refuse the manifest.
+//	6: ADDITIVE — go-embed:build and go-embed:test task file selectors.
+//	   Older readers would silently treat them as unmatched globs and
+//	   restore outputs against changed embedded bytes.
 //	5: ADDITIVE — the agent-content contribution (`agentContent`): skills,
 //	   worker profiles, references and helpers with their host adapters,
 //	   bound by digest to the extension version that ships them. Only a
@@ -53,14 +70,6 @@ package cli
 //	   representation for the field and would load the extension while
 //	   silently dropping its instructions, so it must refuse the stamp —
 //	   which it does, because 5 is above its latest contract.
-//	6: ADDITIVE — go-embed:build and go-embed:test task file selectors.
-//	   Older readers would silently treat them as unmatched globs and
-//	   restore outputs against changed embedded bytes.
-//	7: ADDITIVE — the releaseBaseline runtime task input: the project's
-//	   version-line baseline the CLI reads from git and folds into the task's
-//	   cache key. An older reader resolves no value for a runtime input it
-//	   does not know, so it would key the task without the baseline and serve
-//	   a verdict computed against another tag or another breaking marker.
 //	4: dependent commands may declare sessionPrerequisites. The planner must
 //	   execute those prerequisite commands in the same DAG, project their
 //	   selection and invocation-local parameters, and connect their declared
@@ -97,6 +106,13 @@ const GoEmbedInputsContract = 6
 // declare the releaseBaseline runtime input. Older readers refuse its stamp
 // instead of keying those tasks without the baseline.
 const ReleaseBaselineInputContract = 7
+
+// GitInputModeContract is required only by manifests whose tasks declare a
+// `git:` file pattern, whose key holds each regular candidate's executable bit
+// and refuses an unmerged candidate. It is rung 7, the rung of
+// ReleaseBaselineInputContract: one CLI release added both. Older readers
+// refuse its stamp instead of keying those tasks on bytes alone.
+const GitInputModeContract = ReleaseBaselineInputContract
 
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or

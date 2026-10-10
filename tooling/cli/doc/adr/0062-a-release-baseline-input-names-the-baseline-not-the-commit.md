@@ -44,18 +44,25 @@ one verdict still gave two outputs.
 3. **The verdict names no commit.** `validate-api` reports `breakingDeclared`
    instead of the breaking commit's SHA, and says "a commit since `<tag>`
    declares the breaking change". A branch and its squash merge give the same
-   output.
-4. **The name needs contract 7.** A CLI that does not know a runtime input
-   name resolves nothing for it, and would key the task without the
+   output when the squash commit's message declares the same break as the
+   branch's commits.
+4. **The name needs CLI contract 7.** A CLI that does not know a runtime
+   input name resolves nothing for it, and would key the task without the
    baseline. `ReleaseBaselineInputContract` (7) is the additive contract a
    manifest reaches by declaring the name, so an older CLI refuses the
-   manifest instead.
+   manifest instead. Rung 7 also covers a `git:` input, whose key holds the
+   executable bit from this release on (`GitInputModeContract`,
+   [ADR 0061](0061-a-git-input-keys-the-executable-bit.md)): one CLI release
+   added both meanings.
 5. **`validate-api` keys on what it reads.** Its inputs are the project's
    non-test Go files and the files their embed directives select, its
    `go.mod` and `.json` files, the root `putnami.support.json`, the
    `command-surface` option and `releaseBaseline`. The file patterns skip
-   directories whose name starts with a dot. The working-tree command-surface document must be a
-   `.json` file that this key reads. The task is `deterministic`, so a skip
+   directories whose name starts with a dot, and the CLI's `**` walk never
+   enters `node_modules`, `out`, `dist` or `vendor`. The check reads no Go
+   file under any of those directories, in the working tree or at the tag,
+   and it refuses a working-tree command-surface document under one. That
+   document must be a `.json` file that this key reads. The task is `deterministic`, so a skip
    for a project the support catalog does not list as stable is cached too.
 
 ## Consequences
@@ -63,6 +70,10 @@ one verdict still gave two outputs.
 - A branch and its squash merge share the `validate-api` key when they hold
   one tree and declare the same break, whatever the commits, the ref or the
   checkout directory.
+- A squash title that adds or drops the breaking marker (`!` or a
+  `BREAKING CHANGE:` footer) moves the key, by design: the verdict reads that
+  marker, so an incompatible change that passed on the branch fails on
+  `main`, or the reverse.
 - A new tag, other content at the tag, a changed breaking marker and a
   shallow clone each move the key. A shallow pull request lane and a full
   `main` lane do not share an entry: their verdicts differ, because a shallow

@@ -107,7 +107,7 @@
     },
     {
       "id": "release-baseline-cache-key",
-      "text": "A task that declares the releaseBaseline runtime input keys on its project's release baseline: the repository state, the line's tag pattern, the line's last tag HEAD reaches, the tree that tag holds at the project, and whether a commit since that tag that touches the project declares a breaking change. The key names no commit HEAD reaches: a branch and its squash merge share it, and a new tag, other content at the tag, a changed breaking marker and a shallow clone move it."
+      "text": "A task that declares the releaseBaseline runtime input keys on its project's release baseline: the repository state, the line's tag pattern, its last tag HEAD reaches, the tree that tag holds at the project, and whether a commit since that tag that touches the project declares a breaking change. The key names no commit: a branch and its squash merge share it if they declare one break. A new tag, other content at the tag, a shallow clone and a changed breaking marker, even in a squash title, move it."
     }
   ],
   "decisions": [

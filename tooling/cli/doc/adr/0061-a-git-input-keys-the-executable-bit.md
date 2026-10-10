@@ -2,7 +2,9 @@
 
 - **Status**: accepted
 - **Scope**: `@putnami/cli` (`internal/store`), `putnami-extension-sdk`
-  (`gitcandidate`), `@putnami/sdd` (`features-validate`)
+  (`gitcandidate`), `go.putnami.dev/protocol/cli` and
+  `go.putnami.dev/protocol/extension` (the contract floor), `@putnami/sdd`
+  (`features-validate`)
 - **Amends**: [ADR 0041](0041-git-candidate-file-inputs.md)
 
 ## Context
@@ -38,6 +40,16 @@ uncached, and it ran 53 times in every CI run.
    to an address no earlier entry occupies. A key over symbolic links alone
    kept its address and its meaning. ADR 0059 bumps the version only when an
    existing address could be served under another meaning, and none can.
+6. **A manifest that declares a `git:` input requires CLI contract 7**
+   (`protocols/cli.GitInputModeContract`). A CLI older than this change keys a
+   `git:` candidate by its bytes alone, so it would replay a verdict that reads
+   the bit across a chmod. Rung 7 is the rung of the release baseline input
+   ([ADR 0062](0062-a-release-baseline-input-names-the-baseline-not-the-commit.md)):
+   one CLI release added both meanings. `RequiredCLIContract` raises the stamp
+   for any task whose input port or cache-key files include a `git:` pattern,
+   whether or not its verdict reads the bit: the stamp is computed from the
+   manifest's vocabulary, and a manifest cannot say which of its tasks read
+   the bit. An exclusion (`!git:…`) selects nothing and raises nothing.
 
 ## Consequences
 
@@ -46,6 +58,9 @@ uncached, and it ran 53 times in every CI run.
 - Every task keyed on a regular `git:` candidate misses once after the
   upgrade.
 - A task keyed on the cut runs uncached during a merge conflict.
-- A CLI older than this change keys a `git:` input without the executable bit.
-  A manifest whose verdict reads the bit is exact only under a CLI that keys
-  it.
+- A CLI older than this change refuses every manifest that declares a `git:`
+  input, because their stamp is 7: `@putnami/sdd`, `@putnami/go`,
+  `@putnami/typescript`, `@putnami/python` and `@putnami/clientgen`. Only
+  `features-validate` reads the bit. The `lint-docs` and
+  `clientgen-workspace-check` tasks are raised with it, and the cost is that
+  they need a CLI that reads contract 7.

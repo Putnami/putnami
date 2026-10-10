@@ -121,7 +121,7 @@
     },
     {
       "id": "api-verdict-names-no-commit",
-      "text": "The API check names no commit: a break a commit since the line's last tag declares is reported as declared since that tag, without the commit's SHA or subject, for the exported API and the command surface alike. A branch and its squash merge, which hold one tree and declare one break, give one verdict, so one cache entry serves both."
+      "text": "The API check names no commit: a break a commit since the line's last tag declares is reported as declared since that tag, without the commit's SHA or subject, for the exported API and the command surface alike. A branch and its squash merge, which hold one tree and declare one break, give one verdict, so one cache entry serves both. A squash title that adds or drops the breaking marker declares another break, so it moves the key and the verdict."
     },
     {
       "id": "cli-compatibility-marker",

@@ -739,7 +739,7 @@ key. The CLI resolves these names; any other name contributes nothing:
 |------|-------|
 | `hostPlatform` | The host's operating system and architecture |
 | `extensionVersion` | The version of the extension that runs the task |
-| `releaseBaseline` | The project's release baseline, read from git: the repository state (no work tree, no commit, a shallow clone, or no tag of the project's version line), the line's tag pattern, the last line tag HEAD reaches, the object that tag holds at the project directory, and whether a commit since that tag that touches the project declares a breaking change. It names no commit HEAD reaches, so a branch and its squash merge share the key. Declaring it requires `cliContract` 7. |
+| `releaseBaseline` | The project's release baseline, read from git: the repository state (no work tree, no commit, a shallow clone, or no tag of the project's version line), the line's tag pattern, the last line tag HEAD reaches, the object that tag holds at the project directory, and whether a commit since that tag that touches the project declares a breaking change. It names no commit HEAD reaches, so a branch and its squash merge share the key when the squash message declares the same break; a squash title that adds or drops the breaking marker moves it. Declaring it requires `cliContract` 7. |
 
 A `task` input is the typed producer/consumer edge, and `optional` is what
 makes it a requirement or a courtesy:

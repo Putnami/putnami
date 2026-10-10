@@ -20,8 +20,10 @@ import (
 // the line's last tag HEAD reaches, the object that tag holds at the project
 // directory, and whether a commit since the tag that touches the project
 // declares a breaking change. It names no commit HEAD reaches, no ref and no
-// path, so a branch and its squash merge share the key, and every input of a
-// verdict that compares the working tree with the last release moves it.
+// path, so a branch and its squash merge share the key when the squash message
+// declares the same break, and every input of a verdict that compares the
+// working tree with the last release moves it: a squash title that adds or
+// drops the breaking marker moves it too.
 //
 // A git failure is the key's error, so the task runs uncached instead of
 // keying a verdict to a baseline nobody read. One run reads each project's

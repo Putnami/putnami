@@ -186,8 +186,6 @@ func synchronizeWorkspace(workspaceRoot string, mode workspaceclient.Mode, phase
 	return report, nil
 }
 
-// sortedTimingNames returns the phase names in a fixed order, so the metric
-// events of two runs over one workspace come out in the same sequence.
 // memberPaths returns the workspace-relative directory of every member project
 // the orchestrator resolved.
 func memberPaths(refs []pctx.ProjectRef) []string {
@@ -198,6 +196,8 @@ func memberPaths(refs []pctx.ProjectRef) []string {
 	return paths
 }
 
+// sortedTimingNames returns the phase names in a fixed order, so the metric
+// events of two runs over one workspace come out in the same sequence.
 func sortedTimingNames(timings map[string]int64) []string {
 	names := make([]string, 0, len(timings))
 	for name := range timings {

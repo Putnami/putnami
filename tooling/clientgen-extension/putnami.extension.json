@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 4,
+  "cliContract": 7,
   "name": "@putnami/clientgen",
   "runtime": {
     "executable": "compiled/putnami-clientgen",

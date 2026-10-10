@@ -197,7 +197,7 @@ Every workload's aggregated manifest carries a `runtime` block, even when the de
 }
 ```
 
-Resolution is developer-first: when `<workload>/infra/runtime.json` exists, it wins and the defaults sidecar at `<workload>/.gen/infra/runtime.json` is removed so two competing values never sit on disk. The defaults sidecar is re-emitted on every build, so changes to `infra.DefaultRuntime()` propagate without any developer action.
+Resolution is developer-first: when `<workload>/infra/runtime.json` exists, it wins, and an aggregator run removes the defaults sidecar at `<workload>/.gen/infra/runtime.json` so it does not compete with the authored file. A cache hit of the build step that aggregates restores no sidecar and removes none, so a sidecar an earlier build left stays until the aggregator runs again; the runtime block of `<workload>/.gen/requirements.json` is the value that applies. The defaults sidecar is re-emitted on every build, so changes to `infra.DefaultRuntime()` propagate without any developer action.
 
 Language runtime compatibility defaults may further specialize the runtime block
 before it is emitted. TypeScript/Bun workloads set `runtime.protocols.http2` to

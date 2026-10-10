@@ -9,6 +9,7 @@ import (
 	"sort"
 	"testing"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
 	runtimeproto "go.putnami.dev/protocol/runtime"
@@ -46,8 +47,15 @@ func TestRuntimeHandshakeAnswersBeforeDispatch(t *testing.T) {
 	if info.Extension != extensionName {
 		t.Errorf("descriptor extension = %q, want %q; core matches it against the manifest that spawned this binary", info.Extension, extensionName)
 	}
-	if info.CLIContract != contractOfCommittedManifest(t) {
-		t.Errorf("descriptor cliContract = %d, want the manifest's %d", info.CLIContract, contractOfCommittedManifest(t))
+	// The runtime reports the base contract, which core checks exactly. The
+	// manifest's stamp is that base or an additive rung above it: the sdd
+	// manifest declares `git:` inputs, so it carries rung 7.
+	if info.CLIContract != protocolcli.CurrentContract {
+		t.Errorf("descriptor cliContract = %d, want the base contract %d core checks", info.CLIContract, protocolcli.CurrentContract)
+	}
+	if stamp := contractOfCommittedManifest(t); stamp < info.CLIContract || stamp > protocolcli.LatestContract {
+		t.Errorf("manifest cliContract = %d, want from the runtime's %d up to the latest %d",
+			stamp, info.CLIContract, protocolcli.LatestContract)
 	}
 }
 
