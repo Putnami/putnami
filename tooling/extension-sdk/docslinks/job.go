@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -19,9 +20,11 @@ const Param = "docs-links"
 //	"lint-docs": docslinks.Job(),
 //
 // It checks the project's documents and fails the task when a link is broken.
-// The task is uncacheable: a link may name any file of the workspace, so no
-// file-pattern key covers what the check reads, and a key that missed a
-// deleted target would serve a green verdict for a broken link.
+// A link may name any file of the workspace, and inside a Git work tree the
+// check reads the workspace's candidate cut and nothing else, so the task
+// declares the workspace input `git:**` and is cached on it: deleting a link
+// target, renaming it or editing a heading an anchor names moves the key, and
+// an ignored file does not.
 func Job() cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 		if !ctx.Params.Bool(Param, true) {
@@ -44,6 +47,24 @@ func Job() cli.JobFunc {
 		emit.Summary(fmt.Sprintf("%d broken documentation link%s in %d file%s",
 			len(findings), plural(len(findings)), files, plural(files)))
 		return "FAILED", data, nil
+	}
+}
+
+// Inputs returns the input ports every lint-docs task declares, so each
+// language extension's manifest test holds its declaration to the one Job
+// reads:
+//
+//   - repository, the workspace input `git:**`, holds the candidate cut the
+//     check reads, and the verdict depends on nothing else;
+//   - readme, the project input README.md, names the document the check starts
+//     from. A project side left empty would key on every file under the
+//     project, ignored build output included;
+//   - docs-links, the parameter that turns the check off.
+func Inputs() map[string]proto.TaskInputPort {
+	return map[string]proto.TaskInputPort{
+		"readme":     {From: proto.TaskInputFromProject, Files: []string{"README.md"}},
+		"repository": {From: proto.TaskInputFromWorkspace, Files: []string{"git:**"}},
+		Param:        {From: proto.TaskInputFromParams},
 	}
 }
 

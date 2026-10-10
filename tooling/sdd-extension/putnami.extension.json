@@ -730,7 +730,7 @@
       "declares": {}
     },
     "decisions-validate": {
-      "description": "Prove the workspace's committed decisions.json registries, the root one and each project's, against this worktree. Each entry states a settled value with a stable id, the date it was settled and who settled it, and carries either a json-value check validate proves or the reviewOnly mark a reviewer holds. A violation fails naming the decision \u2014 id, statement and settled date \u2014 so the way out is to change the decision, not the code; an absent registry is adoption, never a failure. UNCACHEABLE on purpose, for the same reason features-validate is: a check's read set is whatever its own `files` globs name, those globs are authored per repository, and no static input pattern can cover them, so an under-declared key would serve a stale verdict while claiming to have checked. There is no verification-mode knob: a decision a repository wrote down and dated is either held or re-decided, and a report mode would be the silent re-decision the registry exists to prevent.",
+      "description": "Prove the workspace's committed decisions.json registries, the root one and each project's, against this worktree. Each entry states a settled value with a stable id, the date it was settled and who settled it, and carries either a json-value check validate proves or the reviewOnly mark a reviewer holds. A violation fails naming the decision \u2014 id, statement and settled date \u2014 so the way out is to change the decision, not the code; an absent registry is adoption, never a failure. A check reads the files its own `files` globs name, and a repository authors those globs, so the task reads the workspace's Git candidate cut (the tracked files and the untracked files no ignore rule excludes) and its key is the input `git:**`, which holds that cut: editing, adding, deleting or renaming a file a glob can match moves the key, and an ignored file is neither read nor keyed. There is no verification-mode knob: a decision a repository wrote down and dated is either held or re-decided, and a report mode would be the silent re-decision the registry exists to prevent.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -738,6 +738,14 @@
       ],
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
+      "inputs": {
+        "repository": {
+          "from": "project",
+          "files": [
+            "git:**"
+          ]
+        }
+      },
       "outputs": {
         "data": {
           "description": "Decision report: registry presence, the settled/enforced/review-only accounting, the files checked, and one finding per violating file."
@@ -747,12 +755,13 @@
         "sources"
       ],
       "cache": {
-        "enabled": false
+        "enabled": true,
+        "noOutput": true
       },
       "declares": {}
     },
     "docs-links-validate": {
-      "description": "Check every relative link and anchor in every README.md file and doc/ tree of the workspace, once per run whatever the selection: the documents no project owns, the projects without a language extension, and a link from one project into another that a change to the other breaks. It applies the SDK's docslinks rule, which each language extension's lint-docs task applies inside its project. UNCACHEABLE on purpose: a link may name any file of the workspace, so no file-pattern key covers the read set.",
+      "description": "Check every relative link and anchor in every README.md file and doc/ tree of the workspace, once per run whatever the selection: the documents no project owns, the projects without a language extension, and a link from one project into another that a change to the other breaks. It applies the SDK's docslinks rule, which each language extension's lint-docs task applies inside its project. A link may name any file of the workspace, so the task reads the workspace's Git candidate cut and its key is the input `git:**`, which holds that cut: deleting or renaming a link target, or editing a heading, moves the key, and a link to an ignored file is broken, as it is in a clone.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -760,6 +769,14 @@
       ],
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
+      "inputs": {
+        "repository": {
+          "from": "project",
+          "files": [
+            "git:**"
+          ]
+        }
+      },
       "outputs": {
         "data": {
           "description": "Documentation link report: the number of documents checked and the sorted broken links."
@@ -769,12 +786,13 @@
         "sources"
       ],
       "cache": {
-        "enabled": false
+        "enabled": true,
+        "noOutput": true
       },
       "declares": {}
     },
     "codeowners-sync": {
-      "description": "Write .github/CODEOWNERS from the owners declared in options.sdd.owners: putnami.workspace.json gives the catch-all rule, a scope or project putnami.json gives its directory a rule, and the spec-governance files stay with the workspace owners. The committed file is rewritten only when it differs, so it follows the declarations without a command of its own; a workspace that declares no owners is left alone. UNCACHEABLE on purpose: it reads the putnami.json of every project and every directory above one, and it rewrites a file that is also its input, so a replayed success over a stale file would skip the rewrite.",
+      "description": "Write .github/CODEOWNERS from the owners declared in options.sdd.owners: putnami.workspace.json gives the catch-all rule, a scope or project putnami.json gives its directory a rule, and the spec-governance files stay with the workspace owners. The committed file is rewritten only when it differs, so it follows the declarations without a command of its own; a workspace that declares no owners is left alone. The task reads the workspace's Git candidate cut, which holds the putnami.json of every project and every directory above one and the CODEOWNERS file it rewrites, and its key is the input `git:**`, which holds that cut. A run that rewrote the file is never replayed: the next run is keyed on the new bytes, and only a run that left the tree unchanged is.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -782,6 +800,14 @@
       ],
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
+      "inputs": {
+        "repository": {
+          "from": "project",
+          "files": [
+            "git:**"
+          ]
+        }
+      },
       "outputs": {
         "data": {
           "description": "CODEOWNERS report: whether owners are declared, the rendered rules with their declaring file, whether the file was rewritten, and sorted diagnostics."
@@ -794,14 +820,15 @@
         "sources"
       ],
       "cache": {
-        "enabled": false
+        "enabled": true,
+        "noOutput": true
       },
       "declares": {
         "mutatesSources": true
       }
     },
     "recipes-validate": {
-      "description": "Check every committed <lang>/samples/recipes.json against this worktree. Each recipe maps one intention to the sample that demonstrates it, the framework primitives it uses and the hand-rolled shapes it replaces; a recipe whose sample is not a directory fails naming it, a second recipe for one intention fails, and an absent index is adoption. UNCACHEABLE on purpose: the verdict depends on whether each named sample directory exists, and no file-pattern key can express that.",
+      "description": "Check every committed <lang>/samples/recipes.json against this worktree. Each recipe maps one intention to the sample that demonstrates it, the framework primitives it uses and the hand-rolled shapes it replaces; a recipe whose sample is not a directory fails naming it, a second recipe for one intention fails, and an absent index is adoption. The task reads the workspace's Git candidate cut, where a sample directory exists when it holds a candidate file, and its key is the input `git:**`, which holds that cut: deleting, renaming or emptying a sample directory moves the key, and an ignored file does not.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -809,6 +836,14 @@
       ],
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000,
+      "inputs": {
+        "repository": {
+          "from": "project",
+          "files": [
+            "git:**"
+          ]
+        }
+      },
       "outputs": {
         "data": {
           "description": "Recipe report: the index files read, the recipe count, and sorted diagnostics."
@@ -818,12 +853,13 @@
         "sources"
       ],
       "cache": {
-        "enabled": false
+        "enabled": true,
+        "noOutput": true
       },
       "declares": {}
     },
     "features-validate": {
-      "description": "Validate one project's durable feature manifest and the evidence backing its requirements. UNCACHEABLE in v1, and deliberately: this verdict depends on evidence source bindings \u2014 arbitrary bound files plus their git blob state \u2014 so no file-pattern key can cover the read set, and an under-declared key would serve a stale verdict while claiming to have checked. A binding-aware key is a follow-up, not a smaller version of this one.",
+      "description": "Validate one project's durable feature manifest and the evidence backing its requirements. Not cached, because its verdict reads three things no declared input holds: an evidence source binding records each bound file's executable bit and each submodule's checked-out commit, which a `git:` input does not read; package-root evidence is matched against the project's version, which the CLI gives a cacheable task as 0.0.0; and the report names the HEAD commit, which a replayed entry would report for another commit. An under-declared key would serve a stale verdict while claiming to have checked. Keying it needs the executable bit and the submodule commit in the `git:` digest, a report without HEAD, and a rule for the version.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [

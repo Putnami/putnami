@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -25,13 +24,15 @@ import (
 // to the other breaks, which no per-project task of that change would run
 // for. A link broken inside a selected project is reported by both.
 //
-// It walks the workspace once. Inside a project it reads what that project's
+// It lists the workspace once. Inside a project it reads what that project's
 // lint-docs reads, and it honors the project's opt-out: `docs-links: false`
 // under `options.lint`, or under the key of one of the project's own
 // extensions or its `<extension>:lint` key, in putnami.json, or those keys
-// and `*` in putnami.workspace.json. The task
-// is UNCACHEABLE for the reason lint-docs is: a link may name any file of the
-// workspace.
+// and `*` in putnami.workspace.json. A link may name any file of the
+// workspace, so every read, the documents, the link targets, each putnami.json
+// and each extension manifest, goes through one docslinks.Reader: inside a Git
+// work tree it reads the candidate cut and nothing else, and the task is
+// cached on the input `git:**`, which holds that cut.
 
 // DocsLinksReport is the result of the documentation link gate.
 type DocsLinksReport struct {
@@ -58,13 +59,17 @@ type DocsLinkFinding struct {
 // line and column.
 func BuildDocsLinksResult(ws *workspace.Workspace, workspaceOptions map[string]map[string]any) (DocsLinksReport, []docslinks.Finding, error) {
 	report := DocsLinksReport{Findings: []DocsLinkFinding{}}
-	files, err := workspaceDocuments(ws, workspaceOptions)
+	reader, err := docslinks.NewReader(ws.Root)
+	if err != nil {
+		return report, nil, fmt.Errorf("docs-links: %w", err)
+	}
+	files, err := workspaceDocuments(reader, ws, workspaceOptions)
 	if err != nil {
 		return report, nil, protocolcli.Classify(fmt.Errorf("list the workspace documents: %w", err),
 			protocolcli.ErrInvalidConfig)
 	}
 	report.Documents = len(files)
-	findings, err := docslinks.Check(ws.Root, files)
+	findings, err := reader.Check(files)
 	if err != nil {
 		return report, nil, protocolcli.Classify(fmt.Errorf("check documentation links: %w", err),
 			protocolcli.ErrInvalidConfig)
@@ -94,9 +99,9 @@ func BuildDocsLinksResult(ws *workspace.Workspace, workspaceOptions map[string]m
 // walk of the workspace: those of every project that keeps the check on, as
 // its lint-docs task sees them, and those outside every project. A root
 // project owns the documents outside the others, so its opt-out covers them.
-func workspaceDocuments(ws *workspace.Workspace, workspaceOptions map[string]map[string]any) ([]string, error) {
+func workspaceDocuments(reader *docslinks.Reader, ws *workspace.Workspace, workspaceOptions map[string]map[string]any) ([]string, error) {
 	root := filepath.Clean(ws.Root)
-	names := extensionNames{root: root, cache: map[string]string{}}
+	names := extensionNames{root: root, reader: reader, cache: map[string]string{}}
 	off := map[string]bool{}
 	dirs := make([]string, 0, len(ws.Projects))
 	for _, project := range ws.Projects {
@@ -105,9 +110,9 @@ func workspaceDocuments(ws *workspace.Workspace, workspaceOptions map[string]map
 		}
 		dir := filepath.Join(root, filepath.FromSlash(project.Path))
 		dirs = append(dirs, dir)
-		off[dir] = docsLinksOff(names.resolve(project.Extensions), workspaceOptions, projectOptions(dir))
+		off[dir] = docsLinksOff(names.resolve(project.Extensions), workspaceOptions, projectOptions(reader, dir))
 	}
-	grouped, err := docslinks.WorkspaceDocuments(root, dirs)
+	grouped, err := reader.WorkspaceDocuments(dirs)
 	if err != nil {
 		return nil, err
 	}
@@ -124,8 +129,8 @@ func workspaceDocuments(ws *workspace.Workspace, workspaceOptions map[string]map
 // projectOptions reads the option blocks of the putnami.json in dir. A file
 // this step cannot read or parse sets nothing: the configuration gates report
 // it, and the link check stays on.
-func projectOptions(dir string) map[string]map[string]any {
-	data, err := os.ReadFile(filepath.Join(dir, "putnami.json"))
+func projectOptions(reader *docslinks.Reader, dir string) map[string]map[string]any {
+	data, err := reader.ReadFile(filepath.Join(dir, "putnami.json"))
 	if err != nil {
 		return nil
 	}
@@ -141,8 +146,9 @@ func projectOptions(dir string) map[string]map[string]any {
 // extensionNames resolves extension references to manifest names, reading
 // each manifest once.
 type extensionNames struct {
-	root  string
-	cache map[string]string
+	root   string
+	reader *docslinks.Reader
+	cache  map[string]string
 }
 
 // resolve returns the manifest names of refs, which key option blocks. A
@@ -158,7 +164,7 @@ func (n extensionNames) resolve(refs []string) []string {
 				var manifest struct {
 					Name string `json:"name"`
 				}
-				data, err := os.ReadFile(filepath.Join(n.root, filepath.FromSlash(ref), "putnami.extension.json"))
+				data, err := n.reader.ReadFile(filepath.Join(n.root, filepath.FromSlash(ref), "putnami.extension.json"))
 				if err == nil && json.Unmarshal(data, &manifest) == nil && manifest.Name != "" {
 					name = manifest.Name
 				}

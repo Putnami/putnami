@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -27,9 +25,11 @@ import (
 // leave it to guess; this gate refuses both.
 //
 // An absent index is adoption, never a failure: a workspace without samples
-// has nothing to index. The task is UNCACHEABLE because its verdict depends on
-// whether each named sample directory exists, and a directory's existence is
-// not something a file-pattern key can express.
+// has nothing to index. The verdict depends on whether each named sample
+// directory exists, so the task reads the workspace through its candidate cut
+// (worktree.go) and is cached on the input `git:**`: a sample directory exists
+// when it holds a candidate file, and renaming, emptying or deleting one moves
+// the key.
 
 // RecipeIndexFilename is the index file inside a language samples directory.
 const RecipeIndexFilename = "recipes.json"
@@ -79,9 +79,13 @@ type RecipesReport struct {
 // BuildRecipesResult validates every committed recipe index in the worktree.
 func BuildRecipesResult(ws *workspace.Workspace) (RecipesReport, error) {
 	report := RecipesReport{Indexes: []string{}}
+	tree, err := openWorktree(ws.Root)
+	if err != nil {
+		return report, fmt.Errorf("recipes: %w", err)
+	}
 	for _, dir := range RecipeIndexDirectories {
 		relative := path.Join(dir, RecipeIndexFilename)
-		data, err := readOptionalBoundedRegularFile(filepath.Join(ws.Root, filepath.FromSlash(relative)))
+		data, err := tree.readRegular(relative)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
@@ -97,7 +101,7 @@ func BuildRecipesResult(ws *workspace.Workspace) (RecipesReport, error) {
 			continue
 		}
 		report.Recipes += len(index.Recipes)
-		report.Diagnostics = append(report.Diagnostics, missingRecipeSamples(ws.Root, relative, index)...)
+		report.Diagnostics = append(report.Diagnostics, missingRecipeSamples(tree, relative, index)...)
 	}
 	sortDiagnostics(report.Diagnostics)
 	if diag.HasErrors(report.Diagnostics) {
@@ -181,7 +185,7 @@ func validateRecipeLine(field, value string) []diag.Diagnostic {
 
 // missingRecipeSamples reports every recipe whose sample is not a directory in
 // this worktree. A symlink is not followed: a sample is committed content.
-func missingRecipeSamples(root, file string, index *RecipeIndex) []diag.Diagnostic {
+func missingRecipeSamples(tree *worktree, file string, index *RecipeIndex) []diag.Diagnostic {
 	var findings []diag.Diagnostic
 	for i, recipe := range index.Recipes {
 		if !validRecipeSample(recipe.Sample) {
@@ -189,8 +193,7 @@ func missingRecipeSamples(root, file string, index *RecipeIndex) []diag.Diagnost
 			// worktree is never stat'ed.
 			continue
 		}
-		info, err := os.Lstat(filepath.Join(root, filepath.FromSlash(recipe.Sample)))
-		if err == nil && info.IsDir() {
+		if tree.isDir(recipe.Sample) {
 			continue
 		}
 		findings = append(findings, diag.Errorf(ErrorCodeRecipeSampleMissing, fmt.Sprintf("%s#recipes[%d].sample", file, i),
