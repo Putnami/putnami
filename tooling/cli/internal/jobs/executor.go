@@ -3,6 +3,7 @@ package jobs
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -10,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -895,11 +897,16 @@ func computeJobCacheHashWith(
 
 	// A task that keys on the Git candidate cut judges the workspace, and it
 	// reads the membership from its context: which projects there are, their
-	// paths, extensions and edges. User config or an ignored scope manifest can
-	// change that membership without changing one candidate file, so the cut
-	// alone would replay a verdict about another set of projects.
+	// names, paths, configs, extensions and edges. User config or an ignored
+	// scope manifest can change that membership without changing one candidate
+	// file, so the cut alone would replay a verdict about another set of
+	// projects.
 	if keysOnCandidateCut(job) {
-		upstreamHashes = append(upstreamHashes, "workspaceMembership:"+ws.ProbeDigest())
+		digest, err := workspaceMembershipDigest(ws)
+		if err != nil {
+			return "", err
+		}
+		upstreamHashes = append(upstreamHashes, digest)
 	}
 
 	projRoot := filepath.Join(ws.Root, job.Project.Path)
@@ -993,19 +1000,39 @@ func computeJobCacheHashWith(
 	return hash, nil
 }
 
-// keysOnCandidateCut reports whether the job's task declares a workspace input
-// on the Git candidate cut (a `git:` pattern, ADR 0041).
+// keysOnCandidateCut reports whether the job's task declares a key input on
+// the Git candidate cut (a `git:` pattern, ADR 0041), from the project, the
+// workspace or the dependency closure.
 func keysOnCandidateCut(job *ScheduledJob) bool {
 	if job == nil || job.JobDef == nil ||
 		job.JobDef.TaskCachePolicy == nil || job.JobDef.TaskCachePolicy.Key == nil {
 		return false
 	}
-	for _, pattern := range job.JobDef.TaskCachePolicy.Key.WorkspaceFiles {
-		if _, ok := wsproto.GitFilePattern(pattern); ok {
-			return true
-		}
+	key := job.JobDef.TaskCachePolicy.Key
+	isGitPattern := func(pattern string) bool {
+		_, ok := wsproto.GitFilePattern(pattern)
+		return ok
 	}
-	return false
+	return slices.ContainsFunc(key.Files, isGitPattern) ||
+		slices.ContainsFunc(key.WorkspaceFiles, isGitPattern) ||
+		slices.ContainsFunc(key.ClosureFiles, isGitPattern)
+}
+
+// workspaceMembershipDigest hashes the membership a job context carries
+// (workspaceProjectsContext), less what differs between two checkouts of one
+// tree: the line's base version and the absolute path.
+func workspaceMembershipDigest(ws *workspace.Workspace) (string, error) {
+	members := workspaceProjectsContext(ws, nil)
+	for i := range members {
+		members[i].Version = ""
+		members[i].FullPath = ""
+	}
+	encoded, err := json.Marshal(members)
+	if err != nil {
+		return "", fmt.Errorf("encode the workspace membership: %w", err)
+	}
+	sum := sha256.Sum256(encoded)
+	return "workspaceMembership:" + hex.EncodeToString(sum[:]), nil
 }
 
 // closureKeyPatterns returns the project-relative globs this job's task

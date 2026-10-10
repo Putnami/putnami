@@ -26,17 +26,28 @@ func TestCandidateCutKeyMovesWithTheMembership(t *testing.T) {
 	treeKeyedGit(t, root, "commit", "-q", "-m", "init")
 
 	ext := &extension.ExtensionDescription{Name: "@test/ext", Tasks: map[string]extension.TaskDefinition{"check": {}}}
-	key := func(ws *workspace.Workspace, workspaceFiles string) string {
+	// A `git:` pattern reaches the key from the workspace, the project or the
+	// closure; the membership must follow it from each.
+	key := func(ws *workspace.Workspace, from, pattern string) string {
 		t.Helper()
+		taskKey := &extension.TaskCacheKey{}
+		switch from {
+		case "workspace":
+			taskKey.WorkspaceFiles = []string{pattern}
+		case "project":
+			taskKey.Files = []string{pattern}
+		case "closure":
+			taskKey.ClosureFiles = []string{pattern}
+		}
 		def := extension.JobDefinition{
 			Name: "validate~check", ExtensionName: ext.Name, Cache: true,
-			TaskCachePolicy: &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{WorkspaceFiles: []string{workspaceFiles}}},
+			TaskCachePolicy: &extension.TaskCachePolicy{Key: taskKey},
 		}
 		job := &ScheduledJob{Project: ws.ProjectByID("/app"), Extension: ext,
 			Step: &extension.PipelineStep{ID: "check", Task: "check"}, JobDef: &def}
 		hash, err := computeJobCacheHash(ws, job, nil, nil, store.NewCacheManager(store.NewLocalStore(t.TempDir())), nil)
 		if err != nil {
-			t.Fatalf("key of %s over %s: %v", job.Key(), workspaceFiles, err)
+			t.Fatalf("key of %s over %s %s: %v", job.Key(), from, pattern, err)
 		}
 		return hash
 	}
@@ -44,10 +55,15 @@ func TestCandidateCutKeyMovesWithTheMembership(t *testing.T) {
 	before := testWorkspace(root, app())
 	after := testWorkspace(root, app(), &workspace.Project{ID: "/tool", Name: "tool", Path: "tool"})
 
-	if key(before, "git:**") == key(after, "git:**") {
-		t.Error("a task keyed on the candidate cut kept its key when the membership gained a project")
+	for _, from := range []string{"workspace", "project", "closure"} {
+		if key(before, from, "git:**") == key(after, from, "git:**") {
+			t.Errorf("a task keyed on the %s candidate cut kept its key when the membership gained a project", from)
+		}
 	}
-	if key(before, "shared.lock") != key(after, "shared.lock") {
+	if key(before, "workspace", "shared.lock") != key(after, "workspace", "shared.lock") {
 		t.Error("a task keyed on ordinary workspace files moved its key with the membership")
+	}
+	if key(before, "workspace", "git:**") != key(testWorkspace(root, app()), "workspace", "git:**") {
+		t.Error("a task keyed on the candidate cut moved its key over one membership")
 	}
 }
