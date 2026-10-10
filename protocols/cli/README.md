@@ -132,7 +132,7 @@ ceilings drop **counted** rather than lost.
 | `go/extension/internal/jobs/apicheck` | Compares a stable project's command surface with its line's last tag in `validate` |
 | [`protocols/extension`](../extension/README.md) | Negotiates a manifest's `cliContract` against `CurrentContract` |
 | [`protocols/job`](../job/README.md) | Shares the typed task identity |
-| [`protocols/ci`](../ci/README.md) | Carries the typed task identity in every ChangePlan task |
+| [`protocols/ci`](../ci/README.md) | Carries the typed task identity in every ChangePlan and ImpactPlan task |
 | `@putnami/cli-protocol` (`typescript/framework/cli-protocol`) | The TypeScript twin of the validators |
 
 ## Versioning and compatibility

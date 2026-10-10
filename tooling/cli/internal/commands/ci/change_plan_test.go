@@ -21,19 +21,20 @@ import (
 func TestEmitChangePlanPinsCheckedOutHeadAndIsByteStable(t *testing.T) {
 	root, baseSHA, headSHA, project := writeChangePlanRepository(t)
 	calls := 0
-	planner := func(_ context.Context, base string, noCache bool) (ChangePlanPlannerResult, error) {
+	planner := func(_ context.Context, base string, noCache bool) (PlannerResult, error) {
 		calls++
 		if base != baseSHA || !noCache {
 			t.Fatalf("unexpected planner inputs: base=%q noCache=%t", base, noCache)
 		}
-		return ChangePlanPlannerResult{
+		return PlannerResult{
+			Commands: []string{"lint"},
 			Complete: true,
 			Projects: []*workspace.Project{project},
 			Jobs:     []*jobs.ScheduledJob{changePlanTestJob(project)},
 		}, nil
 	}
 
-	opts := ChangePlanOptions{Base: baseSHA, NoCache: true, CLIVersion: "test"}
+	opts := PlanOptions{Base: baseSHA, NoCache: true, CLIVersion: "test"}
 	first, err := EmitChangePlan(context.Background(), root, opts, planner)
 	if err != nil {
 		t.Fatalf("emit first plan: %v", err)
@@ -92,9 +93,9 @@ func TestEmitChangePlanPinsCheckedOutHeadAndIsByteStable(t *testing.T) {
 func TestEmitChangePlanNamesThePlannedCommandsWhenIncomplete(t *testing.T) {
 	root, _, _, project := writeChangePlanRepository(t)
 	gate := []string{"lint", "test", "build", "validate"}
-	_, err := EmitChangePlan(context.Background(), root, ChangePlanOptions{Base: "HEAD~1", NoCache: true, CLIVersion: "test"},
-		func(context.Context, string, bool) (ChangePlanPlannerResult, error) {
-			return ChangePlanPlannerResult{Commands: gate, Projects: []*workspace.Project{project}}, nil
+	_, err := EmitChangePlan(context.Background(), root, PlanOptions{Base: "HEAD~1", NoCache: true, CLIVersion: "test"},
+		func(context.Context, string, bool) (PlannerResult, error) {
+			return PlannerResult{Commands: gate, Projects: []*workspace.Project{project}}, nil
 		})
 	want := "change-plan could not produce a complete lint,test,build,validate plan"
 	if err == nil || err.Error() != want {
@@ -105,10 +106,10 @@ func TestEmitChangePlanNamesThePlannedCommandsWhenIncomplete(t *testing.T) {
 func TestEmitChangePlanRejectsNonCheckoutHead(t *testing.T) {
 	root, baseSHA, _, _ := writeChangePlanRepository(t)
 	called := false
-	_, err := EmitChangePlan(context.Background(), root, ChangePlanOptions{Base: baseSHA, Head: baseSHA, NoCache: true, CLIVersion: "test"},
-		func(context.Context, string, bool) (ChangePlanPlannerResult, error) {
+	_, err := EmitChangePlan(context.Background(), root, PlanOptions{Base: baseSHA, Head: baseSHA, NoCache: true, CLIVersion: "test"},
+		func(context.Context, string, bool) (PlannerResult, error) {
 			called = true
-			return ChangePlanPlannerResult{}, nil
+			return PlannerResult{}, nil
 		})
 	if err == nil || !strings.Contains(err.Error(), "checked-out HEAD") {
 		t.Fatalf("error = %v, want checked-out HEAD rejection", err)

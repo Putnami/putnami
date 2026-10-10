@@ -190,6 +190,7 @@ _putnami_path_known() {
         'extensions remove') return 0 ;;
         'extensions update') return 0 ;;
         'help') return 0 ;;
+        'impact-plan') return 0 ;;
         'infra') return 0 ;;
         'infra plan') return 0 ;;
         'init') return 0 ;;
@@ -333,6 +334,12 @@ _putnami_flags_for() {
             reply=(
                 '--man[Render the full reference as a man page]'
                 '--markdown[Render the full reference as Markdown]'
+            )
+            ;;
+        'impact-plan')
+            reply=(
+                '--base[Required base commit or ref; emitted as its full immutable commit SHA]:commit:'
+                '--head[Optional head commit or ref; it must resolve to the checked-out HEAD]:commit:'
             )
             ;;
         'init')
@@ -533,6 +540,7 @@ _putnami() {
         'doctor:Preflight production readiness under a deployment profile'
         'extensions:Manage extensions'
         'help:Show help for a command'
+        'impact-plan:Emit the impacted plan of a change for a command list'
         'infra:Plan workspace infrastructure'
         'init:Initialize a new workspace'
         'install:Install extensions and dependencies'

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	ciproto "go.putnami.dev/protocol/ci"
 	supportproto "go.putnami.dev/protocol/support"
@@ -71,6 +72,7 @@ func init() {
 	registerCommand("pin", cmdPin)
 	registerCommand("doctor", cmdDoctor)
 	registerCommand("change-plan", cmdChangePlan)
+	registerCommand("impact-plan", cmdImpactPlan)
 	registerCommand("ci", cmdCI)
 	registerCommand("channel", cmdChannel)
 }
@@ -206,7 +208,8 @@ func parseCIExplainInput(parsed commandFlagValues, global GlobalFlags) (ciproto.
 
 // cmdChangePlan emits the immutable, exact-revision CI admission document.
 // It deliberately owns no impact or task planning logic: ci.EmitChangePlan
-// routes through Engine.Run with the same impacted planner as lint/test/build.
+// routes through Engine.Run with the same impacted planner as lint/test/build,
+// and projects the ImpactPlan impact-plan would emit for changePlanCommands.
 func cmdChangePlan(env *CommandEnv) error {
 	if err := env.requireWorkspace(); err != nil {
 		return err
@@ -225,7 +228,7 @@ func cmdChangePlan(env *CommandEnv) error {
 		return usageErrorf("change-plan owns impact selection; use --base instead of --baseline, --impacted, --projects, or --all")
 	}
 	planner := newChangePlanPlanner(env.WsRoot, env.Cfg, engine.New().Run)
-	document, err := ci.EmitChangePlan(env.Ctx, env.WsRoot, ci.ChangePlanOptions{
+	document, err := ci.EmitChangePlan(env.Ctx, env.WsRoot, ci.PlanOptions{
 		Base:       parsed.value("--base"),
 		Head:       parsed.value("--head"),
 		NoCache:    env.Global.NoCache,
@@ -235,6 +238,71 @@ func cmdChangePlan(env *CommandEnv) error {
 		return err
 	}
 	return ci.RenderChangePlan(env.OutputFormat, document)
+}
+
+// cmdImpactPlan emits the impacted plan of the exact commit range from --base
+// to the checked-out HEAD for the command list its one positional names. It is
+// the document an extension reads instead of importing the CLI. Like
+// change-plan, it owns no impact or task planning logic: ci.EmitImpactPlan
+// routes through Engine.Run with the impacted planner. The command list is
+// parsed by impactPlanCommands; impact-plan is a positional leaf
+// (commandmeta.PositionalLeaf), so the list arrives in env.Args.
+func cmdImpactPlan(env *CommandEnv) error {
+	if err := env.requireWorkspace(); err != nil {
+		return err
+	}
+	parsed, err := parseCatalogCommandFlags("impact-plan", env.Args)
+	if err != nil {
+		return err
+	}
+	if env.Sub != "" || len(parsed.positionals) != 1 {
+		return usageErrorf("impact-plan takes exactly one command list: run `putnami impact-plan <commands> --base <commit>`")
+	}
+	if env.Global.Baseline != "" || env.Global.Impacted || env.Global.Projects != "" || env.Global.All {
+		return usageErrorf("impact-plan owns impact selection; use --base instead of --baseline, --impacted, --projects, or --all")
+	}
+	commands, err := impactPlanCommands(parsed.positionals[0], env.Cfg)
+	if err != nil {
+		return err
+	}
+	planner := newImpactPlanPlanner("impact-plan", env.WsRoot, env.Cfg, commands, engine.New().Run)
+	document, err := ci.EmitImpactPlan(env.Ctx, env.WsRoot, ci.PlanOptions{
+		Base:       parsed.value("--base"),
+		Head:       parsed.value("--head"),
+		NoCache:    env.Global.NoCache,
+		CLIVersion: Version,
+	}, planner)
+	if err != nil {
+		return err
+	}
+	return ci.RenderImpactPlan(env.OutputFormat, document)
+}
+
+// impactPlanCommands parses the command list of impact-plan the way the CLI
+// parses `putnami <command[,command...]>`: comma-separated, with built-in and
+// workspace aliases resolved, in order. A command named twice, and an alias
+// that expands to several commands, are usage errors: the plan names each
+// command once, by its own name.
+func impactPlanCommands(list string, cfg *wsproto.Config) ([]string, error) {
+	var aliases map[string]string
+	if cfg != nil {
+		aliases = cfg.Aliases
+	}
+	commands, err := resolveCommands(list, aliases)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]bool, len(commands))
+	for _, command := range commands {
+		if strings.ContainsFunc(command, func(r rune) bool { return r == ',' || unicode.IsSpace(r) }) {
+			return nil, usageErrorf("impact-plan: %q in %q is not one command; name each command of the alias instead", command, list)
+		}
+		if seen[command] {
+			return nil, usageErrorf("impact-plan names %s twice in %q", command, list)
+		}
+		seen[command] = true
+	}
+	return commands, nil
 }
 
 // changePlanEngineRun names the adapter seam so the exact Engine.Run request
@@ -259,18 +327,25 @@ type changePlanEngineRun func(context.Context, engine.Request, engine.EventSink)
 // to the gate the generated guidance derives for this workspace.
 var changePlanCommands = []string{"lint", "test", "build", "validate"}
 
-// newChangePlanPlanner maps the command's immutable base revision onto the
-// ordinary impacted engine plan for the quality gate. The CLI owns this
-// adapter: commands receives only its typed result and cannot form an engine
-// cycle. The result and every error it returns name changePlanCommands, the
-// set it planned.
-func newChangePlanPlanner(wsRoot string, cfg *wsproto.Config, run changePlanEngineRun) ci.ChangePlanPlanner {
-	gate := strings.Join(changePlanCommands, ",")
-	return func(ctx context.Context, baseSHA string, noCache bool) (ci.ChangePlanPlannerResult, error) {
+// newChangePlanPlanner is the impact planner of changePlanCommands, the one
+// change-plan runs.
+func newChangePlanPlanner(wsRoot string, cfg *wsproto.Config, run changePlanEngineRun) ci.Planner {
+	return newImpactPlanPlanner("change-plan", wsRoot, cfg, changePlanCommands, run)
+}
+
+// newImpactPlanPlanner maps the immutable base revision of command (impact-plan
+// or change-plan) onto the ordinary impacted engine plan for commands. The CLI
+// owns this adapter: commands receives only its typed result and cannot form
+// an engine cycle. The result and every error it returns name commands, the
+// list it planned.
+func newImpactPlanPlanner(command, wsRoot string, cfg *wsproto.Config, commands []string, run changePlanEngineRun) ci.Planner {
+	planned := append([]string(nil), commands...)
+	gate := strings.Join(planned, ",")
+	return func(ctx context.Context, baseSHA string, noCache bool) (ci.PlannerResult, error) {
 		result, err := run(ctx, engine.Request{
 			WorkspaceRoot: wsRoot,
 			Config:        cfg,
-			Commands:      append([]string(nil), changePlanCommands...),
+			Commands:      append([]string(nil), planned...),
 			Global: engine.GlobalFlags{
 				Impacted: true,
 				Baseline: baseSHA,
@@ -281,18 +356,18 @@ func newChangePlanPlanner(wsRoot string, cfg *wsproto.Config, run changePlanEngi
 			Stdout: io.Discard,
 		}, nil)
 		if err != nil {
-			return ci.ChangePlanPlannerResult{}, fmt.Errorf("plan %s: %w", gate, err)
+			return ci.PlannerResult{}, fmt.Errorf("plan %s: %w", gate, err)
 		}
 		ws, err := workspace.Load(wsRoot)
 		if err != nil {
-			return ci.ChangePlanPlannerResult{}, fmt.Errorf("plan %s: load workspace for change-plan versions: %w", gate, err)
+			return ci.PlannerResult{}, fmt.Errorf("plan %s: load workspace for %s versions: %w", gate, command, err)
 		}
 		versions, err := engine.BuildVersionInfo(ws)
 		if err != nil {
-			return ci.ChangePlanPlannerResult{}, fmt.Errorf("plan %s: change-plan versions: %w", gate, err)
+			return ci.PlannerResult{}, fmt.Errorf("plan %s: %s versions: %w", gate, command, err)
 		}
-		return ci.ChangePlanPlannerResult{
-			Commands: append([]string(nil), changePlanCommands...),
+		return ci.PlannerResult{
+			Commands: append([]string(nil), planned...),
 			Complete: result.ExitCode == engine.ExitSuccess,
 			Projects: result.Projects,
 			Jobs:     result.Plan,

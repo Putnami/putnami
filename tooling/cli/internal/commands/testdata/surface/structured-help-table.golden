@@ -175,6 +175,13 @@ example: putnami help
 example: putnami help projects list
 example: putnami help --man
 example: putnami help --markdown
+═══ impact-plan ═══
+description: Emit the impacted plan of the exact commit delta from --base to the checked-out HEAD for a comma-separated command list: the changed files, the impacted projects, and every task the engine plans for those commands. An extension reads this ImpactPlan instead of importing the CLI, and derives its own document from it, such as a ChangePlan. The worktree must be clean and --base must be a HEAD ancestor. Source contents, environment values, secrets, command arguments, and output paths are never emitted
+usage: putnami impact-plan <commands> --base <commit> [--head <commit>] [--no-cache] [--output <format>]
+flag: --base | <commit> | Required base commit or ref; emitted as its full immutable commit SHA
+flag: --head | <commit> | Optional head commit or ref; it must resolve to the checked-out HEAD
+example: putnami impact-plan test,build --base origin/main --output=json
+example: putnami impact-plan lint --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl
 ═══ infra ═══
 description: Show the aggregated infrastructure plan inferred from project descriptors
 usage: putnami infra plan [--output <format>]

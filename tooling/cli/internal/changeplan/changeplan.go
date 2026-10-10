@@ -1,8 +1,9 @@
 // Package changeplan projects the planner's typed output onto the CI
-// ChangePlan wire, go.putnami.dev/protocol/ci. The protocol owns the document,
-// its canonical form, digest and validation; this package owns only the safe
-// projection and ordering of planner data. It never recreates impact analysis
-// or serializes a task invocation.
+// ImpactPlan wire, go.putnami.dev/protocol/ci, and through the protocol's
+// ChangePlanFromImpactPlan onto the ChangePlan wire. The protocol owns both
+// documents, their canonical forms, the digest and validation; this package
+// owns only the safe projection and ordering of planner data. It never
+// recreates impact analysis or serializes a task invocation.
 package changeplan
 
 import (
@@ -19,10 +20,11 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs"
 )
 
-// Input is the checked, planner-owned data used to construct one ChangePlan.
+// Input is the checked, planner-owned data used to construct one ImpactPlan.
+// Commands is the command list the planner planned, in its order.
 type Input struct {
 	Generator        ciproto.ChangePlanGenerator
-	Repository       ciproto.ChangePlanRepository
+	Commands         []string
 	BaseSHA          string
 	HeadSHA          string
 	ChangedFiles     []string
@@ -32,15 +34,44 @@ type Input struct {
 	Cache            ciproto.ChangePlanCache
 }
 
-// Build projects planner output into a canonical ChangePlan and stamps its
-// digest. The caller owns revision resolution and planner invocation; this
-// package owns only safe projection and ordering, and returns only a plan
-// ciproto.ValidateChangePlan accepts.
-func Build(in Input) (ciproto.ChangePlan, error) {
-	plan := ciproto.ChangePlan{
-		Version:      ciproto.ChangePlanVersion,
+// BuildImpact projects planner output into a canonical ImpactPlan. The caller
+// owns revision resolution and planner invocation; this package owns only safe
+// projection and ordering, and returns only a plan ciproto.ValidateImpactPlan
+// accepts.
+func BuildImpact(in Input) (ciproto.ImpactPlan, error) {
+	plan, err := projectImpact(in)
+	if err != nil {
+		return ciproto.ImpactPlan{}, err
+	}
+	if err := ciproto.ValidateImpactPlan(plan); err != nil {
+		return ciproto.ImpactPlan{}, err
+	}
+	return plan, nil
+}
+
+// Build projects planner output into the canonical ChangePlan of repository
+// and stamps its digest. It is the ImpactPlan projection BuildImpact makes,
+// handed to ciproto.ChangePlanFromImpactPlan, so a ChangePlan and an
+// ImpactPlan of one plan never describe it two ways. It returns only a plan
+// ciproto.ValidateChangePlan accepts, and refuses every shared member as the
+// ChangePlan's.
+func Build(in Input, repository ciproto.ChangePlanRepository) (ciproto.ChangePlan, error) {
+	plan, err := projectImpact(in)
+	if err != nil {
+		return ciproto.ChangePlan{}, err
+	}
+	return ciproto.ChangePlanFromImpactPlan(plan, repository)
+}
+
+// projectImpact is the one projection of planner output onto plan members:
+// every list deduplicated and sorted, the transitive dependents derived, and
+// the command list copied in its order. It validates nothing the protocol
+// validates.
+func projectImpact(in Input) (ciproto.ImpactPlan, error) {
+	plan := ciproto.ImpactPlan{
+		Version:      ciproto.ImpactPlanVersion,
 		Generator:    in.Generator,
-		Repository:   in.Repository,
+		Commands:     append([]string{}, in.Commands...),
 		BaseSHA:      strings.TrimSpace(in.BaseSHA),
 		HeadSHA:      strings.TrimSpace(in.HeadSHA),
 		ChangedFiles: canonicalPaths(in.ChangedFiles),
@@ -49,23 +80,14 @@ func Build(in Input) (ciproto.ChangePlan, error) {
 
 	var err error
 	if plan.Impact.DirectProjects, err = canonicalProjects(in.DirectProjects); err != nil {
-		return ciproto.ChangePlan{}, err
+		return ciproto.ImpactPlan{}, err
 	}
 	if plan.Impact.Projects, err = canonicalProjects(in.ImpactedProjects); err != nil {
-		return ciproto.ChangePlan{}, err
+		return ciproto.ImpactPlan{}, err
 	}
 	plan.Impact.TransitiveDependents = plan.Impact.DerivedTransitiveDependents()
 	if plan.Tasks, err = canonicalTasks(in.Planned); err != nil {
-		return ciproto.ChangePlan{}, err
-	}
-
-	digest, err := ciproto.RecomputeChangePlanDigest(plan)
-	if err != nil {
-		return ciproto.ChangePlan{}, err
-	}
-	plan.Digest = digest
-	if err := ciproto.ValidateChangePlan(plan); err != nil {
-		return ciproto.ChangePlan{}, err
+		return ciproto.ImpactPlan{}, err
 	}
 	return plan, nil
 }
