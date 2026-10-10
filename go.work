@@ -16,6 +16,7 @@ use (
 	./cloud/clients/put-server
 	./cloud/clients/runtime-api
 	./cloud/clients/source-api
+	./cloud/runtime/go
 	./go/extension
 	./go/framework/api
 	./go/framework/app

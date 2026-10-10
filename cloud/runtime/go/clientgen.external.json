@@ -1,0 +1,32 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "Google Compute Engine metadata server v1 (cloud.google.com/compute/docs/metadata/overview)",
+      "adapter": "cloud/runtime/go/token_source.go",
+      "callsites": [
+        {
+          "path": "cloud/runtime/go/token_source.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "4de447bf73161e1778b1de945c65e1f6c9aee4d7fa19f8606aea80fb9811e64f"
+        },
+        {
+          "path": "cloud/runtime/go/token_source.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "7b782d0db67d14a59ee24f1bd68ba4aae49c0e42300e21b687a98ee9864eca31"
+        },
+        {
+          "path": "cloud/runtime/go/token_source.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "e966ce368060cdc837335f8d8722ef20313d0baf24acff817d3c2c130c2ef816"
+        }
+      ],
+      "owner": "go.putnami.dev/cloud/runtime",
+      "tests": ["cloud/runtime/go/token_source_test.go"],
+      "reason": "Mints audience-bound ID tokens for configuration service calls from the fixed metadata endpoint."
+    }
+  ]
+}

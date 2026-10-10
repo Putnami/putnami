@@ -125,6 +125,17 @@
       "reversal": "Same as the protocol step: release a superseding patch version and retract the bad version. Because the protocols published first, a retracted framework version never leaves a consumer without the protocol version it imports."
     },
     {
+      "id": "cloud-runtime",
+      "channels": [
+        "go"
+      ],
+      "artifacts": [
+        "go.putnami.dev/cloud/*"
+      ],
+      "rollbackPoint": "the previously released Cloud runtime module versions on the Go module proxy",
+      "reversal": "Same as the framework step: release a superseding patch version and retract the bad version. The Cloud runtime publishes after the framework modules it imports, so a retracted version never leaves a workload without the framework version it needs."
+    },
+    {
       "id": "typescript-framework",
       "channels": [
         "npm"

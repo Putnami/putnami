@@ -1,0 +1,28 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/cloud/runtime",
+  "visibility": "public",
+  "description": "Putnami Cloud runtime destination for Go: remote config and secrets sources and GCP workload identity for the go.putnami.dev/config loader.",
+  "tags": [
+    "go"
+  ],
+  "extensions": [
+    "/go/extension"
+  ],
+  "dependencies": [
+    "/go/framework/config"
+  ],
+  "publish": [
+    "go"
+  ],
+  "disable": {
+    "jobs": [
+      "serve"
+    ]
+  },
+  "options": {
+    "publish": {
+      "archives": false
+    }
+  }
+}

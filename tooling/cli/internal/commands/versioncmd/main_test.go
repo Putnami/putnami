@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	registryproto "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/launch"
@@ -31,6 +32,10 @@ const fakeCLINotSignedIn = "not signed in to Putnami Cloud"
 // hosted run exports an invocation broker that wins over every authored route
 // and answers 401 to a test archive, so the process drops it before any test
 // runs. Tests that exercise the broker set it themselves with t.Setenv.
+//
+// A hosted run also marks every job offline, and a process so marked starts no
+// `putnami cloud registry-token` child. The pin tests assert on that child, so
+// the process drops the two markers of a hosted job as well.
 func TestMain(m *testing.M) {
 	if reports, ok := os.LookupEnv(fakeCLIReportsEnv); ok && len(os.Args) == 2 && os.Args[1] == "--version" {
 		answerVersionAsFakeCLI(reports)
@@ -41,6 +46,8 @@ func TestMain(m *testing.M) {
 		os.Exit(answerRegistryTokenAsFakeCLI(token))
 	}
 	os.Unsetenv(extension.PrivatePutRegistryURLEnv)
+	os.Unsetenv(extensionproto.OfflineDependenciesEnv)
+	os.Unsetenv(extensionproto.JobCredentialFDEnv)
 	// A Go pin reads and writes a pin record under the Putnami home. The
 	// process runs in a home of its own, so no test reads the records of the
 	// host or leaves one there.

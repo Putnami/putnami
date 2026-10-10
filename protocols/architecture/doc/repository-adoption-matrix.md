@@ -1,9 +1,9 @@
 # Repository adoption matrix
 
-This repository maps **94 of its 148 projects** to **10 architecture domains**.
-The other **54 are excluded on purpose**: 28 samples, 7 templates, 2 template
-proofs, the standalone agent-readiness CLI, the Cloud runtime destination, and
-the Cloud CLI extension with its 14 generated clients. Every one of the 148
+This repository maps **94 of its 149 projects** to **10 architecture domains**.
+The other **55 are excluded on purpose**: 28 samples, 7 templates, 2 template
+proofs, the standalone agent-readiness CLI, the 2 Cloud runtime destinations,
+and the Cloud CLI extension with its 14 generated clients. Every one of the 149
 appears in a table below, mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
@@ -260,21 +260,23 @@ cross-domain permissions before adding it to the frontier.
 |---|---|---|
 | `/intelligence/agent-readiness` | Standalone repository collector | `intelligence` |
 
-### Cloud runtime destination — 1 project
+### Cloud runtime destinations — 2 projects
 
-**Why excluded:** `@putnami/cloud` is client code of the hosted platform. It
-adds config, secrets and Event Server destinations to the TypeScript framework
-through the framework's registration seam. No repository project links it from
-the workspace, and no existing domain owns the hosted platform's wire
-contracts. Mapping it to `typescript-framework` would give that domain an
-authority it does not hold.
+**Why excluded:** `go.putnami.dev/cloud/runtime` and `@putnami/cloud` are
+client code of the hosted platform. They add config, secrets and, for
+TypeScript, Event Server destinations to the Go and TypeScript frameworks
+through each framework's registration seam. No repository project links them
+from the workspace, and no existing domain owns the hosted platform's wire
+contracts. Mapping them to `go-framework` or `typescript-framework` would give
+that domain an authority it does not hold.
 
-**What would change it:** if a repository project links it from the workspace,
+**What would change it:** if a repository project links one from the workspace,
 review a Cloud domain and the exact cross-domain permissions before adding it
 to the frontier.
 
 | Project | Class | Owner |
 |---|---|---|
+| `/cloud/runtime/go` | Hosted-platform client library | `cloud` |
 | `/cloud/runtime/typescript` | Hosted-platform client library | `cloud` |
 
 ### Cloud CLI extension — 15 projects

@@ -83,6 +83,7 @@ var excludedProjects = map[string]string{
 	"/cloud/clients/put-server":                            reasonCloudCLIClient,
 	"/cloud/clients/runtime-api":                           reasonCloudCLIClient,
 	"/cloud/clients/source-api":                            reasonCloudCLIClient,
+	"/cloud/runtime/go":                                    reasonCloudRuntimeDestination,
 	"/cloud/runtime/typescript":                            reasonCloudRuntimeDestination,
 	"/go/samples/application":                              reasonSample,
 	"/go/samples/capabilities-proof":                       reasonSample,
