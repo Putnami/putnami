@@ -26,7 +26,7 @@
     },
     {
       "id": "declared-inputs-cover-the-read-set",
-      "text": "A validation task declares cache inputs only when they cover everything it reads: specs-validate carries a workspace-wide identity port beside its two project ports, architecture-validate reads no git history in the cached path, decisions-validate, recipes-validate, codeowners-sync and docs-links-validate read only the Git candidate cut their `git:**` input holds, and features-validate is uncached because its source bindings record executable bits and submodule commits no input holds."
+      "text": "A validation task declares cache inputs only when they cover everything it reads: specs-validate carries a workspace-wide identity port beside its two project ports, architecture-validate reads no git history in the cached path, and decisions-validate, recipes-validate, codeowners-sync, docs-links-validate and features-validate read only the Git candidate cut their `git:**` input holds. That key holds each file's executable bit, and features-validate reads every project at version 0.0.0 and names no commit."
     },
     {
       "id": "architecture-adoption-policy",

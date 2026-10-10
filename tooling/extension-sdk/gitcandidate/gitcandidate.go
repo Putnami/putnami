@@ -3,7 +3,8 @@
 // A task input written `git:**` (ADR 0041 of the CLI) keys the task on the
 // repository's candidate cut: every path `git ls-files --cached --others
 // --exclude-standard` lists that exists on disk, a regular file by its bytes
-// and a symbolic link by its target text. A cached verdict is sound only when
+// and its executable bit (ADR 0061 of the CLI) and a symbolic link by its
+// target text. A cached verdict is sound only when
 // the task reads nothing outside that cut, so a task that declares the input
 // reads the worktree through a Tree: a path that is not a candidate does not
 // exist for it, whatever the disk holds. Ignored build output, a file Git
@@ -29,6 +30,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"go.putnami.dev/sdk/extension/sourcebinding"
 )
 
 // Paths lists the candidate paths under root, slash-separated, relative to
@@ -67,6 +70,57 @@ func Paths(root string) ([]string, error) {
 	return unique, nil
 }
 
+// indexModes is what the index records for the tracked paths under a root.
+type indexModes struct {
+	// Modes maps a tracked, merged path, slash-separated and relative to the
+	// root, to its six-digit octal mode: "100644", "100755", "120000" or
+	// "160000".
+	Modes map[string]string
+	// Unmerged holds every path the index lists at stage 1, 2 or 3.
+	Unmerged map[string]bool
+}
+
+// readIndexModes reads the index under root once, with `git ls-files -z
+// --stage`, as the CLI does to key a `git:` input, so that a Tree's
+// Fingerprint reads the answer the key reads. A host that does not store the
+// executable bit takes a tracked file's bit from its mode, as a source binding
+// does (sourcebinding.FileMode), and an unmerged path has no single mode at
+// all.
+func readIndexModes(root string) (indexModes, error) {
+	cmd := exec.Command("git", "ls-files", "-z", "--stage")
+	cmd.Dir = root
+	data, err := cmd.Output()
+	if err != nil {
+		return indexModes{}, fmt.Errorf("git ls-files --stage: %w", err)
+	}
+	return parseIndexModes(data)
+}
+
+// parseIndexModes reads `git ls-files -z --stage` output: one
+// "<mode> <object> <stage>\t<path>" entry per NUL-terminated record.
+func parseIndexModes(data []byte) (indexModes, error) {
+	index := indexModes{Modes: map[string]string{}, Unmerged: map[string]bool{}}
+	if len(data) == 0 {
+		return index, nil
+	}
+	if data[len(data)-1] != 0 {
+		return indexModes{}, fmt.Errorf("git ls-files --stage did not terminate its NUL-delimited output")
+	}
+	for _, record := range bytes.Split(data[:len(data)-1], []byte{0}) {
+		metadata, name, found := bytes.Cut(record, []byte{'\t'})
+		fields := bytes.Fields(metadata)
+		if !found || len(name) == 0 || len(fields) != 3 {
+			return indexModes{}, fmt.Errorf("git ls-files --stage returned a malformed entry %q", record)
+		}
+		if string(fields[2]) != "0" {
+			index.Unmerged[string(name)] = true
+			continue
+		}
+		index.Modes[string(name)] = string(fields[0])
+	}
+	return index, nil
+}
+
 // Kind is what a path names in a Tree.
 type Kind int
 
@@ -100,6 +154,10 @@ type Tree struct {
 	dirs map[string]bool
 	// paths is the sorted keys of files.
 	paths []string
+	// unkeyable holds, sorted, every candidate a `git:` key refuses to hold:
+	// one Git lists as a directory (a submodule or a nested repository, whose
+	// checked-out commit no key reads) and a socket, a pipe or a device.
+	unkeyable []string
 	// links caches the target text of each symbolic link read.
 	links map[string]string
 }
@@ -158,8 +216,10 @@ func newTree(root string, listed []string) (*Tree, error) {
 			tree.files[rel] = true
 		case info.IsDir():
 			tree.dirs[rel] = true
+			tree.unkeyable = append(tree.unkeyable, rel)
 		default:
 			// A socket, a pipe or a device has no bytes a key can hold.
+			tree.unkeyable = append(tree.unkeyable, rel)
 			continue
 		}
 		for dir := path.Dir(rel); dir != "."; dir = path.Dir(dir) {
@@ -174,6 +234,7 @@ func newTree(root string, listed []string) (*Tree, error) {
 		tree.paths = append(tree.paths, rel)
 	}
 	sort.Strings(tree.paths)
+	sort.Strings(tree.unkeyable)
 	return tree, nil
 }
 
@@ -270,12 +331,32 @@ func (t *Tree) ReadFile(rel string) ([]byte, error) {
 }
 
 // Fingerprint digests the cut as a `git:` cache input reads it: each
-// candidate's path, then its bytes or, for a symbolic link, its target text.
-// Two cuts with one fingerprint hold the same paths, bytes and link texts, so
-// a `git:**` key of the root cannot tell them apart either. A test of a task
-// that reads through a Tree uses it to prove the task's verdict moves only
-// with what its key reads.
+// candidate's path, then its bytes and its source-v1 mode (regular or
+// executable, read where a source binding reads it) or, for a symbolic link,
+// its target text. Two cuts with one fingerprint hold the same paths, bytes,
+// executable bits and link texts, so a `git:**` key of the root cannot tell
+// them apart either. A test of a task that reads through a Tree uses it to
+// prove the task's verdict moves only with what its key reads.
+//
+// It fails where the key produces none: on a candidate Git lists as a
+// directory (a submodule's commit is not keyed), a socket, a pipe or a
+// device, and on an unmerged index entry.
 func (t *Tree) Fingerprint() (string, error) {
+	if len(t.unkeyable) > 0 {
+		return "", fmt.Errorf("git candidate %q is not a regular file or a symbolic link, so no `git:` key holds it", t.unkeyable[0])
+	}
+	index, err := readIndexModes(t.root)
+	if err != nil {
+		return "", err
+	}
+	if len(index.Unmerged) > 0 {
+		unmerged := make([]string, 0, len(index.Unmerged))
+		for rel := range index.Unmerged {
+			unmerged = append(unmerged, rel)
+		}
+		sort.Strings(unmerged)
+		return "", fmt.Errorf("git candidate %q has an unmerged index entry, so no `git:` key holds it", unmerged[0])
+	}
 	h := sha256.New()
 	for _, rel := range t.paths {
 		writeField(h, rel)
@@ -288,11 +369,17 @@ func (t *Tree) Fingerprint() (string, error) {
 			writeField(h, target)
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(t.root, filepath.FromSlash(rel))) //nolint:gosec // a candidate path inside the root
+		full := filepath.Join(t.root, filepath.FromSlash(rel))
+		info, err := os.Lstat(full)
+		if err != nil {
+			return "", err
+		}
+		data, err := os.ReadFile(full) //nolint:gosec // a candidate path inside the root
 		if err != nil {
 			return "", err
 		}
 		writeField(h, "file")
+		writeField(h, string(sourcebinding.FileMode(info.Mode(), index.Modes[rel], sourcebinding.HostStatsExecBit)))
 		writeField(h, string(data))
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil

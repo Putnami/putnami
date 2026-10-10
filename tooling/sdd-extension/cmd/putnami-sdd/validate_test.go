@@ -902,10 +902,11 @@ func TestProjectValidationViewSeesTheWorkspaceAndReportsOnOneProject(t *testing.
 	if len(selection.ProjectIDs) != 1 || selection.ProjectIDs[0] != "/billing" {
 		t.Errorf("projection = %v, want only the job's own project", selection.ProjectIDs)
 	}
-	// The baseline is evidence about the RUN, reported verbatim so a reader can
-	// join this verdict to the invocation that scheduled it.
-	if selection.Baseline != "origin/main" || selection.BaselineSource != "trunk" {
-		t.Errorf("baseline = %q/%q, want the run's, unchanged", selection.Baseline, selection.BaselineSource)
+	// The baseline names the RUN's ref, and both tasks that read this view are
+	// cached on keys that read no ref: a replayed report would name another
+	// run's.
+	if selection.Baseline != "" || selection.BaselineSource != "" {
+		t.Errorf("baseline = %q/%q, want none: no cache key reads the run's ref", selection.Baseline, selection.BaselineSource)
 	}
 }
 

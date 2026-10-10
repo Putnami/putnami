@@ -32,21 +32,20 @@ import (
 // runFeaturesValidate is the first step of the project-scoped `validate`
 // pipeline: the durable feature manifest and the evidence that backs it.
 //
-// The task it belongs to is not cached (D8), because its verdict reads three
-// things no file key holds. An evidence binding records each bound file's
-// executable bit and each submodule's checked-out commit, which a `git:` key
-// does not read. Package-root evidence is matched against the project's
-// version, which the CLI derives from Git tags and gives a cacheable task as
-// 0.0.0 (ADR 0060 of the CLI). The report names the HEAD commit, which a
-// replayed entry would report for another commit. An under-declared key does
-// not merely miss a change; it serves a stale verdict while claiming to have
-// checked, which is the one failure a validation job must not have.
+// The task is cached (D8) on the input `git:**`, the workspace's Git candidate
+// cut, and its verdict reads that cut and nothing else
+// (sdd.BuildFeatureTaskValidationResult). An evidence source binding records
+// each bound file's bytes or link text and its executable bit, which the key
+// holds too (ADR 0061 of the CLI); a submodule or an unmerged path produces no
+// key, so a run that meets one is never served. Every project carries the
+// tree base version, and the report names no commit, so two runs on one tree
+// write one report whatever the commit, the ref or the checkout.
 func runFeaturesValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	ws, selection, err := projectValidationView(ctx)
 	if err != nil {
 		return "", nil, err
 	}
-	report, verdict := sdd.BuildFeatureValidationResult(ws, selection)
+	report, verdict := sdd.BuildFeatureTaskValidationResult(ws, selection)
 	publishDiagnostics(emit, report.Diagnostics)
 	emit.Summary(fmt.Sprintf("features: %d feature(s), %d requirement(s), %d evidence record(s)",
 		report.Summary.Features, report.Summary.Requirements, report.Summary.Evidence))
@@ -348,6 +347,10 @@ func runDocsLinksValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (s
 // projects the invocation acts on; this task acts on exactly one of them, and
 // scoping it to the rest would make its verdict depend on how many siblings
 // happened to be selected beside it — the same key, two answers.
+//
+// The selection report names no baseline either. Both tasks that read this
+// view are cached, and no key reads the ref an impacted run measured against:
+// a replayed report would name another run's ref.
 func projectValidationView(ctx *pctx.Context) (*wsview.Workspace, sdd.Selection, error) {
 	ws, _ := wsview.FromContext(ctx)
 	if ws == nil || len(ws.Projects) == 0 {
@@ -367,13 +370,6 @@ func projectValidationView(ctx *pctx.Context) (*wsview.Workspace, sdd.Selection,
 		Mode:       pctx.SelectionModeProjects,
 		Scoped:     true,
 		ProjectIDs: []string{own},
-	}
-	if ctx.Selection != nil {
-		// The baseline is evidence about the RUN, reported verbatim so a reader
-		// can join this verdict to the invocation that scheduled it. It never
-		// changes what was evaluated.
-		selection.Baseline = ctx.Selection.Baseline
-		selection.BaselineSource = ctx.Selection.BaselineSource
 	}
 	return ws, selection, nil
 }

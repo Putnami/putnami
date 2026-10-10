@@ -306,8 +306,8 @@ activation:
 
 | Command | Scope | Steps | Cached? |
 |---|---|---|---|
-| `validate` | one project, activated by `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | features: **no**; specs: yes |
-| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate` | architecture and ratchet: yes; decisions, recipes, CODEOWNERS and docs links: **no** |
+| `validate` | one project, activated by `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
+| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS and docs links on the Git candidate cut |
 
 Both are in the canonical gate:
 
@@ -330,7 +330,7 @@ silent way to escape the gate, so `workspace_adoption_test.go` asserts that
 every project in THIS repository which authors a feature manifest or a spec
 declares `/tooling/sdd-extension`.
 
-### Why one task is uncached and the others are not
+### What each task's key reads
 
 A task may be cacheable only when its declared inputs COVER what it reads.
 
@@ -358,15 +358,18 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   renaming a candidate moves the key, and an ignored file is neither read nor
   keyed. Outside a Git work tree the steps read the disk, and the `git:` input
   has no key, so they run every time.
-- `features-validate` is **uncached**. An evidence source binding records each
-  bound file's executable bit and each submodule's checked-out commit, which a
-  `git:` input does not hold. Package-root evidence is matched against the
-  project's version, which the CLI gives a cacheable task as `0.0.0`. The report
-  names the HEAD commit, which a replayed entry would report for another commit.
-  An under-declared key does not merely miss a change — it serves a stale
-  verdict while claiming to have checked. Keying it needs the executable bit and
-  the submodule commit in the `git:` digest, a report without HEAD, and a rule
-  for the version.
+- `features-validate` reads the same Git candidate cut: the feature manifests
+  and evidence at every root, the capability manifests evidence reaches, and
+  every file a source binding hashes. A binding records each bound file's bytes
+  or link text and its executable bit, and the `git:` key holds the bit too
+  (ADR 0061 of the CLI). A submodule or an unmerged path produces no key, so the
+  task then runs uncached rather than replay a verdict about another commit.
+  Every project is read at the tree base version `0.0.0`, the version the CLI
+  gives a task the cache can serve (ADR 0060 of the CLI), and the report names
+  no commit and no baseline ref. Two runs on one tree share one entry, whatever
+  the commit, the ref or the checkout. The cut is a workspace port, so one
+  digest serves every project's key; a project port naming
+  `putnami.features.json` keeps the project side off ignored build output.
 
 ### The decision gate
 
