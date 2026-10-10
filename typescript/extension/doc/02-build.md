@@ -314,8 +314,8 @@ Emits the workload's deployability manifest at `<project>/.gen/requirements.json
    workload's dependency closure (the closure arrives on the job context).
 2. Applies `<workload>/infra/overrides.json`.
 3. Resolves the runtime block — an authored `<workload>/infra/runtime.json` wins
-   and its stale defaults sidecar is removed; otherwise framework defaults are
-   synthesized into `<workload>/.gen/infra/runtime.json`.
+   and the run removes its stale defaults sidecar; otherwise framework defaults
+   are synthesized into `<workload>/.gen/infra/runtime.json`.
 4. Turns HTTP/2 **off** in that block, whatever its source: Bun does not serve
    h2c, and the deploy target may default a service to HTTP/2, so a TypeScript
    workload has to opt out explicitly. This is the TypeScript extension's own
@@ -335,7 +335,11 @@ closure, moves the key. The key also moves with the project type and with the
 extension's code, which holds the runtime defaults and the HTTP/2 rule. No
 commit, ref or checkout path reaches the key. A cache hit restores
 `.gen/requirements.json` and, without an authored runtime,
-`.gen/infra/runtime.json`. Only a run that writes the manifest is stored: a
+`.gen/infra/runtime.json`. With an authored runtime, a hit restores nothing at
+the sidecar's path and removes nothing, so a sidecar an earlier build left
+stays until the phase runs again. The runtime block of
+`.gen/requirements.json` is the value that applies. Only a run that writes the
+manifest is stored: a
 library, a workload that declares nothing and a run whose write failed report a
 skip and are not cached. A cache hit does not repeat the findings.
 

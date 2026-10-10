@@ -446,6 +446,12 @@ func TestValidateContributesTheWorkspaceGuard(t *testing.T) {
 	if task.Cache.Key != nil {
 		t.Fatalf("the guard declares the cache key %+v; its key is its `git:**` input and nothing else", task.Cache.Key)
 	}
+	// A `git:` input needs the CLI contract whose key holds the executable bit;
+	// the manifest carries the stamp the packager earns for it.
+	if manifest.CLIContract != proto.RequiredCLIContract(manifest) {
+		t.Fatalf("cliContract = %d, want the contract the manifest's vocabulary requires, %d",
+			manifest.CLIContract, proto.RequiredCLIContract(manifest))
+	}
 	for _, phrase := range []string{"Git candidate cut", "`git:**`", "neither read nor keyed"} {
 		if !strings.Contains(task.Description, phrase) {
 			t.Fatalf("the guard description does not say what its key reads (%q): %s", phrase, task.Description)

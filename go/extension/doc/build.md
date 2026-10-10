@@ -307,7 +307,7 @@ there would serve a stored verdict for a test the run never executed.
      workload's dependency closure (the closure arrives on the job context)
    - Applies `<workload>/infra/overrides.json`
    - Resolves the runtime block: an authored `<workload>/infra/runtime.json`
-     wins and its stale defaults sidecar is removed; otherwise framework
+     wins and the run removes its stale defaults sidecar; otherwise framework
      defaults are synthesized and written to `<workload>/.gen/infra/runtime.json`
    - Writes `<workload>/.gen/requirements.json` atomically
    - Findings (a malformed contribution, a merge conflict, an unused override)
@@ -321,7 +321,11 @@ there would serve a stored verdict for a test the run never executed.
      moves with the project type and with the extension's code, which holds the
      runtime defaults. No commit, ref or checkout path reaches the key
    - A cache hit restores `.gen/requirements.json` and, without an authored
-     runtime, `.gen/infra/runtime.json`. Only a run that writes the manifest is
+     runtime, `.gen/infra/runtime.json`. With an authored runtime, a hit
+     restores nothing at the sidecar's path and removes nothing, so a sidecar
+     an earlier build left stays until the step runs again. The runtime block
+     of `.gen/requirements.json` is the value that applies. Only a run that
+     writes the manifest is
      stored: a library, a workload that declares nothing and a run whose write
      failed report a skip and are not cached. A cache hit does not repeat the
      findings

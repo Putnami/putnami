@@ -679,6 +679,54 @@ func TestDeclaredCaptureOptionalEmptyLeavesSiblingsAlone(t *testing.T) {
 	}
 }
 
+// build-infra's shape: a required manifest beside an optional runtime defaults
+// file, both under the project root. An entry stored while the workload
+// authored its runtime records the defaults file as empty. A hit on that entry
+// restores the manifest and leaves the defaults file an earlier run wrote in
+// place, because restoring an empty output never touches its destination. The
+// Go and TypeScript build-infra descriptions say so instead of promising that
+// the file is gone.
+func TestDeclaredCaptureEmptyProjectFileLeavesAnEarlierFileInPlace(t *testing.T) {
+	job := declaredJob("build~infra", "infra", &extension.TaskDeclaration{
+		Outputs: map[string]extension.DeclaredOutput{
+			"requirements":    fileDeclaration(extension.OutputRootProject, ".gen/requirements.json", false),
+			"runtimeDefaults": fileDeclaration(extension.OutputRootProject, ".gen/infra/runtime.json", true),
+		},
+	})
+	f := newCaptureFixture(t, job)
+	requirements := filepath.Join(f.ws.Root, captureTestProject, ".gen", "requirements.json")
+	defaults := filepath.Join(f.ws.Root, captureTestProject, ".gen", "infra", "runtime.json")
+
+	// The run under an authored runtime wrote the manifest and no defaults file.
+	const authored = `{"runtime":"authored"}` + "\n"
+	writeFileAt(t, requirements, authored)
+	if !f.sched.storeDeclaredCapture(job, capturedResult(nil), captureHashA) {
+		t.Fatal("declared capture did not publish an entry")
+	}
+	entry, err := f.cache.LookupTaskEntry(captureHashA)
+	if err != nil || entry == nil {
+		t.Fatalf("lookup task entry: %v %v", entry, err)
+	}
+	if record, ok := entry.Output("runtimeDefaults"); !ok || record.Present() {
+		t.Fatalf("absent runtime defaults recorded as %+v, want an explicit empty state", record)
+	}
+
+	// An earlier build, before the workload authored its runtime, left both
+	// files with the defaults.
+	const defaultsRuntime = `{"runtime":"defaults"}` + "\n"
+	writeFileAt(t, requirements, defaultsRuntime)
+	writeFileAt(t, defaults, defaultsRuntime)
+
+	f.hitOrFail(t, job, captureHashA)
+
+	if got := readFileAt(t, requirements); got != authored {
+		t.Errorf("the hit did not restore the manifest: %q", got)
+	}
+	if got := readFileAt(t, defaults); got != defaultsRuntime {
+		t.Errorf("the hit touched the empty output's destination: %q", got)
+	}
+}
+
 // An optional output whose path comes from a task output port is simply absent
 // from the entry when the port reports nothing — and present when it does. The
 // positive control is what keeps this from passing for the wrong reason.

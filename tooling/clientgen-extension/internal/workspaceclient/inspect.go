@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -56,7 +58,7 @@ func InspectCommitted(workspaceRoot string, members []string) Report {
 	view, err := committedView(workspaceRoot, members)
 	if err != nil {
 		report := Report{ProtocolVersion: 1, Mode: ModeCheck,
-			Findings: []Finding{{Code: "clientgen.discovery", Path: workspaceRoot, Message: err.Error()}}}
+			Findings: []Finding{{Code: "clientgen.discovery", Path: ".", Message: workspaceErrorMessage(workspaceRoot, err)}}}
 		canonicalizeReport(&report)
 		return report
 	}
@@ -113,7 +115,7 @@ func inspect(view workspaceView, discovery func(workspaceView) ([]provider, []Fi
 		// survives is the one needing no observation: whether the census
 		// document itself is valid.
 		report.Findings = append(report.Findings, Finding{Code: "clientgen.source-scan",
-			Path: workspaceRoot, Message: scanErr.Error()})
+			Path: ".", Message: workspaceErrorMessage(workspaceRoot, scanErr)})
 		report.Findings = append(report.Findings, loadPendingCensus(view.workspaceFiles).invalid...)
 		canonicalizeReport(&report)
 		return report
@@ -443,6 +445,20 @@ func safeWorkspacePath(value string) (string, error) {
 func joinRel(parts ...string) string {
 	joined := filepath.Join(parts...)
 	return filepath.ToSlash(joined)
+}
+
+// workspaceErrorMessage returns the message of an error a finding reports
+// about the workspace as a whole. A file system error names its file relative
+// to workspaceRoot, so the finding names no absolute checkout directory and
+// reads the same on every machine.
+func workspaceErrorMessage(workspaceRoot string, err error) string {
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) && filepath.IsAbs(pathErr.Path) {
+		if rel, relErr := filepath.Rel(workspaceRoot, pathErr.Path); relErr == nil && filepath.IsLocal(rel) {
+			pathErr.Path = filepath.ToSlash(rel)
+		}
+	}
+	return err.Error()
 }
 
 func canonicalizeReport(report *Report) {

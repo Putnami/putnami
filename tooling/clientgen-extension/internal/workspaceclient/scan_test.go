@@ -358,6 +358,14 @@ func TestSourceScanFailureDoesNotInventDrift(t *testing.T) {
 	if codes["clientgen.source-scan"] != 1 {
 		t.Fatalf("a failed scan must report itself exactly once: %+v", findings)
 	}
+	// The finding names the workspace as ".", never the checkout's absolute
+	// directory, so a report from one machine reads the same on another.
+	for _, finding := range findings {
+		if finding.Code == "clientgen.source-scan" &&
+			(finding.Path != "." || strings.Contains(finding.Message, root)) {
+			t.Errorf("source-scan finding = %+v, want path \".\" and no absolute directory", finding)
+		}
+	}
 	for _, invented := range []string{
 		"clientgen.stale-framework-callsite",
 		"clientgen.stale-external-callsite",

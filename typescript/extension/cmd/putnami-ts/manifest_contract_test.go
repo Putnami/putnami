@@ -942,11 +942,18 @@ func TestWorkspaceAdapterDeclaresEdgeAttribution(t *testing.T) {
 // check on the same key. The check reads the workspace's Git candidate cut,
 // which the workspace input `git:**` holds: a deleted or renamed link target
 // moves the key, and an ignored file does not. It writes nothing, so it
-// declares no output, no effect and no source rewrite.
+// declares no output, no effect and no source rewrite. A `git:` input needs
+// the CLI contract whose key holds the executable bit, and the manifest
+// carries the stamp the packager earns for it.
 func TestLintDocsIsKeyedOnTheCandidateCut(t *testing.T) {
-	task, ok := loadExtensionManifest(t).Tasks["lint-docs"]
+	manifest := loadExtensionManifest(t)
+	task, ok := manifest.Tasks["lint-docs"]
 	if !ok {
 		t.Fatal("manifest task \"lint-docs\" is missing")
+	}
+	if manifest.CLIContract != proto.RequiredCLIContract(manifest) {
+		t.Errorf("cliContract = %d, want the contract the manifest's vocabulary requires, %d",
+			manifest.CLIContract, proto.RequiredCLIContract(manifest))
 	}
 	if !reflect.DeepEqual(task.Inputs, docslinks.Inputs()) {
 		t.Errorf("lint-docs inputs = %+v, want docslinks.Inputs() = %+v", task.Inputs, docslinks.Inputs())

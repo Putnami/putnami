@@ -20,8 +20,10 @@ in this order:
 1. `<workload>/infra/runtime.json`: workload runtime intent. When it is absent,
    the aggregator synthesizes `infra.DefaultRuntime()` and writes a visible
    sidecar at `<workload>/.gen/infra/runtime.json`. When the authored file
-   exists it wins and the sidecar is removed, so two competing values never sit
-   on disk.
+   exists it wins and an aggregator run removes the sidecar. A cache hit of
+   the build step that aggregates removes nothing, so an earlier sidecar can
+   stay until the aggregator runs again; the aggregated manifest's runtime
+   block is the value that applies.
 2. `<workload>/infra/overrides.json`: suppression. `ApplyOverrides` runs on the
    merged manifest and drops entries matching an `ignore` rule by merge
    identity. A rule that matches nothing warns (`infra.unused_override`).

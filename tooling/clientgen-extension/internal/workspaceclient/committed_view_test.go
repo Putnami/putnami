@@ -204,6 +204,14 @@ func TestTheCheckTakesItsMembershipFromTheJobContext(t *testing.T) {
 		if !hasFindingCode(report, "clientgen.discovery") {
 			t.Errorf("%s: the check did not report a discovery finding: %+v", name, report.Findings)
 		}
+		// The finding names the workspace as ".", never the checkout's absolute
+		// directory, so a report from one machine reads the same on another.
+		for _, finding := range report.Findings {
+			if finding.Code == "clientgen.discovery" &&
+				(finding.Path != "." || strings.Contains(finding.Message, root)) {
+				t.Errorf("%s: discovery finding = %+v, want path \".\" and no absolute directory", name, finding)
+			}
+		}
 	}
 	// A project at the workspace root arrives as an empty path and reads as ".".
 	if paths, err := memberProjectPaths([]string{"", "services/catalog"}); err != nil || strings.Join(paths, ",") != ".,services/catalog" {

@@ -546,6 +546,60 @@ func TestOnlyTheFilesTheSurfaceReadsAreLoadedFromTheTag(t *testing.T) {
 	}
 }
 
+// The task's cache key reads no file below a directory the CLI's `**` walk
+// skips (out, dist, node_modules, vendor) or whose name starts with a dot. The
+// check reads none of them either, in the working tree and at the tag, so a
+// change there can neither leave a stored verdict stale nor show as a package
+// added or removed on one side.
+func TestAPackageUnderADirectoryTheKeyDoesNotReadIsNotCompared(t *testing.T) {
+	t.Parallel()
+	unkeyed := []string{"dist/format", "out/format", "node_modules/format", "vendor/format", ".cache/format", "nested/dist/format"}
+	f := newFixture(t, catalog("package", "stable"))
+	for _, dir := range unkeyed {
+		f.write("lib/greet/"+dir+"/format.go", "package format\n\n// Format formats.\nfunc Format() {}\n")
+	}
+	f.commit("feat: format packages")
+	f.git("tag", "lib/v0.5.0")
+
+	files, err := filesAtTag(f.project, "lib/v0.5.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		if inUnkeyedDirectory(file.Path) {
+			t.Errorf("loaded %s from the tag, below a directory the key does not read", file.Path)
+		}
+	}
+	current, err := filesInTree(f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range current {
+		if inUnkeyedDirectory(file.Path) {
+			t.Errorf("read %s from the working tree, below a directory the key does not read", file.Path)
+		}
+	}
+
+	for _, dir := range unkeyed {
+		f.write("lib/greet/"+dir+"/format.go", "package format\n")
+	}
+	f.commit("feat: drop the format functions")
+	report := f.check()
+	if report.Tag != "lib/v0.5.0" || len(report.Changes) != 0 || report.Packages != 1 {
+		t.Fatalf("report = %+v, want lib/v0.5.0 compared over its one keyed package with no change", report)
+	}
+
+	// The control: the same removal in a keyed directory is a change.
+	f.write("lib/greet/format/format.go", "package format\n\n// Format formats.\nfunc Format() {}\n")
+	f.commit("feat: a keyed format package")
+	f.git("tag", "lib/v0.6.0")
+	f.write("lib/greet/format/format.go", "package format\n")
+	f.commit("feat: drop it")
+	if report := f.check(); len(report.Changes) != 1 || report.Changes[0].Symbol != "func Format" {
+		t.Fatalf("report = %+v, want the keyed removal reported", report)
+	}
+}
+
 func TestARepositoryWithoutACommitHasNothingToCompare(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

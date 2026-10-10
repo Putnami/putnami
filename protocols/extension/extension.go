@@ -778,9 +778,10 @@ const (
 //
 // A runtime input names an AMBIENT fact — something true of the machine, the
 // running toolchain or the checkout's git history rather than of the
-// checked-out sources — that a task's output depends on. Declaring one is a statement with two consequences: the
-// value enters the task's cache key, and the plan's keys stop being recomputable
-// from a revision alone (CacheKeysRecomputableAtRevision).
+// checked-out sources — that a task's output depends on. Declaring one is a
+// statement with two consequences: the value enters the task's cache key, and
+// the plan's keys stop being recomputable from a revision alone
+// (CacheKeysRecomputableAtRevision).
 const (
 	// RuntimeInputHostPlatform is the GOOS/GOARCH of the machine running the
 	// CLI. A task declares it when its output or its VERDICT is host-specific:
@@ -874,8 +875,8 @@ type TaskCachePolicy struct {
 	// capturing the shared per-command output directory (which may hold
 	// SIBLING steps' files, making the entry both wrong — a hit restores
 	// stale sibling artifacts — and heavy: tens of MB keyed to a sub-second
-	// task); and the remote required-input guard treats the task's files-less hits as
-	// legitimate instead of rebuilding them locally on every run.
+	// task); and the remote required-input guard treats the task's files-less
+	// hits as legitimate instead of rebuilding them locally on every run.
 	NoOutput bool `json:"noOutput,omitempty"`
 }
 

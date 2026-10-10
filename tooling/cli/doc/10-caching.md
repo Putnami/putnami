@@ -97,9 +97,10 @@ v9                          ← format version (for compatibility)
 Apart from a build stamp that a generate asset copies into the output, no input
 names the commit, the branch, the checkout directory or the base version of the
 project's release line. Two runs on one tree compute the same key, whatever
-tags their checkouts hold. A pull request and the commit its
-squash merge puts on the main branch share their entries, and so do two
-checkouts of one commit in two directories. Otherwise the commit reaches a key
+tags their checkouts hold, except for a task that declares the release
+baseline (see [Release Baseline](#release-baseline)). A pull request and the
+commit its squash merge puts on the main branch share their entries, and so do
+two checkouts of one commit in two directories. Otherwise the commit reaches a key
 only through the publish version, for a task that opts in (see
 [Version-Aware Tasks](#version-aware-tasks)). A task the cache can serve reads
 a line's version only when its key carries it. Every other cached task reads
@@ -126,10 +127,12 @@ git and adds it to the key:
 
 The baseline names no commit HEAD reaches. A branch and its squash merge share
 the key when they hold one tree and declare the same break. A new tag, other
-content at the tag, a changed breaking marker or a shallow clone moves it. A
-git failure leaves the task without a key, so it runs uncached. One run reads
-each project's baseline once, so a tag created during the run is seen by the
-next run. Declaring the input requires extension contract 7. See
+content at the tag, a changed breaking marker or a shallow clone moves it, and
+so does a squash title that adds or drops the breaking marker (`!` or a
+`BREAKING CHANGE:` footer): the verdict reads that marker. A git failure leaves
+the task without a key, so it runs uncached. One run reads each project's
+baseline once, so a tag created during the run is seen by the next run.
+Declaring the input requires CLI contract 7. See
 [ADR 0062](adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md).
 
 ### Extension Implementation
@@ -376,6 +379,10 @@ unsupported non-regular candidate files, a selected unmerged candidate and a
 candidate Git lists as a directory (a submodule or a nested repository) prevent
 key computation. Ordinary patterns keep their existing behavior; adding
 `git:**` does not filter files an ordinary pattern separately selects.
+
+An extension manifest whose task declares a `git:` input requires CLI contract
+7: a CLI before it keys a candidate's bytes without its executable bit. An older
+CLI refuses the manifest instead of replaying a verdict across a `chmod`.
 
 The document gates declare `git:**` instead of a fixed list of repository
 documents, so the public-cut scanner and its cache key cover the same tree.

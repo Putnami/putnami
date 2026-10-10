@@ -423,7 +423,9 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Toolchains: []string{"runtimeCompiler"},
 		},
 	}
-	built.CLIContract = protocolcli.CurrentContract
+	// The stamp the packager earns for this vocabulary: the `git:` inputs of
+	// the workspace checks need the contract that keys the executable bit.
+	built.CLIContract = proto.RequiredCLIContract(built)
 	// The bare `options.<name>` blocks this extension reads for itself, beyond
 	// the ones keyed by its own name or path reference. Declaring them never
 	// widens THIS extension's cache keys; it lets every other extension's key
@@ -551,9 +553,17 @@ func TestScaffoldStampsItsContractExplicitly(t *testing.T) {
 	if !proto.DeclaresContractSurface(m) {
 		t.Fatal("the manifest declares no command, command group or tool; proto.ValidateManifest requires at least one and LoadManifest would treat it as hook-only")
 	}
-	if m.CLIContract != protocolcli.CurrentContract {
-		t.Fatalf("cliContract = %d, want %d; an unstamped manifest that declares a surface is rejected by LoadManifest and the extension disappears from discovery",
-			m.CLIContract, protocolcli.CurrentContract)
+	if m.CLIContract != proto.RequiredCLIContract(m) {
+		t.Fatalf("cliContract = %d, want %d; a manifest stamped below its vocabulary is rejected by LoadManifest and the extension disappears from discovery",
+			m.CLIContract, proto.RequiredCLIContract(m))
+	}
+	// features-validate compares evidence source bindings, which record each
+	// bound file's executable bit, and keys on `git:**`. A CLI below the
+	// contract that keys the bit would replay its verdict across a chmod, so
+	// the stamp must make that CLI refuse the extension.
+	if m.CLIContract != protocolcli.GitInputModeContract {
+		t.Fatalf("cliContract = %d, want %d, the contract whose `git:` key holds the executable bit",
+			m.CLIContract, protocolcli.GitInputModeContract)
 	}
 }
 

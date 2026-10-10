@@ -83,8 +83,9 @@ func (c AgentContentContribution) Packaged() bool {
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
 // the manifest: ReleaseBaselineInputContract for a task that declares the
-// releaseBaseline runtime input, GoEmbedInputsContract for Go embed task
-// inputs/cache-key files, AgentContentContract for an agent-content
+// releaseBaseline runtime input, GitInputModeContract (the same rung) for a
+// task that declares a `git:` file pattern, GoEmbedInputsContract for Go embed
+// task inputs/cache-key files, AgentContentContract for an agent-content
 // contribution, CurrentContract otherwise. The highest rung any task reaches
 // wins.
 //
@@ -101,13 +102,34 @@ func RequiredCLIContract(m *Manifest) int {
 	}
 	for _, task := range m.Tasks {
 		if declaresReleaseBaseline(task) {
-			return protocolcli.ReleaseBaselineInputContract
+			required = max(required, protocolcli.ReleaseBaselineInputContract)
+		}
+		if declaresGitInput(task) {
+			required = max(required, protocolcli.GitInputModeContract)
 		}
 		if declaresGoEmbedSelector(task) {
 			required = max(required, protocolcli.GoEmbedInputsContract)
 		}
 	}
 	return required
+}
+
+// declaresGitInput reports whether a task selects files with a `git:` pattern
+// in an input port or its cache key's files. An exclusion ("!git:…") selects
+// nothing, so it does not count.
+func declaresGitInput(task TaskDefinition) bool {
+	isGitPattern := func(file string) bool { return strings.HasPrefix(file, "git:") }
+	for _, input := range task.Inputs {
+		if slices.ContainsFunc(input.Files, isGitPattern) {
+			return true
+		}
+	}
+	if task.Cache == nil || task.Cache.Key == nil {
+		return false
+	}
+	key := task.Cache.Key
+	return slices.ContainsFunc(key.Files, isGitPattern) || slices.ContainsFunc(key.WorkspaceFiles, isGitPattern) ||
+		slices.ContainsFunc(key.ClosureFiles, isGitPattern)
 }
 
 // declaresReleaseBaseline reports whether a task keys on the releaseBaseline

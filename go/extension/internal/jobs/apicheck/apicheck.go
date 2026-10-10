@@ -87,8 +87,9 @@ type Report struct {
 	CommandChanges []protocolcli.CommandChange
 	// Breaking reports whether a commit since Tag that touches the project
 	// declares a breaking change. The report names no commit: a branch and its
-	// squash merge declare the same break with different commits, and they
-	// give the same verdict.
+	// squash merge that declare the same break with different commits give
+	// the same verdict. A squash title that adds or drops the marker declares
+	// another break, and gives another verdict.
 	Breaking bool
 }
 
@@ -235,7 +236,8 @@ func Check(workspaceRoot, projectDir, name string, options Options) (*Report, er
 // projectDir, with slash paths relative to it. A directory that holds its own
 // go.mod is another module: its go.mod is returned so the surface knows to
 // leave it out, and nothing below it is read. Directories the surface never
-// reads are not walked.
+// reads are not walked, and neither are the directories the task's cache key
+// does not read (unkeyedDirectory), which filesAtTag leaves out too.
 func filesInTree(projectDir string) ([]apisurface.File, error) {
 	var files []apisurface.File
 	err := filepath.WalkDir(projectDir, func(file string, entry fs.DirEntry, walkErr error) error {
@@ -252,8 +254,7 @@ func filesInTree(projectDir string) ([]apisurface.File, error) {
 				return nil
 			}
 			name := entry.Name()
-			if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") ||
-				name == "testdata" || name == "vendor" || name == "internal" || name == "node_modules" {
+			if unkeyedDirectory(name) || strings.HasPrefix(name, "_") || name == "testdata" || name == "internal" {
 				return filepath.SkipDir
 			}
 			if _, err := os.Stat(filepath.Join(file, "go.mod")); err == nil {

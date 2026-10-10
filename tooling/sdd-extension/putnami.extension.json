@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/sdd",
-  "cliContract": 4,
+  "cliContract": 7,
   "optionNamespaces": ["sdd", "publish"],
   "extensionDependencies": {},
   "runtime": {

@@ -29,7 +29,8 @@ const (
 // ReleaseBaseline is what git says about a project's last release, as a check
 // that compares the working tree with that release reads it. It names no
 // commit HEAD reaches and no ref HEAD is on: two histories with the same
-// baseline, such as a branch and its squash merge, give the same value.
+// baseline, such as a branch and its squash merge, give the same value. A
+// squash whose message adds or drops the breaking marker is another baseline.
 type ReleaseBaseline struct {
 	// State is one of the ReleaseBaseline* states.
 	State string `json:"state"`

@@ -254,15 +254,20 @@ The task is cached. Its key holds what the verdict reads:
   the project declares a breaking change.
 
 The project's file patterns skip directories whose name starts with `.`, where
-a run writes its generated files.
+a run writes its generated files, and the CLI's file walk never enters
+`node_modules`, `out`, `dist` or `vendor`. The check reads no Go file under any
+of those directories, in the working tree or at the tag, so a package there is
+never compared.
 
 The key names no commit. A pull request and the commit its squash merge puts
-on the main branch hold one tree and, with the marker in the pull request
-title, declare the same break, so they share the verdict. A new tag, a moved
-tag, a commit that adds or drops a marker, or a shallow clone changes the key.
-A skip for a project the catalog does not list as stable is cached as well.
-The input needs a CLI that implements extension contract 7; an older CLI
-refuses this extension. See CLI
+on the main branch share the verdict when they hold one tree and their
+messages declare the same break: put the marker in the pull request title. A
+squash title that adds or drops the breaking marker (`!` or a
+`BREAKING CHANGE:` footer) moves the key, and the verdict moves with it. A new
+tag, a moved tag, a commit that adds or drops a marker, or a shallow clone
+changes the key. A skip for a project the catalog does not list as stable is
+cached as well. The input needs a CLI that implements CLI contract 7; an older
+CLI refuses this extension. See CLI
 [ADR 0062](../../../tooling/cli/doc/adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md).
 
 ## Limits

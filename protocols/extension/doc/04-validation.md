@@ -149,20 +149,25 @@ the lowest contract whose vocabulary covers the manifest
 `protocols/cli.GoEmbedInputsContract` (6) for `go-embed:build` or
 `go-embed:test` task inputs/cache-key files, or
 `protocols/cli.ReleaseBaselineInputContract` (7) for a task that declares the
-`releaseBaseline` runtime input. The gate applies to every non-empty command, command-group, MCP
+`releaseBaseline` runtime input. `protocols/cli.GitInputModeContract` names the
+same rung 7 for a task whose input port or cache-key files select a `git:`
+pattern. The gate applies to every non-empty command, command-group, MCP
 tool, or agent-content surface. A non-conforming manifest — for example one
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
 Contracts 5, 6 and 7 are **additive**. They add vocabulary a manifest opts into
 and change nothing a manifest without that vocabulary means. An extension without
-agent content, Go embed inputs or a `releaseBaseline` input keeps its contract-4
-stamp; one with agent content but no Go embed inputs requires contract 5. A
-manifest with Go embed inputs requires contract 6 even if it also declares agent
-content. A manifest with a `releaseBaseline` input requires contract 7 whatever
-else it declares: a reader without the name would key the task without the
-baseline. The reader loads every stamp from the one the manifest's vocabulary
-requires up to `protocols/cli.LatestContract` (7):
+agent content, Go embed inputs, a `releaseBaseline` input or a `git:` input keeps
+its contract-4 stamp; one with agent content but no Go embed inputs requires
+contract 5. A manifest with Go embed inputs requires contract 6 even if it also
+declares agent content. A manifest with a `releaseBaseline` input or a `git:` input requires
+contract 7 whatever else it declares: a reader without the name would key the
+task without the baseline, and a reader before 7 keys a `git:` candidate's bytes
+without its executable bit and keys an unmerged candidate by its bytes. An
+exclusion (`!git:…`) selects nothing and requires no rung. The reader loads
+every stamp from the one the manifest's vocabulary requires up to
+`protocols/cli.LatestContract` (7):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|

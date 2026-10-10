@@ -382,8 +382,9 @@ func loadContribution(path, project string) (*infra.ProjectContribution, []diag.
 // manifest (see resolveRuntime) and keeps the defaults sidecar in step with it:
 //
 //  1. <workload>/infra/runtime.json (developer-authored) wins when present; any
-//     stale <workload>/.gen/infra/runtime.json is removed so operators never
-//     see two competing values on disk.
+//     stale <workload>/.gen/infra/runtime.json is removed so it does not
+//     compete with the authored file. A cache hit of the calling task runs
+//     none of this and removes nothing.
 //  2. Otherwise the synthesized defaults are written to
 //     <workload>/.gen/infra/runtime.json, so deployers and operators can see the
 //     values the workload will run under. The defaults are re-emitted on every

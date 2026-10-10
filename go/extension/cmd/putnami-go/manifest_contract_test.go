@@ -2482,12 +2482,13 @@ func TestLintDocsIsKeyedOnTheCandidateCut(t *testing.T) {
 // TestValidateAPIIsKeyedOnTheReleaseBaseline holds the validate-api
 // declaration to what the check reads. The working tree side is the project's
 // non-test Go files with the files their embed directives select, its go.mod
-// and .json files outside dot directories, the root support catalog and the
-// command-surface option in both spellings; the history side is the
-// releaseBaseline runtime input, which the CLI reads from git. The check
-// writes nothing, and a skip is as cacheable as a verdict, so the task is
-// noOutput and deterministic. Declaring the input requires contract 7, and
-// the manifest is stamped with it.
+// and .json files outside dot directories (the CLI's walk also skips
+// node_modules, out, dist and vendor, and so does the check), the root
+// support catalog and the command-surface option in both spellings; the
+// history side is the releaseBaseline runtime input, which the CLI reads from
+// git. The check writes nothing, and a skip is as cacheable as a verdict, so
+// the task is noOutput and deterministic. Declaring the input requires
+// contract 7, and the manifest is stamped with it.
 func TestValidateAPIIsKeyedOnTheReleaseBaseline(t *testing.T) {
 	manifest := loadExtensionManifest(t)
 	task, ok := manifest.Tasks["validate-api"]
