@@ -45,8 +45,12 @@ func MakeEnv(workspaceRoot, workingDir string, extra map[string]string) []string
 // still win. It is deliberately confined to the test paths: `run`, `serve`,
 // `lint` and the workspace/deps jobs keep MakeEnv's inherit-everything
 // behavior.
+//
+// The variables that describe this job to the extension on a hosted run
+// (hostenv.JobVars) are removed as well: the repository's tests are not jobs of
+// the run.
 func MakeTestEnv(workspaceRoot, workingDir string, extra map[string]string) []string {
-	return decorateEnv(hostenv.ScrubPlatformIdentity(os.Environ()), workspaceRoot, workingDir, extra)
+	return decorateEnv(hostenv.ScrubJobVars(hostenv.ScrubPlatformIdentity(os.Environ())), workspaceRoot, workingDir, extra)
 }
 
 // decorateEnv appends the standard Putnami variables, uv's workspace-local

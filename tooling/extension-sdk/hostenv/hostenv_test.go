@@ -191,3 +191,39 @@ func TestScrubPlatformIdentity(t *testing.T) {
 		}
 	})
 }
+
+// A test process of a hosted run must not read as a job of that run: both job
+// variables go, and the settings the launcher derived from them stay.
+func TestScrubJobVars(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "host-identity-scrub", "the-job-variables-of-a-hosted-run-are-scrubbed")
+	env := []string{
+		"PUTNAMI_OFFLINE_DEPENDENCIES=1",
+		"GOPROXY=off",
+		"PUTNAMI_JOB_CREDENTIAL_FD=3",
+		"GOFLAGS=-mod=readonly",
+		"PUTNAMI_WORKSPACE=/ws",
+		"NOT_AN_ASSIGNMENT",
+	}
+	got := ScrubJobVars(env)
+	want := []string{"GOPROXY=off", "GOFLAGS=-mod=readonly", "PUTNAMI_WORKSPACE=/ws", "NOT_AN_ASSIGNMENT"}
+	if !slices.Equal(got, want) {
+		t.Errorf("ScrubJobVars() = %v, want %v", got, want)
+	}
+	if len(env) != 6 || env[0] != "PUTNAMI_OFFLINE_DEPENDENCIES=1" {
+		t.Errorf("ScrubJobVars mutated its input: %v", env)
+	}
+	if got := ScrubJobVars(nil); got != nil {
+		t.Errorf("ScrubJobVars(nil) = %v, want nil", got)
+	}
+}
+
+func TestJobVars_IsSortedAndReturnsIndependentCopy(t *testing.T) {
+	names := JobVars()
+	if want := []string{"PUTNAMI_JOB_CREDENTIAL_FD", "PUTNAMI_OFFLINE_DEPENDENCIES"}; !slices.Equal(names, want) {
+		t.Fatalf("JobVars() = %v, want %v", names, want)
+	}
+	names[0] = "MUTATED"
+	if JobVars()[0] == "MUTATED" {
+		t.Error("JobVars() returned the package's own slice")
+	}
+}

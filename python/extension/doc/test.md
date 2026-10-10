@@ -127,6 +127,10 @@ test-only behavior inside a test. Credentials are **not** scrubbed:
 `GOOGLE_CLOUD_PROJECT` all survive, so an integration test that talks to a real
 backend still can.
 
+On a hosted run, `PUTNAMI_OFFLINE_DEPENDENCIES` and `PUTNAMI_JOB_CREDENTIAL_FD`
+are removed too. They describe the job to the extension, and your tests are not
+jobs of the run.
+
 The scrub is confined to the test paths. `putnami run` and `putnami serve` start
 a real application and inherit the environment whole, host identity included.
 
