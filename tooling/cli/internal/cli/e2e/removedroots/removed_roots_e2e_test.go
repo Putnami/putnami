@@ -23,6 +23,11 @@ import (
 // the implicit install.
 const bootstrappedEnv = "PUTNAMI_WORKSPACE_BOOTSTRAPPED"
 
+// noAutoInstallEnv turns the workspace bootstrap off. A CI host may set it, so
+// the tests clear it: the bootstrap must be able to start for its absence to
+// mean anything.
+const noAutoInstallEnv = "PUTNAMI_NO_AUTO_INSTALL"
+
 func TestMain(m *testing.M) {
 	os.Exit(clitest.Main(m))
 }
@@ -48,6 +53,7 @@ func TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap(t *testing.T) {
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Setenv(bootstrappedEnv, "")
+			t.Setenv(noAutoInstallEnv, "")
 			root := clitest.WhereFixture(t, false, false)
 			code, output := clitest.RunGateArgs(t, root, args...)
 			if code != 2 {
@@ -71,6 +77,7 @@ func TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap(t *testing.T) {
 
 	t.Run("a job command bootstraps the same fixture", func(t *testing.T) {
 		t.Setenv(bootstrappedEnv, "")
+		t.Setenv(noAutoInstallEnv, "")
 		root := clitest.WhereFixture(t, false, false)
 		if code, output := clitest.RunGateArgs(t, root, "lint", "--projects", "app", "--no-cache"); code != 0 {
 			t.Fatalf("lint exit = %d:\n%s", code, output)
