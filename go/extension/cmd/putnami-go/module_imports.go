@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"go/ast"
 	"go/build/constraint"
 	"go/parser"
@@ -35,7 +36,9 @@ import (
 //     is one of them, so a generated tree a build wrote never changes the
 //     answer between a cold clone and a warm checkout;
 //   - a directory the go.mod's `ignore` directive names is skipped with its
-//     whole subtree, because the go command matches no package in it;
+//     whole subtree, because no package pattern matches in it — unless one of
+//     the module's own packages imports a package there: the go command then
+//     loads it, tests included, so the scan reads that package too;
 //   - a subdirectory holding its own go.mod is a different module.
 //
 // The scan is read-only and toolchain-free: no `go list`, no module download,
@@ -67,20 +70,38 @@ func (s moduleImportScan) importsModule(module string) bool {
 }
 
 // scanModuleImports reads the module rooted at moduleDir and reports which of
-// providers its sources import. ignores are the module go.mod's `ignore`
-// paths.
+// providers its sources import. modulePath and ignores are the module's path
+// and its go.mod's `ignore` paths.
 //
 // An import is credited to the longest provider that provides it, so a module
 // nested under another one is credited alone for its own packages. An
 // unreadable directory or an unparsable file leaves the scan incomplete, and
 // the walk reads every other file.
-func scanModuleImports(moduleDir string, ignores, providers []string) moduleImportScan {
+func scanModuleImports(moduleDir, modulePath string, ignores, providers []string) moduleImportScan {
 	scan := moduleImportScan{imported: make(map[string]bool), packages: make(map[string]string), complete: true}
 	if len(providers) == 0 {
 		return scan
 	}
 	ignored := newGoIgnoreRule(ignores)
 	fset := token.NewFileSet()
+	// own holds the imports of the module's own packages not yet followed.
+	var own []string
+	read := func(file string) {
+		imports, ok := goFileImports(fset, file)
+		if !ok {
+			scan.complete = false
+			return
+		}
+		for _, imported := range imports {
+			if module := longestModuleMatch(imported, providers); module != "" {
+				scan.imported[module] = true
+				scan.packages[imported] = module
+			}
+			if modulePath != "" && strings.HasPrefix(imported, modulePath+"/") {
+				own = append(own, imported)
+			}
+		}
+	}
 	_ = filepath.WalkDir(moduleDir, func(current string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			scan.complete = false
@@ -89,30 +110,76 @@ func scanModuleImports(moduleDir string, ignores, providers []string) moduleImpo
 		if entry.IsDir() {
 			return skipGoDirectory(current, moduleDir, entry.Name(), ignored)
 		}
-		if !strings.HasSuffix(entry.Name(), ".go") || skipGoFile(entry.Name()) {
-			return nil
-		}
-		file, err := parser.ParseFile(fset, current, nil, parser.ImportsOnly|parser.ParseComments)
-		if err != nil {
-			scan.complete = false
-			return nil
-		}
-		if tidyIgnores(fset, file) {
-			return nil
-		}
-		for _, spec := range file.Imports {
-			imported, err := strconv.Unquote(spec.Path.Value)
-			if err != nil {
-				continue
-			}
-			if module := longestModuleMatch(imported, providers); module != "" {
-				scan.imported[module] = true
-				scan.packages[imported] = module
-			}
+		if strings.HasSuffix(entry.Name(), ".go") && !skipGoFile(entry.Name()) {
+			read(current)
 		}
 		return nil
 	})
+	// The walk skipped the ignored directories; a package there that one of
+	// the module's own packages imports is read now, and so is every ignored
+	// package it imports in turn.
+	followed := make(map[string]bool)
+	for len(own) > 0 {
+		rel := strings.TrimPrefix(own[len(own)-1], modulePath+"/")
+		own = own[:len(own)-1]
+		if followed[rel] || !ignored.ignores(rel) {
+			continue
+		}
+		followed[rel] = true
+		dir, ok := ownPackageDir(moduleDir, rel)
+		if !ok {
+			continue
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				scan.complete = false
+			}
+			continue
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".go") && !skipGoFile(entry.Name()) {
+				read(filepath.Join(dir, entry.Name()))
+			}
+		}
+	}
 	return scan
+}
+
+// goFileImports returns the import paths of one Go file; ok is false when the
+// file does not parse. A file tidy ignores imports nothing.
+func goFileImports(fset *token.FileSet, path string) (imports []string, ok bool) {
+	file, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly|parser.ParseComments)
+	if err != nil {
+		return nil, false
+	}
+	if tidyIgnores(fset, file) {
+		return nil, true
+	}
+	for _, spec := range file.Imports {
+		if imported, err := strconv.Unquote(spec.Path.Value); err == nil {
+			imports = append(imports, imported)
+		}
+	}
+	return imports, true
+}
+
+// ownPackageDir is the directory of the module's own package at rel, a
+// slash-separated path under the module path. It answers false when the walk
+// rule reads no package there: a directory on the way holds another go.mod or
+// has a name the walk skips.
+func ownPackageDir(moduleDir, rel string) (string, bool) {
+	dir := moduleDir
+	for _, name := range strings.Split(rel, "/") {
+		if skippedGoDirectoryName(name) {
+			return "", false
+		}
+		dir = filepath.Join(dir, name)
+		if info, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil && !info.IsDir() {
+			return "", false
+		}
+	}
+	return dir, true
 }
 
 // skipGoFile reports that the go command loads no package from a file of
@@ -187,7 +254,7 @@ func skipGoDirectory(current, moduleDir, name string, ignored goIgnoreRule) erro
 	if current == moduleDir {
 		return nil
 	}
-	if name == "testdata" || name == "vendor" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
+	if skippedGoDirectoryName(name) {
 		return fs.SkipDir
 	}
 	if rel, err := filepath.Rel(moduleDir, current); err == nil && ignored.ignores(rel) {
@@ -197,6 +264,12 @@ func skipGoDirectory(current, moduleDir, name string, ignored goIgnoreRule) erro
 		return fs.SkipDir
 	}
 	return nil
+}
+
+// skippedGoDirectoryName reports a directory name the go command loads no
+// package from.
+func skippedGoDirectoryName(name string) bool {
+	return name == "testdata" || name == "vendor" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")
 }
 
 // goIgnoreRule matches a module-relative directory against a go.mod's `ignore`

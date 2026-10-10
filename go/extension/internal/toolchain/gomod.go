@@ -64,11 +64,11 @@ type GoModFile struct {
 	Indirect map[string]bool
 	// Replaces are the replace directives, in file order.
 	Replaces []GoModReplace
-	// Ignores are the `ignore` directive paths (Go 1.25), in file order, as
-	// written: a path that starts with `./` names one directory under the
+	// Ignores are the `ignore` directive paths (Go 1.25), in file order,
+	// unquoted: a path that starts with `./` names one directory under the
 	// module root, any other path a directory at any depth. The go command
-	// loads no package from an ignored directory, so `go mod tidy` reads none
-	// of its imports.
+	// matches no package pattern in an ignored directory; it still loads a
+	// package there that another package imports.
 	Ignores []string
 }
 
@@ -101,8 +101,8 @@ func ReadGoMod(path string) (*GoModFile, error) {
 func ParseGoMod(content string) (*GoModFile, error) {
 	mod := &GoModFile{}
 	// block tracks which directive block we are inside: "", "require",
-	// "replace" or "ignore". Directives appear both as single lines and as parenthesized
-	// blocks; go.mod blocks do not nest, so no stack is needed.
+	// "replace" or "ignore". Directives appear both as single lines and as
+	// parenthesized blocks; go.mod blocks do not nest, so no stack is needed.
 	block := ""
 	haveModule := false
 
@@ -121,7 +121,7 @@ func ParseGoMod(content string) (*GoModFile, error) {
 				block = ""
 				continue
 			}
-			// A top-level directive inside a require/replace block ends a block
+			// A top-level directive inside a block ends a block
 			// that never closed, and the line is re-read as the directive it is.
 			if !startsGoModDirective(line) {
 				switch block {
@@ -151,8 +151,6 @@ func ParseGoMod(content string) (*GoModFile, error) {
 			block = "require"
 		case line == "replace (":
 			block = "replace"
-		case line == "ignore (":
-			block = "ignore"
 		case strings.HasPrefix(line, "require ("):
 			// Defensive: `require (` with trailing content on the same line is
 			// not valid go.mod, but treat the paren as opening a block rather
@@ -172,8 +170,15 @@ func ParseGoMod(content string) (*GoModFile, error) {
 			if r, ok := goModReplace(strings.TrimPrefix(line, "replace ")); ok {
 				mod.Replaces = append(mod.Replaces, r)
 			}
-		case strings.HasPrefix(line, "ignore "):
-			mod.recordIgnore(strings.TrimPrefix(line, "ignore "))
+		case goModVerb(line, "ignore"):
+			// The go lexer splits on any whitespace and reads `(` as a token of
+			// its own, so `ignore(` opens a block and `ignore<TAB>x` is a line.
+			// A paren with trailing content opens a block too, like `require (`.
+			if rest := strings.TrimSpace(strings.TrimPrefix(line, "ignore")); strings.HasPrefix(rest, "(") {
+				block = "ignore"
+			} else {
+				mod.recordIgnore(rest)
+			}
 		}
 	}
 
@@ -203,11 +208,12 @@ var goModDirectiveKeywords = []string{"module", "go", "require", "replace", "ign
 // startsGoModDirective reports whether a line opens a top-level directive.
 //
 // Inside a well-formed block it is always false: a require entry is
-// `path version` and a replace entry is `old => new`, and neither begins with
-// one of these keywords followed by a space or an opening paren.
+// `path version`, a replace entry is `old => new` and an ignore entry is one
+// path, and none begins with one of these keywords followed by whitespace or
+// an opening paren.
 func startsGoModDirective(line string) bool {
 	for _, keyword := range goModDirectiveKeywords {
-		if strings.HasPrefix(line, keyword+" ") || strings.HasPrefix(line, keyword+"(") {
+		if goModVerb(line, keyword) {
 			return true
 		}
 	}
@@ -311,17 +317,25 @@ func (m *GoModFile) recordRequire(module string, indirect bool) {
 	m.Indirect[module] = true
 }
 
+// goModVerb reports whether line is the directive verb followed by
+// whitespace or `(`.
+func goModVerb(line, verb string) bool {
+	rest, found := strings.CutPrefix(line, verb)
+	return found && rest != "" && strings.ContainsRune(" \t(", rune(rest[0]))
+}
+
 // recordIgnore collects one `ignore` path. The go command reads the path as a
-// single, possibly quoted, argument; an entry it would reject is dropped.
+// single argument that only a double quote may quote, and rejects an unquoted
+// argument holding a quote; an entry it would reject is dropped.
 func (m *GoModFile) recordIgnore(entry string) {
 	ignored := strings.TrimSpace(entry)
-	if strings.HasPrefix(ignored, `"`) || strings.HasPrefix(ignored, "`") {
+	if strings.HasPrefix(ignored, `"`) {
 		unquoted, err := strconv.Unquote(ignored)
 		if err != nil {
 			return
 		}
 		ignored = unquoted
-	} else if len(strings.Fields(ignored)) != 1 {
+	} else if len(strings.Fields(ignored)) != 1 || strings.ContainsAny(ignored, "\"'`") {
 		return
 	}
 	if ignored == "" {

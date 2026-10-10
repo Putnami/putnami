@@ -532,7 +532,9 @@ Like `go mod tidy`, the probe skips the directories that the `go.mod`
 `ignore` directive (Go 1.25) names, with everything below them. A path that
 starts with `./` names one directory under the module root. Any other path
 names every directory with that path, at any depth. An import in an ignored
-directory adds no edge and no warning.
+directory adds no edge and no warning, unless a package outside the ignored
+directories imports the package that holds it: the go command builds that
+package, so the probe reads it too.
 
 ### Manual declaration (putnami.json → go.mod)
 

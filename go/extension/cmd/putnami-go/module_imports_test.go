@@ -32,7 +32,7 @@ func TestTheImportScanReadsTestFilesAndIgnoresGeneratedTrees(t *testing.T) {
 	writeModuleFile(t, dir, "nested/go.mod", "module acme/nested\n")
 	writeModuleFile(t, dir, "nested/nested.go", "package nested\n\nimport \"acme/nestedonly\"\n")
 
-	scan := scanModuleImports(dir, nil, []string{"acme/used", "acme/testonly", "acme/generated", "acme/fixture", "acme/nestedonly"})
+	scan := scanModuleImports(dir, "acme/app", nil, []string{"acme/used", "acme/testonly", "acme/generated", "acme/fixture", "acme/nestedonly"})
 	if !scan.complete {
 		t.Fatalf("scan did not complete over a readable module")
 	}
@@ -59,7 +59,7 @@ func TestTheImportScanSkipsTheDirectoriesTheGoModIgnores(t *testing.T) {
 	writeModuleFile(t, dir, "pkg/static/assets.go", "package static\n\nimport \"acme/anywhere\"\n")
 	writeModuleFile(t, dir, "pkg/tools/tools.go", "package tools\n\nimport \"acme/kept\"\n")
 
-	scan := scanModuleImports(dir, []string{"./tools", "static"}, []string{"acme/used", "acme/rooted", "acme/anywhere", "acme/kept"})
+	scan := scanModuleImports(dir, "acme/app", []string{"./tools", "static"}, []string{"acme/used", "acme/rooted", "acme/anywhere", "acme/kept"})
 	if !scan.complete {
 		t.Fatalf("scan did not complete over a readable module")
 	}
@@ -71,6 +71,36 @@ func TestTheImportScanSkipsTheDirectoriesTheGoModIgnores(t *testing.T) {
 	for _, module := range []string{"acme/rooted", "acme/anywhere"} {
 		if scan.importsModule(module) {
 			t.Errorf("%s reads as imported from a directory the go.mod ignores", module)
+		}
+	}
+}
+
+// TestAnIgnoredPackageTheModuleImportsIsRead: `ignore` takes a directory out
+// of package patterns only. A package there that the module's own code
+// imports is loaded, tests included, and so is every ignored package it
+// imports in turn, so `go mod tidy` keeps what they import.
+func TestAnIgnoredPackageTheModuleImportsIsRead(t *testing.T) {
+	dir := t.TempDir()
+	writeModuleFile(t, dir, "main.go", "package app\n\nimport (\n\t\"acme/app/tools/gen\"\n\t\"acme/app/tools/mod\"\n)\n")
+	writeModuleFile(t, dir, "tools/gen/gen.go", "package gen\n\nimport (\n\t\"acme/core\"\n\t\"acme/app/tools/deeper\"\n)\n")
+	writeModuleFile(t, dir, "tools/gen/gen_test.go", "package gen\n\nimport \"acme/gentest\"\n")
+	writeModuleFile(t, dir, "tools/deeper/deeper.go", "package deeper\n\nimport \"acme/deep\"\n")
+	writeModuleFile(t, dir, "tools/other/other.go", "package other\n\nimport \"acme/unreached\"\n")
+	writeModuleFile(t, dir, "tools/mod/go.mod", "module acme/app/tools/mod\n")
+	writeModuleFile(t, dir, "tools/mod/mod.go", "package mod\n\nimport \"acme/nestedonly\"\n")
+
+	scan := scanModuleImports(dir, "acme/app", []string{"./tools"}, []string{"acme/core", "acme/gentest", "acme/deep", "acme/unreached", "acme/nestedonly"})
+	if !scan.complete {
+		t.Fatalf("scan did not complete over a readable module")
+	}
+	for _, module := range []string{"acme/core", "acme/gentest", "acme/deep"} {
+		if !scan.importsModule(module) {
+			t.Errorf("%s reads as unimported from an ignored package the module imports", module)
+		}
+	}
+	for _, module := range []string{"acme/unreached", "acme/nestedonly"} {
+		if scan.importsModule(module) {
+			t.Errorf("%s reads as imported from a package the module never loads", module)
 		}
 	}
 }
@@ -111,7 +141,7 @@ func TestTheImportScanCreditsTheLongestModulePath(t *testing.T) {
 	dir := t.TempDir()
 	writeModuleFile(t, dir, "main.go", "package app\n\nimport \"acme/cli/model/extension\"\n")
 
-	scan := scanModuleImports(dir, nil, []string{"acme/cli", "acme/cli/model"})
+	scan := scanModuleImports(dir, "acme/app", nil, []string{"acme/cli", "acme/cli/model"})
 	if !scan.importsModule("acme/cli/model") {
 		t.Errorf("the providing module reads as unimported")
 	}
@@ -127,7 +157,7 @@ func TestAnUnreadableModuleAttributesNothing(t *testing.T) {
 	dir := t.TempDir()
 	writeModuleFile(t, dir, "broken.go", "package app\n\nimport \"acme/used\n")
 
-	scan := scanModuleImports(dir, nil, []string{"acme/used", "acme/never"})
+	scan := scanModuleImports(dir, "acme/app", nil, []string{"acme/used", "acme/never"})
 	if scan.complete {
 		t.Fatalf("an unparsable file left the scan complete")
 	}
@@ -138,7 +168,7 @@ func TestAnUnreadableModuleAttributesNothing(t *testing.T) {
 
 // TestAModuleWithNothingToAttributeIsNotWalked: no module to ask about, no walk.
 func TestAModuleWithNothingToAttributeIsNotWalked(t *testing.T) {
-	scan := scanModuleImports(filepath.Join(t.TempDir(), "absent"), nil, nil)
+	scan := scanModuleImports(filepath.Join(t.TempDir(), "absent"), "acme/app", nil, nil)
 	if !scan.complete || len(scan.imported) != 0 {
 		t.Fatalf("scan = %+v, want a complete empty answer without touching the tree", scan)
 	}

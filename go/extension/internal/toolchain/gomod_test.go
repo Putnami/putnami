@@ -225,14 +225,19 @@ func TestParseGoMod_IgnoreForms(t *testing.T) {
 			want:    []string{"static", "content/html", "./third_party/js"},
 		},
 		{
-			name:    "quoted paths are unquoted",
-			content: "module m\n\nignore \"./with space\"\nignore `raw`\n",
-			want:    []string{"./with space", "raw"},
+			name:    "a double-quoted path is unquoted",
+			content: "module m\n\nignore \"./with space\"\n",
+			want:    []string{"./with space"},
 		},
 		{
-			name:    "an entry with two arguments is dropped",
-			content: "module m\n\nignore a b\nignore c\n",
+			name:    "an entry the go command rejects is dropped",
+			content: "module m\n\nignore a b\nignore `raw`\nignore it's\nignore c\n",
 			want:    []string{"c"},
+		},
+		{
+			name:    "a tab or a paren follows the verb",
+			content: "module m\n\nignore\t./tools\nignore(\n\tstatic\n)\n",
+			want:    []string{"./tools", "static"},
 		},
 		{
 			name:    "an ignore ends a require block that never closed",

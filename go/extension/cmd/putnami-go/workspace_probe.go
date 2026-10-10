@@ -648,7 +648,7 @@ func goModuleImportScan(root string, c *goCandidate, byModule map[string]*goCand
 	for module := range byModule {
 		providers = append(providers, module)
 	}
-	return scanModuleImports(goModuleDirOf(root, c), c.mod.Ignores, providers)
+	return scanModuleImports(goModuleDirOf(root, c), c.mod.Module, c.mod.Ignores, providers)
 }
 
 // goUnrequiredImports lists, sorted, the workspace modules the candidate's
