@@ -12,18 +12,21 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 )
 
-// skipSourceWrapperOnWindows skips a fix skill script test that runs this
-// repository's putnamiw on Windows. In a source workspace the scripts resolve
-// the CLI through putnamiw, which builds the CLI from source and stays on macOS
-// and Linux; a Windows consumer runs the same scripts against the installed
-// putnami. The session-cap hook needs no CLI and runs everywhere.
+// skipSourceWrapperOnWindows skips, on Windows, a fix skill script test written
+// for the source workspace: it runs this repository's putnamiw, which builds
+// the CLI from source and stays on macOS and Linux, or bash fixtures that stand
+// in for a putnamiw. A Windows consumer runs the same scripts against the
+// installed putnami. The session-cap hook needs no CLI and runs everywhere.
 func skipSourceWrapperOnWindows(t *testing.T) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		t.Skip("the test runs the source workspace's putnamiw, which stays on macOS and Linux")
+		t.Skip("the test runs the source workspace's putnamiw, or fixtures that stand in for it, which stay on macOS and Linux")
 	}
 }
 
+// The skill script suites run in parallel with each other: each works in its
+// own temporary directory and reads the environment only once the serial tests
+// have restored it.
 func TestPortableFixFinalizer(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "the-finalizer-publishes-through-the-contracts")
@@ -39,21 +42,25 @@ func TestPortableFixFinalizer(t *testing.T) {
 }
 
 func TestTreeFingerprint(t *testing.T) {
+	t.Parallel()
 	skipSourceWrapperOnWindows(t)
 	runSkillScriptTestBesideAForeignRepository(t, "fix", "tree-fingerprint.test.sh", "tree-fingerprint test: ok", nil)
 }
 
 func TestMachineLoad(t *testing.T) {
+	t.Parallel()
 	skipSourceWrapperOnWindows(t)
 	runSkillScriptTest(t, "fix", "machine-load.test.sh", "machine-load test: ok", nil)
 }
 
 func TestEnglishOnlyDetector(t *testing.T) {
+	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "the-language-rule-reads-tasks-through-the-contract")
 	runSkillScriptTestBesideAForeignRepository(t, "check", "english-only.test.sh", "english-only test: ok", collaborationScriptEnv(t))
 }
 
 func TestSessionCapHook(t *testing.T) {
+	t.Parallel()
 	runSkillScriptTest(t, "fix", "session-cap.test.sh", "session-cap test: ok", nil)
 }
 
@@ -71,6 +78,7 @@ var englishOnlyCall = regexp.MustCompile(`english-only\.sh (\w+)`)
 // `putnami proposals find`, which runs here against the real CLI and the
 // shipped local provider.
 func TestAuditLanguageRuleScansTasksAndProposalsThroughTheContracts(t *testing.T) {
+	t.Parallel()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
