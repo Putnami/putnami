@@ -124,6 +124,28 @@ func TestCollectFiles_SkipsHidden(t *testing.T) {
 	}
 }
 
+// A project whose own directory carries a skipped name, such as tools/dist,
+// keys on its files: the walk skips such a directory only below its root, so
+// a `**` pattern never yields an empty key for the whole project.
+func TestCollectFiles_ARootNamedLikeASkippedDirectoryIsWalked(t *testing.T) {
+	for _, name := range []string{"dist", "out", "vendor", "node_modules"} {
+		dir := filepath.Join(t.TempDir(), name)
+		if err := os.MkdirAll(filepath.Join(dir, "pkg", "dist"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		os.WriteFile(filepath.Join(dir, "pkg", "api.go"), []byte("package pkg"), 0o644)
+		os.WriteFile(filepath.Join(dir, "pkg", "dist", "built.go"), []byte("package dist"), 0o644)
+
+		files, err := collectFiles(dir, []string{"**/*.go"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(files) != 1 {
+			t.Errorf("%s: expected the project's own file and nothing below its dist, got %d", name, len(files))
+		}
+	}
+}
+
 func TestCollectFiles_SkipsNodeModules(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "src.ts"), []byte("ok"), 0o644)
