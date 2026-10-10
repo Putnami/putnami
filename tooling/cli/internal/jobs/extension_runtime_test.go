@@ -1036,12 +1036,11 @@ func TestResolveExtensionRuntimeConcurrentPrepareAndReuse(t *testing.T) {
 // TestResolveExtensionRuntimeConcurrentStress is the higher-fan-out variant of
 // the test above. It stays in the DEFAULT suite (no build tag, no -run gate)
 // where it contends with everything else, and it widens the window the
-// single-digest test cannot reach: several distinct
-// digests admit CONCURRENTLY, so one goroutine's staging tree is created,
-// exec'd, published and cleaned up while others exec from already-published
-// trees. It is -count-friendly (all state is per-run temp dirs) and deliberately
-// cheap — the fixtures are shell scripts, so the cost is process spawns, not
-// compilation.
+// single-digest test cannot reach: several distinct digests admit
+// CONCURRENTLY, so one goroutine's staging tree is created, exec'd, published
+// and cleaned up while others exec from already-published trees. It is
+// -count-friendly (all state is per-run temp dirs) and deliberately cheap — the
+// fixtures are shell scripts, so the cost is process spawns, not compilation.
 func TestResolveExtensionRuntimeConcurrentStress(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
@@ -1219,7 +1218,7 @@ func TestRuntimeHandshakeFailureIsSelfDiagnosing(t *testing.T) {
 		t.Fatal(statErr)
 	}
 	for _, want := range []string{
-		"signal: segmentation fault", // the exact shape previously reported
+		"signal: segmentation fault", // how os/exec reports a SIGSEGV death
 		executable,
 		`stderr="dying"`,
 		fmt.Sprintf("size=%d", info.Size()),
@@ -1261,8 +1260,8 @@ func TestRuntimeHandshakeFailsClosed(t *testing.T) {
 	if !errors.As(err, &runtimeErr) || runtimeErr.code != extensionproto.FailureRuntimeHandshakeFailed {
 		t.Fatalf("malformed error = %v, want %s", err, extensionproto.FailureRuntimeHandshakeFailed)
 	}
-	// Truncated output is the other "bytes moved under the exec" signature, so it
-	// carries the same on-disk identity as a signal death.
+	// Truncated output can also mean bytes moved under the exec, so it carries
+	// the same on-disk identity as a signal death.
 	if !strings.Contains(err.Error(), executable) || !strings.Contains(err.Error(), "size=") {
 		t.Errorf("malformed message %q must name the executable and its on-disk size", err.Error())
 	}
