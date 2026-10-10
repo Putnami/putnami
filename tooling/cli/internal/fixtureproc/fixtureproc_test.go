@@ -116,13 +116,14 @@ func TestOnAnswersTheRunsItNames(t *testing.T) {
 	}
 }
 
-// A warm run does nothing the program describes: it records no run and exits 0
-// at once, whatever the description says.
+// A warm run, the one Write makes included, does nothing the program
+// describes: it records no run and exits 0 at once, whatever the description
+// and the arguments say.
 func TestWarmRunsTheProgramWithoutDoingWhatItDescribes(t *testing.T) {
 	dir := t.TempDir()
 	record := filepath.Join(dir, "runs.jsonl")
 	path := Write(t, filepath.Join(dir, "tool"), Program{Record: record, Stdout: "out\n", WaitFor: []string{filepath.Join(dir, "never")}, Exit: 3})
-	Warm(t, path)
+	Warm(t, path, "mod", "tidy")
 	if runs := Runs(t, record); len(runs) != 0 {
 		t.Fatalf("runs = %d after a warm run, want none", len(runs))
 	}
@@ -264,11 +265,11 @@ func TestBinaryRunsAsTheTestBinary(t *testing.T) {
 // A warm run of a placed binary passes it the arguments its TestMain answers,
 // and fails the test when it exits non-zero: a warm that did not run cannot
 // pass for one that did.
-func TestWarmBinaryRunsTheCopyWithItsArguments(t *testing.T) {
+func TestWarmRunsACopyWithItsArguments(t *testing.T) {
 	path := Binary(t, filepath.Join(t.TempDir(), "plain"))
-	WarmBinary(t, path, "-test.run=^$")
+	Warm(t, path, "-test.run=^$")
 	failed := &fatalRecorder{TB: t}
-	WarmBinary(failed, path, "-test.no-such-flag")
+	Warm(failed, path, "-test.no-such-flag")
 	if !strings.Contains(failed.fatal, "no-such-flag") {
 		t.Fatalf("warm with an argument the copy refuses = %q, want a failure that names it", failed.fatal)
 	}

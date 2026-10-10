@@ -500,7 +500,7 @@ func writePublicationE2EFixture(t *testing.T) *publicationE2EFixture {
 
 // buildExtensionRuntimes builds the TypeScript and Go extension runtimes from
 // their sources, as their prepare steps do, stamped e2eRuntimeVersion, into
-// the extensions of store, and returns their paths.
+// the extensions of store, warms them (warmRuntime), and returns their paths.
 func buildExtensionRuntimes(t *testing.T, store string) (tsRuntime, goRuntime string) {
 	t.Helper()
 	goBinary, err := exec.LookPath("go")
@@ -531,6 +531,8 @@ func buildExtensionRuntimes(t *testing.T, store string) (tsRuntime, goRuntime st
 	if err := errors.Join(tsErr, goErr); err != nil {
 		t.Fatal(err)
 	}
+	warmRuntime(t, tsRuntime)
+	warmRuntime(t, goRuntime)
 	return tsRuntime, goRuntime
 }
 

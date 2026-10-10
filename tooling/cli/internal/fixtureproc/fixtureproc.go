@@ -137,7 +137,7 @@ const (
 const warmEnv = "PUTNAMI_FIXTUREPROC_WARM"
 
 // Write places the helper program at path, with ".exe" appended on Windows,
-// as a program that does p, and returns the program's path.
+// as a program that does p, warms it (Warm), and returns the program's path.
 func Write(t testing.TB, path string, p Program) string {
 	t.Helper()
 	path = executablePath(path)
@@ -153,18 +153,25 @@ func Write(t testing.TB, path string, p Program) string {
 	}
 	Prepare(t)
 	place(t, helper.path, path)
+	Warm(t, path)
 	return path
 }
 
-// Warm runs the program Write placed at path once, in a mode that exits 0
-// before it records a run, writes output or waits. A host that checks a new
-// executable file on its first launch does so here: macOS takes about 0.2 s
-// per new file and seconds under load. A test that bounds how long a later
-// run may take calls Warm first, so the bound measures the program alone.
-func Warm(t testing.TB, path string) {
+// Warm runs the program at path once with args, and fails the test unless it
+// exits 0. A host that checks a new executable file on its first launch does
+// so here, after the start returns: macOS takes about 0.3 s per new file, and
+// seconds under load, where the checks queue. A later run that a deadline
+// bounds then measures the program alone.
+//
+// The run has warmEnv set, so a program Write placed exits 0 before it records
+// a run, writes output or waits, whatever args are. Any other program, such as
+// a copy Binary placed or a script, must answer args and do nothing else; the
+// TestMain of a copy answers them without running the tests. GORACE has a
+// race-enabled copy exit without the race runtime's 1 s exit sleep.
+func Warm(t testing.TB, path string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(path)
-	cmd.Env = append(os.Environ(), warmEnv+"=1")
+	cmd := exec.Command(path, args...)
+	cmd.Env = append(os.Environ(), warmEnv+"=1", "GORACE=atexit_sleep_ms=0")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("fixtureproc: warm %s: %v\n%s", path, err, out)
 	}
@@ -221,7 +228,8 @@ func Remove() {
 
 // Binary places the running test binary at path, with ".exe" appended on
 // Windows, and returns its path. It runs as the test binary under another
-// name, which a TestMain can tell by os.Args[0].
+// name, which a TestMain can tell by os.Args[0]. A test warms the copy (Warm)
+// before a run that a deadline bounds.
 func Binary(t testing.TB, path string) string {
 	t.Helper()
 	path = executablePath(path)
@@ -234,18 +242,6 @@ func Binary(t testing.TB, path string) string {
 	}
 	place(t, executable, path)
 	return path
-}
-
-// WarmBinary runs the copy Binary placed at path once with args, and fails the
-// test unless it exits 0. Like Warm, it has the host check the new file before
-// a later run that a deadline bounds: the check of a copy of a race-enabled
-// test binary takes about 1 s, and seconds more under load. The test's
-// TestMain must answer args without running the tests.
-func WarmBinary(t testing.TB, path string, args ...string) {
-	t.Helper()
-	if out, err := exec.Command(path, args...).CombinedOutput(); err != nil {
-		t.Fatalf("fixtureproc: warm %s: %v\n%s", path, err, out)
-	}
 }
 
 // place puts a copy of the executable source at target. A hard link would be

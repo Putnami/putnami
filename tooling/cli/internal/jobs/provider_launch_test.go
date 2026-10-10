@@ -112,6 +112,8 @@ func TestProviderRemoteCacheStartsThePreparedRuntime(t *testing.T) {
 	ext := runtimeProviderExtension(t, map[string]string{"GORACE": "atexit_sleep_ms=0"})
 	want := fixtureproc.Binary(t, filepath.Join(ext.Path, filepath.FromSlash(providerRuntimeExecutable)))
 	t.Setenv(fakeRuntimeInfoEnv, runtimeInfoFor(t, ext))
+	// The handshake has a deadline, so the copy is warmed first.
+	fixtureproc.Warm(t, want, "__putnami", "runtime-info")
 
 	wsRoot := t.TempDir()
 	remote, notice := LoadRemoteCache(context.Background(), wsRoot, []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny)

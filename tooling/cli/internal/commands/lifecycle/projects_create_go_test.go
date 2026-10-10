@@ -112,9 +112,7 @@ func (f goCreateFixture) writeGo(t *testing.T, path, version string) {
 }
 
 // writeGoAnswering is writeGo for a go command that answers the runs on names
-// as their outcomes say. It launches the command once (fixtureproc.Warm), so
-// the version probe that later starts it within its deadline does not also
-// pay for the host's first-launch check of the new file.
+// as their outcomes say.
 func (f goCreateFixture) writeGoAnswering(t *testing.T, path, version string, on map[string]fixtureproc.Outcome) {
 	t.Helper()
 	for _, placed := range *f.gos {
@@ -127,7 +125,7 @@ func (f goCreateFixture) writeGoAnswering(t *testing.T, path, version string, on
 		return
 	}
 	record := filepath.Join(f.root, "go-calls-"+strconv.Itoa(len(*f.gos))+".jsonl")
-	fixtureproc.Warm(t, fixtureproc.Write(t, path, fixtureproc.Program{Record: record, Stdout: "go" + version + "\n", On: on}))
+	fixtureproc.Write(t, path, fixtureproc.Program{Record: record, Stdout: "go" + version + "\n", On: on})
 	*f.gos = append(*f.gos, fixtureGo{path: path, version: version, record: record})
 }
 
@@ -136,7 +134,7 @@ func (f goCreateFixture) writeGoAnswering(t *testing.T, path, version string, on
 // deadline.
 func (f goCreateFixture) writeSlowGo(t *testing.T) {
 	t.Helper()
-	fixtureproc.Warm(t, fixtureproc.Write(t, f.pinned, fixtureproc.Program{Stdout: "go" + goFixtureVersion + "\n", Sleep: time.Minute}))
+	fixtureproc.Write(t, f.pinned, fixtureproc.Program{Stdout: "go" + goFixtureVersion + "\n", Sleep: time.Minute})
 }
 
 // refusingGoInstall is the lock step and the workspace installers of a host

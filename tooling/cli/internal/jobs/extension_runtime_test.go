@@ -1675,9 +1675,10 @@ fi
 `, shellQuote(controls.mutationTrigger), shellQuote(controls.mutationTrigger),
 			shellQuote(controls.mutationTarget))
 	}
-	// The prepare runs the runtime it wrote once (fixtureproc.Warm), so the
-	// handshake that follows within its deadline does not also pay for the
-	// host's first-launch check of the new file.
+	// The prepare runs the runtime it wrote once, as fixtureproc.Write does
+	// for each program it places, so the handshake that follows within its
+	// deadline does not also pay for the host's first-launch check of the new
+	// file.
 	prepare := `#!/bin/sh
 set -eu
 ` + controls.prepareAssertions + counterStep + barrierStep + delayStep + releaseStep + cpuWorkStep + `output="$2"

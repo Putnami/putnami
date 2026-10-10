@@ -65,16 +65,20 @@ func storeRuntimeExtension(t *testing.T, env map[string]string, args ...string) 
 }
 
 // nativeRuntimeExtension is storeRuntimeExtension with this test binary as its
-// native runtime. It returns the runtime's path.
+// native runtime, warmed for the handshake's deadline (fixtureproc.Warm). It
+// returns the runtime's path.
 func nativeRuntimeExtension(t *testing.T, env map[string]string, args ...string) (*extension.ExtensionDescription, string) {
 	t.Helper()
 	ext, path := storeRuntimeExtension(t, env, args...)
-	return ext, fixtureproc.Binary(t, path)
+	path = fixtureproc.Binary(t, path)
+	fixtureproc.Warm(t, path, "__putnami", "runtime-info")
+	return ext, path
 }
 
 // scriptRuntimeExtension is storeRuntimeExtension whose runtime is a shell
 // script: it answers the handshake itself and runs this test binary for
-// every other command, as a launcher does.
+// every other command, as a launcher does. The script is warmed for the
+// handshake's deadline (fixtureproc.Warm).
 func scriptRuntimeExtension(t *testing.T, env map[string]string) *extension.ExtensionDescription {
 	t.Helper()
 	if runtime.GOOS == "windows" {
@@ -94,6 +98,7 @@ func scriptRuntimeExtension(t *testing.T, env map[string]string) *extension.Exte
 	if err := os.WriteFile(path, []byte(script), 0o755); err != nil { //nolint:gosec // an executable test fixture
 		t.Fatal(err)
 	}
+	fixtureproc.Warm(t, path, "__putnami", "runtime-info")
 	return ext
 }
 

@@ -189,7 +189,6 @@ var spawnSites = map[string]spawnSite{
 	"cli/clitest/runnerfixture.go:(*fixtureProvider).startSupervisor": {spawns: 1, verdict: testSupport},
 	"cli/clitest/runnerfixture.go:superviseFixtureAttempt":            {spawns: 1, verdict: testSupport},
 	"fixtureproc/fixtureproc.go:Warm":                                 {spawns: 1, verdict: testSupport},
-	"fixtureproc/fixtureproc.go:WarmBinary":                           {spawns: 1, verdict: testSupport},
 	"fixtureproc/fixtureproc.go:buildHelper":                          {spawns: 1, verdict: testSupport},
 	"fixtureproc/fixtureproc.go:startOutputHolder":                    {spawns: 1, verdict: testSupport},
 }

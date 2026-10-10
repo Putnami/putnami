@@ -290,7 +290,7 @@ func depsFetch(ctx context.Context, wsRoot string, cfg *wsproto.Config, filterTa
 // module is edited with it and the command exits non-zero naming the command
 // that finishes the install, as `projects create` does.
 func DepsAdd(ctx context.Context, wsRoot string, modules []string, projectSelector string, env LifecycleEnv) error {
-	installErr, err := runGoDeps(ctx, wsRoot, "add", modules, projectSelector, env)
+	installErr, err := runGoDeps(ctx, wsRoot, "add", modules, projectSelector, depsCommand("add", modules, projectSelector), env)
 	return goDepsResult("add", installErr, err)
 }
 
@@ -298,8 +298,22 @@ func DepsAdd(ctx context.Context, wsRoot string, modules []string, projectSelect
 // and tidies the closure. See DepsAdd for the ecosystem/selection rules and
 // the failed-install report.
 func DepsRemove(ctx context.Context, wsRoot string, modules []string, projectSelector string, env LifecycleEnv) error {
-	installErr, err := runGoDeps(ctx, wsRoot, "remove", modules, projectSelector, env)
+	installErr, err := runGoDeps(ctx, wsRoot, "remove", modules, projectSelector, depsCommand("remove", modules, projectSelector), env)
 	return goDepsResult("remove", installErr, err)
+}
+
+// depsCommand is the deps command the user ran: action on modules, which prune
+// takes from the workspace rather than its arguments, with the project
+// selector the user gave.
+func depsCommand(action string, modules []string, projectSelector string) string {
+	command := "putnami deps " + action
+	if action != "prune" {
+		command += " " + strings.Join(modules, " ")
+	}
+	if projectSelector != "" {
+		command += " --projects " + projectSelector
+	}
+	return command
 }
 
 // goDepsResult is the error of a deps command that edited Go modules. err is
@@ -326,8 +340,10 @@ func goDepsResult(action string, installErr, err error) error {
 // release the workspace lock pins, installed first on a host that has none
 // (ensureGoCommand). installErr is the failure of the workspace installers
 // that installed it; err is the failure of the edit. The caller reports both
-// (goDepsResult).
-func runGoDeps(ctx context.Context, wsRoot, action string, modules []string, projectSelector string, lifecycleEnv LifecycleEnv) (installErr, err error) {
+// (goDepsResult). When the version probe of a go timed out, that go is there
+// and slow: err names rerun, the deps command the user ran, as the next step.
+// Any other failure to find a go names putnami install.
+func runGoDeps(ctx context.Context, wsRoot, action string, modules []string, projectSelector, rerun string, lifecycleEnv LifecycleEnv) (installErr, err error) {
 	if len(modules) == 0 {
 		return nil, fmt.Errorf("deps %s requires at least one module (e.g. `putnami deps %s golang.org/x/text@latest`)", action, action)
 	}
@@ -342,7 +358,11 @@ func runGoDeps(ctx context.Context, wsRoot, action string, modules []string, pro
 	}
 	goCmd, err := ensureGoCommand(ctx, wsRoot, proj.Path, "", goToolchainExtension(wsRoot), lifecycleEnv)
 	if err != nil {
-		return nil, protocolcli.WithNext(fmt.Errorf("deps %s: %w", action, err), "putnami install")
+		next := "putnami install"
+		if errors.Is(err, jobs.ErrToolchainProbeTimeout) {
+			next = rerun
+		}
+		return nil, protocolcli.WithNext(fmt.Errorf("deps %s: %w", action, err), next)
 	}
 	moduleDir := filepath.Join(wsRoot, proj.Path)
 	env := shared.GoCommandEnvFrom(goCmd.env, moduleDir)

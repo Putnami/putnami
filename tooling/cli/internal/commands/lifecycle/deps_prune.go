@@ -138,7 +138,7 @@ func prunePlan(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 		iox.Fprintf(out, "  %d declared edge(s) would be pruned; run without --dry-run to apply.\n", pruned)
 		return nil
 	}
-	return applyPrune(ctx, wsRoot, ws, routed, pruned, out, env)
+	return applyPrune(ctx, wsRoot, ws, routed, pruned, depsCommand("prune", nil, projectSelector), out, env)
 }
 
 // selectedFindings is the check's answer, narrowed to one project when the
@@ -271,8 +271,9 @@ func manualManifestEdit(entry routedFinding) string {
 }
 
 // applyPrune edits the files the routed findings name and refuses the rest.
+// rerun is the prune command the user ran (runGoDeps).
 func applyPrune(ctx context.Context, wsRoot string, ws *workspace.Workspace,
-	routed []routedFinding, pruned int, out io.Writer, env LifecycleEnv) error {
+	routed []routedFinding, pruned int, rerun string, out io.Writer, env LifecycleEnv) error {
 	byProject := make(map[string][]routedFinding)
 	var kept []routedFinding
 	for _, entry := range routed {
@@ -301,7 +302,7 @@ func applyPrune(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 		if err := pruneProjectConfig(wsRoot, project, byProject[id]); err != nil {
 			return goDepsResult("prune", installErr, err)
 		}
-		projectInstallErr, err := pruneGoModule(ctx, wsRoot, ws, project, byProject[id], env)
+		projectInstallErr, err := pruneGoModule(ctx, wsRoot, ws, project, byProject[id], rerun, env)
 		if installErr == nil {
 			installErr = projectInstallErr
 		}
@@ -372,9 +373,10 @@ func pruneProjectConfig(wsRoot string, project *workspace.Project, routed []rout
 
 // pruneGoModule drops the unimported workspace requirements from one project's
 // Go module, with the go `deps remove` runs. installErr is the failure of the
-// workspace installers that installed the go it ran (runGoDeps).
+// workspace installers that installed the go it ran, and rerun is the prune
+// command the user ran (runGoDeps).
 func pruneGoModule(ctx context.Context, wsRoot string, ws *workspace.Workspace,
-	project *workspace.Project, routed []routedFinding, env LifecycleEnv) (installErr, err error) {
+	project *workspace.Project, routed []routedFinding, rerun string, env LifecycleEnv) (installErr, err error) {
 	modules := make([]string, 0, len(routed))
 	for _, entry := range routed {
 		if entry.route != pruneRouteGoModule {
@@ -391,7 +393,7 @@ func pruneGoModule(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 		return nil, nil
 	}
 	sort.Strings(modules)
-	return runGoDeps(ctx, wsRoot, "prune", modules, project.Name, env)
+	return runGoDeps(ctx, wsRoot, "prune", modules, project.Name, rerun, env)
 }
 
 // goModulePathOf is a project's module path: the identity its own manifest

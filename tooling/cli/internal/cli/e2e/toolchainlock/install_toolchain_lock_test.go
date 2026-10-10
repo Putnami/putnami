@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -45,6 +46,8 @@ func TestInstall_KeepsTheToolchainPinADeclaredExtensionPreparesWith(t *testing.T
 	tools := t.TempDir()
 	writeFixtureFile(t, filepath.Join(tools, "fixture-go"),
 		"#!/bin/sh\n[ \"$1\" = env ] && [ \"$2\" = GOVERSION ] && { printf 'go%s\\n' '"+goVersion+"'; exit 0; }\nexit 1\n", 0o755)
+	// The toolchain probe has a deadline, so the program is warmed first.
+	fixtureproc.Warm(t, filepath.Join(tools, "fixture-go"), "env", "GOVERSION")
 	t.Setenv("PATH", tools+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	marker := writeCompiledExtensionFixture(t, wsRoot, true)
@@ -137,7 +140,12 @@ func writeCompiledExtensionFixture(t *testing.T, wsRoot string, withToolchain bo
 		"output=\"$2\"\n"+
 		"mkdir -p \"$output/bin\"\n"+
 		"cp \"$(dirname \"$0\")/runtime-template\" \"$output/bin/runtime\"\n"+
-		"chmod +x \"$output/bin/runtime\"\n", 0o755)
+		"chmod +x \"$output/bin/runtime\"\n"+
+		// The prepare runs the runtime it wrote once, as fixtureproc.Write
+		// does for each program it places, so the handshake that follows
+		// within its deadline does not also pay for the host's first-launch
+		// check of the new file.
+		"\"$output/bin/runtime\" __putnami runtime-info >/dev/null\n", 0o755)
 
 	toolchains, prepareToolchains := "", ""
 	if withToolchain {

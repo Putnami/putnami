@@ -120,8 +120,8 @@ func TestDepsAddInstallsThePinnedGoOnAHostWithoutGo(t *testing.T) {
 
 // A go whose version probe does not exit within its deadline is there and
 // slow, not missing: `deps add` installs nothing, stops naming the timeout,
-// and names putnami install. The probe runs under its production deadline of
-// 5 s.
+// and names the same `deps add` as the command to run next. The probe runs
+// under its production deadline of 5 s.
 func TestDepsAddReportsAGoProbeThatTimedOut(t *testing.T) {
 	spectest.Proves(t, "cli/toolchain-lock", "deps-run-the-pinned-go", "deps-add-reports-a-go-probe-that-timed-out")
 	f := newGoCreateFixture(t)
@@ -142,8 +142,27 @@ func TestDepsAddReportsAGoProbeThatTimedOut(t *testing.T) {
 	if strings.Contains(output, "No go command found") {
 		t.Errorf("deps add reported a missing go:\n%s", output)
 	}
-	if got, want := protocolcli.SuggestedNext(err), "putnami install"; got != want {
+	if got, want := protocolcli.SuggestedNext(err), "putnami deps add example.com/lib@v1.0.0"; got != want {
 		t.Fatalf("next command = %q, want %q", got, want)
+	}
+}
+
+// The command a deps run names after a probe timeout is the one the user ran:
+// its modules, except for prune, which takes none, and its project selector.
+func TestDepsCommandIsTheCommandTheUserRan(t *testing.T) {
+	for _, tc := range []struct {
+		action, selector string
+		modules          []string
+		want             string
+	}{
+		{"add", "", []string{"example.com/lib@v1.0.0"}, "putnami deps add example.com/lib@v1.0.0"},
+		{"remove", "api", []string{"example.com/a", "example.com/b"}, "putnami deps remove example.com/a example.com/b --projects api"},
+		{"prune", "", nil, "putnami deps prune"},
+		{"prune", "api", nil, "putnami deps prune --projects api"},
+	} {
+		if got := depsCommand(tc.action, tc.modules, tc.selector); got != tc.want {
+			t.Errorf("depsCommand(%q, %q, %q) = %q, want %q", tc.action, tc.modules, tc.selector, got, tc.want)
+		}
 	}
 }
 

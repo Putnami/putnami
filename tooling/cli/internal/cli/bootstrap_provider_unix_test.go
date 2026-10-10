@@ -152,7 +152,7 @@ func installCredentialDeclarer(t *testing.T, root, name, bearer string, hosts ..
 	}
 	// The provider starts after its runtime answers the runtime-info handshake
 	// within its deadline, which must measure the runtime alone.
-	fixtureproc.WarmBinary(t, filepath.Join(installed, filepath.FromSlash(fixtureRuntimeExecutable)), "__putnami", "runtime-info")
+	fixtureproc.Warm(t, filepath.Join(installed, filepath.FromSlash(fixtureRuntimeExecutable)), "__putnami", "runtime-info")
 	if err := layout.LinkArtifactGlobal(root, layout.Extensions, name, installed); err != nil {
 		t.Fatal(err)
 	}

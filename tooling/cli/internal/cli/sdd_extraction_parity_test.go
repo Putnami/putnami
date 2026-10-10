@@ -399,12 +399,14 @@ func parityExtensionRuntime(t *testing.T) string {
 // server, and the broker wins over every authored route while answering 401
 // to a test archive. Tests that exercise the broker set it with t.Setenv. As
 // the runtime of a fixture extension, this binary answers the runtime-info
-// handshake and exits (answerRuntimeHandshake).
+// handshake and exits (answerRuntimeHandshake). GORACE has every copy of this
+// binary the tests start exit without the race runtime's 1 s exit sleep.
 func TestMain(m *testing.M) {
 	if answerRuntimeHandshake() {
 		os.Exit(0)
 	}
 	os.Unsetenv(extension.PrivatePutRegistryURLEnv)
+	_ = os.Setenv("GORACE", "atexit_sleep_ms=0")
 	code := m.Run()
 	_ = parityRuntimeDir.Remove()
 	_ = parityWorkspaceTemplateScratch.Remove()
@@ -954,8 +956,9 @@ func TestBaselineActuallyReachesTheExtension(t *testing.T) {
 	root := parityWorkspace(t)
 	extensions := parityExtensions(t, root, parityExtensionRuntime(t))
 
-	// An empty answer is a failed run, not a flag that changed nothing: its
-	// exit code and stderr name the cause.
+	// An empty answer is a failed run, not a flag that changed nothing: the
+	// failure reports its exit code, where -1 is a child that a signal ended,
+	// and its stderr.
 	answer := func(args ...string) string {
 		t.Helper()
 		out, errOut, code := runParityExtension(t, root, extensions, args)

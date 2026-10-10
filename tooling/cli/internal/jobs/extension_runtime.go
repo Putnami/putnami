@@ -1406,13 +1406,12 @@ func describeRuntimeExecutable(executable string) string {
 		info.ModTime().UTC().Format(time.RFC3339Nano), identity)
 }
 
-// runtimeHandshakeDeadline is how long a runtime the operating system has
-// already started may take to answer `__putnami runtime-info`.
+// runtimeHandshakeDeadline is how long a started runtime may take to answer
+// `__putnami runtime-info`, counted from the return of exec.Cmd.Start: see
+// validateRuntimeHandshake.
 //
 // The value is settled. Raising it would only move the load at which a
 // healthy runtime is refused — the same rule applied to the capability probes.
-// What keeps load out of the verdict is WHEN this clock starts: see
-// validateRuntimeHandshake.
 const runtimeHandshakeDeadline = 10 * time.Second
 
 // runtimeHandshakeClock arms the deadline of one handshake. It is called exactly
@@ -1438,16 +1437,13 @@ func wallClockHandshakeDeadline(*os.Process) (<-chan time.Time, func()) {
 // from the same ProcessState the physical execution ledger reads. A process
 // that never started reports no CPU rather than a measured zero.
 //
-// The deadline counts from the moment the runtime process EXISTS, not from the
-// spawn request. exec.Cmd.Start returns only once the operating system
-// has admitted the executable. On darwin, admission includes the code-signature
-// and policy assessment of a binary written moments earlier. That assessment
-// queues behind every other fresh binary on a loaded machine and consumes none
-// of the runtime's own time. Start cannot be interrupted, so a deadline that
-// already counted admission could not shorten it: it could only kill the runtime
-// the instant it started, refusing it for the machine's work instead of its
-// own. A deadline that does fire is reported as runtime.handshake_timeout, with
-// the measured start, run, and CPU times, so no reader mistakes load for a
+// The deadline counts from the return of exec.Cmd.Start. On darwin, Start
+// returns within milliseconds, and the host's first-launch check of an
+// executable written moments earlier runs after it: about 0.3 s per new file
+// at rest, and seconds on a loaded machine, where the checks queue. The
+// deadline therefore counts that check on the first run of a new executable.
+// A deadline that does fire is reported as runtime.handshake_timeout, with the
+// measured start, run, and CPU times, so no reader mistakes load for a
 // malformed build.
 func validateRuntimeHandshake(
 	ctx context.Context,
