@@ -180,7 +180,7 @@ func TestRuntimeToolchainProbeTimeoutIsFiveSecondsUnlessTheCallerSetsOne(t *test
 // toolchain from an absent one by the error, never by its text.
 func TestRuntimeToolchainMismatchUnwrapsToAProbeThatTimedOut(t *testing.T) {
 	path := fixtureproc.Write(t, filepath.Join(t.TempDir(), "compiler"), fixtureproc.Program{Sleep: 5 * time.Second})
-	_, probeErr := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, 100*time.Millisecond)
+	_, probeErr := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, hostProcessDeadline(100*time.Millisecond))
 	if probeErr == nil {
 		t.Fatal("a probe that sleeps 5s answered within 100ms")
 	}
@@ -202,7 +202,9 @@ func TestRuntimeToolchainMismatchUnwrapsToAProbeThatTimedOut(t *testing.T) {
 }
 
 // TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion pins each probe
-// rejection reason, including the timeout a slow machine can trip.
+// rejection reason, including the timeout a slow machine can trip. The program
+// that times out polls for a file that never appears, so it keeps running its
+// own code and its deadline arms whenever its progress is first sampled.
 func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -210,15 +212,17 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 		// holdOutput has a copy of the program keep its output open after the
 		// program exits.
 		holdOutput bool
-		timeout    time.Duration
-		want       string
+		// waitForever has the program wait for a file that never appears.
+		waitForever bool
+		deadline    processDeadline
+		want        string
 	}{
-		{"timeout", fixtureproc.Program{Sleep: 5 * time.Second}, false, 100 * time.Millisecond, "probe timed out after 100ms"},
-		{"exit status", fixtureproc.Program{Exit: 3}, false, toolVersionProbeTimeout, "probe failed: exit status 3"},
-		{"empty", fixtureproc.Program{}, false, toolVersionProbeTimeout, "probe output empty"},
-		{"too long", fixtureproc.Program{Stdout: strings.Repeat("0", 70) + "\n"}, false, toolVersionProbeTimeout, "probe output too long (70 bytes, limit 64)"},
-		{"several lines", fixtureproc.Program{Stdout: "1.2.3\nextra\n"}, false, toolVersionProbeTimeout, "probe output malformed (more than one line)"},
-		{"output open after exit", fixtureproc.Program{Stdout: "1.2.3\n"}, true, toolVersionProbeTimeout, "probe output stayed open after exit (wait delay 1s)"},
+		{"timeout", fixtureproc.Program{}, false, true, hostProcessDeadline(100 * time.Millisecond), "probe timed out after 100ms"},
+		{"exit status", fixtureproc.Program{Exit: 3}, false, false, hostProcessDeadline(toolVersionProbeTimeout), "probe failed: exit status 3"},
+		{"empty", fixtureproc.Program{}, false, false, hostProcessDeadline(toolVersionProbeTimeout), "probe output empty"},
+		{"too long", fixtureproc.Program{Stdout: strings.Repeat("0", 70) + "\n"}, false, false, hostProcessDeadline(toolVersionProbeTimeout), "probe output too long (70 bytes, limit 64)"},
+		{"several lines", fixtureproc.Program{Stdout: "1.2.3\nextra\n"}, false, false, hostProcessDeadline(toolVersionProbeTimeout), "probe output malformed (more than one line)"},
+		{"output open after exit", fixtureproc.Program{Stdout: "1.2.3\n"}, true, false, hostProcessDeadline(toolVersionProbeTimeout), "probe output stayed open after exit (wait delay 1s)"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -228,8 +232,11 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 				program.HoldOutput = filepath.Join(dir, "release")
 				defer fixtureproc.Release(t, program.HoldOutput)
 			}
+			if tc.waitForever {
+				program.WaitFor = []string{filepath.Join(dir, "never")}
+			}
 			path := fixtureproc.Write(t, filepath.Join(dir, "compiler"), program)
-			got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, tc.timeout)
+			got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, tc.deadline)
 			if err == nil || err.Error() != tc.want {
 				t.Fatalf("probe = %q, %v; want error %q", got, err, tc.want)
 			}
@@ -246,8 +253,35 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 		if err := os.WriteFile(path, []byte("#!/nonexistent/interpreter\n"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, toolVersionProbeTimeout)
+		got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"},
+			hostProcessDeadline(toolVersionProbeTimeout))
 		if want := "probe failed to start: "; err == nil || !strings.HasPrefix(err.Error(), want) {
+			t.Fatalf("probe = %q, %v; want an error starting with %q", got, err, want)
+		}
+	})
+}
+
+// TestRuntimeToolchainProbeDeadlineCountsFromTheFirstInstruction pins that a
+// probe the host holds before its first instruction is not charged for the
+// hold: held past a deadline that has already elapsed, it still answers. A
+// hold past the admission bound times out and says the host held it. No case
+// depends on how fast the host runs.
+func TestRuntimeToolchainProbeDeadlineCountsFromTheFirstInstruction(t *testing.T) {
+	t.Run("held past its deadline, it answers", func(t *testing.T) {
+		path := fixtureproc.Write(t, filepath.Join(t.TempDir(), "compiler"), fixtureproc.Program{Stdout: "1.2.3\n"})
+		deadline := processDeadline{run: 0, admission: elapsesNever, progress: neverRunning}
+		got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, deadline)
+		if err != nil || got != "1.2.3" {
+			t.Fatalf("probe = %q, %v; want 1.2.3", got, err)
+		}
+	})
+	t.Run("held past the admission bound, it times out", func(t *testing.T) {
+		dir := t.TempDir()
+		program := fixtureproc.Program{WaitFor: []string{filepath.Join(dir, "never")}}
+		path := fixtureproc.Write(t, filepath.Join(dir, "compiler"), program)
+		deadline := processDeadline{run: elapsesNever, admission: 0, progress: neverRunning}
+		got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, deadline)
+		if want := "probe timed out: the host held it "; err == nil || !strings.HasPrefix(err.Error(), want) {
 			t.Fatalf("probe = %q, %v; want an error starting with %q", got, err, want)
 		}
 	})

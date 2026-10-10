@@ -1680,11 +1680,14 @@ name/version, host platform, CLI contract, runtime protocol, and runtime ABI.
 A runtime that carries no version of its own, such as the Go and TypeScript
 extension runtimes, answers the version of the `putnami.extension.json` that
 declares it as its executable, and an empty version when no manifest does.
-Its 10-second deadline counts from the moment the call that starts the runtime
-process returns. On macOS, the check the operating system makes on the first
-launch of a freshly written executable runs after that call returns, so the
-deadline includes it: about 0.3 seconds at rest, and seconds on a loaded
-machine. A runtime still running at the deadline fails with
+Its 10-second deadline counts from the runtime's first instruction. On macOS,
+the host checks a freshly written executable after the process starts and
+before it runs, and that check takes seconds on a loaded machine. The CLI reads
+the new process's task counters and arms the deadline once they move, so the
+check is not charged to the runtime. A separate two-minute bound caps the
+check. A runtime that blocks before the CLI first reads its counters looks held,
+so it stops at that bound rather than at the deadline. A runtime still running
+at the deadline, or still held at the bound, fails with
 `runtime.handshake_timeout`, which names machine load or a blocked runtime
 rather than a malformed build.
 Installed archive runtimes go through the same executable and handshake checks

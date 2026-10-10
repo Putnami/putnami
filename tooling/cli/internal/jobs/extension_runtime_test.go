@@ -1277,17 +1277,22 @@ func TestRuntimeHandshakeFailsClosed(t *testing.T) {
 }
 
 // handshakeClockProbe is a runtimeHandshakeClock a test controls. With fire
-// set, the deadline has elapsed by the time it is armed; without it, the
-// channel is nil and never delivers, so the runtime's own outcome decides.
+// set, the deadline has elapsed by the time the runtime is seen running;
+// without it, the deadline never elapses, so the runtime's own outcome
+// decides. With held set, the runtime is never seen running, as if the host
+// held it before its first instruction, and with heldPastBound also set, the
+// host admission bound has elapsed by the time the deadline is armed.
 // armedPids records the process each arming received, which proves the clock
 // started only once the runtime process existed.
 type handshakeClockProbe struct {
-	fire      bool
-	onArm     func()
-	armedPids []int
+	fire          bool
+	held          bool
+	heldPastBound bool
+	onArm         func()
+	armedPids     []int
 }
 
-func (p *handshakeClockProbe) clock(process *os.Process) (<-chan time.Time, func()) {
+func (p *handshakeClockProbe) clock(process *os.Process) *processWatch {
 	pid := 0
 	if process != nil {
 		pid = process.Pid
@@ -1296,24 +1301,31 @@ func (p *handshakeClockProbe) clock(process *os.Process) (<-chan time.Time, func
 	if p.onArm != nil {
 		p.onArm()
 	}
-	if !p.fire {
-		return nil, func() {}
+	deadline := processDeadline{run: elapsesNever, admission: elapsesNever, progress: runningAtStart}
+	if p.fire {
+		deadline.run = 0
 	}
-	expired := make(chan time.Time)
-	close(expired)
-	return expired, func() {}
+	if p.held {
+		deadline.progress = neverRunning
+	}
+	if p.heldPastBound {
+		deadline.admission = 0
+	}
+	return deadline.watch(process, nil)
 }
 
 // TestRuntimeHandshakeTimeoutIsItsOwnVerdict pins the handshake timeout without a wall clock.
 // A handshake still running when its deadline fires is reported as
 // runtime.handshake_timeout. A runtime that exits non-zero, dies on a signal,
 // or prints malformed runtime-info keeps runtime.handshake_failed, whatever the
-// machine's load. The clock is armed once, with a started process, so the time
-// the operating system spends admitting a freshly written binary never counts.
+// machine's load. The clock is armed once, with a started process, and its
+// deadline counts only once the runtime is seen running: a runtime the host
+// holds past the deadline before its first instruction is accepted when it
+// answers. A hold past the host admission bound times out, and says so.
 //
-// The blocked runtime cannot answer before the probe's deadline, which has
-// elapsed by the time it is armed, and the other runtimes face a deadline that
-// never fires. So no case depends on how fast the host runs.
+// The blocked runtimes cannot answer before the probe's deadline or bound,
+// which has elapsed by the time it applies, and the other runtimes face a
+// deadline that never fires. So no case depends on how fast the host runs.
 //
 // Every case's executable is written before the parallel subtests start, so
 // no subtest's fork ever inherits another subtest's still-open write
@@ -1334,21 +1346,48 @@ func TestRuntimeHandshakeTimeoutIsItsOwnVerdict(t *testing.T) {
 		ext.Name, ext.Version, runtime.GOOS+"/"+runtime.GOARCH, protocolcli.CurrentContract,
 		runtimeproto.MaxKnownProtocolVersion, runtimeproto.RuntimeABIVersion)
 
+	ranPastDeadline := []string{
+		"timed out", "counted from its first instruction", "starting the process took", "the host held it",
+		"not a malformed build", "less loaded", "CPU used",
+	}
 	cases := []struct {
-		name       string
-		script     string
-		fire       bool
-		cancel     bool
-		wantCode   string
-		executable string
+		name          string
+		script        string
+		fire          bool
+		held          bool
+		heldPastBound bool
+		cancel        bool
+		wantCode      string
+		wantMessage   []string
+		executable    string
 	}{
 		{
 			// exec hands the process holding the pipes to sleep, so the kill
 			// reaches it and Wait returns.
-			name:     "a blocked runtime at its deadline times out",
-			script:   "#!/bin/sh\nexec sleep 3600\n",
-			fire:     true,
-			wantCode: extensionproto.FailureRuntimeHandshakeTimeout,
+			name:        "a blocked runtime at its deadline times out",
+			script:      "#!/bin/sh\nexec sleep 3600\n",
+			fire:        true,
+			wantCode:    extensionproto.FailureRuntimeHandshakeTimeout,
+			wantMessage: ranPastDeadline,
+		},
+		{
+			// The deadline has elapsed by the time it could arm, so only a
+			// deadline that waits for the first instruction lets it answer.
+			name:   "a runtime the host holds past its deadline is accepted when it answers",
+			script: "#!/bin/sh\nprintf '%s\\n' '" + answer + "'\n",
+			fire:   true,
+			held:   true,
+		},
+		{
+			name:          "a runtime the host holds past the admission bound times out",
+			script:        "#!/bin/sh\nexec sleep 3600\n",
+			held:          true,
+			heldPastBound: true,
+			wantCode:      extensionproto.FailureRuntimeHandshakeTimeout,
+			wantMessage: []string{
+				"timed out", "the host held the runtime", "host admission bound " + hostAdmissionBound.String(),
+				"starting the process took", "not a malformed build", "less loaded", "CPU used",
+			},
 		},
 		{
 			name:     "a runtime that exits non-zero fails",
@@ -1389,7 +1428,7 @@ func TestRuntimeHandshakeTimeoutIsItsOwnVerdict(t *testing.T) {
 			executable := tc.executable
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			probe := &handshakeClockProbe{fire: tc.fire}
+			probe := &handshakeClockProbe{fire: tc.fire, held: tc.held, heldPastBound: tc.heldPastBound}
 			if tc.cancel {
 				probe.onArm = cancel
 			}
@@ -1419,17 +1458,13 @@ func TestRuntimeHandshakeTimeoutIsItsOwnVerdict(t *testing.T) {
 				}
 				return
 			}
-			for _, want := range []string{
-				"timed out",
-				"counted from process start",
-				"not a malformed build",
-				"less loaded",
-				"CPU used",
-				executable,
-			} {
+			for _, want := range tc.wantMessage {
 				if !strings.Contains(message, want) {
 					t.Errorf("timeout message %q missing %q", message, want)
 				}
+			}
+			if !strings.Contains(message, executable) {
+				t.Errorf("timeout message %q does not name the executable %s", message, executable)
 			}
 		})
 	}
