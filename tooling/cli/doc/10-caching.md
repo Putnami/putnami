@@ -1599,18 +1599,10 @@ clean removes.
 TypeScript action-cache keys hash the workspace package/lock files and the root
 TypeScript/Biome configuration, so a dependency-only or root-config change cannot
 restore stale build, test, or lint results. They also vary with the Bun **binary**
-version: Bun produces those outputs, and a lockfile does not move when a user
-upgrades Bun in place, so the key carries the ambient `bun --version` alongside
-the Go runtime identity.
-
-That version is resolved once per CLI invocation, only when a TypeScript task
-needs it, by running `bun --version` under a 5s deadline and a 4KB output cap. A
-probe that times out, is killed, exits non-zero, or answers with something that
-is not a version line degrades to a reserved identity (`timeout`, `invalid`,
-`unavailable`, `unknown`) and logs a warning. A degraded identity is deliberately
-distinct from every other one, so a run that could not identify Bun neither
-serves nor is served by artifacts a known-good Bun produced — it misses, it never
-hits wrongly.
+version: Bun produces those outputs, and a package lockfile does not name the
+Bun that runs. The TypeScript extension declares Bun as the `taskRuntime`
+runtime toolchain of every task, so the toolchain field of the key carries the
+lock identity of that Bun alongside the Go runtime identity.
 
 | Variable | Effect | Default |
 |----------|--------|---------|
