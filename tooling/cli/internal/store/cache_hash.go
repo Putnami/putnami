@@ -100,6 +100,11 @@ func globDoubleStar(dir, pattern string) []string {
 			return nil
 		}
 		if d.IsDir() {
+			// The skip applies below the search root: a project whose own
+			// directory is named dist or vendor still keys on its files.
+			if p == searchRoot {
+				return nil
+			}
 			switch d.Name() {
 			case "node_modules", ".git", ".putnami", "out", "dist", "vendor":
 				return filepath.SkipDir
