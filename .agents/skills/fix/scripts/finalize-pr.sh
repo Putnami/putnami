@@ -34,8 +34,10 @@ blank lines, list markers and fenced blocks keep their breaks. The body has
 no markdown heading, fits the
 policy's publication.bodyMaxBytes, and no title, body, proof or commit names
 an agent (a Co-Authored-By trailer or a "Generated with" line for a model or
-an agent host). The verification record goes to a comment on the proposal,
-through `proposals review` with the comment verdict.
+an agent host). The title is the squash commit title: a fix or feat title is
+refused when every path of the branch against the base, committed or passed
+with --file, is a test. The verification record goes to a comment on the
+proposal, through `proposals review` with the comment verdict.
 
 The helper is resumable: if the branch is already committed or its proposal
 already exists, it verifies and completes the remaining lifecycle operations.
@@ -199,12 +201,17 @@ cd "$ROOT"
 # A Conventional Commit title names what the diff changes, not the skill that
 # produced it: a change that touches only tests is `test`, not `fix` or `feat`.
 # The title is the squash commit title, so the change is every path the squash
-# carries: the branch's commits against the base and the enumerated files.
+# carries: the branch's commits against the base and the enumerated files. A
+# rename counts as its deleted source and its added target, and paths stay
+# unquoted, so the test pattern reads each one as written.
 if [[ "$TITLE" =~ ^(fix|feat)(\([^\)]*\))?!?: ]]; then
-  CHANGED_PATHS="$(
-    git diff --name-only "$REVISION_BASE...HEAD" 2>/dev/null || true
-    [ "${#FILES[@]}" -eq 0 ] || printf '%s\n' "${FILES[@]}"
-  )"
+  if ! CHANGED_PATHS="$(git -c core.quotePath=false diff --no-renames --name-only "$REVISION_BASE...HEAD")"; then
+    echo "finalize-pr: cannot list the paths of the branch against '$REVISION_BASE'; fetch the base, then finalize again" >&2
+    exit 2
+  fi
+  if [ "${#FILES[@]}" -gt 0 ]; then
+    CHANGED_PATHS="$(printf '%s\n' "$CHANGED_PATHS" "${FILES[@]}" | sed '/^$/d')"
+  fi
   TEST_PATH_PATTERN='(^|/)(testdata|__tests__|tests?)/|_test\.(go|py)$|(^|/)test_[^/]*\.py$|\.(test|spec)\.[cm]?[jt]sx?$|\.test\.sh$'
   if [ -n "$CHANGED_PATHS" ] && ! grep -Evq "$TEST_PATH_PATTERN" <<<"$CHANGED_PATHS"; then
     echo "finalize-pr: every changed path is a test, so the title type is test, not ${BASH_REMATCH[1]}: retitle it \"test${TITLE#"${BASH_REMATCH[1]}"}\"" >&2
