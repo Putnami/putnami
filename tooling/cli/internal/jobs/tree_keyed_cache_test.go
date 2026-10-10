@@ -404,7 +404,7 @@ func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
 		// file, whichever project declares it: lint-docs checks links into it.
 		readsTheCut := map[string]bool{}
 		for _, job := range planned {
-			readsTheCut[job.Key()] = keysOnTheCandidateCut(job)
+			readsTheCut[job.Key()] = keysOnCandidateCut(job)
 		}
 		cutReaders := 0
 		for _, key := range sortedKeyNames(clean) {
@@ -422,20 +422,6 @@ func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
 			t.Fatalf("no task keyed on the candidate cut in %v; the control reads no workspace input", sortedKeyNames(clean))
 		}
 	})
-}
-
-// keysOnTheCandidateCut reports whether job's key holds a workspace `git:`
-// pattern (ADR 0041), so it moves with any candidate file of the repository.
-func keysOnTheCandidateCut(job *ScheduledJob) bool {
-	if job.JobDef == nil || job.JobDef.TaskCachePolicy == nil || job.JobDef.TaskCachePolicy.Key == nil {
-		return false
-	}
-	for _, pattern := range job.JobDef.TaskCachePolicy.Key.WorkspaceFiles {
-		if strings.HasPrefix(pattern, "git:") {
-			return true
-		}
-	}
-	return false
 }
 
 // The scheduler owns a closed set of stamp fields, and each is either a

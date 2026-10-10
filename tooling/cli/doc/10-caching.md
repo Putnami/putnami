@@ -380,9 +380,15 @@ candidate Git lists as a directory (a submodule or a nested repository) prevent
 key computation. Ordinary patterns keep their existing behavior; adding
 `git:**` does not filter files an ordinary pattern separately selects.
 
+A task that declares a `git:` input also keys on the workspace's probe digest:
+its projects, their paths, extensions and dependency edges. Such a task judges
+the workspace from the membership in its context, and user config or a scope
+manifest Git ignores can change that membership without changing a candidate.
+
 An extension manifest whose task declares a `git:` input requires CLI contract
-7: a CLI before it keys a candidate's bytes without its executable bit. An older
-CLI refuses the manifest instead of replaying a verdict across a `chmod`.
+7: a CLI before it keys a candidate's bytes without its executable bit and
+without the membership. An older CLI refuses the manifest instead of replaying a
+verdict across a `chmod` or a membership change.
 
 The document gates declare `git:**` instead of a fixed list of repository
 documents, so the public-cut scanner and its cache key cover the same tree.
