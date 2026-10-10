@@ -113,8 +113,20 @@ func TestAuditLanguageRuleScansTasksAndProposalsThroughTheContracts(t *testing.T
 
 // runSkillScriptTest runs a materialized skill script's bash test from the
 // repository root and requires its success marker. A nil env inherits the
-// caller's environment.
+// caller's environment. Either way, the script receives no variable that
+// selects or configures a git repository from outside: it finds the
+// repository from its working directory.
 func runSkillScriptTest(t *testing.T, skill, name, okMarker string, env []string) {
+	t.Helper()
+	if env == nil {
+		env = os.Environ()
+	}
+	runSkillScript(t, skill, name, okMarker, withoutGitRepositoryVariables(t, env))
+}
+
+// runSkillScript runs a materialized skill script's bash test from the
+// repository root with exactly env and requires its success marker.
+func runSkillScript(t *testing.T, skill, name, okMarker string, env []string) {
 	t.Helper()
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -144,9 +156,9 @@ func runSkillScriptTest(t *testing.T, skill, name, okMarker string, env []string
 
 // runSkillScriptTestBesideAForeignRepository runs a skill script's bash test
 // with GIT_DIR naming another repository, the way a git hook or `git bisect
-// run` starts a command, and requires that repository's configuration, HEAD
-// and refs to come out byte for byte unchanged. A nil env inherits the
-// caller's environment.
+// run` starts a command, and requires that repository's configuration, HEAD,
+// refs, index and object count to come out unchanged. A nil env inherits the
+// caller's environment, without its git repository variables.
 func runSkillScriptTestBesideAForeignRepository(t *testing.T, skill, name, okMarker string, env []string) {
 	t.Helper()
 	if env == nil {
@@ -166,30 +178,35 @@ func runSkillScriptTestBesideAForeignRepository(t *testing.T, skill, name, okMar
 		return string(output)
 	}
 	foreignGit("init", "-q", "-b", "main")
-	foreignGit("-c", "user.name=Foreign", "-c", "user.email=foreign@example.com", "commit", "-q", "--allow-empty", "-m", "foreign")
+	foreignGit("-c", "user.name=Foreign", "-c", "user.email=foreign@example.com", "-c", "commit.gpgsign=false",
+		"commit", "-q", "--no-verify", "--allow-empty", "-m", "foreign")
 	gitDir := filepath.Join(foreign, ".git")
 	state := func() string {
 		t.Helper()
 		var snapshot strings.Builder
-		for _, file := range []string{"config", "HEAD"} {
+		for _, file := range []string{"config", "HEAD", "index"} {
 			data, err := os.ReadFile(filepath.Join(gitDir, file))
-			if err != nil {
+			switch {
+			case os.IsNotExist(err):
+				data = []byte("absent\n")
+			case err != nil:
 				t.Fatal(err)
 			}
 			snapshot.WriteString(file + ":\n" + string(data))
 		}
 		snapshot.WriteString("refs:\n" + foreignGit("for-each-ref", "--format=%(refname) %(objectname)"))
+		snapshot.WriteString("objects:\n" + foreignGit("count-objects", "-v"))
 		return snapshot.String()
 	}
 	before := state()
-	runSkillScriptTest(t, skill, name, okMarker, append(env, "GIT_DIR="+gitDir))
+	runSkillScript(t, skill, name, okMarker, append(env, "GIT_DIR="+gitDir))
 	if after := state(); after != before {
 		t.Fatalf("%s changed the repository GIT_DIR named\nbefore:\n%s\nafter:\n%s", name, before, after)
 	}
 }
 
-// withoutGitRepositoryVariables drops every variable that points git at a
-// repository, so a test names its repositories itself.
+// withoutGitRepositoryVariables drops every variable that selects or configures
+// a git repository from outside, so a test names its repositories itself.
 func withoutGitRepositoryVariables(t *testing.T, env []string) []string {
 	t.Helper()
 	output, err := exec.Command("git", "rev-parse", "--local-env-vars").Output()

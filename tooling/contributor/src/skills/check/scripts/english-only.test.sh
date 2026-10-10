@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Every variable that points git at another repository is unset, so git finds
-# this repository from the working directory and each scratch repository from
-# its own path.
+# Every variable that selects or configures a git repository from outside is
+# unset, so git finds this repository from the working directory and each
+# scratch repository from its own path.
 git_env_vars="$(git rev-parse --local-env-vars)"
 while IFS= read -r name; do unset "${name%$'\r'}"; done <<<"$git_env_vars"
 unset GIT_NAMESPACE GIT_CEILING_DIRECTORIES GIT_DISCOVERY_ACROSS_FILESYSTEM
