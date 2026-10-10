@@ -36,7 +36,9 @@ it is from a clone. Outside a Git work tree the check reads the disk, and no
 **2. The membership comes from the job context.** The check takes the member
 projects from `workspaceProjects`, which the CLI resolves from
 `putnami.workspace.json` and the scope manifests its includes name. Those files
-are candidates, so the key holds them. A context without a membership is a
+are candidates, so the key holds them. The CLI also folds the workspace's probe
+digest into the key of every task keyed on the cut, so a membership that user
+config or an ignored scope manifest changes moves the key too. A context without a membership is a
 `clientgen.discovery` finding. The check never falls back to the index.
 
 **3. A provider's inputs are the files it commits.** The contract is the
@@ -64,10 +66,8 @@ on another branch or in another directory is a hit.
 - An unmarked third-party provider reads as first-party unless the project
   commits its `.gen/clientgen/config.json`. ADR 0003 already reported this on a
   cold clone; it is now the verdict on every tree.
-- The membership is a premise of the key. It holds while the CLI resolves
-  members from committed manifests. A workspace include in the user's
-  `~/.putnami/config.json`, or an untracked scope manifest Git ignores, would
-  change the membership without moving the key.
+- A membership change moves the key, even when no candidate file moves: a
+  workspace include in the user's `~/.putnami/config.json` re-runs the guard.
 
 ## Alternatives rejected
 
