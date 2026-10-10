@@ -203,7 +203,10 @@ selects zero projects and passes having run nothing; the job summary prints the
 selected project and job counts so that case is visible.
 
 The job publishes one service container: a `postgres:17-alpine` on port 6432,
-which is the fallback datasource
+pulled from the Amazon ECR Public mirror of Docker Hub's official images
+(`public.ecr.aws/docker/library/postgres:17-alpine`) because Docker Hub limits
+anonymous pulls from the IP addresses GitHub runners share. Port 6432 is the
+fallback datasource
 [`typescript/framework/database/conf/.env.test.yaml`](typescript/framework/database/conf/.env.test.yaml)
 names. `@putnami/database` plans no `test~test-env` task, so nothing provisions
 it a database and its suite would otherwise start its own container mid-test.

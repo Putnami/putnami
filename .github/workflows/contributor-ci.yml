@@ -69,8 +69,13 @@ jobs:
       # its first try and it never shells out to Docker at all. The image is a
       # public one and the credentials are the fixture's own, so the job still
       # reads no secret.
+      #
+      # The image is Docker Hub's official `postgres:17-alpine`, served by its
+      # Amazon ECR Public mirror. Both registries cap anonymous pulls per IP
+      # address, and GitHub-hosted runners share addresses. ECR Public's caps,
+      # 1 pull per second and 500 GB per month, are far above Docker Hub's.
       postgres:
-        image: postgres:17-alpine
+        image: public.ecr.aws/docker/library/postgres:17-alpine
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
