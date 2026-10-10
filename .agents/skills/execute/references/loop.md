@@ -205,8 +205,8 @@ from what the diff changes, never from the skill, the task label or the word
 point is speed, memory or allocations is `perf`, one that keeps behavior is
 `refactor`, and documentation, build, CI and upkeep are `docs`, `build`, `ci`
 and `chore`. `fix` is a user-visible defect corrected; `feat` is new
-behavior. The finalizer refuses `fix` and `feat` on a change whose every path
-is a test.
+behavior. The finalizer refuses `fix` and `feat` on a branch whose every path,
+committed or enumerated with `--file`, is a test.
 
 The proposal stays a draft until the finalizer marks it ready for review; keep
 it a draft at finalization when requested (`publication.draft` or the
