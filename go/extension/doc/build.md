@@ -508,6 +508,26 @@ require go.putnami.dev/http v0.0.0-00010101000000-000000000000
 }
 ```
 
+### An import go.mod does not require
+
+`go.work` builds an import of a workspace module that the importing `go.mod`
+does not require. A module-mode build, `go mod tidy` included, cannot resolve
+it. A common case is a module nested inside a required one: requiring
+`example.com/provider` does not provide `example.com/provider/client` when
+`provider/client` has its own `go.mod`.
+
+The workspace probe reads every `.go` file of each module that `go mod tidy`
+reads, and for each such import it:
+
+1. Adds the dependency edge, so a change to the imported module selects the
+   importer under `--impacted` and changes its cache key.
+2. Reports an `unrequired-import` warning on the importer's `go.mod`, which
+   names the two lines to add:
+
+```
+putnami: warning: [warning] consumer/go.mod: example.com/consumer imports example.com/provider/client, which this go.mod does not require: go.work resolves the import and a module-mode build does not; add `require example.com/provider/client v0.0.0` and `replace example.com/provider/client => ../provider/client` (unrequired-import)
+```
+
 ### Manual declaration (putnami.json → go.mod)
 
 You can also declare dependencies manually in `putnami.json`. For each workspace dependency with a `go.mod`, the build adds the `replace` directive automatically on the next run.

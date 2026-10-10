@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -181,6 +182,36 @@ func TestSynchronize_ViewThatCannotBeAdoptedIsNeverPersisted(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A refused view keeps the providers' warnings: a warning can be what explains
+// the edge that closed the cycle.
+func TestSynchronize_RefusedViewCarriesTheProviderWarnings(t *testing.T) {
+	ws := syncFixture(t)
+	answer := probeAnswer("@fixture/lang",
+		wsproto.ProbeProject{Path: "web", SourceName: "@acme/web", Dependencies: []string{"svc"}},
+		wsproto.ProbeProject{Path: "svc", SourceName: "@acme/svc", Dependencies: []string{"web"}})
+	answer.Diagnostics = []diag.Diagnostic{diag.Warningf("unrequired-import", "svc/go.mod", "svc imports web")}
+	provider := &countingProvider{
+		name:   "@fixture/lang",
+		answer: func(wsproto.ProbeRequest) wsproto.ProbeResult { return answer },
+	}
+	bindings := []ProviderBinding{{
+		Scope:    scopeFor(t, provider.name, []string{"package.json"}, []string{"package.json", "go.mod"}),
+		Provider: provider,
+	}}
+
+	_, err := Synchronize(SyncRequest{Workspace: ws, Providers: bindings, Reason: wsproto.ProbeReasonLoad})
+	var failure *wsproto.ProbeFailure
+	if !errors.As(err, &failure) {
+		t.Fatalf("err = %v, want a typed *wsproto.ProbeFailure", err)
+	}
+	for _, d := range failure.Diagnostics {
+		if d.Code == "unrequired-import" && d.Severity == diag.Warning {
+			return
+		}
+	}
+	t.Errorf("failure diagnostics = %v, want the provider's unrequired-import warning", failure.Diagnostics)
 }
 
 // A valid index must survive a later run that resolves an unloadable view: the

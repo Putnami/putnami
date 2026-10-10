@@ -1,6 +1,8 @@
 package main
 
 import (
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,7 +32,7 @@ func TestTheImportScanReadsTestFilesAndIgnoresGeneratedTrees(t *testing.T) {
 	writeModuleFile(t, dir, "nested/go.mod", "module acme/nested\n")
 	writeModuleFile(t, dir, "nested/nested.go", "package nested\n\nimport \"acme/nestedonly\"\n")
 
-	scan := scanModuleImports(dir, []string{"acme/used", "acme/testonly", "acme/generated", "acme/fixture", "acme/nestedonly"}, nil)
+	scan := scanModuleImports(dir, []string{"acme/used", "acme/testonly", "acme/generated", "acme/fixture", "acme/nestedonly"})
 	if !scan.complete {
 		t.Fatalf("scan did not complete over a readable module")
 	}
@@ -53,34 +55,12 @@ func TestTheImportScanCreditsTheLongestModulePath(t *testing.T) {
 	dir := t.TempDir()
 	writeModuleFile(t, dir, "main.go", "package app\n\nimport \"acme/cli/model/extension\"\n")
 
-	scan := scanModuleImports(dir, []string{"acme/cli", "acme/cli/model"}, nil)
+	scan := scanModuleImports(dir, []string{"acme/cli", "acme/cli/model"})
 	if !scan.importsModule("acme/cli/model") {
 		t.Errorf("the providing module reads as unimported")
 	}
 	if scan.importsModule("acme/cli") {
 		t.Errorf("the parent module reads as imported by a package it does not provide")
-	}
-}
-
-// TestTheImportScanCreditsANestedModuleTheGoModDoesNotRequire: a known module
-// nested under a wanted one provides its own packages even when it is not
-// wanted, so the wanted parent is not held imported by them.
-func TestTheImportScanCreditsANestedModuleTheGoModDoesNotRequire(t *testing.T) {
-	dir := t.TempDir()
-	writeModuleFile(t, dir, "main.go", "package app\n\nimport \"acme/cli/model/extension\"\n")
-
-	scan := scanModuleImports(dir, []string{"acme/cli"}, []string{"acme/cli", "acme/cli/model"})
-	if !scan.complete {
-		t.Fatalf("scan did not complete over a readable module")
-	}
-	if scan.importsModule("acme/cli") {
-		t.Errorf("the parent module reads as imported by a package a nested module provides")
-	}
-
-	writeModuleFile(t, dir, "parent.go", "package app\n\nimport \"acme/cli/cmd\"\n")
-	scan = scanModuleImports(dir, []string{"acme/cli"}, []string{"acme/cli", "acme/cli/model"})
-	if !scan.importsModule("acme/cli") {
-		t.Errorf("the parent module reads as unimported by a package it provides")
 	}
 }
 
@@ -91,7 +71,7 @@ func TestAnUnreadableModuleAttributesNothing(t *testing.T) {
 	dir := t.TempDir()
 	writeModuleFile(t, dir, "broken.go", "package app\n\nimport \"acme/used\n")
 
-	scan := scanModuleImports(dir, []string{"acme/used", "acme/never"}, nil)
+	scan := scanModuleImports(dir, []string{"acme/used", "acme/never"})
 	if scan.complete {
 		t.Fatalf("an unparsable file left the scan complete")
 	}
@@ -100,10 +80,39 @@ func TestAnUnreadableModuleAttributesNothing(t *testing.T) {
 	}
 }
 
-// TestAModuleWithNothingToAttributeIsNotWalked: no workspace edge, no walk.
+// TestAModuleWithNothingToAttributeIsNotWalked: no module to ask about, no walk.
 func TestAModuleWithNothingToAttributeIsNotWalked(t *testing.T) {
-	scan := scanModuleImports(filepath.Join(t.TempDir(), "absent"), nil, nil)
+	scan := scanModuleImports(filepath.Join(t.TempDir(), "absent"), nil)
 	if !scan.complete || len(scan.imported) != 0 {
 		t.Fatalf("scan = %+v, want a complete empty answer without touching the tree", scan)
+	}
+}
+
+// TestTidyIgnoresOnlyWhatTheIgnoreTagExcludes pins tidy's constraint rule:
+// `ignore` is false and every other tag satisfies either polarity.
+func TestTidyIgnoresOnlyWhatTheIgnoreTagExcludes(t *testing.T) {
+	for _, c := range []struct {
+		header string
+		want   bool
+	}{
+		{"", false},
+		{"//go:build ignore\n\n", true},
+		{"//go:build !ignore\n\n", false},
+		{"//go:build linux && !linux\n\n", false},
+		{"//go:build windows && ignore\n\n", true},
+		{"// +build ignore\n\n", true},
+		{"//go:build linux\n// +build ignore\n\n", false},
+		{"//go:build linux &&\n\n", true},
+		{"//go:build linux\n//go:build darwin\n\n", true},
+		{"// +build ignore\n", false},
+	} {
+		fset := token.NewFileSet()
+		file, err := parser.ParseFile(fset, "f.go", c.header+"package app\n", parser.ImportsOnly|parser.ParseComments)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := tidyIgnores(fset, file); got != c.want {
+			t.Errorf("tidyIgnores(%q) = %v, want %v", c.header, got, c.want)
+		}
 	}
 }

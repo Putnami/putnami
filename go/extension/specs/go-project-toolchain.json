@@ -37,7 +37,7 @@
     },
     {
       "id": "probe-graph-fidelity",
-      "text": "The probe reports each project's module path as its identity and its dependency edges as repo-relative paths resolved from require and replace directives; external modules contribute no edge and a project never depends on itself."
+      "text": "The probe reports each project's module path as its identity and its dependency edges as repo-relative paths resolved from require and replace directives and from an import of a workspace module the go.mod does not require, which it also reports as a warning naming the require and local replace to add; external modules contribute no edge and a project never depends on itself."
     },
     {
       "id": "replace-closure",
