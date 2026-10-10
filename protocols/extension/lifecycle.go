@@ -137,13 +137,16 @@ const (
 	FailureRuntimeHandshakeFailed = "runtime.handshake_failed"
 	// FailureRuntimeHandshakeTimeout: the executable started but had not
 	// answered `__putnami runtime-info` when the handshake deadline elapsed.
-	// The deadline counts from the moment the operating system started the
-	// process, so the time spent admitting a freshly written binary is not
-	// charged to it. A runtime that never answered proves nothing about its
-	// identity and is refused like any other handshake failure, but the cause is
-	// a machine too loaded to schedule it or a runtime that blocks, not a
-	// malformed build. Remedy: rerun on a less loaded machine; if it repeats,
-	// run the executable's `__putnami runtime-info` by hand to see it block.
+	// The deadline counts from the moment the runtime is first seen running its
+	// own code, so the time the host spends checking a freshly written binary
+	// before its first instruction is not charged to it. A separate, larger
+	// bound caps that check, and the same failure reports it, as it reports a
+	// runtime that blocked before the CLI first saw it run. A runtime that
+	// never answered proves nothing about its identity and is refused like any
+	// other handshake failure, but the cause is a machine too loaded to
+	// schedule it or a runtime that blocks, not a malformed build. Remedy:
+	// rerun on a less loaded machine; if it repeats, run the executable's
+	// `__putnami runtime-info` by hand to see it block.
 	FailureRuntimeHandshakeTimeout = "runtime.handshake_timeout"
 	// FailureRuntimeIdentityMismatch: the handshake succeeded and disagreed
 	// with the manifest — a different extension identity, platform, CLI

@@ -1406,9 +1406,8 @@ func describeRuntimeExecutable(executable string) string {
 		info.ModTime().UTC().Format(time.RFC3339Nano), identity)
 }
 
-// runtimeHandshakeDeadline is how long a started runtime may take to answer
-// `__putnami runtime-info`, counted from the return of exec.Cmd.Start: see
-// validateRuntimeHandshake.
+// runtimeHandshakeDeadline is how long a runtime may take to answer
+// `__putnami runtime-info`, counted from its first instruction.
 //
 // The value is settled. Raising it would only move the load at which a
 // healthy runtime is refused — the same rule applied to the capability probes.
@@ -1416,17 +1415,16 @@ const runtimeHandshakeDeadline = 10 * time.Second
 
 // runtimeHandshakeClock arms the deadline of one handshake. It is called exactly
 // once, after exec.Cmd.Start has returned, so process is the started runtime. It
-// returns the channel that delivers when the runtime's time to answer is over,
-// and a function that releases whatever backs that channel.
+// returns the watch whose expired channel closes when the runtime's time to
+// answer is over.
 //
-// Production arms a wall-clock timer (wallClockHandshakeDeadline). A test
-// substitutes a channel it controls, so a timeout classification is asserted
+// Production arms hostProcessDeadline (hostHandshakeDeadline). A test
+// substitutes a deadline it controls, so a timeout classification is asserted
 // without a budget that a loaded host could miss.
-type runtimeHandshakeClock func(process *os.Process) (expired <-chan time.Time, release func())
+type runtimeHandshakeClock func(process *os.Process) *processWatch
 
-func wallClockHandshakeDeadline(*os.Process) (<-chan time.Time, func()) {
-	timer := time.NewTimer(runtimeHandshakeDeadline)
-	return timer.C, func() { timer.Stop() }
+func hostHandshakeDeadline(process *os.Process) *processWatch {
+	return hostProcessDeadline(runtimeHandshakeDeadline).watch(process, nil)
 }
 
 // validateRuntimeHandshake proves the resolved executable really is the runtime
@@ -1437,21 +1435,22 @@ func wallClockHandshakeDeadline(*os.Process) (<-chan time.Time, func()) {
 // from the same ProcessState the physical execution ledger reads. A process
 // that never started reports no CPU rather than a measured zero.
 //
-// The deadline counts from the return of exec.Cmd.Start. On darwin, Start
-// returns within milliseconds, and the host's first-launch check of an
-// executable written moments earlier runs after it: about 0.3 s per new file
-// at rest, and seconds on a loaded machine, where the checks queue. The
-// deadline therefore counts that check on the first run of a new executable.
-// A deadline that does fire is reported as runtime.handshake_timeout, with the
-// measured start, run, and CPU times, so no reader mistakes load for a
-// malformed build.
+// The deadline counts from the runtime's first instruction, not from the spawn
+// request and not from the return of exec.Cmd.Start. On darwin, Start returns
+// before the host has finished checking a binary written moments earlier: the
+// host holds the new process until the check ends, and the check queues behind
+// every other fresh binary on a loaded machine. The hold consumes none of the
+// runtime's own time, so it is not charged to the deadline; hostAdmissionBound
+// bounds it instead. A deadline that does fire is reported as
+// runtime.handshake_timeout, with the measured start, hold, run, and CPU times,
+// so no reader mistakes load for a malformed build.
 func validateRuntimeHandshake(
 	ctx context.Context,
 	executable string,
 	ext *extension.ExtensionDescription,
 	spans *preparationSpans,
 ) error {
-	return runRuntimeHandshake(ctx, executable, ext, spans, wallClockHandshakeDeadline)
+	return runRuntimeHandshake(ctx, executable, ext, spans, hostHandshakeDeadline)
 }
 
 // startRuntimeHandshake starts `executable __putnami runtime-info`, retrying
@@ -1511,37 +1510,36 @@ func runRuntimeHandshake(
 			"extension %q runtime-info failed: %v: stderr=%q: %s",
 			ext.Name, err, strings.TrimSpace(stderr.String()), describeRuntimeExecutable(executable))
 	}
-	running := time.Now()
-	expired, release := clock(cmd.Process)
-	defer release()
+	starting := time.Since(started)
+	deadline := clock(cmd.Process)
 	// os.Process tolerates a Kill concurrent with Wait: exec.CommandContext
 	// cancels a running command exactly this way. The buffered channel lets the
 	// waiter finish even if nothing receives, although every path below does.
+	// The waiter stops the deadline's watch as soon as Wait returns.
 	waited := make(chan error, 1)
-	go func() { waited <- cmd.Wait() }()
+	go func() {
+		err := cmd.Wait()
+		deadline.stop()
+		waited <- err
+	}()
 	deadlineFired := false
 	var runErr error
 	select {
 	case runErr = <-waited:
-	case <-expired:
+	case <-deadline.expired:
 		deadlineFired = true
 		// A Kill error means the runtime ended at the same instant. Wait reports
 		// how it ended, and an answer that arrived in time is still honored below.
 		_ = cmd.Process.Kill()
 		runErr = <-waited
 	}
+	timing := deadline.stop()
 	if runErr != nil {
 		// A canceled caller context kills the process too. That is an
 		// interruption, not a runtime that ran out of time.
 		if deadlineFired && ctx.Err() == nil {
-			return runtimeFailure(extensionproto.FailureRuntimeHandshakeTimeout,
-				"extension %q runtime-info timed out: the runtime ran %s without answering and was stopped "+
-					"(deadline %s, counted from process start; starting the process took %s and is not counted; "+
-					"CPU used %s). A runtime starved of CPU or blocked is not a malformed build: rerun when the "+
-					"machine is less loaded, and if it repeats run `%s __putnami runtime-info` by hand: stderr=%q: %s",
-				ext.Name, time.Since(running).Round(time.Millisecond), runtimeHandshakeDeadline,
-				running.Sub(started).Round(time.Millisecond), spawnCPU(cmd.ProcessState),
-				executable, strings.TrimSpace(stderr.String()), describeRuntimeExecutable(executable))
+			return runtimeHandshakeTimeout(ext, executable, starting, timing,
+				spawnCPU(cmd.ProcessState), strings.TrimSpace(stderr.String()))
 		}
 		return runtimeFailure(extensionproto.FailureRuntimeHandshakeFailed,
 			"extension %q runtime-info failed: %v: stderr=%q: %s",
@@ -1576,6 +1574,38 @@ func runRuntimeHandshake(
 			runtimeproto.MaxKnownProtocolVersion, runtimeproto.RuntimeABIVersion)
 	}
 	return nil
+}
+
+// runtimeHandshakeTimeout reports a handshake whose deadline fired. It states
+// apart the time Start took and the time the host held the runtime before its
+// first instruction, which the deadline does not count, and the time the
+// runtime ran, which it does.
+func runtimeHandshakeTimeout(
+	ext *extension.ExtensionDescription,
+	executable string,
+	starting time.Duration,
+	timing processTiming,
+	cpu time.Duration,
+	stderr string,
+) error {
+	if timing.heldPastBound {
+		return runtimeFailure(extensionproto.FailureRuntimeHandshakeTimeout,
+			"extension %q runtime-info timed out: the host held the runtime %s without letting it run its first "+
+				"instruction, or the runtime blocked before the CLI first sampled it, and it was stopped "+
+				"(host admission bound %s; starting the process took %s; CPU used %s). A runtime held by a loaded "+
+				"host is not a malformed build: rerun when the machine is less loaded, and if it repeats run "+
+				"`%s __putnami runtime-info` by hand: stderr=%q: %s",
+			ext.Name, timing.held.Round(time.Millisecond), hostAdmissionBound, starting.Round(time.Millisecond),
+			cpu, executable, stderr, describeRuntimeExecutable(executable))
+	}
+	return runtimeFailure(extensionproto.FailureRuntimeHandshakeTimeout,
+		"extension %q runtime-info timed out: the runtime ran %s without answering and was stopped "+
+			"(deadline %s, counted from its first instruction; starting the process took %s and the host held it "+
+			"%s before its first instruction, neither counted; CPU used %s). A runtime starved of CPU or blocked "+
+			"is not a malformed build: rerun when the machine is less loaded, and if it repeats run "+
+			"`%s __putnami runtime-info` by hand: stderr=%q: %s",
+		ext.Name, timing.ran.Round(time.Millisecond), runtimeHandshakeDeadline, starting.Round(time.Millisecond),
+		timing.held.Round(time.Millisecond), cpu, executable, stderr, describeRuntimeExecutable(executable))
 }
 
 // hashRuntimeReplacementTree fingerprints exactly the entries stageRuntimeSourceView

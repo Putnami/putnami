@@ -57,8 +57,11 @@ func runToolProbeHelper(mode string) {
 	case "hang":
 		// Sleep rather than block on a channel: a blocked main goroutine trips
 		// the runtime's deadlock detector, which would end the child on its own
-		// and let a probe with no deadline pass this test.
-		time.Sleep(30 * time.Second)
+		// and let a probe with no deadline pass this test. It wakes every 10 ms,
+		// so a host that samples its progress sees it run whenever it samples.
+		for end := time.Now().Add(30 * time.Second); time.Now().Before(end); {
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
 }
 
@@ -105,7 +108,7 @@ func toolProbeHelperMode(executable string) (string, bool) {
 func TestProbeToolVersionHappyPathValueIsUnchanged(t *testing.T) {
 	t.Parallel()
 	path := helperTool(t, "version")
-	if got := probeToolVersion(path, 30*time.Second); got != toolProbeHelperVersion {
+	if got := probeToolVersion(path, hostProcessDeadline(30*time.Second)); got != toolProbeHelperVersion {
 		t.Fatalf("probe = %q, want the trimmed version line %q", got, toolProbeHelperVersion)
 	}
 
@@ -134,7 +137,7 @@ func TestProbeToolVersionBoundsAChildThatNeverReturns(t *testing.T) {
 	path := helperTool(t, "hang")
 
 	start := time.Now()
-	got := probeToolVersion(path, time.Second)
+	got := probeToolVersion(path, hostProcessDeadline(time.Second))
 	elapsed := time.Since(start)
 
 	if got != toolVersionTimeout {
@@ -156,7 +159,7 @@ func TestProbeToolVersionBoundsAChildThatNeverReturns(t *testing.T) {
 // bytes and must not have its first 4KB of noise adopted as a cache identity.
 func TestProbeToolVersionRejectsOversizedOutput(t *testing.T) {
 	t.Parallel()
-	got := probeToolVersion(helperTool(t, "flood"), 30*time.Second)
+	got := probeToolVersion(helperTool(t, "flood"), hostProcessDeadline(30*time.Second))
 	if got != toolVersionInvalid {
 		t.Fatalf("probe = %q, want %q", got, toolVersionInvalid)
 	}
@@ -185,16 +188,33 @@ func TestProbeToolVersionDegradedIdentities(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := probeToolVersion(helperTool(t, tc.mode), 30*time.Second); got != tc.want {
+			if got := probeToolVersion(helperTool(t, tc.mode), hostProcessDeadline(30*time.Second)); got != tc.want {
 				t.Fatalf("probe = %q, want %q", got, tc.want)
 			}
 		})
 	}
 }
 
+// TestProbeToolVersionDeadlineCountsFromTheFirstInstruction pins that a
+// probe the host holds before its first instruction keeps its identity: held
+// past a deadline that has already elapsed, it still answers its version. A
+// hold past the admission bound is a timeout, never a missing tool. No case
+// depends on how fast the host runs.
+func TestProbeToolVersionDeadlineCountsFromTheFirstInstruction(t *testing.T) {
+	t.Parallel()
+	held := processDeadline{run: 0, admission: elapsesNever, progress: neverRunning}
+	if got := probeToolVersion(helperTool(t, "version"), held); got != toolProbeHelperVersion {
+		t.Fatalf("probe held past its deadline = %q, want %q", got, toolProbeHelperVersion)
+	}
+	heldPastBound := processDeadline{run: elapsesNever, admission: 0, progress: neverRunning}
+	if got := probeToolVersion(helperTool(t, "hang"), heldPastBound); got != toolVersionTimeout {
+		t.Fatalf("probe held past the admission bound = %q, want %q", got, toolVersionTimeout)
+	}
+}
+
 func TestProbeToolVersionMissingExecutableIsUnavailable(t *testing.T) {
 	t.Parallel()
-	got := probeToolVersion(filepath.Join(t.TempDir(), "tool"), 30*time.Second)
+	got := probeToolVersion(filepath.Join(t.TempDir(), "tool"), hostProcessDeadline(30*time.Second))
 	if got != toolVersionUnavailable {
 		t.Fatalf("probe = %q, want %q", got, toolVersionUnavailable)
 	}

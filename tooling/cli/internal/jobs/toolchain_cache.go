@@ -19,7 +19,13 @@ import (
 // IDENTITY: a probe that times out on a slow-but-working tool would key that run
 // differently from every other run on the same machine. Five seconds absorbs a
 // cold page-in of a ~100MB binary on a loaded CI box while still bounding a
-// wedged one to a single short stall per process.
+// tool that wedges while it runs to a single short stall per process.
+//
+// The deadline counts from the probe's first instruction (hostProcessDeadline).
+// The time the host holds a new process before that, such as darwin's check of
+// a freshly written executable, is not charged to it: hostAdmissionBound
+// bounds that hold. A tool that blocks before its first sample, such as a
+// wrapper waiting on a hung child, reads as held and stalls up to that bound.
 const toolVersionProbeTimeout = 5 * time.Second
 
 // toolVersionProbeWaitDelay bounds the drain AFTER the deadline kills the child.
@@ -97,7 +103,7 @@ func resolveAmbientToolVersionWith(
 	if err != nil {
 		return toolVersionUnavailable
 	}
-	version := probeToolVersion(path, toolVersionProbeTimeout)
+	version := probeToolVersion(path, hostProcessDeadline(toolVersionProbeTimeout))
 	if isDegradedToolVersion(version) {
 		// A degraded identity is not a failure — the run proceeds — but it does
 		// mean this run's cache entries for that ecosystem are not pinned to a
@@ -111,9 +117,9 @@ func resolveAmbientToolVersionWith(
 // probeToolVersion runs `<path> --version` under a deadline and a byte cap, and
 // returns the version string a healthy tool printed or one of the reserved
 // degraded identities.
-func probeToolVersion(path string, timeout time.Duration) string {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+func probeToolVersion(path string, deadline processDeadline) string {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
 
 	out := &boundedBuffer{limit: toolVersionProbeOutputLimit}
 	cmd := exec.CommandContext(ctx, path, "--version")
@@ -125,13 +131,16 @@ func probeToolVersion(path string, timeout time.Duration) string {
 	cmd.Stderr = out
 	cmd.WaitDelay = toolVersionProbeWaitDelay
 
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
+		return toolVersionUnavailable
+	}
+	if _, err := waitUnderDeadline(cmd, deadline, cancel); err != nil {
 		// The deadline is read before the error, not instead of it: killing a
 		// child reports a generic signal failure, and calling THAT "unavailable"
 		// would hide the hang this exists to bound. Reading it only when the run
 		// failed keeps a probe that answered a nanosecond before its deadline from
 		// being thrown away.
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if errors.Is(context.Cause(ctx), errProcessDeadline) {
 			return toolVersionTimeout
 		}
 		return toolVersionUnavailable

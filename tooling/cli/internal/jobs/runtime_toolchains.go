@@ -629,7 +629,8 @@ func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirem
 			probeEnv = setEnv(probeEnv, name, strings.ReplaceAll(value, extensionproto.RuntimeToolchainVersionToken, version))
 		}
 		probeEnv = prependEnvPath(probeEnv, filepath.Dir(realExecutable))
-		got, err := probeRuntimeToolchain(ctx, realExecutable, requirement.Probe.Args, probeEnv, runtimeToolchainProbeTimeout(ctx))
+		got, err := probeRuntimeToolchain(ctx, realExecutable, requirement.Probe.Args, probeEnv,
+			hostProcessDeadline(runtimeToolchainProbeTimeout(ctx)))
 		if err != nil {
 			rejections = append(rejections, runtimeToolchainRejection{candidate: label, reason: err.Error(), err: err})
 			continue
@@ -857,14 +858,14 @@ func runtimeToolchainProbeTimeout(ctx context.Context) time.Duration {
 	return toolVersionProbeTimeout
 }
 
-// probeRuntimeToolchain runs the declared probe under timeout and returns its
+// probeRuntimeToolchain runs the declared probe under deadline and returns its
 // trimmed one-line output. The error states why the output cannot identify a
 // version: a timeout (ErrToolchainProbeTimeout), a failed start, a failed
 // exit, output that stays open after the probe exits, or output that is
 // empty, too long, or spans several lines.
-func probeRuntimeToolchain(ctx context.Context, path string, args, env []string, timeout time.Duration) (string, error) {
-	probeCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+func probeRuntimeToolchain(ctx context.Context, path string, args, env []string, deadline processDeadline) (string, error) {
+	probeCtx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 	out := &boundedBuffer{limit: toolVersionProbeOutputLimit}
 	//nolint:gosec // G702: path is an executable candidate from the validated extension manifest; probing it is the resolver's purpose.
 	cmd := exec.CommandContext(probeCtx, path, args...)
@@ -872,9 +873,16 @@ func probeRuntimeToolchain(ctx context.Context, path string, args, env []string,
 	cmd.Stdout = out
 	cmd.Stderr = out
 	cmd.WaitDelay = toolVersionProbeWaitDelay
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() == nil && errors.Is(probeCtx.Err(), context.DeadlineExceeded) {
-			return "", fmt.Errorf("%w after %s", ErrToolchainProbeTimeout, timeout)
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("probe failed to start: %w", err)
+	}
+	if timing, err := waitUnderDeadline(cmd, deadline, cancel); err != nil {
+		if ctx.Err() == nil && errors.Is(context.Cause(probeCtx), errProcessDeadline) {
+			if timing.heldPastBound {
+				return "", fmt.Errorf("%w: the host held it %s without letting it run, "+
+					"or it blocked before it was first sampled", ErrToolchainProbeTimeout, timing.held.Round(time.Millisecond))
+			}
+			return "", fmt.Errorf("%w after %s", ErrToolchainProbeTimeout, deadline.run)
 		}
 		if errors.Is(err, exec.ErrWaitDelay) {
 			return "", fmt.Errorf("probe output stayed open after exit (wait delay %s)", toolVersionProbeWaitDelay)
@@ -882,9 +890,6 @@ func probeRuntimeToolchain(ctx context.Context, path string, args, env []string,
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			return "", fmt.Errorf("probe failed: %w", exitErr)
-		}
-		if cmd.Process == nil {
-			return "", fmt.Errorf("probe failed to start: %w", err)
 		}
 		return "", fmt.Errorf("probe failed: %w", err)
 	}
