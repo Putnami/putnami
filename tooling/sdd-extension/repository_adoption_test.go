@@ -63,8 +63,11 @@ var declaredDomains = []string{
 // sample — the fix is to map it, not to widen this reason.
 // The standalone Intelligence collector is excluded separately: no repository
 // project consumes its anonymous payload, and no existing domain owns the
-// external report's assessment semantics.
+// external report's assessment semantics. The Cloud runtime destination is
+// excluded the same way: no repository project links it from the workspace,
+// and no existing domain owns the hosted platform's wire contracts.
 var excludedProjects = map[string]string{
+	"/cloud/runtime/typescript":                            reasonCloudRuntimeDestination,
 	"/go/samples/application":                              reasonSample,
 	"/go/samples/capabilities-proof":                       reasonSample,
 	"/go/samples/library":                                  reasonSample,
@@ -111,6 +114,7 @@ const (
 	reasonGeneratedClient         = "generated client: produced by @putnami/clientgen inside a sample, owned by the sample"
 	reasonTemplateProof           = "template proof: renders the templates beside it against the workspace framework and runs their tests, owned by the language vertical"
 	reasonAgentReadinessCollector = "standalone Intelligence repository collector: no repository project consumes its anonymous payload or owns the external report's assessment semantics, owned by intelligence"
+	reasonCloudRuntimeDestination = "Cloud runtime destination: a client library of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"
 )
 
 // expectedEvidenceRows is every DARC evidence row this repository commits, as the

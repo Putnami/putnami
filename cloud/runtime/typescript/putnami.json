@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/cloud",
+  "visibility": "public",
+  "description": "Putnami Cloud runtime destination for TypeScript: remote config and secrets sources, and managed Event Server publication with Google workload identity.",
+  "type": "library",
+  "tags": ["ts"],
+  "extensions": ["/typescript/extension"],
+  "options": {
+    "package": {
+      "npm": true
+    },
+    "publish": {
+      "npm": true
+    }
+  }
+}
