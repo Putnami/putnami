@@ -196,7 +196,7 @@ packaged, published, or released by that run. Preview the exact DAG with
 Beside it, [`.github/workflows/contributor-ci.yml`](.github/workflows/contributor-ci.yml)
 runs the documented contributor path on every pull request, on a GitHub-hosted
 runner that reads no secret and empties every Putnami credential variable before
-starting. It complements `putnami ci` — the merge decision rests on `putnami ci`;
+starting. It complements Putnami CI — the merge decision rests on Putnami CI;
 a red Contributor CI means the credential-free path broke and is worth fixing on
 its own. It is scoped by `--impacted`, so a documentation-only pull request
 selects zero projects and passes having run nothing; the job summary prints the

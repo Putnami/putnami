@@ -1,12 +1,12 @@
 # Contributor CI — the credential-free gate.
 #
-# This does NOT replace `putnami ci`, the authoritative gate Putnami Cloud's
+# This does NOT replace Putnami CI, the authoritative gate Putnami Cloud's
 # native runner executes. It runs beside it and proves the one thing that gate
 # cannot: the repository lints, tests, builds and validates for somebody who
 # has no Putnami account. The task list is the one CONTRIBUTING.md documents
 # and the one the native runner's fixed gate runs, so this gate covers the same
 # project and workspace validation surface without credentials.
-# `putnami ci` runs on credentialed runners with a warm machine-global
+# Putnami CI runs on credentialed runners with a warm machine-global
 # store and a reachable private cache, so "it passes there" says nothing about a
 # fresh clone on a stranger's machine.
 #
@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     # A wide change fans out across the whole workspace (a CLI edit reaches ~79
     # projects), so this is a ceiling that fails loudly, not an expected
-    # duration. `putnami ci` remains the gate that has to cover everything.
+    # duration. Putnami CI remains the gate that has to cover everything.
     timeout-minutes: 60
 
     services:

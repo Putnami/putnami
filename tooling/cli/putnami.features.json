@@ -1670,7 +1670,7 @@
       "id": "cli/ci-document",
       "type": "feature",
       "name": "CI document",
-      "outcome": "A repository declares in one reviewed file the commands its CI runs, the channels a branch, a tag, or a pull request publishes, and the environments that follow those channels, and the CLI tells it what that means before anything runs",
+      "outcome": "A repository declares in one reviewed file the commands its CI runs, and the guidance the CLI generates names them as the gate",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -1683,78 +1683,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "guidance-follows-blocking-commands",
-              "init-seeds-commands"
-            ]
-          }
-        },
-        {
-          "id": "rules-and-triggers",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "protected-channel-is-refused",
-              "tag-publishes-by-convention",
-              "explain-reports-the-baseline-channel",
-              "an-unreadable-baseline-is-refused"
-            ]
-          }
-        },
-        {
-          "id": "environments-follow-channels",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "explain-lists-followers"
-            ]
-          }
-        },
-        {
-          "id": "channel-lifetime-is-declared",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "an-inapplicable-lifetime-is-refused",
-              "explain-reports-the-declared-lifetime"
-            ]
-          }
-        },
-        {
-          "id": "provider-sections-need-a-provider",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "validate-refuses-without-provider"
-            ]
-          }
-        },
-        {
-          "id": "review-guidance-is-bounded-intent",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "review-profile-validates-without-provider",
-              "review-authority-fields-are-refused"
+              "guidance-follows-blocking-commands"
             ]
           }
         }
@@ -1874,19 +1803,6 @@
             "kind": "acceptance",
             "checks": [
               "publish-refuses-a-protected-channel"
-            ]
-          }
-        },
-        {
-          "id": "channel-set-is-metadata-only",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "channel-set-calls-the-provider-once"
             ]
           }
         },

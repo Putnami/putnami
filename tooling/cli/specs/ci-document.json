@@ -3,11 +3,11 @@
   "protocolVersion": 1,
   "feature": "cli/ci-document",
   "outcomes": [
-    "A repository declares in one reviewed file the commands its CI runs, the channels a branch, a tag, or a pull request publishes, and the environments that follow those channels, and the CLI tells it what that means before anything runs",
-    "A contributor reads one command line — the blocking commands of that file — and knows it is exactly what gates their merge",
-    "A workspace without a release-set provider is told so when it authors distribution or environments, instead of declaring authority nothing can serve"
+    "A repository declares in one reviewed file the commands its CI runs, and the guidance the CLI generates names them as the gate",
+    "A contributor reads one command line — the blocking commands of that file — and knows it is exactly what gates their merge"
   ],
   "nonGoals": [
+    "Writing, validating, formatting, or explaining the file: an extension serves those commands, such as putnami cloud ci",
     "Granting, resolving, or checking any authorization: channels, environments, visibility levels, and approvals are declared here and resolved by the execution plane",
     "Migrating an earlier putnami.ci.json: versions 1 and 2 are not read, and the three repositories that authored them migrated by hand",
     "Owning the runner's own configuration, whose content stays open and is preserved unread"
@@ -16,32 +16,9 @@
     {
       "id": "commands-not-gate",
       "text": "putnami.ci.json declares the ordered commands the runner executes, each blocking unless failOnError is false, and the flags appended to the invocation; the generated agent guidance derives its gate line from the blocking commands."
-    },
-    {
-      "id": "rules-and-triggers",
-      "text": "A rule selects one trigger, branches, tags, or pull requests, and lists the channels a publish advances, and may name one baseline channel it measures against but never advances; a tag publishes by convention unless a tags rule opts out; a protected channel is refused in any rule."
-    },
-    {
-      "id": "environments-follow-channels",
-      "text": "An environment declares the channel it follows, its constraints, its rollout, and the workload rules that override them; explain lists the environments that follow each channel a rule advances."
-    },
-    {
-      "id": "channel-lifetime-is-declared",
-      "text": "A rule that publishes a channel may declare how long it is kept — while-open on a pull-request rule whose every published channel is per-pull-request, or a whole number of days — validate refuses a lifetime that could never apply soundly, and explain reports the declared lifetime, or its absence, with the rule it matched."
-    },
-    {
-      "id": "provider-sections-need-a-provider",
-      "text": "distribution and envs are refused by validate in a workspace without a release-set provider."
-    },
-    {
-      "id": "review-guidance-is-bounded-intent",
-      "text": "validate and fmt accept and preserve an optional closed review profile independently of CI commands and release-set providers, reject unknown authority fields and invalid bounds, and leave target-revision loading, enrollment, credentials and execution to the review plane."
     }
   ],
   "decisions": [
-    "protocols/ci/doc/adr/0001-commands-rules-environments-distribution.md",
-    "protocols/ci/doc/adr/0002-target-revision-review-profile.md",
-    "protocols/ci/doc/adr/0003-published-channel-lifetime.md",
-    "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md"
+    "protocols/ci/doc/adr/0001-commands-rules-environments-distribution.md"
   ]
 }

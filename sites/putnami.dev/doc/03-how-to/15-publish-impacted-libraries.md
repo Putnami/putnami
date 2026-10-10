@@ -136,8 +136,7 @@ heads; the command never falls back from `--impacted` to `--all`.
 
 Without a release-set provider, `putnami publish --all` still publishes every
 member to the registries the workspace declares, with git-derived versions.
-`--channel` is refused, and `distribution` and `envs` in `putnami.ci.json` fail
-`putnami ci validate`.
+`--channel` is refused.
 
 ## Keep channel selection separate from delivery
 
@@ -162,9 +161,9 @@ immutable content address. Successful publication emits one typed
 `channels` reports the head each advanced channel now points at, with the
 monotone generation the provider stamped. A registry applies a projection only
 when the generation increases, so a delayed event can never restore an older
-projection and a retry is idempotent. `putnami channel status <c>` shows the
-desired head against what each registry has actually applied, and exits `1`
-while any is behind.
+projection and a retry is idempotent. With Putnami Cloud,
+`putnami cloud channels status` shows the desired head against what each
+registry has actually applied.
 
 CI must carry both `ref.id` and `ref.digest` from that result into deployment.
 Deployment consumes those exact values and must not resolve `canary` again: if
@@ -192,15 +191,16 @@ publishing `--namespace` explicitly and needs the release-set provider. See
 ## Promote and roll back without rewriting artifacts
 
 Release sets and their member artifacts are immutable, so promotion and rollback
-are the same gesture — move the channel:
+are the same gesture — move the channel with the release-set provider's channel
+command. With Putnami Cloud:
 
 ```bash
-putnami channel set latest --from canary        # promote the head canary points at
-putnami channel set latest --from rs_<64 hex>   # roll back to an exact snapshot
+putnami cloud channels set latest --from canary        # promote the head canary points at
+putnami cloud channels set latest --from rs_<64 hex>   # roll back to an exact snapshot
 ```
 
-`channel set` is one provider call: no publisher runs, no artifact is uploaded,
-no branch is checked out, and the move is compare-and-swapped against the
+The move is one provider call: no publisher runs, no artifact is uploaded, no
+branch is checked out, and the move is compare-and-swapped against the
 channel's current head. A channel the repository declares `protected` in
 `putnami.ci.json` moves only this way — `putnami publish --channel latest` is
 refused before any provider call.

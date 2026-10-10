@@ -335,7 +335,7 @@ func TestParseArgs_PositionalLeafKeepsItsArgument(t *testing.T) {
 	if help := ParseArgs([]string{"help", "build"}, nil, nil); help.Subcommand != "build" {
 		t.Errorf("help sub = %q, want build", help.Subcommand)
 	}
-	for root, want := range map[string]bool{"qualify": true, "pin": false, "help": false, "channel": false, "sessions": false, "missing": false} {
+	for root, want := range map[string]bool{"qualify": true, "pin": false, "help": false, "version": false, "sessions": false, "missing": false} {
 		if got := commandmeta.PositionalLeaf(root); got != want {
 			t.Errorf("PositionalLeaf(%q) = %v, want %v", root, got, want)
 		}

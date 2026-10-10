@@ -174,13 +174,6 @@ A version is derived from git, never declared: there is no `version set` and no
 than one version line. To update installed CLI binaries, use
 `putnami upgrade --cli` (workspace pin) or `putnami upgrade --global`.
 
-### `putnami channel`
-
-- `putnami channel set <channel> --from <channel|rs_id>` — Point a channel at a set that already exists: promotion and rollback, one provider call, no publisher
-- `putnami channel set <channel> --from <src> --expected <rs_id>` — State the head the move is compare-and-swapped against
-- `putnami channel status <channel>` — Desired head versus what each registry projection has applied; exits `1` while any is behind
-- `putnami channel status <channel> --wait <duration>` — Poll until every projection converges
-
 ## Project targeting
 
 ### Target expressions

@@ -18,20 +18,6 @@ _putnami_subcommands_for() {
                 'verify'
             )
             ;;
-        'channel')
-            reply=(
-                'set'
-                'status'
-            )
-            ;;
-        'ci')
-            reply=(
-                'explain'
-                'fmt'
-                'init'
-                'validate'
-            )
-            ;;
         'completion')
             reply=(
                 'bash'
@@ -157,14 +143,6 @@ _putnami_path_known() {
         'cache gc') return 0 ;;
         'cache verify') return 0 ;;
         'change-plan') return 0 ;;
-        'channel') return 0 ;;
-        'channel set') return 0 ;;
-        'channel status') return 0 ;;
-        'ci') return 0 ;;
-        'ci explain') return 0 ;;
-        'ci fmt') return 0 ;;
-        'ci init') return 0 ;;
-        'ci validate') return 0 ;;
         'completion') return 0 ;;
         'completion bash') return 0 ;;
         'completion fish') return 0 ;;
@@ -250,35 +228,6 @@ _putnami_flags_for() {
             reply=(
                 '--base[Required base commit or ref; emitted as its full immutable commit SHA]:commit:'
                 '--head[Optional head commit or ref; it must resolve to the checked-out HEAD]:commit:'
-            )
-            ;;
-        'channel set')
-            reply=(
-                '--expected[The id the channel must currently name; without it the channel'\''s current head is read and used]:rs_id:'
-                '--from[The channel whose head is re-released, or the immutable release-set id to point at]:channel|rs_id:'
-            )
-            ;;
-        'channel status')
-            reply=(
-                '--wait[Poll every 2s until every registry has applied the accepted head, or this Go duration elapses]:duration:'
-            )
-            ;;
-        'ci explain')
-            reply=(
-                '--branch[Updated push branch or pull-request head branch]:branch:'
-                '--event[Normalized Source event assumption]:push|tag|pull_request:'
-                '--pr[Pull-request number used to render the closed channel placeholder]:number:'
-                '--tag[Created tag, for --event tag]:tag:'
-            )
-            ;;
-        'ci fmt')
-            reply=(
-                '--check[Check canonical formatting without writing]'
-            )
-            ;;
-        'ci init')
-            reply=(
-                '--force[Replace an existing putnami.ci.json]'
             )
             ;;
         'compose')
@@ -529,8 +478,6 @@ _putnami() {
     structured_commands=(
         'cache:Manage cache'
         'change-plan:Emit an immutable impacted CI ChangePlan'
-        'channel:Move a distribution channel and report how far it is served'
-        'ci:Manage source-controlled workspace CI intent'
         'completion:Generate shell completions (bash, zsh, fish)'
         'compose:Serve a workload with the workloads it runs with'
         'config:Manage configuration'

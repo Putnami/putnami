@@ -17,6 +17,6 @@
     }
   },
   "featureAuthority": {
-    "none": "The user outcome is owned by the `putnami ci` command surface and the plane that executes its requests."
+    "none": "The user outcome is owned by the commands that write, validate and explain the document, which a CI extension serves, and the plane that executes its requests."
   }
 }

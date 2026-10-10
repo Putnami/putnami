@@ -11,7 +11,8 @@
     "Downloading dependencies itself: the native tools do that once the pins are written",
     "Deriving a channel from a branch name",
     "Holding a Putnami-specific credential store: the credential comes from the native seam @putnami/cloud owns",
-    "Computing a visibility level: the CLI resolves the declared chain's selectors and carries it; the provider resolves and ratchets the level"
+    "Computing a visibility level: the CLI resolves the declared chain's selectors and carries it; the provider resolves and ratchets the level",
+    "Moving a channel to a release set that already exists: the release-set provider's channel command does, such as putnami cloud channels set"
   ],
   "requirements": [
     {
@@ -24,11 +25,7 @@
     },
     {
       "id": "protected-channels",
-      "text": "A protected channel is refused by publish and by a branch rule; only channel set from a user moves it."
-    },
-    {
-      "id": "channel-set-is-metadata-only",
-      "text": "channel set moves a channel to an existing set through one provider call, without any publisher."
+      "text": "A protected channel is refused by publish; only a user moves it, with the release-set provider's channel command."
     },
     {
       "id": "visibility-is-carried-not-computed",
