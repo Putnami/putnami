@@ -269,7 +269,7 @@ func refuseUndeclaredCommands(commands []string, run changePlanEngineRun) change
 				return nil
 			}
 			return usageErrorf("no extension of this workspace declares %s, so impact-plan cannot plan it; "+
-				"`putnami extensions list` shows the commands the installed extensions declare, and %s lists the commands that moved to an extension",
+				"%s lists the commands that moved to an extension",
 				strings.Join(undeclared, ", "), commandmeta.CommandsThatLeftTheCoreURL)
 		}
 		return run(ctx, req, sink)
