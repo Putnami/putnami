@@ -312,9 +312,19 @@ there would serve a stored verdict for a test the run never executed.
    - Writes `<workload>/.gen/requirements.json` atomically
    - Findings (a malformed contribution, a merge conflict, an unused override)
      are reported as task warnings and never fail the build
-   - Skipped for libraries (see [Project classification](#project-classification)),
-     and never cached — its inputs are other projects' committed manifests, which
-     no per-project cache key covers
+   - Skipped for libraries (see [Project classification](#project-classification))
+   - Cached. The key holds every file the step reads: the committed
+     `infra/requirements.json` of every project in the closure, with that
+     project's path, and the workload's `infra/runtime.json` and
+     `infra/overrides.json`. A change to a dependency's requirements, or a
+     project that joins or leaves the closure, moves the key. The key also
+     moves with the project type and with the extension's code, which holds the
+     runtime defaults. No commit, ref or checkout path reaches the key
+   - A cache hit restores `.gen/requirements.json` and, without an authored
+     runtime, `.gen/infra/runtime.json`. Only a run that writes the manifest is
+     stored: a library, a workload that declares nothing and a run whose write
+     failed report a skip and are not cached. A cache hit does not repeat the
+     findings
    - The `package` command's `deployment` step writes the same aggregate as
      the workload's deployment declaration (see
      [Package](package.md#deployment-channel))
@@ -576,6 +586,7 @@ Every declared output has exactly one owning task:
 | `build-describe` | `.gen/schema/`, `.gen/clientgen/`, `.gen/design/`, `.gen/migrations.json`, `.gen/migration-bundle/`, and the generated client directory (via the `clientOutputs` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
 | `config-merge-exec` | `.gen/conf/.env.<APP_ENV or local>.yaml` (via the `mergedConfig` port) | project dir |
 | `config-merge-test-exec` | `.gen/conf/.env.test.yaml` | project dir |
+| `build-infra` | `.gen/requirements.json`, `.gen/infra/runtime.json` | project dir |
 | `build-compile` | `bin/` | per-command output dir (`build` only) |
 | `build-cross-compile` | `bin/` | per-command output dir (`package` only) |
 | `test-exec` | `coverage.out`, `coverage.html` | per-command output dir |
@@ -584,22 +595,26 @@ Every declared output has exactly one owning task:
 | `package-docker` | `docker/` | per-command output dir |
 | `config-extract-exec` | `schema/config.json`, `schema/config.jsonschema.json` | project dir |
 
-Every output above except `.gen/` may legitimately be absent after a successful
-run — coverage is not instrumented for a project with `coverage: false`, a project with no
+Every output above except `.gen/` and `.gen/requirements.json` may legitimately
+be absent after a successful run — coverage is not instrumented for a project with `coverage: false`, a project with no
 client generator emits no client, a dry-run package writes no channel directory,
 a project that contributes no migration operation has no bundle, a project with
-nothing to merge writes no merged config file,
+nothing to merge writes no merged config file, a workload that authors
+`infra/runtime.json` gets no runtime defaults file,
 and a library's `bin/` is empty because its build evidence is a compile check.
 
 `build-generate` does NOT own every subpath of `.gen`. It declares the subtree
-with nine paths excluded. Seven of them exist because it runs FIRST and its
+with eleven paths excluded. Seven of them exist because it runs FIRST and its
 snapshot predates everything `build-describe` writes there — so a run serving
 both tasks from cache used to restore a `.gen` missing all of it; five of those
 `build-describe` declares, at the documented contract path rather than a
 private staging copy. `.gen/deployment.json` is ceded for the same reason: the
 `package` command's `deployment` step writes it after generate's snapshot and
 declares it as its one required output (see
-[Package](package.md#deployment-channel)). The ninth, `.gen/conf/`, is ceded for
+[Package](package.md#deployment-channel)). `.gen/requirements.json` and
+`.gen/infra/runtime.json` are ceded for the same reason: the `build` command's
+`infra` step writes them after generate's snapshot and declares them, the
+manifest as a required output. The last, `.gen/conf/`, is ceded for
 the opposite ordering: `config-merge` runs BEFORE generate, so generate's snapshot adopted
 whatever merged file was on disk at capture and its restore deleted the file
 whenever the snapshot lacked it, while a `config-merge` cache hit reproduced
@@ -613,6 +628,8 @@ nothing because the task declared no output:
 | `.gen/migrations.json` | `build-describe` | none; ceded so a project that stops contributing migrations cannot have a stale dump resurrected |
 | `.gen/migration-bundle/` | `build-describe` | release-set migration publication, deploy, `database.ApplyBundle`, the database test provider |
 | `.gen/deployment.json` | `package-deployment` | the publication of the workload's release-set member of kind `deployment` |
+| `.gen/requirements.json` | `build-infra` | deployers and `putnami infra` read the workload's aggregated manifest |
+| `.gen/infra/runtime.json` | `build-infra` | none: it shows operators the runtime defaults. Ceded so that a `build-infra` cache hit restores it after `build-generate` deleted it |
 | `.gen/conf/` | `config-merge-test-exec` (`.gen/conf/.env.test.yaml`) and `config-merge-exec` (`.gen/conf/.env.<APP_ENV or local>.yaml`, via the `mergedConfig` port) | `test-exec`'s database binding fallback reads `.gen/conf/.env.test.yaml`; every dependent's `config-merge` reads its dependencies' merged file. The `.manifest.json` sidecar beside them is claimed by nobody: it carries a `generatedAt` timestamp and no consumer reads it |
 | `.gen/.describe.lock` | nobody | none: a run-scoped `lockedfile` mutex |
 | `.gen/config-deps.json` | nobody | none: a fragment the same describe run folds into `schema/config.json` |
@@ -671,12 +688,12 @@ Three footprints are deliberately **not** declared:
 
 - **Everything else written under `<project>/.gen`.** `build-generate` is its
   single producer and owns the subtree whole apart from the ceded subpaths
-  above; `config-extract`'s `.gen/config-schema.json` fallback and
-  `build-infra`'s `.gen/requirements.json` write into generate-owned territory
-  rather than claiming a slice of it. Two shared regions stay generate's
-  deliberately: `.gen/infra/`, whose fragments
-  `build-generate` deletes at the start of every run — so its entry is a pure
-  function of its own producers — and whose durable form is the committed
+  above; `config-extract`'s `.gen/config-schema.json` fallback writes into
+  generate-owned territory rather than claiming a slice of it. Two shared
+  regions stay generate's deliberately: `.gen/infra/` apart from `build-infra`'s
+  `runtime.json`, whose fragments `build-generate` deletes at the start of every
+  run — the runtime defaults file with them, which `build-infra` writes again
+  after it — so its entry is a pure function of its own producers, and whose durable form is the committed
   `infra/requirements.json`, and `.gen/generate-result.json`, whose only reader is
   `build-describe`, before describe rewrites it. What that costs is worth naming:
   a write inside `.gen` survives a cache hit only because generate's own snapshot

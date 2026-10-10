@@ -224,6 +224,12 @@ func (r ownerRow) String() string {
 //     inside the .gen subtree build-generate produces. Resolved by SINGLE
 //     PRODUCER: build-generate owns .gen whole, so config-extract-exec claims
 //     only the committed schema/ files and never a slice of .gen.
+//   - `.gen/deployment.json`, `.gen/requirements.json` and
+//     `.gen/infra/runtime.json` are written after generate by package-deployment
+//     and build-infra. Resolved by CEDED SUBPATHS: build-generate excludes
+//     exactly those three files (cededGenSubpaths) and their writers declare
+//     them, so a hit restores them and generate's restore never resurrects
+//     an earlier run's copy.
 //   - test-env-up's two rows are the only INVOCATION-scoped outputs here (an
 //     earlier migration). They collide with nothing by construction: they live in
 //     the orchestrator's private per-invocation tree, not in the project or the
@@ -243,6 +249,12 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		{task: "build-generate", id: "client", kind: "directory", root: "project", path: "clientOutput", optionalEmpty: true, drift: "fail"},
 		{task: "build-generate", id: "gen", kind: "directory", root: "project", path: ".gen"},
 		{task: "build-generate", id: "openapi", kind: "file", root: "project", path: "schema/openapi.json", optionalEmpty: true, drift: "fail"},
+		// The aggregated deployability manifest and its runtime defaults
+		// sidecar, at the .gen/requirements.json and .gen/infra/runtime.json
+		// build-generate cedes. The manifest is required, so a run that writes
+		// none caches nothing.
+		{task: "build-infra", id: "requirements", kind: "file", root: "project", path: ".gen/requirements.json"},
+		{task: "build-infra", id: "runtimeDefaults", kind: "file", root: "project", path: ".gen/infra/runtime.json", optionalEmpty: true},
 		{task: "build-transpile", id: "lib", kind: "directory", root: "command-output", path: "lib", optionalEmpty: true},
 		{task: "build-types", id: "types", kind: "directory", root: "command-output", path: "types", optionalEmpty: true},
 		{task: "config-extract-exec", id: "jsonSchema", kind: "file", root: "project", path: "schema/config.jsonschema.json", optionalEmpty: true},
@@ -543,19 +555,39 @@ func TestGenerateDeclaresTheClientOutputPort(t *testing.T) {
 	}
 }
 
-// TestInfraAggregationIsWiredIntoBuild pins the three properties that make
-// extension-owned infra aggregation work at all.
+// cededGenSubpaths is every path build-generate cedes out of <project>/.gen,
+// in the order the manifest normalizes it to: the files package-deployment and
+// build-infra write after generate and declare as their outputs.
+var cededGenSubpaths = []string{infraagg.DeploymentFile, infraagg.RuntimeDefaultsFile, infraagg.AggregatedManifestFile}
+
+// TestInfraAggregationIsWiredIntoBuild pins the properties that make
+// extension-owned infra aggregation correct and cacheable.
 //
 // It replaced a CLI gate that ran unconditionally on every build, watched every
 // generator step in the workload's dependency closure, and decided by tag
 // matching that a TypeScript workload runs without HTTP/2. As a pipeline step
-// it must therefore: (1) exist under `build` and nowhere else, because the
-// aggregated manifest is a build artifact; (2) run AFTER this project's own
-// build steps — the dependency closure is covered transitively, because
-// build-generate already depends on `^generate`; and (3) never be cached,
-// because its inputs are OTHER projects' committed manifests, which no
-// per-project cache key covers. A cached aggregation would replay a stale
-// deployability manifest from a hit.
+// it must therefore:
+//
+//   - ORDERED. Exist under `build` and nowhere else, because the aggregated
+//     manifest is a build artifact, and run AFTER build-generate. The
+//     dependency closure is covered transitively, because build-generate
+//     depends on `^generate`, and build-generate's run clears the defaults
+//     sidecar with the rest of .gen/infra.
+//   - KEYED. Its key folds every file it reads: the closure's
+//     infra/requirements.json, seed included, and the workload's
+//     infra/runtime.json and infra/overrides.json. A requirements-only change
+//     in a dependency moves the key. No param or environment input reaches it,
+//     so no commit, ref or checkout path does either. The project type (the
+//     library skip) is in the project metadata digest, and the runtime defaults
+//     and the HTTP/2 compatibility hook are code, in the extension
+//     implementation digest.
+//   - DECLARED. It declares every file it writes, at paths build-generate
+//     cedes: the manifest, required, so a run that writes none caches nothing
+//     (infraagg.Job reports SKIP for a library, a workload that declares
+//     nothing and a failed write), and the runtime defaults sidecar,
+//     optionalEmpty, because a workload that authors infra/runtime.json gets
+//     none. The paths are the SDK's, so a hit restores exactly what
+//     infraagg.Aggregate writes (infraagg.TestAggregate_WritesOnlyTheDeclaredFiles).
 func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 	m := loadExtensionManifest(t)
 
@@ -563,28 +595,50 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 	if !ok {
 		t.Fatal("manifest task \"build-infra\" is missing")
 	}
-	if task.Cache.IsEnabled() {
-		t.Error("build-infra is cacheable; a cache hit would replay a stale aggregated manifest, " +
-			"because the task's real inputs are other projects' committed infra/requirements.json")
+	if task.Cache == nil || !task.Cache.IsEnabled() || !task.Cache.Deterministic {
+		t.Errorf("build-infra cache = %+v, want an enabled, deterministic cache", task.Cache)
+	}
+	key := proto.DeriveTaskCacheKey(task.Inputs)
+	if !slices.Equal(key.ClosureFiles, []string{"infra/requirements.json"}) {
+		t.Errorf("build-infra closure files = %v, want [infra/requirements.json]: the task merges every closure member's requirements", key.ClosureFiles)
+	}
+	if !slices.Equal(key.Files, []string{"infra/overrides.json", "infra/runtime.json"}) {
+		t.Errorf("build-infra project files = %v, want the workload's runtime and overrides files", key.Files)
+	}
+	if len(key.WorkspaceFiles) != 0 || len(key.Params) != 0 || len(key.Env) != 0 {
+		t.Errorf("build-infra keys on workspace files %v, params %v, env %v; it reads none of them",
+			key.WorkspaceFiles, key.Params, key.Env)
 	}
 	if task.Declares == nil {
 		t.Fatal("build-infra lost its v3 declaration")
 	}
-	if len(task.Declares.Outputs) != 0 {
-		t.Errorf("build-infra declares outputs %+v; it writes into <project>/.gen, which build-generate "+
-			"owns whole as its single producer", task.Declares.Outputs)
+	if len(task.Declares.Effects) != 0 || task.Declares.MutatesSources {
+		t.Errorf("build-infra declares effects %v (mutatesSources %t); it reads committed files and writes two generated ones",
+			task.Declares.Effects, task.Declares.MutatesSources)
 	}
-
-	var commands []string
-	for name, cmd := range m.Commands {
-		for _, step := range cmd.Run {
-			if step.Task == "build-infra" {
-				commands = append(commands, name)
-			}
+	if len(task.Declares.Outputs) != 2 {
+		t.Errorf("build-infra outputs = %+v, want the manifest and the runtime defaults sidecar", task.Declares.Outputs)
+	}
+	for id, want := range map[string]struct {
+		path     string
+		required bool
+	}{
+		"requirements":    {path: infraagg.AggregatedManifestFile, required: true},
+		"runtimeDefaults": {path: infraagg.RuntimeDefaultsFile},
+	} {
+		output, ok := task.Declares.Outputs[id]
+		if !ok || output.Kind != proto.OutputKindFile || output.EffectiveRoot() != proto.OutputRootProject ||
+			output.Path != want.path || output.OptionalEmpty == want.required {
+			t.Errorf("build-infra %s output = %+v, want the project-rooted file %s (required %t)", id, output, want.path, want.required)
 		}
 	}
-	if len(commands) != 1 || commands[0] != "build" {
-		t.Errorf("build-infra commands = %v, want only [build]", commands)
+	gen := m.Tasks["build-generate"].Declares.Outputs["gen"]
+	if !slices.Equal(gen.Excludes, cededGenSubpaths) {
+		t.Errorf("build-generate gen excludes = %v, want %v: generate cedes exactly the files build-infra and package-deployment claim", gen.Excludes, cededGenSubpaths)
+	}
+
+	if cmds := commandsByTask(m)["build-infra"]; len(cmds) != 1 || cmds[0] != "build" {
+		t.Errorf("build-infra commands = %v, want only [build]", cmds)
 	}
 
 	build, ok := m.Commands["build"]
@@ -605,7 +659,7 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 	}
 	if !slices.Contains(step.DependsOn, "generate") {
 		t.Errorf("infra step dependsOn = %v, want it to include \"generate\" — the committed "+
-			"requirements are only current once that step has run", step.DependsOn)
+			"requirements are only current once that step has run, and its run clears the sidecar", step.DependsOn)
 	}
 }
 
@@ -621,9 +675,9 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 //   - KEYED. Its key folds the closure's infra/requirements.json and the
 //     workload's runtime and overrides files. A requirements-only change in a
 //     dependency moves the key, so the member is republished.
-//   - OWNED. build-generate cedes exactly the declaration path, and the
-//     declaration is a required output, so a run that writes no declaration
-//     caches nothing and generate's restore never resurrects one.
+//   - OWNED. build-generate cedes the declaration path, and the declaration
+//     is a required output, so a run that writes no declaration caches
+//     nothing and generate's restore never resurrects one.
 func TestDeploymentDeclarationIsAGatedCachedPackageStep(t *testing.T) {
 	m := loadExtensionManifest(t)
 
@@ -654,8 +708,8 @@ func TestDeploymentDeclarationIsAGatedCachedPackageStep(t *testing.T) {
 		t.Errorf("package-deployment deployment output = %+v, want the required project-rooted file %s", output, infraagg.DeploymentFile)
 	}
 	gen := m.Tasks["build-generate"].Declares.Outputs["gen"]
-	if !slices.Equal(gen.Excludes, []string{infraagg.DeploymentFile}) {
-		t.Errorf("build-generate gen excludes = %v, want exactly [%s], the path package-deployment claims", gen.Excludes, infraagg.DeploymentFile)
+	if !slices.Contains(gen.Excludes, infraagg.DeploymentFile) {
+		t.Errorf("build-generate gen excludes = %v, want them to cede %s, the path package-deployment claims", gen.Excludes, infraagg.DeploymentFile)
 	}
 
 	var commands []string

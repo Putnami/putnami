@@ -138,8 +138,8 @@ func TestAggregateWaitsForAReaderOfTheStaleRuntimeDefaults(t *testing.T) {
 	closed := closeAfter(holdForRemoval(t, defaultsPath))
 	result := Aggregate(ctx, Options{})
 	<-closed
-	if diag.HasErrors(result.Diagnostics) {
-		t.Fatalf("Aggregate after the reader closed: %v", result.Diagnostics)
+	if result.Err != nil || diag.HasErrors(result.Diagnostics) {
+		t.Fatalf("Aggregate after the reader closed: %v, %v", result.Err, result.Diagnostics)
 	}
 	if _, err := os.Stat(defaultsPath); !os.IsNotExist(err) {
 		t.Fatalf("the stale runtime defaults survived: %v", err)

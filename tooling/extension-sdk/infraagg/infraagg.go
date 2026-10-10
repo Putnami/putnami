@@ -33,7 +33,10 @@
 // Nothing in Aggregate is fatal. A malformed contribution, a merge conflict, a
 // validation finding and a failed write all come back as diagnostics: a build
 // that produced binaries must not be failed by a deployability manifest, and a
-// finding nobody sees is worse than one attributed to its project.
+// finding nobody sees is worse than one attributed to its project. A failed
+// write or removal also sets Result.Err, because the files it leaves on disk
+// need not describe the inputs, and a caller that caches the outcome must not
+// keep them.
 //
 // Deployment derives the same manifest from the same committed files and
 // writes it as the workload's deployment declaration, the canonical bytes a
@@ -46,6 +49,7 @@ package infraagg
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -67,6 +71,17 @@ const AggregatedSchemaURL = "https://putnami.dev/schemas/putnami-infra.json"
 // requirements manifest because the per-project schema rejects a top-level
 // runtime block (it is a workload-root concern).
 const RuntimeManifestFilename = "runtime.json"
+
+// AggregatedManifestFile is the project-relative, slash-separated path of a
+// workload's aggregated manifest: <project>/.gen/requirements.json.
+const AggregatedManifestFile = infra.AggregatedManifestDir + "/" + infra.AggregatedManifestFilename
+
+// RuntimeDefaultsFile is the project-relative, slash-separated path of a
+// workload's runtime defaults sidecar: <project>/.gen/infra/runtime.json.
+// Aggregate writes it when the workload authors no infra/runtime.json and
+// removes it when the workload does. Nothing reads it back: it shows operators
+// the values the workload runs under.
+const RuntimeDefaultsFile = infra.AggregatedManifestDir + "/" + infra.PerProjectManifestDir + "/" + RuntimeManifestFilename
 
 // projectTypeApplication is the classification of a deployable workload.
 // Libraries are consumed, never deployed, so they never receive an aggregated
@@ -106,19 +121,29 @@ type Result struct {
 	// ManifestPath is the absolute path of the aggregated manifest — the file
 	// written, or the one removed. Empty for a skipped project.
 	ManifestPath string
+	// ManifestFile is ManifestPath relative to the project, slash-separated.
+	// It is the same in every checkout of the workspace. Empty for a skipped
+	// project.
+	ManifestFile string
 	// Contributions is the number of per-project manifests that reached the
 	// merge.
 	Contributions int
 	// Diagnostics are the run's findings, already attributed to the project
 	// they came from. Never fatal.
 	Diagnostics []diag.Diagnostic
+	// Err is a write or removal that failed. It can leave an earlier manifest
+	// or runtime defaults sidecar in place, so the files on disk need not
+	// describe the inputs. Aggregate also reports it in Diagnostics.
+	Err error
 }
 
-// Data projects the result into a task's structured result data.
+// Data projects the result into a task's structured result data. It names the
+// manifest by its project-relative path, so a cache entry that replays the
+// data names no directory of the checkout that stored it.
 func (r Result) Data() map[string]any {
 	return map[string]any{
 		"outcome":       string(r.Outcome),
-		"manifest":      r.ManifestPath,
+		"manifest":      r.ManifestFile,
 		"contributions": r.Contributions,
 	}
 }
@@ -156,29 +181,42 @@ func Aggregate(ctx *pctx.Context, opts Options) Result {
 
 	// Source the workload-only runtime block up front: a workload may declare
 	// only ingress/scaling (no databases/secrets/etc.) and must still emit.
-	runtime, runtimeDiags := sourceRuntime(workloadRoot, opts)
+	runtime, runtimeDiags, runtimeErr := sourceRuntime(workloadRoot, opts)
 	diags = append(diags, runtimeDiags...)
 
 	if len(contributions) == 0 && runtime == nil {
 		// Nothing to declare. Clear any manifest left by a prior build so a
 		// deployer can't consume requirements that have since been removed.
-		diags = append(diags, RemoveAggregatedManifest(workloadRoot)...)
-		return Result{Outcome: OutcomeCleared, ManifestPath: manifestPath, Diagnostics: diags}
+		removeErr := removeAggregatedManifest(manifestPath)
+		if removeErr != nil {
+			diags = append(diags, diag.Errorf(infra.ErrorCodeParseError, "", "%v", removeErr))
+		}
+		return Result{
+			Outcome:      OutcomeCleared,
+			ManifestPath: manifestPath,
+			ManifestFile: AggregatedManifestFile,
+			Diagnostics:  diags,
+			Err:          errors.Join(runtimeErr, removeErr),
+		}
 	}
 
 	merged, assembleDiags := assemble(workloadID(ctx), workloadRoot, contributions, runtime)
 	diags = append(diags, assembleDiags...)
 	merged.Schema = AggregatedSchemaURL
 
+	var writeErr error
 	if err := writeAggregatedManifest(manifestPath, merged); err != nil {
+		writeErr = fmt.Errorf("write aggregated infra manifest %s: %w", manifestPath, err)
 		diags = append(diags, diag.Errorf(infra.ErrorCodeParseError, "",
 			"write aggregated infra manifest for %s: %v", ctx.Project.Name, err))
 	}
 	return Result{
 		Outcome:       OutcomeEmitted,
 		ManifestPath:  manifestPath,
+		ManifestFile:  AggregatedManifestFile,
 		Contributions: len(contributions),
 		Diagnostics:   diags,
+		Err:           errors.Join(runtimeErr, writeErr),
 	}
 }
 
@@ -207,7 +245,7 @@ func assemble(workload, workloadRoot string, contributions []infra.ProjectContri
 
 // AggregatedManifestPath is the workload's aggregated manifest location.
 func AggregatedManifestPath(workloadRoot string) string {
-	return filepath.Join(workloadRoot, infra.AggregatedManifestDir, infra.AggregatedManifestFilename)
+	return filepath.Join(workloadRoot, filepath.FromSlash(AggregatedManifestFile))
 }
 
 // RemoveAggregatedManifest deletes a workload's aggregated manifest if one
@@ -215,10 +253,17 @@ func AggregatedManifestPath(workloadRoot string) string {
 // artifact from a prior build cannot mislead deployers. Best-effort: a missing
 // file is not an error.
 func RemoveAggregatedManifest(workloadRoot string) []diag.Diagnostic {
-	path := AggregatedManifestPath(workloadRoot)
+	if err := removeAggregatedManifest(AggregatedManifestPath(workloadRoot)); err != nil {
+		return []diag.Diagnostic{diag.Errorf(infra.ErrorCodeParseError, "", "%v", err)}
+	}
+	return nil
+}
+
+// removeAggregatedManifest deletes the aggregated manifest at path. A missing
+// file is not an error.
+func removeAggregatedManifest(path string) error {
 	if err := robustio.Remove(path); err != nil && !os.IsNotExist(err) {
-		return []diag.Diagnostic{diag.Errorf(infra.ErrorCodeParseError, "",
-			"remove stale aggregated infra manifest %s: %v", path, err)}
+		return fmt.Errorf("remove stale aggregated infra manifest %s: %w", path, err)
 	}
 	return nil
 }
@@ -345,25 +390,25 @@ func loadContribution(path, project string) (*infra.ProjectContribution, []diag.
 //     build to track changes in infra.DefaultRuntime() and in the language's
 //     compatibility constraints.
 //
-// A failed sidecar removal or write costs the runtime block and yields that one
-// diagnostic.
-func sourceRuntime(workloadRoot string, opts Options) (*infra.Runtime, []diag.Diagnostic) {
+// A failed sidecar removal or write costs the runtime block, yields that one
+// diagnostic, and returns the failure as the error.
+func sourceRuntime(workloadRoot string, opts Options) (*infra.Runtime, []diag.Diagnostic, error) {
 	runtime, authored, diags := resolveRuntime(workloadRoot, opts)
 	defaultsPath := runtimeDefaultsPath(workloadRoot)
 
 	if authored {
 		if err := robustio.Remove(defaultsPath); err != nil && !os.IsNotExist(err) {
-			return nil, []diag.Diagnostic{diag.Errorf(infra.ErrorCodeParseError, "",
-				"remove stale runtime defaults %s: %v", defaultsPath, err)}
+			err = fmt.Errorf("remove stale runtime defaults %s: %w", defaultsPath, err)
+			return nil, []diag.Diagnostic{diag.Errorf(infra.ErrorCodeParseError, "", "%v", err)}, err
 		}
-		return runtime, diags
+		return runtime, diags, nil
 	}
 
 	if err := writeRuntimeDefaults(defaultsPath, runtime); err != nil {
-		return nil, []diag.Diagnostic{diag.Errorf(infra.ErrorCodeParseError, "",
-			"write runtime defaults %s: %v", defaultsPath, err)}
+		err = fmt.Errorf("write runtime defaults %s: %w", defaultsPath, err)
+		return nil, []diag.Diagnostic{diag.Errorf(infra.ErrorCodeParseError, "", "%v", err)}, err
 	}
-	return runtime, diags
+	return runtime, diags, nil
 }
 
 // resolveRuntime returns the workload-only runtime block and whether the
@@ -392,7 +437,7 @@ func resolveRuntime(workloadRoot string, opts Options) (*infra.Runtime, bool, []
 // runtimeDefaultsPath is the workload's framework-generated runtime defaults
 // sidecar.
 func runtimeDefaultsPath(workloadRoot string) string {
-	return filepath.Join(workloadRoot, infra.AggregatedManifestDir, infra.PerProjectManifestDir, RuntimeManifestFilename)
+	return filepath.Join(workloadRoot, filepath.FromSlash(RuntimeDefaultsFile))
 }
 
 func applyRuntimeCompatibility(rt *infra.Runtime, opts Options) {
