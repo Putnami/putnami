@@ -34,7 +34,11 @@
     },
     {
       "id": "one-engine-two-surfaces",
-      "text": "Each vertical stops at a Build<Something>Result builder that returns a report and never writes to stdout; the interactive subcommands and the sdd.* MCP tools are two renderings of that one value, so they cannot answer differently."
+      "text": "Each vertical stops at a Build<Something>Result builder that returns a report and never writes to stdout; the interactive subcommands and the sdd.* MCP tools are two renderings of that one value, so they cannot answer differently. A tool that bounds its answer projects that value and never evaluates the workspace a second time."
+    },
+    {
+      "id": "bounded-feature-catalog",
+      "text": "sdd.list_features answers one page of short entries in id order: truncated name, owner and outcome summary, target stage, counts, and at most eight conflicting sources. A page holds 1 to limit entries (default 50, at most 200), stops before 64 KiB of indented JSON, reports the total, and returns next while entries remain; following next returns every feature once. An unscoped page counts projects instead of listing them. putnami features list keeps the full catalog."
     },
     {
       "id": "architecture-agent-context",

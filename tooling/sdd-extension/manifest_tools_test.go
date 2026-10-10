@@ -51,13 +51,11 @@ import (
 type toolSpec struct {
 	// name is the agent-facing tool name, dot-namespaced per D4.
 	name string
-	// description is ported VERBATIM from the core tool it replaces
-	// (tooling/cli/internal/mcp/tools.go). It is the text an agent reads to
-	// choose a tool, so a paraphrase changes behavior no test would catch.
+	// description is the text an agent reads to choose a tool, pinned here
+	// verbatim because a paraphrase changes behavior no other test would catch.
 	description string
-	// inputSchema is the arguments object, identical to the core tool's — the
-	// same properties, the same required list, the same additionalProperties:
-	// false.
+	// inputSchema is the arguments object: its properties, its required list,
+	// and additionalProperties: false.
 	inputSchema string
 }
 
@@ -66,14 +64,19 @@ func sddMCPTools() []toolSpec {
 	return []toolSpec{
 		{
 			name: "sdd.list_features",
-			description: "List the compact product-feature catalog derived from explicit native design declarations and durable putnami.features.json files at the workspace or exact project roots. " +
-				"Use this first when the feature id is unknown. Narrow it with projects or impacted to bound both the answer and the work: project selection is applied FIRST and decides which design graphs are read at all, " +
+			description: "List one page of the compact product-feature catalog derived from explicit native design declarations and durable putnami.features.json files at the workspace or exact project roots. " +
+				"Use this first when the feature id is unknown, then read one feature's declarations, requirements and implementations with sdd.feature_context. " +
+				"An entry carries the id, name, a one-line outcome summary, owner, target stage and counts. " +
+				"The page is ordered by id, holds at most limit entries within a fixed byte budget, reports the total, and returns next while more entries exist: pass it back as cursor. " +
+				"Narrow the catalog with projects or impacted to bound the work: project selection is applied FIRST and decides which design graphs are read at all, " +
 				"then optional query terms filter semantic ids, names, outcomes, and owners. Durable declarations stay workspace-wide so feature identity and duplicate detection never depend on the selection.",
 			inputSchema: `{"type":"object","properties":{` +
 				`"query":{"type":"string","description":"Optional space-separated terms matched across feature id, name, outcome, and owner, applied after project selection"},` +
 				`"projects":{"type":"array","items":{"type":"string"},"description":"Project ids or names owning the features to list (default: every project)"},` +
 				`"impacted":{"type":"boolean","description":"List the features owned by the projects the current git change reaches, instead of 'projects'"},` +
-				`"baseline":{"type":"string","description":"Git baseline ref for 'impacted'. When omitted, Putnami resolves workspace config baseline, nearest configured epic branch, trunk (origin/HEAD, origin/main), local main/master, then the upstream tracking ref — never the current branch itself."}` +
+				`"baseline":{"type":"string","description":"Git baseline ref for 'impacted'. When omitted, Putnami resolves workspace config baseline, nearest configured epic branch, trunk (origin/HEAD, origin/main), local main/master, then the upstream tracking ref — never the current branch itself."},` +
+				`"cursor":{"type":"string","description":"The next value of the previous page; omit it for the first page"},` +
+				`"limit":{"type":"integer","minimum":1,"maximum":200,"description":"Most entries in the page (default 50, at most 200)"}` +
 				`},"additionalProperties":false}`,
 		},
 		{
@@ -320,7 +323,7 @@ func TestToolInputSchemasAreClosedObjects(t *testing.T) {
 	}
 	wantProperties := map[string][]string{
 		"sdd.architecture_context": {"domain"},
-		"sdd.list_features":        {"baseline", "impacted", "projects", "query"},
+		"sdd.list_features":        {"baseline", "cursor", "impacted", "limit", "projects", "query"},
 		"sdd.list_specs":           {"baseline", "impacted", "projects"},
 		"sdd.feature_context":      {"feature"},
 		"sdd.spec_context":         {"feature"},

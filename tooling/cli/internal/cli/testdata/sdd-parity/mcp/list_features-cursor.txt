@@ -12,16 +12,15 @@ isError false
     "projectCount": 2,
     "features": 2
   },
-  "query": "invoice",
   "graphs": 0,
   "manifests": 2,
-  "total": 1,
+  "total": 2,
   "features": [
     {
-      "id": "billing/invoice",
-      "name": "Invoice export",
-      "summary": "Customers export issued invoices",
-      "owner": "billing",
+      "id": "shipping/labels",
+      "name": "Shipping labels",
+      "summary": "Operators print shipping labels",
+      "owner": "shipping",
       "target": "modeled",
       "counts": {
         "projects": 1,

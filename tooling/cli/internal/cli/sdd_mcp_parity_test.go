@@ -17,20 +17,26 @@ import (
 )
 
 // The extraction acceptance: for each of the four SDD
-// MCP tools, `sdd.<name>` must return the bytes core's `<name>` returned.
+// MCP tools, `sdd.<name>` must return the bytes core's `<name>` returned, except
+// `sdd.list_features`, whose recordings hold its own bounded page (below).
 //
 // # The oracle is recorded, because the oracle is gone
 //
 // Same story as sdd_extraction_parity_test.go beside it, and the same
 // disposition. Until Task 8 this file called core's tool and the extension's
 // tool on one server and compared the two answers; Task 8 deletes core's four,
-// so the last thing they did was answer the seventeen calls below, and their
+// so the last thing they did was answer the seventeen calls it then had, and their
 // answers were written into testdata/sdd-parity/mcp/ in the SAME commit that
 // deleted them. What is asserted did not change; where the expected bytes live
 // did.
 //
 // There is deliberately no -update flag: nothing but the implementation under
 // test could rewrite these files, and a self-regenerated oracle is not one.
+//
+// The `list_features` recordings, including the `limit` and `cursor` cases,
+// hold the tool's own contract rather than a core answer: one bounded page of
+// short entries, as tooling/sdd-extension/doc/04-mcp-tools.md documents. They
+// change only with that contract.
 //
 // # The extension side goes through the real server
 //
@@ -191,6 +197,19 @@ func mcpParityCases() []mcpParityCase {
 			// extension is spawned.
 			name: "list_features projects and impacted", core: "list_features",
 			arguments: `{"projects":["@acme/billing"],"impacted":true}`,
+			wantError: true,
+		},
+		{
+			name: "list_features limit", core: "list_features",
+			arguments: `{"limit":1}`,
+		},
+		{
+			name: "list_features cursor", core: "list_features",
+			arguments: `{"limit":1,"cursor":"YWZ0ZXI6YmlsbGluZy9pbnZvaWNl"}`,
+		},
+		{
+			name: "list_features limit above the maximum", core: "list_features",
+			arguments: `{"limit":500}`,
 			wantError: true,
 		},
 		{
@@ -365,9 +384,10 @@ func TestSDDMCPToolsAnswerFromTheWorkspaceOnTheWire(t *testing.T) {
 	}
 	var catalog struct {
 		Selection struct {
-			Mode     string   `json:"mode"`
-			Scoped   bool     `json:"scoped"`
-			Projects []string `json:"projects"`
+			Mode         string   `json:"mode"`
+			Scoped       bool     `json:"scoped"`
+			Projects     []string `json:"projects"`
+			ProjectCount int      `json:"projectCount"`
 		} `json:"selection"`
 		Features []struct {
 			ID string `json:"id"`
@@ -382,8 +402,8 @@ func TestSDDMCPToolsAnswerFromTheWorkspaceOnTheWire(t *testing.T) {
 	if catalog.Selection.Mode != "all" || catalog.Selection.Scoped {
 		t.Errorf("an unnarrowed call resolved to %+v, want the unscoped whole-workspace projection", catalog.Selection)
 	}
-	if len(catalog.Selection.Projects) != 2 {
-		t.Errorf("the call covered %v, want both fixture projects", catalog.Selection.Projects)
+	if catalog.Selection.ProjectCount != 2 || len(catalog.Selection.Projects) != 0 {
+		t.Errorf("the call covered %+v, want the count of both fixture projects and no id list", catalog.Selection)
 	}
 
 	// And a narrowed call must actually narrow — through the orchestrator's

@@ -161,8 +161,9 @@ flags instead of accepting one that would change nothing.
 
 `list` is the compact catalog: every explicitly authored feature — native design
 declarations plus durable `putnami.features.json` entries — with its outcome,
-owner, implementing projects, and exact declaration sources. It is the same
-builder the `sdd.list_features` MCP tool answers from. An optional `query` filters
+owner, implementing projects, and exact declaration sources. The
+`sdd.list_features` MCP tool answers from the same builder, as one bounded page
+of short entries ([04-mcp-tools.md](04-mcp-tools.md)). An optional `query` filters
 ids, names, outcomes, and owners **after** project selection.
 
 `validate` discovers `putnami.features.json` only at the workspace root and

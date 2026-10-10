@@ -12,10 +12,9 @@ isError false
     "projectCount": 2,
     "features": 2
   },
-  "query": "invoice",
   "graphs": 0,
   "manifests": 2,
-  "total": 1,
+  "total": 2,
   "features": [
     {
       "id": "billing/invoice",
@@ -29,5 +28,6 @@ isError false
         "requirements": 0
       }
     }
-  ]
+  ],
+  "next": "YWZ0ZXI6YmlsbGluZy9pbnZvaWNl"
 }

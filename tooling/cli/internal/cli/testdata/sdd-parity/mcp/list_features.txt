@@ -9,66 +9,36 @@ isError false
   "selection": {
     "mode": "all",
     "scoped": false,
-    "projects": [
-      "/billing",
-      "/shipping"
-    ],
-    "features": 2,
-    "specs": 0,
-    "externalRecords": []
+    "projectCount": 2,
+    "features": 2
   },
   "graphs": 0,
   "manifests": 2,
+  "total": 2,
   "features": [
     {
       "id": "billing/invoice",
       "name": "Invoice export",
-      "outcome": "Customers export issued invoices",
+      "summary": "Customers export issued invoices",
       "owner": "billing",
-      "projects": [
-        "@acme/billing"
-      ],
-      "declarations": [
-        {
-          "kind": "manifest",
-          "source": "billing/putnami.features.json",
-          "project": "@acme/billing",
-          "name": "Invoice export",
-          "outcome": "Customers export issued invoices",
-          "owner": "billing",
-          "type": "feature",
-          "target": "modeled",
-          "provenance": {
-            "path": "billing/putnami.features.json",
-            "symbol": "features[0]"
-          }
-        }
-      ]
+      "target": "modeled",
+      "counts": {
+        "projects": 1,
+        "declarations": 1,
+        "requirements": 0
+      }
     },
     {
       "id": "shipping/labels",
       "name": "Shipping labels",
-      "outcome": "Operators print shipping labels",
+      "summary": "Operators print shipping labels",
       "owner": "shipping",
-      "projects": [
-        "@acme/shipping"
-      ],
-      "declarations": [
-        {
-          "kind": "manifest",
-          "source": "shipping/putnami.features.json",
-          "project": "@acme/shipping",
-          "name": "Shipping labels",
-          "outcome": "Operators print shipping labels",
-          "owner": "shipping",
-          "type": "feature",
-          "target": "modeled",
-          "provenance": {
-            "path": "shipping/putnami.features.json",
-            "symbol": "features[0]"
-          }
-        }
-      ]
+      "target": "modeled",
+      "counts": {
+        "projects": 1,
+        "declarations": 1,
+        "requirements": 0
+      }
     }
   ]
 }
