@@ -32,7 +32,7 @@ type GCSConfig struct {
 	// Identity on Cloud Run / GKE), which needs no static secret.
 	CredentialsFile string
 	// RequestTimeout bounds non-streaming control-plane operations (Put, Delete,
-	// List, Exists) and the auth token fetches they trigger. Default: 60s. It does
+	// List, Exists, Stat) and the auth token fetches they trigger. Default: 60s. It does
 	// NOT cap a streaming Get — that body read is bounded only by the caller's
 	// context. Set to a negative value to disable the per-op cap.
 	RequestTimeout time.Duration
@@ -56,7 +56,10 @@ type GCSBackend struct {
 }
 
 // Ensure GCSBackend implements Backend at compile time.
-var _ Backend = (*GCSBackend)(nil)
+var (
+	_ Backend = (*GCSBackend)(nil)
+	_ Stater  = (*GCSBackend)(nil)
+)
 
 // NewGCSBackend creates a Google Cloud Storage backend. Authentication uses the
 // service-account key at cfg.CredentialsFile when set (or the path in
@@ -404,6 +407,28 @@ func (b *GCSBackend) Exists(ctx context.Context, bucket, key string) (bool, erro
 		return false, err
 	}
 	return status != http.StatusNotFound, nil
+}
+
+// Stat returns the metadata of an object in GCS with one object metadata read
+// (objects.get without media). It never lists the bucket.
+func (b *GCSBackend) Stat(ctx context.Context, bucket, key string) (*ObjectInfo, error) {
+	ctx, cancel := ctxutil.WithRequestTimeout(ctx, b.requestTimeout)
+	defer cancel()
+
+	attrs, status, err := b.getAttrs(ctx, bucket, key)
+	if err != nil {
+		return nil, err
+	}
+	if status == http.StatusNotFound {
+		return nil, statNotFound("gcs", bucket, key)
+	}
+	return &ObjectInfo{
+		Key:          key,
+		Size:         attrs.size(),
+		ContentType:  attrs.ContentType,
+		ETag:         attrs.Etag,
+		LastModified: attrs.updatedTime(),
+	}, nil
 }
 
 // List returns objects in a GCS bucket matching the given options. Pagination

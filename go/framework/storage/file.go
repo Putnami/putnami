@@ -5,12 +5,14 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 
 	"go.putnami.dev/errors"
 )
@@ -19,6 +21,12 @@ import (
 type FileBackend struct {
 	dataDir string
 }
+
+// Ensure FileBackend implements Backend and Stater at compile time.
+var (
+	_ Backend = (*FileBackend)(nil)
+	_ Stater  = (*FileBackend)(nil)
+)
 
 // NewFileBackend creates a filesystem-based storage backend.
 func NewFileBackend(dataDir string) *FileBackend {
@@ -64,6 +72,19 @@ const fileMetaSuffix = ".meta.json"
 // temporary file never appears as an object.
 const fileTempSuffix = ".putnami-tmp"
 
+// reservedSuffix returns the reserved suffix that ends a path segment of key,
+// compared without regard to case, or "" when no segment ends with one.
+func reservedSuffix(key string) string {
+	for _, segment := range strings.Split(strings.ToLower(key), "/") {
+		for _, suffix := range []string{fileMetaSuffix, fileTempSuffix} {
+			if strings.HasSuffix(segment, suffix) {
+				return suffix
+			}
+		}
+	}
+	return ""
+}
+
 // Put stores an object on the filesystem. It streams data into a temporary
 // file in the object's directory and renames it over the object path only
 // after the whole body is written, so a failing reader leaves any existing
@@ -75,15 +96,10 @@ const fileTempSuffix = ".putnami-tmp"
 // names for metadata and temporary files, and a directory with such a name
 // would block the metadata or temporary file of another key.
 func (b *FileBackend) Put(_ context.Context, bucket, key string, data io.Reader, meta *ObjectMetadata) (*PutResult, error) {
-	for _, segment := range strings.Split(strings.ToLower(key), "/") {
-		for _, suffix := range []string{fileMetaSuffix, fileTempSuffix} {
-			if !strings.HasSuffix(segment, suffix) {
-				continue
-			}
-			return nil, errors.New(CodeStorageWrite, "key has a path segment with a suffix the file backend reserves",
-				errors.String("backend", "file"), errors.String("bucket", bucket),
-				errors.String("key", key), errors.String("suffix", suffix))
-		}
+	if suffix := reservedSuffix(key); suffix != "" {
+		return nil, errors.New(CodeStorageWrite, "key has a path segment with a suffix the file backend reserves",
+			errors.String("backend", "file"), errors.String("bucket", bucket),
+			errors.String("key", key), errors.String("suffix", suffix))
 	}
 	objPath, err := b.objectPath(bucket, key)
 	if err != nil {
@@ -185,20 +201,65 @@ func (b *FileBackend) Get(_ context.Context, bucket, key string) (*GetResult, er
 		ETag:         fmt.Sprintf("%x", info.Size()),
 	}
 
-	// Load metadata if it exists.
-	mp, merr := b.metaPath(bucket, key)
-	if merr == nil {
-		metaBytes, rerr := os.ReadFile(mp) //nolint:gosec // path validated by safePath
-		if rerr == nil {
-			var meta ObjectMetadata
-			if json.Unmarshal(metaBytes, &meta) == nil {
-				result.ContentType = meta.ContentType
-				result.Metadata = meta.Custom
-			}
-		}
+	if meta := b.loadMetadata(bucket, key); meta != nil {
+		result.ContentType = meta.ContentType
+		result.Metadata = meta.Custom
 	}
 
 	return result, nil
+}
+
+// loadMetadata reads an object's metadata file. It returns nil when the object
+// has none or the file cannot be read.
+func (b *FileBackend) loadMetadata(bucket, key string) *ObjectMetadata {
+	mp, err := b.metaPath(bucket, key)
+	if err != nil {
+		return nil
+	}
+	metaBytes, err := os.ReadFile(mp) //nolint:gosec // path validated by safePath
+	if err != nil {
+		return nil
+	}
+	var meta ObjectMetadata
+	if json.Unmarshal(metaBytes, &meta) != nil {
+		return nil
+	}
+	return &meta
+}
+
+// Stat returns the metadata of an object on the filesystem. A directory, a
+// path below an object, and a key Put would reject for a reserved suffix hold
+// no object.
+func (b *FileBackend) Stat(_ context.Context, bucket, key string) (*ObjectInfo, error) {
+	if reservedSuffix(key) != "" {
+		return nil, statNotFound("file", bucket, key)
+	}
+	objPath, err := b.objectPath(bucket, key)
+	if err != nil {
+		return nil, errors.Wrapf(err, CodeStorageRead, "resolve object path", errors.String("op", "stat"))
+	}
+	fi, err := os.Stat(objPath)
+	if err != nil {
+		// ENOTDIR: a parent segment of key is an object, so key holds none.
+		if os.IsNotExist(err) || stderrors.Is(err, syscall.ENOTDIR) {
+			return nil, statNotFound("file", bucket, key)
+		}
+		return nil, errors.Wrap(err, CodeStorageRead, errors.String("backend", "file"), errors.String("op", "stat"))
+	}
+	if fi.IsDir() {
+		return nil, statNotFound("file", bucket, key)
+	}
+
+	info := &ObjectInfo{
+		Key:          key,
+		Size:         fi.Size(),
+		ETag:         fmt.Sprintf("%x", fi.Size()),
+		LastModified: fi.ModTime(),
+	}
+	if meta := b.loadMetadata(bucket, key); meta != nil {
+		info.ContentType = meta.ContentType
+	}
+	return info, nil
 }
 
 // Delete removes an object from the filesystem.

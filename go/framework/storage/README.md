@@ -70,6 +70,29 @@ type Backend interface {
 }
 ```
 
+### Reading one object's metadata
+
+`storage.Stat` reads one object's size, write time, ETag and content type
+without its bytes and without listing its prefix. A missing key fails with
+`storage.not_found`:
+
+```go
+info, err := storage.Stat(ctx, backend, "avatars", "user-123/avatar.png")
+if errors.Is(err, storage.CodeStorageNotFound) {
+    // not found
+}
+// info.Size, info.LastModified, info.ETag, info.ContentType
+```
+
+It never lists: it reads the object's entry in memory, stats the object file
+and reads its metadata file on the filesystem, sends one `HeadObject` on S3, and one
+object metadata read on GCS, which bills as a Class B operation where a list
+bills as Class A. `Stat` is the optional
+`Stater` interface rather than a `Backend` method, so a backend you write
+yourself keeps compiling. Every backend this package provides implements it,
+and the constrained and binding backends forward it. On a backend without it,
+`storage.Stat` fails with `storage.unsupported`.
+
 ## Memory Backend
 
 In-memory backend for testing:
@@ -243,4 +266,5 @@ are recorded in [ADR 0001](doc/adr/0001-backend-and-bucket-isolation.md), and
 constraint enforcement in
 [ADR 0002](doc/adr/0002-enforce-constraints-on-the-plugin-backend.md). They are
 protected by [`backend_test.go`](backend_test.go), [`constrain_test.go`](constrain_test.go),
-[`file_test.go`](file_test.go), and [`binding_test.go`](binding_test.go).
+[`file_test.go`](file_test.go), [`binding_test.go`](binding_test.go), and
+[`stat_test.go`](stat_test.go).

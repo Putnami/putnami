@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"go.putnami.dev/errors"
 )
 
 // newStorageHTTPClient builds the http.Client used by a storage backend.
@@ -105,6 +107,33 @@ type ObjectInfo struct {
 	ContentType  string
 	ETag         string
 	LastModified time.Time
+}
+
+// Stater is an optional interface that backends implement to read one object's
+// metadata without its bytes and without listing its prefix. Every backend this
+// package provides implements it; call it through Stat.
+type Stater interface {
+	// Stat returns the metadata of the object at key. It fails with
+	// CodeStorageNotFound when the key holds no object.
+	Stat(ctx context.Context, bucket, key string) (*ObjectInfo, error)
+}
+
+// Stat reads the metadata of the object at key through b. It fails with
+// CodeStorageNotFound when the key holds no object, and with
+// CodeStorageUnsupported when b does not implement Stater.
+func Stat(ctx context.Context, b Backend, bucket, key string) (*ObjectInfo, error) {
+	stater, ok := b.(Stater)
+	if !ok {
+		return nil, errors.New(CodeStorageUnsupported, "backend does not support Stat",
+			errors.String("bucket", bucket), errors.String("key", key))
+	}
+	return stater.Stat(ctx, bucket, key)
+}
+
+// statNotFound is the error a Stater returns for a key that holds no object.
+func statNotFound(backend, bucket, key string) error {
+	return errors.New(CodeStorageNotFound, "object not found",
+		errors.String("backend", backend), errors.String("bucket", bucket), errors.String("key", key))
 }
 
 // URLSigner is an optional interface that backends can implement to provide

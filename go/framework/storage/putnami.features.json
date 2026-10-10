@@ -18,17 +18,22 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "binding-and-constrained-stat-forward",
               "cross-runtime-backend-conformance",
               "filesystem-backend-copy",
               "filesystem-backend-failed-put-keeps-object",
               "filesystem-backend-round-trip",
               "filesystem-missing-get-returns-no-object",
+              "filesystem-stat-reads-one-object",
               "gcs-missing-get-returns-no-object",
+              "gcs-stat-reads-metadata-without-listing",
               "memory-backend-copy",
               "memory-backend-round-trip",
               "memory-missing-get-returns-no-object",
               "memory-s3-gcs-failed-put-keeps-object",
-              "s3-missing-get-returns-no-object"
+              "memory-stat-reads-one-object",
+              "s3-missing-get-returns-no-object",
+              "s3-stat-reads-one-object"
             ]
           }
         },

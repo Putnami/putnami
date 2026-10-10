@@ -38,6 +38,8 @@ type fakeGCS struct {
 	// object-metadata (Attrs) still succeeds. This isolates the reader error
 	// branch from the attrs path.
 	failDownload bool
+	// requests records "METHOD escaped-path?query" for every request it serves.
+	requests []string
 }
 
 type fakeObject struct {
@@ -104,6 +106,13 @@ func (f *fakeGCS) setFailDownload(v bool) {
 	f.failDownload = v
 }
 
+// served returns the requests the fake has served so far.
+func (f *fakeGCS) served() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.requests...)
+}
+
 func (f *fakeGCS) put(name string, data []byte) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -141,6 +150,7 @@ func (f *fakeGCS) handle(w http.ResponseWriter, r *http.Request) {
 	}
 	f.mu.Lock()
 	fail := f.failStatus
+	f.requests = append(f.requests, r.Method+" "+r.URL.EscapedPath()+"?"+r.URL.RawQuery)
 	f.mu.Unlock()
 	if fail != 0 {
 		f.writeJSON(w, fail, map[string]any{

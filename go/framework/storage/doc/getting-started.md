@@ -22,6 +22,29 @@ All operations are context-aware and return structured errors with codes defined
 
 `Put` replaces any existing object at the key. A `Put` whose `data` reader fails commits nothing: it returns an error and leaves the existing object and its metadata intact.
 
+### Reading one object's metadata
+
+`storage.Stat` reads one object's size, write time, ETag and content type
+without its bytes and without listing its prefix. A missing key fails with
+`storage.not_found`:
+
+```go
+info, err := storage.Stat(ctx, backend, "avatars", "user-123/avatar.png")
+if errors.Is(err, storage.CodeStorageNotFound) {
+    // not found
+}
+// info.Size, info.LastModified, info.ETag, info.ContentType
+```
+
+It never lists: it reads the object's entry in memory, stats the object file
+and reads its metadata file on the filesystem, sends one `HeadObject` on S3, and one
+object metadata read on GCS, which bills as a Class B operation where a list
+bills as Class A. `Stat` is the optional
+`Stater` interface rather than a `Backend` method, so a backend you write
+yourself keeps compiling. Every backend this package provides implements it,
+and the constrained and binding backends forward it. On a backend without it,
+`storage.Stat` fails with `storage.unsupported`.
+
 ### Object Metadata
 
 Attach metadata when storing objects:
@@ -365,6 +388,7 @@ All errors are wrapped with structured codes from `go.putnami.dev/errors`:
 - **Use `MemoryBackend` in tests.** It requires no setup, no cleanup, and runs entirely in-process.
 - **Always close `GetResult.Body`.** The body is an `io.ReadCloser`. Failing to close it leaks resources (file descriptors for filesystem, HTTP connections for S3).
 - **Use `Exists` instead of `Get` when you only need to check presence.** The S3 backend uses a lightweight HEAD request, avoiding a full object download.
+- **Use `storage.Stat` instead of `List` to read one object's size or write time.** It reads that object's metadata alone; a list with the key as prefix costs a Class A operation on GCS.
 - **Paginate large listings.** Set `MaxKeys` and use `ContinuationToken` from the `ListResult` to iterate through large buckets without loading everything into memory.
 - **Define bucket constraints early.** Register buckets with `Bucket()` at package init time so constraints are available before any upload logic runs.
 - **Call `Close` on shutdown.** This releases file handles and drains idle HTTP connections.
