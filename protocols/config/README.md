@@ -125,6 +125,39 @@ Every operation is tenant-scoped, and the tenant is derived from request context
 (JWT claims or workload identity) rather than passed as a parameter. It is
 therefore not a field on any shape in this module.
 
+### Authored config member contract
+
+Import path: `go.putnami.dev/protocol/config/authoredmember`.
+
+An authored config member is the immutable, secret-free artifact that a config
+producer publishes for one workspace, project and environment. The config store
+accepts it only after it validates the bytes. The package fixes:
+
+- **Format** — `FormatVersion` is `config.authored-member.v1`, `MediaType` is
+  `application/vnd.putnami.config.authored-member+json`, and a member is at
+  most 4 MiB (`MaxMemberSize`).
+- **Content** — a normalized schema (`SchemaField`: canonical dotted path, one
+  of `string`, `integer`, `number`, `boolean`, `object`, `array`, plus
+  `required` and `sensitive`), authored layers (name, immutable pin, values by
+  schema path), secret references, and source provenance (repository and
+  revision).
+- **Canonical encoding** — `Publisher.Build` sorts fields, layers and
+  references and returns compact JSON. Equivalent input gives the same bytes.
+- **Validation** — `Publisher.Validate` decodes the bytes, rebuilds them, and
+  refuses any member whose bytes differ. Errors wrap `ErrInvalidMember`. A
+  value must match its schema type, and a placeholder (`TODO`, `${...}`,
+  `{{...}}`) is refused. A sensitive field never carries a value: it
+  carries a `config-secret://` reference instead, and `SecretReferencePath`
+  checks that URI. A required field needs a value or, when it is sensitive, a
+  reference. Paths must not overlap.
+- **Identity** — the `Descriptor` carries SHA-256 digests of the schema, the
+  authored layers, the references and the whole content, a selection
+  fingerprint over all of them, the size, and the provenance.
+
+A workload with no configuration publishes an empty schema (`fields: []`) and
+empty values. Changing the bytes or digests of a v1 member requires a new
+`FormatVersion`. `TestCanonicalBytesArePinned` holds the v1 bytes.
+
 ## API surface
 
 The endpoint contract the shapes above are exchanged over:
