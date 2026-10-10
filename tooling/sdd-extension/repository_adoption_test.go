@@ -67,6 +67,7 @@ var declaredDomains = []string{
 // excluded the same way: no repository project links it from the workspace,
 // and no existing domain owns the hosted platform's wire contracts.
 var excludedProjects = map[string]string{
+	"/cloud/runtime/go":                                    reasonCloudRuntimeDestination,
 	"/cloud/runtime/typescript":                            reasonCloudRuntimeDestination,
 	"/go/samples/application":                              reasonSample,
 	"/go/samples/capabilities-proof":                       reasonSample,
