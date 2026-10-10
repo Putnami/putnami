@@ -362,20 +362,25 @@ A `git:` pattern enumerates `git ls-files -z --cached --others
 project-relative matching and exclusions. `git:**` covers every candidate,
 including files outside the project's directory. It never walks ignored local
 directories. Missing tracked files are absent from the candidate; additions,
-edits, renames and deletions change the key. Staging unchanged bytes does not.
+edits, a change of the executable bit, renames and deletions change the key.
+Staging unchanged bytes does not.
 
 Candidate inputs hash raw file bytes and symlink target text, with separate
-file-type markers. They do not follow symlinks or normalize project-config
-task tuning or the fields of the version stamp: a repository scanner can read
-those bytes. When ordinary and Git patterns select the same file, the raw
-candidate digest wins. Git enumeration errors and unsupported non-regular
-candidate files prevent key computation. Ordinary patterns keep their existing
-behavior; adding `git:**` does not filter files an ordinary pattern separately
-selects.
+file-type markers, and each regular file's executable bit as a source binding
+reads it: from the file's permission bits, or on Windows, which stores no bit,
+from the mode the index records for a tracked file. They do not follow symlinks
+or normalize project-config task tuning or the fields of the version stamp: a
+repository scanner can read those bytes. When ordinary and Git patterns select
+the same file, the raw candidate digest wins. Git enumeration errors,
+unsupported non-regular candidate files, a selected unmerged candidate and a
+candidate Git lists as a directory (a submodule or a nested repository) prevent
+key computation. Ordinary patterns keep their existing behavior; adding
+`git:**` does not filter files an ordinary pattern separately selects.
 
 The document gates declare `git:**` instead of a fixed list of repository
 documents, so the public-cut scanner and its cache key cover the same tree.
-See [ADR 0041](adr/0041-git-candidate-file-inputs.md).
+See [ADR 0041](adr/0041-git-candidate-file-inputs.md) and
+[ADR 0061](adr/0061-a-git-input-keys-the-executable-bit.md).
 
 ### Environment Variable Hashing
 
@@ -1349,9 +1354,10 @@ complete, and the first file it misses is a silently stale verdict. Such a task
 reads the Git candidate cut instead, the tracked files and the untracked files
 no ignore rule excludes, and keys on `git:**`, which hashes exactly that set
 (ADR [0041](adr/0041-git-candidate-file-inputs.md)): its read set and its key
-are then one list. `lint-docs`, the `validate-workspace` checks and
-`@putnami/clientgen`'s `clientgen-workspace-check` (the `clientgen-guard` task of
-`putnami validate`) do this.
+are then one list. `lint-docs`, the `validate-workspace` checks,
+`@putnami/sdd`'s `features-validate` (the `features` step of `putnami
+validate`) and `@putnami/clientgen`'s `clientgen-workspace-check` (the
+`clientgen-guard` task of `putnami validate`) do this.
 
 ### Version-Aware Tasks
 
