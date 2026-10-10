@@ -57,17 +57,19 @@ const clientProjectGenDir = ".gen"
 // the provider's describe runs, and nothing orders it after that step. Each
 // staged file replaces its target through a temporary file and a rename, a
 // target whose bytes already match is left untouched, and a stale entry is
-// removed only once the new set is in place. The workspace-owned scaffold files
-// listed in ownedClientFiles are the exception: they are scaffolded only when
-// absent while the stage still includes one, and an existing copy is neither
-// moved nor overwritten, so a committed or hand-edited module or project file
-// never churns and the workspace go.work stays stable. When the stage carries
-// no client (e.g. no routes), the generated entries are dropped, the owned
-// files are kept, and the directory is removed only once it is empty. Returns
-// the project-relative paths present after the mirror — the generated files
-// plus every owned file — for the manifest, plus the project-relative output
-// directories managed by the client generator so the scheduler can
-// cache/restore or remove them on cache hits.
+// removed only once the new set is in place, unless it blocks a staged path (a
+// directory where a staged file goes, a file where its parent directory goes):
+// such an entry goes just before that file is written. The workspace-owned
+// scaffold files listed in ownedClientFiles are the exception: they are
+// scaffolded only when absent while the stage still includes one, and an
+// existing copy is neither moved nor overwritten, so a committed or hand-edited
+// module or project file never churns and the workspace go.work stays stable.
+// When the stage carries no client (e.g. no routes), the generated entries are
+// dropped, the owned files are kept, and the directory is removed only once it
+// is empty. Returns the project-relative paths present after the mirror — the
+// generated files plus every owned file — for the manifest, plus the
+// project-relative output directories managed by the client generator so the
+// scheduler can cache/restore or remove them on cache hits.
 func mirrorGeneratedClients(projectPath, genDir string) ([]string, []string, error) {
 	raw, err := os.ReadFile(filepath.Join(genDir, "clientgen", "config.json"))
 	if err != nil {
@@ -132,8 +134,9 @@ func mirrorGeneratedClients(projectPath, genDir string) ([]string, []string, err
 		if isOwnedClientFile(rel) {
 			// Scaffold-once: write the staged copy only when the target has
 			// none. Lstat, so even a dangling symlink counts as present and is
-			// never written through. It is reported below with the other owned
-			// files.
+			// never written through; a directory at that path counts as absent
+			// and gives way to the file. It is reported below with the other
+			// owned files.
 			if info, statErr := os.Lstat(dst); statErr == nil && !info.IsDir() {
 				return nil
 			}

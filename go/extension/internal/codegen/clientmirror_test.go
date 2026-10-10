@@ -459,3 +459,36 @@ func TestMirrorGeneratedClients_ClientFileNeverAbsent(t *testing.T) {
 		t.Fatalf("client.gen.go was absent during a mirror: %v", err)
 	}
 }
+
+// A symlink at a generated file path is replaced by a regular file; the mirror
+// never writes through it to the file it points at.
+func TestMirrorGeneratedClients_ReplacesSymlinkWithoutWritingThrough(t *testing.T) {
+	proj := t.TempDir()
+	genDir := filepath.Join(proj, ".gen")
+	stageClient(t, genDir, goTarget, map[string]string{"client.gen.go": "package client\n"})
+	outside := filepath.Join(t.TempDir(), "outside.go")
+	if err := os.WriteFile(outside, []byte("package outside\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(proj, "clients", "go")
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(target, "client.gen.go")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	if _, _, err := mirrorGeneratedClients(proj, genDir); err != nil {
+		t.Fatalf("mirror: %v", err)
+	}
+	info, err := os.Lstat(filepath.Join(target, "client.gen.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.Mode().IsRegular() {
+		t.Errorf("client.gen.go mode = %v, want a regular file", info.Mode())
+	}
+	if got, _ := os.ReadFile(outside); string(got) != "package outside\n" {
+		t.Errorf("symlink target was written through: %q", got)
+	}
+}
