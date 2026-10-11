@@ -85,6 +85,10 @@ $CommandMapUrlEnv = 'PUTNAMI_COMMAND_MAP_URL'
 $CommandMapHeader = 'putnami.install-commands.v1'
 $RunEnv = 'PUTNAMI_RUN'
 
+# Retired commands. The installer refuses one before any network call: it
+# installs nothing and says the command is retired.
+$RetiredCommands = @('agent-readiness')
+
 # The patterns of install.sh, matched with -cmatch. A case-sensitive .NET range
 # compares code points, so a-z is exactly the 26 lowercase ASCII letters, and
 # \z anchors at the very end of the text, where $ also matches before a final
@@ -1469,6 +1473,10 @@ function Invoke-PutnamiInstaller([string[]]$Arguments) {
         $Progress.ToStderr = $true
         if ($runCommand -cnotmatch $RunCommandPattern) {
             Write-InstallError ("The command to run (--run, $RunEnv, or ?run=) must match " + '^[a-z][a-z0-9-]{0,63}$. Nothing was installed.')
+            Stop-Install
+        }
+        if ([Array]::IndexOf($RetiredCommands, $runCommand) -ge 0) {
+            Write-InstallError "putnami $runCommand is retired. Nothing was installed."
             Stop-Install
         }
     }

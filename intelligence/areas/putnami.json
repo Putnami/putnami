@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/intelligence/areas",
+  "description": "Area detector: splits a repository into the parts an agent works in, from its workspace manifests.",
+  "tags": ["go"],
+  "extensions": ["/go/extension"],
+  "disable": {
+    "jobs": ["serve"]
+  }
+}

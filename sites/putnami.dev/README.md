@@ -52,7 +52,6 @@ there:
 | `/docs/08-support` | `putnami.support.json` (workspace root) | `src/plugins/support-catalog.plugin.ts` |
 | `/docs/platform` | `cloud/doc-contents-platform` bundle (published by the Cloud workspace), pinned by `content.lock.json` | `src/plugins/content-bundle.plugin.ts` |
 | `/schemas/…` | `protocols/*/schemas/*.json` | `src/plugins/schemas.plugin.ts` |
-| `/schemas/agent-readiness/…` | `hosted-schemas/agent-readiness/*.json`, copies of the `@putnami/agent-readiness` schemas | `src/plugins/schemas.plugin.ts` |
 | `/install.sh`, `/install-commands.txt`, `/install.ps1`, `/LICENSE.md` | `tooling/cli/scripts/install.sh`, `tooling/cli/scripts/install-commands.txt`, `tooling/cli/scripts/install.ps1`, `LICENSE.md` | `putnami.json` `generate.assets` copy |
 
 A `generate.assets` source that no longer exists is not silently dropped. The
@@ -64,14 +63,6 @@ non-documentation copies (`install.sh`, `install-commands.txt`, `install.ps1`,
 `LICENSE.md`) still only produce the extension's `generate asset source not
 found, skipping` warning. Treat that warning as a broken page; `test/docs-sources.test.ts` fails
 on it.
-
-`hosted-schemas/` holds schemas that a published Putnami product owns and
-this site serves at their `$id`. Today that is the `putnami agent-readiness`
-payload and report. Their public copies live in
-`intelligence/agent-readiness/schema/`. Each hosted file must stay byte-identical to
-that source. `test/agent-readiness.test.ts` checks parity and each file's `$id`.
-When the service changes its contract, update the embedded and hosted schemas
-together.
 
 The support page is written from the reviewed catalog on every build, so a
 package or protocol status can only change by changing `putnami.support.json`.
@@ -129,7 +120,6 @@ evidence, never authority — emitting one cannot create a cross-domain permissi
 | `/docs` | Documentation hub |
 | `/docs/support` | Generated public support catalog |
 | `/install.sh` | Install script (`curl -fsSL https://putnami.dev/install.sh \| bash`) |
-| `/agent-readiness/method` | Redirect (302) to the agent-readiness method page under `/docs/platform/intelligence` |
 | `/install.sh?run=<command>` | The same script with `<command>` set in its one `RUN_COMMAND_DEFAULT=""` line (`src/plugins/installer-run.plugin.ts`); a `run` value that is not one `^[a-z][a-z0-9-]{0,63}$` is a 400 |
 | `/install-commands.txt` | Command map the installers read for `?run=`: which extension provides each command. Unsigned, trusted as far as `install.sh` or `install.ps1` from the same origin |
 | `/install.ps1` | Windows install script (`irm https://putnami.dev/install.ps1 \| iex`, typed in a PowerShell window) |
@@ -237,9 +227,6 @@ emitted artifact agree, so it cannot drift.
 | `/assets` | GET | reject | — |
 | `/fonts/inter-latin.woff2` | GET | allow | `prefix /fonts/` |
 | `/schemas/putnami-project.json` | GET | allow | `prefix /schemas/` |
-| `/schemas/agent-readiness/payload.v1.json` | GET | allow | `prefix /schemas/` |
-| `/agent-readiness/method` | GET | allow | `exact /agent-readiness/method` |
-| `/agent-readiness/method` | POST | reject | — |
 | `/search/index.json` | GET | allow | `exact /search/index.json` |
 | `/react/chunk.abc12345.js` | GET | allow | `prefix /react/` |
 | `/react-islands/islands.abc12345.js` | GET | allow | `prefix /react-islands/` |

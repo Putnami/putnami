@@ -164,7 +164,10 @@ in the script.
 The installer then works in this order:
 
 1. **It checks the command name.** The name must match `^[a-z][a-z0-9-]{0,63}$`.
-   Anything else exits non-zero before any network call.
+   Anything else exits non-zero before any network call. A command the
+   installer once ran and that is now retired also exits non-zero here: the
+   installer prints one line that says the command is retired, and installs
+   nothing.
 2. **It resolves the extension.** It downloads the
    [command map](#the-command-map) and looks up the extension that provides the
    command. A command the map does not list, a map that fails validation, and a
@@ -232,15 +235,11 @@ An entry without `@<constraint>` pins the extension's `latest` channel. The
 registry decides who can read that channel: when it is private, the pin fails
 for a reader without access, and the command does not run.
 
-The map the framework ships lists these commands:
-
-| Command | Extension | One line |
-|---|---|---|
-| `agent-readiness` | `@putnami/agent-readiness` | `curl -fsSL "https://putnami.dev/install.sh?run=agent-readiness" \| bash` |
+The map the framework ships lists no command today.
 
 An extension owner adds an entry by pull request against
-`tooling/cli/scripts/install-commands.txt`, and adds the command to the table
-above and to the list in `internal/installscript/run_command_test.go`. The
+`tooling/cli/scripts/install-commands.txt`, and adds the command to the list in
+`internal/installscript/run_command_test.go`. The
 command must declare that it runs without a workspace, and must not write to
 the directory it runs in.
 
@@ -1030,6 +1029,7 @@ map is served the same way: removing an entry is a pull request against
 | The run form exits with the command's status, and a failed pin exits with the pin's status without running the command | `TestRunExitsWithTheCommandsExitStatus`, `TestRunDoesNotRunTheCommandWhenThePinFails` |
 | `?run=` sets the command in one placeholder line, and `--run` and `PUTNAMI_RUN` win over it | `TestInstallScriptCarriesExactlyOneRunPlaceholder`, `TestRunUsesTheCommandTheSiteBakedIn` |
 | An invalid command name refuses before any network call, whether from `--run`, `PUTNAMI_RUN`, or the script | `TestRunRejectsAnInvalidCommandBeforeAnyNetworkCall` |
+| A retired command refuses before any network call and says it is retired | `TestRunSaysARetiredCommandIsRetired`, `TestInstallPS1RunSaysARetiredCommandIsRetired` |
 | A command the map does not list, and a map that is malformed, lists a command twice, is missing, or is announced as over 1 MiB, all refuse before the CLI is downloaded or installed | `TestRunRefusesACommandTheMapDoesNotList`, `TestRunFailsClosedOnAMalformedCommandMap` |
 | The shipped map is well formed and pins each listed extension | `TestShippedCommandMapResolvesEveryListedCommand`, `TestInstallPS1RunReadsTheShippedMap` |
 | The map URL follows the registry's https-or-loopback rule | `TestRunRefusesAnInsecureCommandMapURL` |

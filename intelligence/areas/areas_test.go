@@ -5,8 +5,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-
-	"go.putnami.dev/intelligence/agent-readiness/contract"
 )
 
 func reader(files map[string]string) Reader {
@@ -96,7 +94,7 @@ func TestDetectReadsEveryWorkspaceManifest(t *testing.T) {
 				t.Fatalf("manifests = %+v, want kind %s", layout.Manifests, tc.kind)
 			}
 			for _, area := range layout.Areas {
-				if want := contract.AreaFromManifest; area.Path != RootPath && area.Source != want {
+				if want := FromManifest; area.Path != RootPath && area.Source != want {
 					t.Fatalf("area %s source %s", area.Path, area.Source)
 				}
 			}
@@ -109,7 +107,7 @@ func TestDetectInfersAreasWithoutAManifest(t *testing.T) {
 	if got, want := paths(layout), []string{"root=.", "api=api", "app=web/app"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("areas = %v, want %v", got, want)
 	}
-	if layout.Declared() || layout.Areas[1].Source != contract.AreaInferred {
+	if layout.Declared() || layout.Areas[1].Source != Inferred {
 		t.Fatalf("layout = %+v", layout)
 	}
 	flat := Detect([]string{"src/a.py", "docs/b.md", ".github/ci.yml"}, reader(nil))
@@ -249,8 +247,8 @@ func TestDetectReadsNestedWorkspacesAndBazel(t *testing.T) {
 			t.Fatalf("manifests = %v, want %v", manifests, want)
 		}
 		for _, area := range layout.Areas {
-			if want := contract.AreaFromManifest; area.Path == "ai" || area.Path == RootPath {
-				want = contract.AreaInferred
+			if want := FromManifest; area.Path == "ai" || area.Path == RootPath {
+				want = Inferred
 				if area.Source != want {
 					t.Fatalf("area %s source %s, want %s", area.Path, area.Source, want)
 				}
@@ -298,9 +296,9 @@ func TestDetectGivesSupportingAreasTheirRole(t *testing.T) {
 		"README.md", "packages/server/package.json", "packages/tests/package.json", "www/package.json",
 		"guide/docusaurus.config.ts", "guide/intro.md", "manual/conf.py", "manual/index.rst", "spec/models/a_spec.rb", "src/a.py",
 	}, reader(nil))
-	want := map[string]contract.AreaRole{
-		".": contract.AreaCode, "packages/server": contract.AreaCode, "packages/tests": contract.AreaTests, "www": contract.AreaDocs,
-		"guide": contract.AreaDocs, "manual": contract.AreaDocs, "spec": contract.AreaTests, "src": contract.AreaCode,
+	want := map[string]Role{
+		".": RoleCode, "packages/server": RoleCode, "packages/tests": RoleTests, "www": RoleDocs,
+		"guide": RoleDocs, "manual": RoleDocs, "spec": RoleTests, "src": RoleCode,
 	}
 	for _, area := range layout.Areas {
 		if role, ok := want[area.Path]; !ok || area.Role != role {

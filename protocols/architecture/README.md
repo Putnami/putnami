@@ -229,12 +229,12 @@ its declarations complete, so there has never been debt to record.
 | `public-docs` | public-docs | 1 | What the public documentation site publishes |
 
 The excluded 55 are the 28 samples, 7 templates, 2 template proofs, the
-standalone agent-readiness repository collector, the 2 Cloud runtime
+standalone area detector, the 2 Cloud runtime
 destinations, and the Cloud CLI extension with its 14 generated clients. Samples and templates prove or
 seed the public API without owning a fact another repository project consumes.
-The collector produces an optional anonymous payload for an external report;
-no repository project consumes it, and no existing domain owns the assessment
-semantics. Mapping it now would imply an authority that domain does not hold.
+The area detector reads the manifests of repositories that are not Putnami
+workspaces; no repository project imports it, and no existing domain owns that
+reading. Mapping it now would imply an authority that domain does not hold.
 The Cloud runtime destinations and the Cloud CLI extension are hosted-platform
 client code that no repository project links from the workspace.
 The full inventory, the reason for every exclusion, and the completion rule live

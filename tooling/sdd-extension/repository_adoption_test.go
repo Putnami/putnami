@@ -61,9 +61,9 @@ var declaredDomains = []string{
 // mapping them would inflate the coverage number without authorizing anything
 // real. A sample that grows into a first-party workload stops being a
 // sample — the fix is to map it, not to widen this reason.
-// The standalone Intelligence collector is excluded separately: no repository
-// project consumes its anonymous payload, and no existing domain owns the
-// external report's assessment semantics. The Cloud runtime destination is
+// The standalone Intelligence area detector is excluded separately: no
+// repository project imports it, and no existing domain owns its reading of
+// foreign repository manifests. The Cloud runtime destination is
 // excluded the same way: no repository project links it from the workspace,
 // and no existing domain owns the hosted platform's wire contracts. The Cloud
 // CLI extension and its generated service clients follow the same rule.
@@ -98,7 +98,7 @@ var excludedProjects = map[string]string{
 	"/go/templates/go-library":                             reasonTemplate,
 	"/go/templates/go-server":                              reasonTemplate,
 	"/go/templates/proof":                                  reasonTemplateProof,
-	"/intelligence/agent-readiness":                        reasonAgentReadinessCollector,
+	"/intelligence/areas":                                  reasonAreaDetector,
 	"/python/samples/application":                          reasonSample,
 	"/python/samples/library":                              reasonSample,
 	"/python/templates/python-library":                     reasonTemplate,
@@ -130,7 +130,7 @@ const (
 	reasonTemplate                = "template: scaffold input packaged by @putnami/scaffold, owned by the language vertical"
 	reasonGeneratedClient         = "generated client: produced by @putnami/clientgen inside a sample, owned by the sample"
 	reasonTemplateProof           = "template proof: renders the templates beside it against the workspace framework and runs their tests, owned by the language vertical"
-	reasonAgentReadinessCollector = "standalone Intelligence repository collector: no repository project consumes its anonymous payload or owns the external report's assessment semantics, owned by intelligence"
+	reasonAreaDetector            = "standalone Intelligence area detector: no repository project imports it or owns its reading of foreign repository manifests, owned by intelligence"
 	reasonCloudRuntimeDestination = "Cloud runtime destination: a client library of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"
 	reasonCloudCLIExtension       = "Cloud CLI extension: the @putnami/cloud extension binary, a client of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"
 	reasonCloudCLIClient          = "generated client: produced by @putnami/clientgen from the published Cloud CLI schema, consumed only by the Cloud CLI extension, owned by cloud"

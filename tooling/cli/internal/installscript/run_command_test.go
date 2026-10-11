@@ -573,9 +573,7 @@ func TestRunRefusesACommandTheMapDoesNotList(t *testing.T) {
 // shippedCommands lists every command the shipped map provides, with the
 // extension reference on its line. A change to install-commands.txt updates
 // this list in the same change.
-var shippedCommands = map[string]string{
-	"agent-readiness": "@putnami/agent-readiness",
-}
+var shippedCommands = map[string]string{}
 
 // The shipped map is well-formed, lists exactly shippedCommands, and the
 // installer pins and runs each of them. A command it does not list is refused.
@@ -792,6 +790,22 @@ func TestRunRejectsAnInvalidCommandBeforeAnyNetworkCall(t *testing.T) {
 				t.Fatalf("an invalid command fetched the command map:\n%s", out.transcript())
 			}
 		})
+	}
+}
+
+// A retired command installs nothing and says so in one line, before the
+// installer reads the command map.
+func TestRunSaysARetiredCommandIsRetired(t *testing.T) {
+	t.Parallel()
+	site := newRunSite(t, runSiteOptions{commandMap: commandMap("agent-readiness @acme/revived")})
+	r := newRunEnv(t, site)
+	out := r.invoke(t, nil, "--run", "agent-readiness")
+	r.assertRefusedBeforeInstalling(t, site, out)
+	if got := strings.Split(strings.TrimSuffix(out.stderr, "\n"), "\n"); len(got) != 1 || !strings.HasSuffix(got[0], "putnami agent-readiness is retired. Nothing was installed.") {
+		t.Fatalf("the refusal is not one line that says the command is retired:\n%s", out.transcript())
+	}
+	if got := site.count("/install-commands.txt"); got != 0 {
+		t.Fatalf("a retired command fetched the command map:\n%s", out.transcript())
 	}
 }
 

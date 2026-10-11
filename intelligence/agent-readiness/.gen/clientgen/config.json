@@ -1,9 +1,0 @@
-{
-  "targets": ["go"],
-  "go": {
-    "output": "clients/go",
-    "modulePath": "",
-    "packageName": "intelligenceclient",
-    "clientName": "IntelligenceClient"
-  }
-}

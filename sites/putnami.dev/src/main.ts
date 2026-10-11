@@ -89,10 +89,6 @@ export const app = () => {
       .use(new DarcPlugin('public-docs-contracts', ...documentation.components()))
       .use(
         schemas({
-          // hosted-schemas/ holds byte-identical copies of schemas a published
-          // Putnami product owns, such as the `putnami agent-readiness` payload
-          // and report. See README.md "Where the published content comes from".
-          sources: ['protocols/*/schemas/*.json', 'sites/putnami.dev/hosted-schemas/*/*.json'],
           // infra-aggregated.json is an ephemeral, build-emitted manifest that
           // intentionally shares the putnami-infra.json $id with the per-project
           // schema (PerProjectSchemaURL / aggregatedSchemaURL). Only the

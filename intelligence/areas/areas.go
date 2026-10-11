@@ -14,22 +14,40 @@ import (
 	"slices"
 	"sort"
 	"strings"
-
-	"go.putnami.dev/intelligence/agent-readiness/contract"
-	"go.putnami.dev/intelligence/agent-readiness/internal/scope"
 )
 
 // RootPath is the path of the root area.
 const RootPath = "."
 
+// Source says whether an area comes from a workspace manifest or from
+// directory inference.
+type Source string
+
+// The two area sources.
+const (
+	FromManifest Source = "manifest"
+	Inferred     Source = "inferred"
+)
+
+// Role says whether an area holds code or supports it: a test tree and a
+// documentation site have no public entry point.
+type Role string
+
+// The three area roles.
+const (
+	RoleCode  Role = "code"
+	RoleTests Role = "tests"
+	RoleDocs  Role = "docs"
+)
+
 // Area is one part of the repository.
 type Area struct {
 	Name   string
 	Path   string
-	Source contract.AreaSource
+	Source Source
 	// Role says whether the area holds code, a test tree or a documentation
 	// site. The root area always holds code.
-	Role contract.AreaRole
+	Role Role
 }
 
 // Manifest is a workspace manifest found at the repository root or in a
@@ -77,7 +95,7 @@ func Wanted(files []string) []string {
 		switch {
 		case base == "putnami.json":
 			wanted = append(wanted, file)
-		case strings.Count(file, "/") == 1 && slices.Contains(manifestFiles, base) && !scope.Skipped(file):
+		case strings.Count(file, "/") == 1 && slices.Contains(manifestFiles, base) && !skipped(file):
 			wanted = append(wanted, file)
 		}
 	}
@@ -100,8 +118,8 @@ const maxInferredDepth = 3
 // top-level directories become areas of their own.
 const maxRootShare = 0.5
 
-// maxAreaPath keeps a path usable as an area name, which the contract bounds
-// to 128 bytes. A longer or unusual path folds into its parent area.
+// maxAreaPath is the longest path, in bytes, that names an area. A longer or
+// unusual path folds into its parent area.
 const maxAreaPath = 128
 
 var safePath = regexp.MustCompile(`^[A-Za-z0-9._@+-]+(/[A-Za-z0-9._@+-]+)*$`)
@@ -111,7 +129,7 @@ func Detect(files []string, read Reader) Layout {
 	dirsWith := map[string][]string{}
 	var authored []string
 	for _, file := range files {
-		if scope.Skipped(file) {
+		if skipped(file) {
 			continue
 		}
 		authored = append(authored, file)
@@ -119,14 +137,14 @@ func Detect(files []string, read Reader) Layout {
 	}
 	manifests, members, claimed := declared(read(Wanted(files)), dirsWith, read)
 	layout := Layout{Manifests: manifests, byPath: map[string]int{}}
-	layout.add(members, contract.AreaFromManifest)
-	layout.add(inferred(dirsWith, members, claimed), contract.AreaInferred)
+	layout.add(members, FromManifest)
+	layout.add(inferred(dirsWith, members, claimed), Inferred)
 	if layout.rootShare(authored) > maxRootShare {
-		layout.add(topLevel(authored, layout), contract.AreaInferred)
+		layout.add(topLevel(authored, layout), Inferred)
 	}
 	for _, file := range authored {
 		if layout.Assign(file) < 0 {
-			layout.Areas = append([]Area{{Path: RootPath, Source: contract.AreaInferred}}, layout.Areas...)
+			layout.Areas = append([]Area{{Path: RootPath, Source: Inferred}}, layout.Areas...)
 			layout.index()
 			break
 		}
@@ -186,23 +204,23 @@ func assignRoles(areas []Area, files []string) {
 		}
 	}
 	for i, area := range areas {
-		areas[i].Role = contract.AreaCode
+		areas[i].Role = RoleCode
 		if area.Path == RootPath {
 			continue
 		}
 		segments := strings.Split(area.Path, "/")
 		switch {
 		case slices.ContainsFunc(segments, func(s string) bool { return slices.Contains(TestTrees, s) }):
-			areas[i].Role = contract.AreaTests
+			areas[i].Role = RoleTests
 		case slices.ContainsFunc(segments, func(s string) bool { return slices.Contains(docsDirs, s) }), configured[area.Path]:
-			areas[i].Role = contract.AreaDocs
+			areas[i].Role = RoleDocs
 		}
 	}
 }
 
 // add appends the usable directories that are not areas yet, and keeps the
 // areas sorted by path.
-func (l *Layout) add(dirs []string, source contract.AreaSource) {
+func (l *Layout) add(dirs []string, source Source) {
 	for _, dir := range dirs {
 		if _, ok := l.byPath[dir]; ok || dir == RootPath || len(dir) > maxAreaPath || !safePath.MatchString(dir) || Fixture(dir) {
 			continue
@@ -351,7 +369,7 @@ func workspaceRoots(contents map[string][]byte) []string {
 	var nested []string
 	for file := range contents {
 		dir := path.Dir(file)
-		if strings.Count(file, "/") == 1 && !seen[dir] && !scope.Skipped(file) && !strings.HasPrefix(dir, ".") && slices.Contains(manifestFiles, path.Base(file)) {
+		if strings.Count(file, "/") == 1 && !seen[dir] && !skipped(file) && !strings.HasPrefix(dir, ".") && slices.Contains(manifestFiles, path.Base(file)) {
 			seen[dir] = true
 			nested = append(nested, dir)
 		}

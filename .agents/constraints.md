@@ -28,7 +28,7 @@ Framework reference is served live by the `putnami` MCP server's versioned `putn
 The repo is organized by ownership — each language ecosystem is self-contained. Full rules live in CONTRIBUTING.md (Repository Layout); the short map:
 
 - `tooling/` — workspace-wide machinery: the CLI (`tooling/cli`, Go), extension SDK, scaffold, client generator, SDD extension, agent workflows, hooks, and tooling samples.
-- `intelligence/` — public Intelligence extensions, including the agent-readiness CLI and repository collector.
+- `intelligence/` — public Intelligence code: the area detector (`intelligence/areas`).
 - `cloud/` — public client code of the hosted platform, such as the Cloud runtime destination libraries.
 - `protocols/` — cross-pillar wire contracts (JSON schemas + fixture corpora) shared by frameworks, tooling, and platform. Structured CLI output, workspace/project config, extension manifests, features, support status, and the other contracts are defined here.
 - `typescript/`, `go/`, `python/` — each language root follows the same shape: `extension/` (owns the generic lifecycle jobs: build, test, lint, serve, package), `framework/` (runtime APIs — Go modules publish as `go.putnami.dev/*`), `templates/`, `samples/`. Framework packages must not compete with the language extension for generic lifecycle command names; extension identity is manifest- and package-driven, not path-driven.
