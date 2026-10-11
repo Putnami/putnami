@@ -22,6 +22,7 @@ func TestVersionTagBumpFollowsTheSupportCatalog(t *testing.T) {
 		files               []string
 		noCatalog           bool
 		webDependsOnKit     bool
+		kitIsProtocol       bool
 		want                string
 	}{
 		{name: "breaking in an experimental project is a patch", last: "0.4.0",
@@ -42,6 +43,8 @@ func TestVersionTagBumpFollowsTheSupportCatalog(t *testing.T) {
 			subject: "feat(kit)!: drop the flag", files: []string{"typescript/kit/src.ts"}, want: "ts/v0.4.1"},
 		{name: "an unlisted project a stable one depends on counts as stable", last: "0.4.0", webDependsOnKit: true,
 			subject: "feat(kit)!: drop the flag", files: []string{"typescript/kit/src.ts"}, want: "ts/v0.5.0"},
+		{name: "a padded protocol tag classifies like the API check reads it", last: "0.4.0", kitIsProtocol: true,
+			subject: "feat(kit)!: drop the flag", files: []string{"typescript/kit/src.ts"}, want: "ts/v0.5.0"},
 		{name: "a stable file outside the line does not count", last: "0.4.0",
 			subject: "feat!: drop the flag", files: []string{"typescript/lab/src.ts", "tooling/cli/main.go"}, want: "ts/v0.4.1"},
 		{name: "without a catalog every commit is stable", last: "0.4.0", noCatalog: true,
@@ -54,6 +57,12 @@ func TestVersionTagBumpFollowsTheSupportCatalog(t *testing.T) {
 					`{"name": "@putnami/web", "dependencies": ["@putnami/kit"]}`)
 				gitInRepo(t, dir, "add", "-A")
 				gitInRepo(t, dir, "commit", "-m", "chore: web uses kit")
+			}
+			if testCase.kitIsProtocol {
+				writeRepoFile(t, dir, "typescript/kit/"+wsproto.ConfigFilename,
+					`{"name": "@putnami/kit", "tags": [" protocol"]}`)
+				gitInRepo(t, dir, "add", "-A")
+				gitInRepo(t, dir, "commit", "-m", "chore: kit is a protocol")
 			}
 			gitInRepo(t, dir, "tag", "-a", "ts/v"+testCase.last, "-m", "release")
 			for _, file := range testCase.files {
@@ -92,8 +101,8 @@ func TestVersionTagRefusesAnInvalidSupportCatalog(t *testing.T) {
 // supportCatalogRepo is versionLineRepo with two more projects on the
 // typescript line, @putnami/lab and @putnami/kit, and, when withCatalog is set,
 // a catalog that lists @putnami/web as stable, @putnami/lab as experimental and
-// @putnami/cli (on the tooling line) as stable, and does not list
-// @putnami/kit.
+// @putnami/cli (on the tooling line) as stable, and lists @putnami/kit only as
+// a stable protocol, so it is unlisted until it carries the protocol tag.
 func supportCatalogRepo(t *testing.T, withCatalog bool) string {
 	t.Helper()
 	dir := versionLineRepo(t)
@@ -108,6 +117,7 @@ func supportCatalogRepo(t *testing.T, withCatalog bool) string {
 				{ID: "@putnami/lab", Kind: supportproto.SubjectKindPackage, Status: supportproto.StatusExperimental},
 				{ID: "@putnami/web", Kind: supportproto.SubjectKindPackage, Status: supportproto.StatusStable},
 				{ID: "@putnami/cli", Kind: supportproto.SubjectKindPackage, Status: supportproto.StatusStable},
+				{ID: "@putnami/kit", Kind: supportproto.SubjectKindProtocol, Status: supportproto.StatusStable},
 			},
 		})
 		if err != nil {
