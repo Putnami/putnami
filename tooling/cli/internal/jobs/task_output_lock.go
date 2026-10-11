@@ -95,7 +95,8 @@ package jobs
 //
 // Across sessions a shared flock coexists with other shared ones and an
 // exclusive flock with none: the readers of one resource in several sessions
-// run together, and its writer waits for every one of them. A hold covers a
+// run together, unless a reader joined its own session's writer hold, and its
+// writer waits for every one of them. A hold covers a
 // cache restore into the task's outputs (restoreDeclaredCacheHit) with the
 // writer keys alone: the restore writes the recorded outputs and reads no
 // resource. For an execution it covers everything from output preparation

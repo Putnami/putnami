@@ -764,8 +764,8 @@ the workspace-scoped `workspace-clients` declare no output, so a reader of
 `workspace-clients` is not protected from them. The `sources` resource takes
 no lock: the tasks that write it change source files, not declared outputs.
 Shared locks coexist: tasks of several sessions read one project at once,
-whatever else their sessions plan, and a task that writes there waits until
-all of them finished.
+unless a task of their own session writes there when they start, and a task
+that writes there waits until all of them finished.
 
 A task holds these locks across a cache restore into its outputs, and for an
 execution from the output preparation through the capture into the cache:
