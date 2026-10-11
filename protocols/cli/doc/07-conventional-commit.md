@@ -85,6 +85,7 @@ The reading has no document and no schema. Go is its only runtime:
 | `tooling/cli/internal/git` | The version bump (`BumpFor`) and the breaking flag of a release baseline |
 | `tooling/cli/internal/commands/versioncmd` | The section a commit takes in the changelog |
 | `go/extension/internal/jobs/apicheck` | The marker that allows an incompatible API or command-surface change in `validate` |
+| `tooling/sdd-extension/internal/sdd` | The breaking-marker step of `validate-workspace`, which fails a proposed squash message that drops the breaking marker a commit of the change declares |
 
 The bump policy is not here: which type advances which number, the pre-1.0
 rule and the support-catalog rule belong to the CLI. See

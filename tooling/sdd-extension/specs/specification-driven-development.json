@@ -69,6 +69,10 @@
       "text": "validate-workspace checks every relative link and anchor in every README.md file and doc/ tree of the workspace, whatever the selection, with the rule each language extension's lint-docs task applies. A missing file, a path whose case differs on disk, an anchor no heading of the target defines, or a path that leaves the workspace fails naming the file, line and link. A project whose lint options set docs-links false is skipped. Links with a scheme and absolute paths are not checked."
     },
     {
+      "id": "squash-keeps-the-breaking-marker",
+      "text": "validate-workspace compares the squash message in PUTNAMI_PROPOSAL_MESSAGE with the commits from the impacted baseline to HEAD, reading both as Git and the version bump do. A commit that declares a break the message drops fails, named by id and subject; a message that declares it, or a range with no break, passes. A non-conventional title declares nothing. An unset message passes with a note; a missing baseline or a shallow clone fails. Base commits never count, and the step is never cached."
+    },
+    {
       "id": "authoring-never-grants-a-permission",
       "text": "The two architecture authoring subcommands write only the mechanical half of a declaration: architecture init scaffolds a domain carrying the id, owner and projects the caller stated and refuses a domain another manifest already declares, and architecture sync removes a project entry the workspace no longer contains and a binding the graph no longer observes while refusing to grant an edge no declared import covers; the reconciliation is whole-workspace, so it rejects project selection."
     }
@@ -78,6 +82,7 @@
     "tooling/cli/doc/adr/0007-read-mostly-spec-surface.md",
     "tooling/cli/doc/adr/0008-executable-architecture-command-boundary.md",
     "tooling/cli/doc/adr/0015-specs-ratchet-keeps-its-own-discovery.md",
-    "tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md"
+    "tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md",
+    "tooling/sdd-extension/doc/adr/0001-the-squash-commit-keeps-the-breaking-marker.md"
   ]
 }

@@ -83,9 +83,9 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			},
 		}).
 		Command("validate-workspace", proto.CommandDefinition{
-			Description: "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, and check the links of every README.md file and doc/ tree of the workspace.",
+			Description: "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, and check that the proposed squash commit keeps the breaking marker the commits of the change declare.",
 			Activation:  "workspace-once",
-			// The six steps are independent workspace-wide steps; none reads
+			// The seven steps are independent workspace-wide steps; none reads
 			// another's answer, so no dependsOn orders them.
 			Run: []proto.PipelineStep{
 				{ID: "architecture", Task: "architecture-validate"},
@@ -94,6 +94,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 				{ID: "recipes", Task: "recipes-validate"},
 				{ID: "codeowners", Task: "codeowners-sync"},
 				{ID: "docs-links", Task: "docs-links-validate"},
+				{ID: "breaking-marker", Task: "breaking-marker-validate"},
 			},
 		}).
 		Task("features-validate", proto.TaskDefinition{
@@ -324,6 +325,32 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Cache: cacheEnabledNoOutput(),
 			Outputs: map[string]proto.TaskOutputPort{
 				"data": {Description: "Documentation link report: the number of documents checked and the sorted broken links."},
+			},
+			Declares: sdkmanifest.Declares(),
+		}).
+		Task("breaking-marker-validate", proto.TaskDefinition{
+			Description: "Compare the proposed squash commit message in PUTNAMI_PROPOSAL_MESSAGE with the commits the change adds since the run's impacted baseline, " +
+				"and fail naming each commit that declares a breaking change the message does not. " +
+				"Every message is read as a conventional commit with the parser the version bump uses: a \"!\" before the subject colon, or a BREAKING CHANGE: footer in the body. " +
+				"An unset message passes with a note; a set message without an impacted baseline, or in a shallow clone, fails. " +
+				"Uncached on purpose: the verdict reads an environment variable and Git history, and the candidate cut holds neither, " +
+				"so a restored answer could approve a message or a range it never read.",
+			Kind:      "command",
+			Command:   "{extensionRuntime}",
+			Args:      []string{"breaking-marker-validate"},
+			Cwd:       "{workspaceRoot}",
+			TimeoutMs: 120000,
+			// The port names the variable the step reads. It keys nothing, since
+			// the task is never cached; it states the contract with the runner
+			// that sets the variable.
+			Inputs: map[string]proto.TaskInputPort{
+				"PUTNAMI_PROPOSAL_MESSAGE": {From: "env"},
+			},
+			// No sources read: it reads commits, which no task of the run
+			// rewrites, and never the worktree.
+			Cache: sdkmanifest.NoCache(),
+			Outputs: map[string]proto.TaskOutputPort{
+				"data": {Description: "Breaking-marker report: the squash subject, whether it declares a break, the baseline, the number of commits read, and the commits that declare a break."},
 			},
 			Declares: sdkmanifest.Declares(),
 		}).
@@ -648,21 +675,23 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 	if workspace.Activation != "workspace-once" {
 		t.Errorf("validate-workspace activation = %q, want workspace-once", workspace.Activation)
 	}
-	// The six workspace-wide steps are independent — none reads another's
+	// The seven workspace-wide steps are independent — none reads another's
 	// answer — so no dependsOn orders them.
-	if len(workspace.Run) != 6 ||
+	if len(workspace.Run) != 7 ||
 		workspace.Run[0].Task != "architecture-validate" ||
 		workspace.Run[1].Task != "specs-ratchet-validate" ||
 		workspace.Run[2].Task != "decisions-validate" ||
 		workspace.Run[3].Task != "recipes-validate" ||
 		workspace.Run[4].Task != "codeowners-sync" ||
 		workspace.Run[5].Task != "docs-links-validate" ||
+		workspace.Run[6].Task != "breaking-marker-validate" ||
 		len(workspace.Run[1].DependsOn) != 0 ||
 		len(workspace.Run[2].DependsOn) != 0 ||
 		len(workspace.Run[3].DependsOn) != 0 ||
 		len(workspace.Run[4].DependsOn) != 0 ||
-		len(workspace.Run[5].DependsOn) != 0 {
-		t.Errorf("validate-workspace pipeline = %+v, want the architecture step, the specs ratchet, the decision gate, the recipe gate, the CODEOWNERS step and the documentation link gate", workspace.Run)
+		len(workspace.Run[5].DependsOn) != 0 ||
+		len(workspace.Run[6].DependsOn) != 0 {
+		t.Errorf("validate-workspace pipeline = %+v, want the architecture step, the specs ratchet, the decision gate, the recipe gate, the CODEOWNERS step, the documentation link gate and the breaking-marker step", workspace.Run)
 	}
 	// Both are user-facing: they are what `putnami validate` and the CI gate
 	// run. The internal self-check is the only hidden command here.
@@ -777,6 +806,31 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 	}
 }
 
+// TestTheBreakingMarkerStepIsNeverServedFromCache pins the one validation task
+// whose read set no key can hold. It reads PUTNAMI_PROPOSAL_MESSAGE and the
+// commits since the run's impacted baseline; neither is in the candidate cut,
+// and a replayed verdict would approve a message or a range this run never
+// read. So the task is uncached, and its sole port names the variable it reads.
+func TestTheBreakingMarkerStepIsNeverServedFromCache(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "squash-keeps-the-breaking-marker", "the-step-is-never-served-from-cache")
+	m := committedManifest(t)
+
+	task, found := m.Tasks["breaking-marker-validate"]
+	if !found {
+		t.Fatal("the manifest declares no breaking-marker-validate task")
+	}
+	if task.Cache == nil || task.Cache.IsEnabled() {
+		t.Errorf("task \"breaking-marker-validate\" cache = %+v, want disabled: its verdict reads state no key holds", task.Cache)
+	}
+	if !strings.Contains(task.Description, "Uncached on purpose") {
+		t.Errorf("task \"breaking-marker-validate\" description = %q, want it to say why it is uncached", task.Description)
+	}
+	want := map[string]proto.TaskInputPort{"PUTNAMI_PROPOSAL_MESSAGE": {From: "env"}}
+	if !reflect.DeepEqual(task.Inputs, want) {
+		t.Errorf("task \"breaking-marker-validate\" inputs = %+v, want %+v", task.Inputs, want)
+	}
+}
+
 // TestEveryTaskCarriesAV3Declaration pins that the contract is COMPLETE. v3 is
 // additive per task, so a task that quietly loses (or never gains) its
 // `declares` block keeps v2 inferred capture while the rest of the manifest is
@@ -841,9 +895,11 @@ func TestNoTaskDeclaresAnEffectOrOwnsAPath(t *testing.T) {
 			t.Errorf("task %q claims declared output paths %v; only specs-validate owns a path here (the criteria projection), and that exception is justified above", name, sortedKeys(declares.Outputs))
 		}
 	}
-	// The self-check is uncacheable for a reason none of the others share: its
-	// whole verdict is about the environment of THIS invocation, so a restored
-	// answer from another one would be the single thing it must never report.
+	// The self-check is uncacheable because its whole verdict is about the
+	// environment of THIS invocation, so a restored answer from another one
+	// would be the single thing it must never report. The breaking-marker step
+	// is the other uncached task; TestTheBreakingMarkerStepIsNeverServedFromCache
+	// pins it.
 	if m.Tasks["sdd-selfcheck-exec"].Cache.IsEnabled() {
 		t.Error("sdd-selfcheck-exec is cacheable; a restored self-check reports another invocation's environment")
 	}
