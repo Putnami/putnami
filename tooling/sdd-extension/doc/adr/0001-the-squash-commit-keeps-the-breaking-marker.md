@@ -82,6 +82,17 @@ is too late.
   message in the merge dialog can still drop the marker.
 - The step does not run when `--impacted` selects no project: the run then
   plans no job at all.
+- The step reads every commit of the range. A branch stacked on a parent that
+  has since been squash-merged, or a breaking commit reverted later on the
+  branch, fails although the squash commit breaks nothing. The remedy is to
+  rebase onto the base and drop those commits, not a waiver.
+- The variable travels in the process environment only. A run with
+  `--where remote` does not carry it, so the step passes there with the note
+  "no proposal message to compare". The runner that sets the variable runs
+  the gate locally.
+- The variable holds the title and the body. A body near the operating
+  system's limit for one environment variable (128 KiB on Linux) cannot be
+  passed, and the runner fails before the gate starts.
 - A stale baseline counts the commits it lacks. The runner fetches the base
   branch before the gate, as Contributor CI does with its full clone.
 - A repository that changes its squash setting changes what its runner writes

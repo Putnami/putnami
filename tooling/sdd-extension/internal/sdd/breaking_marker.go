@@ -89,7 +89,7 @@ func BuildBreakingMarkerResult(root, message, baseline string) (BreakingMarkerRe
 	if baseline == "" {
 		return report, WithResultData(protocolcli.Classify(fmt.Errorf(
 			"breaking marker: %s is set, but the run has no impacted baseline to read the commits of the change from; "+
-				"this step needs an --impacted run", ProposalMessageEnv), protocolcli.ErrInvalidConfig), report)
+				"run with --impacted against a base branch this clone holds", ProposalMessageEnv), protocolcli.ErrInvalidConfig), report)
 	}
 	report.Baseline = baseline
 	shallow, err := gitread.IsShallow(root)

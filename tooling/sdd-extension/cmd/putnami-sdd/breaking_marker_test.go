@@ -90,7 +90,7 @@ func TestBreakingMarkerValidateRefusesARunThatIsNotImpacted(t *testing.T) {
 		ctx := workspaceJobContext(root, nil)
 		ctx.Selection = selection
 		outcome := runJob(t, runBreakingMarkerValidate, ctx)
-		if outcome.err == nil || !strings.Contains(outcome.err.Error(), "--impacted run") {
+		if outcome.err == nil || !strings.Contains(outcome.err.Error(), "run with --impacted") {
 			t.Errorf("%s: error = %v, want a refusal that asks for an --impacted run", name, outcome.err)
 		}
 		if code := outcome.exitCode(); code != protocolcli.ExitUsage {

@@ -220,7 +220,7 @@ func TestBreakingMarkerRefusesAMessageWithoutABaseline(t *testing.T) {
 
 	for _, title := range []string{"feat(cli): rework the selection", "feat(cli)!: rework the selection"} {
 		_, err := BuildBreakingMarkerResult(dir, title, " ")
-		if err == nil || !strings.Contains(err.Error(), "--impacted run") {
+		if err == nil || !strings.Contains(err.Error(), "run with --impacted") {
 			t.Fatalf("title %q: error = %v, want a refusal that asks for an --impacted run", title, err)
 		}
 		if code := protocolcli.ExitCodeForError(err); code != protocolcli.ExitUsage {

@@ -173,8 +173,9 @@ its existing admission gate; the shared absent-policy default remains `report`.
   | Situation | Result |
   |---|---|
   | `PUTNAMI_PROPOSAL_MESSAGE` unset or blank | Passes, with the note "no proposal message to compare" |
-  | Message set, the run is not `--impacted` | Fails: without an impacted baseline there is no range to compare |
+  | Message set, the run resolved no impacted baseline | Fails: without a baseline there is no range to compare. This covers a run without `--impacted` and an `--impacted` run that found no base and fell back to every project |
   | Message set, the repository is a shallow clone | Fails, naming the shallow clone: the range could stop at the clone depth |
+  | Message set, the baseline names no commit, or Git fails | Fails with exit `1`, an error rather than a finding |
   | No commit of the range declares a break | Passes, whatever the title says |
   | A commit declares a break, and the title carries `!` or the body a `BREAKING CHANGE:` footer | Passes |
   | A commit declares a break, and the message declares none | Fails with one `sdd.breaking_marker_dropped` diagnostic per such commit |
@@ -193,8 +194,12 @@ its existing admission gate; the shared absent-policy default remains `report`.
   the variable when the repository squashes with it: the step cannot read that
   setting. A footer with no blank line above it is part of the subject and
   declares nothing. A merge of the base into the branch brings no commit of
-  the base into the range. The step does not run when `--impacted` selects no
-  project, because the run then plans no job. It is never cached (see
+  the base into the range. The step reads every commit of the range, so two
+  cases fail although the squash commit breaks nothing: a branch stacked on a
+  parent that has since been squash-merged still holds the parent's commits,
+  and a breaking commit reverted later on the branch still declares its break.
+  Rebase the branch onto the base and drop those commits. The step does not
+  run when `--impacted` selects no project, because the run then plans no job. It is never cached (see
   [below](#breaking-marker-validate--never-cached)). The decision is
   [ADR 0001](adr/0001-the-squash-commit-keeps-the-breaking-marker.md).
 
