@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
@@ -14,6 +15,8 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -28,58 +31,70 @@ func impactPlanTestPlanner(project *workspace.Project, commands []string, calls 
 			Commands: commands,
 			Complete: true,
 			Projects: []*workspace.Project{project},
-			Jobs:     []*jobs.ScheduledJob{changePlanTestJob(project)},
+			Jobs:     []*jobs.ScheduledJob{impactPlanTestJob(project)},
 		}, nil
 	}
 }
 
-// TestEmitImpactPlanIsTheChangePlanBeforeItsRepository holds the one
-// projection end to end: the ChangePlan change-plan emits is exactly
-// ChangePlanFromImpactPlan of the ImpactPlan impact-plan emits for the same
-// range and planner, with the origin remote as the repository.
-func TestEmitImpactPlanIsTheChangePlanBeforeItsRepository(t *testing.T) {
-	spectest.Proves(t, "cli/impact-plan", "one-projection", "change-plan-is-the-projection-of-impact-plan")
-	root, baseSHA, headSHA, project := writeChangePlanRepository(t)
+// TestEmitImpactPlanPinsTheRangeAndIsByteStable holds the plan to the range it
+// was asked for: the full base and head commit IDs, the commit diff and the
+// project that owns it, the planned command list in its order, and the same
+// bytes for two runs over one range. The plan never carries the credentials of
+// the checkout's remote.
+func TestEmitImpactPlanPinsTheRangeAndIsByteStable(t *testing.T) {
+	root, baseSHA, headSHA, project := writeImpactPlanRepository(t)
 	calls := 0
-	planner := impactPlanTestPlanner(project, []string{"test", "lint"}, &calls)
+	planner := func(_ context.Context, base string, noCache bool) (PlannerResult, error) {
+		calls++
+		if base != baseSHA || !noCache {
+			t.Fatalf("planner inputs = base %q, noCache %t; want %s and true", base, noCache, baseSHA)
+		}
+		return PlannerResult{
+			Commands: []string{"test", "lint"},
+			Complete: true,
+			Projects: []*workspace.Project{project},
+			Jobs:     []*jobs.ScheduledJob{impactPlanTestJob(project)},
+		}, nil
+	}
 	opts := PlanOptions{Base: baseSHA, NoCache: true, CLIVersion: "test"}
 
-	impact, err := EmitImpactPlan(context.Background(), root, opts, planner)
+	first, err := EmitImpactPlan(context.Background(), root, opts, planner)
 	if err != nil {
-		t.Fatalf("EmitImpactPlan: %v", err)
+		t.Fatalf("EmitImpactPlan first: %v", err)
 	}
-	if err := ciproto.ValidateImpactPlan(impact); err != nil {
+	if err := ciproto.ValidateImpactPlan(first); err != nil {
 		t.Fatalf("ValidateImpactPlan: %v", err)
 	}
-	if impact.BaseSHA != baseSHA || impact.HeadSHA != headSHA || !reflect.DeepEqual(impact.Commands, []string{"test", "lint"}) {
-		t.Fatalf("impact plan = %s..%s %v, want %s..%s [test lint]", impact.BaseSHA, impact.HeadSHA, impact.Commands, baseSHA, headSHA)
+	if first.BaseSHA != baseSHA || first.HeadSHA != headSHA || !reflect.DeepEqual(first.Commands, []string{"test", "lint"}) {
+		t.Fatalf("impact plan = %s..%s %v, want %s..%s [test lint]", first.BaseSHA, first.HeadSHA, first.Commands, baseSHA, headSHA)
 	}
-	if !reflect.DeepEqual(impact.ChangedFiles, []string{"app/source.txt"}) || len(impact.Tasks) != 1 ||
-		len(impact.Impact.DirectProjects) != 1 || impact.Impact.DirectProjects[0].ID != project.ID {
-		t.Fatalf("impact plan members = %+v", impact)
+	if !reflect.DeepEqual(first.ChangedFiles, []string{"app/source.txt"}) || len(first.Tasks) != 1 ||
+		len(first.Impact.DirectProjects) != 1 || first.Impact.DirectProjects[0].ID != project.ID {
+		t.Fatalf("impact plan members = %+v", first)
 	}
-	if impact.Cache.Status != "disabled" {
-		t.Fatalf("cache = %+v, want disabled under --no-cache", impact.Cache)
+	if first.Cache.Status != "disabled" {
+		t.Fatalf("cache = %+v, want disabled under --no-cache", first.Cache)
 	}
 
-	change, err := EmitChangePlan(context.Background(), root, opts, planner)
+	second, err := EmitImpactPlan(context.Background(), root, opts, planner)
 	if err != nil {
-		t.Fatalf("EmitChangePlan: %v", err)
+		t.Fatalf("EmitImpactPlan second: %v", err)
 	}
-	projected, err := ciproto.ChangePlanFromImpactPlan(impact, change.Repository)
-	if err != nil {
-		t.Fatalf("ChangePlanFromImpactPlan: %v", err)
-	}
-	changeBytes, err := json.Marshal(change)
+	firstBytes, err := json.Marshal(first)
 	if err != nil {
 		t.Fatal(err)
 	}
-	projectedBytes, err := json.Marshal(projected)
+	secondBytes, err := json.Marshal(second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(changeBytes) != string(projectedBytes) {
-		t.Fatalf("change-plan differs from the projection of impact-plan:\n%s\n%s", changeBytes, projectedBytes)
+	if string(firstBytes) != string(secondBytes) {
+		t.Fatalf("equivalent runs differ:\n%s\n%s", firstBytes, secondBytes)
+	}
+	for _, credential := range []string{"token", "secret"} {
+		if strings.Contains(string(firstBytes), credential) {
+			t.Fatalf("impact plan carries the remote credential %q:\n%s", credential, firstBytes)
+		}
 	}
 	if calls != 2 {
 		t.Fatalf("planner calls = %d, want 2", calls)
@@ -87,12 +102,11 @@ func TestEmitImpactPlanIsTheChangePlanBeforeItsRepository(t *testing.T) {
 }
 
 // TestEmitImpactPlanNeedsNoRemote holds the repository to the consumer: an
-// impact plan is emitted from a checkout with no origin remote, which
-// change-plan refuses before it plans anything.
+// impact plan is emitted from a checkout with no origin remote.
 func TestEmitImpactPlanNeedsNoRemote(t *testing.T) {
 	spectest.Proves(t, "cli/impact-plan", "pinned-revisions", "no-remote-is-needed")
-	root, baseSHA, _, project := writeChangePlanRepository(t)
-	runChangePlanGit(t, root, "remote", "remove", "origin")
+	root, baseSHA, _, project := writeImpactPlanRepository(t)
+	runImpactPlanGit(t, root, "remote", "remove", "origin")
 	calls := 0
 	planner := impactPlanTestPlanner(project, []string{"lint"}, &calls)
 	opts := PlanOptions{Base: baseSHA, NoCache: true, CLIVersion: "test"}
@@ -100,12 +114,8 @@ func TestEmitImpactPlanNeedsNoRemote(t *testing.T) {
 	if _, err := EmitImpactPlan(context.Background(), root, opts, planner); err != nil {
 		t.Fatalf("EmitImpactPlan without a remote: %v", err)
 	}
-	_, err := EmitChangePlan(context.Background(), root, opts, planner)
-	if err == nil || err.Error() != "change-plan requires a credential-free origin remote URL" {
-		t.Fatalf("EmitChangePlan error = %v, want the origin remote refusal", err)
-	}
 	if calls != 1 {
-		t.Fatalf("planner calls = %d, want 1: change-plan must refuse before planning", calls)
+		t.Fatalf("planner calls = %d, want 1", calls)
 	}
 }
 
@@ -113,12 +123,12 @@ func TestEmitImpactPlanNeedsNoRemote(t *testing.T) {
 // revision checks and planning stage to the command that ran it.
 func TestEmitImpactPlanRefusalsNameImpactPlan(t *testing.T) {
 	spectest.Proves(t, "cli/impact-plan", "pinned-revisions", "the-range-is-refused-before-planning")
-	root, baseSHA, _, project := writeChangePlanRepository(t)
+	root, baseSHA, _, project := writeImpactPlanRepository(t)
 	complete := func(context.Context, string, bool) (PlannerResult, error) {
 		return PlannerResult{Commands: []string{"lint"}, Complete: true, Projects: []*workspace.Project{project}}, nil
 	}
 	plannerErr := errors.New("plan lint: engine refused the plan")
-	orphanSHA := changePlanGitOutput(t, root, "commit-tree", "HEAD^{tree}", "-m", "orphan")
+	orphanSHA := impactPlanGitOutput(t, root, "commit-tree", "HEAD^{tree}", "-m", "orphan")
 	for _, tc := range []struct {
 		name    string
 		opts    PlanOptions
@@ -147,14 +157,31 @@ func TestEmitImpactPlanRefusalsNameImpactPlan(t *testing.T) {
 	}
 }
 
+// TestEmitImpactPlanRefusesANonCheckoutHeadBeforePlanning holds the head to
+// the checkout: a --head other than the checked-out HEAD is refused before the
+// planner runs.
+func TestEmitImpactPlanRefusesANonCheckoutHeadBeforePlanning(t *testing.T) {
+	spectest.Proves(t, "cli/impact-plan", "pinned-revisions", "the-range-is-refused-before-planning")
+	root, baseSHA, _, project := writeImpactPlanRepository(t)
+	calls := 0
+	_, err := EmitImpactPlan(context.Background(), root, PlanOptions{Base: baseSHA, Head: baseSHA, NoCache: true, CLIVersion: "test"},
+		impactPlanTestPlanner(project, []string{"lint"}, &calls))
+	if err == nil || err.Error() != "impact-plan --head must resolve to the checked-out HEAD" {
+		t.Fatalf("EmitImpactPlan error = %v, want the checked-out HEAD refusal", err)
+	}
+	if calls != 0 {
+		t.Fatal("planner ran for a head that is not the checkout")
+	}
+}
+
 // TestEmitImpactPlanRefusesPlanningThatChangesTheCheckout holds the recheck
 // after planning: a plan whose planning wrote into the worktree is refused.
 func TestEmitImpactPlanRefusesPlanningThatChangesTheCheckout(t *testing.T) {
 	spectest.Proves(t, "cli/impact-plan", "pinned-revisions", "planning-that-changes-the-checkout-is-refused")
-	root, baseSHA, _, _ := writeChangePlanRepository(t)
+	root, baseSHA, _, _ := writeImpactPlanRepository(t)
 	_, err := EmitImpactPlan(context.Background(), root, PlanOptions{Base: baseSHA},
 		func(context.Context, string, bool) (PlannerResult, error) {
-			writeChangePlanFile(t, filepath.Join(root, "app", "generated.txt"), "written by planning\n")
+			writeImpactPlanFile(t, filepath.Join(root, "app", "generated.txt"), "written by planning\n")
 			return PlannerResult{Commands: []string{"lint"}, Complete: true}, nil
 		})
 	if err == nil || err.Error() != "impact-plan planning changed the checked-out source state" {
@@ -167,8 +194,8 @@ func TestEmitImpactPlanRefusesPlanningThatChangesTheCheckout(t *testing.T) {
 // planned.
 func TestEmitImpactPlanRefusesADirtyWorktreeBeforePlanning(t *testing.T) {
 	spectest.Proves(t, "cli/impact-plan", "pinned-revisions", "a-dirty-worktree-is-refused-before-planning")
-	root, baseSHA, _, project := writeChangePlanRepository(t)
-	writeChangePlanFile(t, filepath.Join(root, "app", "source.txt"), "uncommitted\n")
+	root, baseSHA, _, project := writeImpactPlanRepository(t)
+	writeImpactPlanFile(t, filepath.Join(root, "app", "source.txt"), "uncommitted\n")
 	calls := 0
 	_, err := EmitImpactPlan(context.Background(), root, PlanOptions{Base: baseSHA}, impactPlanTestPlanner(project, []string{"lint"}, &calls))
 	if err == nil || err.Error() != "impact-plan requires a clean worktree" || !errors.Is(err, cmderr.ErrInvalidConfig) {
@@ -184,7 +211,7 @@ func TestEmitImpactPlanRefusesADirtyWorktreeBeforePlanning(t *testing.T) {
 // with the protocol package alone, and the human output to a summary.
 func TestRenderImpactPlanWritesOneEnvelope(t *testing.T) {
 	spectest.Proves(t, "cli/impact-plan", "one-structured-result", "the-render-writes-one-envelope")
-	root, baseSHA, headSHA, project := writeChangePlanRepository(t)
+	root, baseSHA, headSHA, project := writeImpactPlanRepository(t)
 	calls := 0
 	document, err := EmitImpactPlan(context.Background(), root, PlanOptions{Base: baseSHA, NoCache: true, CLIVersion: "test"},
 		impactPlanTestPlanner(project, []string{"lint", "test"}, &calls))
@@ -236,7 +263,77 @@ func TestRenderImpactPlanWritesOneEnvelope(t *testing.T) {
 	}
 }
 
-func changePlanGitOutput(t *testing.T, dir string, args ...string) string {
+// writeImpactPlanRepository is a two-commit workspace repository whose head
+// changes one file of its one project, app. Its origin remote carries
+// credentials. It returns the root, both commits and the project.
+func writeImpactPlanRepository(t *testing.T) (root, baseSHA, headSHA string, project *workspace.Project) {
+	t.Helper()
+	root = t.TempDir()
+	writeImpactPlanFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name":"fixture","includes":["app"]}`)
+	writeImpactPlanFile(t, filepath.Join(root, "app", "putnami.json"), `{"name":"app"}`)
+	writeImpactPlanFile(t, filepath.Join(root, "app", "source.txt"), "base\n")
+	runImpactPlanGit(t, root, "init")
+	runImpactPlanGit(t, root, "config", "user.email", "fixture@example.test")
+	runImpactPlanGit(t, root, "config", "user.name", "Fixture")
+	runImpactPlanGit(t, root, "remote", "add", "origin", "https://token:secret@example.test/org/repo.git")
+	runImpactPlanGit(t, root, "add", ".")
+	runImpactPlanGit(t, root, "commit", "-m", "base")
+	var err error
+	baseSHA, err = git.HeadSHA(root)
+	if err != nil {
+		t.Fatalf("base HEAD: %v", err)
+	}
+	writeImpactPlanFile(t, filepath.Join(root, "app", "source.txt"), "head\n")
+	runImpactPlanGit(t, root, "add", "app/source.txt")
+	runImpactPlanGit(t, root, "commit", "-m", "head")
+	headSHA, err = git.HeadSHA(root)
+	if err != nil {
+		t.Fatalf("head HEAD: %v", err)
+	}
+	workspace.InvalidateLoadCache(root)
+	ws, err := workspace.Load(root)
+	if err != nil {
+		t.Fatalf("load workspace: %v", err)
+	}
+	if len(ws.Projects) != 1 {
+		t.Fatalf("projects = %d, want 1", len(ws.Projects))
+	}
+	return root, baseSHA, headSHA, ws.Projects[0]
+}
+
+func impactPlanTestJob(project *workspace.Project) *jobs.ScheduledJob {
+	return &jobs.ScheduledJob{
+		Project:   project,
+		Extension: &extension.ExtensionDescription{Name: "@putnami/test", Version: "1.0.0"},
+		JobDef: &extension.JobDefinition{
+			Name:           "lint",
+			CommandName:    "lint",
+			ContractDigest: "tc1:test-contract",
+			Reads:          []extension.ResourceRef{{ID: extension.ResourceIDSources, Scope: extension.ResourceScopeProject}},
+		},
+	}
+}
+
+func writeImpactPlanFile(t *testing.T, path, contents string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", path, err)
+	}
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func runImpactPlanGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	command := exec.Command("git", args...)
+	command.Dir = dir
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, output)
+	}
+}
+
+func impactPlanGitOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	command := exec.Command("git", args...)
 	command.Dir = dir

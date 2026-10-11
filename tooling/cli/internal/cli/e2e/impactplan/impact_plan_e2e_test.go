@@ -1,7 +1,6 @@
-// Package impactplan drives `putnami impact-plan` and `putnami change-plan`
-// through the real CLI: the argument parser, the structured dispatcher,
-// discovery and the engine's impacted planner, in a fixture workspace that is
-// a Git repository. These tests swap the process streams and the working
+// Package impactplan drives `putnami impact-plan` through the real CLI: the
+// argument parser, the structured dispatcher, discovery and the engine's
+// impacted planner, in a fixture workspace that is a Git repository. These tests swap the process streams and the working
 // directory, so they run in their own test binary.
 package impactplan
 
@@ -31,17 +30,6 @@ func TestMain(m *testing.M) {
 // declare. It returns the root and the base commit.
 func impactPlanFixture(t *testing.T) (root, baseSHA string) {
 	t.Helper()
-	return impactPlanFixtureWith(t, func(manifest *extensionproto.Manifest) {
-		validate := manifest.Commands["validate"]
-		validate.AlsoRuns = []string{"validate-workspace"}
-		manifest.Commands["validate"] = validate
-	})
-}
-
-// impactPlanFixtureWith is impactPlanFixture with edit applied to the fixture
-// extension's manifest instead of the validate-workspace companion.
-func impactPlanFixtureWith(t *testing.T, edit func(*extensionproto.Manifest)) (root, baseSHA string) {
-	t.Helper()
 	root = clitest.WhereFixture(t, false, false)
 	manifestPath := filepath.Join(root, "extension", "putnami.extension.json")
 	data, err := os.ReadFile(manifestPath)
@@ -52,7 +40,9 @@ func impactPlanFixtureWith(t *testing.T, edit func(*extensionproto.Manifest)) (r
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	edit(&manifest)
+	validate := manifest.Commands["validate"]
+	validate.AlsoRuns = []string{"validate-workspace"}
+	manifest.Commands["validate"] = validate
 	data, err = json.Marshal(manifest)
 	if err != nil {
 		t.Fatal(err)
@@ -140,36 +130,18 @@ func TestImpactPlanPlansTheNamedCommandsAndRunsNothing(t *testing.T) {
 	}
 }
 
-// TestChangePlanIsTheProjectionOfImpactPlan holds the one projection through
-// the real engine: change-plan's ChangePlan is ChangePlanFromImpactPlan of the
-// ImpactPlan impact-plan emits for the same gate and range.
-func TestChangePlanIsTheProjectionOfImpactPlan(t *testing.T) {
-	spectest.Proves(t, "cli/impact-plan", "one-projection", "change-plan-is-the-projection-of-impact-plan")
+// TestImpactPlanPlansTheCompanionsOfTheNamedCommands holds the plan of the
+// gate through the real engine: the plan names the commands requested, and
+// its tasks also hold the validate-workspace task validate plans through
+// alsoRuns.
+func TestImpactPlanPlansTheCompanionsOfTheNamedCommands(t *testing.T) {
+	spectest.Proves(t, "cli/impact-plan", "named-commands", "the-planner-plans-the-named-commands")
 	root, baseSHA := impactPlanFixture(t)
-	clitest.RunGit(t, root, "remote", "add", "origin", "https://example.test/org/repo.git")
 
 	impact := runStructured[ciproto.ImpactPlan](t, root, "impact-plan", "lint,test,build,validate", "--base", baseSHA, "--no-cache", "--output=json")
-	change := runStructured[ciproto.ChangePlan](t, root, "change-plan", "--base", baseSHA, "--no-cache", "--output=json")
-	if err := ciproto.ValidateChangePlan(change); err != nil {
-		t.Fatalf("change plan does not validate: %v", err)
+	if err := ciproto.ValidateImpactPlan(impact); err != nil {
+		t.Fatalf("impact plan does not validate: %v", err)
 	}
-	projected, err := ciproto.ChangePlanFromImpactPlan(impact, change.Repository)
-	if err != nil {
-		t.Fatalf("ChangePlanFromImpactPlan: %v", err)
-	}
-	changeBytes, err := json.Marshal(change)
-	if err != nil {
-		t.Fatal(err)
-	}
-	projectedBytes, err := json.Marshal(projected)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(changeBytes) != string(projectedBytes) {
-		t.Fatalf("change-plan differs from the projection of impact-plan:\n%s\n%s", changeBytes, projectedBytes)
-	}
-	// The plan names the commands requested; its tasks also hold the
-	// validate-workspace task validate plans through alsoRuns.
 	planned := map[string]bool{}
 	for _, task := range impact.Tasks {
 		planned[task.Identity.Task.Command] = true
@@ -216,29 +188,5 @@ func TestImpactPlanRefusesACommandNoExtensionDeclares(t *testing.T) {
 	}
 	if strings.Join(empty.Commands, ",") != "format" || len(empty.Tasks) != 0 || len(empty.ChangedFiles) != 0 {
 		t.Fatalf("plan = commands %v, %d tasks, changed %v; want an empty plan of format", empty.Commands, len(empty.Tasks), empty.ChangedFiles)
-	}
-}
-
-// TestChangePlanPlansItsListWhateverTheWorkspaceDeclares keeps change-plan's
-// fixed list out of the refusal impact-plan applies: in a workspace that
-// declares no validate job, change-plan still succeeds with the tasks of the
-// commands of its list that are declared.
-func TestChangePlanPlansItsListWhateverTheWorkspaceDeclares(t *testing.T) {
-	spectest.Proves(t, "cli/impact-plan", "named-commands", "change-plan-plans-its-list-whatever-the-workspace-declares")
-	root, baseSHA := impactPlanFixtureWith(t, func(manifest *extensionproto.Manifest) {
-		delete(manifest.Commands, "validate")
-	})
-	clitest.RunGit(t, root, "remote", "add", "origin", "https://example.test/org/repo.git")
-
-	change := runStructured[ciproto.ChangePlan](t, root, "change-plan", "--base", baseSHA, "--no-cache", "--output=json")
-	if err := ciproto.ValidateChangePlan(change); err != nil {
-		t.Fatalf("change plan does not validate: %v", err)
-	}
-	planned := map[string]bool{}
-	for _, task := range change.Tasks {
-		planned[task.Identity.Task.Command] = true
-	}
-	if len(planned) != 3 || !planned["lint"] || !planned["test"] || !planned["build"] {
-		t.Fatalf("planned commands = %v, want lint, test and build", planned)
 	}
 }

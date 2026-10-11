@@ -70,51 +70,16 @@ func init() {
 	registerCommand("mcp", cmdMcp)
 	registerCommand("pin", cmdPin)
 	registerCommand("doctor", cmdDoctor)
-	registerCommand("change-plan", cmdChangePlan)
 	registerCommand("impact-plan", cmdImpactPlan)
-}
-
-// cmdChangePlan emits the immutable, exact-revision CI admission document.
-// It deliberately owns no impact or task planning logic: ci.EmitChangePlan
-// routes through Engine.Run with the same impacted planner as lint/test/build,
-// and projects the ImpactPlan impact-plan would emit for changePlanCommands.
-func cmdChangePlan(env *CommandEnv) error {
-	if err := env.requireWorkspace(); err != nil {
-		return err
-	}
-	if env.Sub != "" {
-		return usageErrorf("change-plan takes no subcommand: run `putnami change-plan --base <commit>`")
-	}
-	parsed, err := parseCatalogCommandFlags("change-plan", env.Args)
-	if err != nil {
-		return err
-	}
-	if len(parsed.positionals) != 0 {
-		return usageErrorf("change-plan takes no positional arguments: run `putnami change-plan --base <commit>`")
-	}
-	if env.Global.Baseline != "" || env.Global.Impacted || env.Global.Projects != "" || env.Global.All {
-		return usageErrorf("change-plan owns impact selection; use --base instead of --baseline, --impacted, --projects, or --all")
-	}
-	planner := newChangePlanPlanner(env.WsRoot, env.Cfg, engine.New().Run)
-	document, err := ci.EmitChangePlan(env.Ctx, env.WsRoot, ci.PlanOptions{
-		Base:       parsed.value("--base"),
-		Head:       parsed.value("--head"),
-		NoCache:    env.Global.NoCache,
-		CLIVersion: Version,
-	}, planner)
-	if err != nil {
-		return err
-	}
-	return ci.RenderChangePlan(env.OutputFormat, document)
 }
 
 // cmdImpactPlan emits the impacted plan of the exact commit range from --base
 // to the checked-out HEAD for the command list its one positional names. It is
-// the document an extension reads instead of importing the CLI. Like
-// change-plan, it owns no impact or task planning logic: ci.EmitImpactPlan
-// routes through Engine.Run with the impacted planner. The command list is
-// parsed by impactPlanCommands; impact-plan is a positional leaf
-// (commandmeta.PositionalLeaf), so the list arrives in env.Args.
+// the document an extension reads instead of importing the CLI. It owns no
+// impact or task planning logic: ci.EmitImpactPlan routes through Engine.Run
+// with the impacted planner. The command list is parsed by impactPlanCommands;
+// impact-plan is a positional leaf (commandmeta.PositionalLeaf), so the list
+// arrives in env.Args.
 func cmdImpactPlan(env *CommandEnv) error {
 	if err := env.requireWorkspace(); err != nil {
 		return err
@@ -133,7 +98,7 @@ func cmdImpactPlan(env *CommandEnv) error {
 	if err != nil {
 		return err
 	}
-	planner := newImpactPlanPlanner("impact-plan", env.WsRoot, env.Cfg, commands, refuseUndeclaredCommands(commands, engine.New().Run))
+	planner := newImpactPlanPlanner(env.WsRoot, env.Cfg, commands, refuseUndeclaredCommands(commands, engine.New().Run))
 	document, err := ci.EmitImpactPlan(env.Ctx, env.WsRoot, ci.PlanOptions{
 		Base:       parsed.value("--base"),
 		Head:       parsed.value("--head"),
@@ -173,39 +138,15 @@ func impactPlanCommands(list string, cfg *wsproto.Config) ([]string, error) {
 	return commands, nil
 }
 
-// changePlanEngineRun names the adapter seam so the exact Engine.Run request
-// can be tested without making commands depend on the engine package.
-type changePlanEngineRun func(context.Context, engine.Request, engine.EventSink) (engine.SessionResult, error)
+// engineRun names the adapter seam so the exact Engine.Run request can be
+// tested without making commands depend on the engine package.
+type engineRun func(context.Context, engine.Request, engine.EventSink) (engine.SessionResult, error)
 
-// changePlanCommands is the quality gate the change plan projects: the
-// command list CI runs, in the same order.
-//
-// The two must not drift. The change plan is what a reviewer reads to decide
-// what CI will do with a revision, so a command CI runs and the plan omits is a
-// task nobody reviewed, and a command the plan shows and CI skips is a check
-// nobody performed. `validate-workspace` is not listed: the manifest that
-// declares both commands plans it from `validate` through `alsoRuns`, so the
-// planned session runs it all the same.
-//
-// It stays a literal here rather than a read of a CI document: the planner
-// must answer for a workspace whose CI document is absent or unreadable, and
-// planning nothing at all would report an empty change plan as a legitimate
-// "nothing to do". TestChangePlanCommandsMatchTheCIQualityJob holds it equal
-// to the gate the generated guidance derives for this workspace.
-var changePlanCommands = []string{"lint", "test", "build", "validate"}
-
-// newChangePlanPlanner is the impact planner of changePlanCommands, the one
-// change-plan runs.
-func newChangePlanPlanner(wsRoot string, cfg *wsproto.Config, run changePlanEngineRun) ci.Planner {
-	return newImpactPlanPlanner("change-plan", wsRoot, cfg, changePlanCommands, run)
-}
-
-// newImpactPlanPlanner maps the immutable base revision of command (impact-plan
-// or change-plan) onto the ordinary impacted engine plan for commands. The CLI
-// owns this adapter: commands receives only its typed result and cannot form
-// an engine cycle. The result and every error it returns name commands, the
-// list it planned.
-func newImpactPlanPlanner(command, wsRoot string, cfg *wsproto.Config, commands []string, run changePlanEngineRun) ci.Planner {
+// newImpactPlanPlanner maps the immutable base revision of impact-plan onto the
+// ordinary impacted engine plan for commands. The CLI owns this adapter:
+// commands receives only its typed result and cannot form an engine cycle. The
+// result and every error it returns name commands, the list it planned.
+func newImpactPlanPlanner(wsRoot string, cfg *wsproto.Config, commands []string, run engineRun) ci.Planner {
 	planned := append([]string(nil), commands...)
 	gate := strings.Join(planned, ",")
 	return func(ctx context.Context, baseSHA string, noCache bool) (ci.PlannerResult, error) {
@@ -227,11 +168,11 @@ func newImpactPlanPlanner(command, wsRoot string, cfg *wsproto.Config, commands 
 		}
 		ws, err := workspace.Load(wsRoot)
 		if err != nil {
-			return ci.PlannerResult{}, fmt.Errorf("plan %s: load workspace for %s versions: %w", gate, command, err)
+			return ci.PlannerResult{}, fmt.Errorf("plan %s: load workspace for impact-plan versions: %w", gate, err)
 		}
 		versions, err := engine.BuildVersionInfo(ws)
 		if err != nil {
-			return ci.PlannerResult{}, fmt.Errorf("plan %s: %s versions: %w", gate, command, err)
+			return ci.PlannerResult{}, fmt.Errorf("plan %s: impact-plan versions: %w", gate, err)
 		}
 		return ci.PlannerResult{
 			Commands: append([]string(nil), planned...),
@@ -249,8 +190,8 @@ func newImpactPlanPlanner(command, wsRoot string, cfg *wsproto.Config, commands 
 // caller that admits a change from the plan would read "nothing to run". The
 // check reads the job map the engine plans from, after extension discovery and
 // before selection. A declared command that plans zero tasks because nothing it
-// serves is impacted stays a valid empty plan. change-plan does not use it.
-func refuseUndeclaredCommands(commands []string, run changePlanEngineRun) changePlanEngineRun {
+// serves is impacted stays a valid empty plan.
+func refuseUndeclaredCommands(commands []string, run engineRun) engineRun {
 	requested := append([]string(nil), commands...)
 	return func(ctx context.Context, req engine.Request, sink engine.EventSink) (engine.SessionResult, error) {
 		req.ValidateCommandFlags = func(discovered *extension.DiscoveryResult, _ GlobalFlags) error {
@@ -612,7 +553,7 @@ func cmdCache(env *CommandEnv) error {
 func newCacheVerifyRunner(
 	cfg *wsproto.Config,
 	global GlobalFlags,
-	run changePlanEngineRun,
+	run engineRun,
 ) cachecmd.CacheVerifyRunner {
 	return func(ctx context.Context, workspaceRoot, storeRoot string) (cachecmd.CacheVerifyEngineResult, error) {
 		flags := global

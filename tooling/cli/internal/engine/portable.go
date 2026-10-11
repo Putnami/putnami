@@ -395,9 +395,10 @@ func portableRequest(req *Request, ws *workspace.Workspace, discovered *internal
 	}, nil
 }
 
-// expectedPlan projects the final DAG through the ChangePlan's projection so
-// the two documents can never describe one plan two ways, and adds the one
-// plan property the ChangePlan omits: whether a task is cacheable at all.
+// expectedPlan projects the final DAG through the task projection an
+// ImpactPlan uses, so the two documents can never describe one plan two ways,
+// and adds the one plan property that projection omits: whether a task is
+// cacheable at all.
 // Cache PRESENCE is deliberately absent; it is an observation, not identity.
 func expectedPlan(planned []*jobs.ScheduledJob) (runner.PlanBlock, error) {
 	tasks, err := changeplan.ProjectTasks(planned)

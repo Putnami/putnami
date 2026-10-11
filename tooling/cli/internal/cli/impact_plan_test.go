@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -110,7 +111,7 @@ func TestImpactPlanPlannerRoutesThroughEngine(t *testing.T) {
 	workspace.InvalidateLoadCache(root)
 	commands := []string{"test", "build"}
 	var requested []string
-	planner := newImpactPlanPlanner("impact-plan", root, &wsproto.Config{}, commands,
+	planner := newImpactPlanPlanner(root, &wsproto.Config{}, commands,
 		func(_ context.Context, request engine.Request, _ engine.EventSink) (engine.SessionResult, error) {
 			requested = request.Commands
 			if request.WorkspaceRoot != root || !request.Global.Impacted || request.Global.Baseline != impactPlanTestBase ||
@@ -133,7 +134,7 @@ func TestImpactPlanPlannerRoutesThroughEngine(t *testing.T) {
 	}
 
 	engineErr := errors.New("engine refused the plan")
-	failing := newImpactPlanPlanner("impact-plan", root, &wsproto.Config{}, []string{"lint"},
+	failing := newImpactPlanPlanner(root, &wsproto.Config{}, []string{"lint"},
 		func(context.Context, engine.Request, engine.EventSink) (engine.SessionResult, error) {
 			return engine.SessionResult{}, engineErr
 		})
@@ -141,13 +142,21 @@ func TestImpactPlanPlannerRoutesThroughEngine(t *testing.T) {
 		t.Fatalf("error = %v, want the engine error naming lint", err)
 	}
 
-	complete := newImpactPlanPlanner("impact-plan", root, &wsproto.Config{}, []string{"test"},
-		func(context.Context, engine.Request, engine.EventSink) (engine.SessionResult, error) {
-			return engine.SessionResult{ExitCode: engine.ExitSuccess}, nil
+	project := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
+	planned := []*jobs.ScheduledJob{{Project: project}}
+	complete := newImpactPlanPlanner(root, &wsproto.Config{}, []string{"test"},
+		func(_ context.Context, request engine.Request, sink engine.EventSink) (engine.SessionResult, error) {
+			if sink != nil || !request.Global.NoCache {
+				t.Fatalf("sink = %T, no-cache = %v; want no sink and --no-cache passed through", sink, request.Global.NoCache)
+			}
+			return engine.SessionResult{ExitCode: engine.ExitSuccess, Projects: []*workspace.Project{project}, Plan: planned}, nil
 		})
 	result, err = complete(context.Background(), impactPlanTestBase, true)
 	if err != nil || !result.Complete || !reflect.DeepEqual(result.Commands, []string{"test"}) {
 		t.Fatalf("result = %+v, %v; want a complete plan of test", result, err)
+	}
+	if !reflect.DeepEqual(result.Projects, []*workspace.Project{project}) || !reflect.DeepEqual(result.Jobs, planned) {
+		t.Fatalf("result projects = %v, jobs = %v; want the engine's plan", result.Projects, result.Jobs)
 	}
 }
 

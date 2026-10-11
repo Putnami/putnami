@@ -183,21 +183,6 @@ Usage lines, subcommands, flags and examples for each command below are
 generated: run `putnami help <command>`. The sections here describe the
 behavior that a usage line cannot state.
 
-### `change-plan`
-
-Emit a revision-pinned CI admission plan for the affected projects and their
-transitive dependents:
-
-```bash
-putnami change-plan --base origin/main --output=json
-```
-
-It rejects dirty trees, a non-checked-out `--head`, and a base that is not an
-ancestor of HEAD. The structured result contains the full immutable document in
-`data`; see [CI Change Plans](17-ci-change-plans.md) for the v1 schema and
-digest rules. The plan covers the fixed CI gate and is the projection of the
-`impact-plan` document for that gate.
-
 ### `impact-plan`
 
 Emit the impacted plan of a checked-out commit range for the commands you name:
@@ -207,12 +192,14 @@ putnami impact-plan test,build --base origin/main --output=json
 ```
 
 It is the document an extension reads to learn the changed files, the impacted
-projects and the planned tasks of a change without importing the CLI. It runs
-the same revision checks as `change-plan` and needs no repository remote. The
-command list is one positional argument, comma-separated, with aliases resolved;
-a command named twice, an alias that expands to several commands, and a command
-that no extension of the workspace declares are refused. See
-[Impact plans](17-ci-change-plans.md#impact-plans).
+projects and the planned tasks of a change without importing the CLI. It
+rejects dirty trees, a non-checked-out `--head`, and a base that is not an
+ancestor of HEAD, and needs no repository remote. The command list is one
+positional argument, comma-separated, with aliases resolved; a command named
+twice, an alias that expands to several commands, and a command that no
+extension of the workspace declares are refused. A consumer that needs a
+ChangePlan projects one from this document with `ChangePlanFromImpactPlan`.
+See [Impact Plans](17-impact-plans.md).
 
 ### `projects`
 

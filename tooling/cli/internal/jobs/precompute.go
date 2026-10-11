@@ -34,9 +34,10 @@ func CacheEntryPresent(cache *store.CacheManager, job *ScheduledJob, hash string
 }
 
 // CacheKeysRecomputableAtRevision reports whether every cacheable task can be
-// keyed from a checked-out revision and this CLI binary alone. A ChangePlan
-// must not carry a key that depends on an environment value or an ambient
-// toolchain identity that its digest deliberately does not publish.
+// keyed from a checked-out revision and this CLI binary alone. An ImpactPlan,
+// and the ChangePlan a consumer projects from it, must not carry a key that
+// depends on an environment value or an ambient toolchain identity that the
+// ChangePlan digest deliberately does not publish.
 func CacheKeysRecomputableAtRevision(ws *workspace.Workspace, planned []*ScheduledJob, noCache bool) bool {
 	if noCache {
 		return false

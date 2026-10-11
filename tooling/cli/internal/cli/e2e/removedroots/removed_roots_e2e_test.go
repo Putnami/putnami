@@ -50,6 +50,8 @@ func TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap(t *testing.T) {
 		{"help", "ci"},
 		{"help", "ci", "validate"},
 		{"help", "channel"},
+		{"change-plan", "--base", "HEAD", "--output=json"},
+		{"help", "change-plan"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Setenv(bootstrappedEnv, "")
@@ -103,6 +105,7 @@ func TestRemovedRootsAreRefusedOutsideAWorkspace(t *testing.T) {
 		{"channel", "status", "latest"},
 		{"help", "ci"},
 		{"help", "channel"},
+		{"change-plan", "--base", "HEAD"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			code, output := clitest.RunGateArgs(t, t.TempDir(), args...)

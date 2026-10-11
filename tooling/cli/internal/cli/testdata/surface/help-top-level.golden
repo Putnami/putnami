@@ -8,7 +8,6 @@ Build (from extensions):
   Multi-command: putnami lint,test,build --impacted
 
 CI:
-  change-plan                  Emit an immutable impacted CI ChangePlan
   impact-plan                  Emit the impacted plan of a change for a command list
 
 Projects:

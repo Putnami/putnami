@@ -63,55 +63,30 @@ func encodePlan(t *testing.T, plan ciproto.ChangePlan) []byte {
 	return append(encoded, '\n')
 }
 
-// TestBuildReproducesTheValidCorpus runs every valid protocol fixture back
-// through Build, the path every emitted plan takes. Build receives the
-// fixture's planner data reversed and with duplicates, so it must canonicalize
-// it into the exact committed bytes and digest.
-func TestBuildReproducesTheValidCorpus(t *testing.T) {
+// TestBuildImpactProjectsOntoTheChangePlanCorpus runs the planner data of
+// every valid ChangePlan fixture through BuildImpact, the path every emitted
+// plan takes, reversed and with duplicates. The protocol's projection of the
+// result for the fixture's repository must be the committed bytes and digest,
+// so the CLI canonicalizes every member a ChangePlan shares with an ImpactPlan.
+func TestBuildImpactProjectsOntoTheChangePlanCorpus(t *testing.T) {
 	t.Parallel()
 	for name, digest := range readCorpusExpectations(t).Valid {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			plan, data := readCorpusPlan(t, "valid", name)
-			built, err := Build(scrambledInput(plan, corpusCommands), plan.Repository)
+			built, err := BuildImpact(scrambledInput(plan, corpusCommands))
 			if err != nil {
-				t.Fatalf("Build: %v", err)
+				t.Fatalf("BuildImpact: %v", err)
 			}
-			if built.Digest != digest {
-				t.Fatalf("Build digest = %s, want %s", built.Digest, digest)
-			}
-			if encoded := encodePlan(t, built); !bytes.Equal(encoded, data) {
-				t.Fatalf("Build emitted a different document:\n--- corpus ---\n%s\n--- built ---\n%s", data, encoded)
-			}
-		})
-	}
-}
-
-// TestBuildNeverEmitsAnInvalidCorpusPlan holds the producer to every refusal:
-// the protocol refuses each invalid fixture with its expected reason, and
-// Build given the same planner data either refuses it for that reason or
-// emits a different, valid plan.
-func TestBuildNeverEmitsAnInvalidCorpusPlan(t *testing.T) {
-	t.Parallel()
-	for name, refusal := range readCorpusExpectations(t).Invalid {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			plan, data := readCorpusPlan(t, "invalid", name)
-			if err := ciproto.ValidateChangePlan(plan); err == nil || err.Error() != refusal {
-				t.Fatalf("ValidateChangePlan = %v, want %q", err, refusal)
-			}
-			built, err := Build(scrambledInput(plan, corpusCommands), plan.Repository)
+			projected, err := ciproto.ChangePlanFromImpactPlan(built, plan.Repository)
 			if err != nil {
-				if err.Error() != refusal {
-					t.Fatalf("Build refused with %q, want %q", err, refusal)
-				}
-				return
+				t.Fatalf("ChangePlanFromImpactPlan: %v", err)
 			}
-			if bytes.Equal(encodePlan(t, built), data) {
-				t.Fatal("Build emitted the invalid fixture byte for byte")
+			if projected.Digest != digest {
+				t.Fatalf("projected digest = %s, want %s", projected.Digest, digest)
 			}
-			if err := ciproto.ValidateChangePlan(built); err != nil {
-				t.Fatalf("Build emitted a plan the protocol refuses: %v", err)
+			if encoded := encodePlan(t, projected); !bytes.Equal(encoded, data) {
+				t.Fatalf("the projection differs from the corpus:\n--- corpus ---\n%s\n--- projected ---\n%s", data, encoded)
 			}
 		})
 	}
@@ -170,12 +145,11 @@ func encodeImpactPlan(t *testing.T, plan ciproto.ImpactPlan) []byte {
 
 // TestBuildImpactReproducesTheValidCorpus runs every valid protocol impact
 // plan back through BuildImpact, the path every emitted impact plan takes,
-// from scrambled planner data, and then through Build, which must emit the
-// ChangePlan fixture the corpus pairs it with.
+// from scrambled planner data, which must emit the committed bytes.
 func TestBuildImpactReproducesTheValidCorpus(t *testing.T) {
 	spectest.Proves(t, "cli/impact-plan", "one-projection", "the-corpus-is-reproduced")
 	t.Parallel()
-	for name, changePlanName := range readImpactCorpusExpectations(t).Valid {
+	for name := range readImpactCorpusExpectations(t).Valid {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			plan, data := readImpactCorpus(t, "valid", name)
@@ -186,21 +160,14 @@ func TestBuildImpactReproducesTheValidCorpus(t *testing.T) {
 			if encoded := encodeImpactPlan(t, built); !bytes.Equal(encoded, data) {
 				t.Fatalf("BuildImpact emitted a different document:\n--- corpus ---\n%s\n--- built ---\n%s", data, encoded)
 			}
-			changePlan, changePlanData := readCorpusPlan(t, "valid", changePlanName)
-			rebuilt, err := Build(scrambledImpactInput(plan), changePlan.Repository)
-			if err != nil {
-				t.Fatalf("Build: %v", err)
-			}
-			if encoded := encodePlan(t, rebuilt); !bytes.Equal(encoded, changePlanData) {
-				t.Fatalf("Build emitted a different ChangePlan than change-plan/valid/%s:\n%s", changePlanName, encoded)
-			}
 		})
 	}
 }
 
-// TestBuildImpactNeverEmitsAnInvalidCorpusPlan holds BuildImpact to every
-// impact plan refusal, the way TestBuildNeverEmitsAnInvalidCorpusPlan holds
-// Build to the ChangePlan ones.
+// TestBuildImpactNeverEmitsAnInvalidCorpusPlan holds the producer to every
+// impact plan refusal: the protocol refuses each invalid fixture with its
+// expected reason, and BuildImpact given the same planner data either refuses
+// it for that reason or emits a different, valid plan.
 func TestBuildImpactNeverEmitsAnInvalidCorpusPlan(t *testing.T) {
 	spectest.Proves(t, "cli/impact-plan", "one-projection", "an-invalid-plan-is-never-emitted")
 	t.Parallel()

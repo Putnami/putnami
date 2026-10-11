@@ -14,22 +14,25 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-func TestBuildCanonicalDigestIsStable(t *testing.T) {
+// TestBuildImpactIsCanonical holds the projection to one encoding per plan:
+// planner data that differs only in order and repetition emits the same bytes.
+func TestBuildImpactIsCanonical(t *testing.T) {
+	spectest.Proves(t, "cli/impact-plan", "one-projection", "the-projection-is-canonical")
 	app := &workspace.Project{ID: "/app", Name: "app", Path: "apps/app"}
 	lib := &workspace.Project{ID: "/lib", Name: "lib", Path: "libs/lib"}
-	first, err := Build(changePlanInput(app, lib, []string{"apps/app/main.go", "libs/lib/lib.go"}, ciproto.ChangePlanCache{
+	first, err := BuildImpact(changePlanInput(app, lib, []string{"apps/app/main.go", "libs/lib/lib.go"}, ciproto.ChangePlanCache{
 		Status:  "available",
 		Entries: []ciproto.ChangePlanCacheEntry{{TaskKey: "/lib:build", Key: "key-lib"}, {TaskKey: "/app:lint", Key: "key-app"}},
-	}), testRepository)
+	}))
 	if err != nil {
-		t.Fatalf("Build first: %v", err)
+		t.Fatalf("BuildImpact first: %v", err)
 	}
-	second, err := Build(changePlanInput(app, lib, []string{"libs/lib/lib.go", "apps/app/main.go", "apps/app/main.go"}, ciproto.ChangePlanCache{
+	second, err := BuildImpact(changePlanInput(app, lib, []string{"libs/lib/lib.go", "apps/app/main.go", "apps/app/main.go"}, ciproto.ChangePlanCache{
 		Status:  "available",
 		Entries: []ciproto.ChangePlanCacheEntry{{TaskKey: "/app:lint", Key: "key-app"}, {TaskKey: "/lib:build", Key: "key-lib"}},
-	}), testRepository)
+	}))
 	if err != nil {
-		t.Fatalf("Build second: %v", err)
+		t.Fatalf("BuildImpact second: %v", err)
 	}
 	firstJSON, err := json.Marshal(first)
 	if err != nil {
@@ -42,57 +45,19 @@ func TestBuildCanonicalDigestIsStable(t *testing.T) {
 	if string(firstJSON) != string(secondJSON) {
 		t.Fatalf("equivalent inputs emitted different documents:\n%s\n%s", firstJSON, secondJSON)
 	}
-	if first.Digest != second.Digest {
-		t.Fatalf("digest differs: %s != %s", first.Digest, second.Digest)
-	}
-	if err := ciproto.ValidateChangePlan(first); err != nil {
-		t.Fatalf("Validate: %v", err)
-	}
-	recomputed, err := ciproto.RecomputeChangePlanDigest(first)
-	if err != nil {
-		t.Fatalf("RecomputeChangePlanDigest: %v", err)
-	}
-	if recomputed != first.Digest {
-		t.Fatalf("recomputed digest = %s, want %s", recomputed, first.Digest)
+	if err := ciproto.ValidateImpactPlan(first); err != nil {
+		t.Fatalf("ValidateImpactPlan: %v", err)
 	}
 }
 
-func TestDigestExcludesAdvisoryCachePresence(t *testing.T) {
-	app := &workspace.Project{ID: "/app", Name: "app", Path: "apps/app"}
-	lib := &workspace.Project{ID: "/lib", Name: "lib", Path: "libs/lib"}
-	cold, err := Build(changePlanInput(app, lib, []string{"apps/app/main.go"}, ciproto.ChangePlanCache{
-		Status:  "available",
-		Entries: []ciproto.ChangePlanCacheEntry{{TaskKey: "/app:lint", Key: "key-app", Present: false}},
-	}), testRepository)
-	if err != nil {
-		t.Fatalf("Build cold: %v", err)
-	}
-	warm, err := Build(changePlanInput(app, lib, []string{"apps/app/main.go"}, ciproto.ChangePlanCache{
-		Status:  "available",
-		Entries: []ciproto.ChangePlanCacheEntry{{TaskKey: "/app:lint", Key: "key-app", Present: true}},
-	}), testRepository)
-	if err != nil {
-		t.Fatalf("Build warm: %v", err)
-	}
-	if cold.Digest != warm.Digest {
-		t.Fatalf("cache presence changed digest: %s != %s", cold.Digest, warm.Digest)
-	}
-	if err := ciproto.ValidateChangePlan(cold); err != nil {
-		t.Fatalf("Validate cold: %v", err)
-	}
-	if err := ciproto.ValidateChangePlan(warm); err != nil {
-		t.Fatalf("Validate warm: %v", err)
-	}
-}
-
-func TestBuildDoesNotSerializeInvocationDetails(t *testing.T) {
+func TestBuildImpactDoesNotSerializeInvocationDetails(t *testing.T) {
 	app := &workspace.Project{ID: "/app", Name: "app", Path: "apps/app"}
 	job := testJob(app, "lint~secret", 0)
 	job.JobDef.Command = "private-command"
 	job.JobDef.Args = []string{"--token", "super-secret-token"}
 	job.JobDef.Cwd = "private-working-directory"
 	job.JobDef.Env = map[string]string{"API_TOKEN": "super-secret-token"}
-	document, err := Build(Input{
+	document, err := BuildImpact(Input{
 		Generator:        ciproto.ChangePlanGenerator{Name: "putnami", Version: "test"},
 		Commands:         []string{"lint"},
 		BaseSHA:          strings.Repeat("a", 40),
@@ -102,9 +67,9 @@ func TestBuildDoesNotSerializeInvocationDetails(t *testing.T) {
 		ImpactedProjects: []*workspace.Project{app},
 		Planned:          []*jobs.ScheduledJob{job},
 		Cache:            ciproto.ChangePlanCache{Status: "disabled"},
-	}, testRepository)
+	})
 	if err != nil {
-		t.Fatalf("Build: %v", err)
+		t.Fatalf("BuildImpact: %v", err)
 	}
 	encoded, err := json.Marshal(document)
 	if err != nil {
@@ -117,21 +82,20 @@ func TestBuildDoesNotSerializeInvocationDetails(t *testing.T) {
 	}
 }
 
-func TestBuildRejectsTaskWithoutHardDeadline(t *testing.T) {
+func TestBuildImpactRejectsTaskWithoutHardDeadline(t *testing.T) {
 	app := &workspace.Project{ID: "/app", Name: "app", Path: "apps/app"}
 	in := changePlanInput(app, app, []string{"apps/app/main.go"}, ciproto.ChangePlanCache{Status: "disabled"})
 	in.Planned = []*jobs.ScheduledJob{testJob(app, "lint~unbounded", -1)}
-	if _, err := Build(in, testRepository); err == nil || !strings.Contains(err.Error(), "no hard deadline") {
-		t.Fatalf("Build error = %v, want hard-deadline rejection", err)
+	if _, err := BuildImpact(in); err == nil || !strings.Contains(err.Error(), "no hard deadline") {
+		t.Fatalf("BuildImpact error = %v, want hard-deadline rejection", err)
 	}
 }
 
-// TestBuildIsTheChangePlanOfBuildImpact holds the one projection: the
-// ChangePlan Build emits is exactly ChangePlanFromImpactPlan of the ImpactPlan
-// BuildImpact emits for the same planner data, and the ImpactPlan keeps the
-// planned command list in its order.
-func TestBuildIsTheChangePlanOfBuildImpact(t *testing.T) {
-	spectest.Proves(t, "cli/impact-plan", "one-projection", "build-is-the-change-plan-of-build-impact")
+// TestBuildImpactKeepsThePlannedCommandOrder holds the ImpactPlan to the
+// planned command list in its order, and derives the transitive dependents
+// from the impacted closure.
+func TestBuildImpactKeepsThePlannedCommandOrder(t *testing.T) {
+	spectest.Proves(t, "cli/impact-plan", "one-projection", "the-projection-is-canonical")
 	app := &workspace.Project{ID: "/app", Name: "app", Path: "apps/app"}
 	lib := &workspace.Project{ID: "/lib", Name: "lib", Path: "libs/lib"}
 	in := changePlanInput(app, lib, []string{"libs/lib/lib.go", "apps/app/main.go"}, ciproto.ChangePlanCache{Status: "disabled"})
@@ -147,25 +111,6 @@ func TestBuildIsTheChangePlanOfBuildImpact(t *testing.T) {
 	}
 	if len(impact.Impact.TransitiveDependents) != 1 || impact.Impact.TransitiveDependents[0].ID != "/lib" {
 		t.Fatalf("transitive dependents = %#v, want /lib", impact.Impact.TransitiveDependents)
-	}
-	projected, err := ciproto.ChangePlanFromImpactPlan(impact, testRepository)
-	if err != nil {
-		t.Fatalf("ChangePlanFromImpactPlan: %v", err)
-	}
-	built, err := Build(in, testRepository)
-	if err != nil {
-		t.Fatalf("Build: %v", err)
-	}
-	projectedJSON, err := json.Marshal(projected)
-	if err != nil {
-		t.Fatal(err)
-	}
-	builtJSON, err := json.Marshal(built)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(projectedJSON) != string(builtJSON) {
-		t.Fatalf("Build and the projection of BuildImpact differ:\n%s\n%s", builtJSON, projectedJSON)
 	}
 }
 
@@ -195,7 +140,7 @@ func TestBuildImpactRefusesWhatTheProtocolRefuses(t *testing.T) {
 
 // TestProjectionRefusalsNameTheDocument holds every refusal of the projection
 // to the document it was building: BuildImpact refuses as the impact plan,
-// while Build and ProjectTasks keep the change plan's messages byte for byte.
+// while ProjectTasks keeps the change plan's messages byte for byte.
 func TestProjectionRefusalsNameTheDocument(t *testing.T) {
 	t.Parallel()
 	app := &workspace.Project{ID: "/app", Name: "app", Path: "apps/app"}
@@ -231,9 +176,6 @@ func TestProjectionRefusalsNameTheDocument(t *testing.T) {
 			if _, err := BuildImpact(in); err == nil || err.Error() != fmt.Sprintf(tc.message, "impact plan") {
 				t.Errorf("BuildImpact error = %v, want %q", err, fmt.Sprintf(tc.message, "impact plan"))
 			}
-			if _, err := Build(in, testRepository); err == nil || err.Error() != fmt.Sprintf(tc.message, "change plan") {
-				t.Errorf("Build error = %v, want %q", err, fmt.Sprintf(tc.message, "change plan"))
-			}
 			if !strings.Contains(tc.message, "task") {
 				return
 			}
@@ -243,10 +185,6 @@ func TestProjectionRefusalsNameTheDocument(t *testing.T) {
 		})
 	}
 }
-
-// testRepository is the repository identity every ChangePlan in these tests
-// is built for.
-var testRepository = ciproto.ChangePlanRepository{Remote: "origin", URL: "https://example.test/org/repo.git"}
 
 func changePlanInput(app, lib *workspace.Project, changed []string, cache ciproto.ChangePlanCache) Input {
 	return Input{

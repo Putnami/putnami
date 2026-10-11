@@ -63,3 +63,11 @@ packages, which an extension cannot do.
   empty plan.
 - `impact-plan` refuses an alias that expands to several commands: the plan
   names each command once, by its own name.
+
+## Note (2026-10-11)
+
+The core CLI no longer ships `putnami change-plan`
+([CLI ADR 0061](../../../../tooling/cli/doc/adr/0061-channel-and-ci-commands-leave-the-core-cli.md)).
+The CLI emits only the ImpactPlan; a consumer that needs a ChangePlan
+projects one with `ChangePlanFromImpactPlan`. ChangePlan v1, its digest and
+its corpus are unchanged.

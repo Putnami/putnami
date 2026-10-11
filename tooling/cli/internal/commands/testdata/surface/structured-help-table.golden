@@ -12,13 +12,6 @@ description: Run lint, test, and build twice in isolated worktrees, compare cach
 usage: putnami cache verify [--projects <selector> | --impacted | --all] [--output <format>]
 example: putnami cache verify --projects /my/project
 example: putnami cache verify --all --output=jsonl
-═══ change-plan ═══
-description: Emit a deterministic admission plan of the CI quality gate for the exact commit delta from --base to the checked-out HEAD. The worktree must be clean and --base must be a HEAD ancestor, so Cloud can recompute the document's digest from immutable repository state. Source contents, environment values, secrets, command arguments, and output paths are never emitted
-usage: putnami change-plan --base <commit> [--head <commit>] [--no-cache] [--output <format>]
-flag: --base | <commit> | Required base commit or ref; emitted as its full immutable commit SHA
-flag: --head | <commit> | Optional head commit or ref; it must resolve to the checked-out HEAD
-example: putnami change-plan --base origin/main --output=json
-example: putnami change-plan --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl
 ═══ completion ═══
 description: Generate a shell completion script for bash, zsh, or fish; source it or install it where the shell looks for completions
 usage: putnami completion <bash|zsh|fish>
