@@ -269,9 +269,20 @@ func TestParseSummary_LargeStaticAssetSummary(t *testing.T) {
 
 // ---- discoverHooks ----
 
+// mustDiscoverHooks is discoverHooks for a fixture whose dependencies are all
+// installed under dir, outside any workspace root.
+func mustDiscoverHooks(t *testing.T, dir, kind string) []discoveredHook {
+	t.Helper()
+	hooks, err := discoverHooks("", dir, kind)
+	if err != nil {
+		t.Fatalf("discoverHooks: %v", err)
+	}
+	return hooks
+}
+
 func TestDiscoverHooks_NoPackageJSON(t *testing.T) {
 	dir := t.TempDir()
-	hooks := discoverHooks("", dir, HookPreBuild)
+	hooks := mustDiscoverHooks(t, dir, HookPreBuild)
 	if len(hooks) != 0 {
 		t.Errorf("expected 0 hooks for missing package.json, got %d", len(hooks))
 	}
@@ -281,7 +292,7 @@ func TestDiscoverHooks_NoDependencies(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"test"}`), 0644)
 
-	hooks := discoverHooks("", dir, HookPreBuild)
+	hooks := mustDiscoverHooks(t, dir, HookPreBuild)
 	if len(hooks) != 0 {
 		t.Errorf("expected 0 hooks with no deps, got %d", len(hooks))
 	}
@@ -309,7 +320,7 @@ func TestDiscoverHooks_DependencyWithHook(t *testing.T) {
 	pkgJSON := `{"name":"test","dependencies":{"@putnami/web":"^1.0.0"}}`
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte(pkgJSON), 0644)
 
-	hooks := discoverHooks("", dir, HookPreBuild)
+	hooks := mustDiscoverHooks(t, dir, HookPreBuild)
 	if len(hooks) != 1 {
 		t.Fatalf("expected 1 hook, got %d", len(hooks))
 	}
@@ -333,7 +344,7 @@ func TestDiscoverHooks_DevDependencyWithHook(t *testing.T) {
 	pkgJSON := `{"name":"test","devDependencies":{"my-dev-ext":"^2.0.0"}}`
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte(pkgJSON), 0644)
 
-	hooks := discoverHooks("", dir, HookPreBuild)
+	hooks := mustDiscoverHooks(t, dir, HookPreBuild)
 	if len(hooks) != 1 {
 		t.Fatalf("expected 1 hook from devDependencies, got %d", len(hooks))
 	}
@@ -351,7 +362,7 @@ func TestDiscoverHooks_DependencyWithoutHook(t *testing.T) {
 	pkgJSON := `{"name":"test","dependencies":{"some-lib":"^1.0.0"}}`
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte(pkgJSON), 0644)
 
-	hooks := discoverHooks("", dir, HookPreBuild)
+	hooks := mustDiscoverHooks(t, dir, HookPreBuild)
 	if len(hooks) != 0 {
 		t.Errorf("expected 0 hooks when no preBuild hook, got %d", len(hooks))
 	}
@@ -367,7 +378,7 @@ func TestDiscoverHooks_DependencyWithoutManifest(t *testing.T) {
 	pkgJSON := `{"name":"test","dependencies":{"plain-lib":"^1.0.0"}}`
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte(pkgJSON), 0644)
 
-	hooks := discoverHooks("", dir, HookPreBuild)
+	hooks := mustDiscoverHooks(t, dir, HookPreBuild)
 	if len(hooks) != 0 {
 		t.Errorf("expected 0 hooks when no manifest, got %d", len(hooks))
 	}
@@ -383,7 +394,7 @@ func TestDiscoverHooks_InvalidManifestJSON(t *testing.T) {
 	pkgJSON := `{"name":"test","dependencies":{"bad-manifest":"^1.0.0"}}`
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte(pkgJSON), 0644)
 
-	hooks := discoverHooks("", dir, HookPreBuild)
+	hooks := mustDiscoverHooks(t, dir, HookPreBuild)
 	if len(hooks) != 0 {
 		t.Errorf("expected 0 hooks for invalid JSON manifest, got %d", len(hooks))
 	}
@@ -402,7 +413,7 @@ func TestDiscoverHooks_MultipleDepsWithHooks(t *testing.T) {
 	pkgJSON := `{"name":"test","dependencies":{"ext-a":"^1.0.0","ext-b":"^1.0.0"}}`
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte(pkgJSON), 0644)
 
-	hooks := discoverHooks("", dir, HookPreBuild)
+	hooks := mustDiscoverHooks(t, dir, HookPreBuild)
 	if len(hooks) != 2 {
 		t.Errorf("expected 2 hooks, got %d", len(hooks))
 	}
@@ -496,7 +507,7 @@ func TestDiscoverHooks_OrderIsDeterministicAndRankedFirst(t *testing.T) {
 	}
 
 	for attempt := range 64 {
-		got := hookNames(discoverHooks("", dir, HookPreBuild))
+		got := hookNames(mustDiscoverHooks(t, dir, HookPreBuild))
 		if len(got) != len(want) {
 			t.Fatalf("attempt %d: discovered %d hooks, want %d (%v)", attempt, len(got), len(want), got)
 		}
@@ -523,7 +534,7 @@ func TestDiscoverHooks_UnrankedManifestsKeepByteOrder(t *testing.T) {
 
 	want := []string{"ext-a", "ext-b", "ext-c"}
 	for attempt := range 32 {
-		got := hookNames(discoverHooks("", dir, HookPreBuild))
+		got := hookNames(mustDiscoverHooks(t, dir, HookPreBuild))
 		if len(got) != len(want) {
 			t.Fatalf("attempt %d: discovered %v, want %v", attempt, got, want)
 		}
@@ -570,6 +581,110 @@ func TestRunHooks_InvokesInDiscoveredOrder(t *testing.T) {
 	want := []string{"@putnami/web", "@putnami/application"}
 	if len(invoked) != len(want) || invoked[0] != want[0] || invoked[1] != want[1] {
 		t.Fatalf("invocation order = %v, want %v (the finalizer must observe the producer's output)", invoked, want)
+	}
+}
+
+// ---- discoverHooks: an uninstalled dependency ----
+
+// failOnHookExec fails the test if any hook process starts.
+func failOnHookExec(t *testing.T) {
+	t.Helper()
+	withMockExec(t, func(_ string, args []string, _ ...exec.Option) (*exec.Result, error) {
+		t.Errorf("a hook ran (%v) although a dependency of the project is not installed", args)
+		return &exec.Result{Success: true, Stdout: `{"type":"summary","data":{"exports":{},"assets":{}}}`}, nil
+	})
+}
+
+// TestRunHooks_UninstalledDependencyFails pins that a project whose declared
+// dependency is not installed fails hook discovery instead of running with
+// fewer hooks. The hook set is not part of any cache key: a generate that ran
+// without the @putnami/application hook succeeded in milliseconds with a .gen
+// lacking clientgen/config.json and schema/, under the same key as a complete
+// run, and the shared cache then served that tree to every checkout.
+func TestRunHooks_UninstalledDependencyFails(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "hook-discovery-fails-closed", "an-uninstalled-dependency-fails-discovery")
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "apps", "api")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, "package.json"),
+		[]byte(`{"name":"api","dependencies":{"@putnami/application":"^1.0.0"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	failOnHookExec(t)
+
+	result, err := RunHooks(root, projectDir, "api", HookPreBuild, "build", "bun", false, nil)
+	if err == nil {
+		t.Fatalf("RunHooks = %+v, nil; want an error naming the uninstalled dependency", result)
+	}
+	for _, want := range []string{"@putnami/application", "not installed", "putnami install"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not mention %q", err, want)
+		}
+	}
+}
+
+// TestRunHooks_DanglingWorkspaceLinkFails covers a workspace: dependency whose
+// node_modules link points nowhere: it is not installed either.
+func TestRunHooks_DanglingWorkspaceLinkFails(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "hook-discovery-fails-closed", "an-uninstalled-dependency-fails-discovery")
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "apps", "api")
+	linkDir := filepath.Join(projectDir, "node_modules", "@acme")
+	if err := os.MkdirAll(linkDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "libs", "missing"), filepath.Join(linkDir, "gen")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, "package.json"),
+		[]byte(`{"name":"api","dependencies":{"@acme/gen":"workspace:*"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	failOnHookExec(t)
+
+	if _, err := RunHooks(root, projectDir, "api", HookPreBuild, "build", "bun", false, nil); err == nil ||
+		!strings.Contains(err.Error(), "@acme/gen") {
+		t.Fatalf("RunHooks error = %v, want one naming @acme/gen", err)
+	}
+}
+
+// TestRunHooks_DependencyInstalledAtWorkspaceRootRuns pins the other half of
+// the rule: a dependency counts as installed where Node resolution finds it,
+// from the project's node_modules up to the workspace root's, so a hoisted
+// install still runs its hooks and is not reported as missing.
+func TestRunHooks_DependencyInstalledAtWorkspaceRootRuns(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "hook-discovery-fails-closed", "a-hoisted-dependency-is-installed")
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "apps", "api")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeHookDependency(t, root, "@putnami/application", 100)
+	if err := os.WriteFile(filepath.Join(projectDir, "package.json"),
+		[]byte(`{"name":"api","dependencies":{"@putnami/application":"^1.0.0"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var invoked []string
+	withMockExec(t, func(_ string, args []string, _ ...exec.Option) (*exec.Result, error) {
+		data, err := os.ReadFile(args[len(args)-1]) //nolint:gosec // test fixture path
+		if err != nil {
+			return nil, err
+		}
+		var ctx hookContext
+		if err := json.Unmarshal(data, &ctx); err != nil {
+			return nil, err
+		}
+		invoked = append(invoked, ctx.Extension)
+		return &exec.Result{Success: true, Stdout: `{"type":"summary","data":{"exports":{},"assets":{}}}`}, nil
+	})
+
+	if _, err := RunHooks(root, projectDir, "api", HookPreBuild, "build", "bun", false, nil); err != nil {
+		t.Fatalf("RunHooks: %v", err)
+	}
+	if len(invoked) != 1 || invoked[0] != "@putnami/application" {
+		t.Fatalf("invoked = %v, want the hoisted @putnami/application hook", invoked)
 	}
 }
 
@@ -1185,12 +1300,12 @@ func TestDiscoverHooks_ConfigExtractKind(t *testing.T) {
 	pkg := `{"name":"test","dependencies":{"@putnami/application":"workspace:*"}}`
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte(pkg), 0644)
 
-	pre := discoverHooks("", dir, HookPreBuild)
+	pre := mustDiscoverHooks(t, dir, HookPreBuild)
 	if len(pre) != 1 || pre[0].kind != HookPreBuild {
 		t.Errorf("expected 1 preBuild hook, got %d", len(pre))
 	}
 
-	ext := discoverHooks("", dir, HookConfigExtract)
+	ext := mustDiscoverHooks(t, dir, HookConfigExtract)
 	if len(ext) != 1 || ext[0].kind != HookConfigExtract {
 		t.Errorf("expected 1 configExtract hook with kind=%q, got %d (kind=%q)", HookConfigExtract, len(ext), kindOrEmpty(ext))
 	}
@@ -1212,10 +1327,10 @@ func TestDiscoverHooks_OnlyOneKindRegistered(t *testing.T) {
 	pkg := `{"name":"test","dependencies":{"extract-only":"^1.0.0"}}`
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte(pkg), 0644)
 
-	if got := discoverHooks("", dir, HookPreBuild); len(got) != 0 {
+	if got := mustDiscoverHooks(t, dir, HookPreBuild); len(got) != 0 {
 		t.Errorf("expected 0 preBuild hooks, got %d", len(got))
 	}
-	if got := discoverHooks("", dir, HookConfigExtract); len(got) != 1 {
+	if got := mustDiscoverHooks(t, dir, HookConfigExtract); len(got) != 1 {
 		t.Errorf("expected 1 configExtract hook, got %d", len(got))
 	}
 }
