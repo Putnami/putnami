@@ -196,7 +196,10 @@ BREAKING CHANGE: Greet is gone; use Wave.
 
 A message counts exactly when the version bump counts it: a subject of the form
 `type(scope)!: summary`, or `type: summary` with a body line that starts with
-`BREAKING CHANGE:` or its synonym `BREAKING-CHANGE:`. A marker on a commit that
+`BREAKING CHANGE:` or its synonym `BREAKING-CHANGE:`. The check and the bump
+call one reader, specified in
+[conventional commit reading](../../../protocols/cli/doc/07-conventional-commit.md).
+A marker on a commit that
 does not touch the project does not count. An uncommitted change has no marker
 yet: commit it with one.
 

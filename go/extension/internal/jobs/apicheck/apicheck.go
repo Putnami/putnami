@@ -228,7 +228,10 @@ func Check(workspaceRoot, projectDir, name string, options Options) (*Report, er
 	if err != nil {
 		return nil, err
 	}
-	report.Breaking = slices.ContainsFunc(commits, func(c commit) bool { return declaresBreaking(c.subject, c.body) })
+	report.Breaking = slices.ContainsFunc(commits, func(c commit) bool {
+		parsed, ok := protocolcli.ParseConventionalCommit(c.subject, c.body)
+		return ok && parsed.Breaking
+	})
 	return report, nil
 }
 

@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	protocolcli "go.putnami.dev/protocol/cli"
 )
 
 // The repository states a release baseline distinguishes. A check that
@@ -45,7 +47,7 @@ type ReleaseBaseline struct {
 	// directory ("tree <id>"); empty when the directory is absent at Tag.
 	Object string `json:"object,omitempty"`
 	// Breaking reports whether a commit after Tag up to HEAD that touches the
-	// project directory declares a breaking change (ParseConventional).
+	// project directory declares a breaking change (protocolcli.ParseConventionalCommit).
 	Breaking bool `json:"breaking,omitempty"`
 }
 
@@ -127,7 +129,7 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 		return ReleaseBaseline{}, err
 	}
 	for _, c := range commits {
-		if _, breaking, ok := ParseConventional(c.Subject, c.Body); ok && breaking {
+		if parsed, ok := protocolcli.ParseConventionalCommit(c.Subject, c.Body); ok && parsed.Breaking {
 			baseline.Breaking = true
 			break
 		}

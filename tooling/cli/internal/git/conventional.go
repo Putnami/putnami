@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	protocolcli "go.putnami.dev/protocol/cli"
 )
 
 // Bump is how far a version advances. The zero value is BumpNone, and the
@@ -33,63 +35,6 @@ func (b Bump) String() string {
 	default:
 		return "none"
 	}
-}
-
-// breakingFooters are the conventional-commit footers that declare a breaking
-// change without the "!" marker; Conventional Commits 1.0.0 makes the hyphenated
-// form a synonym. One is matched at the start of a body line.
-var breakingFooters = []string{"BREAKING CHANGE:", "BREAKING-CHANGE:"}
-
-// ParseConventional reads a commit subject as a conventional commit:
-// "type(scope)!: summary". ok is false when the subject does not have that
-// shape, which is how a merge commit or a hand-written message is recognized
-// and left out of the advance.
-//
-// breaking is true for the "!" marker OR a "BREAKING CHANGE:" footer in the
-// body, because the two spellings mean the same thing and a release that
-// honored only one would ship a breaking change as a patch.
-func ParseConventional(subject, body string) (typ string, breaking bool, ok bool) {
-	head, _, found := strings.Cut(subject, ":")
-	if !found {
-		return "", false, false
-	}
-	head = strings.TrimSpace(head)
-	if strings.HasSuffix(head, "!") {
-		breaking = true
-		head = strings.TrimSuffix(head, "!")
-	}
-	if open := strings.IndexByte(head, '('); open >= 0 {
-		if !strings.HasSuffix(head, ")") {
-			return "", false, false
-		}
-		head = head[:open]
-	}
-	typ = strings.TrimSpace(head)
-	if typ == "" || !isConventionalType(typ) {
-		return "", false, false
-	}
-	for _, line := range strings.Split(body, "\n") {
-		line = strings.TrimSpace(line)
-		for _, footer := range breakingFooters {
-			if strings.HasPrefix(line, footer) {
-				breaking = true
-			}
-		}
-	}
-	return typ, breaking, true
-}
-
-// isConventionalType reports whether s is a conventional commit type: lowercase
-// letters only, as the convention spells them. Anything else — a sentence, a
-// ticket id, a path, "WIP" — is not a conventional commit, and reading it as one
-// would let an ordinary message advance a version.
-func isConventionalType(s string) bool {
-	for _, r := range s {
-		if r < 'a' || r > 'z' {
-			return false
-		}
-	}
-	return true
 }
 
 // StableTest reports whether a commit, by the files it changes inside its
@@ -143,21 +88,21 @@ func BumpFor(commits []Commit, preOne bool, stable CommitStableTest) (Bump, erro
 	}
 	strongest := BumpNone
 	for _, commit := range commits {
-		typ, breaking, ok := ParseConventional(commit.Subject, commit.Body)
+		parsed, ok := protocolcli.ParseConventionalCommit(commit.Subject, commit.Body)
 		if !ok {
 			continue
 		}
 		level := BumpNone
 		switch {
-		case breaking && preOne:
+		case parsed.Breaking && preOne:
 			level = BumpMinor
-		case breaking:
+		case parsed.Breaking:
 			level = BumpMajor
-		case typ == "feat" && preOne:
+		case parsed.Type == "feat" && preOne:
 			level = BumpPatch
-		case typ == "feat":
+		case parsed.Type == "feat":
 			level = BumpMinor
-		case typ == "fix", typ == "perf":
+		case parsed.Type == "fix", parsed.Type == "perf":
 			level = BumpPatch
 		}
 		if level <= strongest {

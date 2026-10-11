@@ -34,6 +34,7 @@ import protocolcli "go.putnami.dev/protocol/cli"
 | `SessionSubscribersFile`, `NewSessionSubscriberEvidence`, `ParseSessionSubscribersFile` | Per-subscriber delivery evidence (`subscribers.json`) for a session's event stream — [doc/05-session-subscribers.md](doc/05-session-subscribers.md) |
 | `ReservedGlobalFlags`, `IsReservedGlobalFlag`, `LookupReservedGlobalFlag`, `ValidateNoReservedShadow` | The reserved global-flag registry — flags every surface handles and no extension may redefine |
 | `CommandSurface`, `NewCommandSurface`, `MarshalCommandSurface`, `ParseCommandSurface`, `ErrUnknownCommandSurfaceVersion`, `IncompatibleCommandChanges` | The command-surface document a CLI commits, and the comparison that finds an incompatible change to its commands and flags — [doc/06-command-surface.md](doc/06-command-surface.md) |
+| `ConventionalCommit`, `ParseConventionalCommit` | The type, scope and breaking declaration of a commit message, read one way by the version bump and the API checks — [doc/07-conventional-commit.md](doc/07-conventional-commit.md) |
 
 See [doc/01-contract.md](doc/01-contract.md) for the full contract.
 
@@ -98,6 +99,15 @@ dropped from a closed list. It is published as
 `https://putnami.dev/schemas/putnami-cli-command-surface.json`). Go is its only
 runtime.
 
+## Conventional commit reading
+
+[doc/07-conventional-commit.md](doc/07-conventional-commit.md) specifies how a
+commit message is read as a conventional commit: its type, its scope, and
+whether it declares a breaking change with `!` or a `BREAKING CHANGE:` footer.
+`ParseConventionalCommit` is the only reader, so the version bump, the
+changelog and the API checks agree on which commit is breaking. The bump policy
+stays in the CLI. Go is its only runtime.
+
 ## The session report
 
 [doc/03-report.md](doc/03-report.md) specifies `reportFile` — the run's
@@ -129,7 +139,8 @@ ceilings drop **counted** rather than lost.
 | `tooling/cli/internal/{cli,clibin,cmderr,commands,extension,launch,lockfile,workspace_state}` | Exit-code classification, output-mode resolution, reserved flags, and reading recorded sessions |
 | `tooling/extension-sdk/{cli,manifest,runtimeinfo}` | The exit-code taxonomy and reserved global-flag registry every extension binary must honour |
 | `go/extension/internal/jobs/pkg`, `typescript/extension/internal/pkg` | The package-time contract stamp |
-| `go/extension/internal/jobs/apicheck` | Compares a stable project's command surface with its line's last tag in `validate` |
+| `go/extension/internal/jobs/apicheck` | Compares a stable project's command surface with its line's last tag in `validate`, and reads the breaking marker of the commits since that tag |
+| `tooling/cli/internal/git`, `tooling/cli/internal/commands/versioncmd` | Read a commit as a conventional commit for the version bump, the release baseline and the changelog |
 | [`protocols/extension`](../extension/README.md) | Negotiates a manifest's `cliContract` against `CurrentContract` |
 | [`protocols/job`](../job/README.md) | Shares the typed task identity |
 | [`protocols/ci`](../ci/README.md) | Carries the typed task identity in every ChangePlan and ImpactPlan task |
