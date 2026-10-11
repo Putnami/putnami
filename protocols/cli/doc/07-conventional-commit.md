@@ -83,7 +83,7 @@ The reading has no document and no schema. Go is its only runtime:
 | Consumer | Use |
 | --- | --- |
 | `tooling/cli/internal/git` | The version bump (`BumpFor`) and the breaking flag of a release baseline |
-| `tooling/cli/internal/commands/versioncmd` | The section a commit takes in the changelog, and the marker `version check` requires of a squash commit message |
+| `tooling/cli/internal/commands/versioncmd` | The section a commit takes in the changelog |
 | `go/extension/internal/jobs/apicheck` | The marker that allows an incompatible API or command-surface change in `validate` |
 
 The bump policy is not here: which type advances which number, the pre-1.0

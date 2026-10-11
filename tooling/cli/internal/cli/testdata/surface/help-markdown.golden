@@ -120,7 +120,7 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | `putnami upgrade` | Upgrade CLI, extensions, and dependencies |
 | `putnami pin` | Pin the CLI version this workspace uses |
 | `putnami workspace describe` | Describe the active workspace |
-| `putnami version <subcommand>` | Versions derived from git, release tags, and installed CLI binaries |
+| `putnami version get|tag|list|use` | Versions derived from git, release tags, and installed CLI binaries |
 | `putnami infra plan` | Plan workspace infra (--output=jsonl) |
 
 ## Extensions & Templates
@@ -481,12 +481,12 @@ putnami workspace describe [--output <format>]
 
 ### `putnami version`
 
-Show the version each line is at (get), release a line (tag), hold the breaking marker of a squash commit (check), and manage the installed CLI binaries (list/use)
+Show the version each line is at (get), release a line (tag), and manage the installed CLI binaries (list/use)
 
 **Usage**
 
 ```
-putnami version <get|tag|check|list|use>
+putnami version <get|tag|list|use>
 ```
 
 **Examples**
@@ -543,29 +543,6 @@ putnami version tag [<tag>] [--scope <line>] [--push] [--dry-run] [--yes]
 - `putnami version tag --scope typescript --dry-run`
 - `putnami version tag --scope tooling --yes --push`
 - `putnami version tag tooling/v0.3.0 --scope tooling --yes`
-
-### `putnami version check`
-
-Fail when a commit since the base declares a breaking change and the squash commit message does not
-
-**Usage**
-
-```
-putnami version check --base <ref> (--title <title> | --message-file <path>)
-```
-
-**Flags**
-
-| Flag | Description |
-|------|-------------|
-| `--base` <ref> | The branch or commit the change merges into; the commits read are those from it to HEAD |
-| `--title` <title> | The subject of the squash commit, which is the pull request title; a squash commit with a body, or a title that starts with a dash, goes through --message-file |
-| `--message-file` <path> | A file holding the squash commit message: the subject, a blank line, then the body when the squash commit keeps the pull request body |
-
-**Examples**
-
-- `putnami version check --base origin/main --title "feat(cli)!: drop the --all flag"`
-- `putnami version check --base origin/main --message-file squash-message.txt`
 
 ### `putnami version list`
 

@@ -20,7 +20,7 @@ _putnami_subcommands_for() {
         'telemetry') printf '%s\n' 'off on show status' ;;
         'templates') printf '%s\n' 'install list remove update' ;;
         'tree') printf '%s\n' 'fingerprint verify' ;;
-        'version') printf '%s\n' 'check get list tag use' ;;
+        'version') printf '%s\n' 'get list tag use' ;;
         'workspace') printf '%s\n' 'describe init' ;;
     esac
 }
@@ -99,7 +99,6 @@ _putnami_path_known() {
         'tree verify') return 0 ;;
         'upgrade') return 0 ;;
         'version') return 0 ;;
-        'version check') return 0 ;;
         'version get') return 0 ;;
         'version list') return 0 ;;
         'version tag') return 0 ;;
@@ -142,7 +141,6 @@ _putnami_flags_for() {
         'templates install') printf '%s\n' '--latest' ;;
         'tree verify') printf '%s\n' '--base --gate --record --ref --report --snapshot' ;;
         'upgrade') printf '%s\n' '--channel --cli --deps --dry-run --extensions --from-source --global --namespace --release --version' ;;
-        'version check') printf '%s\n' '--base --message-file --title' ;;
         'version get') printf '%s\n' '--scope' ;;
         'version list') printf '%s\n' '--global' ;;
         'version tag') printf '%s\n' '--dry-run --push --scope --yes' ;;

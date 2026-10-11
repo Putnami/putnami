@@ -177,16 +177,3 @@ func parseSemverCore(version string) (major, minor, patch int) {
 	}
 	return numbers[0], numbers[1], numbers[2]
 }
-
-// BreakingCommits returns the commits that declare a breaking change, in the
-// order given. It reads each message the way BumpFor does, so a commit listed
-// here is one that moves a line past a feature release.
-func BreakingCommits(commits []Commit) []Commit {
-	var breaking []Commit
-	for _, commit := range commits {
-		if parsed, ok := protocolcli.ParseConventionalCommit(commit.Subject, commit.Body); ok && parsed.Breaking {
-			breaking = append(breaking, commit)
-		}
-	}
-	return breaking
-}

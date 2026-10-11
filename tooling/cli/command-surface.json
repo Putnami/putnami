@@ -1035,28 +1035,10 @@
       "flags": [],
       "positionals": [
         {
-          "name": "get|tag|check|list|use",
+          "name": "get|tag|list|use",
           "required": true
         }
       ]
-    },
-    {
-      "path": "version check",
-      "flags": [
-        {
-          "long": "--base",
-          "type": "value"
-        },
-        {
-          "long": "--message-file",
-          "type": "value"
-        },
-        {
-          "long": "--title",
-          "type": "value"
-        }
-      ],
-      "positionals": []
     },
     {
       "path": "version get",

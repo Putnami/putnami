@@ -358,21 +358,13 @@ example: putnami upgrade --release rs_<64-lowercase-hex> --namespace putnami
 example: putnami upgrade --deps --version 1.2.3
 example: putnami upgrade --from-source --global
 ═══ version ═══
-description: Show the version each line is at (get), release a line (tag), hold the breaking marker of a squash commit (check), and manage the installed CLI binaries (list/use)
-usage: putnami version <get|tag|check|list|use>
+description: Show the version each line is at (get), release a line (tag), and manage the installed CLI binaries (list/use)
+usage: putnami version <get|tag|list|use>
 example: putnami version get
 example: putnami version tag --scope typescript --dry-run
 example: putnami version tag --scope tooling --yes --push
 example: putnami version list --global
 example: putnami version use go-dev
-═══ version check ═══
-description: Fail when a commit since the base declares a breaking change and the squash commit message does not
-usage: putnami version check --base <ref> (--title <title> | --message-file <path>)
-flag: --base | <ref> | The branch or commit the change merges into; the commits read are those from it to HEAD
-flag: --title | <title> | The subject of the squash commit, which is the pull request title; a squash commit with a body, or a title that starts with a dash, goes through --message-file
-flag: --message-file | <path> | A file holding the squash commit message: the subject, a blank line, then the body when the squash commit keeps the pull request body
-example: putnami version check --base origin/main --title "feat(cli)!: drop the --all flag"
-example: putnami version check --base origin/main --message-file squash-message.txt
 ═══ version get ═══
 description: Show the version every version line is at, derived from its git tags
 usage: putnami version get [--scope <line>] [--output <format>]

@@ -47,48 +47,11 @@ A breaking change outside the stable projects still needs its migration in the r
 
 The marker is checked, not trusted. For a stable Go project, `putnami validate` compares the exported API with the line's last release, and fails an incompatible change that no commit since that release declares breaking. A project that ships a CLI holds its commands and flags to the same rule through a committed command-surface document: this CLI renders `command-surface.json` from its command catalog, so a removed command, flag, short alias or accepted value without a `!` fails `validate`. See [the Go extension's validate command](../../../go/extension/doc/validate.md).
 
-The marker also has to survive the merge. A squash merge keeps the title of the pull request, and its body when the host is set to, and drops the commits of the branch. A `!` that only a branch commit carries is then lost: the break ships as a patch, and the next `validate` on the trunk fails with no commit able to clear it. `putnami version check` closes that gap. See [Holding the marker across a squash merge](#holding-the-marker-across-a-squash-merge-version-check).
-
 A pre-release is always at least a patch above the last release, so a docs-only commit still produces a new, ordered version. Versions of one line are totally ordered by their timestamp segment, which is what lets a registry answer "the newest build of this channel" without any Putnami-specific metadata.
 
 ```bash
 putnami version get                   # one line per version line: "<line> <version>"
 ```
-
-## Holding the marker across a squash merge: `version check`
-
-```bash
-putnami version check --base origin/main --title "feat(cli)!: drop the --all flag"
-putnami version check --base origin/main --message-file squash-message.txt
-```
-
-`version check` reads every commit between `--base` and `HEAD`, whatever line it touches. It fails when one of them declares a breaking change and the squash commit message does not. The squash message is `--title` alone, or the content of `--message-file`, split as git splits a commit message: the subject, a blank line, then the body. A footer with no blank line above it is part of the subject and declares nothing. Every message is read by the [one conventional-commit reader](../../../protocols/cli/doc/07-conventional-commit.md) the version bump uses.
-
-| Branch commits | Squash message | Result |
-| --- | --- | --- |
-| None declares a break | Any title | Passes |
-| One declares a break | Title with `!` | Passes |
-| One declares a break | Conventional title without `!`, body with a `BREAKING CHANGE:` footer | Passes when `--message-file` holds that body |
-| One declares a break | Conventional title without `!`, no footer | Fails, exit code 1 |
-| One declares a break | Title that is not a conventional commit | Fails, exit code 1: such a message declares nothing, whatever its body says |
-
-A failure names each commit that declares a break, by its 12-character ID and its subject:
-
-```text
-version check: the squash commit "feat(cli): rework the selection" drops the breaking change that 1 commit declares since origin/main:
-  3f2a9c1d0b7e feat(cli)!: drop the --all flag
-Add "!" before the colon of the title, or a "BREAKING CHANGE:" footer to the body when the squash commit keeps the body. If the change breaks nothing, reword the commit.
-```
-
-The check has no waiver. When the branch commit is wrong and the change breaks nothing, reword that commit.
-
-Put the body in the message file only when the squash commit keeps the pull request body. The check cannot read that host setting. A footer in a body the host drops is in no commit, so it must not count. On GitHub the setting is the repository's default squash commit message: write the body when it is "Pull request title and description", and the title alone otherwise.
-
-An automated caller uses `--message-file`, not `--title`. The CLI reads an argument that starts with a dash as a flag, so a title such as `--help` would never reach the check.
-
-The check refuses a shallow clone, which holds only part of the commits to read. It reads the commits `--base` does not reach, so a merge of the base into the branch adds none. Fetch the base first: a stale `--base` counts the commits it lacks.
-
-The command reads git only. Run it where the pull request title is known, such as a workflow on the pull request event that also runs when the title or the body is edited. [ADR 0064](adr/0064-a-squash-title-carries-the-breaking-marker-of-its-commits.md) records the rule.
 
 ## Releasing a line: `version tag`
 

@@ -469,8 +469,8 @@ func cmdWorkspace(env *CommandEnv) error {
 func cmdVersion(env *CommandEnv) error {
 	// list/use manage the installed CLI binaries in .putnami/bin (local) or
 	// ~/.putnami/bin (--global) and so do not need a workspace when --global,
-	// mirroring `upgrade --global`. get/tag/check read the version lines and
-	// the git history of a workspace and always require one.
+	// mirroring `upgrade --global`. get/set/bump/tag operate on workspace,
+	// scope, and project release versions and always require a workspace.
 	switch env.Sub {
 	case "list":
 		binDir, err := cliBinDir(env)
@@ -503,10 +503,8 @@ func cmdVersion(env *CommandEnv) error {
 			args = append(append([]string{}, args...), "--dry-run")
 		}
 		return versioncmd.VersionTag(env.Ctx, env.WsRoot, args)
-	case "check":
-		return versioncmd.VersionCheck(env.WsRoot, env.Args)
 	default:
-		return usageErrorf("unknown subcommand: version %s\n  Available: get, tag, check, list, use", env.Sub)
+		return usageErrorf("unknown subcommand: version %s\n  Available: get, tag, list, use", env.Sub)
 	}
 }
 

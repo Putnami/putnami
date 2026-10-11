@@ -1804,22 +1804,6 @@
               "changelog-is-in-the-tagged-commit"
             ]
           }
-        },
-        {
-          "id": "squash-keeps-the-breaking-marker",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "dropped-marker-fails-and-names-the-commit",
-              "title-with-the-marker-passes",
-              "no-breaking-commit-passes-any-title",
-              "shallow-clone-is-refused-by-the-check"
-            ]
-          }
         }
       ]
     },
