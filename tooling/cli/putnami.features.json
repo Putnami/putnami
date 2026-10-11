@@ -2153,7 +2153,8 @@
             "kind": "acceptance",
             "checks": [
               "the-cli-receives-the-callers-go-environment-whether-or-not-the-run-builds",
-              "an-older-system-go-builds-with-the-managed-install"
+              "an-older-system-go-builds-with-the-managed-install",
+              "a-downloaded-go-is-installed-only-at-its-locked-or-published-sha256"
             ]
           }
         }

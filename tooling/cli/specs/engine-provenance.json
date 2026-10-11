@@ -34,7 +34,7 @@
     },
     {
       "id": "build-toolchain-stays-in-the-build",
-      "text": "The wrapper builds with the go on PATH when it satisfies the workspace's Go version, and otherwise with the managed install under the Putnami home, which it downloads when missing; it never builds with a Go only it can find. The resolved Go's GOROOT, its bin directory first on PATH, and GOTOOLCHAIN=local reach the build command alone: the CLI the wrapper runs receives the caller's GOROOT, PATH and GOTOOLCHAIN, on a run that builds and on a run that reuses the blob."
+      "text": "The wrapper builds with the go on PATH when it satisfies go.work, whose version is the higher of its go and toolchain lines, and otherwise with the managed install under the Putnami home, installed only at the SHA-256 the lock records or go.dev publishes. The resolved Go's GOROOT, its bin directory first on PATH, and GOTOOLCHAIN=local reach the build command alone: the CLI receives the caller's GOROOT, PATH and GOTOOLCHAIN, on a run that builds and on one that reuses the blob."
     }
   ],
   "decisions": [

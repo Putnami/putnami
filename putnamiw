@@ -130,6 +130,8 @@ SOURCE_KEY_PATHS=(go.work go.work.sum tooling protocols go)
 CLI_LDFLAGS="-s -w"
 # Managed Go toolchains are shared across worktrees: ~/.putnami/toolchains/go/go-<ver>/.
 GO_MANAGED_DIR="$PUTNAMI_HOME/toolchains/go"
+# GO_CHECKSUM_URL is where go.dev publishes the SHA-256 of each Go archive.
+GO_CHECKSUM_URL="https://dl.google.com/go/"
 RESOLVER_URL="${PUTNAMI_REGISTRY_URL:-https://putnami.dev/dl}"
 
 # --- Colors ---
@@ -446,16 +448,45 @@ detect_platform() {
 
 # --- Go version from go.work ---
 
+# read_go_version prints the higher of the go and toolchain lines of go.work,
+# the release the CLI pins in the lock from them.
 read_go_version() {
   if [ -f "$GO_WORK" ]; then
-    local version
+    local version toolchain
     version="$(grep -m1 '^go ' "$GO_WORK" | awk '{print $2}')"
+    toolchain="$(grep -m1 '^toolchain ' "$GO_WORK" | awk '{print $2}')"
+    [ -n "$version" ] && version="$(normalize_go_version "$version")"
+    [ -n "$toolchain" ] && toolchain="$(normalize_go_version "$toolchain")"
+    if [ -n "$toolchain" ] && { [ -z "$version" ] || go_version_satisfies "$toolchain" "$version"; }; then
+      version="$toolchain"
+    fi
     if [ -n "$version" ]; then
-      normalize_go_version "$version"
+      echo "$version"
       return 0
     fi
   fi
   return 1
+}
+
+# locked_go_sha256 prints the SHA-256 the workspace lock records for the Go
+# release $1 on platform $2, such as darwin/arm64, and fails when the lock pins
+# another release or records none for the platform. It reads the layout the CLI
+# writes: two-space indentation, toolchains.go.{version,integrities}.
+locked_go_sha256() {
+  local lock="$SCRIPT_DIR/putnami.lock.json"
+  [ -f "$lock" ] || return 1
+  awk -v want="$1" -v platform="$2" '
+    /^  "toolchains": [{]/ { in_toolchains = 1; next }
+    in_toolchains && /^  [}]/ { in_toolchains = 0 }
+    in_toolchains && /^    "go": [{]/ { in_go = 1; next }
+    in_go && /^    [}]/ { in_go = 0 }
+    in_go && /^      "version": / { version = $2; gsub(/[",]/, "", version) }
+    in_go && index($0, "        \"" platform "\": ") == 1 { digest = $2; gsub(/[",]/, "", digest) }
+    END {
+      if (version == want && length(digest) == 64 && digest !~ /[^0-9a-f]/) { print digest; exit 0 }
+      exit 1
+    }
+  ' "$lock"
 }
 
 normalize_go_version() {
@@ -777,6 +808,29 @@ resolve_go() {
   else
     rm -rf "$stage"
     fail "curl or wget is required to download Go"
+  fi
+
+  # The archive is installed only when its SHA-256 is the one the workspace
+  # lock records for this release and platform, or, when the lock pins another
+  # release, the one go.dev publishes beside the archive.
+  local expected actual
+  if ! expected="$(locked_go_sha256 "$version" "$GO_OS/$GO_ARCH")"; then
+    local checksum_url="${GO_CHECKSUM_URL}go${version}.${GO_OS}-${GO_ARCH}${ext}.sha256"
+    if command -v curl >/dev/null 2>&1; then
+      expected="$(curl -fsSL "$checksum_url" 2>/dev/null | awk '{print $1}')" || expected=""
+    else
+      expected="$(wget -q -O - "$checksum_url" 2>/dev/null | awk '{print $1}')" || expected=""
+    fi
+    [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || expected=""
+  fi
+  actual="$(sha256_of "$archive")"
+  if [ -z "$expected" ] || [ -z "$actual" ]; then
+    rm -rf "$stage"
+    fail "Cannot verify Go $version: no SHA-256 for $GO_OS/$GO_ARCH in putnami.lock.json or from go.dev, or no sha256sum or shasum"
+  fi
+  if [ "$actual" != "$expected" ]; then
+    rm -rf "$stage"
+    fail "Refusing Go $version from $url: SHA-256 $actual, want $expected"
   fi
 
   if [ "$ext" = ".zip" ]; then
