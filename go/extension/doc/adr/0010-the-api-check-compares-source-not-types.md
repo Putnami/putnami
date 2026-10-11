@@ -1,6 +1,8 @@
 # ADR 0010 — The API check compares source declarations, not type-checked packages
 
-- **Status**: accepted
+- **Status**: accepted, amended by CLI
+  [ADR 0062](../../../../tooling/cli/doc/adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md):
+  the task is now cached, keyed on the release baseline the CLI reads from git
 - **Scope**: `@putnami/go` (`go/extension`), the `validate-api` task
 
 ## Context

@@ -88,12 +88,12 @@ func TestWriteAllowedResolvesProjectAndWorkspaceOutputRoots(t *testing.T) {
 // TestWriteAllowedHonorsProjectLevelOwnership pins a write-ownership fix: write ownership
 // is the PROJECT's declared output surface, matching the one-owner-per-output
 // model the manifests declare (build-generate owns <project>/.gen whole while
-// build-describe and build-infra write inside it and declare nothing). Scoring
-// a task against only its own outputs made this check fail by construction on
-// every Go project.
+// build-describe's staging and config-extract's fallback write inside it and
+// declare nothing). Scoring a task against only its own outputs made this check
+// fail by construction on every Go project.
 func TestWriteAllowedHonorsProjectLevelOwnership(t *testing.T) {
 	job := &jobs.ScheduledJob{Project: &workspace.Project{ID: "/app", Path: "apps/app"}}
-	// The writer declares nothing, exactly like build~describe / build~infra.
+	// The writer declares nothing, exactly like build~describe's staging write.
 	writer := jobs.VerificationContract{}
 	owner := jobs.VerificationContract{Outputs: []jobs.VerificationOutput{
 		{Root: extension.OutputRootProject, Path: ".gen"},

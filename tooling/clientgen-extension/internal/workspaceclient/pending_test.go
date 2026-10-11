@@ -54,7 +54,7 @@ func TestACensusedCallsiteReportsAndANewOneBlocks(t *testing.T) {
 		TransportCallsite{Path: "svc/legacy.go", Line: 42, Column: 3, Transport: "http", Symbol: "http.Get"},
 	)
 
-	blocking, pending := classifyPendingTransports([]Finding{old, fresh}, callsites, loadPendingCensus(root))
+	blocking, pending := classifyPendingTransports([]Finding{old, fresh}, callsites, loadPendingCensus(workspaceFiles{root: root}))
 	if len(pending) != 1 || pending[0].Line != 10 {
 		t.Fatalf("pending = %+v, want exactly the censused callsite", pending)
 	}
@@ -80,7 +80,7 @@ func TestTheCensusIsNotAFileOrTransportAllowlist(t *testing.T) {
 		TransportCallsite{Path: "svc/legacy.go", Line: 11, Column: 3, Transport: "http", Symbol: "http.Post"},
 		TransportCallsite{Path: "svc/other.go", Line: 12, Column: 3, Transport: "http", Symbol: "http.Get"},
 	)
-	blocking, pending := classifyPendingTransports([]Finding{otherSymbol, otherFile}, callsites, loadPendingCensus(root))
+	blocking, pending := classifyPendingTransports([]Finding{otherSymbol, otherFile}, callsites, loadPendingCensus(workspaceFiles{root: root}))
 	if len(pending) != 0 {
 		t.Fatalf("pending = %+v, want none: neither callsite matches the censused class", pending)
 	}
@@ -96,7 +96,7 @@ func TestTheCensusOnlyShrinks(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "censused-pending-transports", "an-entry-that-matches-nothing-fails-so-the-census-only-shrinks")
 	root := t.TempDir()
 	writeCensus(t, root, censusOneHTTPGet)
-	blocking, pending := classifyPendingTransports(nil, nil, loadPendingCensus(root))
+	blocking, pending := classifyPendingTransports(nil, nil, loadPendingCensus(workspaceFiles{root: root}))
 	if len(pending) != 0 {
 		t.Fatalf("pending = %+v, want none", pending)
 	}
@@ -112,7 +112,7 @@ func TestAnAbsentCensusBlocksEverything(t *testing.T) {
 	root := t.TempDir()
 	finding := censusFinding("svc/legacy.go", 10)
 	callsites := censusCallsites(TransportCallsite{Path: "svc/legacy.go", Line: 10, Column: 3, Transport: "http", Symbol: "http.Get"})
-	blocking, pending := classifyPendingTransports([]Finding{finding}, callsites, loadPendingCensus(root))
+	blocking, pending := classifyPendingTransports([]Finding{finding}, callsites, loadPendingCensus(workspaceFiles{root: root}))
 	if len(pending) != 0 || len(blocking) != 1 {
 		t.Fatalf("blocking = %+v pending = %+v, want the callsite to fail", blocking, pending)
 	}
@@ -142,7 +142,7 @@ func TestAMalformedCensusFailsClosed(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
 			writeCensus(t, root, body)
-			blocking, _ := classifyPendingTransports(nil, nil, loadPendingCensus(root))
+			blocking, _ := classifyPendingTransports(nil, nil, loadPendingCensus(workspaceFiles{root: root}))
 			invalid := false
 			for _, finding := range blocking {
 				invalid = invalid || finding.Code == "clientgen.invalid-pending-census"
@@ -160,7 +160,7 @@ func TestAMalformedCensusFailsClosed(t *testing.T) {
 // would exempt the thing the guard exists for.
 func TestTheCommittedCensusIsValidAndOnlyCoversHandwrittenTransports(t *testing.T) {
 	root := repositoryRootForTest(t)
-	census := loadPendingCensus(root)
+	census := loadPendingCensus(workspaceFiles{root: root})
 	if len(census.invalid) != 0 {
 		t.Fatalf("the committed census is invalid: %+v", census.invalid)
 	}

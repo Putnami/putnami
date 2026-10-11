@@ -171,6 +171,26 @@ func TestProbe_ReportsModuleIdentityAndMarker(t *testing.T) {
 	}
 }
 
+// The Go provider reports no tags, not even the ones a project's putnami.json
+// declares. The validate-api skip reads a project's tags from its putnami.json
+// and its scope chain (apicheck projectTags), the tags the CLI resolves and
+// keys the task on only while no provider reports tags for a Go project. A
+// provider tag would win over the scope's, so a scope tag change would no
+// longer move the key while the check still read it.
+func TestProbe_ReportsNoTags(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "apps", "svc", "putnami.json"), `{"tags":["protocol"]}`+"\n")
+	result := probeAll(t, root, ".", "apps/svc", "libs/core", "web")
+	if len(result.Projects) == 0 {
+		t.Fatal("the probe reported no project")
+	}
+	for _, project := range result.Projects {
+		if len(project.Tags) != 0 {
+			t.Errorf("%s: tags = %v, want none: apicheck projectTags would read other tags than the key", project.Path, project.Tags)
+		}
+	}
+}
+
 // A directory with no go.mod is not a Go project. Claiming it would make the
 // merged view assert a module identity that does not exist — and, for a
 // directory that a DIFFERENT provider owns, would turn a merge into a conflict.

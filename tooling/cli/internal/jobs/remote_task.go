@@ -30,9 +30,9 @@
 //     input the entry claimed to hold.
 //
 // What IS carried over unchanged: the trust policy (a hint warms blobs and can
-// never return a green result), the source-mutation rejection, the break-even
-// upload guard, side-effecting task exclusion, and best-effort semantics — every
-// failure logs and degrades to local execution, never to a broken build.
+// never return a green result), the source-mutation rejection, side-effecting
+// task exclusion, and best-effort semantics — every failure logs and degrades
+// to local execution, never to a broken build.
 //
 // A hit whose files no job of the run reads takes the result-only path instead
 // (remote_result_only.go). That path writes nothing, so it cannot leave a reader
@@ -234,14 +234,10 @@ func (r *RemoteCache) UploadTaskEntry(ctx context.Context, hash string, job *Sch
 }
 
 // prepareTaskUpload turns a published task-owned entry into the input to share
-// with the provider, applying the same eligibility gates the legacy write path
-// has. It returns ok=false when the entry should not be uploaded.
-//
-// The break-even guard prices the PAYLOAD, not the wire manifest: the descriptor
-// is fixed overhead every task-owned entry carries, and counting it would make a
-// status-only entry (every output recorded empty, zero payload bytes) look like
-// a transfer and turn its key into a permanent remote miss — the regression
-// WorthRemoteCaching's zero-size exemption exists to prevent.
+// with the provider, applying the same eligibility rule as the legacy write
+// path: every entry is shared whatever its build duration or size, except a
+// side-effecting task's (cache.SideEffectingTask). It returns ok=false when the
+// entry should not be uploaded.
 func (r *RemoteCache) prepareTaskUpload(hash string, job *ScheduledJob, cm *store.CacheManager) (taskUploadInput, bool) {
 	entry, err := cm.LookupTaskEntry(hash)
 	if err != nil || entry == nil || entry.Result == nil {
@@ -262,13 +258,6 @@ func (r *RemoteCache) prepareTaskUpload(hash string, job *ScheduledJob, cm *stor
 	if entry.Metadata != nil {
 		durationMs = entry.Metadata.DurationMs
 		sizeBytes = entry.Metadata.Size
-	}
-	if !cache.EligibleForRemote(
-		cache.KeyRequest{Task: job.JobDef.Name, DurationMs: durationMs, SizeBytes: manifestBytes(transfer.Payload)},
-		cache.DefaultBreakEven,
-	) {
-		r.stats.recordUploadSkipped()
-		return taskUploadInput{}, false
 	}
 
 	return taskUploadInput{

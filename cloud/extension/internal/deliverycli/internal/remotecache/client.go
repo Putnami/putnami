@@ -116,7 +116,6 @@ type Client struct {
 	httpClient *http.Client
 	controls   controlClients
 	mode       cache.Mode
-	breakEven  cache.BreakEvenParams
 }
 
 // resolvedBearer is a memoized credential tagged with the generation it belongs
@@ -135,9 +134,6 @@ func WithHTTPClient(hc *http.Client) Option { return func(c *Client) { c.httpCli
 
 // WithMode sets the materialization mode advertised to the server.
 func WithMode(m cache.Mode) Option { return func(c *Client) { c.mode = m } }
-
-// WithBreakEven overrides the break-even parameters used to filter keys.
-func WithBreakEven(p cache.BreakEvenParams) Option { return func(c *Client) { c.breakEven = p } }
 
 // WithTokenFunc sets a lazy per-session bearer resolver used in place of a
 // static token. The resolver's renewability is unknown, so its credential is
@@ -186,7 +182,6 @@ func NewClient(baseURL, token string, opts ...Option) *Client {
 		// The control-plane timeout is applied per attempt in doAuthed instead.
 		httpClient: &http.Client{Transport: newTransport()},
 		mode:       cache.DefaultMode,
-		breakEven:  cache.DefaultBreakEven,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -277,7 +272,7 @@ func (c *Client) BuildRequest(inputs []KeyInput) *cache.NegotiateRequest {
 			DurationMs: in.DurationMs,
 			SizeBytes:  in.SizeBytes,
 		}
-		if !cache.EligibleForRemote(k, c.breakEven) {
+		if cache.SideEffectingTask(k.Task) {
 			continue
 		}
 		req.Keys = append(req.Keys, k)

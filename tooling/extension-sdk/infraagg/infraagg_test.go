@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -794,7 +796,146 @@ func TestResult_DataCarriesTheOutcome(t *testing.T) {
 	if data["outcome"] != string(OutcomeEmitted) {
 		t.Errorf("data[outcome] = %v, want %q", data["outcome"], OutcomeEmitted)
 	}
-	if data["manifest"] != aggregatedPath(root, "app") {
-		t.Errorf("data[manifest] = %v, want %q", data["manifest"], aggregatedPath(root, "app"))
+	if data["manifest"] != AggregatedManifestFile {
+		t.Errorf("data[manifest] = %v, want %q", data["manifest"], AggregatedManifestFile)
+	}
+}
+
+// The result data a cache entry replays is the same in every checkout: it
+// names the manifest relative to the project, never by the absolute path of
+// the checkout that stored the entry.
+func TestResult_DataIsTheSameInEveryCheckout(t *testing.T) {
+	run := func() map[string]any {
+		root := t.TempDir()
+		ctx := closureContext(root, "app", "app", "application", "lib")
+		writeProjectFile(t, root, "lib", "infra/requirements.json", dbManifest)
+		return Aggregate(ctx, Options{}).Data()
+	}
+	first, second := run(), run()
+	if !reflect.DeepEqual(first, second) {
+		t.Fatalf("data differs between two checkouts:\n%v\n%v", first, second)
+	}
+	for key, value := range first {
+		if text, ok := value.(string); ok && filepath.IsAbs(text) {
+			t.Errorf("data[%s] = %q is an absolute path", key, text)
+		}
+	}
+}
+
+// The project-relative files are where Aggregate writes: a language declares
+// them as the task's outputs, so a cache entry holds exactly what a run writes.
+func TestAggregatedFiles_AreWhereAggregateWrites(t *testing.T) {
+	if AggregatedManifestFile != ".gen/requirements.json" {
+		t.Errorf("AggregatedManifestFile = %q", AggregatedManifestFile)
+	}
+	if RuntimeDefaultsFile != ".gen/infra/runtime.json" {
+		t.Errorf("RuntimeDefaultsFile = %q", RuntimeDefaultsFile)
+	}
+	root := filepath.Join(t.TempDir(), "app")
+	if got, want := AggregatedManifestPath(root), filepath.Join(root, ".gen", "requirements.json"); got != want {
+		t.Errorf("AggregatedManifestPath = %q, want %q", got, want)
+	}
+	if got, want := runtimeDefaultsPath(root), filepath.Join(root, ".gen", "infra", "runtime.json"); got != want {
+		t.Errorf("runtimeDefaultsPath = %q, want %q", got, want)
+	}
+}
+
+// Every file a run leaves under the workload's .gen is one of the two files a
+// language declares as the task's outputs, so a cache hit restores everything
+// an execution would have written: the manifest and, without an authored
+// runtime, the defaults sidecar.
+func TestAggregate_WritesOnlyTheDeclaredFiles(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		authored bool
+		want     []string
+	}{
+		{name: "defaults", want: []string{AggregatedManifestFile, RuntimeDefaultsFile}},
+		{name: "authored runtime", authored: true, want: []string{AggregatedManifestFile}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			ctx := closureContext(root, "app", "app", "application", "lib")
+			writeProjectFile(t, root, "lib", "infra/requirements.json", dbManifest)
+			if tc.authored {
+				writeProjectFile(t, root, "app", "infra/runtime.json",
+					`{"ingress":{"public":true},"scaling":{"max":5,"concurrency":80}}`)
+			}
+
+			if result := Aggregate(ctx, Options{}); result.Err != nil || diag.HasErrors(result.Diagnostics) {
+				t.Fatalf("Aggregate = %v, %v", result.Err, result.Diagnostics)
+			}
+
+			var got []string
+			appRoot := filepath.Join(root, "app")
+			err := filepath.WalkDir(filepath.Join(appRoot, ".gen"), func(path string, entry os.DirEntry, err error) error {
+				if err != nil || entry.IsDir() {
+					return err
+				}
+				rel, err := filepath.Rel(appRoot, path)
+				got = append(got, filepath.ToSlash(rel))
+				return err
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			sort.Strings(got)
+			sort.Strings(tc.want)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("files under .gen = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// A write or removal that fails sets Err, whatever the outcome: each one can
+// leave an earlier manifest or sidecar in place. The failure is also a finding.
+func TestAggregate_AFailedWriteOrRemovalSetsErr(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		blocked string
+		runtime string
+		deps    []string
+		outcome Outcome
+	}{
+		{name: "manifest write", blocked: AggregatedManifestFile, deps: []string{"lib"}, outcome: OutcomeEmitted},
+		{name: "defaults sidecar write", blocked: RuntimeDefaultsFile, deps: []string{"lib"}, outcome: OutcomeEmitted},
+		{name: "stale sidecar removal", blocked: RuntimeDefaultsFile, deps: []string{"lib"},
+			runtime: `{"ingress":{"public":true},"scaling":{"max":5,"concurrency":80}}`, outcome: OutcomeEmitted},
+		{name: "cleared manifest removal", blocked: AggregatedManifestFile,
+			runtime: `{ this is not json`, outcome: OutcomeCleared},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			ctx := closureContext(root, "app", "app", "application", tc.deps...)
+			writeProjectFile(t, root, "lib", "infra/requirements.json", dbManifest)
+			if tc.runtime != "" {
+				writeProjectFile(t, root, "app", "infra/runtime.json", tc.runtime)
+			}
+			// A non-empty directory where the file goes can be neither
+			// replaced by a rename nor removed.
+			writeProjectFile(t, root, "app", tc.blocked+"/blocker", "x")
+
+			result := Aggregate(ctx, Options{})
+
+			if result.Err == nil {
+				t.Fatalf("Err = nil, want the failed %s", tc.name)
+			}
+			if result.Outcome != tc.outcome {
+				t.Errorf("outcome = %q, want %q", result.Outcome, tc.outcome)
+			}
+			if !strings.Contains(result.Err.Error(), filepath.Join("app", filepath.FromSlash(tc.blocked))) {
+				t.Errorf("Err = %v, want it to name %s", result.Err, tc.blocked)
+			}
+			if !diag.HasErrors(result.Diagnostics) {
+				t.Errorf("diags = %v, want the failure reported as a finding too", result.Diagnostics)
+			}
+		})
+	}
+
+	root := t.TempDir()
+	ctx := closureContext(root, "app", "app", "application")
+	if result := Aggregate(ctx, Options{}); result.Err != nil {
+		t.Errorf("Err = %v for a run whose writes succeed", result.Err)
 	}
 }

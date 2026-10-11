@@ -6,10 +6,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -112,8 +114,8 @@ var httpMethods = map[string]bool{
 // wrote (.gen/clientgen/config.json) and the built contract in preference to
 // the committed sidecar. It is the sync, adopt and generation view — a fresh
 // build precedes each of them.
-func discover(workspaceRoot string) ([]provider, []Finding) {
-	return discoverWith(workspaceRoot, builtSpecPath, false)
+func discover(view workspaceView) ([]provider, []Finding) {
+	return discoverWith(view, builtSpecPath, false)
 }
 
 // discoverCommitted reads the COMMITTED tree, which is the only tree the guard
@@ -122,23 +124,25 @@ func discover(workspaceRoot string) ([]provider, []Finding) {
 // The committed contract sidecar wins over a built one, and a provider whose
 // build never ran here still names its targets through the committed
 // client.putnami.json manifests under its tree. A provider the session did
-// build converged the sidecar it commits, so the two views agree for it.
-func discoverCommitted(workspaceRoot string) ([]provider, []Finding) {
-	return discoverWith(workspaceRoot, committedSpecPath, true)
+// build converged the sidecar it commits, so the two views agree for it. In
+// the candidate cut a .gen file exists only when the project commits it.
+func discoverCommitted(view workspaceView) ([]provider, []Finding) {
+	return discoverWith(view, committedSpecPath, true)
 }
 
-func discoverWith(workspaceRoot string, specPathFor func(workspaceRoot, projectRel string) string, targetsFromManifests bool) ([]provider, []Finding) {
+func discoverWith(view workspaceView, specPathFor func(files workspaceFiles, projectRel string) string, targetsFromManifests bool) ([]provider, []Finding) {
 	var findings []Finding
-	projectPaths, err := indexedProjectPaths(workspaceRoot)
+	workspaceRoot := view.root
+	projectPaths, err := view.members()
 	if err != nil {
-		return nil, append(findings, Finding{Code: "clientgen.discovery", Path: workspaceRoot, Message: err.Error()})
+		return nil, append(findings, Finding{Code: "clientgen.discovery", Path: ".", Message: workspaceErrorMessage(workspaceRoot, err)})
 	}
 
 	providers := make([]provider, 0, len(projectPaths))
 	for _, projectRel := range projectPaths {
 		item := &provider{root: filepath.Join(workspaceRoot, filepath.FromSlash(projectRel)), rel: projectRel}
 		configRel := joinRel(projectRel, ".gen/clientgen/config.json")
-		configData, configErr := os.ReadFile(filepath.Join(workspaceRoot, filepath.FromSlash(configRel))) //nolint:gosec
+		configData, configErr := view.Read(configRel)
 		if configErr == nil {
 			var config clientGenConfig
 			if parseErr := json.Unmarshal(configData, &config); parseErr != nil {
@@ -146,10 +150,10 @@ func discoverWith(workspaceRoot string, specPathFor func(workspaceRoot, projectR
 			} else {
 				item.config = &config
 			}
-		} else if !os.IsNotExist(configErr) {
+		} else if !errors.Is(configErr, fs.ErrNotExist) {
 			findings = append(findings, Finding{Code: "clientgen.invalid-config", Path: configRel, Message: configErr.Error()})
 		}
-		item.specPath = specPathFor(workspaceRoot, projectRel)
+		item.specPath = specPathFor(view.workspaceFiles, projectRel)
 		if item.config == nil && targetsFromManifests {
 			// No build wrote a contract here, but the tree may commit generated
 			// targets: each committed manifest names its own language and
@@ -158,7 +162,7 @@ func discoverWith(workspaceRoot string, specPathFor func(workspaceRoot, projectR
 			// with no generation contract never was. One that commits targets
 			// but no contract has clients nothing can judge, and says so below
 			// rather than being skipped as a non-provider.
-			config, manifestFindings := configFromCommittedManifests(workspaceRoot, item.root)
+			config, manifestFindings := configFromCommittedManifests(view.workspaceFiles, projectRel)
 			findings = append(findings, manifestFindings...)
 			if config != nil {
 				item.config = config
@@ -171,7 +175,7 @@ func discoverWith(workspaceRoot string, specPathFor func(workspaceRoot, projectR
 			}
 			continue
 		}
-		data, readErr := readSpec(filepath.Join(workspaceRoot, filepath.FromSlash(item.specPath)))
+		data, readErr := readSpec(view.workspaceFiles, item.specPath)
 		if readErr != nil {
 			findings = append(findings, Finding{Code: "clientgen.invalid-contract", Path: item.specPath, Message: readErr.Error()})
 			continue
@@ -308,8 +312,8 @@ func indexedProjectPaths(workspaceRoot string) ([]string, error) {
 
 // builtSpecPath prefers the contract the provider's build wrote over the
 // committed sidecar: after a build the built one is the authority.
-func builtSpecPath(workspaceRoot, projectRel string) string {
-	return firstSpecPath(workspaceRoot, projectRel,
+func builtSpecPath(files workspaceFiles, projectRel string) string {
+	return firstSpecPath(files, projectRel,
 		".gen/schema/openapi.json",
 		".gen/schema/openapi.json.gz",
 		"schema/openapi.json")
@@ -317,19 +321,19 @@ func builtSpecPath(workspaceRoot, projectRel string) string {
 
 // committedSpecPath prefers the committed sidecar: it is what the checkout
 // holds, whether or not anything under .gen exists or is current. A provider
-// with no sidecar (a project whose describe commits none) still resolves to
-// its built contract when one is present.
-func committedSpecPath(workspaceRoot, projectRel string) string {
-	return firstSpecPath(workspaceRoot, projectRel,
+// with no sidecar resolves to a contract under .gen only when one is there to
+// read, which in the candidate cut means the project commits it.
+func committedSpecPath(files workspaceFiles, projectRel string) string {
+	return firstSpecPath(files, projectRel,
 		"schema/openapi.json",
 		".gen/schema/openapi.json",
 		".gen/schema/openapi.json.gz")
 }
 
-func firstSpecPath(workspaceRoot, projectRel string, candidates ...string) string {
+func firstSpecPath(files workspaceFiles, projectRel string, candidates ...string) string {
 	for _, projectPath := range candidates {
 		rel := joinRel(projectRel, projectPath)
-		if info, err := os.Stat(filepath.Join(workspaceRoot, filepath.FromSlash(rel))); err == nil && info.Mode().IsRegular() { //nolint:gosec
+		if files.isRegularFile(rel) {
 			return rel
 		}
 	}
@@ -350,57 +354,31 @@ func firstSpecPath(workspaceRoot, projectRel string, candidates ...string) strin
 // decoder is what keeps the two answers about a target — which language it is
 // generated for, and which provider it belongs to — from disagreeing about
 // which files are targets at all.
-func configFromCommittedManifests(workspaceRoot, projectRoot string) (*clientGenConfig, []Finding) {
+func configFromCommittedManifests(files workspaceFiles, projectRel string) (*clientGenConfig, []Finding) {
 	config := &clientGenConfig{}
 	var findings []Finding
-	found := false
-	_ = filepath.WalkDir(projectRoot, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			if entry != nil && entry.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if entry.IsDir() {
-			if path != projectRoot && excludedSnapshotDir(entry.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if entry.Name() != clientcontract.GeneratedManifestFile {
-			return nil
-		}
-		if filepath.Dir(path) == projectRoot {
-			// A manifest at this project's OWN root is a generated client the
-			// project IS — an indexed client package inside its provider's
-			// output directory — not a target the project generates. Its
-			// provider names it from above.
-			return nil
-		}
-		found = true
-		manifestRel, relErr := filepath.Rel(workspaceRoot, path)
-		if relErr != nil {
-			return nil
-		}
-		manifestRel = filepath.ToSlash(manifestRel)
-		data, readErr := os.ReadFile(path) //nolint:gosec // discovered inside the indexed provider
+	manifests := committedManifestPaths(files, projectRel)
+	if len(manifests) == 0 {
+		return nil, findings
+	}
+	for _, manifestRel := range manifests {
+		data, readErr := files.Read(manifestRel)
 		if readErr != nil {
 			findings = append(findings, Finding{Code: "clientgen.invalid-manifest", Path: manifestRel,
 				Message: fmt.Sprintf("committed generated client manifest could not be read: %v", readErr)})
-			return nil
+			continue
 		}
 		reference, ok := clientcontract.DecodeGeneratedClientReference(data)
 		if !ok {
 			findings = append(findings, Finding{Code: "clientgen.invalid-manifest", Path: manifestRel,
 				Message: "committed generated client manifest does not name a first-party target " +
 					"(generatedBy, protocolVersion, service.id, contractSha256), so the target it names cannot be judged"})
-			return nil
+			continue
 		}
-		output, relErr := filepath.Rel(projectRoot, filepath.Dir(path))
-		if relErr != nil {
-			return nil
+		output := path.Dir(manifestRel)
+		if projectRel != "." {
+			output = strings.TrimPrefix(output, projectRel+"/")
 		}
-		output = filepath.ToSlash(output)
 		switch reference.Language {
 		case clientcontract.GeneratedLanguageGo:
 			if !hasConfiguredTarget(config.Targets, "go") {
@@ -416,21 +394,74 @@ func configFromCommittedManifests(workspaceRoot, projectRoot string) (*clientGen
 			findings = append(findings, Finding{Code: "clientgen.invalid-manifest", Path: manifestRel,
 				Message: fmt.Sprintf("committed generated client manifest names no supported language (%q)", reference.Language)})
 		}
-		return nil
-	})
-	if !found {
-		return nil, findings
 	}
 	sort.Strings(config.Targets)
 	return config, findings
 }
 
-func readSpec(path string) ([]byte, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // discovered under the workspace root
+// committedManifestPaths lists, in directory-walk order, the workspace-relative
+// client.putnami.json manifests below the provider projectRel ("." is the
+// root), outside the directories the snapshot walk skips and never at the
+// project's own root. A manifest at the project's OWN root is a generated
+// client the project IS — an indexed client package inside its provider's
+// output directory — not a target the project generates; its provider names
+// it from above. In the candidate cut an ignored manifest is absent.
+func committedManifestPaths(files workspaceFiles, projectRel string) []string {
+	var manifests []string
+	if files.tree != nil {
+		for _, rel := range files.candidatesBelow(projectRel, excludedSnapshotDir) {
+			if path.Base(rel) != clientcontract.GeneratedManifestFile || path.Dir(rel) == projectRel {
+				continue
+			}
+			manifests = append(manifests, rel)
+		}
+		sort.SliceStable(manifests, func(i, j int) bool { return walkOrderLess(manifests[i], manifests[j]) })
+		return manifests
+	}
+	projectRoot := filepath.Join(files.root, filepath.FromSlash(projectRel))
+	_ = filepath.WalkDir(projectRoot, func(walked string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if entry != nil && entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.IsDir() {
+			if walked != projectRoot && excludedSnapshotDir(entry.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.Name() != clientcontract.GeneratedManifestFile || filepath.Dir(walked) == projectRoot {
+			return nil
+		}
+		if rel, relErr := filepath.Rel(files.root, walked); relErr == nil {
+			manifests = append(manifests, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	return manifests
+}
+
+// walkOrderLess orders two slash paths as a lexical directory walk visits
+// them: segment by segment, so "a/b" precedes "a-c/d" although '-' sorts
+// before '/'.
+func walkOrderLess(a, b string) bool {
+	left, right := strings.Split(a, "/"), strings.Split(b, "/")
+	for index := 0; index < len(left) && index < len(right); index++ {
+		if left[index] != right[index] {
+			return left[index] < right[index]
+		}
+	}
+	return len(left) < len(right)
+}
+
+func readSpec(files workspaceFiles, rel string) ([]byte, error) {
+	data, err := files.Read(rel)
 	if err != nil {
 		return nil, err
 	}
-	if !strings.HasSuffix(path, ".gz") {
+	if !strings.HasSuffix(rel, ".gz") {
 		return data, nil
 	}
 	reader, err := gzip.NewReader(bytes.NewReader(data))

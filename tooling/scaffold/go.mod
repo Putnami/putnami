@@ -13,6 +13,7 @@ require (
 )
 
 require (
+	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
 	go.putnami.dev/protocol/job v0.0.0 // indirect
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect

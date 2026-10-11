@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -110,6 +111,50 @@ func surfaceDocumentPath(option string) (string, error) {
 		return "", protocolcli.InvalidConfigf("option %s is %q, want the path of a file of the project, relative to it", commandSurfaceOption, option)
 	}
 	return rel, nil
+}
+
+// unkeyedDirectories mirrors the directory names the CLI's `**` file-pattern
+// walk never enters, tooling/cli/internal/store globDoubleStar: node_modules,
+// .git, .putnami, out, dist and vendor. The two whose name starts with a dot
+// are covered by unkeyedDirectory's dot rule, which also stands for the
+// task's `!**/.*/**/*` input pattern: a run writes its generated files there.
+var unkeyedDirectories = []string{"node_modules", "out", "dist", "vendor"}
+
+// unkeyedDirectory reports whether the task's cache key reads nothing below a
+// directory of this name. The check reads nothing below it either, in the
+// working tree and at the tag alike: a file the key does not hold could change
+// and leave a stored verdict in place, and reading it on one side only would
+// report its packages as added or removed.
+func unkeyedDirectory(name string) bool {
+	return strings.HasPrefix(name, ".") || slices.Contains(unkeyedDirectories, name)
+}
+
+// inUnkeyedDirectory reports whether a project-relative slash path lies below
+// an unkeyed directory.
+func inUnkeyedDirectory(rel string) bool {
+	dirs := strings.Split(rel, "/")
+	return slices.ContainsFunc(dirs[:len(dirs)-1], unkeyedDirectory)
+}
+
+// surfaceDocumentKeyed refuses a working-tree document the task's cache key
+// does not read, which could change and leave a stored verdict in place. The
+// key reads the project's .json files outside unkeyed directories
+// (putnami.extension.json, validate-api inputs). rel is a surfaceDocumentPath
+// result. The document at the tag needs no such rule: the key reads the whole
+// tree the tag holds at the project.
+func surfaceDocumentKeyed(rel string) error {
+	if path.Ext(rel) != ".json" {
+		return protocolcli.InvalidConfigf("option %s is %q, want a .json file: the task's cache key reads the project's .json files",
+			commandSurfaceOption, rel)
+	}
+	dirs := strings.Split(rel, "/")
+	for _, dir := range dirs[:len(dirs)-1] {
+		if unkeyedDirectory(dir) {
+			return protocolcli.InvalidConfigf("option %s is %q, which is inside %s: the task's cache key does not read that directory; move the document out of it",
+				commandSurfaceOption, rel, dir)
+		}
+	}
+	return nil
 }
 
 // readSurfaceInTree reads and validates the command-surface document at rel

@@ -51,7 +51,6 @@
     "bytesDeduped": 8192,
     "uploadMs": 44,
     "uploadErrors": 0,
-    "uploadsSkipped": 1,
     "providerSummaryRestoredCount": 1,
     "providerSummaryRestoredBytes": 20480,
     "providerSummaryUploadedCount": 5,

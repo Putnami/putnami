@@ -1,6 +1,7 @@
 # ADR 0003 — Drift is the generator task's verdict; the guard reads committed inputs
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0006](0006-the-guard-reads-and-keys-on-the-git-candidate-cut.md)
 - **Scope**: `@putnami/clientgen` (`tooling/clientgen-extension`), the client
   outputs of `@putnami/go` `build-describe` and `@putnami/typescript`
   `build-generate`
@@ -42,7 +43,10 @@ inputs only: the project index, the committed `schema/openapi.json` sidecar
 (over whatever a build last wrote under `.gen`), and the committed
 `client.putnami.json` manifests, which also name a provider's targets on a cold
 clone. A cold clone and a tree the session just built reach one verdict. The
-guard is not cached: its read set is every production source.
+guard is not cached: its read set is every production source. ADR 0006 amends
+this decision: the guard takes its member projects from the job context instead
+of the project index, reads the Git candidate cut only, and is keyed on the
+input `git:**`.
 
 **3. Activation is workspace-once.** The guard is a `validate` command with
 `activation: "workspace-once"`. The planner matches it without consulting any
@@ -93,5 +97,7 @@ can only shrink. This repository has no census.
 - **Keep a nested session, made cheaper.** Planning and restoring the
   providers' closure alone stayed above the 5 s target.
 - **Cache the guard.** Its read set, every consumer source, cannot be listed.
+  ADR 0006 reverses this: the read set is the candidate cut, which `git:**`
+  holds.
 - **Allowlist debt by folder, file or transport.** A class-based exemption keeps
   matching callsites nobody enumerated, including new ones.

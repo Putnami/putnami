@@ -3,8 +3,6 @@ package workspaceclient
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -29,12 +27,12 @@ type frameworkInventoryV2 struct {
 	Transports      []frameworkTransportV2 `json:"transports"`
 }
 
-func loadAndValidateFrameworkInventory(workspaceRoot string) ([]FrameworkTransport, []Finding) {
-	indexed, indexErr := indexedProjectPaths(workspaceRoot)
+func loadAndValidateFrameworkInventory(view workspaceView) ([]FrameworkTransport, []Finding) {
+	indexed, indexErr := view.members()
 	if indexErr != nil {
 		return nil, []Finding{{Code: "clientgen.invalid-framework-inventory", Path: frameworkInventoryFile, Message: indexErr.Error()}}
 	}
-	files, findings := readProjectInventories(workspaceRoot, indexed, frameworkInventoryFile,
+	files, findings := readProjectInventories(view.workspaceFiles, indexed, frameworkInventoryFile,
 		"clientgen.framework-inventory-read", "clientgen.invalid-framework-inventory")
 	seen, claimed := map[string]bool{}, map[string]bool{}
 	validated := []FrameworkTransport{}
@@ -57,8 +55,8 @@ func loadAndValidateFrameworkInventory(workspaceRoot string) ([]FrameworkTranspo
 				Reason: entry.Reason, Operations: entry.Operations, PendingWork: entry.PendingWork}
 			before := len(findings)
 			field := fmt.Sprintf("transports[%d]", index)
-			findings = append(findings, validateFrameworkStatus(workspaceRoot, file, field, transport)...)
-			findings = append(findings, validateInventoryFile(workspaceRoot, file, field+".adapter", transport.Adapter)...)
+			findings = append(findings, validateFrameworkStatus(view.workspaceFiles, file, field, transport)...)
+			findings = append(findings, validateInventoryFile(view.workspaceFiles, file, field+".adapter", transport.Adapter)...)
 			if !pathOwnedByProject(transport.Adapter, transport.Project) {
 				findings = append(findings, file.finding(field+".adapter", "must sit in the directory of the project that holds this file"))
 			}
@@ -77,7 +75,7 @@ func loadAndValidateFrameworkInventory(workspaceRoot string) ([]FrameworkTranspo
 			lastCallsite := ""
 			for callsiteIndex, callsite := range transport.Callsites {
 				callsiteField := fmt.Sprintf("%s.callsites[%d]", field, callsiteIndex)
-				findings = append(findings, validateAuthorityCallsite(workspaceRoot, file, transport.Adapter, callsiteField, callsite)...)
+				findings = append(findings, validateAuthorityCallsite(view.workspaceFiles, file, transport.Adapter, callsiteField, callsite)...)
 				key := externalCallsiteKey(callsite)
 				if callsiteIndex > 0 && key <= lastCallsite {
 					findings = append(findings, file.finding(callsiteField, "callsites must be unique and sorted"))
@@ -93,7 +91,7 @@ func loadAndValidateFrameworkInventory(workspaceRoot string) ([]FrameworkTranspo
 			lastTest := ""
 			for testIndex, testPath := range transport.Tests {
 				testField := fmt.Sprintf("%s.tests[%d]", field, testIndex)
-				findings = append(findings, validateInventoryFile(workspaceRoot, file, testField, testPath)...)
+				findings = append(findings, validateInventoryFile(view.workspaceFiles, file, testField, testPath)...)
 				if testIndex > 0 && testPath <= lastTest {
 					findings = append(findings, file.finding(testField, "test paths must be unique and sorted"))
 				}
@@ -113,16 +111,16 @@ func loadAndValidateFrameworkInventory(workspaceRoot string) ([]FrameworkTranspo
 // validateFrameworkStatus binds each status to the identity it is allowed to
 // claim. Every status requires the runtime to be the declared project's exact
 // indexed identity, so an entry names one package and never a directory.
-func validateFrameworkStatus(workspaceRoot string, file inventoryFile, field string, transport FrameworkTransport) []Finding {
+func validateFrameworkStatus(files workspaceFiles, file inventoryFile, field string, transport FrameworkTransport) []Finding {
 	var findings []Finding
 	switch transport.Status {
 	case StatusFrameworkRuntime:
-		if !generatedBindingRuntimeIdentity(workspaceRoot, transport.Project, transport.Runtime) {
+		if !generatedBindingRuntimeIdentity(files, transport.Project, transport.Runtime) {
 			findings = append(findings, file.finding(field+".runtime",
 				"must equal the indexed generated-binding runtime identity (@putnami/client or go.putnami.dev/client)"))
 		}
 	case StatusTransportPrimitive, StatusPendingProviderContract:
-		if !indexedProjectIdentity(workspaceRoot, transport.Project, transport.Runtime) {
+		if !indexedProjectIdentity(files, transport.Project, transport.Runtime) {
 			findings = append(findings, file.finding(field+".runtime",
 				"must equal the declared project's exact indexed package identity"))
 		}
@@ -162,18 +160,18 @@ func sortExternalCallsites(callsites []ExternalCallsite) {
 
 // generatedBindingRuntimeIdentity reports whether the project is one of the two
 // runtimes a generated binding executes on, named by its own manifest.
-func generatedBindingRuntimeIdentity(workspaceRoot, project, runtimeName string) bool {
+func generatedBindingRuntimeIdentity(files workspaceFiles, project, runtimeName string) bool {
 	return (runtimeName == "@putnami/client" || runtimeName == "go.putnami.dev/client") &&
-		indexedProjectIdentity(workspaceRoot, project, runtimeName)
+		indexedProjectIdentity(files, project, runtimeName)
 }
 
 // indexedProjectIdentity reports whether runtimeName is the exact package name
 // the project's own manifest declares.
-func indexedProjectIdentity(workspaceRoot, project, runtimeName string) bool {
+func indexedProjectIdentity(files workspaceFiles, project, runtimeName string) bool {
 	if blank(runtimeName) {
 		return false
 	}
-	data, err := os.ReadFile(filepath.Join(workspaceRoot, filepath.FromSlash(project), "putnami.json")) //nolint:gosec // indexed project metadata
+	data, err := files.Read(projectInventoryPath(project, "putnami.json"))
 	if err != nil {
 		return false
 	}

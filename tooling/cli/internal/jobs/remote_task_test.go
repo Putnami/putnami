@@ -361,9 +361,7 @@ func matrixJob() *ScheduledJob {
 	})
 }
 
-// matrixResult is the fixture task's execution result. The duration clears the
-// break-even floor (cache.DefaultBreakEven.MinDurationMs), so the entry is
-// genuinely eligible for sharing rather than silently skipped as too cheap.
+// matrixResult is the fixture task's execution result.
 func matrixResult() *JobResult {
 	return &JobResult{Status: "success", Duration: 2 * time.Second}
 }
@@ -985,8 +983,8 @@ func TestDeclaredSourceRewriterRejectsMutatingStatusEntry(t *testing.T) {
 
 // TestPrepareTaskUpload_AppliesTheSameGatesAsTheLegacyPath keeps the write-path
 // policy identical across the two entry models: side-effecting tasks are never
-// shared, a status-only entry is always shared (its payload moves no bytes), and
-// the wire manifest always carries the descriptor.
+// shared, a status-only entry is always shared, and the wire manifest always
+// carries the descriptor.
 func TestPrepareTaskUpload_AppliesTheSameGatesAsTheLegacyPath(t *testing.T) {
 	job := declaredJob("build~emit", "emit", &extension.TaskDeclaration{
 		Outputs: map[string]extension.DeclaredOutput{
@@ -1009,15 +1007,51 @@ func TestPrepareTaskUpload_AppliesTheSameGatesAsTheLegacyPath(t *testing.T) {
 	if len(in.Manifest.Files) != 1 || in.Manifest.Files[0].Path != store.RemoteEntryDescriptorPath {
 		t.Fatalf("wire manifest = %+v, want exactly the descriptor", in.Manifest)
 	}
-	if r.Stats().UploadsSkipped != 0 {
-		t.Fatal("a zero-byte payload must never be break-even skipped")
-	}
 
 	publish := declaredJob("publish", "publish", &extension.TaskDeclaration{
 		Outputs: map[string]extension.DeclaredOutput{
 			"coverage": fileDeclaration(extension.OutputRootProject, "coverage.json", true),
 		},
 	})
+	if _, ok := r.prepareTaskUpload(captureHashA, publish, f.cache); ok {
+		t.Fatal("a side-effecting task must never be shared with the provider")
+	}
+}
+
+// TestPrepareTaskUpload_SharesACheapEntryWithItsBytes pins the eligibility rule
+// on the task-owned path: a 5 ms task whose declared outputs carry bytes is
+// shared with its payload, because no duration or size rule leaves a
+// non-side-effecting result out of the remote cache. The same entry under a
+// side-effecting task name is never shared.
+func TestPrepareTaskUpload_SharesACheapEntryWithItsBytes(t *testing.T) {
+	job := matrixJob()
+	f := newCaptureFixture(t, job)
+	executeMatrixTask(t, f, "stamp\n")
+	if !f.sched.storeDeclaredCapture(job, &JobResult{Status: "success", Duration: 5 * time.Millisecond}, captureHashA) {
+		t.Fatal("declared capture published no entry")
+	}
+
+	r := newUploadTestCache()
+	in, ok := r.prepareTaskUpload(captureHashA, job, f.cache)
+	if !ok {
+		t.Fatal("a cheap bytes-carrying task-owned entry must be eligible for upload")
+	}
+	if in.Key != store.RemoteTaskEntryKey(captureHashA) {
+		t.Fatalf("upload key = %q, want the format-qualified key", in.Key)
+	}
+	if len(in.payload.Files) == 0 || manifestBytes(in.payload) == 0 {
+		t.Fatalf("payload = %+v, want the task's output bytes", in.payload)
+	}
+	if len(in.Manifest.Files) != len(in.payload.Files)+1 {
+		t.Fatalf("wire manifest has %d files, want the %d payload files plus the descriptor",
+			len(in.Manifest.Files), len(in.payload.Files))
+	}
+	if in.Result == nil || in.Result.DurationMs != 5 {
+		t.Fatalf("upload result = %+v, want the recorded 5 ms duration", in.Result)
+	}
+
+	publish := matrixJob()
+	publish.JobDef.Name = "publish~emit"
 	if _, ok := r.prepareTaskUpload(captureHashA, publish, f.cache); ok {
 		t.Fatal("a side-effecting task must never be shared with the provider")
 	}

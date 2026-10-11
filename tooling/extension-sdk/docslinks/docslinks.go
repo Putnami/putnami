@@ -11,6 +11,14 @@
 // scheme (https:, mailto:), protocol-relative links and absolute paths are not
 // relative and are not checked: an absolute path is a site route, which only
 // the site that serves it can resolve.
+//
+// Inside a Git work tree the check reads the repository's candidate cut, as
+// gitcandidate reads it: the tracked files and the untracked files no ignore
+// rule excludes. A link to an ignored file, to an empty directory, or through
+// a symbolic link to anything outside the cut is broken, as it is in a clone.
+// That cut is exactly what a `git:**` task input keys, so the tasks that run
+// the check are cached on it. Outside a Git work tree the check reads the
+// disk, and no `git:` input can key it.
 package docslinks
 
 import (
@@ -23,6 +31,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -31,6 +40,7 @@ import (
 	"unicode"
 
 	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/sdk/extension/gitcandidate"
 )
 
 // Code is the diagnostic code every finding is reported under.
@@ -60,9 +70,123 @@ var skippedDirectories = map[string]bool{
 // projects and Go modules, dot and underscore directories, the directories in
 // skippedDirectories and the directories git ignores, as the lint tasks do.
 func ProjectDocuments(root string) ([]string, error) {
-	return documents(root, func(path string) bool {
-		return fileExists(filepath.Join(path, "putnami.json")) || fileExists(filepath.Join(path, "go.mod"))
+	r, err := NewReader(root)
+	if err != nil {
+		return nil, err
+	}
+	return r.ProjectDocuments(r.root)
+}
+
+// Reader reads one workspace for the check: through its candidate cut when the
+// workspace is a Git work tree, from the disk otherwise. One reader serves one
+// check, so the documents, the link targets and any configuration its caller
+// reads through ReadFile come from one cut.
+type Reader struct {
+	root string
+	// tree is the candidate cut of root, or nil outside a Git work tree.
+	tree *gitcandidate.Tree
+}
+
+// NewReader returns the reader of the workspace at root. Inside a Git work
+// tree it lists the candidate cut once; an enumeration that fails there is an
+// error, never an empty workspace.
+func NewReader(root string) (*Reader, error) {
+	root = filepath.Clean(root)
+	tree, err := gitcandidate.Open(root)
+	if err != nil {
+		return nil, fmt.Errorf("list the candidate files of %s: %w", root, err)
+	}
+	return &Reader{root: root, tree: tree}, nil
+}
+
+// ReadFile returns the bytes of path, a file inside the workspace, following
+// symbolic links as os.ReadFile does. Inside a Git work tree a path outside
+// the candidate cut does not exist, and the error matches fs.ErrNotExist.
+func (r *Reader) ReadFile(path string) ([]byte, error) {
+	if r.tree == nil {
+		return os.ReadFile(path) //nolint:gosec // a file of the workspace the caller names
+	}
+	rel, inside := within(r.root, path)
+	if !inside {
+		return nil, &fs.PathError{Op: "read", Path: path, Err: fs.ErrNotExist}
+	}
+	return r.tree.ReadFile(filepath.ToSlash(rel))
+}
+
+// ProjectDocuments returns the documents of the project at dir, which lies
+// inside the reader's root, as the package-level ProjectDocuments reads them.
+func (r *Reader) ProjectDocuments(dir string) ([]string, error) {
+	nested := func(path string) bool {
+		return r.isFile(filepath.Join(path, "putnami.json")) || r.isFile(filepath.Join(path, "go.mod"))
+	}
+	if r.tree == nil {
+		return documents(dir, nested)
+	}
+	base, inside := within(r.root, dir)
+	if !inside {
+		return nil, fmt.Errorf("project %s lies outside the workspace %s", dir, r.root)
+	}
+	var files []string
+	r.eachCandidate(filepath.ToSlash(base), nested, func(path string) {
+		if isDocument(dir, path) {
+			files = append(files, path)
+		}
 	})
+	sort.Strings(files)
+	return files, nil
+}
+
+// eachCandidate calls visit with the absolute path of every candidate below
+// the slash directory base that resolves to a regular file and that no walk of
+// base would skip: a skipped directory name, or a directory skip reports.
+func (r *Reader) eachCandidate(base string, skip func(dir string) bool, visit func(path string)) {
+	prefix := ""
+	if base != "." {
+		prefix = base + "/"
+	}
+	skipped := map[string]bool{}
+	for _, rel := range r.tree.Paths() {
+		if !strings.HasPrefix(rel, prefix) {
+			continue
+		}
+		if r.skippedBelow(base, rel, skip, skipped) {
+			continue
+		}
+		if _, kind := r.tree.Resolve(rel); kind == gitcandidate.File {
+			visit(filepath.Join(r.root, filepath.FromSlash(rel)))
+		}
+	}
+}
+
+// skippedBelow reports whether a directory between base and the candidate rel
+// is one the walk skips. memo holds the answer for each directory already
+// asked about.
+func (r *Reader) skippedBelow(base, rel string, skip func(dir string) bool, memo map[string]bool) bool {
+	dir := path.Dir(rel)
+	if dir == base || (base == "." && dir == ".") {
+		return false
+	}
+	if answer, ok := memo[dir]; ok {
+		return answer
+	}
+	answer := r.skippedBelow(base, dir, skip, memo) || skippedDirectory(path.Base(dir)) ||
+		(skip != nil && skip(filepath.Join(r.root, filepath.FromSlash(dir))))
+	memo[dir] = answer
+	return answer
+}
+
+// isFile reports whether path is a file, or a symbolic link to one, in what
+// the reader reads.
+func (r *Reader) isFile(path string) bool {
+	if r.tree == nil {
+		return fileExists(path)
+	}
+	rel, inside := within(r.root, path)
+	if !inside {
+		return false
+	}
+	_, kind := r.tree.Resolve(filepath.ToSlash(rel))
+	return kind == gitcandidate.File
 }
 
 // WorkspaceDocuments returns every document under the workspace root in one
@@ -73,7 +197,71 @@ func ProjectDocuments(root string) ([]string, error) {
 // to the project around it. A project the walk cannot reach, under a skipped
 // or ignored directory, is read on its own. Each group is sorted.
 func WorkspaceDocuments(root string, projects []string) (map[string][]string, error) {
-	root = filepath.Clean(root)
+	r, err := NewReader(root)
+	if err != nil {
+		return nil, err
+	}
+	return r.WorkspaceDocuments(projects)
+}
+
+// WorkspaceDocuments returns every document of the reader's workspace, grouped
+// by the project of projects that owns it, as the package-level
+// WorkspaceDocuments groups them.
+func (r *Reader) WorkspaceDocuments(projects []string) (map[string][]string, error) {
+	if r.tree == nil {
+		return diskWorkspaceDocuments(r, projects)
+	}
+	root := r.root
+	isProject := make(map[string]bool, len(projects))
+	for _, dir := range projects {
+		isProject[filepath.Clean(dir)] = true
+	}
+	grouped := make(map[string][]string)
+	owners := map[string]string{".": root}
+	var owner func(dir string) string
+	owner = func(dir string) string {
+		if found, ok := owners[dir]; ok {
+			return found
+		}
+		found := owner(path.Dir(dir))
+		if absolute := filepath.Join(root, filepath.FromSlash(dir)); isProject[absolute] {
+			found = absolute
+		}
+		owners[dir] = found
+		return found
+	}
+	r.eachCandidate(".", nil, func(file string) {
+		rel, _ := within(root, file)
+		holder := owner(path.Dir(filepath.ToSlash(rel)))
+		if isDocument(holder, file) {
+			grouped[holder] = append(grouped[holder], file)
+		}
+	})
+	// A project below a directory the walk skips is read on its own, as
+	// ProjectDocuments reads it.
+	for dir := range isProject {
+		rel, inside := within(root, dir)
+		if !inside || rel == "." || !r.skippedBelow(".", filepath.ToSlash(rel)+"/x", nil, map[string]bool{}) {
+			continue
+		}
+		files, err := r.ProjectDocuments(dir)
+		if err != nil {
+			return nil, err
+		}
+		if len(files) > 0 {
+			grouped[dir] = files
+		}
+	}
+	for holder := range grouped {
+		sort.Strings(grouped[holder])
+	}
+	return grouped, nil
+}
+
+// diskWorkspaceDocuments is workspaceDocuments outside a Git work tree: one
+// walk of the disk.
+func diskWorkspaceDocuments(r *Reader, projects []string) (map[string][]string, error) {
+	root := r.root
 	unreached := make(map[string]bool, len(projects))
 	for _, dir := range projects {
 		unreached[filepath.Clean(dir)] = true
@@ -117,7 +305,7 @@ func WorkspaceDocuments(root string, projects []string) (map[string][]string, er
 		return nil, err
 	}
 	for dir := range unreached {
-		files, err := ProjectDocuments(dir)
+		files, err := r.ProjectDocuments(dir)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
@@ -234,7 +422,17 @@ func fileExists(path string) bool {
 // because no reader of the repository can follow it. A file that cannot be
 // read is an error.
 func Check(workspaceRoot string, files []string) ([]Finding, error) {
-	root := filepath.Clean(workspaceRoot)
+	r, err := NewReader(workspaceRoot)
+	if err != nil {
+		return nil, err
+	}
+	return r.Check(files)
+}
+
+// Check returns the broken links of files, as the package-level Check does,
+// reading the workspace through r.
+func (r *Reader) Check(files []string) ([]Finding, error) {
+	root := r.root
 	realRoot, err := dirlink.Resolve(root)
 	if err != nil {
 		realRoot = root
@@ -242,12 +440,13 @@ func Check(workspaceRoot string, files []string) ([]Finding, error) {
 	checker := &checker{
 		root:     root,
 		realRoot: realRoot,
+		tree:     r.tree,
 		anchors:  make(map[string]map[string]bool),
 		entries:  make(map[string]map[string]bool),
 	}
 	var findings []Finding
 	for _, file := range files {
-		source, err := os.ReadFile(file)
+		source, err := checker.read(file)
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", file, err)
 		}
@@ -265,13 +464,18 @@ func Check(workspaceRoot string, files []string) ([]Finding, error) {
 	return findings, nil
 }
 
-// CheckProject checks the documents ProjectDocuments returns for root.
+// CheckProject checks the documents ProjectDocuments returns for root, a
+// project inside workspaceRoot.
 func CheckProject(workspaceRoot, root string) ([]Finding, error) {
-	files, err := ProjectDocuments(root)
+	r, err := NewReader(workspaceRoot)
 	if err != nil {
 		return nil, err
 	}
-	return Check(workspaceRoot, files)
+	files, err := r.ProjectDocuments(filepath.Clean(root))
+	if err != nil {
+		return nil, err
+	}
+	return r.Check(files)
 }
 
 type checker struct {
@@ -280,6 +484,9 @@ type checker struct {
 	// resolved: a link target whose own links lead out of it leaves the
 	// workspace.
 	realRoot string
+	// tree is the candidate cut the check reads, or nil when it reads the
+	// disk.
+	tree *gitcandidate.Tree
 	// anchors caches the anchors of each Markdown file a link names.
 	anchors map[string]map[string]bool
 	// entries caches the exact names in each directory a link walks through.
@@ -328,23 +535,11 @@ func (c *checker) resolve(file string, source []byte, target string) string {
 		if !inside {
 			return fmt.Sprintf("link %q leaves the workspace", target)
 		}
-		if !c.exists(rel) {
-			return fmt.Sprintf("link %q names %s, which does not exist", target, filepath.ToSlash(rel))
-		}
-		// A reader of the repository cannot follow a symbolic link out of it,
-		// and the check must not read what lies outside either.
-		real, evalErr := dirlink.Resolve(resolved)
-		if evalErr != nil {
-			return fmt.Sprintf("link %q names %s, which does not resolve: %v", target, filepath.ToSlash(rel), evalErr)
-		}
-		if _, inside := within(c.realRoot, real); !inside {
-			return fmt.Sprintf("link %q names %s, a symbolic link that leaves the workspace", target, filepath.ToSlash(rel))
+		if message := c.reach(target, rel, resolved); message != "" {
+			return message
 		}
 	}
-	if anchor == "" || !isMarkdown(resolved) {
-		return ""
-	}
-	if info, statErr := os.Stat(resolved); statErr != nil || info.IsDir() {
+	if anchor == "" || !isMarkdown(resolved) || !c.isFile(resolved) {
 		return ""
 	}
 	var anchors map[string]bool
@@ -364,6 +559,61 @@ func (c *checker) resolve(file string, source []byte, target string) string {
 		return fmt.Sprintf("link %q names no heading of this file", target)
 	}
 	return fmt.Sprintf("link %q names no heading of %s", target, filepath.ToSlash(relOrSelf(c.root, resolved)))
+}
+
+// reach returns why the path rel, which target names and which lies at
+// resolved inside the workspace, cannot be followed, or "" when it can.
+func (c *checker) reach(target, rel, resolved string) string {
+	if c.tree != nil {
+		switch _, kind := c.tree.Resolve(filepath.ToSlash(rel)); kind {
+		case gitcandidate.Missing:
+			return fmt.Sprintf("link %q names %s, which does not exist", target, filepath.ToSlash(rel))
+		case gitcandidate.Outside:
+			return fmt.Sprintf("link %q names %s, a symbolic link that leaves the workspace", target, filepath.ToSlash(rel))
+		}
+		return ""
+	}
+	if !c.exists(rel) {
+		return fmt.Sprintf("link %q names %s, which does not exist", target, filepath.ToSlash(rel))
+	}
+	// A reader of the repository cannot follow a symbolic link out of it,
+	// and the check must not read what lies outside either.
+	real, evalErr := dirlink.Resolve(resolved)
+	if evalErr != nil {
+		return fmt.Sprintf("link %q names %s, which does not resolve: %v", target, filepath.ToSlash(rel), evalErr)
+	}
+	if _, inside := within(c.realRoot, real); !inside {
+		return fmt.Sprintf("link %q names %s, a symbolic link that leaves the workspace", target, filepath.ToSlash(rel))
+	}
+	return ""
+}
+
+// isFile reports whether path, inside the workspace, is a file or resolves to
+// one.
+func (c *checker) isFile(path string) bool {
+	if c.tree == nil {
+		info, err := os.Stat(path)
+		return err == nil && !info.IsDir()
+	}
+	rel, inside := within(c.root, path)
+	if !inside {
+		return false
+	}
+	_, kind := c.tree.Resolve(filepath.ToSlash(rel))
+	return kind == gitcandidate.File
+}
+
+// read returns the bytes of file: from the candidate cut, where a file that is
+// not a candidate does not exist, or from the disk.
+func (c *checker) read(file string) ([]byte, error) {
+	if c.tree == nil {
+		return os.ReadFile(file) //nolint:gosec // a document or a link target inside the workspace
+	}
+	rel, inside := within(c.root, file)
+	if !inside {
+		return nil, fmt.Errorf("%s lies outside the workspace %s", file, c.root)
+	}
+	return c.tree.ReadFile(filepath.ToSlash(rel))
 }
 
 // within returns path relative to root, and whether path lies inside root.
@@ -441,7 +691,7 @@ func (c *checker) anchorsOf(file string, source []byte) map[string]bool {
 		return anchors
 	}
 	if source == nil {
-		source, _ = os.ReadFile(file)
+		source, _ = c.read(file)
 	}
 	anchors := Anchors(source)
 	c.anchors[file] = anchors

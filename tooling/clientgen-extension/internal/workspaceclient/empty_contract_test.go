@@ -123,7 +123,7 @@ func TestADeclaredEmptyFirstPartyContractNeedsNoGeneratedTarget(t *testing.T) {
 			// targets. This is the state the issue reported.
 			writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go","ts"]}`)
 
-			report := InspectCommitted(root)
+			report := InspectCommitted(root, fixtureMembers(t, root))
 			if !report.Clean() {
 				t.Fatalf("a declared empty first-party contract produced findings: %+v", report.Findings)
 			}
@@ -141,7 +141,7 @@ func TestADeclaredEmptyFirstPartyContractNeedsNoGeneratedTarget(t *testing.T) {
 			if err := os.RemoveAll(filepath.Join(root, "services", "gomod-server", ".gen")); err != nil {
 				t.Fatal(err)
 			}
-			report = InspectCommitted(root)
+			report = InspectCommitted(root, fixtureMembers(t, root))
 			if !report.Clean() {
 				t.Fatalf("the cold-tree verdict differs from the built-tree one: %+v", report.Findings)
 			}
@@ -152,7 +152,7 @@ func TestADeclaredEmptyFirstPartyContractNeedsNoGeneratedTarget(t *testing.T) {
 			// A generation contract that configures no target stays satisfied:
 			// there is nothing for clientgen.no-targets to be about.
 			writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":[]}`)
-			if report = InspectCommitted(root); !report.Clean() {
+			if report = InspectCommitted(root, fixtureMembers(t, root)); !report.Clean() {
 				t.Fatalf("an empty contract with no configured target produced findings: %+v", report.Findings)
 			}
 		})
@@ -169,7 +169,7 @@ func TestAContractWithFirstPartyOperationsStillNeedsItsGeneratedTarget(t *testin
 	root := emptyContractWorkspace(t, string(catalogContractForFixture(t)))
 	writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go","ts"]}`)
 
-	report := InspectCommitted(root)
+	report := InspectCommitted(root, fixtureMembers(t, root))
 	assertFindingCodes(t, report, "clientgen.missing-manifest")
 	if count := findingCount(report, "clientgen.missing-manifest"); count != 2 {
 		t.Fatalf("missing-manifest findings = %d, want one per declared target", count)
@@ -183,7 +183,7 @@ func TestAContractWithFirstPartyOperationsStillNeedsItsGeneratedTarget(t *testin
 	if err := os.RemoveAll(filepath.Join(root, "services", "gomod-server", ".gen")); err != nil {
 		t.Fatal(err)
 	}
-	assertFindingCodes(t, InspectCommitted(root), "clientgen.missing-config")
+	assertFindingCodes(t, InspectCommitted(root, fixtureMembers(t, root)), "clientgen.missing-config")
 }
 
 // TestAContractDiscoveryCouldNotReadIsNeverEmpty: an operation the guard could
@@ -206,7 +206,7 @@ func TestAContractDiscoveryCouldNotReadIsNeverEmpty(t *testing.T) {
 		t.Run(contract.name, func(t *testing.T) {
 			root := emptyContractWorkspace(t, contract.document)
 			writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go"]}`)
-			assertFindingCodes(t, InspectCommitted(root), contract.code, "clientgen.missing-manifest")
+			assertFindingCodes(t, InspectCommitted(root, fixtureMembers(t, root)), contract.code, "clientgen.missing-manifest")
 		})
 	}
 }
@@ -286,7 +286,7 @@ func TestAnOperationUnderAMethodTheGuardOnceDroppedStillNeedsItsTarget(t *testin
 	root := emptyContractWorkspace(t, traceOperationContractDocument)
 	writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go","ts"]}`)
 
-	report := InspectCommitted(root)
+	report := InspectCommitted(root, fixtureMembers(t, root))
 	if count := findingCount(report, "clientgen.missing-manifest"); count != 2 {
 		t.Fatalf("missing-manifest findings = %d, want one per declared target; findings=%+v", count, report.Findings)
 	}
@@ -390,7 +390,7 @@ func call() { _, _ = http.Get("gomod-server") }
 	writeWorkspaceFile(t, root, "services/gomod-server/schema/openapi.json", allExternalContractDocument)
 	writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go","ts"]}`)
 	writeSourceIndex(t, root, "consumer", "services/gomod-server")
-	inspected := InspectCommitted(root)
+	inspected := InspectCommitted(root, fixtureMembers(t, root))
 	var found bool
 	for _, reported := range inspected.Providers {
 		if reported.ServiceID != "gomod-server" {

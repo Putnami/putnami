@@ -68,6 +68,7 @@ func Deployment(ctx *pctx.Context, opts Options) (Result, error) {
 	withheld := Result{
 		Outcome:       OutcomeWithheld,
 		ManifestPath:  declarationPath,
+		ManifestFile:  DeploymentFile,
 		Contributions: len(contributions),
 		Diagnostics:   diags,
 	}
@@ -89,6 +90,7 @@ func Deployment(ctx *pctx.Context, opts Options) (Result, error) {
 	return Result{
 		Outcome:       OutcomeEmitted,
 		ManifestPath:  declarationPath,
+		ManifestFile:  DeploymentFile,
 		Contributions: len(contributions),
 		Diagnostics:   diags,
 	}, nil

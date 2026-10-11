@@ -1,6 +1,6 @@
 # Build
 
-The build command compiles TypeScript projects through a 5-phase pipeline: **generate**, **transpile**, **types**, **compile**, and **infra**. The first four are independently cacheable and can be run selectively; **infra** aggregates a workload's deployability requirements at the end of the build and is never cached.
+The build command compiles TypeScript projects through a 5-phase pipeline: **generate**, **transpile**, **types**, **compile**, and **infra**. The first four are independently cacheable and can be run selectively; **infra** aggregates a workload's deployability requirements at the end of the build and is cached on the files it reads.
 
 ## Overview
 
@@ -314,8 +314,8 @@ Emits the workload's deployability manifest at `<project>/.gen/requirements.json
    workload's dependency closure (the closure arrives on the job context).
 2. Applies `<workload>/infra/overrides.json`.
 3. Resolves the runtime block — an authored `<workload>/infra/runtime.json` wins
-   and its stale defaults sidecar is removed; otherwise framework defaults are
-   synthesized into `<workload>/.gen/infra/runtime.json`.
+   and the run removes its stale defaults sidecar; otherwise framework defaults
+   are synthesized into `<workload>/.gen/infra/runtime.json`.
 4. Turns HTTP/2 **off** in that block, whatever its source: Bun does not serve
    h2c, and the deploy target may default a service to HTTP/2, so a TypeScript
    workload has to opt out explicitly. This is the TypeScript extension's own
@@ -325,8 +325,23 @@ Emits the workload's deployability manifest at `<project>/.gen/requirements.json
 
 Findings (a malformed contribution, a merge conflict, an unused override) are
 reported as task warnings and never fail the build. The phase is skipped for
-libraries, and it is never cached: its inputs are other projects' committed
-manifests, which no per-project cache key covers.
+libraries.
+
+The phase is cached. Its key holds every file it reads: the committed
+`infra/requirements.json` of every project in the closure, with that project's
+path, and the workload's `infra/runtime.json` and `infra/overrides.json`. A
+change to a dependency's requirements, or a project that joins or leaves the
+closure, moves the key. The key also moves with the project type and with the
+extension's code, which holds the runtime defaults and the HTTP/2 rule. No
+commit, ref or checkout path reaches the key. A cache hit restores
+`.gen/requirements.json` and, without an authored runtime,
+`.gen/infra/runtime.json`. With an authored runtime, a hit restores nothing at
+the sidecar's path and removes nothing, so a sidecar an earlier build left
+stays until the phase runs again. The runtime block of
+`.gen/requirements.json` is the value that applies. Only a run that writes the
+manifest is stored: a
+library, a workload that declares nothing and a run whose write failed report a
+skip and are not cached. A cache hit does not repeat the findings.
 
 The `package` command's `deployment` step writes the same aggregate, under the
 same HTTP/2 hook, as the workload's deployment declaration (see
@@ -362,28 +377,34 @@ Every output has exactly one owning task:
 
 | Task | Owns | Root |
 |------|------|------|
-| `build-generate` | `.gen/` minus `.gen/deployment.json`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
+| `build-generate` | `.gen/` minus `.gen/deployment.json`, `.gen/requirements.json` and `.gen/infra/runtime.json`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
 | `build-transpile` | `lib/` | per-command output dir |
 | `build-types` | `types/` | per-command output dir |
 | `build-compile` | `compile/` | per-command output dir |
 | `test-run` | `lcov.info`, `results.junit.xml` | per-command output dir |
 | `package-npm` | `npm/` | per-command output dir |
 | `package-docker` | `docker/` | per-command output dir |
+| `build-infra` | `.gen/requirements.json` (required: a run that writes none caches nothing), `.gen/infra/runtime.json` | project dir |
 | `package-deployment` | `.gen/deployment.json` (required: a run that writes none caches nothing) | project dir |
 | `config-extract-exec` | `schema/config.json`, `schema/config.jsonschema.json` | project dir |
 
-Except the required `.gen/deployment.json` of `package-deployment`, each
-declared output above may legitimately be absent after a successful run —
-a project with no entrypoint transpiles to nothing, coverage is only
-instrumented under `--enforce-coverage`, and a project with no config blocks
-emits no schema.
+Except the required `.gen/requirements.json` of `build-infra` and
+`.gen/deployment.json` of `package-deployment`, each declared output above may
+legitimately be absent after a successful run — a project with no entrypoint
+transpiles to nothing, coverage is only instrumented under `--enforce-coverage`,
+a project with no config blocks emits no schema, and a workload that authors
+`infra/runtime.json` gets no runtime defaults file.
 
 `build-generate` is the single producer of `<project>/.gen` — anything else
 that writes inside `.gen` (such as the `config-extract` fallback location)
 writes into generate-owned territory rather than claiming a slice of it. The
-one exception is `.gen/deployment.json`: `build-generate` cedes it to
-`package-deployment`, which writes it after generate's snapshot (see
-[Package → Deployment Channel](./07-package.md#deployment-channel)).
+exceptions are the files later steps write after generate's snapshot:
+`build-generate` cedes `.gen/deployment.json` to `package-deployment` (see
+[Package → Deployment Channel](./07-package.md#deployment-channel)), and
+`.gen/requirements.json` and `.gen/infra/runtime.json` to `build-infra`.
+`build-generate` still deletes `.gen/infra/` fragments at the start of every
+run, the runtime defaults file with them, and `build-infra` writes it again
+after generate.
 
 Every packaging task declares everything it writes, including the channel record
 it leaves inside its own output directory, which is what keeps `package` under

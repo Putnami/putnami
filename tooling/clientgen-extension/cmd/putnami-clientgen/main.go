@@ -74,13 +74,15 @@ func runWorkspace(mode workspaceclient.Mode) cli.JobFunc {
 		}
 		var report workspaceclient.Report
 		if mode == workspaceclient.ModeCheck {
-			// The check builds nothing and renders nothing. Every input is a
-			// committed file, so a cold clone and a tree the session just built
-			// reach one verdict; whether the committed clients are what the
-			// current contract GENERATES is the generator tasks' own verdict,
-			// judged by the engine on their declared outputs (protocols/extension
-			// ADR 0004). This task keeps what no generator task can judge.
-			report = workspaceclient.InspectCommitted(ctx.WorkspaceRoot)
+			// The check builds nothing and renders nothing. It reads the Git
+			// candidate cut its `git:**` key holds and the membership the
+			// orchestrator resolved from committed manifests, so a cold clone
+			// and a tree the session just built reach one verdict; whether the
+			// committed clients are what the current contract GENERATES is the
+			// generator tasks' own verdict, judged by the engine on their
+			// declared outputs (protocols/extension ADR 0004). This task keeps
+			// what no generator task can judge.
+			report = workspaceclient.InspectCommitted(ctx.WorkspaceRoot, memberPaths(ctx.WorkspaceProjects))
 		} else {
 			regenerated, err := synchronizeWorkspace(ctx.WorkspaceRoot, mode, phase)
 			if err != nil {
@@ -182,6 +184,16 @@ func synchronizeWorkspace(workspaceRoot string, mode workspaceclient.Mode, phase
 	report = workspaceclient.InspectRendered(workspaceRoot, expectedRoot, mode).WithFindings(snapshotFindings...)
 	report.AppliedAdaptations = applied
 	return report, nil
+}
+
+// memberPaths returns the workspace-relative directory of every member project
+// the orchestrator resolved.
+func memberPaths(refs []pctx.ProjectRef) []string {
+	paths := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		paths = append(paths, ref.Path)
+	}
+	return paths
 }
 
 // sortedTimingNames returns the phase names in a fixed order, so the metric
