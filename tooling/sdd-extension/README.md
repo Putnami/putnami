@@ -362,7 +362,7 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   and evidence at every root, the capability manifests evidence reaches, and
   every file a source binding hashes. A binding records each bound file's bytes
   or link text and its executable bit, and the `git:` key holds the bit too
-  (ADR 0061 of the CLI). A submodule or an unmerged path produces no key, so the
+  (ADR 0063 of the CLI). A submodule or an unmerged path produces no key, so the
   task then runs uncached rather than replay a verdict about another commit.
   Every project is read at the tree base version `0.0.0`, the version the CLI
   gives a task the cache can serve (ADR 0060 of the CLI), and the report names

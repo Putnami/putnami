@@ -309,7 +309,7 @@ const treeBaseVersion = "0.0.0"
 //
 //   - It reads the cut (features.NewTaskReader): an ignored file is absent,
 //     and a source binding records what the key holds, the executable bit
-//     included (ADR 0061 of the CLI).
+//     included (ADR 0063 of the CLI).
 //   - Every project carries the tree base version, whatever the wire says. A
 //     package-root selector matches a project by name and version, and the
 //     CLI gives a cacheable task 0.0.0, or no version at all where Git has no

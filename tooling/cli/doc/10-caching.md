@@ -395,7 +395,7 @@ verdict across a `chmod` or a membership change.
 The document gates declare `git:**` instead of a fixed list of repository
 documents, so the public-cut scanner and its cache key cover the same tree.
 See [ADR 0041](adr/0041-git-candidate-file-inputs.md) and
-[ADR 0061](adr/0061-a-git-input-keys-the-executable-bit.md).
+[ADR 0063](adr/0063-a-git-input-keys-the-executable-bit.md).
 
 ### Environment Variable Hashing
 

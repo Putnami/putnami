@@ -702,7 +702,7 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 
 	// features-validate reads the workspace's Git candidate cut: manifests,
 	// evidence, capability manifests and every file a source binding hashes,
-	// the executable bit included, which `git:**` holds (ADR 0061 of the CLI).
+	// the executable bit included, which `git:**` holds (ADR 0063 of the CLI).
 	// The cut is workspace-scoped so one digest serves every project's key;
 	// the project port keeps the project side off ignored build output.
 	features := m.Tasks["features-validate"]

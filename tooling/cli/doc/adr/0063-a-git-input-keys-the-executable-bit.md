@@ -1,4 +1,4 @@
-# ADR 0061 — A `git:` input keys the executable bit
+# ADR 0063 — A `git:` input keys the executable bit
 
 - **Status**: accepted
 - **Scope**: `@putnami/cli` (`internal/store`), `putnami-extension-sdk`

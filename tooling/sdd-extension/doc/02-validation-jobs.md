@@ -380,7 +380,7 @@ holds that cut:
 - A binding records each bound file's bytes or link text and its executable
   bit. The `git:` key holds the bit too, read where the binding reads it: from
   the file's mode, or on Windows, which stores none, from the mode the index
-  records (ADR 0061 of the CLI). A `chmod +x` of a bound file moves the key.
+  records (ADR 0063 of the CLI). A `chmod +x` of a bound file moves the key.
 - A binding records a submodule's checked-out commit and refuses an unmerged
   path. The `git:` key holds neither and produces no key for either, so the
   task then runs uncached instead of replaying a verdict about another commit.

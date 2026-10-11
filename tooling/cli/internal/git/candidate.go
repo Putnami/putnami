@@ -54,7 +54,7 @@ type IndexModes struct {
 // binding reads it (ReadSourceBindingSnapshot). A `git:` cache key needs it for
 // two answers a binding gives: on a host that does not store the executable
 // bit, a tracked file takes its bit from the index mode, and an unmerged path
-// is refused (ADR 0061).
+// is refused (ADR 0063).
 func ReadIndexModes(root string) (IndexModes, error) {
 	output, err := run(root, "ls-files", "--stage", "-z")
 	if err != nil {

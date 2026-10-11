@@ -458,7 +458,7 @@ func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, erro
 // (sourcebinding.HostStatsExecBit). The mode marker differs from the bare
 // "git-file" marker earlier keys used, so every key over a regular candidate
 // moved to an address no earlier entry occupies, and no cacheKeyVersion bump
-// was needed (ADR 0061).
+// was needed (ADR 0063).
 func gitCandidateDigest(file fileEntry, buf []byte, statsExecBit bool) []byte {
 	h := sha256.New()
 	if file.info.Mode()&os.ModeSymlink != 0 {

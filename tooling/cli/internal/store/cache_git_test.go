@@ -315,7 +315,7 @@ func (info fixedModeInfo) Mode() os.FileMode { return info.mode }
 // host stores it, from the index mode where it does not, and an untracked file
 // is regular there. Its preimage is not the one earlier keys used, so a key
 // over a regular candidate cannot land on an entry written before the bit was
-// keyed (ADR 0061).
+// keyed (ADR 0063).
 func TestGitCandidateDigestReadsTheBitWhereTheBindingDoes(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "git-candidate-inputs", "candidate-bytes-and-membership-determine-the-key")
 	dir := t.TempDir()

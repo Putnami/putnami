@@ -36,7 +36,7 @@ import (
 // cut, and its verdict reads that cut and nothing else
 // (sdd.BuildFeatureTaskValidationResult). An evidence source binding records
 // each bound file's bytes or link text and its executable bit, which the key
-// holds too (ADR 0061 of the CLI); a submodule or an unmerged path produces no
+// holds too (ADR 0063 of the CLI); a submodule or an unmerged path produces no
 // key, so a run that meets one is never served. Every project carries the
 // tree base version, and the report names no commit, so two runs on one tree
 // write one report whatever the commit, the ref or the checkout.

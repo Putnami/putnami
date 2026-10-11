@@ -25,7 +25,7 @@ import (
 //
 // A source binding needs no cut of its own. ProjectSourceBinding enumerates
 // the same candidates with Git and records each one's path, bytes or link
-// text, and executable bit, which the key holds too (ADR 0061 of the CLI). A
+// text, and executable bit, which the key holds too (ADR 0063 of the CLI). A
 // submodule and an unmerged path produce no key, so a run that meets one is
 // never served from the cache.
 type CutReader struct {

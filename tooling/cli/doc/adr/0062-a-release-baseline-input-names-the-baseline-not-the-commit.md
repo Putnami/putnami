@@ -52,7 +52,7 @@ one verdict still gave two outputs.
    manifest reaches by declaring the name, so an older CLI refuses the
    manifest instead. Rung 7 also covers a `git:` input, whose key holds the
    executable bit from this release on (`GitInputModeContract`,
-   [ADR 0061](0061-a-git-input-keys-the-executable-bit.md)): one CLI release
+   [ADR 0063](0063-a-git-input-keys-the-executable-bit.md)): one CLI release
    added both meanings.
 5. **`validate-api` keys on what it reads.** Its inputs are the project's
    non-test Go files and the files their embed directives select, its

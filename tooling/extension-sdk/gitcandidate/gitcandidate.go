@@ -3,7 +3,7 @@
 // A task input written `git:**` (ADR 0041 of the CLI) keys the task on the
 // repository's candidate cut: every path `git ls-files --cached --others
 // --exclude-standard` lists that exists on disk, a regular file by its bytes
-// and its executable bit (ADR 0061 of the CLI) and a symbolic link by its
+// and its executable bit (ADR 0063 of the CLI) and a symbolic link by its
 // target text. A cached verdict is sound only when
 // the task reads nothing outside that cut, so a task that declares the input
 // reads the worktree through a Tree: a path that is not a candidate does not
