@@ -931,23 +931,32 @@ func TestInstallPS1RunRefusesACommandTheMapDoesNotList(t *testing.T) {
 	}
 }
 
-// The shipped map resolves agent-readiness through its public extension.
+// The shipped map reads as a well-formed map, so a command it does not list
+// is refused as unlisted, not as a malformed map.
 func TestInstallPS1RunReadsTheShippedMap(t *testing.T) {
 	t.Parallel()
 	shipped := readFile(t, filepath.Join(filepath.Dir(installScriptPath(t)), "install-commands.txt"))
 	r := newPS1RunEnv(t, string(shipped), 0)
+	res := r.run(t, "--run", "deploy")
+	r.assertRefusedBeforeInstalling(t, res)
+	if !strings.Contains(res.stderr, "does not list it") {
+		t.Fatalf("the shipped map did not refuse an unlisted command as unlisted:\n%s", res.output())
+	}
+}
+
+// A retired command installs nothing and says so, before the installer reads
+// the command map.
+func TestInstallPS1RunSaysARetiredCommandIsRetired(t *testing.T) {
+	t.Parallel()
+	r := newPS1RunEnv(t, commandMap("agent-readiness @acme/revived"), 0)
 	res := r.run(t, "--run", "agent-readiness")
-	if res.exitCode != 0 {
-		t.Fatalf("run failed (exit %d):\n%s", res.exitCode, res.output())
+	r.assertRefusedBeforeInstalling(t, res)
+	if !strings.Contains(res.stderr, "putnami agent-readiness is retired. Nothing was installed.") {
+		t.Fatalf("the refusal does not say the command is retired:\n%s", res.output())
 	}
-	want := []string{
-		"pin argv=extensions install --user --latest @putnami/agent-readiness",
-		"run argv=agent-readiness",
+	if got := len(r.registry.recorded()); got != 0 {
+		t.Fatalf("a retired command made %d request(s):\n%s", got, res.output())
 	}
-	if got := r.cliCalls(t); len(got) < 2 || got[0] != want[0] || got[1] != want[1] {
-		t.Fatalf("CLI calls = %q, want %q first\n%s", got, want, res.output())
-	}
-	assertGitDirUntouched(t, r.callerDir)
 }
 
 func TestInstallPS1RunIgnoresBlankAndIndentedCommentLines(t *testing.T) {

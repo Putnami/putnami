@@ -282,53 +282,6 @@ the orientation document from going stale behind the code.
 
 ---
 
-## Agent readiness, marker by marker
-
-The command and collector are [public source](https://github.com/Putnami/putnami/tree/main/intelligence/agent-readiness) in the separate
-`@putnami/agent-readiness` extension:
-
-```sh
-putnami extensions install --user --latest @putnami/agent-readiness
-putnami agent-readiness --print-payload
-putnami agent-readiness
-```
-
-In a Putnami workspace, declare the extension in that workspace's extensions.
-Print-only mode sends nothing; a normal run sends the validated payload to the
-existing anonymous scoring service and prints its verdict and report link.
-It needs Git history, and no account or cloud setup.
-
-`putnami agent-readiness` measures how far a repository lets an agent work
-safely. It reads twelve markers, grouped in four steps, and grades each one.
-The
-[agent-readiness method](/docs/platform/intelligence/agent-readiness-method)
-says how. The method is neutral: it recognizes a tool by what the tool does,
-and a Putnami command counts the same as any other tool.
-
-This table says what each Putnami default gives each marker:
-
-| Marker | What Putnami does by default |
-| --- | --- |
-| `understand.instructions` | `putnami init` writes a Putnami block in `AGENTS.md` that names the command to run and the gate to pass: the blocking commands of `putnami.ci.json`, or `lint`, `test` and `build` when the workspace has no usable `putnami.ci.json`. |
-| `understand.commands` | `putnami cloud ci init` writes `putnami.ci.json`, which runs `lint`, `test` and `build` on every change, and `validate` when an extension of the workspace declares a `validate` job. |
-| `understand.area-docs` | Every project template writes a `README.md`, and the `lint-docs` step of `putnami lint` fails on a broken relative link or anchor in a project's `README.md` files and `doc/` tree. |
-| `bound.declared-areas` | Each project declares itself in its `putnami.json`, and `putnami.workspace.json` marks the workspace root. |
-| `bound.boundary-rules` | A project is importable only from its own scope unless its `visibility` widens it, and an import that crosses a boundary fails every command that plans over the graph. |
-| `bound.cross-area-changes` | `--impacted` runs what a change reaches; how often a change crosses areas depends on how you work, not on a default. |
-| `verify.tests` | `putnami test` runs the tests of every selected project, and `--enforce-coverage` fails the gate below the coverage threshold. |
-| `verify.static-checks` | `putnami lint` runs the linters of each language extension in the gate. |
-| `verify.reliable-signal` | The Go and TypeScript lint refuses a skipped or focused test that no platform or dependency guard explains; a reviewed exception carries `putnami:allow-skip <reason>`. |
-| `verify.pinned-toolchain` | `putnami.lock.json` pins each extension and template, and `putnami pin` adds the CLI to that lock. |
-| `recover.ownership` | With `@putnami/sdd`, `validate-workspace` writes `.github/CODEOWNERS` from the `options.sdd.owners` each `putnami.json` declares, and CI fails when the committed file drifts. |
-| `recover.small-changes` | An `--impacted` run reports the size of the change by category and warns on mixed intent; no line count fails it. See [Deliver in gated phases](#deliver-in-gated-phases-not-in-small-pull-requests). |
-
-Two markers need a declaration from you: `recover.ownership` needs the owners,
-and `verify.pinned-toolchain` needs a CLI pin. Some markers grade how long a
-check has been enforced, so a new workspace reaches their top level only after
-90 days of use.
-
----
-
 ## The documentation is part of the surface
 
 Stable URL prefixes per section, **Copy as Markdown** on every page, and

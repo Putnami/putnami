@@ -2,7 +2,7 @@
 
 This repository maps **94 of its 149 projects** to **10 architecture domains**.
 The other **55 are excluded on purpose**: 28 samples, 7 templates, 2 template
-proofs, the standalone agent-readiness CLI, the 2 Cloud runtime destinations,
+proofs, the standalone area detector, the 2 Cloud runtime destinations,
 and the Cloud CLI extension with its 14 generated clients. Every one of the 149
 appears in a table below, mapped or excluded, with a reason.
 
@@ -236,29 +236,27 @@ owning none of their content.
 ## Excluded projects
 
 Samples, templates, and template proofs consume the public API without owning a
-fact another repository project depends on. The standalone agent-readiness CLI
-is also outside the current architecture frontier: it collects an anonymous
-repository payload, but no project in this repository consumes or depends on
-that payload. None of the existing domains owns its assessment semantics.
+fact another repository project depends on. The standalone area detector
+is also outside the current architecture frontier: it reads the manifests of
+repositories that are not Putnami workspaces, and no project in this
+repository imports it. None of the existing domains owns that reading.
 Mapping it to one of them would imply authority that domain does not hold.
 Each exclusion has an owner and a condition for joining a domain.
 
-### Standalone Intelligence CLI — 1 project
+### Standalone Intelligence library — 1 project
 
-**Why excluded:** the agent-readiness extension collects a repository-local
-payload for an optional external report. It does not decide workspace planning,
+**Why excluded:** the area detector splits a repository into areas from the
+manifests that repository declares. It does not decide workspace planning,
 ecosystem lifecycle results, or framework behavior, and no repository project
-depends on its payload. Its extension packaging alone does not make it an
-`extension-providers` member.
+imports it.
 
-**What would change it:** if a public project consumes its payload as an
-authoritative contract, or this repository starts owning the report's
-assessment semantics, review a matching Intelligence domain and the exact
-cross-domain permissions before adding it to the frontier.
+**What would change it:** if a repository project imports it, review a
+matching Intelligence domain and the exact cross-domain permissions before
+adding it to the frontier.
 
 | Project | Class | Owner |
 |---|---|---|
-| `/intelligence/agent-readiness` | Standalone repository collector | `intelligence` |
+| `/intelligence/areas` | Standalone area detector | `intelligence` |
 
 ### Cloud runtime destinations — 2 projects
 

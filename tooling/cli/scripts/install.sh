@@ -48,6 +48,11 @@ COMMAND_MAP_URL_ENV="PUTNAMI_COMMAND_MAP_URL"
 COMMAND_MAP_HEADER="putnami.install-commands.v1"
 RUN_ENV="PUTNAMI_RUN"
 
+# Commands the installer ran once and no longer does, each between two spaces.
+# A one-liner that names one is still in circulation, so it installs nothing
+# and says the command is retired instead of reporting an unlisted command.
+RETIRED_COMMANDS=" agent-readiness "
+
 # Character sets are spelled out rather than written as ranges: a range such as
 # a-z follows the locale's collation order in some regex implementations and can
 # admit uppercase or non-ASCII letters.
@@ -1394,6 +1399,10 @@ main() {
         configure_colors 2
         if [[ ! "$RUN_COMMAND" =~ $RUN_COMMAND_PATTERN ]]; then
             print_error "The command to run (--run, ${RUN_ENV}, or ?run=) must match ^[a-z][a-z0-9-]{0,63}\$. Nothing was installed."
+            exit 1
+        fi
+        if [[ "$RETIRED_COMMANDS" == *" ${RUN_COMMAND} "* ]]; then
+            print_error "putnami ${RUN_COMMAND} is retired. Nothing was installed."
             exit 1
         fi
     fi

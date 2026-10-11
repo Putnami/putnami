@@ -192,8 +192,6 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("typescript", "framework", "web", ManifestFilename):         true,
 		filepath.Join("typescript", "framework", "spectest", ManifestFilename):    true,
 
-		// This extension declares executable acceptance criteria in its v2 manifest.
-		filepath.Join("intelligence", "agent-readiness", ManifestFilename): true,
 		// The Cloud CLI extension names the acceptance check of its archive
 		// publication in the verification block.
 		filepath.Join("cloud", "extension", ManifestFilename): true,

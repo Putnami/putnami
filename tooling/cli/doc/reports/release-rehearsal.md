@@ -85,11 +85,11 @@ addition. Re-read them from the test's log output at any time.
 
 | Quantity | Value |
 | --- | --- |
-| Candidate files scanned | 8285 |
+| Candidate files scanned | 9222 |
 | Release series | 0.3.0 (from `tooling/CHANGELOG.md`) |
 | Builder archive matrix | `darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64` |
-| Publishable artifacts | 101 across `archives=19 docker=4 go=63 npm=15 template-archives=7` |
-| Publish order | protocols → extension-sdk → go-framework → typescript-framework → language-extensions → intelligence-extensions → cloud-extensions → cli → contributor-extensions → templates |
+| Publishable artifacts | 102 across `archives=19 docker=4 go=64 npm=15 template-archives=7` |
+| Publish order | protocols → extension-sdk → go-framework → cloud-runtime → typescript-framework → language-extensions → cloud-extensions → cli → contributor-extensions → templates |
 | Public-cut scrub findings | 0 unresolved beyond the reviewed baseline |
 
 The `docker` channel carries four artifacts — the documentation site, the
@@ -102,8 +102,6 @@ order with that reason recorded.
 Every step publishes only after the artifacts it resolves, so a rollback never
 strands a consumer. Each rollback point and its exact reversal are declared in
 the release plan and asserted by the `rollback-plan` check.
-The agent-readiness archive follows its published protocol, framework, SDK, and
-language-extension inputs and precedes the CLI that resolves it.
 
 The extension SDK (`go.putnami.dev/sdk/extension`, project
 `putnami-extension-sdk`) is explicitly enrolled after the protocols and before
@@ -117,8 +115,7 @@ downstream extension builds.
 | 2 | go-framework | `go` | Same as protocols. |
 | 3 | typescript-framework | `npm` | Superseding patch version plus a deprecation of the bad version. |
 | 4 | language-extensions | `archives` | Repoint the extension archive channel at the previous version. |
-| 5 | intelligence-extensions | `archives` | Repoint the agent-readiness archive channel at the previous version. |
-| 5a | cloud-extensions | `archives` | Repoint the Cloud CLI extension archive channel at the previous version. |
+| 5 | cloud-extensions | `archives` | Repoint the Cloud CLI extension archive channel at the previous version. |
 | 6 | cli | `archives` | Repoint the CLI download channel at the previous version. |
 | 7 | templates | `archives`, `template-archives` | Repoint the template archive channel at the previous version. |
 
