@@ -338,6 +338,21 @@
           }
         },
         {
+          "id": "hook-discovery-fails-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-uninstalled-dependency-fails-discovery",
+              "a-hoisted-dependency-is-installed",
+              "a-generate-with-an-uninstalled-dependency-fails"
+            ]
+          }
+        },
+        {
           "id": "structured-reports",
           "stage": "coded",
           "evidenceKinds": [

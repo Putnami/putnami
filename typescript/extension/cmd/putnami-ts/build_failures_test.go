@@ -340,6 +340,70 @@ func setupUnmanifestedLoaderProject(t *testing.T) (*pctx.Context, string) {
 	return ctx, projectPath
 }
 
+// setupUninstalledDependencyProject makes a provider whose package.json
+// declares @putnami/application, the dependency that contributes the hook
+// writing .gen/clientgen/config.json and .gen/schema, while no node_modules
+// holds it, as in a checkout that skipped the install.
+func setupUninstalledDependencyProject(t *testing.T) (*pctx.Context, string) {
+	t.Helper()
+	mockBunResolution(t)
+	ctx, root := makeTestCtx(t)
+	projectPath := filepath.Join(root, "project")
+	if err := os.WriteFile(filepath.Join(projectPath, "package.json"),
+		[]byte(`{"name":"@test/pkg","dependencies":{"@putnami/application":"^1.0.0"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mockAllExec(t, func(_ string, args []string, _ ...exec.Option) (*exec.Result, error) {
+		t.Errorf("a process ran (%v) although a dependency of the project is not installed", args)
+		return &exec.Result{Success: true, Stdout: `{"type":"summary","data":{"exports":{},"assets":{}}}` + "\n"}, nil
+	})
+	return ctx, projectPath
+}
+
+// TestRunBuildGenerate_UninstalledDependencyFails pins that generate never
+// reports success without the hooks its dependencies contribute. Hook discovery
+// is not part of the task's cache key, so a successful generate in a checkout
+// without node_modules was a cache entry whose .gen lacked
+// clientgen/config.json under the same key as a complete one; a restore of it
+// left clientgen~generate-go without its contract.
+func TestRunBuildGenerate_UninstalledDependencyFails(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "hook-discovery-fails-closed", "a-generate-with-an-uninstalled-dependency-fails")
+	ctx, projectPath := setupUninstalledDependencyProject(t)
+
+	status, _, err := runBuildGenerate(ctx, jsonl.New(), nil)
+	if err == nil || status != "FAILED" {
+		t.Fatalf("status=%q err=%v, want FAILED naming the uninstalled dependency", status, err)
+	}
+	if !strings.Contains(err.Error(), "@putnami/application") {
+		t.Errorf("error %q does not name @putnami/application", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(projectPath, ".gen", "generate-result.json")); !os.IsNotExist(statErr) {
+		t.Errorf("generate-result.json exists (stat error %v); a failed generate must not write its manifest", statErr)
+	}
+}
+
+// TestRunBuildGenerateBatch_UninstalledDependencyFails holds the batch path to
+// the same rule, project by project.
+func TestRunBuildGenerateBatch_UninstalledDependencyFails(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "hook-discovery-fails-closed", "a-generate-with-an-uninstalled-dependency-fails")
+	ctx, projectPath := setupUninstalledDependencyProject(t)
+	ctx.SelectedProjects = []pctx.ProjectRef{
+		{ID: "/project", Name: "@test/pkg", Path: "project", FullPath: projectPath},
+	}
+
+	status, data, err := runBuildGenerateBatch(ctx)
+	if err != nil || status != "OK" {
+		t.Fatalf("batch status=%q err=%v, want a per-project failure inside an OK batch", status, err)
+	}
+	res, ok := resultByID(batchResultsFor(t, data), "/project")
+	if !ok || res.Status != "FAILED" {
+		t.Fatalf("result = %#v, want /project FAILED", res)
+	}
+	if len(res.Diagnostics) == 0 || !strings.Contains(res.Diagnostics[0].Description, "@putnami/application") {
+		t.Fatalf("diagnostics = %#v, want one naming @putnami/application", res.Diagnostics)
+	}
+}
+
 func TestGenerateDiagnostics_FallsBackWhenNoFramePatternMatches(t *testing.T) {
 	diags := generateDiagnostics(errs.Wrapf(
 		errors.New("generated server loaders require schema/capabilities.json"),

@@ -141,13 +141,18 @@ func (h discoveredHook) order() int {
 // RunHooks discovers and invokes all hooks of the given kind for a project, in
 // the deterministic order discoverHooks defines (see its ordering contract —
 // hooks share one `.gen` tree, so the sequence is part of the build contract).
-// Returns an empty Result (never nil) when no dependency registers the hook.
+// Returns an empty Result (never nil) when no dependency registers the hook,
+// and an error, before any hook runs, when a dependency the project declares
+// is not installed (see discoverHooks).
 // hookConfig is forwarded to each hook subprocess as its `config`; pass nil
 // when the hook kind carries no project configuration. projectName is the
 // putnami project identity (see hookContext.ProjectName); pass "" when the
 // caller has no project identity to forward.
 func RunHooks(workspaceRoot, projectPath, projectName, hookKind, mode, bunBin string, debug bool, hookConfig map[string]any) (*Result, error) {
-	hooks := discoverHooks(workspaceRoot, projectPath, hookKind)
+	hooks, err := discoverHooks(workspaceRoot, projectPath, hookKind)
+	if err != nil {
+		return nil, err
+	}
 	if len(hooks) == 0 {
 		return &Result{Exports: map[string]string{}, Assets: map[string]string{}, HookCount: 0}, nil
 	}
@@ -213,10 +218,23 @@ func RunHooks(workspaceRoot, projectPath, projectName, hookKind, mode, bunBin st
 // The rank is declared by the consumer, not by naming the producers, so a
 // third-party extension that generates sources gets the correct order without
 // anyone editing this file or its own manifest.
-func discoverHooks(_, projectPath, hookKind string) []discoveredHook {
+//
+// # An uninstalled dependency fails discovery
+//
+// A dependency the project declares that no node_modules holds is an error,
+// never "a dependency without hooks". No cache key holds the hook set: a key
+// reads package.json and bun.lock, which name the dependencies, not whether
+// they are installed. A generate that ran without the hooks of an uninstalled
+// dependency therefore succeeded, in milliseconds, with a .gen that lacked
+// what those hooks write (clientgen/config.json, schema/, the loaders), under
+// the key of a complete run, and the shared cache served that tree to every
+// checkout. A dependency is installed where Node resolution finds it:
+// node_modules of the project, then of each parent directory up to the
+// workspace root (installedDependencyRoot).
+func discoverHooks(workspaceRoot, projectPath, hookKind string) ([]discoveredHook, error) {
 	pkg := project.ReadPackageJSONSafe(filepath.Join(projectPath, "package.json"))
 	if pkg == nil {
-		return nil
+		return nil, nil
 	}
 
 	var hooks []discoveredHook
@@ -236,21 +254,13 @@ func discoverHooks(_, projectPath, hookKind string) []discoveredHook {
 	}
 	sort.Strings(depNames)
 
+	var missing []string
 	for _, depName := range depNames {
-		depVersion := allDeps[depName]
-		var extRoot string
-
-		if strings.HasPrefix(depVersion, "workspace:") {
-			// Workspace dependency — resolve via node_modules symlink
-			nmPath := filepath.Join(projectPath, "node_modules", depName)
-			resolved, err := filepath.EvalSymlinks(nmPath)
-			if err != nil {
-				continue
-			}
-			extRoot = resolved
-		} else {
-			// npm dependency — check in node_modules
-			extRoot = filepath.Join(projectPath, "node_modules", depName)
+		extRoot, installed := installedDependencyRoot(workspaceRoot, projectPath, depName,
+			strings.HasPrefix(allDeps[depName], "workspace:"))
+		if !installed {
+			missing = append(missing, depName)
+			continue
 		}
 
 		manifestPath := filepath.Join(extRoot, "putnami.extension.json")
@@ -274,13 +284,65 @@ func discoverHooks(_, projectPath, hookKind string) []discoveredHook {
 		}
 	}
 
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("%s declares %s, which no node_modules from the project up to the workspace root holds: "+
+			"the dependencies are not installed, so the hooks they contribute cannot run; run `putnami install`",
+			projectPath, strings.Join(missing, ", "))
+	}
+
 	// depNames is already byte-ordered, so a stable sort on the rank alone
 	// yields the full (order, name) sequence.
 	sort.SliceStable(hooks, func(i, j int) bool {
 		return hooks[i].order() < hooks[j].order()
 	})
 
-	return hooks
+	return hooks, nil
+}
+
+// installedDependencyRoot returns the directory a declared dependency is
+// installed at, searched the way Node resolves a bare specifier: node_modules
+// of the project, then of each parent directory up to and including the
+// workspace root. A workspace: dependency is the target of its link, which
+// must exist; any other dependency is the node_modules path itself, which must
+// resolve to an existing entry (a dangling link does not). installed is false
+// when no candidate qualifies.
+func installedDependencyRoot(workspaceRoot, projectPath, depName string, workspaceLink bool) (string, bool) {
+	for _, dir := range resolutionDirs(workspaceRoot, projectPath) {
+		candidate := filepath.Join(dir, "node_modules", filepath.FromSlash(depName))
+		if workspaceLink {
+			if resolved, err := filepath.EvalSymlinks(candidate); err == nil {
+				return resolved, true
+			}
+			continue
+		}
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
+// resolutionDirs lists the directories whose node_modules may hold a
+// dependency of the project, nearest first: the project, then each parent up to
+// and including the workspace root. Without a workspace root, or for a project
+// outside it, it is the project alone, so resolution never leaves the
+// workspace.
+func resolutionDirs(workspaceRoot, projectPath string) []string {
+	projectDir := filepath.Clean(projectPath)
+	dirs := []string{projectDir}
+	if workspaceRoot == "" {
+		return dirs
+	}
+	root := filepath.Clean(workspaceRoot)
+	if rel, err := filepath.Rel(root, projectDir); err != nil || rel == "." || !filepath.IsLocal(rel) {
+		return dirs
+	}
+	for dir := filepath.Dir(projectDir); ; dir = filepath.Dir(dir) {
+		dirs = append(dirs, dir)
+		if dir == root || filepath.Dir(dir) == dir {
+			return dirs
+		}
+	}
 }
 
 // invokeHook runs a single hook subprocess and parses its JSONL output. The

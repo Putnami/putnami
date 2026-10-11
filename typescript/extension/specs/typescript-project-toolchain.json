@@ -96,6 +96,10 @@
       "text": "Build hooks contributed by dependencies are discovered and invoked in a deterministic order: ranked manifests first, remaining manifests in a stable order, and invocation follows discovery."
     },
     {
+      "id": "hook-discovery-fails-closed",
+      "text": "Hook discovery fails, before any hook runs, when a dependency the project declares is not installed in the node_modules of the project or of a directory above it up to the workspace root, so generate never succeeds without the hooks its dependencies contribute and never caches an incomplete .gen under the key of a complete one."
+    },
+    {
       "id": "structured-reports",
       "text": "Test and coverage results are parsed into structured per-file and per-project reports, uncovered project sources are counted, external dependencies are excluded, and a missing report file is an empty result rather than a crash."
     },
