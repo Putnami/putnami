@@ -2067,6 +2067,19 @@
               "a-run-that-plans-no-job-keeps-the-warning"
             ]
           }
+        },
+        {
+          "id": "mismatch-names-the-install",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-pinned-release-no-candidate-matches-names-putnami-install-unless-it-does-not-help"
+            ]
+          }
         }
       ]
     },
@@ -2127,6 +2140,20 @@
             "kind": "acceptance",
             "checks": [
               "print-engine-names-the-keyed-blob-and-runs-nothing"
+            ]
+          }
+        },
+        {
+          "id": "build-toolchain-stays-in-the-build",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-receives-the-callers-go-environment-whether-or-not-the-run-builds",
+              "an-older-system-go-builds-with-the-managed-install"
             ]
           }
         }

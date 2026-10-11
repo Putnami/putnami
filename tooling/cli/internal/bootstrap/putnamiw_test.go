@@ -1082,11 +1082,10 @@ func TestPutnamiwSourceKey_ExecsTheBlobAndExportsTheSessionPin(t *testing.T) {
 		"a-keyed-from-source-run-execs-the-immutable-blob-and-exports-its-key")
 }
 
-// The Go that compiles the CLI must not reach the CLI the wrapper then runs.
-// A run that builds and a run that reuses the blob would otherwise resolve
-// different toolchains: an install on the building run finds the build's Go on
-// PATH and in GOROOT, skips the release the lock pins, and the next run finds
-// no Go that matches the lock.
+// The wrapper runs the CLI with the caller's GOROOT, PATH and GOTOOLCHAIN on a
+// run that builds and on a run that reuses the blob. The resolved Go's GOROOT,
+// its bin directory first on PATH, and GOTOOLCHAIN=local reach the build
+// command alone.
 func TestPutnamiwSourceKey_BuildEnvironmentStaysOutOfTheCLI(t *testing.T) {
 	repo, _, env := gitSourceRepo(t)
 	stubBin := strings.Split(envValue(env, "PATH"), string(os.PathListSeparator))[0]
@@ -1114,6 +1113,45 @@ func TestPutnamiwSourceKey_BuildEnvironmentStaysOutOfTheCLI(t *testing.T) {
 		t.Fatalf("warm run failed (%d):\n%s", code, out)
 	}
 	assertCallerEnvironment("the warm fast path", out)
+	spectest.Proves(t, "cli/engine-provenance", "build-toolchain-stays-in-the-build",
+		"the-cli-receives-the-callers-go-environment-whether-or-not-the-run-builds")
+}
+
+// A system Go older than the workspace's is not the build's Go, and neither is
+// a toolchain that Go resolves on its own: the wrapper builds with the managed
+// install under the Putnami home, where the CLI it runs looks for the Go the
+// lock pins. The build command receives that Go's GOROOT, its bin directory
+// first on PATH, and GOTOOLCHAIN=local; the CLI receives the caller's.
+func TestPutnamiwSourceKey_OlderSystemGoBuildsWithTheManagedInstall(t *testing.T) {
+	repo, home, env := gitSourceRepo(t)
+	stubBin := strings.Split(envValue(env, "PATH"), string(os.PathListSeparator))[0]
+	if err := os.WriteFile(filepath.Join(repo, "go.work"), []byte("go 1.30.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	buildEnv := envValue(env, "GO_LOG") + ".managed"
+	writeExec(t, filepath.Join(home, "toolchains", "go", "go-1.30.0", "go", "bin", "go"), `#!/usr/bin/env bash
+if [ "$1" = build ]; then
+  printf '%s|%s|%s\n' "${GOROOT:-<unset>}" "${GOTOOLCHAIN:-<unset>}" "${PATH%%:*}" >> "$GO_LOG.managed"
+fi
+exec "`+filepath.Join(stubBin, "go")+`" "$@"
+`)
+
+	out, code := runIn(t, repo, env, "ping")
+	if code != 0 || !strings.Contains(out, "RAN_BUILT") {
+		t.Fatalf("run failed (%d):\n%s", code, out)
+	}
+	data, err := os.ReadFile(buildEnv)
+	if err != nil {
+		t.Fatalf("the managed Go did not build the CLI: %v\n%s", err, out)
+	}
+	if got, want := strings.TrimSpace(string(data)), "/fake/goroot|local|/fake/goroot/bin"; got != want {
+		t.Errorf("build environment GOROOT|GOTOOLCHAIN|PATH head = %q, want %q", got, want)
+	}
+	if got := sentinelField(t, out, "PATH_HEAD"); got != stubBin {
+		t.Errorf("the CLI ran with PATH head %q, want the caller's %q", got, stubBin)
+	}
+	spectest.Proves(t, "cli/engine-provenance", "build-toolchain-stays-in-the-build",
+		"an-older-system-go-builds-with-the-managed-install")
 }
 
 // A concurrent `./putnamiw` at another tree state re-points the shared engine

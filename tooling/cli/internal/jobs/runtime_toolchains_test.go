@@ -229,6 +229,8 @@ func TestRuntimeToolchainMismatchNamesInstallUnlessItDoesNotHelp(t *testing.T) {
 	if err := newRuntimeToolchainMismatchError("example", "compiler", "1.2.3", []runtimeToolchainRejection{absent}); strings.Contains(err.Error(), remedy) {
 		t.Errorf("error of a hosted run = %v, want no install remedy", err)
 	}
+	spectest.Proves(t, "cli/runtime-toolchain-pinning", "mismatch-names-the-install",
+		"a-pinned-release-no-candidate-matches-names-putnami-install-unless-it-does-not-help")
 }
 
 // TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion pins each probe

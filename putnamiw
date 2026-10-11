@@ -693,28 +693,6 @@ publish_source_cli() {
   fi
 }
 
-# When the base `go` is older than the workspace pin, Go may already resolve a
-# satisfying toolchain (cached from an earlier GOTOOLCHAIN=auto run). Return that
-# toolchain's own `go` binary; it runs the pinned version directly under
-# GOTOOLCHAIN=local, so build_cli works without a network download.
-resolve_toolchain_go() {
-  local binary="$1"
-  local want="$2"
-  [ -n "$want" ] || return 1
-  local troot
-  troot="$(GOTOOLCHAIN=auto "$binary" env GOROOT 2>/dev/null)" || return 1
-  [ -n "$troot" ] || return 1
-  local tgo="$troot/bin/go"
-  [ -x "$tgo" ] || return 1
-  local tver
-  tver="$(go_binary_version_mode "$tgo" "local" || true)"
-  if [ -n "$tver" ] && go_version_satisfies "$tver" "$want"; then
-    echo "$tgo"
-    return 0
-  fi
-  return 1
-}
-
 go_version_satisfies() {
   local have
   local want
@@ -753,22 +731,19 @@ resolve_go() {
   if command -v go >/dev/null 2>&1; then
     local system_go
     local system_version
-    local toolchain_go
     system_go="$(command -v go)"
     system_version="$(go_binary_version_mode "$system_go" "local" || true)"
     if [ -z "$version" ] || go_version_satisfies "$system_version" "$version"; then
       GO_BINARY="$system_go"
       return 0
     fi
-    # Base binary too old: reuse a satisfying toolchain Go already resolves.
-    if toolchain_go="$(resolve_toolchain_go "$system_go" "$version")"; then
-      GO_BINARY="$toolchain_go"
-      return 0
-    fi
     warn "System Go ${system_version:-unknown} is older than workspace Go $version; using managed Go"
   fi
 
-  # 2. Managed install
+  # 2. Managed install, under the Putnami home: the one place besides PATH and
+  # GOROOT where the CLI this script runs looks for the Go the lock pins. A Go
+  # only this script can find, such as a toolchain an older go downloads into
+  # its module cache, is never used.
   if [ -z "$version" ]; then
     version="1.23.0"
   fi
@@ -956,15 +931,12 @@ build_cli_package() {
     /*) ;;
     *) out="$PWD/$out" ;;
   esac
-  # The Go that compiles the CLI is set for the build alone. Exported, GOROOT
-  # and PATH would reach the CLI this script then runs: an install on a run
-  # that builds would find that Go and skip the release the lock pins, and the
-  # next run, which reuses the blob and exports nothing, would find no Go.
+  # GOROOT, PATH and GOTOOLCHAIN name the resolved Go for the build command
+  # alone. The CLI this script then runs receives the caller's environment,
+  # the same on a run that builds and on a run that reuses the blob.
   #
-  # GOROOT is pinned to the resolved Go binary. Cloud shells and version
-  # managers may export GOROOT for a different Go installation; inheriting that
-  # path can make a newer toolchain compile against an older standard library
-  # cache.
+  # GOROOT is the resolved Go binary's own, whatever the caller exports: cloud
+  # shells and version managers may export the GOROOT of another installation.
   local go_root
   go_root="$(env -u GOROOT "$GO_BINARY" env GOROOT 2>/dev/null || true)"
   if [ -z "$go_root" ]; then
