@@ -11,8 +11,7 @@ what earlier runs wrote. A generator that stops emitting a file leaves that
 file in place: after a page or the last island of a `@putnami/web` site is
 deleted, `build-generate` keeps the page's prerendered HTML and the island
 bundles in `.gen/public`. The capture stored those files under the key of the
-new sources, and a later build from a deleted `.gen` restored them (issue
-#149). The output of a task marked `deterministic` depended on what the
+new sources, and a later build from a deleted `.gen` restored them. The output of a task marked `deterministic` depended on what the
 directory held before the run, which no key describes.
 
 A restore already behaved the other way. It replaces what the task owns,
