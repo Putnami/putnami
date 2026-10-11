@@ -109,7 +109,9 @@ func (c *client) observeAndSettle(ctx context.Context, outcome Outcome) (Outcome
 	final, err := c.observe(ctx)
 	if err != nil {
 		if ctx.Err() != nil {
-			return c.cancel(outcome)
+			ackCtx, cancelAck := context.WithTimeout(context.Background(), cancelAckBudget)
+			defer cancelAck()
+			return c.cancel(ackCtx, outcome)
 		}
 		return outcome, fmt.Errorf("remote attempt %s: %w", c.record.Attempt, err)
 	}
@@ -221,16 +223,14 @@ func (c *client) forward(result *runner.FollowResult) (bool, error) {
 }
 
 // cancel runs after the observing context was canceled: it asks the provider
-// to terminate the attempt, waits a bounded time for the acknowledgement and
+// to terminate the attempt, waits until ackCtx ends for the acknowledgement and
 // then for a terminal state, records what it observed, and reports it. A
 // cancellation that raced a completion converges on the provider's terminal
 // outcome: a completed attempt is still fetched and imported, because the
 // verdict exists and the interrupt changes nothing about it.
-func (c *client) cancel(outcome Outcome) (Outcome, error) {
+func (c *client) cancel(ackCtx context.Context, outcome Outcome) (Outcome, error) {
 	attempt := c.record.Attempt
 	iox.Fprintf(c.stderr, "putnami: interrupt: canceling remote attempt %s\n", attempt)
-	ackCtx, cancelAck := context.WithTimeout(context.Background(), cancelAckBudget)
-	defer cancelAck()
 	if c.session == nil || c.session.ended() {
 		if err := c.connect(ackCtx); err != nil {
 			return outcome, fmt.Errorf("%w: cancellation of attempt %s could not be sent (%w); it may still be running, resume it with `putnami sessions inspect --run %s`", protocolcli.ErrSignal, attempt, err, attempt)
@@ -281,6 +281,33 @@ func (c *client) cancel(outcome Outcome) (Outcome, error) {
 		iox.Fprintf(c.stderr, "putnami: remote attempt %s is still %s after the cancellation was acknowledged; observation ended, resume it with `putnami sessions inspect --run %s`\n", attempt, state, attempt)
 		return outcome, fmt.Errorf("%w: remote attempt %s still %s after cancellation", protocolcli.ErrSignal, attempt, state)
 	}
+}
+
+// interruptedSubmit runs when the interrupt reached the submission before its
+// acknowledgement: the provider may have accepted it all the same. The key
+// resolves what it accepted, within the same budget as the cancellation
+// acknowledgement, so the whole shutdown still fits the two-signal window. An
+// accepted attempt is canceled as an interrupted observation is; a key the
+// provider does not know leaves the record submitting, so the next run
+// resolves the key again instead of submitting twice.
+func (c *client) interruptedSubmit(outcome Outcome, key string, cause error) (Outcome, error) {
+	ackCtx, cancelAck := context.WithTimeout(context.Background(), cancelAckBudget)
+	defer cancelAck()
+	if c.session == nil || c.session.ended() {
+		if err := c.connect(ackCtx); err != nil {
+			return outcome, fmt.Errorf("%w: submission %s was interrupted before its acknowledgement and could not be resolved (%w); the next run resolves it under the same key", protocolcli.ErrSignal, key, err)
+		}
+	}
+	found, err := c.session.Lookup(ackCtx, &runner.LookupParams{IdempotencyKey: key})
+	if err != nil {
+		return outcome, fmt.Errorf("%w: submission %s was interrupted before its acknowledgement and could not be resolved (%w); the next run resolves it under the same key", protocolcli.ErrSignal, key, err)
+	}
+	if found.Attempt == "" {
+		return outcome, fmt.Errorf("%w: submission %s was interrupted before the provider accepted it: %w", protocolcli.ErrSignal, key, cause)
+	}
+	c.record.Attempt, c.record.State = found.Attempt, found.State
+	outcome.Attempt = found.Attempt
+	return c.cancel(ackCtx, outcome)
 }
 
 // settle records the terminal state, fetches the bundle of a completed

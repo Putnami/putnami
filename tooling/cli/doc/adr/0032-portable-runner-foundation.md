@@ -104,7 +104,11 @@ what the snapshot must carry beyond tracked files.
 - An interrupt sends `cancel` through the still-open provider session (the
   provider process is not bound to the run's context), waits a bounded time
   for the acknowledgement and then for a terminal state, records what it saw
-  and exits with the signal code. A cancel that raced a completion keeps the
+  and exits with the signal code. An interrupt that reaches the submission
+  before its acknowledgement first resolves the idempotency key within the
+  same acknowledgement budget and cancels the attempt the provider accepted;
+  one that lands before the submission cancels nothing and leaves the key to
+  the next run. A cancel that raced a completion keeps the
   provider's outcome: the attempt is fetched and imported under a bounded
   detached context. Every budget fits inside the terminal adapter's
   two-signal shutdown window, and none bounds a verdict.

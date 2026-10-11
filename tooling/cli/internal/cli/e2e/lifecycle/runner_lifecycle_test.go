@@ -504,6 +504,43 @@ func TestPortableInterruptBeforeExecutionNeverStartsTheEngine(t *testing.T) {
 	}
 }
 
+// An interrupt that lands while the submission is in flight — accepted by the
+// provider, not yet acknowledged — is an interrupt like any other: the client
+// resolves the attempt by its key and cancels it, and the engine never starts.
+func TestPortableInterruptDuringSubmitCancelsTheAcceptedAttempt(t *testing.T) {
+	spectest.Proves(t, "cli/portable-runner", "durable-lifecycle", "interrupt-cancels-and-cleans-up")
+	root, providerRoot := clitest.PortableFixture(t, false, true)
+	hold := filepath.Join(t.TempDir(), "launch-hold")
+	t.Setenv(clitest.RunnerFixtureHoldEnv, hold)
+	ackHold := filepath.Join(t.TempDir(), "ack-hold")
+	t.Setenv(clitest.RunnerFixtureAckHoldEnv, ackHold)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	var code int
+	var output string
+	go func() {
+		defer close(done)
+		code, output = clitest.RunGateArgsContext(t, ctx, root, "build", "--projects", "app", "--no-cache", "--where", "remote")
+	}()
+	waitForFile(t, ackHold+".accepted", 60*time.Second)
+	cancel()
+	// The provider answers one request at a time: the acknowledgement the
+	// client stopped waiting for goes out first, then the key's resolution.
+	clitest.WriteFile(t, ackHold, "")
+	<-done
+	if code != cli.ExitSignalReceived || !strings.Contains(output, "canceled") {
+		t.Fatalf("interrupt during submit: exit %d: %s", code, output)
+	}
+	dir := filepath.Join(providerRoot, "attempts", attemptDirs(t, providerRoot)[0])
+	if state := clitest.ReadFixtureState(dir); state.State != runner.StateCanceled || state.Engine != 0 {
+		t.Fatalf("the accepted attempt was not canceled: %+v", state)
+	}
+	if record := clitest.OnlyAttemptRecord(t, root); record.State != runner.StateCanceled || record.Attempt == "" {
+		t.Fatalf("record: %+v", record)
+	}
+}
+
 // An interrupt that races the completion converges on the one outcome the
 // provider recorded: the completed attempt is imported and the exit code is
 // the remote gate's, whichever side won the race.
