@@ -104,10 +104,9 @@ tags rather than from any declared field.
   below the inner one would otherwise have two.
 - A line on a scope with `activate: true` is refused: the scope-self project
   would be both the line and a member of it.
-- `LineTagPattern`, `RenderLineTag` and `ParseLineTag` render a version into a
-  tag and read it back. `ParseLineTag` resolves the **most specific** pattern
-  first, so `ts/v0.3.0` belongs to `ts/v{version}` even when the root line
-  `v{version}` is declared too.
+- `LineTagPattern` and `RenderLineTag` render a version into a tag. The
+  protocol does not read a tag back: `linetag` of the extension SDK reads a
+  line's release tags, and only a `MAJOR.MINOR.PATCH` version is a release.
 
 Codes: `invalid-line` at `line` or `line.tag`.
 

@@ -32,41 +32,16 @@ func TestLineTagPatternDefaults(t *testing.T) {
 	}
 }
 
-func TestRenderAndParseLineTag(t *testing.T) {
-	lines := map[string]string{
-		"":           LineTagPattern("", nil),
-		"typescript": LineTagPattern("typescript", &LineConfig{Tag: "ts/v{version}"}),
-		"go":         LineTagPattern("go", &LineConfig{Tag: "go/v{version}"}),
+func TestRenderLineTag(t *testing.T) {
+	cases := map[string]string{
+		LineTagPattern("", nil): "v0.3.0",
+		LineTagPattern("typescript", &LineConfig{Tag: "ts/v{version}"}): "ts/v0.3.0",
+		LineTagPattern("go", nil): "go/v0.3.0",
 	}
-
-	for scopePath, pattern := range lines {
-		tag := RenderLineTag(pattern, "0.3.0")
-		gotScope, gotVersion, ok := ParseLineTag(tag, lines)
-		if !ok {
-			t.Fatalf("ParseLineTag(%q) did not match any line", tag)
+	for pattern, want := range cases {
+		if got := RenderLineTag(pattern, "0.3.0"); got != want {
+			t.Errorf("RenderLineTag(%q, 0.3.0) = %q, want %q", pattern, got, want)
 		}
-		if gotScope != scopePath || gotVersion != "0.3.0" {
-			t.Fatalf("ParseLineTag(%q) = (%q, %q), want (%q, %q)", tag, gotScope, gotVersion, scopePath, "0.3.0")
-		}
-	}
-
-	// The most specific pattern wins: "ts/v{version}" claims the tag even
-	// though the root line "v{version}" is declared too.
-	if got := RenderLineTag(lines["typescript"], "1.2.3"); got != "ts/v1.2.3" {
-		t.Fatalf("RenderLineTag = %q, want ts/v1.2.3", got)
-	}
-	scopePath, version, ok := ParseLineTag("ts/v1.2.3", lines)
-	if !ok || scopePath != "typescript" || version != "1.2.3" {
-		t.Fatalf("ParseLineTag(ts/v1.2.3) = (%q, %q, %v), want (typescript, 1.2.3, true)", scopePath, version, ok)
-	}
-
-	// A tag no line produced is not attributed to one.
-	if _, _, ok := ParseLineTag("nightly-2026-09-04", lines); ok {
-		t.Error("ParseLineTag matched a tag no line pattern produces")
-	}
-	// A tag that is the bare pattern prefix carries no version.
-	if _, _, ok := ParseLineTag("ts/v", lines); ok {
-		t.Error("ParseLineTag accepted an empty version")
 	}
 }
 

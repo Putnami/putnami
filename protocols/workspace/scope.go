@@ -90,36 +90,6 @@ func RenderLineTag(pattern, version string) string {
 	return strings.Replace(pattern, LineTagPlaceholder, version, 1)
 }
 
-// ParseLineTag reads a git tag back into the line that produced it and the
-// version it carries. lines maps each line's scope path to its tag pattern, as
-// LineTagPattern returns it. The most specific pattern wins — the one whose
-// literal prefix is longest — so "ts/v{version}" claims "ts/v0.3.0" even when
-// the root line "v{version}" is also declared. Ties break on the scope path so
-// one repository always resolves one tag the same way.
-func ParseLineTag(tag string, lines map[string]string) (scopePath, version string, ok bool) {
-	bestPrefix := -1
-	for _, path := range sortedMapKeys(lines) {
-		prefix, suffix, found := strings.Cut(lines[path], LineTagPlaceholder)
-		if !found {
-			continue
-		}
-		if len(tag) <= len(prefix)+len(suffix) {
-			continue
-		}
-		if !strings.HasPrefix(tag, prefix) || !strings.HasSuffix(tag, suffix) {
-			continue
-		}
-		if len(prefix) <= bestPrefix {
-			continue
-		}
-		bestPrefix = len(prefix)
-		scopePath = path
-		version = tag[len(prefix) : len(tag)-len(suffix)]
-		ok = true
-	}
-	return scopePath, version, ok
-}
-
 // IncludePaths returns the scope's project membership entries.
 func (sc *ScopeConfig) IncludePaths() []string {
 	if sc == nil {
