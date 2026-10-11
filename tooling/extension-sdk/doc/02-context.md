@@ -161,6 +161,28 @@ The distinction from `Options` is who wrote it: `Options` is **authored** in the
 project's `putnami.json`, `Metadata` is **derived** by the owning extension's
 probe.
 
+### Resolved project tags
+
+`Project.Tags` is the project's tags as the orchestrator resolves them: the tags
+its `putnami.json` declares, else the tags a workspace provider reports, else
+the tags of its scopes. The list is sorted and free of duplicates.
+
+```go
+if ctx.Project.Tags == nil {
+    return fmt.Errorf("the job context carries no resolved tags (`project.tags`)")
+}
+isProtocol := slices.Contains(ctx.Project.Tags, "protocol")
+```
+
+Read the tags here, and do not resolve them from `putnami.json` files. The
+orchestrator keys your task on the resolved tags, so a verdict that reads this
+list moves with its cache key. The key does not hold the scope manifests.
+
+A nil list and an empty list are two answers. An empty list says the project
+resolves to no tags. A nil list says the orchestrator sent none: it predates the
+member. When your answer depends on a tag, fail on a nil list rather than read
+it as "no tags".
+
 ### Resolved project selection
 
 `Selection` is how the invocation chose the projects in scope. Read it to know
@@ -330,6 +352,7 @@ Reads and parses a Putnami context JSON file.
 | `Publish` | `json.RawMessage` | Publish channels array |
 | `Options` | `map[string]json.RawMessage` | Extension-specific options, **authored** in `putnami.json` |
 | `Metadata` | `map[string]json.RawMessage` | Provider-owned metadata, **derived** by each extension's workspace probe (v2) |
+| `Tags` | `[]string` | Resolved tags, sorted and free of duplicates; empty for a project with no tags, nil when the orchestrator sent none (v2) |
 
 ### `Selection`
 

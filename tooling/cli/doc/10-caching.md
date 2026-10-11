@@ -1720,12 +1720,20 @@ Its 10-second deadline counts from the runtime's first instruction. On macOS,
 the host checks a freshly written executable after the process starts and
 before it runs, and that check takes seconds on a loaded machine. The CLI reads
 the new process's task counters and arms the deadline once they move, so the
-check is not charged to the runtime. A separate two-minute bound caps the
-check. A runtime that blocks before the CLI first reads its counters looks held,
-so it stops at that bound rather than at the deadline. A runtime still running
-at the deadline, or still held at the bound, fails with
-`runtime.handshake_timeout`, which names machine load or a blocked runtime
-rather than a malformed build.
+check is not charged to the runtime. Once the runtime runs, the deadline does
+not count the time it is ready to run and waits for a CPU either: the CLI reads
+that time from the kernel on macOS (`proc_pid_rusage`) and on Linux (the
+`schedstat` of each thread). It counts every moment on other systems, and
+after a read that fails it counts every moment since the last read that
+succeeded. It reads the runtime only, not the processes the runtime
+starts. A separate two-minute bound caps the check and the wait together. A
+runtime that blocks before the CLI first reads its counters looks held, so it
+stops at that bound rather than at the deadline. A runtime still running at the
+deadline, or at the bound, fails with `runtime.handshake_timeout`. Its message
+states how long the host held the runtime and how long the runtime waited for a
+CPU; at the deadline, it also states how long the runtime ran. It names machine
+load or a blocked runtime rather than a malformed build. The toolchain version probe runs under the same rules
+with a 5-second deadline.
 Installed archive runtimes go through the same executable and handshake checks
 in place. Any prepare, validation, or identity failure stops synchronization;
 the CLI never falls back to a legacy wrapper path.

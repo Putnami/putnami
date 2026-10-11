@@ -133,6 +133,11 @@ type JobContextProject struct {
 	// language extension's.
 	Type              string                 `json:"type,omitempty"`
 	DependencyClosure []JobContextProjectRef `json:"dependencyClosure,omitempty"`
+	// Tags are the project's resolved tags, in the form the task cache key
+	// holds them (projectContextTags). Never nil in a built context: a project
+	// that resolves to no tags emits `[]`, which a consumer reads as an answer
+	// and tells apart from an absent member.
+	Tags []string `json:"tags,omitzero"`
 }
 
 // JobContextProjectRef locates one project a context references — a member of
@@ -397,6 +402,7 @@ func BuildJobContext(
 		Metadata:          projectContextMetadata(job.Project),
 		Type:              job.Project.Type,
 		DependencyClosure: dependencyClosureContext(ws, versions, job.Project),
+		Tags:              projectContextTags(job.Project),
 	}
 	ctx.SelectedProjects = selectedProjectsContext(ws, versions, job.SelectedProjects, cmdName)
 	// The complete membership travels on EVERY document, not only the
@@ -765,6 +771,21 @@ func projectContextMetadata(project *workspace.Project) map[string]json.RawMessa
 		copied[extension] = block
 	}
 	return copied
+}
+
+// projectContextTags returns the project's resolved tags as a sorted list of
+// distinct, trimmed tags. It is never nil.
+//
+// The list is the tag set of the project's probe view, the view the cache key's
+// project metadata digest hashes (workspace.Workspace.MetadataDigestFor). A
+// task therefore reads the tags its key holds: the order of the authored list,
+// a repeated tag and surrounding white space move neither.
+func projectContextTags(project *workspace.Project) []string {
+	tags := workspace.ProbeViewOf(project, nil).Tags
+	if tags == nil {
+		return []string{}
+	}
+	return tags
 }
 
 func projectContextOptions(project *workspace.Project) map[string]map[string]any {

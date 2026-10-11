@@ -33,7 +33,15 @@ const protocolTag = "protocol"
 //
 // The version bump reads the catalog by the same rule
 // (tooling/cli/internal/workspace SupportSubjectOf).
-func notChecked(workspaceRoot, projectDir, name string) (string, error) {
+//
+// tags are the project's resolved tags as the job context carries them
+// (`project.tags`). They decide whether the catalog lists the project as a
+// protocol or as a package. A nil list says the context carries none, which is
+// not the same as a project with no tags. The tags are then not resolved from
+// the manifests: the check reads the catalog both ways, and fails only when the
+// two readings disagree on whether the API is checked. A workspace with no
+// catalog reads no tag, so a nil list changes nothing there.
+func notChecked(workspaceRoot, name string, tags []string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(workspaceRoot, supportproto.CatalogFilename)) //nolint:gosec // the workspace root plus one protocol filename
 	if errors.Is(err, fs.ErrNotExist) {
 		return "", nil
@@ -45,39 +53,49 @@ func notChecked(workspaceRoot, projectDir, name string) (string, error) {
 	if catalog == nil || diag.HasErrors(findings) {
 		return "", fmt.Errorf("%s is invalid: %s", supportproto.CatalogFilename, diag.ErrorText(findings))
 	}
+	if tags == nil {
+		asPackage := catalogVerdict(catalog, name, supportproto.SubjectKindPackage)
+		asProtocol := catalogVerdict(catalog, name, supportproto.SubjectKindProtocol)
+		switch {
+		case asPackage.checked && asProtocol.checked:
+			return "", nil
+		case !asPackage.checked && !asProtocol.checked:
+			return fmt.Sprintf("%s lists %s as neither a stable package nor a stable protocol, so it promises "+
+				"no compatibility: its API is not checked", supportproto.CatalogFilename, name), nil
+		}
+		return "", fmt.Errorf("the job context carries no resolved tags (`project.tags`), and %s gives %s a "+
+			"different status as a protocol than as a package; this orchestrator predates the member",
+			supportproto.CatalogFilename, name)
+	}
 	kind := supportproto.SubjectKindPackage
-	if slices.Contains(projectTags(workspaceRoot, projectDir), protocolTag) {
+	if slices.Contains(tags, protocolTag) {
 		kind = supportproto.SubjectKindProtocol
 	}
+	return catalogVerdict(catalog, name, kind).skip, nil
+}
+
+// supportVerdict is what the catalog says about one subject: whether its API
+// is checked, and otherwise why not.
+type supportVerdict struct {
+	checked bool
+	skip    string
+}
+
+// catalogVerdict reads the catalog entry for the subject of the given kind and
+// name.
+func catalogVerdict(catalog *supportproto.Catalog, name string, kind supportproto.SubjectKind) supportVerdict {
 	for _, entry := range catalog.Entries {
 		if entry.Kind != kind || entry.ID != name {
 			continue
 		}
 		if entry.Status == supportproto.StatusStable {
-			return "", nil
+			return supportVerdict{checked: true}
 		}
-		return fmt.Sprintf("%s is %s in %s, which promises no compatibility: its API is not checked",
-			name, entry.Status, supportproto.CatalogFilename), nil
+		return supportVerdict{skip: fmt.Sprintf("%s is %s in %s, which promises no compatibility: its API is not checked",
+			name, entry.Status, supportproto.CatalogFilename)}
 	}
-	return fmt.Sprintf("%s does not list the %s %s, so it promises no compatibility: its API is not checked",
-		supportproto.CatalogFilename, kind, name), nil
-}
-
-// projectTags returns a project's tags as the workspace loader resolves them
-// (tooling/cli-model/workspace probe_view.go): the tags its putnami.json
-// declares, else the tags of its scope chain. An authored empty list is a
-// declaration, "this project has no tags", and blocks the scope's tags as it
-// does for the loader. The loader also reads tags a language provider reports
-// for a project that declares none; a task cannot see those, so such a project
-// takes its scope's tags here.
-func projectTags(workspaceRoot, projectDir string) []string {
-	if config, _ := wsproto.LoadProjectConfigWithDiagnostics(projectDir); config != nil && config.Tags != nil {
-		return config.Tags
-	}
-	if scope := wsproto.LoadScopeChain(workspaceRoot, projectDir); scope != nil {
-		return scope.Tags
-	}
-	return nil
+	return supportVerdict{skip: fmt.Sprintf("%s does not list the %s %s, so it promises no compatibility: its API is not checked",
+		supportproto.CatalogFilename, kind, name)}
 }
 
 // linePattern returns the tag pattern of the version line a project belongs

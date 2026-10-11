@@ -213,6 +213,26 @@ type Project struct {
 	// extension-owned aggregation is a policy decision over core's graph rather
 	// than a second graph.
 	DependencyClosure []ProjectRef `json:"dependencyClosure,omitempty"`
+	// Tags are the project's RESOLVED tags: the tags its putnami.json declares,
+	// else the tags a workspace provider reports, else the tags of its scopes.
+	// v2 only — forbidden at v1.
+	//
+	// Resolved, for the reason Type is: the merge rule belongs to the
+	// orchestrator. The orchestrator's task cache key holds the same value, so
+	// a task that reads its tags here reads what its key holds. A task does not
+	// resolve tags from manifests: the key does not hold the scope manifests.
+	//
+	// The list is a set in one spelling: every tag is non-empty and carries no
+	// surrounding white space, and the list is sorted in byte order and free of
+	// duplicates. The key holds that form, so the order of the tags and a
+	// repeated tag are not facts a task can read.
+	//
+	// Absent and empty are two answers, so the member is omitted only when the
+	// list is nil. An empty list says the project resolves to no tags. A nil
+	// list says the producer did not resolve them: an orchestrator older than
+	// the member, for example. A consumer whose answer depends on a tag then
+	// declines; it does not read a nil list as "no tags".
+	Tags []string `json:"tags,omitzero"`
 }
 
 // ProjectRef identifies one project the context references: a member of the
