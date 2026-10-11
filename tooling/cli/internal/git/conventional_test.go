@@ -5,35 +5,6 @@ import (
 	"testing"
 )
 
-func TestParseConventional(t *testing.T) {
-	t.Parallel()
-	for _, testCase := range []struct {
-		name, subject, body, typ string
-		breaking, ok             bool
-	}{
-		{name: "plain type", subject: "feat: add", typ: "feat", ok: true},
-		{name: "scoped type", subject: "fix(cli): stop", typ: "fix", ok: true},
-		{name: "breaking marker", subject: "feat(cli)!: change", typ: "feat", breaking: true, ok: true},
-		{name: "breaking footer", subject: "refactor: move", body: "why\n\nBREAKING CHANGE: the flag is gone",
-			typ: "refactor", breaking: true, ok: true},
-		{name: "hyphenated breaking footer", subject: "fix: move", body: "BREAKING-CHANGE: the flag is gone",
-			typ: "fix", breaking: true, ok: true},
-		{name: "no colon", subject: "just a message"},
-		{name: "unclosed scope", subject: "feat(cli: add"},
-		{name: "non-letter type", subject: "WIP: add"},
-		{name: "merge commit", subject: "Merge pull request #1 from a/b"},
-	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			typ, breaking, ok := ParseConventional(testCase.subject, testCase.body)
-			if typ != testCase.typ || breaking != testCase.breaking || ok != testCase.ok {
-				t.Errorf("ParseConventional(%q) = %q/%v/%v, want %q/%v/%v",
-					testCase.subject, typ, breaking, ok, testCase.typ, testCase.breaking, testCase.ok)
-			}
-		})
-	}
-}
-
 // BumpFor reduces a range to its strongest advance. The pre-1.0 reading makes
 // a breaking change a minor and a feature a patch: before 1.0 the major number
 // is not yet a compatibility promise, and a minor is kept for what may need a

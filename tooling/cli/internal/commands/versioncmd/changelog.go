@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -73,12 +74,12 @@ func renderChangelogAt(line, version string, commits []git.Commit, at time.Time)
 func groupChangelogCommits(commits []git.Commit) map[string][]string {
 	grouped := make(map[string][]string, len(changelogSections))
 	for _, commit := range commits {
-		typ, breaking, ok := git.ParseConventional(commit.Subject, commit.Body)
+		parsed, ok := protocolcli.ParseConventionalCommit(commit.Subject, commit.Body)
 		if !ok {
 			continue
 		}
-		grouped[changelogSectionFor(typ, breaking)] = append(
-			grouped[changelogSectionFor(typ, breaking)], changelogBullet(commit))
+		section := changelogSectionFor(parsed.Type, parsed.Breaking)
+		grouped[section] = append(grouped[section], changelogBullet(commit))
 	}
 	return grouped
 }

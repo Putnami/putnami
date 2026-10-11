@@ -35,7 +35,7 @@ one verdict still gave two outputs.
      project directory;
    - whether a commit since that tag that touches the project declares a
      breaking change, read by the version bump's own parser
-     (`ParseConventional`).
+     (`ParseConventionalCommit` of the CLI protocol).
 
    The baseline names no commit HEAD reaches, no ref and no path. One run
    reads each project's baseline once.
