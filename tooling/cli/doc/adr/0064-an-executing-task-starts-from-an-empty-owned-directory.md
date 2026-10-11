@@ -90,9 +90,10 @@ declaration, so it can give every task the same starting point.
 - A file another task writes inside an owned region goes at the owner's next
   execution, as the owner's restore already removed it. A path that must
   outlive the owner's execution has to be ceded by the owner. The TypeScript
-  `build-generate` cedes the `config-extract` fallback `.gen/config-schema.json`,
-  written when `options.generate.schema=false`, because only `config-extract`
-  writes it and `cloud config publish` reads it after a build.
+  `build-generate` cedes the `config-extract` fallback `.gen/config-schema.json`
+  and its JSON Schema companion, written when `options.generate.schema=false`,
+  because only `config-extract` writes them and `cloud config publish` reads the
+  fallback after a build.
 - A `pathFrom` output keeps a file its generator stops emitting, in the
   worktree and in the entries captured from it. The generator owns that
   removal. Every drift-policed output in this repository is a `pathFrom`

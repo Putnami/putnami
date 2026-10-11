@@ -1121,12 +1121,13 @@
             "path": ".gen",
             "excludes": [
               ".gen/config-schema.json",
+              ".gen/config-schema.jsonschema.json",
               ".gen/deployment.json",
               ".gen/infra/runtime.json",
               ".gen/layers",
               ".gen/requirements.json"
             ],
-            "description": "Generated sources: the whole project-rooted .gen subtree, owned exclusively by this task, minus .gen/deployment.json, which it cedes to package-deployment, .gen/requirements.json and .gen/infra/runtime.json, which it cedes to build-infra (those tasks write the files after this task's snapshot and declare them), .gen/layers, which it cedes to cloud-image-layers of @putnami/cloud, which declares it, and .gen/config-schema.json, the config-extract fallback that only config-extract-exec writes and nobody claims, so an execution or a restore of this task leaves it in place."
+            "description": "Generated sources: the whole project-rooted .gen subtree, owned exclusively by this task, minus .gen/deployment.json, which it cedes to package-deployment, .gen/requirements.json and .gen/infra/runtime.json, which it cedes to build-infra (those tasks write the files after this task's snapshot and declare them), .gen/layers, which it cedes to cloud-image-layers of @putnami/cloud, which declares it, and .gen/config-schema.json with its .gen/config-schema.jsonschema.json companion, the config-extract fallback that only config-extract-exec writes and nobody claims, so an execution or a restore of this task leaves them in place."
           },
           "client": {
             "kind": "directory",

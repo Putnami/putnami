@@ -663,9 +663,9 @@ subprocess starts, with an error that names the output, and nothing is stored.
 A file that another task writes inside the owned region is removed with the
 rest, exactly as a restore of the owner's entry removes it. A path that must
 outlive the owner's execution has to be ceded by the owner. The TypeScript
-`build-generate` cedes the config schema fallback `.gen/config-schema.json`,
-which `config-extract` writes when `options.generate.schema=false`, so a build
-keeps it.
+`build-generate` cedes the config schema fallback `.gen/config-schema.json` and
+its JSON Schema companion, which `config-extract` writes when
+`options.generate.schema=false`, so a build keeps them.
 
 A task of another session in the same worktree that reads an owned directory
 while its owner runs can see it empty. The task-output locks order writers

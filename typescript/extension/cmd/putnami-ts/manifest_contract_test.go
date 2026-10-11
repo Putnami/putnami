@@ -220,10 +220,6 @@ func (r ownerRow) String() string {
 //     disjoint subpaths: transpile owns lib/, types owns types/, compile owns
 //     compile/, and package-npm/package-docker own npm/ and docker/. Each reads
 //     its siblings' trees and writes only its own.
-//   - `.gen/config-schema.json` (the config-extract fallback location) sits
-//     inside the .gen subtree build-generate produces. Resolved by SINGLE
-//     PRODUCER: build-generate owns .gen whole, so config-extract-exec claims
-//     only the committed schema/ files and never a slice of .gen.
 //   - `.gen/deployment.json`, `.gen/requirements.json` and
 //     `.gen/infra/runtime.json` are written after generate by package-deployment
 //     and build-infra. Resolved by CEDED SUBPATHS: build-generate excludes
@@ -231,10 +227,11 @@ func (r ownerRow) String() string {
 //     a hit restores them and generate's restore never resurrects an earlier
 //     run's copy. It also excludes `.gen/layers`, which cloud-image-layers of
 //     @putnami/cloud declares.
-//   - `.gen/config-schema.json` is the config-extract fallback that only
-//     config-extract-exec writes. build-generate cedes it too, and nobody
-//     declares it, so neither an execution nor a restore of generate removes
-//     it.
+//   - `.gen/config-schema.json` and its `.gen/config-schema.jsonschema.json`
+//     companion are the config-extract fallback that only config-extract-exec
+//     writes. build-generate cedes them too, and nobody declares them, so
+//     neither an execution nor a restore of generate removes them. Its claim on
+//     the committed schema/ files is unchanged.
 //   - test-env-up's two rows are the only INVOCATION-scoped outputs here (an
 //     earlier migration). They collide with nothing by construction: they live in
 //     the orchestrator's private per-invocation tree, not in the project or the
@@ -560,12 +557,17 @@ func TestGenerateDeclaresTheClientOutputPort(t *testing.T) {
 	}
 }
 
+// configSchemaFallbackCompanionPath is the JSON Schema the TypeScript extractor
+// writes next to the fallback manifest.
+const configSchemaFallbackCompanionPath = ".gen/config-schema.jsonschema.json"
+
 // cededGenSubpaths is every path build-generate cedes out of <project>/.gen,
-// in the order the manifest normalizes it to: the config-extract fallback,
-// which nobody declares, the files package-deployment and build-infra write
-// after generate and declare as their outputs, and the .gen/layers directory
-// cloud-image-layers of @putnami/cloud declares.
-var cededGenSubpaths = []string{configSchemaFallbackPath, infraagg.DeploymentFile, infraagg.RuntimeDefaultsFile, imageLayersDir, infraagg.AggregatedManifestFile}
+// in the order the manifest normalizes it to: the config-extract fallback and
+// its JSON Schema companion, which nobody declares, the files
+// package-deployment and build-infra write after generate and declare as their
+// outputs, and the .gen/layers directory cloud-image-layers of @putnami/cloud
+// declares.
+var cededGenSubpaths = []string{configSchemaFallbackPath, configSchemaFallbackCompanionPath, infraagg.DeploymentFile, infraagg.RuntimeDefaultsFile, imageLayersDir, infraagg.AggregatedManifestFile}
 
 // imageLayersDir is the project directory cloud-image-layers of @putnami/cloud
 // declares as its output.
