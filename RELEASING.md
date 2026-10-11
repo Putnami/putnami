@@ -29,9 +29,14 @@ Three bounds are commitments rather than intentions:
   [Compatibility and Migration](tooling/cli/doc/21-compatibility-and-migration.md),
   and every number there is pinned by a test against prior-release bytes.
 
-The post-1.0 cadence is decided before v1.0.0 ships and recorded in this section.
-Until then, treating the absence of a calendar as an oversight would be reading a
-promise the project has not made.
+From v1.0.0, patch and minor releases stay event-driven: each is cut when it is
+needed and the checklist passes. Majors have no cadence either. Each
+[version line](#version-lines-and-their-tags) cuts its own major when its
+breaking changes call for one; the project does not align majors across lines or
+promise a rhythm for them. One rule holds on every line: whatever a major
+removes is marked deprecated in an earlier minor of that line. Treating the
+absence of a calendar as an oversight would be reading a promise the project has
+not made.
 
 ## What a release may contain
 
