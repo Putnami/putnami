@@ -98,16 +98,7 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | Command | Description |
 |---------|-------------|
 | `putnami change-plan` | Emit an immutable impacted CI ChangePlan |
-| `putnami ci init` | Create a safe putnami.ci.json version 3 contract |
-| `putnami ci validate` | Validate CI intent and workspace graph references |
-| `putnami ci fmt` | Canonicalize putnami.ci.json |
-| `putnami ci explain` | Explain first-match CI intent for local Source assumptions |
-
-## Distribution
-
-| Command | Description |
-|---------|-------------|
-| `putnami channel set|status` | Move a distribution channel and report how far it is served |
+| `putnami impact-plan` | Emit the impacted plan of a change for a command list |
 
 ## Projects
 
@@ -236,146 +227,27 @@ putnami change-plan --base <commit> [--head <commit>] [--no-cache] [--output <fo
 - `putnami change-plan --base origin/main --output=json`
 - `putnami change-plan --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl`
 
-### `putnami ci init`
+### `putnami impact-plan`
 
-Create putnami.ci.json beside putnami.workspace.json using discovered framework graph jobs, with no distribution and no environment, so it requests no publish or deploy authority
+Emit the impacted plan of the exact commit delta from --base to the checked-out HEAD for a comma-separated command list: the changed files, the impacted projects, and every task the engine plans for those commands. An extension reads this ImpactPlan instead of importing the CLI, and derives its own document from it, such as a ChangePlan. The worktree must be clean and --base must be a HEAD ancestor. Source contents, environment values, secrets, command arguments, and output paths are never emitted
 
 **Usage**
 
 ```
-putnami ci init [--force] [--output <format>]
+putnami impact-plan <commands> --base <commit> [--head <commit>] [--no-cache] [--output <format>]
 ```
 
 **Flags**
 
 | Flag | Description |
 |------|-------------|
-| `--force` | Replace an existing putnami.ci.json |
+| `--base` <commit> | Required base commit or ref; emitted as its full immutable commit SHA |
+| `--head` <commit> | Optional head commit or ref; it must resolve to the checked-out HEAD |
 
 **Examples**
 
-- `putnami ci init`
-- `putnami ci init --output=json`
-
-### `putnami ci validate`
-
-Strictly validate putnami.ci.json, resolve its command references against discovered workspace jobs, refuse distribution and envs without an installed release-set provider, and report its canonical digest without contacting Putnami Cloud
-
-**Usage**
-
-```
-putnami ci validate [--output <format>]
-```
-
-**Examples**
-
-- `putnami ci validate`
-- `putnami ci validate --output=json`
-
-### `putnami ci fmt`
-
-Validate and canonicalize putnami.ci.json while preserving semantic rule order; --check is read-only and fails when bytes differ
-
-**Usage**
-
-```
-putnami ci fmt [--check] [--output <format>]
-```
-
-**Flags**
-
-| Flag | Description |
-|------|-------------|
-| `--check` | Check canonical formatting without writing |
-
-**Examples**
-
-- `putnami ci fmt`
-- `putnami ci fmt --check`
-
-### `putnami ci explain`
-
-Evaluate ordered rules locally and report the commands and flags the run executes, the matching rule or the implicit tag convention, the channels a publish advances, and the environments that follow each of them. Trust, entitlements, secrets, and remote authorization remain explicitly unresolved
-
-**Usage**
-
-```
-putnami ci explain --event <push|tag|pull_request> [--branch <branch>] [--tag <tag>] [--pr <number>] [--output <format>]
-```
-
-**Flags**
-
-| Flag | Description |
-|------|-------------|
-| `--event` <push|tag|pull_request> | Normalized Source event assumption |
-| `--branch` <branch> | Updated push branch or pull-request head branch |
-| `--tag` <tag> | Created tag, for --event tag |
-| `--pr` <number> | Pull-request number used to render the closed channel placeholder |
-
-**Examples**
-
-- `putnami ci explain --event push --branch main --output=json`
-- `putnami ci explain --event tag --tag ts/v0.3.0`
-- `putnami ci explain --event pull_request --branch feature/x --pr 42`
-
-### `putnami channel`
-
-Move a channel to a release set that already exists, and report the head each registry has applied. Both are metadata operations: they publish nothing, build nothing, and check nothing out
-
-**Usage**
-
-```
-putnami channel <set|status>
-```
-
-**Examples**
-
-- `putnami channel set latest --from canary`
-- `putnami channel status latest --wait 2m`
-
-### `putnami channel set`
-
-Point a channel at a release set that already exists, taken from another channel or named by its immutable id. Promotion and rollback are this one command: no publisher runs, no artifact is uploaded, and the move is compare-and-swapped against the channel's current head
-
-**Usage**
-
-```
-putnami channel set <channel> --from <channel|rs_id> [--expected <rs_id>]
-```
-
-**Flags**
-
-| Flag | Description |
-|------|-------------|
-| `--from` <channel|rs_id> | The channel whose head is re-released, or the immutable release-set id to point at |
-| `--expected` <rs_id> | The id the channel must currently name; without it the channel's current head is read and used |
-
-**Examples**
-
-- `putnami channel set latest --from canary`
-- `putnami channel set latest --from rs_<64-lowercase-hex>`
-- `putnami channel set canary --from ts-v0.3.0 --expected rs_<64-lowercase-hex>`
-
-### `putnami channel status`
-
-Report a channel's accepted head and the generation each registry has applied. It exits non-zero while any registry is behind, so a pipeline waits for the channel to be served instead of assuming it
-
-**Usage**
-
-```
-putnami channel status <channel> [--wait <duration>]
-```
-
-**Flags**
-
-| Flag | Description |
-|------|-------------|
-| `--wait` <duration> | Poll every 2s until every registry has applied the accepted head, or this Go duration elapses |
-
-**Examples**
-
-- `putnami channel status latest`
-- `putnami channel status canary --wait 2m`
+- `putnami impact-plan test,build --base origin/main --output=json`
+- `putnami impact-plan lint --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl`
 
 ### `putnami projects list`
 

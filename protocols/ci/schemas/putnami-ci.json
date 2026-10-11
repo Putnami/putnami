@@ -267,7 +267,7 @@
               "protected": {
                 "type": "boolean",
                 "default": false,
-                "description": "A channel no rule may target and no CI principal may move; only `putnami channel set` by a user moves it."
+                "description": "A channel no rule may target and no CI principal may move; only a user moves it, with the release-set provider's channel command."
               }
             }
           },

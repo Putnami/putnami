@@ -309,8 +309,8 @@ This table says what each Putnami default gives each marker:
 
 | Marker | What Putnami does by default |
 | --- | --- |
-| `understand.instructions` | `putnami init` writes a Putnami block in `AGENTS.md` that names the command to run and the gate to pass. |
-| `understand.commands` | `putnami ci init` writes `putnami.ci.json`, which runs `lint`, `test` and `build` on every change, and `validate` when the workspace declares `@putnami/sdd`. |
+| `understand.instructions` | `putnami init` writes a Putnami block in `AGENTS.md` that names the command to run and the gate to pass: the blocking commands of `putnami.ci.json`, or `lint`, `test` and `build` when the workspace has no usable `putnami.ci.json`. |
+| `understand.commands` | `putnami cloud ci init` writes `putnami.ci.json`, which runs `lint`, `test` and `build` on every change, and `validate` when an extension of the workspace declares a `validate` job. |
 | `understand.area-docs` | Every project template writes a `README.md`, and the `lint-docs` step of `putnami lint` fails on a broken relative link or anchor in a project's `README.md` files and `doc/` tree. |
 | `bound.declared-areas` | Each project declares itself in its `putnami.json`, and `putnami.workspace.json` marks the workspace root. |
 | `bound.boundary-rules` | A project is importable only from its own scope unless its `visibility` widens it, and an import that crosses a boundary fails every command that plans over the graph. |

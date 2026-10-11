@@ -5,8 +5,6 @@
 _putnami_subcommands_for() {
     case "$1" in
         'cache') printf '%s\n' 'clean gc verify' ;;
-        'channel') printf '%s\n' 'set status' ;;
-        'ci') printf '%s\n' 'explain fmt init validate' ;;
         'completion') printf '%s\n' 'bash fish zsh' ;;
         'config') printf '%s\n' 'set show' ;;
         'context') printf '%s\n' 'generate map' ;;
@@ -34,14 +32,6 @@ _putnami_path_known() {
         'cache gc') return 0 ;;
         'cache verify') return 0 ;;
         'change-plan') return 0 ;;
-        'channel') return 0 ;;
-        'channel set') return 0 ;;
-        'channel status') return 0 ;;
-        'ci') return 0 ;;
-        'ci explain') return 0 ;;
-        'ci fmt') return 0 ;;
-        'ci init') return 0 ;;
-        'ci validate') return 0 ;;
         'completion') return 0 ;;
         'completion bash') return 0 ;;
         'completion fish') return 0 ;;
@@ -67,6 +57,7 @@ _putnami_path_known() {
         'extensions remove') return 0 ;;
         'extensions update') return 0 ;;
         'help') return 0 ;;
+        'impact-plan') return 0 ;;
         'infra') return 0 ;;
         'infra plan') return 0 ;;
         'init') return 0 ;;
@@ -122,11 +113,6 @@ _putnami_path_known() {
 _putnami_flags_for() {
     case "$1" in
         'change-plan') printf '%s\n' '--base --head' ;;
-        'channel set') printf '%s\n' '--expected --from' ;;
-        'channel status') printf '%s\n' '--wait' ;;
-        'ci explain') printf '%s\n' '--branch --event --pr --tag' ;;
-        'ci fmt') printf '%s\n' '--check' ;;
-        'ci init') printf '%s\n' '--force' ;;
         'compose') printf '%s\n' '--no-watch --port --ready-timeout' ;;
         'context generate') printf '%s\n' '--force' ;;
         'context map') printf '%s\n' '--print' ;;
@@ -136,6 +122,7 @@ _putnami_flags_for() {
         'extensions list') printf '%s\n' '--user' ;;
         'extensions remove') printf '%s\n' '--user' ;;
         'help') printf '%s\n' '--man --markdown' ;;
+        'impact-plan') printf '%s\n' '--base --head' ;;
         'init') printf '%s\n' '--channel --extension --force --project --project-path --workspace' ;;
         'install') printf '%s\n' '--latest' ;;
         'migrate agent-content') printf '%s\n' '--apply --check --rollback' ;;
@@ -166,8 +153,8 @@ _putnami_completions() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="D P b build cache change-plan channel ci completion compose config context d deploy deps dev doctor extensions f format generate help infra init install l lint mcp migrate p package pin projects publish qualify report run s scopes serve sessions t telemetry templates test tree upgrade version workspace"
-    local structured="cache change-plan channel ci completion compose config context deps dev doctor extensions help infra init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade version workspace"
+    local commands="D P b build cache change-plan completion compose config context d deploy deps dev doctor extensions f format generate help impact-plan infra init install l lint mcp migrate p package pin projects publish qualify report run s scopes serve sessions t telemetry templates test tree upgrade version workspace"
+    local structured="cache change-plan completion compose config context deps dev doctor extensions help impact-plan infra init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade version workspace"
     local global_flags="--verbose --debug --watch --plan --help --all --impacted --projects --tag --exclude-tag --exclude --baseline --impacted-strict --where --providers --credential-fd --no-cache --no-cache-projects --cache-trust --continue-on-error --max-parallel --resource --cpu-policy --retry --retry-failed --profile --dry-run --output --json --quiet --color --no-color --trace-profile --version"
     local projects=""
     local project_ids=""

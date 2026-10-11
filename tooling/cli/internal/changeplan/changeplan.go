@@ -1,8 +1,9 @@
 // Package changeplan projects the planner's typed output onto the CI
-// ChangePlan wire, go.putnami.dev/protocol/ci. The protocol owns the document,
-// its canonical form, digest and validation; this package owns only the safe
-// projection and ordering of planner data. It never recreates impact analysis
-// or serializes a task invocation.
+// ImpactPlan wire, go.putnami.dev/protocol/ci, and through the protocol's
+// ChangePlanFromImpactPlan onto the ChangePlan wire. The protocol owns both
+// documents, their canonical forms, the digest and validation; this package
+// owns only the safe projection and ordering of planner data. It never
+// recreates impact analysis or serializes a task invocation.
 package changeplan
 
 import (
@@ -19,10 +20,11 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs"
 )
 
-// Input is the checked, planner-owned data used to construct one ChangePlan.
+// Input is the checked, planner-owned data used to construct one ImpactPlan.
+// Commands is the command list the planner planned, in its order.
 type Input struct {
 	Generator        ciproto.ChangePlanGenerator
-	Repository       ciproto.ChangePlanRepository
+	Commands         []string
 	BaseSHA          string
 	HeadSHA          string
 	ChangedFiles     []string
@@ -32,15 +34,51 @@ type Input struct {
 	Cache            ciproto.ChangePlanCache
 }
 
-// Build projects planner output into a canonical ChangePlan and stamps its
-// digest. The caller owns revision resolution and planner invocation; this
-// package owns only safe projection and ordering, and returns only a plan
-// ciproto.ValidateChangePlan accepts.
-func Build(in Input) (ciproto.ChangePlan, error) {
-	plan := ciproto.ChangePlan{
-		Version:      ciproto.ChangePlanVersion,
+// The nouns name the document a refusal is about: BuildImpact refuses as the
+// impact plan, Build and ProjectTasks as the change plan.
+const (
+	impactPlanNoun = "impact plan"
+	changePlanNoun = "change plan"
+)
+
+// BuildImpact projects planner output into a canonical ImpactPlan. The caller
+// owns revision resolution and planner invocation; this package owns only safe
+// projection and ordering, and returns only a plan ciproto.ValidateImpactPlan
+// accepts.
+func BuildImpact(in Input) (ciproto.ImpactPlan, error) {
+	plan, err := projectImpact(in, impactPlanNoun)
+	if err != nil {
+		return ciproto.ImpactPlan{}, err
+	}
+	if err := ciproto.ValidateImpactPlan(plan); err != nil {
+		return ciproto.ImpactPlan{}, err
+	}
+	return plan, nil
+}
+
+// Build projects planner output into the canonical ChangePlan of repository
+// and stamps its digest. It is the ImpactPlan projection BuildImpact makes,
+// handed to ciproto.ChangePlanFromImpactPlan, so a ChangePlan and an
+// ImpactPlan of one plan never describe it two ways. It returns only a plan
+// ciproto.ValidateChangePlan accepts, and refuses every shared member as the
+// ChangePlan's.
+func Build(in Input, repository ciproto.ChangePlanRepository) (ciproto.ChangePlan, error) {
+	plan, err := projectImpact(in, changePlanNoun)
+	if err != nil {
+		return ciproto.ChangePlan{}, err
+	}
+	return ciproto.ChangePlanFromImpactPlan(plan, repository)
+}
+
+// projectImpact is the one projection of planner output onto plan members:
+// every list deduplicated and sorted, the transitive dependents derived, and
+// the command list copied in its order. It validates nothing the protocol
+// validates. noun names the document in a refusal.
+func projectImpact(in Input, noun string) (ciproto.ImpactPlan, error) {
+	plan := ciproto.ImpactPlan{
+		Version:      ciproto.ImpactPlanVersion,
 		Generator:    in.Generator,
-		Repository:   in.Repository,
+		Commands:     append([]string{}, in.Commands...),
 		BaseSHA:      strings.TrimSpace(in.BaseSHA),
 		HeadSHA:      strings.TrimSpace(in.HeadSHA),
 		ChangedFiles: canonicalPaths(in.ChangedFiles),
@@ -48,37 +86,28 @@ func Build(in Input) (ciproto.ChangePlan, error) {
 	}
 
 	var err error
-	if plan.Impact.DirectProjects, err = canonicalProjects(in.DirectProjects); err != nil {
-		return ciproto.ChangePlan{}, err
+	if plan.Impact.DirectProjects, err = canonicalProjects(in.DirectProjects, noun); err != nil {
+		return ciproto.ImpactPlan{}, err
 	}
-	if plan.Impact.Projects, err = canonicalProjects(in.ImpactedProjects); err != nil {
-		return ciproto.ChangePlan{}, err
+	if plan.Impact.Projects, err = canonicalProjects(in.ImpactedProjects, noun); err != nil {
+		return ciproto.ImpactPlan{}, err
 	}
 	plan.Impact.TransitiveDependents = plan.Impact.DerivedTransitiveDependents()
-	if plan.Tasks, err = canonicalTasks(in.Planned); err != nil {
-		return ciproto.ChangePlan{}, err
-	}
-
-	digest, err := ciproto.RecomputeChangePlanDigest(plan)
-	if err != nil {
-		return ciproto.ChangePlan{}, err
-	}
-	plan.Digest = digest
-	if err := ciproto.ValidateChangePlan(plan); err != nil {
-		return ciproto.ChangePlan{}, err
+	if plan.Tasks, err = canonicalTasks(in.Planned, noun); err != nil {
+		return ciproto.ImpactPlan{}, err
 	}
 	return plan, nil
 }
 
-func canonicalProjects(projects []*workspace.Project) ([]ciproto.ChangePlanProject, error) {
+func canonicalProjects(projects []*workspace.Project, noun string) ([]ciproto.ChangePlanProject, error) {
 	byID := make(map[string]ciproto.ChangePlanProject, len(projects))
 	for _, p := range projects {
 		if p == nil || p.ID == "" || p.Name == "" {
-			return nil, fmt.Errorf("change plan project identity is incomplete")
+			return nil, fmt.Errorf("%s project identity is incomplete", noun)
 		}
 		project := ciproto.ChangePlanProject{ID: p.ID, Name: p.Name, Path: filepath.ToSlash(p.Path)}
 		if prior, exists := byID[project.ID]; exists && prior != project {
-			return nil, fmt.Errorf("change plan has conflicting project identities for %q", project.ID)
+			return nil, fmt.Errorf("%s has conflicting project identities for %q", noun, project.ID)
 		}
 		byID[project.ID] = project
 	}
@@ -96,18 +125,18 @@ func canonicalProjects(projects []*workspace.Project) ([]ciproto.ChangePlanProje
 // it so the ChangePlan and the execution request can never describe the same
 // plan two ways. It adds nothing to the ChangePlan digest domain.
 func ProjectTasks(planned []*jobs.ScheduledJob) ([]ciproto.ChangePlanTask, error) {
-	return canonicalTasks(planned)
+	return canonicalTasks(planned, changePlanNoun)
 }
 
-func canonicalTasks(planned []*jobs.ScheduledJob) ([]ciproto.ChangePlanTask, error) {
+func canonicalTasks(planned []*jobs.ScheduledJob, noun string) ([]ciproto.ChangePlanTask, error) {
 	byKey := make(map[string]ciproto.ChangePlanTask, len(planned))
 	for _, job := range planned {
-		task, err := projectTask(job)
+		task, err := projectTask(job, noun)
 		if err != nil {
 			return nil, err
 		}
 		if prior, exists := byKey[task.Identity.Key]; exists && !equalTask(prior, task) {
-			return nil, fmt.Errorf("change plan has conflicting tasks for %q", task.Identity.Key)
+			return nil, fmt.Errorf("%s has conflicting tasks for %q", noun, task.Identity.Key)
 		}
 		byKey[task.Identity.Key] = task
 	}
@@ -119,13 +148,13 @@ func canonicalTasks(planned []*jobs.ScheduledJob) ([]ciproto.ChangePlanTask, err
 	return out, nil
 }
 
-func projectTask(job *jobs.ScheduledJob) (ciproto.ChangePlanTask, error) {
+func projectTask(job *jobs.ScheduledJob, noun string) (ciproto.ChangePlanTask, error) {
 	if job == nil || job.JobDef == nil || job.Project == nil || job.Extension == nil {
-		return ciproto.ChangePlanTask{}, fmt.Errorf("change plan contains incomplete planned task")
+		return ciproto.ChangePlanTask{}, fmt.Errorf("%s contains incomplete planned task", noun)
 	}
 	identity := job.TypedIdentity()
 	if identity.Key == "" || identity.Project.ID == "" || identity.Task.Name == "" || identity.Provider.Extension == "" {
-		return ciproto.ChangePlanTask{}, fmt.Errorf("change plan contains incomplete task identity")
+		return ciproto.ChangePlanTask{}, fmt.Errorf("%s contains incomplete task identity", noun)
 	}
 	deadline := job.JobDef.TimeoutMs
 	if deadline == 0 {

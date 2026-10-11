@@ -31,8 +31,8 @@ There is no schema directory here and no fixture corpus, and that is not an
 omission to be backfilled. Nothing sends a `Diagnostic` document on its own:
 `Diagnostic` is the shared **return type** of every protocol package's parse and
 validate entry points. It reaches a wire only when an owning contract embeds it
-— a `putnami ci` report, a structured CLI result — and that owning contract is
-where the bytes are specified, schematized and fixtured.
+— a CI document validation report, a structured CLI result — and that owning
+contract is where the bytes are specified, schematized and fixtured.
 
 So the compatibility surface of this module is the Go type and the Go
 constructor set:
@@ -106,8 +106,8 @@ keep the type small rather than a reason to freeze it prematurely.
 There is deliberately **no user-facing feature or spec for this module**. It is
 a shared record type between protocol packages; a user never chooses it, and the
 outcome a user cares about — "the tool told me exactly which field is wrong and
-why" — is delivered by whichever command renders the findings (`putnami ci`,
-`putnami doctor`, `putnami contracts check`, …). A product feature per shared Go
+why" — is delivered by whichever command renders the findings
+(`putnami doctor`, `putnami contracts check`, …). A product feature per shared Go
 type would be a promise with no user behind it.
 
 This module records **no durable decisions of its own**. The one rule worth

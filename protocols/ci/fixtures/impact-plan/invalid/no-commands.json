@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "generator": {
+    "name": "putnami",
+    "version": "dev"
+  },
+  "commands": [],
+  "baseSHA": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03",
+  "headSHA": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "changedFiles": [
+    "README.md"
+  ],
+  "impact": {
+    "directProjects": [],
+    "projects": [],
+    "transitiveDependents": []
+  },
+  "tasks": [],
+  "cache": {
+    "status": "unavailable",
+    "reason": "ambient-input"
+  }
+}

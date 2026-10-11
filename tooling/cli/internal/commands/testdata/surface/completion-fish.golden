@@ -64,8 +64,6 @@ complete -c putnami -n '__fish_use_subcommand' -a 'test' -d 'Run the project\'s 
 # Structured commands
 complete -c putnami -n '__fish_use_subcommand' -a 'cache' -d 'Manage cache'
 complete -c putnami -n '__fish_use_subcommand' -a 'change-plan' -d 'Emit an immutable impacted CI ChangePlan'
-complete -c putnami -n '__fish_use_subcommand' -a 'channel' -d 'Move a distribution channel and report how far it is served'
-complete -c putnami -n '__fish_use_subcommand' -a 'ci' -d 'Manage source-controlled workspace CI intent'
 complete -c putnami -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completions (bash, zsh, fish)'
 complete -c putnami -n '__fish_use_subcommand' -a 'compose' -d 'Serve a workload with the workloads it runs with'
 complete -c putnami -n '__fish_use_subcommand' -a 'config' -d 'Manage configuration'
@@ -75,6 +73,7 @@ complete -c putnami -n '__fish_use_subcommand' -a 'dev' -d 'Author extensions an
 complete -c putnami -n '__fish_use_subcommand' -a 'doctor' -d 'Preflight production readiness under a deployment profile'
 complete -c putnami -n '__fish_use_subcommand' -a 'extensions' -d 'Manage extensions'
 complete -c putnami -n '__fish_use_subcommand' -a 'help' -d 'Show help for a command'
+complete -c putnami -n '__fish_use_subcommand' -a 'impact-plan' -d 'Emit the impacted plan of a change for a command list'
 complete -c putnami -n '__fish_use_subcommand' -a 'infra' -d 'Plan workspace infrastructure'
 complete -c putnami -n '__fish_use_subcommand' -a 'init' -d 'Initialize a new workspace'
 complete -c putnami -n '__fish_use_subcommand' -a 'install' -d 'Install extensions and dependencies'
@@ -97,12 +96,6 @@ complete -c putnami -n '__fish_use_subcommand' -a 'workspace' -d 'Manage workspa
 complete -c putnami -n '__putnami_complete_children cache' -a 'clean'
 complete -c putnami -n '__putnami_complete_children cache' -a 'gc'
 complete -c putnami -n '__putnami_complete_children cache' -a 'verify'
-complete -c putnami -n '__putnami_complete_children channel' -a 'set'
-complete -c putnami -n '__putnami_complete_children channel' -a 'status'
-complete -c putnami -n '__putnami_complete_children ci' -a 'explain'
-complete -c putnami -n '__putnami_complete_children ci' -a 'fmt'
-complete -c putnami -n '__putnami_complete_children ci' -a 'init'
-complete -c putnami -n '__putnami_complete_children ci' -a 'validate'
 complete -c putnami -n '__putnami_complete_children completion' -a 'bash'
 complete -c putnami -n '__putnami_complete_children completion' -a 'fish'
 complete -c putnami -n '__putnami_complete_children completion' -a 'zsh'
@@ -190,15 +183,6 @@ complete -c putnami -l 'version' -d 'Show version'
 # Structured command flags
 complete -c putnami -n '__putnami_seen_path change-plan' -l 'base' -d 'Required base commit or ref; emitted as its full immutable commit SHA' -r
 complete -c putnami -n '__putnami_seen_path change-plan' -l 'head' -d 'Optional head commit or ref; it must resolve to the checked-out HEAD' -r
-complete -c putnami -n '__putnami_seen_path channel set' -l 'expected' -d 'The id the channel must currently name; without it the channel\'s current head is read and used' -r
-complete -c putnami -n '__putnami_seen_path channel set' -l 'from' -d 'The channel whose head is re-released, or the immutable release-set id to point at' -r
-complete -c putnami -n '__putnami_seen_path channel status' -l 'wait' -d 'Poll every 2s until every registry has applied the accepted head, or this Go duration elapses' -r
-complete -c putnami -n '__putnami_seen_path ci explain' -l 'branch' -d 'Updated push branch or pull-request head branch' -r
-complete -c putnami -n '__putnami_seen_path ci explain' -l 'event' -d 'Normalized Source event assumption' -r
-complete -c putnami -n '__putnami_seen_path ci explain' -l 'pr' -d 'Pull-request number used to render the closed channel placeholder' -r
-complete -c putnami -n '__putnami_seen_path ci explain' -l 'tag' -d 'Created tag, for --event tag' -r
-complete -c putnami -n '__putnami_seen_path ci fmt' -l 'check' -d 'Check canonical formatting without writing'
-complete -c putnami -n '__putnami_seen_path ci init' -l 'force' -d 'Replace an existing putnami.ci.json'
 complete -c putnami -n '__putnami_seen_path compose' -l 'no-watch' -d 'Run the target production-mode without watch, like its dependencies'
 complete -c putnami -n '__putnami_seen_path compose' -l 'port' -d 'Proxy port of the target; default options.serve.port then 3000; 0 picks an ephemeral port' -r
 complete -c putnami -n '__putnami_seen_path compose' -l 'ready-timeout' -d 'Deadline for each member\'s typed ready event; default 60s' -r
@@ -218,6 +202,8 @@ complete -c putnami -n '__putnami_seen_path extensions list' -l 'user' -d 'List 
 complete -c putnami -n '__putnami_seen_path extensions remove' -l 'user' -d 'Remove the extension from the user scope (~/.putnami/user) instead of the workspace'
 complete -c putnami -n '__putnami_seen_path help' -l 'man' -d 'Render the full reference as a man page'
 complete -c putnami -n '__putnami_seen_path help' -l 'markdown' -d 'Render the full reference as Markdown'
+complete -c putnami -n '__putnami_seen_path impact-plan' -l 'base' -d 'Required base commit or ref; emitted as its full immutable commit SHA' -r
+complete -c putnami -n '__putnami_seen_path impact-plan' -l 'head' -d 'Optional head commit or ref; it must resolve to the checked-out HEAD' -r
 complete -c putnami -n '__putnami_seen_path init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
 complete -c putnami -n '__putnami_seen_path init' -l 'extension' -d 'Default extension to install' -r
 complete -c putnami -n '__putnami_seen_path init' -l 'force' -d 'Reinitialize an existing workspace'

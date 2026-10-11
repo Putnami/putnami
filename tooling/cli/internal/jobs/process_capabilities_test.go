@@ -1295,3 +1295,40 @@ func TestCapturedCloudCapabilityStaysOutOfAmbientPlanContextAndCacheKey(t *testi
 		t.Fatal("captured capability entered a context diagnostic")
 	}
 }
+
+// TestReleaseSetProviderInvocationAcceptsOnlyTheCoordinatorOperations holds
+// provider-only mode to the operations the coordinator calls: resolve and
+// release. Any other distribution operation, the channel ones included, is
+// refused in that mode, and a process without the private marker is not in
+// provider-only mode whatever operation its argv names.
+func TestReleaseSetProviderInvocationAcceptsOnlyTheCoordinatorOperations(t *testing.T) {
+	t.Parallel()
+	ctx := context.WithValue(context.Background(), processCapabilityContextKey{}, &processCapabilities{
+		releaseSetProvider: &releaseSetProviderIdentity{ExtensionName: "@example/provider", Command: distribution.ProviderCommandName},
+	})
+	argv := func(operation string) []string {
+		return []string{
+			distribution.CloudCommand,
+			distribution.ReleaseSetCommand,
+			operation,
+			distribution.RequestFileFlag,
+			filepath.Join(t.TempDir(), "request.json"),
+		}
+	}
+	for _, operation := range []string{distribution.ResolveCommand, distribution.ReleaseCommand} {
+		if providerMode, err := ValidateReleaseSetProviderInvocation(ctx, argv(operation)); err != nil || !providerMode {
+			t.Errorf("%s = (%v, %v), want (true, nil)", operation, providerMode, err)
+		}
+	}
+	for _, operation := range []string{distribution.ChannelSetCommand, distribution.ChannelStatusCommand, "unknown"} {
+		providerMode, err := ValidateReleaseSetProviderInvocation(ctx, argv(operation))
+		if !providerMode || err == nil || !strings.Contains(err.Error(), "unexpected operation") {
+			t.Errorf("%s = (%v, %v), want provider-only mode refusing the operation", operation, providerMode, err)
+		}
+	}
+	for _, operation := range []string{distribution.ChannelSetCommand, distribution.ChannelStatusCommand} {
+		if providerMode, err := ValidateReleaseSetProviderInvocation(context.Background(), argv(operation)); providerMode || err != nil {
+			t.Errorf("%s without the marker = (%v, %v), want (false, nil)", operation, providerMode, err)
+		}
+	}
+}

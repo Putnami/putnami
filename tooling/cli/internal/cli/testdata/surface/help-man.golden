@@ -166,21 +166,8 @@ Current directory scope (project or subtree).
 .B change-plan
 Emit an immutable impacted CI ChangePlan.
 .TP
-.B ci init
-Create a safe putnami.ci.json version 3 contract.
-.TP
-.B ci validate
-Validate CI intent and workspace graph references.
-.TP
-.B ci fmt
-Canonicalize putnami.ci.json.
-.TP
-.B ci explain
-Explain first-match CI intent for local Source assumptions.
-.SS Distribution
-.TP
-.B channel set|status
-Move a distribution channel and report how far it is served.
+.B impact-plan
+Emit the impacted plan of a change for a command list.
 .SS Projects
 .TP
 .B projects list
@@ -349,75 +336,18 @@ Required base commit or ref; emitted as its full immutable commit SHA.
 .TP
 .B --head
 Optional head commit or ref; it must resolve to the checked-out HEAD.
-.SS ci init
-Create putnami.ci.json beside putnami.workspace.json using discovered framework graph jobs, with no distribution and no environment, so it requests no publish or deploy authority.
+.SS impact-plan
+Emit the impacted plan of the exact commit delta from --base to the checked-out HEAD for a comma-separated command list: the changed files, the impacted projects, and every task the engine plans for those commands. An extension reads this ImpactPlan instead of importing the CLI, and derives its own document from it, such as a ChangePlan. The worktree must be clean and --base must be a HEAD ancestor. Source contents, environment values, secrets, command arguments, and output paths are never emitted.
 .PP
 .B Usage:
 .br
-putnami ci init [--force] [--output <format>]
+putnami impact-plan <commands> --base <commit> [--head <commit>] [--no-cache] [--output <format>]
 .TP
-.B --force
-Replace an existing putnami.ci.json.
-.SS ci validate
-Strictly validate putnami.ci.json, resolve its command references against discovered workspace jobs, refuse distribution and envs without an installed release-set provider, and report its canonical digest without contacting Putnami Cloud.
-.PP
-.B Usage:
-.br
-putnami ci validate [--output <format>]
-.SS ci fmt
-Validate and canonicalize putnami.ci.json while preserving semantic rule order; --check is read-only and fails when bytes differ.
-.PP
-.B Usage:
-.br
-putnami ci fmt [--check] [--output <format>]
+.B --base
+Required base commit or ref; emitted as its full immutable commit SHA.
 .TP
-.B --check
-Check canonical formatting without writing.
-.SS ci explain
-Evaluate ordered rules locally and report the commands and flags the run executes, the matching rule or the implicit tag convention, the channels a publish advances, and the environments that follow each of them. Trust, entitlements, secrets, and remote authorization remain explicitly unresolved.
-.PP
-.B Usage:
-.br
-putnami ci explain --event <push|tag|pull_request> [--branch <branch>] [--tag <tag>] [--pr <number>] [--output <format>]
-.TP
-.B --event
-Normalized Source event assumption.
-.TP
-.B --branch
-Updated push branch or pull-request head branch.
-.TP
-.B --tag
-Created tag, for --event tag.
-.TP
-.B --pr
-Pull-request number used to render the closed channel placeholder.
-.SS channel
-Move a channel to a release set that already exists, and report the head each registry has applied. Both are metadata operations: they publish nothing, build nothing, and check nothing out.
-.PP
-.B Usage:
-.br
-putnami channel <set|status>
-.SS channel set
-Point a channel at a release set that already exists, taken from another channel or named by its immutable id. Promotion and rollback are this one command: no publisher runs, no artifact is uploaded, and the move is compare-and-swapped against the channel's current head.
-.PP
-.B Usage:
-.br
-putnami channel set <channel> --from <channel|rs_id> [--expected <rs_id>]
-.TP
-.B --from
-The channel whose head is re-released, or the immutable release-set id to point at.
-.TP
-.B --expected
-The id the channel must currently name; without it the channel's current head is read and used.
-.SS channel status
-Report a channel's accepted head and the generation each registry has applied. It exits non-zero while any registry is behind, so a pipeline waits for the channel to be served instead of assuming it.
-.PP
-.B Usage:
-.br
-putnami channel status <channel> [--wait <duration>]
-.TP
-.B --wait
-Poll every 2s until every registry has applied the accepted head, or this Go duration elapses.
+.B --head
+Optional head commit or ref; it must resolve to the checked-out HEAD.
 .SS projects list
 List every project in the loaded workspace graph with its canonical name, path, type, and tags; use projects describe for dependencies, dependents, extensions, and metadata.
 .PP

@@ -119,7 +119,7 @@ all use that declared provider identity. Without a declared namespace, the works
 name remains the default. Native package coordinates keep their own declared names;
 the provider still checks publication authority.
 
-`putnami publish --channel <channel>` names the channels the release-set coordinator advances. Several are allowed: `--channel canary,staging` measures impact against the **first** head and advances every listed channel to the same snapshot in one transaction. Every name must be portable (`^[a-z0-9][a-z0-9._-]{0,63}$`), and a channel the repository declared `protected` in `putnami.ci.json` is refused before any provider call — a protected channel moves only through `putnami channel set`.
+`putnami publish --channel <channel>` names the channels the release-set coordinator advances. Several are allowed: `--channel canary,staging` measures impact against the **first** head and advances every listed channel to the same snapshot in one transaction. Every name must be portable (`^[a-z0-9][a-z0-9._-]{0,63}$`), and a channel the repository declared `protected` in `putnami.ci.json` is refused before any provider call — only a user moves a protected channel, with the release-set provider's channel command.
 
 `putnami publish --baseline-channel <channel>` names one channel the publication **reads and never advances**. It is the head impact is measured against when the first channel of `--channel` has no head yet: the first push of a pull request advances an empty `pr-7` and measures against `canary`, so it republishes what the branch changed instead of the whole workspace, and `canary` — which belongs to `main` — is not moved. As soon as the advanced channel has a head of its own, that head is the baseline again and the flag changes nothing. The name is portable like any channel, must not be one of the channels `--channel` advances, and requires both a channel to publish and `--impacted`: a publication that advances nothing falls to the legacy per-package path where no head is read, `--all` republishes everything by definition, and a tagged publish releases its whole version line. Each of those is refused rather than ignored, the way the document half refuses a `baseline` on a rule that publishes nothing. A protected channel is a valid baseline, because protection forbids advancing a channel, not reading it. The one resolve of the publication names the advanced channels plus this one, so 16 advanced channels leave no room for a baseline and the flag is refused at parse time. The rule that renders it in CI is `rules[].baseline` in `putnami.ci.json`; `--baseline` remains the global git ref `--impacted` resolves against, which a release-set publish never uses (D16).
 
@@ -145,23 +145,17 @@ The channels are resolved exactly once and never again. The run's `data.releaseS
 
 A credential provider that negotiates `publication-v1` takes the release-set provider's place: it resolves and releases over its session, and the engine uploads every npm, Go module, OCI and Put registry member; see [`--providers`](#credential-provider---providers).
 
-Without a release-set provider, `putnami publish --all` still publishes every member to the registries the workspace declares, with git-derived versions. `--channel` is refused, and `distribution` and `envs` in `putnami.ci.json` fail `putnami ci validate`.
+Without a release-set provider, `putnami publish --all` still publishes every member to the registries the workspace declares, with git-derived versions. `--channel` is refused.
 
-### Promote and roll back: `channel set`, `channel status`
+### Promote and roll back
 
-Promotion and rollback are the same gesture and neither runs a publisher, a build, or a checkout:
+Promotion and rollback are the same gesture: move a channel to a release set that already exists. Neither runs a publisher, a build, or a checkout. The core CLI has no command for it; the release-set provider owns the move. `putnami channel …` and `putnami ci …` exit with a usage error unless an installed extension declares that root; [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli) lists where each one moved. With Putnami Cloud:
 
 ```bash
-putnami channel set latest --from canary          # promote the head canary points at
-putnami channel set latest --from rs_<64 hex>     # roll back to an exact snapshot
-putnami channel set latest --from canary --expected rs_<64 hex>
-putnami channel status canary                     # desired versus observed, per registry
-putnami channel status canary --wait 2m           # poll until every projection converges
+putnami cloud channels set latest --from canary          # promote the head canary points at
+putnami cloud channels set latest --from rs_<64 hex>     # roll back to an exact snapshot
+putnami cloud channels status --wait 2m                  # poll until every registry applied its head
 ```
-
-`channel set` moves a channel to a set that already exists, through one provider call, compare-and-swapped against the channel's current head; `--expected` states that head explicitly instead of resolving it. `channel status` prints the desired head (id and generation) and what each registry projection has actually applied, and exits `1` while any observed generation is behind.
-
-Both address the namespace the publisher writes to — `distribution.namespace` from `putnami.ci.json`, falling back to the workspace name — so a repository whose declared namespace differs from its workspace name promotes the sets it actually published. A provider failure names that namespace and the channel asked for; provider stderr stays out of the message because it is human-owned and may carry credentials.
 
 ### Deploy an environment
 
@@ -201,7 +195,24 @@ putnami change-plan --base origin/main --output=json
 It rejects dirty trees, a non-checked-out `--head`, and a base that is not an
 ancestor of HEAD. The structured result contains the full immutable document in
 `data`; see [CI Change Plans](17-ci-change-plans.md) for the v1 schema and
-digest rules.
+digest rules. The plan covers the fixed CI gate and is the projection of the
+`impact-plan` document for that gate.
+
+### `impact-plan`
+
+Emit the impacted plan of a checked-out commit range for the commands you name:
+
+```bash
+putnami impact-plan test,build --base origin/main --output=json
+```
+
+It is the document an extension reads to learn the changed files, the impacted
+projects and the planned tasks of a change without importing the CLI. It runs
+the same revision checks as `change-plan` and needs no repository remote. The
+command list is one positional argument, comma-separated, with aliases resolved;
+a command named twice, an alias that expands to several commands, and a command
+that no extension of the workspace declares are refused. See
+[Impact plans](17-ci-change-plans.md#impact-plans).
 
 ### `projects`
 
@@ -286,7 +297,9 @@ These four command groups are **not part of the CLI**. They are provided by the
 first-party `@putnami/sdd` extension, which also contributes the `validate` and
 `validate-workspace` jobs and the five `sdd.*` MCP tools. A workspace that does
 not declare the extension has none of them, and a run that plans zero jobs
-prints a courtesy hint naming it.
+prints a courtesy hint that the command moved to an extension. The hint links
+to [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli),
+which names the extension.
 
 ```json
 {

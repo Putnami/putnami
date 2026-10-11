@@ -226,30 +226,17 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		return ExitSuccess
 	}
 
+	// A root that left the core is refused here, before help, the workspace
+	// bootstrap and planning, unless an extension declares it.
+	if len(parsed.Commands) > 0 {
+		if err := refuseRemovedCoreRoot(parsed.Commands[0], extensionGroups, extensions); err != nil {
+			printCommandError(os.Stderr, err)
+			return exitCodeForError(err)
+		}
+	}
+
 	if parsed.Global.Help {
-		if parsed.Global.HelpMan {
-			PrintHelpMan()
-			return ExitSuccess
-		}
-		if parsed.Global.HelpMD {
-			PrintHelpMarkdown()
-			return ExitSuccess
-		}
-		if len(parsed.Commands) > 0 && parsed.Commands[0] != "help" {
-			cmd := parsed.Commands[0]
-			if extensionGroups[cmd] {
-				printCommandGroupHelp(ctx, os.Stdout, wsRoot, cfg, extensions, cmd, parsed.Subcommand, parsed.Global.Output)
-			} else if isStructuredCommand(cmd) {
-				PrintSubcommandHelp(cmd, parsed.Subcommand)
-			} else {
-				if code := printJobCommandHelpForWorkspace(cmd, wsRoot, cfg, extensions); code != ExitSuccess {
-					return code
-				}
-			}
-		} else {
-			PrintHelp()
-		}
-		return ExitSuccess
+		return printRequestedHelp(ctx, parsed, wsRoot, cfg, extensions, extensionGroups)
 	}
 
 	// The single parse-and-validation pass reports here, after
@@ -410,6 +397,34 @@ func refuseHostedWatch(hosted bool, global *GlobalFlags, commands []string) erro
 func closeHostedHolders(cache *engine.HostedRemoteCache, reporters *engine.HostedReporters) {
 	reporters.Close()
 	cache.Close()
+}
+
+// printRequestedHelp prints the help --help asks for and returns the exit
+// code: the manual or Markdown form, the help of an extension command group,
+// of a built-in command or of a job command, or the top-level help.
+func printRequestedHelp(
+	ctx context.Context,
+	parsed *ParsedArgs,
+	wsRoot string,
+	cfg *wsproto.Config,
+	extensions []*extension.ExtensionDescription,
+	extensionGroups map[string]bool,
+) int {
+	switch {
+	case parsed.Global.HelpMan:
+		PrintHelpMan()
+	case parsed.Global.HelpMD:
+		PrintHelpMarkdown()
+	case len(parsed.Commands) == 0 || parsed.Commands[0] == "help":
+		PrintHelp()
+	case extensionGroups[parsed.Commands[0]]:
+		printCommandGroupHelp(ctx, os.Stdout, wsRoot, cfg, extensions, parsed.Commands[0], parsed.Subcommand, parsed.Global.Output)
+	case isStructuredCommand(parsed.Commands[0]):
+		PrintSubcommandHelp(parsed.Commands[0], parsed.Subcommand)
+	default:
+		return printJobCommandHelpForWorkspace(parsed.Commands[0], wsRoot, cfg, extensions)
+	}
+	return ExitSuccess
 }
 
 // startHostedHoldersOfJobCommand is the first-use bootstrap's
