@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"slices"
 	"strings"
@@ -61,18 +60,22 @@ func Version(tag, pattern string) (version string, ok bool) {
 // released. A release tag that points at no commit is not a release. A pattern
 // that does not carry exactly one version placeholder, a repository without a
 // commit, a release tag of the line whose object git cannot read, reached or
-// not, and a history git cannot read are errors.
+// not, and a missing object git reports while it walks the history from HEAD
+// are errors. Git walks only as far as the tags it looks for, so a missing
+// object beyond them is not read and not reported.
 func LastRelease(dir, pattern string) (release Release, ok bool, err error) {
 	prefix, suffix, usable := splitPattern(pattern)
 	if !usable {
 		return Release{}, false, fmt.Errorf("read the last release: %q is not a usable line tag pattern", pattern)
 	}
-	if _, err := runGit(dir, nil, nil, "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}"); err != nil {
+	head, err := runGit(dir, nil, "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}")
+	if err != nil {
 		return Release{}, false, fmt.Errorf("read the last release: %w", err)
 	}
+	head = strings.TrimSpace(head)
 	// Listing tag names reads no object, so every release tag of the line is a
 	// candidate here, whether git can read its object or not.
-	refs, err := runGit(dir, nil, nil, "for-each-ref", "--format=%(refname)", "refs/tags")
+	refs, err := runGit(dir, nil, "for-each-ref", "--format=%(refname)", "refs/tags")
 	if err != nil {
 		return Release{}, false, fmt.Errorf("read the last release: %w", err)
 	}
@@ -88,7 +91,7 @@ func LastRelease(dir, pattern string) (release Release, ok bool, err error) {
 	for _, candidate := range candidates {
 		names.WriteString("refs/tags/" + candidate.Tag + "^{}\n")
 	}
-	objects, err := runGit(dir, nil, strings.NewReader(names.String()), "cat-file", "--batch-check")
+	objects, err := runGit(dir, strings.NewReader(names.String()), "cat-file", "--batch-check")
 	if err != nil {
 		return Release{}, false, fmt.Errorf("read the last release: %w", err)
 	}
@@ -106,14 +109,15 @@ func LastRelease(dir, pattern string) (release Release, ok bool, err error) {
 		}
 	}
 
-	// --merged lists every tag HEAD reaches in one walk of the history. On a
-	// history it cannot read it still exits 0, naming the missing object on
-	// stderr only, so any stderr is a failure. GIT_TRACE* settings write to
-	// stderr too, so this call runs without them.
-	merged, stderr, err := runGitCapture(dir, withoutGitTrace(os.Environ()), nil,
-		"for-each-ref", "--merged=HEAD", "--format=%(refname)", "refs/tags")
-	if err == nil && strings.TrimSpace(stderr) != "" {
-		err = fmt.Errorf("git for-each-ref (in %s): %s", dir, strings.TrimSpace(stderr))
+	// --merged lists every tag HEAD reaches in one walk of the history. It
+	// names HEAD by its commit, so a ref called HEAD cannot make it ambiguous.
+	// On a history it cannot read it still exits 0 and reports the missing
+	// object on an "error:" line of stderr. Warnings and trace lines on stderr
+	// are not failures.
+	merged, stderr, err := runGitCapture(dir, nil,
+		"for-each-ref", "--merged="+head, "--format=%(refname)", "refs/tags")
+	if err == nil {
+		err = reportedError(stderr)
 	}
 	if err != nil {
 		return Release{}, false, fmt.Errorf("read the last release: %w", err)
@@ -143,32 +147,35 @@ func releases(refs, prefix, suffix string) []Release {
 	return found
 }
 
-// withoutGitTrace is env without git's GIT_TRACE* settings.
-func withoutGitTrace(env []string) []string {
-	kept := make([]string, 0, len(env))
-	for _, entry := range env {
-		if !strings.HasPrefix(entry, "GIT_TRACE") {
-			kept = append(kept, entry)
+// reportedError returns the "error:" and "fatal:" lines of a git stderr that
+// exited 0, or nil when there is none.
+func reportedError(stderr string) error {
+	var reported []string
+	for line := range strings.SplitSeq(stderr, "\n") {
+		if strings.HasPrefix(line, "error:") || strings.HasPrefix(line, "fatal:") {
+			reported = append(reported, line)
 		}
 	}
-	return kept
+	if len(reported) == 0 {
+		return nil
+	}
+	return fmt.Errorf("git for-each-ref: %s", strings.Join(reported, "; "))
 }
 
 // runGit runs git in dir and returns its stdout. A failure carries git's
 // stderr.
-func runGit(dir string, env []string, stdin io.Reader, args ...string) (string, error) {
-	stdout, _, err := runGitCapture(dir, env, stdin, args...)
+func runGit(dir string, stdin io.Reader, args ...string) (string, error) {
+	stdout, _, err := runGitCapture(dir, stdin, args...)
 	return stdout, err
 }
 
-// runGitCapture runs git in dir with env (nil inherits this process's) and
-// stdin, and returns its stdout and stderr. A failure carries git's stderr.
-func runGitCapture(dir string, env []string, stdin io.Reader, args ...string) (string, string, error) {
+// runGitCapture runs git in dir with stdin and returns its stdout and stderr.
+// A failure carries git's stderr.
+func runGitCapture(dir string, stdin io.Reader, args ...string) (string, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
-	cmd.Env = env
 	cmd.Stdin = stdin
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

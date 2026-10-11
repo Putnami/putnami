@@ -46,6 +46,14 @@ func commit(t *testing.T, dir, subject string) {
 	git(t, dir, "commit", "--quiet", "--allow-empty", "-m", subject)
 }
 
+// removeObject deletes a loose object, so git can no longer read it.
+func removeObject(t *testing.T, dir, object string) {
+	t.Helper()
+	if err := os.Remove(filepath.Join(dir, ".git", "objects", object[:2], object[2:])); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestALineWithoutAReleaseTagHasNoLastRelease(t *testing.T) {
 	t.Parallel()
 	dir := repository(t)
@@ -176,13 +184,52 @@ func TestAReleaseTagGitCannotReadIsAnError(t *testing.T) {
 	git(t, dir, "tag", "ts/v0.1.0")
 	git(t, dir, "tag", "-a", "ts/v0.2.0", "-m", "release")
 	object := git(t, dir, "rev-parse", "refs/tags/ts/v0.2.0")
-	if err := os.Remove(filepath.Join(dir, ".git", "objects", object[:2], object[2:])); err != nil {
-		t.Fatal(err)
-	}
+	removeObject(t, dir, object)
 
 	_, ok, err := LastRelease(dir, "ts/v{version}")
 	if err == nil || ok || !strings.Contains(err.Error(), "ts/v0.2.0") {
 		t.Fatalf("LastRelease with an unreadable tag = %v/%v, want an error naming ts/v0.2.0", ok, err)
+	}
+}
+
+func TestALowerReleaseTagGitCannotReadIsAnError(t *testing.T) {
+	t.Parallel()
+	dir := repository(t)
+	git(t, dir, "tag", "-a", "ts/v0.0.5", "-m", "release")
+	removeObject(t, dir, git(t, dir, "rev-parse", "refs/tags/ts/v0.0.5"))
+	commit(t, dir, "feat(ts): add")
+	git(t, dir, "tag", "ts/v0.1.0")
+
+	if _, ok, err := LastRelease(dir, "ts/v{version}"); err == nil || ok || !strings.Contains(err.Error(), "ts/v0.0.5") {
+		t.Fatalf("LastRelease with an unreadable lower tag = %v/%v, want an error naming ts/v0.0.5", ok, err)
+	}
+}
+
+func TestAnUnreadableTagOfAnotherLineIsNotAnError(t *testing.T) {
+	t.Parallel()
+	dir := repository(t)
+	git(t, dir, "tag", "ts/v0.1.0")
+	git(t, dir, "tag", "-a", "go/v0.2.0", "-m", "release")
+	removeObject(t, dir, git(t, dir, "rev-parse", "refs/tags/go/v0.2.0"))
+
+	if release, ok, err := LastRelease(dir, "ts/v{version}"); err != nil || !ok || release.Tag != "ts/v0.1.0" {
+		t.Fatalf("LastRelease = %+v/%v/%v, want ts/v0.1.0", release, ok, err)
+	}
+}
+
+// A ref named HEAD makes the name HEAD ambiguous, and a broken ref makes git
+// warn: neither is a failure to read the history.
+func TestGitWarningsDoNotChangeTheReading(t *testing.T) {
+	t.Parallel()
+	dir := repository(t)
+	git(t, dir, "tag", "ts/v0.1.0")
+	git(t, dir, "update-ref", "refs/heads/HEAD", "HEAD")
+	if err := os.WriteFile(filepath.Join(dir, ".git", "refs", "tags", "broken"), []byte("garbage\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if release, ok, err := LastRelease(dir, "ts/v{version}"); err != nil || !ok || release.Tag != "ts/v0.1.0" {
+		t.Fatalf("LastRelease = %+v/%v/%v, want ts/v0.1.0", release, ok, err)
 	}
 }
 
@@ -252,9 +299,7 @@ func TestAHistoryGitCannotReadIsAnError(t *testing.T) {
 	commit(t, dir, "feat(ts): add")
 	commit(t, dir, "fix(ts): repair")
 	missing := git(t, dir, "rev-parse", "HEAD~1")
-	if err := os.Remove(filepath.Join(dir, ".git", "objects", missing[:2], missing[2:])); err != nil {
-		t.Fatal(err)
-	}
+	removeObject(t, dir, missing)
 
 	_, ok, err := LastRelease(dir, "ts/v{version}")
 	if err == nil || ok {
@@ -273,9 +318,7 @@ func TestAHistoryGitCannotReadUnderGitTraceIsStillAnError(t *testing.T) {
 	commit(t, dir, "feat(ts): add")
 	commit(t, dir, "fix(ts): repair")
 	missing := git(t, dir, "rev-parse", "HEAD~1")
-	if err := os.Remove(filepath.Join(dir, ".git", "objects", missing[:2], missing[2:])); err != nil {
-		t.Fatal(err)
-	}
+	removeObject(t, dir, missing)
 	t.Setenv("GIT_TRACE", "1")
 
 	if _, ok, err := LastRelease(dir, "ts/v{version}"); err == nil || ok || !strings.Contains(err.Error(), missing) {
