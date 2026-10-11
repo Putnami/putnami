@@ -615,7 +615,7 @@ func TestALineWithoutATagHasNothingToCompare(t *testing.T) {
 	if found := diagnostics(events, runtime.SeverityError); len(found) != 0 {
 		t.Fatalf("error diagnostics = %+v, want none", found)
 	}
-	if report := f.check(); !strings.Contains(report.Note, "no release tag of line lib/v{version} is on the first-parent history of HEAD") || report.Warning != "" {
+	if report := f.check(); !strings.Contains(report.Note, "no release tag of line lib/v{version} is reachable from HEAD") || report.Warning != "" {
 		t.Fatalf("report = %+v", report)
 	}
 
@@ -627,7 +627,7 @@ func TestALineWithoutATagHasNothingToCompare(t *testing.T) {
 	}
 	warnings := diagnostics(events, runtime.SeverityWarning)
 	if len(warnings) != 1 || warnings[0].Code != NotComparedCode ||
-		!strings.Contains(warnings[0].Message, "no release tag of line lib/v{version} is on the first-parent history of HEAD, though the repository has other tags") {
+		!strings.Contains(warnings[0].Message, "no release tag of line lib/v{version} is reachable from HEAD, though the repository has other tags") {
 		t.Fatalf("warnings = %+v", warnings)
 	}
 }
@@ -646,16 +646,19 @@ func TestATagThatIsNotAReleaseIsNoBaseline(t *testing.T) {
 	}
 }
 
-// A release a merged branch carries is not on the first-parent history, so it
-// does not replace a later release of the branch HEAD is on.
-func TestAReleaseOfAMergedBranchIsNoBaseline(t *testing.T) {
+// An older release a merged branch carries does not replace a later release:
+// the baseline is the highest release tag HEAD reaches. The branch holds two
+// commits before its tag, so `git describe` finds that tag nearest.
+func TestAnOlderReleaseOfAMergedBranchIsNoBaseline(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, catalog("package", "stable"))
 	f.commit("feat: more")
 	f.git("tag", "lib/v0.5.0")
 	f.commit("fix: repair")
+	f.commit("docs: explain")
 	f.git("checkout", "-q", "-b", "hotfix", firstTag)
 	f.commit("fix: hotfix")
+	f.commit("test: cover the hotfix")
 	f.git("tag", "lib/v0.4.1")
 	f.git("checkout", "-q", "main")
 	f.git("merge", "-q", "--no-ff", "-m", "merge the hotfix", "hotfix")

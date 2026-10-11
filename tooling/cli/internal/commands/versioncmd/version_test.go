@@ -332,14 +332,16 @@ func TestVersionTagWithoutYesWritesNothing(t *testing.T) {
 	}
 }
 
-// An explicit tag name overrides the computed one, and a name that does not
-// match the line's pattern is refused rather than silently creating a tag no
-// reader can attribute to a line.
-func TestVersionTagExplicitNameMustMatchTheLinePattern(t *testing.T) {
+// An explicit tag name overrides the computed one, and a name that is not a
+// release tag of the line is refused rather than silently creating a tag no
+// reader takes as the line's release.
+func TestVersionTagExplicitNameMustBeAReleaseTagOfTheLine(t *testing.T) {
 	dir := versionLineRepo(t)
-	err := VersionTag(context.Background(), dir, []string{"v9.9.9", "--scope", "typescript", "--dry-run"})
-	if err == nil || !strings.Contains(err.Error(), "does not match the pattern") {
-		t.Fatalf("err = %v, want a refusal of a name outside the line's pattern", err)
+	for _, name := range []string{"v9.9.9", "ts/v9.9", "ts/v9.9.9-rc.1", "ts/vnext"} {
+		err := VersionTag(context.Background(), dir, []string{name, "--scope", "typescript", "--dry-run"})
+		if err == nil || !strings.Contains(err.Error(), "is not a release tag of line") {
+			t.Fatalf("VersionTag(%s) err = %v, want a refusal of a name that is not a release tag", name, err)
+		}
 	}
 	out, err := sharedtest.CaptureStdout(t, func() error {
 		return VersionTag(context.Background(), dir, []string{"ts/v9.9.9", "--scope", "typescript", "--dry-run"})

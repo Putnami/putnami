@@ -185,10 +185,11 @@ func Check(workspaceRoot, projectDir, name string, tags []string, options Option
 			return nil, err
 		}
 		if tagged {
-			return &Report{Warning: fmt.Sprintf("no release tag of line %s is on the first-parent history of HEAD, though the repository has other tags, "+
-				"so the API is not compared; fetch the line's tags if it has released", pattern)}, nil
+			return &Report{Warning: fmt.Sprintf("no release tag of line %s is reachable from HEAD, though the repository has other tags, "+
+				"so the API is not compared; fetch the line's tags if it has released. A tag with a pre-release "+
+				"or any other text in place of MAJOR.MINOR.PATCH is not a release", pattern)}, nil
 		}
-		return &Report{Note: fmt.Sprintf("no release tag of line %s is on the first-parent history of HEAD: there is no released API to compare with", pattern)}, nil
+		return &Report{Note: fmt.Sprintf("no release tag of line %s is reachable from HEAD: there is no released API to compare with", pattern)}, nil
 	}
 
 	oldFiles, err := filesAtTag(projectDir, tag)

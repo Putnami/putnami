@@ -218,10 +218,11 @@ func requireSourceRevisionAtHead(wsRoot string) error {
 // releases a version the commits did not ask for.
 func proposedTag(wsRoot string, spec git.LineSpec, explicit string) (version, tagName string, err error) {
 	if explicit != "" {
-		parsed, ok := versionFromPattern(explicit, spec.TagPattern)
+		parsed, ok := linetag.Version(explicit, spec.TagPattern)
 		if !ok {
 			return "", "", cmderr.InvalidConfigf(
-				"tag %q does not match the pattern %q of line %s", explicit, spec.TagPattern, printableLine(spec.ScopePath))
+				"tag %q is not a release tag of line %s: the pattern %q with a MAJOR.MINOR.PATCH version",
+				explicit, printableLine(spec.ScopePath), spec.TagPattern)
 		}
 		return parsed, explicit, nil
 	}
@@ -350,18 +351,6 @@ func changelogRelPath(scopePath string) string {
 		return "CHANGELOG.md"
 	}
 	return scopePath + "/CHANGELOG.md"
-}
-
-// versionFromPattern reads the version a tag carries under a line pattern.
-func versionFromPattern(tag, pattern string) (string, bool) {
-	prefix, suffix, found := strings.Cut(pattern, wsproto.LineTagPlaceholder)
-	if !found || len(tag) <= len(prefix)+len(suffix) {
-		return "", false
-	}
-	if !strings.HasPrefix(tag, prefix) || !strings.HasSuffix(tag, suffix) {
-		return "", false
-	}
-	return tag[len(prefix) : len(tag)-len(suffix)], true
 }
 
 // majorOf reads the major number of a version, or 0 when it has none.

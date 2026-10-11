@@ -5,34 +5,34 @@
 // with the line's last release read that release here, so they agree on the
 // baseline.
 //
-// The last release of a line is its highest release tag on the first-parent
-// history of HEAD:
+// The last release of a line is its highest release tag that HEAD reaches:
 //
 //   - A release tag is the pattern rendered with a MAJOR.MINOR.PATCH version
 //     of decimal numbers without leading zeros. A tag that carries anything
 //     else where the version goes, such as a pre-release or a word, is not a
 //     release.
-//   - The first-parent history is HEAD and the chain of first parents behind
-//     it. A tag on a commit that only a merged branch holds is not on it.
-//   - The highest tag wins, by version, whatever its distance from HEAD.
+//   - HEAD reaches a tag when the tag's commit is HEAD or one of its
+//     ancestors, through any parent.
+//   - The highest tag wins, by version, whatever its distance from HEAD: an
+//     older release that a merged branch carries never replaces a later one.
 package linetag
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
-// gitTimeout bounds the git call, which reads local objects only.
+// gitTimeout bounds one git call. Every call reads local objects only.
 const gitTimeout = 2 * time.Minute
-
-// tagDecoration opens the name of a tag in a `--decorate=full` decoration.
-const tagDecoration = "tag: refs/tags/"
 
 // Release is a release tag of a version line.
 type Release struct {
@@ -44,54 +44,122 @@ type Release struct {
 	Commit string
 }
 
+// Version returns the release version tag carries under the line tag pattern.
+// ok is false when the tag is not a release tag of the line, or when the
+// pattern does not carry exactly one version placeholder.
+func Version(tag, pattern string) (version string, ok bool) {
+	prefix, suffix, usable := splitPattern(pattern)
+	if !usable {
+		return "", false
+	}
+	return releaseVersion(tag, prefix, suffix)
+}
+
 // LastRelease returns the last release of the line that renders its tags with
-// pattern, read from the repository that holds dir. ok is false when the
-// first-parent history of HEAD holds no release tag of the line, which is the
-// state of a line that never released. A pattern that does not carry exactly
-// one version placeholder, a repository without a commit and a history git
-// cannot read are errors.
+// pattern, read from the repository that holds dir. ok is false when HEAD
+// reaches no release tag of the line, which is the state of a line that never
+// released. A release tag that points at no commit is not a release. A pattern
+// that does not carry exactly one version placeholder, a repository without a
+// commit, a release tag whose object git cannot read and a history git cannot
+// read are errors.
 func LastRelease(dir, pattern string) (release Release, ok bool, err error) {
-	placeholder := wsproto.LineTagPlaceholder
-	if strings.Count(pattern, placeholder) != 1 || strings.ContainsAny(pattern, " \t\n*?[") || strings.HasPrefix(pattern, "-") {
+	prefix, suffix, usable := splitPattern(pattern)
+	if !usable {
 		return Release{}, false, fmt.Errorf("read the last release: %q is not a usable line tag pattern", pattern)
 	}
-	prefix, suffix, _ := strings.Cut(pattern, placeholder)
-
-	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
-	defer cancel()
-	// One record per first-parent commit: its ID, NUL, then the tags that
-	// point at it. --decorate-refs takes precedence over log.excludeDecoration.
-	cmd := exec.CommandContext(ctx, "git", "log", "--first-parent", "--no-show-signature",
-		"--decorate=full", "--decorate-refs=refs/tags", "--format=%H%x00%D", "HEAD")
-	cmd.Dir = dir
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if runErr := cmd.Run(); runErr != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return Release{}, false, fmt.Errorf("read the last release: git log (in %s): timed out after %s", dir, gitTimeout)
-		}
-		return Release{}, false, fmt.Errorf("read the last release: git log (in %s): %w: %s", dir, runErr, strings.TrimSpace(stderr.String()))
+	if _, err := runGit(dir, nil, "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}"); err != nil {
+		return Release{}, false, fmt.Errorf("read the last release: %w", err)
 	}
+	refs, err := runGit(dir, nil, "for-each-ref", "--format=%(refname)", "refs/tags")
+	if err != nil {
+		return Release{}, false, fmt.Errorf("read the last release: %w", err)
+	}
+	var candidates []Release
+	for ref := range strings.SplitSeq(refs, "\n") {
+		tag := strings.TrimPrefix(ref, "refs/tags/")
+		if version, isRelease := releaseVersion(tag, prefix, suffix); isRelease {
+			candidates = append(candidates, Release{Tag: tag, Version: version})
+		}
+	}
+	if len(candidates) == 0 {
+		return Release{}, false, nil
+	}
+	slices.SortFunc(candidates, func(a, b Release) int { return compareVersions(b.Version, a.Version) })
 
-	for record := range strings.SplitSeq(stdout.String(), "\n") {
-		commit, decorations, found := strings.Cut(record, "\x00")
-		if !found || decorations == "" {
+	// One line per candidate, in order: "<object> <type> <size>" for the
+	// object the tag peels to, or "<name> missing".
+	var names strings.Builder
+	for _, candidate := range candidates {
+		names.WriteString("refs/tags/" + candidate.Tag + "^{}\n")
+	}
+	objects, err := runGit(dir, strings.NewReader(names.String()), "cat-file", "--batch-check")
+	if err != nil {
+		return Release{}, false, fmt.Errorf("read the last release: %w", err)
+	}
+	lines := strings.Split(strings.TrimSuffix(objects, "\n"), "\n")
+	if len(lines) != len(candidates) {
+		return Release{}, false, fmt.Errorf("read the last release: git cat-file answered %d lines for %d tags", len(lines), len(candidates))
+	}
+	for i, candidate := range candidates {
+		fields := strings.Fields(lines[i])
+		if len(fields) != 3 {
+			return Release{}, false, fmt.Errorf("read the last release: git cannot read tag %s: %s", candidate.Tag, lines[i])
+		}
+		if fields[1] != "commit" {
 			continue
 		}
-		// A ref name holds no space, so ", " separates two decorations.
-		for decoration := range strings.SplitSeq(decorations, ", ") {
-			tag, isTag := strings.CutPrefix(decoration, tagDecoration)
-			if !isTag {
-				continue
-			}
-			version, isRelease := releaseVersion(tag, prefix, suffix)
-			if !isRelease || (ok && !higher(version, release.Version)) {
-				continue
-			}
-			release, ok = Release{Tag: tag, Version: version, Commit: commit}, true
+		candidate.Commit = fields[0]
+		reached, err := reachedFromHead(dir, candidate.Commit)
+		if err != nil {
+			return Release{}, false, fmt.Errorf("read the last release: %w", err)
+		}
+		if reached {
+			return candidate, true, nil
 		}
 	}
-	return release, ok, nil
+	return Release{}, false, nil
+}
+
+// reachedFromHead reports whether commit is HEAD or one of its ancestors.
+func reachedFromHead(dir, commit string) (bool, error) {
+	_, err := runGit(dir, nil, "merge-base", "--is-ancestor", commit, "HEAD")
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == 1 {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+// runGit runs git in dir with stdin and returns its stdout. A failure carries
+// git's stderr.
+func runGit(dir string, stdin io.Reader, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = dir
+	cmd.Stdin = stdin
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("git %s (in %s): timed out after %s", args[0], dir, gitTimeout)
+		}
+		return "", fmt.Errorf("git %s (in %s): %w: %s", args[0], dir, err, strings.TrimSpace(stderr.String()))
+	}
+	return stdout.String(), nil
+}
+
+// splitPattern returns what a line tag pattern holds before and after its
+// version placeholder. usable is false for a pattern that does not carry
+// exactly one placeholder, holds a space or a glob character, or starts with a
+// dash.
+func splitPattern(pattern string) (prefix, suffix string, usable bool) {
+	placeholder := wsproto.LineTagPlaceholder
+	if strings.Count(pattern, placeholder) != 1 || strings.ContainsAny(pattern, " \t\n*?[") || strings.HasPrefix(pattern, "-") {
+		return "", "", false
+	}
+	prefix, suffix, _ = strings.Cut(pattern, placeholder)
+	return prefix, suffix, true
 }
 
 // releaseVersion returns the version tag carries between prefix and suffix,
@@ -113,17 +181,18 @@ func releaseVersion(tag, prefix, suffix string) (string, bool) {
 	return version, true
 }
 
-// higher reports whether release version a orders after release version b.
-// Numbers compare by length, then by digits, so no number overflows.
-func higher(a, b string) bool {
+// compareVersions orders two release versions: negative when a is the lower,
+// positive when a is the higher. Numbers compare by length, then by digits, so
+// no number overflows.
+func compareVersions(a, b string) int {
 	as, bs := strings.Split(a, "."), strings.Split(b, ".")
 	for i := range as {
 		if len(as[i]) != len(bs[i]) {
-			return len(as[i]) > len(bs[i])
+			return len(as[i]) - len(bs[i])
 		}
 		if as[i] != bs[i] {
-			return as[i] > bs[i]
+			return strings.Compare(as[i], bs[i])
 		}
 	}
-	return false
+	return 0
 }

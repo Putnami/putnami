@@ -382,7 +382,7 @@ putnami version list --global         # ...in ~/.putnami/bin
 putnami version use go-dev            # switch the active CLI binary
 ```
 
-There is no `version set` and no `version bump`: a version is **derived from git**, never declared. A commit carrying its line's tag has the tag's version; any other commit takes the line's last tag advanced by the conventional commits that touch the line, plus an ordered pre-release suffix. `version tag` regenerates the line's changelog from the same commits, creates the release commit, then the annotated tag on it; `--push` pushes both. See [Version Management](14-version-management.md).
+There is no `version set` and no `version bump`: a version is **derived from git**, never declared. A commit carrying a release tag of its line has the tag's version; any other commit takes the line's last release advanced by the conventional commits that touch the line, plus an ordered pre-release suffix. `version tag` regenerates the line's changelog from the same commits, creates the release commit, then the annotated tag on it; `--push` pushes both. See [Version Management](14-version-management.md).
 
 `list`/`use` manage the binaries in `.putnami/bin` (or `~/.putnami/bin` with `--global`).
 

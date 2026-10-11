@@ -74,7 +74,8 @@ and the release call themselves follow
 8. **The version is derived from git.** A tagged commit carries the tag's
    version. Otherwise the version is `<next>-<suffix>`, with the ordered suffix
    of [ADR 0018](0018-ordered-prerelease-versions.md). `<next>` starts from the
-   line's last reachable tag and advances by the conventional commits that
+   line's last release (its highest `MAJOR.MINOR.PATCH` tag that HEAD reaches)
+   and advances by the conventional commits that
    touch a project of the line, attributed by changed files: `!` or
    `BREAKING CHANGE:` is minor before 1.0 and major after, `feat` is minor,
    `fix` and `perf` are patch, anything else does not advance. A pre-release is

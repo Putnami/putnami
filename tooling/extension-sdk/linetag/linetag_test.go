@@ -97,15 +97,19 @@ func TestATagThatIsNotAReleaseVersionIsNeverTheLastRelease(t *testing.T) {
 	}
 }
 
-func TestATagOfAMergedBranchIsNotOnTheFirstParentHistory(t *testing.T) {
+// The merged branch holds two commits before its tag, so `git describe`
+// finds the merged tag nearest whatever the commit dates.
+func TestAnOlderReleaseOfAMergedBranchDoesNotReplaceALaterOne(t *testing.T) {
 	t.Parallel()
 	dir := repository(t)
 	git(t, dir, "tag", "-a", "ts/v0.1.0", "-m", "release")
 	commit(t, dir, "feat(ts): add")
 	git(t, dir, "tag", "-a", "ts/v0.2.0", "-m", "release")
 	commit(t, dir, "fix(ts): repair")
+	commit(t, dir, "docs(ts): explain")
 	git(t, dir, "checkout", "--quiet", "-b", "hotfix", "ts/v0.1.0")
 	commit(t, dir, "fix(ts): hotfix")
+	commit(t, dir, "test(ts): cover the hotfix")
 	git(t, dir, "tag", "-a", "ts/v0.1.1", "-m", "hotfix release")
 	git(t, dir, "checkout", "--quiet", "main")
 	git(t, dir, "merge", "--quiet", "--no-ff", "-m", "merge the hotfix", "hotfix")
@@ -119,18 +123,66 @@ func TestATagOfAMergedBranchIsNotOnTheFirstParentHistory(t *testing.T) {
 	}
 }
 
-func TestATagOnlyAMergedBranchHoldsLeavesTheLineUnreleased(t *testing.T) {
+// A feature branch that merges main reaches the release main tagged after the
+// branch started, through the merge's second parent.
+func TestAReleaseReachedThroughASecondParentCounts(t *testing.T) {
 	t.Parallel()
 	dir := repository(t)
-	git(t, dir, "checkout", "--quiet", "-b", "side")
-	commit(t, dir, "feat(ts): add")
-	git(t, dir, "tag", "ts/v0.1.0")
+	git(t, dir, "tag", "ts/v0.2.0")
+	git(t, dir, "checkout", "--quiet", "-b", "feature")
+	commit(t, dir, "feat(ts): start")
 	git(t, dir, "checkout", "--quiet", "main")
-	commit(t, dir, "docs: explain")
-	git(t, dir, "merge", "--quiet", "--no-ff", "-m", "merge side", "side")
+	commit(t, dir, "feat(ts): ship")
+	git(t, dir, "tag", "ts/v0.3.0")
+	git(t, dir, "checkout", "--quiet", "feature")
+	git(t, dir, "merge", "--quiet", "--no-ff", "-m", "merge main", "main")
 
-	if release, ok, err := LastRelease(dir, "ts/v{version}"); err != nil || ok {
-		t.Fatalf("LastRelease = %+v/%v/%v, want none and no error", release, ok, err)
+	release, ok, err := LastRelease(dir, "ts/v{version}")
+	if err != nil || !ok || release.Tag != "ts/v0.3.0" {
+		t.Fatalf("LastRelease = %+v/%v/%v, want ts/v0.3.0", release, ok, err)
+	}
+}
+
+func TestAReleaseHEADCannotReachIsNotTheLastRelease(t *testing.T) {
+	t.Parallel()
+	dir := repository(t)
+	git(t, dir, "tag", "ts/v0.1.0")
+	git(t, dir, "checkout", "--quiet", "-b", "next")
+	commit(t, dir, "feat(ts): next")
+	git(t, dir, "tag", "ts/v0.2.0")
+	git(t, dir, "checkout", "--quiet", "main")
+
+	release, ok, err := LastRelease(dir, "ts/v{version}")
+	if err != nil || !ok || release.Tag != "ts/v0.1.0" {
+		t.Fatalf("LastRelease = %+v/%v/%v, want ts/v0.1.0", release, ok, err)
+	}
+}
+
+func TestATagOnATreeIsNotARelease(t *testing.T) {
+	t.Parallel()
+	dir := repository(t)
+	git(t, dir, "tag", "ts/v0.1.0")
+	git(t, dir, "tag", "ts/v0.2.0", "HEAD^{tree}")
+
+	release, ok, err := LastRelease(dir, "ts/v{version}")
+	if err != nil || !ok || release.Tag != "ts/v0.1.0" {
+		t.Fatalf("LastRelease = %+v/%v/%v, want ts/v0.1.0", release, ok, err)
+	}
+}
+
+func TestAReleaseTagGitCannotReadIsAnError(t *testing.T) {
+	t.Parallel()
+	dir := repository(t)
+	git(t, dir, "tag", "ts/v0.1.0")
+	git(t, dir, "tag", "-a", "ts/v0.2.0", "-m", "release")
+	object := git(t, dir, "rev-parse", "refs/tags/ts/v0.2.0")
+	if err := os.Remove(filepath.Join(dir, ".git", "objects", object[:2], object[2:])); err != nil {
+		t.Fatal(err)
+	}
+
+	_, ok, err := LastRelease(dir, "ts/v{version}")
+	if err == nil || ok || !strings.Contains(err.Error(), "ts/v0.2.0") {
+		t.Fatalf("LastRelease with an unreadable tag = %v/%v, want an error naming ts/v0.2.0", ok, err)
 	}
 }
 
@@ -164,15 +216,22 @@ func TestThePatternMatchesCompletely(t *testing.T) {
 	}
 }
 
-func TestATagHiddenFromLogDecorationsIsStillRead(t *testing.T) {
+func TestVersionReadsOnlyAReleaseTagOfTheLine(t *testing.T) {
 	t.Parallel()
-	dir := repository(t)
-	git(t, dir, "tag", "ts/v0.1.0")
-	git(t, dir, "config", "log.excludeDecoration", "refs/tags/*")
-
-	release, ok, err := LastRelease(dir, "ts/v{version}")
-	if err != nil || !ok || release.Tag != "ts/v0.1.0" {
-		t.Fatalf("LastRelease = %+v/%v/%v, want ts/v0.1.0", release, ok, err)
+	for tag, want := range map[string]string{
+		"ts/v1.2.3":      "1.2.3",
+		"ts/v10.20.30":   "10.20.30",
+		"ts/v1.2.3-rc.1": "",
+		"ts/vnext":       "",
+		"ts/v01.2.3":     "",
+		"go/v1.2.3":      "",
+	} {
+		if got, ok := Version(tag, "ts/v{version}"); got != want || ok != (want != "") {
+			t.Errorf("Version(%q) = %q/%v, want %q", tag, got, ok, want)
+		}
+	}
+	if _, ok := Version("ts/v1.2.3", "ts/v*"); ok {
+		t.Error("Version with an unusable pattern succeeded")
 	}
 }
 

@@ -10,8 +10,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 func TestIsShallowOnAFullClone(t *testing.T) {
@@ -147,20 +145,6 @@ func TestTreeStateReadsACommitDatedAtTheEpoch(t *testing.T) {
 	}
 	if !strings.HasPrefix(state.Suffix, "19700101000000-") {
 		t.Fatalf("suffix = %q, want the epoch's time", state.Suffix)
-	}
-}
-
-// The line tag placeholder is restated in this package rather than imported.
-// This is the guard that keeps the two spellings equal.
-func TestLineTagPlaceholderMatchesTheWorkspaceProtocol(t *testing.T) {
-	t.Parallel()
-	if lineTagPlaceholder != wsproto.LineTagPlaceholder {
-		t.Fatalf("placeholder = %q, want the workspace protocol's %q", lineTagPlaceholder, wsproto.LineTagPlaceholder)
-	}
-	pattern := wsproto.LineTagPattern("typescript", &wsproto.LineConfig{Tag: "ts/v{version}"})
-	version, ok := versionFromLineTag(wsproto.RenderLineTag(pattern, "1.2.3"), pattern)
-	if !ok || version != "1.2.3" {
-		t.Fatalf("versionFromLineTag = %q/%v, want the rendered version back", version, ok)
 	}
 }
 

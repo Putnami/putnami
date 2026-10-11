@@ -120,8 +120,8 @@ git and adds it to the key:
   of the line, or tagged;
 - the line's tag pattern, and for an untagged line whether the repository has
   a tag of another line;
-- the tag of the line's last release, which is its highest release tag on the
-  first-parent history of HEAD, and the tree that tag holds at the project
+- the tag of the line's last release, which is its highest release tag that
+  HEAD reaches, and the tree that tag holds at the project
   directory;
 - whether a commit since that tag that touches the project declares a breaking
   change.
