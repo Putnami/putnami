@@ -531,10 +531,10 @@ Related Commands:
 ═══ version ═══
 putnami version
 
-Show the version each line is at (get), release a line (tag), and manage the installed CLI binaries (list/use)
+Show the version each line is at (get), release a line (tag), hold the breaking marker of a squash commit (check), and manage the installed CLI binaries (list/use)
 
 Usage:
-  putnami version <get|tag|list|use>
+  putnami version <get|tag|check|list|use>
 
 Examples:
   putnami version get

@@ -5,7 +5,8 @@
   "outcomes": [
     "A user gets the exact version every version line is at, derived from the line's git tags and the conventional commits that touch it, and releases a line with one command that writes its changelog, its release commit, and its tag",
     "Two builds of one line never publish under one version: an untagged commit carries the ordered suffix above the line's last tag",
-    "A release is reviewable before it happens: version tag prints the proposed tag and its changelog and writes nothing without --yes"
+    "A release is reviewable before it happens: version tag prints the proposed tag and its changelog and writes nothing without --yes",
+    "A breaking change keeps its marker through a squash merge: version check fails a squash commit message that drops the marker a branch commit declares"
   ],
   "nonGoals": [
     "Declaring a version in the workspace, a scope, or a project document",
@@ -32,9 +33,14 @@
     {
       "id": "release-commit-then-tag",
       "text": "version tag regenerates the line's changelog, creates the release commit, then the annotated tag on it."
+    },
+    {
+      "id": "squash-keeps-the-breaking-marker",
+      "text": "version check fails when a commit between the base and HEAD declares a breaking change and the squash commit message, the title with the body when given, declares none, and names each such commit; a title with the marker passes, and so does any title when no commit declares a break."
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md"
+    "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md",
+    "tooling/cli/doc/adr/0064-a-squash-title-carries-the-breaking-marker-of-its-commits.md"
   ]
 }

@@ -121,6 +121,7 @@ _putnami_subcommands_for() {
             ;;
         'version')
             reply=(
+                'check'
                 'get'
                 'list'
                 'tag'
@@ -210,6 +211,7 @@ _putnami_path_known() {
         'tree verify') return 0 ;;
         'upgrade') return 0 ;;
         'version') return 0 ;;
+        'version check') return 0 ;;
         'version get') return 0 ;;
         'version list') return 0 ;;
         'version tag') return 0 ;;
@@ -412,6 +414,13 @@ _putnami_flags_for() {
                 '--namespace[Release-set namespace that published the --release id; accepted only with --release]:namespace:'
                 '--release[Use one immutable release-set snapshot for npm and Go dependencies (needs --namespace)]:rs_id:'
                 '--version[Use an exact Putnami release version]:version:'
+            )
+            ;;
+        'version check')
+            reply=(
+                '--base[The branch or commit the change merges into; the commits read are those from it to HEAD]:ref:'
+                '--body-file[A file holding the body of the squash commit; pass it only when the squash commit keeps the pull request body]:path:'
+                '--title[The subject of the squash commit, which is the pull request title]:title:'
             )
             ;;
         'version get')

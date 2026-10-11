@@ -137,6 +137,7 @@ complete -c putnami -n '__putnami_complete_children templates' -a 'remove'
 complete -c putnami -n '__putnami_complete_children templates' -a 'update'
 complete -c putnami -n '__putnami_complete_children tree' -a 'fingerprint'
 complete -c putnami -n '__putnami_complete_children tree' -a 'verify'
+complete -c putnami -n '__putnami_complete_children version' -a 'check'
 complete -c putnami -n '__putnami_complete_children version' -a 'get'
 complete -c putnami -n '__putnami_complete_children version' -a 'list'
 complete -c putnami -n '__putnami_complete_children version' -a 'tag'
@@ -255,6 +256,9 @@ complete -c putnami -n '__putnami_seen_path upgrade' -l 'global' -d 'Upgrade the
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'namespace' -d 'Release-set namespace that published the --release id; accepted only with --release' -r
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'release' -d 'Use one immutable release-set snapshot for npm and Go dependencies (needs --namespace)' -r
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'version' -d 'Use an exact Putnami release version' -r
+complete -c putnami -n '__putnami_seen_path version check' -l 'base' -d 'The branch or commit the change merges into; the commits read are those from it to HEAD' -r
+complete -c putnami -n '__putnami_seen_path version check' -l 'body-file' -d 'A file holding the body of the squash commit; pass it only when the squash commit keeps the pull request body' -r
+complete -c putnami -n '__putnami_seen_path version check' -l 'title' -d 'The subject of the squash commit, which is the pull request title' -r
 complete -c putnami -n '__putnami_seen_path version get' -l 'scope' -d 'Report only this version line, by its scope path' -r
 complete -c putnami -n '__putnami_seen_path version list' -l 'global' -d 'List binaries in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path version tag' -l 'dry-run' -d 'Print the proposed tag and changelog without writing anything'

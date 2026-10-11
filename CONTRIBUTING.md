@@ -120,7 +120,9 @@ Examples:
 - `fix(sql): handle connection pool timeout`
 - `docs(react): update SSR guide`
 
-The PR title becomes the squash merge commit message, so keep it accurate as the PR evolves.
+The PR title becomes the squash merge commit message, so keep it accurate as the PR evolves. The PR description becomes its body.
+
+A breaking change needs its marker in that message: `!` before the colon of the title, or a `BREAKING CHANGE:` footer in the description. The commits of the branch are dropped at merge, so a marker on a branch commit alone is lost. The "Pull request title" check fails such a pull request and names the commit.
 
 ## Contributor CI Without Putnami Cloud Credentials
 

@@ -1035,10 +1035,28 @@
       "flags": [],
       "positionals": [
         {
-          "name": "get|tag|list|use",
+          "name": "get|tag|check|list|use",
           "required": true
         }
       ]
+    },
+    {
+      "path": "version check",
+      "flags": [
+        {
+          "long": "--base",
+          "type": "value"
+        },
+        {
+          "long": "--body-file",
+          "type": "value"
+        },
+        {
+          "long": "--title",
+          "type": "value"
+        }
+      ],
+      "positionals": []
     },
     {
       "path": "version get",

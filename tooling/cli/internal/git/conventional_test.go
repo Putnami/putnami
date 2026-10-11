@@ -125,3 +125,20 @@ func TestBumpString(t *testing.T) {
 		}
 	}
 }
+
+// BreakingCommits keeps the commits BumpFor reads as breaking, in order.
+func TestBreakingCommitsKeepsTheCommitsThatDeclareABreak(t *testing.T) {
+	commits := []Commit{
+		{SHA: "a", Subject: "feat: add"},
+		{SHA: "b", Subject: "feat(cli)!: drop"},
+		{SHA: "c", Subject: "Merge branch 'main'", Body: "BREAKING CHANGE: not a conventional commit"},
+		{SHA: "d", Subject: "refactor: move", Body: "BREAKING-CHANGE: gone"},
+	}
+	got := BreakingCommits(commits)
+	if len(got) != 2 || got[0].SHA != "b" || got[1].SHA != "d" {
+		t.Fatalf("BreakingCommits = %+v, want the commits b and d", got)
+	}
+	if BreakingCommits(commits[:1]) != nil {
+		t.Fatal("BreakingCommits returned a commit for a range that declares nothing")
+	}
+}
