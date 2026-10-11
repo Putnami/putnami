@@ -211,11 +211,9 @@ func DeriveSiteContentSections(siteDir, site, only string, byPackage map[string]
 		if only != "" && section != only {
 			continue
 		}
-		mount := siteContentDocRoot + "/" + section
-		if !sitecontent.ValidMountPrefix(mount) {
-			return nil, clicore.NewError(fmt.Sprintf(
-				"section %q (under docs/%s) maps to invalid mount %q — section directories must be lowercase URL-safe slugs (letters, digits, '.', '_', '-'); NN- ordering prefixes belong on pages inside a section, not on the section directory",
-				section, site, mount), clicore.ExitUsage)
+		mount, err := siteContentMount(site, section)
+		if err != nil {
+			return nil, err
 		}
 		if owner, dup := byPackage[section]; dup {
 			return nil, clicore.NewError(fmt.Sprintf(
@@ -233,6 +231,18 @@ func DeriveSiteContentSections(siteDir, site, only string, byPackage map[string]
 		})
 	}
 	return sections, nil
+}
+
+// siteContentMount returns the URL prefix one section of a site serves under,
+// or an error when the section slug cannot be a mount.
+func siteContentMount(site, section string) (string, error) {
+	mount := siteContentDocRoot + "/" + section
+	if !sitecontent.ValidMountPrefix(mount) {
+		return "", clicore.NewError(fmt.Sprintf(
+			"section %q (under docs/%s) maps to invalid mount %q — section directories must be lowercase URL-safe slugs (letters, digits, '.', '_', '-'); NN- ordering prefixes belong on pages inside a section, not on the section directory",
+			section, site, mount), clicore.ExitUsage)
+	}
+	return mount, nil
 }
 
 // assembleSection collects one section and assembles its bundle. shipped is

@@ -227,9 +227,10 @@ func (r ownerRow) String() string {
 //   - `.gen/deployment.json`, `.gen/requirements.json` and
 //     `.gen/infra/runtime.json` are written after generate by package-deployment
 //     and build-infra. Resolved by CEDED SUBPATHS: build-generate excludes
-//     exactly those three files (cededGenSubpaths) and their writers declare
-//     them, so a hit restores them and generate's restore never resurrects
-//     an earlier run's copy.
+//     those three files (cededGenSubpaths) and their writers declare them, so
+//     a hit restores them and generate's restore never resurrects an earlier
+//     run's copy. It also excludes `.gen/layers`, which cloud-image-layers of
+//     @putnami/cloud declares.
 //   - test-env-up's two rows are the only INVOCATION-scoped outputs here (an
 //     earlier migration). They collide with nothing by construction: they live in
 //     the orchestrator's private per-invocation tree, not in the project or the
@@ -557,8 +558,13 @@ func TestGenerateDeclaresTheClientOutputPort(t *testing.T) {
 
 // cededGenSubpaths is every path build-generate cedes out of <project>/.gen,
 // in the order the manifest normalizes it to: the files package-deployment and
-// build-infra write after generate and declare as their outputs.
-var cededGenSubpaths = []string{infraagg.DeploymentFile, infraagg.RuntimeDefaultsFile, infraagg.AggregatedManifestFile}
+// build-infra write after generate and declare as their outputs, and the
+// .gen/layers directory cloud-image-layers of @putnami/cloud declares.
+var cededGenSubpaths = []string{infraagg.DeploymentFile, infraagg.RuntimeDefaultsFile, imageLayersDir, infraagg.AggregatedManifestFile}
+
+// imageLayersDir is the project directory cloud-image-layers of @putnami/cloud
+// declares as its output.
+const imageLayersDir = ".gen/layers"
 
 // TestInfraAggregationIsWiredIntoBuild pins the properties that make
 // extension-owned infra aggregation correct and cacheable.
@@ -634,7 +640,11 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 	}
 	gen := m.Tasks["build-generate"].Declares.Outputs["gen"]
 	if !slices.Equal(gen.Excludes, cededGenSubpaths) {
-		t.Errorf("build-generate gen excludes = %v, want %v: generate cedes exactly the files build-infra and package-deployment claim", gen.Excludes, cededGenSubpaths)
+		t.Errorf("build-generate gen excludes = %v, want %v: generate cedes exactly the paths build-infra, package-deployment and cloud-image-layers claim", gen.Excludes, cededGenSubpaths)
+	}
+	layers := proto.DeclaredOutput{Kind: proto.OutputKindDirectory, Root: proto.OutputRootProject, Path: imageLayersDir}
+	if proto.OutputsOverlap(gen.Ref(), layers.Ref()) {
+		t.Errorf("build-generate gen output %+v overlaps the %s directory cloud-image-layers declares", gen.Ref(), imageLayersDir)
 	}
 
 	if cmds := commandsByTask(m)["build-infra"]; len(cmds) != 1 || cmds[0] != "build" {

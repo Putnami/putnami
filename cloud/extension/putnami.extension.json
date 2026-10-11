@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 4,
+  "cliContract": 7,
   "name": "@putnami/cloud",
   "version": "0.1.0",
   "ecosystems": [
@@ -672,18 +672,6 @@
     }
   },
   "commands": {
-    "cloud": {
-      "activationFiles": [
-        "putnami.extension.json"
-      ],
-      "description": "Show Putnami Cloud command help.",
-      "run": [
-        {
-          "id": "cloud",
-          "task": "cloud-help"
-        }
-      ]
-    },
     "cloud-login": {
       "activationFiles": [
         "putnami.extension.json"
@@ -2688,26 +2676,6 @@
     }
   },
   "tasks": {
-    "cloud": {
-      "kind": "command",
-      "command": "{extensionRuntime}",
-      "args": [],
-      "cwd": "{workspaceRoot}",
-      "cache": false,
-      "description": "Show Putnami Cloud command help.",
-      "timeoutMs": 30000
-    },
-    "cloud-help": {
-      "kind": "command",
-      "command": "{extensionRuntime}",
-      "args": [
-        "help"
-      ],
-      "cwd": "{workspaceRoot}",
-      "cache": false,
-      "description": "Show Putnami Cloud command help.",
-      "timeoutMs": 30000
-    },
     "cloud-login": {
       "kind": "command",
       "command": "{extensionRuntime}",
@@ -2904,6 +2872,14 @@
       "cwd": "{projectRoot}",
       "cache": false,
       "declares": {
+        "outputs": {
+          "layers": {
+            "kind": "directory",
+            "root": "project",
+            "path": ".gen/layers",
+            "description": "The produced layers: <name>.tar or bin/<name> for each declared layer, and its <name>.json record. Sole owner of <project>/.gen/layers."
+          }
+        },
         "effects": [
           "network"
         ]
@@ -2916,11 +2892,21 @@
       "command": "{extensionRuntime}",
       "args": [
         "image-layers",
-        "--check"
+        "--check",
+        "--project",
+        "{projectRoot}"
       ],
       "cwd": "{projectRoot}",
-      "cache": false,
-      "description": "Verify the project's produced layers against image-layers.json and the workspace sources that derive their versions: every declared layer has a record, its produced file still hashes to what that record claims, and its version is the one the workspace declares today. Reads only — no network, no registry, no execution. Uncached on purpose: it exists to observe the CURRENT state of a .gen tree the producer writes outside any cache key, so a hit would report a verdict about bytes this checkout may no longer have.",
+      "cache": {"enabled": true, "noOutput": true},
+      "declares": {},
+      "reads": ["gen"],
+      "inputs": {
+        "manifest": {"from": "project", "files": ["image-layers.json"]},
+        "layers": {"from": "project", "files": [".gen/layers/*.json", ".gen/layers/*.tar", ".gen/layers/bin/*"]},
+        "pins": {"from": "workspace", "files": ["go.work", "package.json", "putnami.lock.json", ".putnami/bin/extensions/putnami-go/tools/versions.json"]},
+        "cloud-cli": {"from": "workspace", "files": [".putnami/out/cloud/extension/build/bin/linux-x64/putnami-cloud"]}
+      },
+      "description": "Verify the project's produced layers against image-layers.json and the workspace sources that derive their versions: every declared layer has a record, its produced file still hashes to what that record claims, and its version is the one the workspace declares today. Reads only — no network, no registry, no execution. Cached on the files the extension README lists, which are the only files it reads: it refuses a record that names a file other than the one its producer writes, and the --project argument pins it to its own project, so no parameter redirects it.",
       "timeoutMs": 120000
     },
     "cloud-shell-test": {
@@ -3056,11 +3042,15 @@
       "command": "{extensionRuntime}",
       "args": ["validate-site-content"],
       "cwd": "{projectRoot}",
-      "cache": false,
+      "cache": {"enabled": true, "noOutput": true},
+      "declares": {},
       "inputs": {
-        "declaration": {"from": "project", "files": ["putnami.json"]}
+        "manifest": {"from": "project", "files": ["putnami.jso[n]"]},
+        "sections": {"from": "project", "files": ["git:**", "!../**"]},
+        "app": {"from": "params"},
+        "appName": {"from": "params"}
       },
-      "description": "Inspect declared site sections, mounts, regular-file policy and paths using fresh directory metadata; never read or hash payloads, generate artifacts or assemble archives. Uncached: it checks directory metadata (empty section directories, symlink vs regular file) that the file hasher does not key.",
+      "description": "Inspect declared site sections, mounts, regular-file policy and paths; never read payloads, generate artifacts or assemble archives. Cached on the files and parameters the extension README lists: it reads the sections through the project's Git candidate files, so an ignored file and an empty directory are absent for it, and a symbolic link is refused. Refuses any project other than the one in its working directory.",
       "timeoutMs": 60000
     },
     "cloud-validate-config-project": {

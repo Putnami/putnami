@@ -377,7 +377,7 @@ Every output has exactly one owning task:
 
 | Task | Owns | Root |
 |------|------|------|
-| `build-generate` | `.gen/` minus `.gen/deployment.json`, `.gen/requirements.json` and `.gen/infra/runtime.json`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
+| `build-generate` | `.gen/` minus `.gen/deployment.json`, `.gen/requirements.json`, `.gen/infra/runtime.json` and `.gen/layers/`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
 | `build-transpile` | `lib/` | per-command output dir |
 | `build-types` | `types/` | per-command output dir |
 | `build-compile` | `compile/` | per-command output dir |
@@ -401,8 +401,9 @@ writes into generate-owned territory rather than claiming a slice of it. The
 exceptions are the files later steps write after generate's snapshot:
 `build-generate` cedes `.gen/deployment.json` to `package-deployment` (see
 [Package → Deployment Channel](./07-package.md#deployment-channel)), and
-`.gen/requirements.json` and `.gen/infra/runtime.json` to `build-infra`.
-`build-generate` still deletes `.gen/infra/` fragments at the start of every
+`.gen/requirements.json` and `.gen/infra/runtime.json` to `build-infra`. It
+also cedes `.gen/layers/` to `cloud-image-layers` of `@putnami/cloud`, which
+declares it. `build-generate` still deletes `.gen/infra/` fragments at the start of every
 run, the runtime defaults file with them, and `build-infra` writes it again
 after generate.
 

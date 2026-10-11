@@ -507,6 +507,7 @@ var cededGenSubpaths = []string{
 	".gen/deployment.json",
 	".gen/design",
 	".gen/infra/runtime.json",
+	".gen/layers",
 	".gen/migration-bundle",
 	".gen/migrations.json",
 	".gen/requirements.json",
@@ -527,7 +528,8 @@ type cededClaim struct {
 }
 
 // cededGenOwner maps each ceded subpath to the declared outputs that claim it,
-// or to nil for the ones deliberately claimed by NOBODY.
+// or to nil when no task of this manifest claims it: the ones deliberately
+// claimed by NOBODY, and the one a task of another extension claims.
 //
 // An unclaimed cede is a statement, not an oversight: protocol ADR 0003 says so
 // explicitly, and each of the two here is run-scoped scratch that a LATER task
@@ -567,8 +569,11 @@ var cededGenOwner = map[string][]cededClaim{
 	// build-infra runs after generate under `build`. It is optionalEmpty: a
 	// workload that authors its runtime has none.
 	".gen/infra/runtime.json": {{task: "build-infra", output: "runtimeDefaults"}},
-	".gen/migration-bundle":   {{task: "build-describe", output: "migrationBundle"}},
-	".gen/migrations.json":    {{task: "build-describe", output: "migrations"}},
+	// The image layers, which cloud-image-layers of @putnami/cloud declares as
+	// its project directory output.
+	".gen/layers":           nil,
+	".gen/migration-bundle": {{task: "build-describe", output: "migrationBundle"}},
+	".gen/migrations.json":  {{task: "build-describe", output: "migrations"}},
 	// The workload's aggregated deployability manifest, written by build-infra
 	// after generate. It is REQUIRED rather than optionalEmpty for the reason
 	// the deployment declaration is: the task removes the file when the
@@ -618,6 +623,12 @@ func TestGenCedesEverySubpathDescribeProducesAfterGenerate(t *testing.T) {
 	gen := m.Tasks["build-generate"].Declares.Outputs["gen"]
 	if !slices.Equal(gen.Excludes, cededGenSubpaths) {
 		t.Errorf("build-generate gen excludes = %v, want %v", gen.Excludes, cededGenSubpaths)
+	}
+	// cloud-image-layers of @putnami/cloud declares the project directory
+	// .gen/layers, and the ownership check accepts it beside this output.
+	layers := proto.DeclaredOutput{Kind: proto.OutputKindDirectory, Root: proto.OutputRootProject, Path: ".gen/layers"}
+	if proto.OutputsOverlap(gen.Ref(), layers.Ref()) {
+		t.Errorf("build-generate gen output %+v overlaps the .gen/layers directory cloud-image-layers declares", gen.Ref())
 	}
 
 	for _, ceded := range cededGenSubpaths {
