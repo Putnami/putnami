@@ -88,7 +88,7 @@ func Execute(ctx context.Context, offload Offload) (Outcome, error) {
 	// The admitted bound set travels on the request; capture binds exactly it.
 	snapshot, err := sourceStore.Capture(ctx, offload.WorkspaceRoot, offload.Request.Source.Bound)
 	if err != nil {
-		return outcome, fmt.Errorf("capture source: %w", err)
+		return outcome, interrupted(ctx, fmt.Errorf("capture source: %w", err))
 	}
 	request, err := bindSource(offload.Request, offload.WorkspaceRoot, snapshot)
 	if err != nil {
@@ -160,6 +160,12 @@ func Execute(ctx context.Context, offload Offload) (Outcome, error) {
 		if c.record.Attempt != "" {
 			iox.Fprintf(c.stderr, "putnami: %s no longer knows attempt %s; submitting %s again under the same key\n", offload.ProviderName, c.record.Attempt, request.Control.IdempotencyKey)
 			c.record.Attempt, c.record.Cursor = "", 0
+			// Persisted before the submit: an interrupted resubmission that
+			// cannot be resolved leaves a record the next run can still adopt
+			// the key's new attempt from, instead of one naming the lost one.
+			if err := c.store.Write(c.record); err != nil {
+				return outcome, fmt.Errorf("record submission: %w", err)
+			}
 		}
 		submitted, err := c.session.Submit(ctx, &runner.SubmitParams{Request: request, Manifest: snapshot.Manifest})
 		if err != nil {

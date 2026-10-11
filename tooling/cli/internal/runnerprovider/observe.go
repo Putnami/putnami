@@ -224,7 +224,7 @@ func (c *client) forward(result *runner.FollowResult) (bool, error) {
 
 // cancel runs after the observing context was canceled: it asks the provider
 // to terminate the attempt, waits until ackCtx ends for the acknowledgement and
-// then for a terminal state, records what it observed, and reports it. A
+// a bounded time for a terminal state, records what it observed, and reports it. A
 // cancellation that raced a completion converges on the provider's terminal
 // outcome: a completed attempt is still fetched and imported, because the
 // verdict exists and the interrupt changes nothing about it.
@@ -288,8 +288,10 @@ func (c *client) cancel(ackCtx context.Context, outcome Outcome) (Outcome, error
 // resolves what it accepted, within the same budget as the cancellation
 // acknowledgement, so the whole shutdown still fits the two-signal window. An
 // accepted attempt is canceled as an interrupted observation is; a key the
-// provider does not know leaves the record submitting, so the next run
+// provider names no attempt for leaves the record submitting, so the next run
 // resolves the key again instead of submitting twice.
+// A provider that answers the lookup while the submit is still being accepted
+// may name none yet; that attempt is adopted by the next run under the key.
 func (c *client) interruptedSubmit(outcome Outcome, key string, cause error) (Outcome, error) {
 	ackCtx, cancelAck := context.WithTimeout(context.Background(), cancelAckBudget)
 	defer cancelAck()
@@ -303,7 +305,10 @@ func (c *client) interruptedSubmit(outcome Outcome, key string, cause error) (Ou
 		return outcome, fmt.Errorf("%w: submission %s was interrupted before its acknowledgement and could not be resolved (%w); the next run resolves it under the same key", protocolcli.ErrSignal, key, err)
 	}
 	if found.Attempt == "" {
-		return outcome, fmt.Errorf("%w: submission %s was interrupted before the provider accepted it: %w", protocolcli.ErrSignal, key, cause)
+		return outcome, fmt.Errorf("%w: submission %s was interrupted before its acknowledgement and the provider names no attempt for it (%w); the next run resolves it under the same key", protocolcli.ErrSignal, key, cause)
+	}
+	if found.ExecutionInputDigest != "" && found.ExecutionInputDigest != c.record.InputDigest {
+		return outcome, fmt.Errorf("%w: submission %s names attempt %s, which executed different inputs (%s); refusing to cancel it", protocolcli.ErrSignal, key, found.Attempt, found.ExecutionInputDigest)
 	}
 	c.record.Attempt, c.record.State = found.Attempt, found.State
 	outcome.Attempt = found.Attempt

@@ -106,9 +106,9 @@ what the snapshot must carry beyond tracked files.
   for the acknowledgement and then for a terminal state, records what it saw
   and exits with the signal code. An interrupt that reaches the submission
   before its acknowledgement first resolves the idempotency key within the
-  same acknowledgement budget and cancels the attempt the provider accepted;
-  one that lands before the submission cancels nothing and leaves the key to
-  the next run. A cancel that raced a completion keeps the
+  same acknowledgement budget and cancels the attempt the key names; a key
+  that names none yet, like an interrupt before the submission, leaves the key
+  to the next run. A cancel that raced a completion keeps the
   provider's outcome: the attempt is fetched and imported under a bounded
   detached context. Every budget fits inside the terminal adapter's
   two-signal shutdown window, and none bounds a verdict.

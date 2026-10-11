@@ -704,7 +704,7 @@ func (p *fixtureProvider) submit(payload json.RawMessage) (any, error) {
 	}
 	if hold := p.getenv(RunnerFixtureAckHoldEnv); hold != "" {
 		_ = os.WriteFile(hold+".accepted", []byte(id), 0o600)
-		for {
+		for waited := time.Duration(0); waited < time.Minute; waited += 20 * time.Millisecond {
 			if _, err := os.Stat(hold); err == nil {
 				break
 			}

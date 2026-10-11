@@ -524,6 +524,9 @@ func TestPortableInterruptDuringSubmitCancelsTheAcceptedAttempt(t *testing.T) {
 		code, output = clitest.RunGateArgsContext(t, ctx, root, "build", "--projects", "app", "--no-cache", "--where", "remote")
 	}()
 	waitForFile(t, ackHold+".accepted", 60*time.Second)
+	// The supervisor holds before launch once it recorded itself, so the
+	// cancellation finds a supervised attempt to stop.
+	waitForFile(t, hold+".ready", 60*time.Second)
 	cancel()
 	// The provider answers one request at a time: the acknowledgement the
 	// client stopped waiting for goes out first, then the key's resolution.

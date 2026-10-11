@@ -225,6 +225,9 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 	admission, err := runnerprovider.AdmitInputs(ctx, req.WorkspaceRoot, inputs)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: --where remote: %v\n", err)
+		if ctx.Err() != nil {
+			return SessionResult{ExitCode: ExitSignalReceived, Plan: planned}, true
+		}
 		if errors.Is(err, runnerprovider.ErrInadmissible) {
 			return SessionResult{ExitCode: ExitUsage, Plan: planned}, true
 		}
@@ -240,6 +243,9 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 	launch, err := runnerprovider.LaunchSpecFor(ctx, req.WorkspaceRoot, discovered.Extensions, req.runnerProvider)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: --where remote: %v\n", err)
+		if ctx.Err() != nil {
+			return SessionResult{ExitCode: ExitSignalReceived, Plan: planned}, true
+		}
 		return SessionResult{ExitCode: ExitError, Plan: planned}, true
 	}
 	outcome, err := runnerprovider.Execute(ctx, runnerprovider.Offload{
