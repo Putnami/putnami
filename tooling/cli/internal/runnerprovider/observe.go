@@ -223,11 +223,12 @@ func (c *client) forward(result *runner.FollowResult) (bool, error) {
 }
 
 // cancel runs after the observing context was canceled: it asks the provider
-// to terminate the attempt, waits until ackCtx ends for the acknowledgement and
-// a bounded time for a terminal state, records what it observed, and reports it. A
-// cancellation that raced a completion converges on the provider's terminal
-// outcome: a completed attempt is still fetched and imported, because the
-// verdict exists and the interrupt changes nothing about it.
+// to terminate the attempt, waits until ackCtx ends for the acknowledgement
+// and a bounded time for a terminal state, records what it observed, and
+// reports it. A cancellation that raced a completion converges on the
+// provider's terminal outcome: a completed attempt is still fetched and
+// imported, because the verdict exists and the interrupt changes nothing
+// about it.
 func (c *client) cancel(ackCtx context.Context, outcome Outcome) (Outcome, error) {
 	attempt := c.record.Attempt
 	iox.Fprintf(c.stderr, "putnami: interrupt: canceling remote attempt %s\n", attempt)

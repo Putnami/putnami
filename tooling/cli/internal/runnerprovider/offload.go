@@ -159,7 +159,7 @@ func Execute(ctx context.Context, offload Offload) (Outcome, error) {
 	default:
 		if c.record.Attempt != "" {
 			iox.Fprintf(c.stderr, "putnami: %s no longer knows attempt %s; submitting %s again under the same key\n", offload.ProviderName, c.record.Attempt, request.Control.IdempotencyKey)
-			c.record.Attempt, c.record.Cursor = "", 0
+			c.record.Attempt, c.record.Cursor, c.record.State = "", 0, StateSubmitting
 			// Persisted before the submit: an interrupted resubmission that
 			// cannot be resolved leaves a record the next run can still adopt
 			// the key's new attempt from, instead of one naming the lost one.
