@@ -649,8 +649,11 @@ func HasMatchingFiles(dir string, patterns []string) (bool, error) {
 // with case folded, the way declared-output ownership is compared: two
 // spellings that alias on a case-insensitive filesystem overlap, and on a
 // case-sensitive one the comparison only reports an overlap too many. A bound
-// that cannot be decided from the patterns alone is unbounded, so an overlap
-// can be reported too often but never missed.
+// that cannot be decided from the patterns alone is unbounded, so between
+// paths as written an overlap can be reported too often but is never missed.
+// Symbolic links are not resolved: a pattern that reaches a directory through
+// a link is bounded by the link's path, so a write declared at the link's
+// target does not overlap it.
 type InputRegion struct {
 	roots     []string
 	unbounded bool

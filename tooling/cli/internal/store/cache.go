@@ -19,28 +19,93 @@ import (
 // transparent caching. It handles cache key computation, hit/miss
 // detection, result restoration, and output storage.
 type CacheManager struct {
-	store         *LocalStore
-	fileHashCache map[string]memoizedInputHash // memoizes file hashes: "dir|patterns|scope" → hash and region
-	// fileHashGeneration counts the invalidations of fileHashCache. A digest
-	// whose computation spans one is never memoized (lookupFileHash).
-	fileHashGeneration uint64
-	fileHashMu         sync.Mutex
-	extraFileHashCache map[string]memoizedInputHash // memoizes extra-file hashes: workspace root and sorted paths, NUL-joined → hash and region
-	// extraFileHashGeneration is fileHashGeneration for extraFileHashCache.
-	extraFileHashGeneration uint64
-	extraFileHashMu         sync.Mutex
-	sourceStates            map[string]string // memoizes SourceState: workspace root → state
-	sourceStateMu           sync.Mutex
-	digests                 map[string]*memoizedDigest // memoizes Digest: key → one computation
-	digestsMu               sync.Mutex
+	store           *LocalStore
+	fileHashes      inputHashMemo     // memoizes file hashes: "dir|patterns|scope" → hash
+	extraFileHashes inputHashMemo     // memoizes extra-file hashes: workspace root and sorted paths, NUL-joined → hash
+	sourceStates    map[string]string // memoizes SourceState: workspace root → state
+	sourceStateMu   sync.Mutex
+	digests         map[string]*memoizedDigest // memoizes Digest: key → one computation
+	digestsMu       sync.Mutex
 }
 
-// memoizedInputHash is one memoized input digest and the region every file it
+// invalidationLogSize is how many invalidations an inputHashMemo remembers
+// the regions of. A digest computed across more of them than that is not
+// memoized, whatever they named.
+const invalidationLogSize = 64
+
+// inputHashMemo memoizes input digests, each with the region every file it
 // read lies in, so an invalidation that names the paths a task wrote drops
-// exactly the digests those writes can move.
+// exactly the digests those writes can move. The zero value is an empty memo.
+type inputHashMemo struct {
+	mu      sync.Mutex
+	entries map[string]memoizedInputHash
+	// generation counts the invalidations, and log holds the regions the last
+	// invalidationLogSize of them named, oldest first.
+	generation uint64
+	log        []invalidatedRegion
+}
+
+// memoizedInputHash is one memoized input digest and the region of its files.
 type memoizedInputHash struct {
 	hash   string
 	region InputRegion
+}
+
+// invalidatedRegion is what one invalidation of an inputHashMemo named.
+type invalidatedRegion struct {
+	generation uint64
+	written    InputRegion
+}
+
+// lookup returns the digest memoized at key, or false with the generation a
+// computation of it starts from (memoize).
+func (m *inputHashMemo) lookup(key string) (string, uint64, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if cached, ok := m.entries[key]; ok {
+		return cached.hash, m.generation, true
+	}
+	return "", m.generation, false
+}
+
+// memoize records hash at key unless an invalidation since generation, the one
+// its computation started from, named a path in region: the digest may then
+// hold the bytes from before that write. An invalidation the log no longer
+// holds counts as one that did.
+func (m *inputHashMemo) memoize(key string, generation uint64, hash string, region InputRegion) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.generation != generation {
+		if len(m.log) == 0 || m.log[0].generation > generation+1 {
+			return
+		}
+		for _, invalidation := range m.log {
+			if invalidation.generation > generation && invalidation.written.Overlaps(region) {
+				return
+			}
+		}
+	}
+	if m.entries == nil {
+		m.entries = make(map[string]memoizedInputHash)
+	}
+	m.entries[key] = memoizedInputHash{hash: hash, region: region}
+}
+
+// invalidate drops every memoized digest whose region overlaps written, and
+// logs written for the digests being computed meanwhile.
+func (m *inputHashMemo) invalidate(written InputRegion) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for key, memo := range m.entries {
+		if memo.region.Overlaps(written) {
+			delete(m.entries, key)
+		}
+	}
+	m.generation++
+	m.log = append(m.log, invalidatedRegion{generation: m.generation, written: written})
+	if len(m.log) > invalidationLogSize {
+		m.log = append([]invalidatedRegion(nil), m.log[len(m.log)-invalidationLogSize:]...)
+	}
 }
 
 // memoizedDigest is one key's computation in CacheManager.Digest.
@@ -52,11 +117,7 @@ type memoizedDigest struct {
 
 // NewCacheManager creates a CacheManager backed by the given store.
 func NewCacheManager(store *LocalStore) *CacheManager {
-	return &CacheManager{
-		store:              store,
-		fileHashCache:      make(map[string]memoizedInputHash),
-		extraFileHashCache: make(map[string]memoizedInputHash),
-	}
+	return &CacheManager{store: store}
 }
 
 // lookupFileHash computes a combined hash for files matching patterns
@@ -67,8 +128,8 @@ func NewCacheManager(store *LocalStore) *CacheManager {
 // An entry lives until an invalidation names a path in its region
 // (FileInputRegion): the scheduler names the outputs every task writes, so a
 // key computed after a task ran reads that task's bytes. A digest computed
-// while an invalidation happened may hold bytes from before the write that
-// caused it, so it is returned but not memoized.
+// while an invalidation named a path in its region may hold bytes from before
+// that write, so it is returned but not memoized (inputHashMemo.memoize).
 func (cm *CacheManager) lookupFileHash(dir string, patterns []string, scope ProjectConfigScope) (string, error) {
 	// The scope selects which bytes of a project config the digest reads, so two
 	// scopes are two different values and must never share one memo entry.
@@ -78,26 +139,17 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, scope Proj
 		key += "|verbatim"
 	}
 
-	cm.fileHashMu.Lock()
-	if cached, ok := cm.fileHashCache[key]; ok {
-		cm.fileHashMu.Unlock()
-		return cached.hash, nil
+	cached, generation, ok := cm.fileHashes.lookup(key)
+	if ok {
+		return cached, nil
 	}
-	generation := cm.fileHashGeneration
-	cm.fileHashMu.Unlock()
 
 	hash, err := memoizedHashFiles(dir, patterns, scope)
 	if err != nil {
 		return "", err
 	}
 
-	region := FileInputRegion(dir, patterns)
-	cm.fileHashMu.Lock()
-	if cm.fileHashGeneration == generation {
-		cm.fileHashCache[key] = memoizedInputHash{hash: hash, region: region}
-	}
-	cm.fileHashMu.Unlock()
-
+	cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns))
 	return hash, nil
 }
 
@@ -130,15 +182,9 @@ func (cm *CacheManager) InvalidateFileHashes() {
 	if cm == nil {
 		return
 	}
-	cm.fileHashMu.Lock()
-	clear(cm.fileHashCache)
-	cm.fileHashGeneration++
-	cm.fileHashMu.Unlock()
-
-	cm.extraFileHashMu.Lock()
-	clear(cm.extraFileHashCache)
-	cm.extraFileHashGeneration++
-	cm.extraFileHashMu.Unlock()
+	everything := InputRegion{unbounded: true}
+	cm.fileHashes.invalidate(everything)
+	cm.extraFileHashes.invalidate(everything)
 }
 
 // InvalidateFileHashesUnder drops every memoized input digest whose region
@@ -152,24 +198,8 @@ func (cm *CacheManager) InvalidateFileHashesUnder(paths []string) {
 		return
 	}
 	written := PathsRegion(paths)
-
-	cm.fileHashMu.Lock()
-	for key, memo := range cm.fileHashCache {
-		if memo.region.Overlaps(written) {
-			delete(cm.fileHashCache, key)
-		}
-	}
-	cm.fileHashGeneration++
-	cm.fileHashMu.Unlock()
-
-	cm.extraFileHashMu.Lock()
-	for key, memo := range cm.extraFileHashCache {
-		if memo.region.Overlaps(written) {
-			delete(cm.extraFileHashCache, key)
-		}
-	}
-	cm.extraFileHashGeneration++
-	cm.extraFileHashMu.Unlock()
+	cm.fileHashes.invalidate(written)
+	cm.extraFileHashes.invalidate(written)
 }
 
 // lookupExtraFilesHash computes the combined content hash of a set of extra
@@ -198,23 +228,13 @@ func (cm *CacheManager) lookupExtraFilesHash(workspaceRoot string, paths []strin
 	sort.Strings(sorted)
 	key := workspaceRoot + "\x00" + strings.Join(sorted, "\x00")
 
-	cm.extraFileHashMu.Lock()
-	if cached, ok := cm.extraFileHashCache[key]; ok {
-		cm.extraFileHashMu.Unlock()
-		return cached.hash
+	cached, generation, ok := cm.extraFileHashes.lookup(key)
+	if ok {
+		return cached
 	}
-	generation := cm.extraFileHashGeneration
-	cm.extraFileHashMu.Unlock()
 
 	hash := hashExtraFiles(workspaceRoot, sorted)
-
-	region := PathsRegion(sorted)
-	cm.extraFileHashMu.Lock()
-	if cm.extraFileHashGeneration == generation {
-		cm.extraFileHashCache[key] = memoizedInputHash{hash: hash, region: region}
-	}
-	cm.extraFileHashMu.Unlock()
-
+	cm.extraFileHashes.memoize(key, generation, hash, PathsRegion(sorted))
 	return hash
 }
 

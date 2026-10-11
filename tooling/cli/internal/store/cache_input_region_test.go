@@ -223,6 +223,54 @@ func TestDigestSpanningAnInvalidationIsNotMemoized(t *testing.T) {
 	}
 }
 
+// A digest computed while invalidations name only paths outside its region is
+// memoized: nothing it read was written. One computed across more
+// invalidations than the memo remembers is not, whatever they named.
+func TestDigestSpanningUnrelatedInvalidationsIsMemoizedWhileTheyAreRemembered(t *testing.T) {
+	cases := []struct {
+		name          string
+		invalidations int
+		memoized      bool
+	}{
+		{name: "invalidations the memo remembers", invalidations: invalidationLogSize, memoized: true},
+		{name: "more invalidations than the memo remembers", invalidations: invalidationLogSize + 1, memoized: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			layer := filepath.Join(dir, ".gen", "base.tar")
+			writeRegionFile(t, layer, "old layer")
+
+			cm := NewCacheManager(nil)
+			original := memoizedHashFiles
+			t.Cleanup(func() { memoizedHashFiles = original })
+			memoizedHashFiles = func(dir string, patterns []string, scope ProjectConfigScope) (string, error) {
+				hash, err := original(dir, patterns, scope)
+				// Other tasks land outputs elsewhere while this digest is in flight.
+				for range tc.invalidations {
+					cm.InvalidateFileHashesUnder([]string{filepath.Join(dir, "elsewhere")})
+				}
+				memoizedHashFiles = original
+				return hash, err
+			}
+
+			first, err := cm.HashFiles(dir, []string{".gen/**"}, ProjectConfigScope{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			// An edit no invalidation names: only a fresh computation sees it.
+			writeRegionFile(t, layer, "edited layer")
+			second, err := cm.HashFiles(dir, []string{".gen/**"}, ProjectConfigScope{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if memoized := second == first; memoized != tc.memoized {
+				t.Fatalf("memoized = %v, want %v", memoized, tc.memoized)
+			}
+		})
+	}
+}
+
 func writeRegionFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

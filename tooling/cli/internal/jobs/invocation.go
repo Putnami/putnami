@@ -386,7 +386,12 @@ func (rt *invocationRuntime) relationFor(job *ScheduledJob) *invocationRelation 
 // A producer about to start confirms, once, a pruning decided on a consumer key
 // that may have moved since (prune): present answers for each consumer from the
 // key it computes now, and the first absent entry withdraws the pruning, so the
-// producer runs and its finalizer with it.
+// producer runs and its finalizer with it. present runs without the relation's
+// lock: it takes the run's lock, which the coordinator holds while it takes
+// every relation's (pendingFinalizers, settleFinalizers), so a relation's lock
+// is never held while the run's is awaited. Nothing reads pruned meanwhile:
+// only the producer's own start claims the confirmation, and the finalizer
+// waits for the producer to arm it.
 func (rt *invocationRuntime) isPruned(job *ScheduledJob, present func(consumer *ScheduledJob) bool) bool {
 	if rt == nil || job == nil {
 		return false
@@ -401,15 +406,27 @@ func (rt *invocationRuntime) isPruned(job *ScheduledJob, present func(consumer *
 		return false
 	}
 	rel.mu.Lock()
-	defer rel.mu.Unlock()
-	if producer && rel.pruned && rel.recheck {
+	confirm := producer && rel.pruned && rel.recheck
+	if confirm {
 		rel.recheck = false
-		for _, consumer := range rel.consumers {
-			if !present(consumer) {
-				rel.pruned = false
-				break
-			}
+	}
+	pruned := rel.pruned
+	rel.mu.Unlock()
+	if !confirm {
+		return pruned
+	}
+
+	confirmed := true
+	for _, consumer := range rel.consumers {
+		if !present(consumer) {
+			confirmed = false
+			break
 		}
+	}
+	rel.mu.Lock()
+	defer rel.mu.Unlock()
+	if !confirmed {
+		rel.pruned = false
 	}
 	return rel.pruned
 }

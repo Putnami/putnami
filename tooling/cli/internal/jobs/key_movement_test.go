@@ -431,6 +431,61 @@ func TestInvocation_PruningOnAMovableConsumerKeyIsConfirmedWhenTheProducerStarts
 	}
 }
 
+// The confirmation computes consumer keys under the run's lock
+// (Scheduler.cachedAtCurrentKey), which the coordinator holds while it takes
+// every relation's lock to find the finalizers to run (runReadyFinalizers). The
+// confirmation therefore holds no relation's lock while it waits for the run's:
+// here the coordinator takes the run's lock while the confirmation is under
+// way, and both must finish.
+func TestInvocation_PruningConfirmationHoldsNoRelationAcrossTheRunLock(t *testing.T) {
+	fixture := newInvocationFixture(t, provisionBody, consumeBody)
+	invocations := newInvocationRuntime(fixture.ws, fixture.planned)
+	rel := invocations.byProducer[fixture.producer.Key()]
+	if rel == nil {
+		t.Fatal("the fixture's producer heads no relation")
+	}
+	rel.pruned, rel.recheck = true, true
+
+	var mu sync.Mutex
+	confirming, coordinating, coordinated := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var enter sync.Once
+	go func() {
+		<-confirming
+		mu.Lock()
+		close(coordinating)
+		invocations.pendingFinalizers(map[string]*JobResult{}, true)
+		mu.Unlock()
+		close(coordinated)
+	}()
+	confirmed := make(chan bool, 1)
+	go func() {
+		confirmed <- invocations.isPruned(fixture.producer, func(*ScheduledJob) bool {
+			enter.Do(func() { close(confirming) })
+			<-coordinating
+			// The consumer's key is computed under the run's lock, and it has no
+			// entry.
+			mu.Lock()
+			defer mu.Unlock()
+			return false
+		})
+	}()
+
+	deadline := time.After(30 * time.Second)
+	select {
+	case pruned := <-confirmed:
+		if pruned {
+			t.Fatal("a consumer with no entry at its current key left the relation pruned")
+		}
+	case <-deadline:
+		t.Fatal("the pruning confirmation and the finalizer pass wait for each other's lock")
+	}
+	select {
+	case <-coordinated:
+	case <-deadline:
+		t.Fatal("the finalizer pass never finished")
+	}
+}
+
 // A consumer key that a write may move after the producer starts cannot be
 // confirmed in time, so the relation is not pruned: the producer provisions,
 // and the consumer runs against the resource once the write moved its key.

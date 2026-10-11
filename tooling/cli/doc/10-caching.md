@@ -454,9 +454,11 @@ the bytes it reads, whether or not it depends on that task:
 - a generate asset reaches the paths it names.
 
 A write outside every declaration is not seen until the next run, so a file a
-task produces for a later task belongs in its declared outputs. A task that
-rewrites its sources drops every digest (see
-[Source-writing fix tasks](#source-writing-fix-tasks)).
+task produces for a later task belongs in its declared outputs. Paths are
+compared as written, without resolving symbolic links: an input read through a
+link is reached by the link's path, so an output declared at the link's target
+does not drop its digest. A task that rewrites its sources drops every digest
+(see [Source-writing fix tasks](#source-writing-fix-tasks)).
 
 The remote negotiation and the pruning of an invocation-scoped resource key the
 whole plan before any task runs. When another planned task may write a file a

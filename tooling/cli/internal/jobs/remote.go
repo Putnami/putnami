@@ -122,9 +122,9 @@ type RemoteCache struct {
 	// keys maps a job key to its precomputed cache key (from Negotiate), only
 	// for a job whose key no planned write can move (planKeyMovement); localHits
 	// records keys already present locally before negotiation. Together they let
-	// computeRequiredInputs tell "will execute locally" from "already satisfied".
-	// Neither addresses a restore or an upload: both use the key the scheduler
-	// computes when the job starts.
+	// computeRequiredInputs tell "already satisfied" from "may execute locally":
+	// a job without a recorded key may execute. Neither addresses a restore or
+	// an upload: both use the key the scheduler computes when the job starts.
 	keys      map[string]string
 	localHits map[string]bool
 	// requiredInputs records hit dependency keys that feed a job expected to
@@ -355,7 +355,7 @@ func (r *RemoteCache) Negotiate(
 		providerKeys = append(providerKeys, hash)
 		executesLocally = true
 	}
-	r.requiredInputs = r.computeRequiredInputs(planned)
+	r.requiredInputs = r.computeRequiredInputs(planned, keys)
 
 	// Spawn the provider when there is something to warm, OR when a job will run
 	// here and could use the object cache. A fully warm rebuild still spins up
@@ -683,17 +683,22 @@ func (r *RemoteCache) Close() {
 // a corrupt blob), and it then consumes its inputs like any built job. Treating a
 // hit job's dependencies as optional is what let a files-less dependency hit
 // silently satisfy a job that then rebuilt locally without its inputs.
-func (r *RemoteCache) computeRequiredInputs(planned []*ScheduledJob) map[string]bool {
-	if r == nil || len(r.keys) == 0 {
+//
+// A job is a local hit only through its recorded key (keys), so a job whose key
+// may move counts as one that may execute. Its dependencies are named through
+// the whole negotiated key set, so a dependency whose key may move is still
+// required: naming one hash too many only makes the guard stricter.
+func (r *RemoteCache) computeRequiredInputs(planned []*ScheduledJob, negotiated map[string]string) map[string]bool {
+	if r == nil || len(negotiated) == 0 {
 		return nil
 	}
 	out := make(map[string]bool)
 	for _, job := range planned {
-		if r.localHits[r.keys[job.Key()]] {
+		if hash, recorded := r.keys[job.Key()]; recorded && r.localHits[hash] {
 			continue
 		}
 		for _, depKey := range job.DependsOn {
-			depHash := r.keys[depKey]
+			depHash := negotiated[depKey]
 			if depHash != "" {
 				out[depHash] = true
 			}
