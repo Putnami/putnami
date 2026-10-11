@@ -20,7 +20,7 @@ func TestRuntimeToolchainUnexpandedCandidatesNameWhatIsMissing(t *testing.T) {
 	ext := runtimeToolchainExtension(requirement)
 	err := resolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"},
 		[]string{"PATH=" + t.TempDir(), "COMPILER_HOME= "})
-	want := `resolve extension "example" runtime toolchain "compiler": no candidate matched locked version "1.2.3": ` +
+	want := `resolve extension "example" runtime toolchain "compiler": no candidate matched locked version "1.2.3"; run ` + "`putnami install`" + ` to install it: ` +
 		`candidate 1 (environment COMPILER_HOME "bin/compiler"): environment variable COMPILER_HOME is not set; ` +
 		`candidate 2 (path "compiler"): no executable on PATH`
 	if err == nil || err.Error() != want {

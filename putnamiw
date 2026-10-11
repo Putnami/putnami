@@ -23,8 +23,8 @@
 # --print-engine is for a launcher that starts the engine itself. It writes
 # nothing under .putnami/bin, takes no command, and accepts --bootstrap. It is
 # refused where tooling/cli is absent, and where no content key can be computed
-# (no git work tree or no SHA-256 tool). Progress and errors go to stderr; on
-# failure it exits non-zero and prints nothing on stdout.
+# (no git work tree, or no sha256sum or shasum). Progress and errors go to
+# stderr; on failure it exits non-zero and prints nothing on stdout.
 #
 # A workspace whose lock records cli.source "workspace" admits the printed
 # binary when the process that starts it sets:
@@ -130,6 +130,8 @@ SOURCE_KEY_PATHS=(go.work go.work.sum tooling protocols go)
 CLI_LDFLAGS="-s -w"
 # Managed Go toolchains are shared across worktrees: ~/.putnami/toolchains/go/go-<ver>/.
 GO_MANAGED_DIR="$PUTNAMI_HOME/toolchains/go"
+# GO_CHECKSUM_URL is where go.dev publishes the SHA-256 of each Go archive.
+GO_CHECKSUM_URL="https://dl.google.com/go/"
 RESOLVER_URL="${PUTNAMI_REGISTRY_URL:-https://putnami.dev/dl}"
 
 # --- Colors ---
@@ -255,13 +257,15 @@ resolve_link_target() {
   esac
 }
 
-# sha256_of prints the lowercase-hex SHA-256 of a file, or nothing when no
-# hashing tool is available (the caller then falls back to a per-worktree copy).
+# sha256_of prints the lowercase-hex SHA-256 of a file with sha256sum, shasum
+# or openssl, or nothing when none is available.
 sha256_of() {
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "$1" | awk '{print $1}'
   elif command -v shasum >/dev/null 2>&1; then
     shasum -a 256 "$1" | awk '{print $1}'
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$1" | awk '{print tolower($NF)}'
   fi
 }
 
@@ -446,16 +450,45 @@ detect_platform() {
 
 # --- Go version from go.work ---
 
+# read_go_version prints the higher of the go and toolchain lines of go.work,
+# the release the CLI pins in the lock from them.
 read_go_version() {
   if [ -f "$GO_WORK" ]; then
-    local version
+    local version toolchain
     version="$(grep -m1 '^go ' "$GO_WORK" | awk '{print $2}')"
+    toolchain="$(grep -m1 '^toolchain ' "$GO_WORK" | awk '{print $2}')"
+    [ -n "$version" ] && version="$(normalize_go_version "$version")"
+    [ -n "$toolchain" ] && toolchain="$(normalize_go_version "$toolchain")"
+    if [ -n "$toolchain" ] && { [ -z "$version" ] || go_version_satisfies "$toolchain" "$version"; }; then
+      version="$toolchain"
+    fi
     if [ -n "$version" ]; then
-      normalize_go_version "$version"
+      echo "$version"
       return 0
     fi
   fi
   return 1
+}
+
+# locked_go_sha256 prints the SHA-256 the workspace lock records for the Go
+# release $1 on platform $2, such as darwin/arm64, and fails when the lock pins
+# another release or records none for the platform. It reads the layout the CLI
+# writes: two-space indentation, toolchains.go.{version,integrities}.
+locked_go_sha256() {
+  local lock="$SCRIPT_DIR/putnami.lock.json"
+  [ -f "$lock" ] || return 1
+  awk -v want="$1" -v platform="$2" '
+    /^  "toolchains": [{]/ { in_toolchains = 1; next }
+    in_toolchains && /^  [}]/ { in_toolchains = 0 }
+    in_toolchains && /^    "go": [{]/ { in_go = 1; next }
+    in_go && /^    [}]/ { in_go = 0 }
+    in_go && /^      "version": / { version = $2; gsub(/[",]/, "", version) }
+    in_go && index($0, "        \"" platform "\": ") == 1 { digest = $2; gsub(/[",]/, "", digest) }
+    END {
+      if (version == want && length(digest) == 64 && digest !~ /[^0-9a-f]/) { print digest; exit 0 }
+      exit 1
+    }
+  ' "$lock"
 }
 
 normalize_go_version() {
@@ -551,9 +584,9 @@ go_toolchain_identity() {
 #   3. The Go toolchain identity and the exact ldflags, so a toolchain switch or
 #      a link-flag change never reuses a foreign binary.
 #
-# No key is not an error. Git missing, $SCRIPT_DIR not a work tree, no SHA-256
-# tool, or any call failing all mean "fall back to the mtime gate", so a tarball
-# checkout still builds and runs.
+# No key is not an error. Git missing, $SCRIPT_DIR not a work tree, no sha256sum
+# or shasum, or any call failing all mean "fall back to the mtime gate", so a
+# tarball checkout still builds and runs.
 compute_source_key() {
   SOURCE_KEY=""
   local hasher status_file key record path file paths_file blobs_file _origin
@@ -693,28 +726,6 @@ publish_source_cli() {
   fi
 }
 
-# When the base `go` is older than the workspace pin, Go may already resolve a
-# satisfying toolchain (cached from an earlier GOTOOLCHAIN=auto run). Return that
-# toolchain's own `go` binary; it runs the pinned version directly under
-# GOTOOLCHAIN=local, so build_cli works without a network download.
-resolve_toolchain_go() {
-  local binary="$1"
-  local want="$2"
-  [ -n "$want" ] || return 1
-  local troot
-  troot="$(GOTOOLCHAIN=auto "$binary" env GOROOT 2>/dev/null)" || return 1
-  [ -n "$troot" ] || return 1
-  local tgo="$troot/bin/go"
-  [ -x "$tgo" ] || return 1
-  local tver
-  tver="$(go_binary_version_mode "$tgo" "local" || true)"
-  if [ -n "$tver" ] && go_version_satisfies "$tver" "$want"; then
-    echo "$tgo"
-    return 0
-  fi
-  return 1
-}
-
 go_version_satisfies() {
   local have
   local want
@@ -753,22 +764,19 @@ resolve_go() {
   if command -v go >/dev/null 2>&1; then
     local system_go
     local system_version
-    local toolchain_go
     system_go="$(command -v go)"
     system_version="$(go_binary_version_mode "$system_go" "local" || true)"
     if [ -z "$version" ] || go_version_satisfies "$system_version" "$version"; then
       GO_BINARY="$system_go"
       return 0
     fi
-    # Base binary too old: reuse a satisfying toolchain Go already resolves.
-    if toolchain_go="$(resolve_toolchain_go "$system_go" "$version")"; then
-      GO_BINARY="$toolchain_go"
-      return 0
-    fi
     warn "System Go ${system_version:-unknown} is older than workspace Go $version; using managed Go"
   fi
 
-  # 2. Managed install
+  # 2. Managed install, under the Putnami home: the one place besides PATH and
+  # GOROOT where the CLI this script runs looks for the Go the lock pins. A Go
+  # only this script can find, such as a toolchain an older go downloads into
+  # its module cache, is never used.
   if [ -z "$version" ]; then
     version="1.23.0"
   fi
@@ -802,6 +810,29 @@ resolve_go() {
   else
     rm -rf "$stage"
     fail "curl or wget is required to download Go"
+  fi
+
+  # The archive is installed only when its SHA-256 is the one the workspace
+  # lock records for this release and platform, or, when the lock pins another
+  # release, the one go.dev publishes beside the archive.
+  local expected actual
+  if ! expected="$(locked_go_sha256 "$version" "$GO_OS/$GO_ARCH")"; then
+    local checksum_url="${GO_CHECKSUM_URL}go${version}.${GO_OS}-${GO_ARCH}${ext}.sha256"
+    if command -v curl >/dev/null 2>&1; then
+      expected="$(curl -fsSL "$checksum_url" 2>/dev/null | awk '{print $1}')" || expected=""
+    else
+      expected="$(wget -q -O - "$checksum_url" 2>/dev/null | awk '{print $1}')" || expected=""
+    fi
+    [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || expected=""
+  fi
+  actual="$(sha256_of "$archive")"
+  if [ -z "$expected" ] || [ -z "$actual" ]; then
+    rm -rf "$stage"
+    fail "Cannot verify Go $version: no SHA-256 for $GO_OS/$GO_ARCH in putnami.lock.json or from go.dev, or no sha256sum, shasum or openssl"
+  fi
+  if [ "$actual" != "$expected" ]; then
+    rm -rf "$stage"
+    fail "Refusing Go $version from $url: SHA-256 $actual, want $expected"
   fi
 
   if [ "$ext" = ".zip" ]; then
@@ -956,23 +987,23 @@ build_cli_package() {
     /*) ;;
     *) out="$PWD/$out" ;;
   esac
-  (cd "$SCRIPT_DIR" && "$GO_BINARY" build -o "$out" -ldflags="$CLI_LDFLAGS" "$CLI_SOURCE") >&2
-}
-
-build_cli() {
-  info "Building putnami CLI..."
-
-  # Pin GOROOT to the resolved Go binary. Cloud shells and version managers
-  # may export GOROOT for a different Go installation; inheriting that path can
-  # make a newer toolchain compile against an older standard library cache.
+  # GOROOT, PATH and GOTOOLCHAIN name the resolved Go for the build command
+  # alone. The CLI this script then runs receives the caller's environment,
+  # the same on a run that builds and on a run that reuses the blob.
+  #
+  # GOROOT is the resolved Go binary's own, whatever the caller exports: cloud
+  # shells and version managers may export the GOROOT of another installation.
   local go_root
   go_root="$(env -u GOROOT "$GO_BINARY" env GOROOT 2>/dev/null || true)"
   if [ -z "$go_root" ]; then
     go_root="$(cd "$(dirname "$GO_BINARY")/.." && pwd)"
   fi
-  export GOROOT="$go_root"
-  export PATH="$go_root/bin:$PATH"
-  export GOTOOLCHAIN=local
+  (cd "$SCRIPT_DIR" && GOROOT="$go_root" PATH="$go_root/bin:$PATH" GOTOOLCHAIN=local \
+    "$GO_BINARY" build -o "$out" -ldflags="$CLI_LDFLAGS" "$CLI_SOURCE") >&2
+}
+
+build_cli() {
+  info "Building putnami CLI..."
 
   if [ "$PRINT_ENGINE" = "false" ]; then
     mkdir -p "$(dirname "$CLI_BINARY")"
@@ -1003,7 +1034,7 @@ build_cli() {
     return 0
   fi
 
-  # No key (no git, not a work tree, or no SHA-256 tool): per-worktree binary,
+  # No key (no git, not a work tree, or no sha256sum or shasum): per-worktree binary,
   # governed by the mtime gate, exactly as before.
   #
   # If a prior --download left $CLI_BINARY as a symlink into the shared store,
@@ -1081,7 +1112,7 @@ if [ "$BOOTSTRAP" = "false" ] && [ -x "$CLI_BINARY" ]; then
     fi
     # Key mismatch: fall through and rebuild.
   else
-    # No key (no git, not a work tree, or no SHA-256 tool — a tarball checkout).
+    # No key (no git, not a work tree, or no sha256sum or shasum — a tarball checkout).
     # Fall back to the historical mtime gate, unchanged.
     #
     # Staleness gate for BOTH a symlinked pin/download and a regular-file build:
@@ -1150,7 +1181,7 @@ else
   resolve_go
   build_cli
   # A keyed build published a store blob, so run it through its immutable path.
-  # Without a key (no git or no SHA-256 tool) build_cli wrote a regular file into
+  # Without a key (no git, or no sha256sum or shasum) build_cli wrote a regular file into
   # $CLI_BINARY and there is no blob to exec; fall through to the identity check.
   if [ -n "$SOURCE_KEY" ]; then
     exec_source_blob "$SOURCE_KEY" "${PASSTHROUGH_ARGS[@]}"

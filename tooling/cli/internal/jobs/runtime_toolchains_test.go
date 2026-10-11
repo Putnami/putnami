@@ -23,6 +23,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -80,7 +81,7 @@ func TestRuntimeToolchainRequiredMismatchFailsClosed(t *testing.T) {
 	writeRuntimeToolchainLock(t, workspaceRoot, "compiler", "1.2.3", "integrity-a")
 	ext := runtimeToolchainExtension(runtimeToolchainFixture("compiler"))
 	err := resolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + bin})
-	want := `no candidate matched locked version "1.2.3": candidate 1 (path "compiler") at ` +
+	want := `no candidate matched locked version "1.2.3"; run ` + "`putnami install`" + ` to install it: candidate 1 (path "compiler") at ` +
 		compiler + `: version "1.2.2" does not match locked "1.2.3"`
 	if err == nil || !strings.HasSuffix(err.Error(), want) {
 		t.Fatalf("mismatched executable error = %v, want suffix %q", err, want)
@@ -108,7 +109,7 @@ func TestRuntimeToolchainRequiredFailureNamesEveryCandidateInDeclarationOrder(t 
 	ext := runtimeToolchainExtension(requirement)
 	err := resolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"},
 		[]string{"PATH=" + bin, "PUTNAMI_HOME=" + putnamiHome})
-	want := `resolve extension "example" runtime toolchain "compiler": no candidate matched locked version "1.2.3": ` +
+	want := `resolve extension "example" runtime toolchain "compiler": no candidate matched locked version "1.2.3"; run ` + "`putnami install`" + ` to install it: ` +
 		`candidate 1 (environment COMPILER_HOME "bin/compiler"): environment variable COMPILER_HOME is not set; ` +
 		`candidate 2 (putnami-home "tools/compiler") at ` + notExecutable + `: not executable; ` +
 		`candidate 3 (path "compiler") at ` + failing + `: probe failed: exit status 3`
@@ -199,6 +200,37 @@ func TestRuntimeToolchainMismatchUnwrapsToAProbeThatTimedOut(t *testing.T) {
 	if err := newRuntimeToolchainMismatchError("example", "compiler", "1.2.3", []runtimeToolchainRejection{absent}); errors.Is(err, ErrToolchainProbeTimeout) {
 		t.Errorf("error of an absent toolchain = %v, want no probe timeout", err)
 	}
+}
+
+// TestRuntimeToolchainMismatchNamesInstallUnlessItDoesNotHelp pins the remedy
+// of the mismatch error: `putnami install` installs the release the lock pins.
+// The error names no remedy after a probe that timed out, whose toolchain is
+// there and slow, or in a hosted run, which installs no toolchain.
+func TestRuntimeToolchainMismatchNamesInstallUnlessItDoesNotHelp(t *testing.T) {
+	const remedy = "; run `putnami install` to install it"
+	absent := runtimeToolchainRejection{candidate: `candidate 1 (path "compiler")`, reason: "path missing"}
+	timedOut := runtimeToolchainRejection{
+		candidate: `candidate 2 (path "compiler")`,
+		reason:    ErrToolchainProbeTimeout.Error(),
+		err:       fmt.Errorf("%w after 100ms", ErrToolchainProbeTimeout),
+	}
+
+	err := newRuntimeToolchainMismatchError("example", "compiler", "1.2.3", []runtimeToolchainRejection{absent})
+	want := `resolve extension "example" runtime toolchain "compiler": no candidate matched locked version "1.2.3"` +
+		remedy + `: candidate 1 (path "compiler"): path missing`
+	if err.Error() != want {
+		t.Errorf("error of an absent toolchain = %v\nwant %s", err, want)
+	}
+	if err := newRuntimeToolchainMismatchError("example", "compiler", "1.2.3", []runtimeToolchainRejection{absent, timedOut}); strings.Contains(err.Error(), remedy) {
+		t.Errorf("error of a probe that timed out = %v, want no install remedy", err)
+	}
+
+	t.Cleanup(runcredential.SetForTest("run-credential"))
+	if err := newRuntimeToolchainMismatchError("example", "compiler", "1.2.3", []runtimeToolchainRejection{absent}); strings.Contains(err.Error(), remedy) {
+		t.Errorf("error of a hosted run = %v, want no install remedy", err)
+	}
+	spectest.Proves(t, "cli/runtime-toolchain-pinning", "mismatch-names-the-install",
+		"a-pinned-release-no-candidate-matches-names-putnami-install-unless-it-does-not-help")
 }
 
 // TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion pins each probe

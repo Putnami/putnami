@@ -7,6 +7,8 @@
 package bootstrap_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -556,6 +558,9 @@ echo RAN_BUILT
 echo "SELF=$0"
 echo "FROM_SOURCE=${PUTNAMI_FROM_SOURCE:-<unset>}"
 echo "FROM_SOURCE_KEY=${PUTNAMI_FROM_SOURCE_KEY:-<unset>}"
+echo "GOROOT=${GOROOT:-<unset>}"
+echo "GOTOOLCHAIN=${GOTOOLCHAIN:-<unset>}"
+echo "PATH_HEAD=${PATH%%:*}"
 SENTINEL
          chmod +x "$out"; };;
 esac
@@ -1077,6 +1082,267 @@ func TestPutnamiwSourceKey_ExecsTheBlobAndExportsTheSessionPin(t *testing.T) {
 	}
 	spectest.Proves(t, "cli/engine-provenance", "foreign-engine-refused",
 		"a-keyed-from-source-run-execs-the-immutable-blob-and-exports-its-key")
+}
+
+// The wrapper runs the CLI with the caller's GOROOT, PATH and GOTOOLCHAIN on a
+// run that builds and on a run that reuses the blob. The resolved Go's GOROOT,
+// its bin directory first on PATH, and GOTOOLCHAIN=local reach the build
+// command alone.
+func TestPutnamiwSourceKey_BuildEnvironmentStaysOutOfTheCLI(t *testing.T) {
+	repo, _, env := gitSourceRepo(t)
+	stubBin := strings.Split(envValue(env, "PATH"), string(os.PathListSeparator))[0]
+	env = append(env, "GOROOT=/caller/goroot", "GOTOOLCHAIN=auto")
+
+	assertCallerEnvironment := func(path, out string) {
+		t.Helper()
+		for key, want := range map[string]string{"GOROOT": "/caller/goroot", "GOTOOLCHAIN": "auto", "PATH_HEAD": stubBin} {
+			if got := sentinelField(t, out, key); got != want {
+				t.Errorf("%s ran the CLI with %s=%q, want the caller's %q", path, key, got, want)
+			}
+		}
+	}
+
+	out, code := runIn(t, repo, env, "ping")
+	if code != 0 {
+		t.Fatalf("cold run failed (%d):\n%s", code, out)
+	}
+	if got := goBuildCount(t, env); got != 1 {
+		t.Fatalf("cold run invoked `go build` %d times, want 1", got)
+	}
+	assertCallerEnvironment("the cold build", out)
+
+	if out, code = runIn(t, repo, env, "ping"); code != 0 {
+		t.Fatalf("warm run failed (%d):\n%s", code, out)
+	}
+	assertCallerEnvironment("the warm fast path", out)
+	spectest.Proves(t, "cli/engine-provenance", "build-toolchain-stays-in-the-build",
+		"the-cli-receives-the-callers-go-environment-whether-or-not-the-run-builds")
+}
+
+// A system Go older than the workspace's Go is not the build's Go, and neither
+// is the toolchain that Go downloads into its module cache under
+// GOTOOLCHAIN=auto: the wrapper builds with the managed install under the
+// Putnami home, where the CLI it runs looks for the Go the lock pins. The
+// workspace's Go is the higher of the go and toolchain lines of go.work, as
+// the lock pins it. The build command receives the managed Go's GOROOT, its
+// bin directory first on PATH, and GOTOOLCHAIN=local; the CLI receives the
+// caller's.
+func TestPutnamiwSourceKey_OlderSystemGoBuildsWithTheManagedInstall(t *testing.T) {
+	for name, goWork := range map[string]string{
+		"go line":        "go 1.30.0\n",
+		"toolchain line": "go 1.26.0\n\ntoolchain go1.30.0\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			repo, home, env := gitSourceRepo(t)
+			stubBin := strings.Split(envValue(env, "PATH"), string(os.PathListSeparator))[0]
+			if err := os.WriteFile(filepath.Join(repo, "go.work"), []byte(goWork), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			wrongBuild := envValue(env, "GO_LOG") + ".wrong"
+			modCacheRoot := filepath.Join(t.TempDir(), "toolchain@v0.0.1-go1.30.0")
+			writeExec(t, filepath.Join(modCacheRoot, "bin", "go"), `#!/usr/bin/env bash
+case "$1" in
+  env) [ "$2" = GOVERSION ] && echo go1.30.0; [ "$2" = GOROOT ] && echo "`+modCacheRoot+`";;
+  build) echo module-cache >> "`+wrongBuild+`";;
+esac
+exit 0
+`)
+			systemBin := t.TempDir()
+			writeExec(t, filepath.Join(systemBin, "go"), `#!/usr/bin/env bash
+case "$1" in
+  env) case "$2" in
+         GOVERSION) if [ "$GOTOOLCHAIN" = auto ]; then echo go1.30.0; else echo go1.26.1; fi;;
+         GOROOT) if [ "$GOTOOLCHAIN" = auto ]; then echo "`+modCacheRoot+`"; else echo /system/goroot; fi;;
+       esac;;
+  build) echo system >> "`+wrongBuild+`";;
+esac
+exit 0
+`)
+			managedRoot := filepath.Join(home, "toolchains", "go", "go-1.30.0", "go")
+			buildEnv := envValue(env, "GO_LOG") + ".managed"
+			writeExec(t, filepath.Join(managedRoot, "bin", "go"), `#!/usr/bin/env bash
+case "$1" in
+  env) [ "$2" = GOVERSION ] && echo go1.30.0; [ "$2" = GOROOT ] && echo "`+managedRoot+`"; exit 0;;
+  build) printf '%s|%s|%s\n' "${GOROOT:-<unset>}" "${GOTOOLCHAIN:-<unset>}" "${PATH%%:*}" >> "`+buildEnv+`";;
+esac
+exec "`+filepath.Join(stubBin, "go")+`" "$@"
+`)
+			env = append(env, "PATH="+systemBin+string(os.PathListSeparator)+envValue(env, "PATH"))
+
+			out, code := runIn(t, repo, env, "ping")
+			if code != 0 || !strings.Contains(out, "RAN_BUILT") {
+				t.Fatalf("run failed (%d):\n%s", code, out)
+			}
+			if data, err := os.ReadFile(wrongBuild); err == nil {
+				t.Fatalf("the CLI was built by %s, want the managed install", strings.TrimSpace(string(data)))
+			}
+			data, err := os.ReadFile(buildEnv)
+			if err != nil {
+				t.Fatalf("the managed Go did not build the CLI: %v\n%s", err, out)
+			}
+			want := managedRoot + "|local|" + filepath.Join(managedRoot, "bin")
+			if got := strings.TrimSpace(string(data)); got != want {
+				t.Errorf("build environment GOROOT|GOTOOLCHAIN|PATH head = %q, want %q", got, want)
+			}
+			if got := sentinelField(t, out, "PATH_HEAD"); got != systemBin {
+				t.Errorf("the CLI ran with PATH head %q, want the caller's %q", got, systemBin)
+			}
+		})
+	}
+	spectest.Proves(t, "cli/engine-provenance", "build-toolchain-stays-in-the-build",
+		"an-older-system-go-builds-with-the-managed-install")
+}
+
+// The wrapper installs a Go archive it downloads only when the archive's
+// SHA-256 is the one the workspace lock records for that release and platform,
+// or, when the lock pins another release, the one go.dev publishes beside the
+// archive. Any other archive stops the run, and nothing is installed or built.
+func TestPutnamiwSourceKey_DownloadedGoMustMatchItsSHA256(t *testing.T) {
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	switch platform {
+	case "darwin/amd64", "darwin/arm64", "linux/amd64", "linux/arm64":
+	default:
+		t.Skipf("the wrapper downloads no Go for %s", platform)
+	}
+	const archive = "FAKE-GO-ARCHIVE"
+	sum := sha256.Sum256([]byte(archive))
+	digest := hex.EncodeToString(sum[:])
+	wrong := strings.Repeat("0", 64)
+
+	cases := []struct {
+		name, lockVersion, lockDigest, published string
+		installs                                 bool
+		message                                  string
+	}{
+		{name: "the lock records the archive", lockVersion: "1.30.0", lockDigest: digest, installs: true},
+		{name: "the lock records another archive", lockVersion: "1.30.0", lockDigest: wrong, published: digest, message: "Refusing Go 1.30.0"},
+		{name: "go.dev publishes the archive", lockVersion: "1.29.0", lockDigest: wrong, published: digest, installs: true},
+		{name: "go.dev publishes another archive", lockVersion: "1.29.0", lockDigest: digest, published: wrong, message: "Refusing Go 1.30.0"},
+		{name: "no checksum anywhere", lockVersion: "1.29.0", lockDigest: digest, message: "Cannot verify Go 1.30.0"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			repo, home, env := gitSourceRepo(t)
+			stubBin := strings.Split(envValue(env, "PATH"), string(os.PathListSeparator))[0]
+			if err := os.WriteFile(filepath.Join(repo, "go.work"), []byte("go 1.30.0\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			type goPin struct {
+				Version     string            `json:"version"`
+				Integrities map[string]string `json:"integrities"`
+				Source      string            `json:"source"`
+			}
+			type lockFile struct {
+				Version    int              `json:"version"`
+				Toolchains map[string]goPin `json:"toolchains"`
+			}
+			lock, err := json.MarshalIndent(lockFile{
+				Version: 3,
+				Toolchains: map[string]goPin{"go": {
+					Version:     c.lockVersion,
+					Integrities: map[string]string{platform: c.lockDigest},
+					Source:      "https://go.dev/dl/",
+				}},
+			}, "", "  ")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(repo, "putnami.lock.json"), lock, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			downloadBin := t.TempDir()
+			writeExec(t, filepath.Join(downloadBin, "curl"), `#!/usr/bin/env bash
+out=""; url=""
+while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2;; -*) shift;; *) url="$1"; shift;; esac; done
+case "$url" in
+  *.sha256) [ -n "`+c.published+`" ] || exit 22; echo "`+c.published+`"; exit 0;;
+esac
+printf '`+archive+`' > "$out"
+`)
+			writeExec(t, filepath.Join(downloadBin, "tar"), `#!/usr/bin/env bash
+dir=""
+while [ $# -gt 0 ]; do case "$1" in -C) dir="$2"; shift 2;; *) shift;; esac; done
+mkdir -p "$dir/go/bin"
+printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "`+filepath.Join(stubBin, "go")+`" > "$dir/go/bin/go"
+chmod +x "$dir/go/bin/go"
+`)
+			env = append(env, "PATH="+downloadBin+string(os.PathListSeparator)+envValue(env, "PATH"))
+
+			out, code := runIn(t, repo, env, "ping")
+			installed := filepath.Join(home, "toolchains", "go", "go-1.30.0", "go", "bin", "go")
+			_, statErr := os.Stat(installed)
+			if c.installs {
+				if code != 0 || !strings.Contains(out, "RAN_BUILT") || statErr != nil {
+					t.Fatalf("run = %d, install %v, want the verified Go installed and the CLI run:\n%s", code, statErr, out)
+				}
+				return
+			}
+			if code == 0 || !strings.Contains(out, c.message) {
+				t.Errorf("run = %d, want a failure naming %q:\n%s", code, c.message, out)
+			}
+			if statErr == nil {
+				t.Errorf("an unverified archive was installed at %s", installed)
+			}
+			if got := goBuildCount(t, env); got != 0 {
+				t.Errorf("`go build` ran %d times after an unverified download, want 0", got)
+			}
+		})
+	}
+	spectest.Proves(t, "cli/engine-provenance", "build-toolchain-stays-in-the-build",
+		"a-downloaded-go-is-installed-only-at-its-locked-or-published-sha256")
+}
+
+// sha256_of, which checks a downloaded Go archive, hashes with openssl on a
+// host that has neither sha256sum nor shasum.
+func TestPutnamiwSHA256OfFallsBackToOpenSSL(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("putnamiw is a bash script; skip on Windows")
+	}
+	bashPath, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash not available")
+	}
+	data, err := os.ReadFile(findPutnamiw(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	start := strings.Index(script, "\nsha256_of() {\n")
+	if start < 0 {
+		t.Fatal("putnamiw defines no sha256_of function")
+	}
+	end := strings.Index(script[start:], "\n}\n")
+	if end < 0 {
+		t.Fatal("sha256_of has no closing brace")
+	}
+	function := script[start : start+end+3]
+
+	tools := t.TempDir()
+	for _, tool := range []string{"awk", "openssl"} {
+		path, err := exec.LookPath(tool)
+		if err != nil {
+			t.Skipf("%s not available", tool)
+		}
+		if err := os.Symlink(path, filepath.Join(tools, tool)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	file := filepath.Join(t.TempDir(), "archive")
+	if err := os.WriteFile(file, []byte("FAKE-GO-ARCHIVE"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(bashPath, "-c", function+`sha256_of "$1"`, "bash", file)
+	cmd.Env = []string{"PATH=" + tools}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("sha256_of: %v\n%s", err, out)
+	}
+	sum := sha256.Sum256([]byte("FAKE-GO-ARCHIVE"))
+	if got, want := strings.TrimSpace(string(out)), hex.EncodeToString(sum[:]); got != want {
+		t.Errorf("sha256_of with openssl alone = %q, want %q", got, want)
+	}
+	spectest.Proves(t, "cli/engine-provenance", "build-toolchain-stays-in-the-build",
+		"a-downloaded-go-is-installed-only-at-its-locked-or-published-sha256")
 }
 
 // A concurrent `./putnamiw` at another tree state re-points the shared engine

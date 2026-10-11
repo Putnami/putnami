@@ -124,9 +124,8 @@ jobs:
           # selection possible in the first place.
           fetch-depth: 0
 
-      # Keep every wrapper invocation on the exact workspace Go version. The
-      # first putnamiw call can provision its own managed toolchain, but later
-      # fast-path calls reuse the CLI binary and inherit PATH from the runner.
+      # Keep every wrapper invocation on the exact workspace Go version: the
+      # CLI that putnamiw runs inherits PATH from the runner.
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.work

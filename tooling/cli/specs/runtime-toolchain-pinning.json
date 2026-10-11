@@ -44,6 +44,10 @@
     {
       "id": "provisioning-reports-the-installed-toolchain",
       "text": "workspace-install that starts before a required alias's pinned toolchain exists logs no warning then, since installing it can be what the run does. After the run, however it ends and including a run that plans no job, it probes each such alias again: a candidate that now matches the pin is reported at info level, and an alias still unmatched is a warning naming the extension, the alias and each rejected candidate. A run that holds no workspace-install reports nothing."
+    },
+    {
+      "id": "mismatch-names-the-install",
+      "text": "The error of a required alias whose pinned release no candidate matches names putnami install, the command that installs that release, before the rejected candidates. It names no remedy when a probe timed out, since that toolchain is there and slow, or in a hosted run, which installs no toolchain."
     }
   ],
   "decisions": [

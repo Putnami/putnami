@@ -31,6 +31,10 @@
     {
       "id": "build-only-engine",
       "text": "`./putnamiw --print-engine` builds or reuses the content-keyed store blob exactly as a normal run does, starts nothing, writes nothing under .putnami/bin, and prints one JSON line: the absolute blob path, the source key, and the absolute workspace root. That blob, started with PUTNAMI_FROM_SOURCE, PUTNAMI_FROM_SOURCE_KEY and the same PUTNAMI_HOME, is admitted as the workspace's own engine. Every failure or refusal exits non-zero with nothing on stdout."
+    },
+    {
+      "id": "build-toolchain-stays-in-the-build",
+      "text": "The wrapper builds with the go on PATH when it satisfies go.work, whose version is the higher of its go and toolchain lines, and otherwise with the managed install under the Putnami home, installed only at the SHA-256 the lock records or go.dev publishes. The resolved Go's GOROOT, its bin directory first on PATH, and GOTOOLCHAIN=local reach the build command alone: the CLI receives the caller's GOROOT, PATH and GOTOOLCHAIN, on a run that builds and on one that reuses the blob."
     }
   ],
   "decisions": [
