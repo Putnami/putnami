@@ -23,8 +23,8 @@
 # --print-engine is for a launcher that starts the engine itself. It writes
 # nothing under .putnami/bin, takes no command, and accepts --bootstrap. It is
 # refused where tooling/cli is absent, and where no content key can be computed
-# (no git work tree or no SHA-256 tool). Progress and errors go to stderr; on
-# failure it exits non-zero and prints nothing on stdout.
+# (no git work tree, or no sha256sum or shasum). Progress and errors go to
+# stderr; on failure it exits non-zero and prints nothing on stdout.
 #
 # A workspace whose lock records cli.source "workspace" admits the printed
 # binary when the process that starts it sets:
@@ -584,9 +584,9 @@ go_toolchain_identity() {
 #   3. The Go toolchain identity and the exact ldflags, so a toolchain switch or
 #      a link-flag change never reuses a foreign binary.
 #
-# No key is not an error. Git missing, $SCRIPT_DIR not a work tree, no SHA-256
-# tool, or any call failing all mean "fall back to the mtime gate", so a tarball
-# checkout still builds and runs.
+# No key is not an error. Git missing, $SCRIPT_DIR not a work tree, no sha256sum
+# or shasum, or any call failing all mean "fall back to the mtime gate", so a
+# tarball checkout still builds and runs.
 compute_source_key() {
   SOURCE_KEY=""
   local hasher status_file key record path file paths_file blobs_file _origin
@@ -1034,7 +1034,7 @@ build_cli() {
     return 0
   fi
 
-  # No key (no git, not a work tree, or no SHA-256 tool): per-worktree binary,
+  # No key (no git, not a work tree, or no sha256sum or shasum): per-worktree binary,
   # governed by the mtime gate, exactly as before.
   #
   # If a prior --download left $CLI_BINARY as a symlink into the shared store,
@@ -1112,7 +1112,7 @@ if [ "$BOOTSTRAP" = "false" ] && [ -x "$CLI_BINARY" ]; then
     fi
     # Key mismatch: fall through and rebuild.
   else
-    # No key (no git, not a work tree, or no SHA-256 tool — a tarball checkout).
+    # No key (no git, not a work tree, or no sha256sum or shasum — a tarball checkout).
     # Fall back to the historical mtime gate, unchanged.
     #
     # Staleness gate for BOTH a symlinked pin/download and a regular-file build:
@@ -1181,7 +1181,7 @@ else
   resolve_go
   build_cli
   # A keyed build published a store blob, so run it through its immutable path.
-  # Without a key (no git or no SHA-256 tool) build_cli wrote a regular file into
+  # Without a key (no git, or no sha256sum or shasum) build_cli wrote a regular file into
   # $CLI_BINARY and there is no blob to exec; fall through to the identity check.
   if [ -n "$SOURCE_KEY" ]; then
     exec_source_blob "$SOURCE_KEY" "${PASSTHROUGH_ARGS[@]}"
