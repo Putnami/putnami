@@ -652,18 +652,24 @@ next execution, and no later restore brings it back.
 The emptying runs after the drift reference is taken and before the stamp
 refresh, the `preBuild` hook and the subprocess. Each retry empties again. A
 cache hit, a follower that adopts its leader's result and a coalesced waiter
-execute nothing, so they empty nothing. Each owned entry leaves the output in
-one rename into a private directory under the workspace scratch root, or beside
-the output when a rename cannot reach the scratch root, so a reader finds an
-entry whole or gone. When the emptying fails, the task fails before its
+(a session that waits on another session's cache lease for the same key, then
+restores its entry) execute nothing, so they empty nothing. Each owned entry
+leaves the output in one rename into a private directory, so a reader finds an
+entry whole or gone. That directory is under the workspace scratch root, beside
+the output when a rename cannot reach the scratch root, or inside the output
+when the output is a mount of its own. When the emptying fails, the task fails before its
 subprocess starts, with an error that names the output, and nothing is stored.
 
 A file that another task writes inside the owned region is removed with the
-rest, exactly as a restore of the owner's entry removes it. The config schema
-fallback `.gen/config-schema.json` that `config-extract` writes when
-`options.generate.schema=false` is one: the next `build-generate` that executes
-removes it. A path that must outlive the owner's execution has to be ceded by
-the owner and declared by its writer.
+rest, exactly as a restore of the owner's entry removes it. A path that must
+outlive the owner's execution has to be ceded by the owner. The TypeScript
+`build-generate` cedes the config schema fallback `.gen/config-schema.json`,
+which `config-extract` writes when `options.generate.schema=false`, so a build
+keeps it.
+
+A task of another session in the same worktree that reads an owned directory
+while its owner runs can see it empty. The task-output locks order writers
+across sessions, not readers.
 
 Three outputs are not emptied:
 

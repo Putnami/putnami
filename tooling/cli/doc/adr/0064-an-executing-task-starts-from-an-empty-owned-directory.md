@@ -44,8 +44,9 @@ declaration, so it can give every task the same starting point.
    command-output detach, and before the stamp refresh, the `preBuild` hook and
    the subprocess. Each retry empties again before it runs.
 4. **Only an execution empties.** A cache hit, a follower of a plan-level shared
-   node (`sharedResult`) and a coalesced waiter execute nothing, so they empty
-   nothing. A follower captures the tree its leader wrote. Each member of a
+   node (`sharedResult`) and a coalesced waiter (a session that waits on
+   another session's cache lease for the same key, then restores its entry)
+   execute nothing, so they empty nothing. A follower captures the tree its leader wrote. Each member of a
    batch is emptied in its own preparation, before the one subprocess starts.
 5. **The emptying is the pruning half of a restore** (`store.EmptyTaskOutput`
    over `pruneAround`). Each owned entry leaves the output in one rename into a
@@ -87,11 +88,11 @@ declaration, so it can give every task the same starting point.
   once, so the next publication republishes those members once, as after
   [ADR 0060](0060-the-base-version-is-not-a-cache-key-input.md).
 - A file another task writes inside an owned region goes at the owner's next
-  execution, as the owner's restore already removed it. The `config-extract`
-  fallback `.gen/config-schema.json`, written when
-  `options.generate.schema=false`, is one: an executing `build-generate` removes
-  it. A path that must outlive the owner's execution has to be ceded by the
-  owner and declared by its writer.
+  execution, as the owner's restore already removed it. A path that must
+  outlive the owner's execution has to be ceded by the owner. The TypeScript
+  `build-generate` cedes the `config-extract` fallback `.gen/config-schema.json`,
+  written when `options.generate.schema=false`, because only `config-extract`
+  writes it and `cloud config publish` reads it after a build.
 - A `pathFrom` output keeps a file its generator stops emitting, in the
   worktree and in the entries captured from it. The generator owns that
   removal. Every drift-policed output in this repository is a `pathFrom`
@@ -105,7 +106,12 @@ declaration, so it can give every task the same starting point.
   falls back to the committed `schema/` copy.
 - A reader in another session, such as a development server, sees an owned
   directory empty from the emptying until the task writes it again. The
-  task-output locks order writers across sessions, not readers.
+  task-output locks order writers across sessions, not readers. A task of
+  another session in the same worktree that reads the directory meanwhile,
+  such as a transpile that reads `.gen`, can fail, or succeed on missing files
+  and store that result under its key. Before this decision the same reader
+  could already see a file mid-rewrite; the emptying widens that window to the
+  whole run of the owner.
 - A failed execution leaves only what it wrote before it failed.
 - A scheduler-level `preBuild` hook runs once per extension and project per
   session. A later executing task that owns the directory the hook wrote
