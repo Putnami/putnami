@@ -48,11 +48,10 @@
 // every entry but the subpaths the declaration cedes or preserves
 // (outputSkippedSubpaths) and the scheduler's own build stamp. That is the set
 // a restore replaces, so an execution and a restore leave the same paths
-// untouched. A file another task wrote inside the owned region, such as the
-// config-extract schema fallback under .gen, is removed with the rest, exactly
-// as a restore of the owner's entry removes it: a path that must outlive its
-// neighbor's execution has to be ceded by the owner and declared by its
-// writer.
+// untouched. A file another task wrote inside the owned region is removed with
+// the rest, exactly as a restore of the owner's entry removes it: a path that
+// must outlive its neighbor's execution has to be ceded by the owner, as the
+// TypeScript build-generate cedes the config-extract schema fallback.
 //
 // Only a required directory output with a literal path is emptied
 // (emptiedOutputDeclarations). An optionalEmpty output is not: a run that

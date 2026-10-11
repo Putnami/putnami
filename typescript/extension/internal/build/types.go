@@ -334,7 +334,7 @@ func removeLegacyTypesTsConfigs(projectPath string) error {
 //
 // tsBuildInfoDir, when non-empty, is a PERSISTENT per-(command,project) scratch
 // directory (under the workspace CacheRoot) that survives across cache misses —
-// unlike the content-addressed outputPath, which the scheduler clears every miss.
+// unlike outputPath, which RunTypes seeds from the mirror on every miss.
 // It holds two artifacts: tsc's incremental .tsbuildinfo and a "mirror" of the
 // complete declaration set, so a miss re-type-checks only the changed delta.
 //

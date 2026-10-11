@@ -847,8 +847,9 @@ func TestEmptyOwnedOutputsRefusesWithoutAWorkspaceRoot(t *testing.T) {
 // other task: a task with no declared output, an optionalEmpty directory, a
 // file output or a pathFrom output keeps the address an engine that emptied
 // nothing computed for it. The selection key, which a release-set member
-// records, moves exactly when the execution key does, so a publication
-// republishes only the members whose task owns a required directory.
+// records, moves exactly when the execution key does. A member republishes
+// when its own task owns a required directory or when one of its upstream
+// keys moved.
 func TestEmptiedOutputsMoveOnlyTheKeysOfTasksThatOwnOne(t *testing.T) {
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-entry-stored-without-emptying-is-never-served")
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-output-is-left-as-it-stands")
