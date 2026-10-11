@@ -27,7 +27,8 @@ too late.
    It reads the commits between `--base` and `HEAD`. It fails, with exit
    code 1, when one declares a breaking change and the squash commit message
    declares none. The message is `--title` alone, or the content of
-   `--message-file`: the subject on the first line, then the body. It names
+   `--message-file`, split as git splits a commit message: the subject, a
+   blank line, then the body. It names
    each such commit by its 12-character ID and its subject.
 2. **One reader.** The command reads the branch commits and the squash
    message with `ParseConventionalCommit` of the CLI protocol, the reader of

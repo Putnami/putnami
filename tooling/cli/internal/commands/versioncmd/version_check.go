@@ -31,7 +31,8 @@ type versionCheckFlags struct {
 // The check reads the commits between --base and HEAD and fails when one
 // declares a breaking change and the squash commit message declares none. It
 // names each such commit. The message is --title alone, or the content of
-// --message-file: its first line is the subject and the rest is the body. The
+// --message-file, split as git splits a commit message: the subject, a blank
+// line, then the body. The
 // check reads every message with the reader the version bump uses, so the two
 // cannot disagree.
 func VersionCheck(wsRoot string, args []string) error {
@@ -45,8 +46,7 @@ func VersionCheck(wsRoot string, args []string) error {
 		if readErr != nil {
 			return cmderr.Usagef("version check: read --message-file: %v", readErr)
 		}
-		title, body, _ = strings.Cut(string(data), "\n")
-		if title = strings.TrimSpace(title); title == "" {
+		if title, body = splitCommitMessage(string(data)); title == "" {
 			return cmderr.Usagef("version check: the first line of --message-file is empty; it is the subject of the squash commit")
 		}
 	}
@@ -88,6 +88,21 @@ func VersionCheck(wsRoot string, args []string) error {
 	}
 	message.WriteString(" If the change breaks nothing, reword the commit.")
 	return errors.New(message.String())
+}
+
+// splitCommitMessage splits a commit message into its subject and its body
+// the way git does: the subject is every line before the first blank line,
+// joined by a space, and the body is what follows. A footer written directly
+// under the first line, with no blank line, is therefore part of the subject,
+// where it declares nothing.
+func splitCommitMessage(message string) (subject, body string) {
+	lines := strings.Split(strings.ReplaceAll(message, "\r\n", "\n"), "\n")
+	end := 0
+	for end < len(lines) && strings.TrimSpace(lines[end]) != "" {
+		lines[end] = strings.TrimSpace(lines[end])
+		end++
+	}
+	return strings.Join(lines[:end], " "), strings.Join(lines[min(end+1, len(lines)):], "\n")
 }
 
 // declaringCommits renders how many commits declare a breaking change, as the

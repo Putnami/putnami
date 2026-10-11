@@ -62,7 +62,7 @@ putnami version check --base origin/main --title "feat(cli)!: drop the --all fla
 putnami version check --base origin/main --message-file squash-message.txt
 ```
 
-`version check` reads every commit between `--base` and `HEAD`, whatever line it touches. It fails when one of them declares a breaking change and the squash commit message does not. The squash message is `--title` alone, or the content of `--message-file`: its first line is the subject and the rest is the body. Every message is read by the [one conventional-commit reader](../../../protocols/cli/doc/07-conventional-commit.md) the version bump uses.
+`version check` reads every commit between `--base` and `HEAD`, whatever line it touches. It fails when one of them declares a breaking change and the squash commit message does not. The squash message is `--title` alone, or the content of `--message-file`, split as git splits a commit message: the subject, a blank line, then the body. A footer with no blank line above it is part of the subject and declares nothing. Every message is read by the [one conventional-commit reader](../../../protocols/cli/doc/07-conventional-commit.md) the version bump uses.
 
 | Branch commits | Squash message | Result |
 | --- | --- | --- |

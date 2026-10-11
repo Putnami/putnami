@@ -1816,7 +1816,8 @@
             "checks": [
               "dropped-marker-fails-and-names-the-commit",
               "title-with-the-marker-passes",
-              "no-breaking-commit-passes-any-title"
+              "no-breaking-commit-passes-any-title",
+              "shallow-clone-is-refused-by-the-check"
             ]
           }
         }

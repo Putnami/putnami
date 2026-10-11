@@ -447,7 +447,7 @@ var catalog = []Command{
 		Flags: []Flag{
 			{Long: "--base", Type: FlagValue, ValueName: "<ref>", Description: "The branch or commit the change merges into; the commits read are those from it to HEAD"},
 			{Long: "--title", Type: FlagValue, ValueName: "<title>", Description: "The subject of the squash commit, which is the pull request title; a squash commit with a body, or a title that starts with a dash, goes through --message-file"},
-			{Long: "--message-file", Type: FlagValue, ValueName: "<path>", Description: "A file holding the squash commit message: the subject on the first line, then the body when the squash commit keeps the pull request body"},
+			{Long: "--message-file", Type: FlagValue, ValueName: "<path>", Description: "A file holding the squash commit message: the subject, a blank line, then the body when the squash commit keeps the pull request body"},
 		},
 		Examples: []string{
 			"putnami version check --base origin/main --title \"feat(cli)!: drop the --all flag\"",

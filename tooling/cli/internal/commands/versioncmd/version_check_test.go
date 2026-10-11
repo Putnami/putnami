@@ -122,6 +122,18 @@ func TestVersionCheckCountsABreakingFooterInTheMessageFile(t *testing.T) {
 	}
 }
 
+// Git reads a line directly under the first one as part of the subject, so a
+// footer written there is in no body: the check reads the message as git will.
+func TestVersionCheckReadsAFooterWithoutABlankLineAsTheSubject(t *testing.T) {
+	dir, _ := branchWithCommits(t, "feat(cli)!: drop the --all flag")
+	message := writeSquashMessage(t, "feat(cli): rework the selection\nBREAKING CHANGE: --all is gone.\n")
+
+	_, err := runVersionCheck(t, dir, "--base", "main", "--message-file", message)
+	if err == nil || !strings.Contains(err.Error(), `"feat(cli): rework the selection BREAKING CHANGE: --all is gone."`) {
+		t.Fatalf("error = %v, want a failure that quotes the subject git would keep", err)
+	}
+}
+
 // A title that is not a conventional commit declares nothing, whatever its
 // body says: the version bump reads the squash commit the same way.
 func TestVersionCheckFailsATitleThatIsNotAConventionalCommit(t *testing.T) {
@@ -137,6 +149,7 @@ func TestVersionCheckFailsATitleThatIsNotAConventionalCommit(t *testing.T) {
 // A shallow clone holds part of the range: the check refuses it instead of
 // passing without the commit that declares the break.
 func TestVersionCheckRefusesAShallowClone(t *testing.T) {
+	spectest.Proves(t, "cli/version-from-git", "squash-keeps-the-breaking-marker", "shallow-clone-is-refused-by-the-check")
 	origin, _ := branchWithCommits(t, "feat(cli)!: drop the --all flag", "fix(cli): stop the leak")
 	clone := filepath.Join(t.TempDir(), "clone")
 	gitInRepo(t, t.TempDir(), "clone", "--depth", "1", "--no-single-branch", "file://"+origin, clone)
@@ -166,13 +179,14 @@ func TestVersionCheckIgnoresTheCommitsOfTheBase(t *testing.T) {
 func TestVersionCheckRefusesIncompleteArguments(t *testing.T) {
 	dir, _ := branchWithCommits(t, "feat(cli): add a flag")
 	empty := writeSquashMessage(t, "\nfeat: add\n")
+	valid := writeSquashMessage(t, "feat: add\n")
 	for name, args := range map[string][]string{
 		"no base":            {"--title", "feat: add"},
 		"no title":           {"--base", "main"},
 		"blank title":        {"--base", "main", "--title", " "},
 		"missing value":      {"--base", "main", "--title"},
 		"unknown argument":   {"--base", "main", "--title", "feat: add", "extra"},
-		"title and message":  {"--base", "main", "--title", "feat: add", "--message-file", empty},
+		"title and message":  {"--base", "main", "--title", "feat: add", "--message-file", valid},
 		"unreadable message": {"--base", "main", "--message-file", filepath.Join(dir, "missing.txt")},
 		"empty first line":   {"--base", "main", "--message-file", empty},
 	} {
