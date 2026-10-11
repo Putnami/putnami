@@ -274,21 +274,29 @@ func TestProcessDeadlineCountsTheTimeAProcessDoesNotWait(t *testing.T) {
 // that reads a lower wait, as a thread's exit does on Linux, does not throw
 // away the wait already read: the deadline keeps it and counts only the time
 // after it.
+//
+// The wait the second sample reads is the whole time since the first one, so
+// the deadline counts almost nothing at that read and always reads again,
+// however late the host fires its timer. A fixed wait shorter than that
+// lateness would let the deadline fire at the read that measured it.
 func TestProcessDeadlineKeepsTheWaitAlreadyRead(t *testing.T) {
 	t.Parallel()
-	const (
-		run    = 3 * processDeadlineMinRearm
-		waited = processDeadlineMinRearm / 2
+	const run = 3 * processDeadlineMinRearm
+	var (
+		calls       int
+		firstSample time.Time
+		waited      time.Duration
 	)
-	calls := 0
 	progress := func(*os.Process) func() processSample {
 		return func() processSample {
 			calls++
 			switch {
 			case calls == 1:
 				// The sample that sees the process run.
+				firstSample = time.Now()
 				return processSample{measured: true}
 			case calls == 2:
+				waited = time.Since(firstSample)
 				return processSample{waitedForCPU: waited, measured: true}
 			case calls%2 == 1:
 				return processSample{}
