@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -824,12 +826,18 @@ func moduleRoot(t *testing.T) string {
 func goSources(t *testing.T, root string) (production, test []string) {
 	t.Helper()
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		// The walk reads a live workspace: a build running beside the test
+		// rewrites its outputs, so an entry listed a moment ago can be gone.
+		// A vanished entry holds no source to count.
+		if err != nil && path != root && errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
 		if err != nil {
 			return err
 		}
 		if info.IsDir() {
 			switch info.Name() {
-			case ".git", ".putnami", "node_modules", "testdata", "vendor":
+			case ".gen", ".git", ".putnami", "node_modules", "testdata", "vendor":
 				return filepath.SkipDir
 			}
 			return nil
