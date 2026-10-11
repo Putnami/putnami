@@ -3,7 +3,6 @@ package deliverycli
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -158,14 +157,6 @@ const (
 	objectUploadQueue = 256
 )
 
-// objectProbeTimeout bounds the capability probe initialize makes before it
-// opens the socket. The client's own control-plane budget is 30s, which is the
-// right bound for a negotiate but not for a discovery probe that sits in front
-// of the FIRST op of every run: an unreachable or wedged cache server must cost
-// the build a few seconds, not half a minute, and the only thing lost is the
-// compiler cache.
-const objectProbeTimeout = 5 * time.Second
-
 // objectCache is the session's object-cache half: the listener, its bounded
 // serving pool, and the background upload queue that summary drains. It is nil
 // on a session that did not negotiate the capability, which is the whole off
@@ -314,9 +305,9 @@ func (s *providerSession) negotiateObjectCache(p *cache.InitializeParams) *objec
 		return nil
 	}
 
-	probeCtx, cancelProbe := context.WithTimeout(s.ctx, objectProbeTimeout)
-	defer cancelProbe()
-	caps, err := s.client.Capabilities(probeCtx)
+	// The session's one capabilities probe, bounded by capabilitiesProbeTimeout;
+	// the uploader reuses its answer to pick the task-cache write path.
+	caps, err := s.serverCapabilities()
 	if err != nil {
 		s.logCacheError("object cache capabilities", err)
 		return nil

@@ -1063,9 +1063,107 @@
         },
         "type": "object"
       },
+      "CIUsageBilled": {
+        "additionalProperties": false,
+        "properties": {
+          "cacheEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "computeEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/CIUsageBilledDay"
+            },
+            "type": "array"
+          },
+          "egressEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "gatewayEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "logsEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "perRunEur": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "runs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "totalEur": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "CIUsageBilledDay": {
+        "additionalProperties": false,
+        "properties": {
+          "cacheEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "computeEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "day": {
+            "type": "string"
+          },
+          "egressEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "gatewayEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "logsEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "perRunEur": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "runs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "totalEur": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "CIUsageResponse": {
         "additionalProperties": false,
         "properties": {
+          "billed": {
+            "$ref": "#/components/schemas/CIUsageBilled",
+            "nullable": true
+          },
           "gate": {
             "additionalProperties": {
               "$ref": "#/components/schemas/CIUsageWallSummary"
@@ -2445,6 +2543,10 @@
             "type": "string"
           },
           "enforceCoverage": {
+            "type": "boolean"
+          },
+          "fix": {
+            "nullable": true,
             "type": "boolean"
           },
           "git": {
@@ -4852,7 +4954,7 @@
     },
     "/v1/workspaces/{workspace}/ci/usage": {
       "get": {
-        "description": "Aggregate a workspace's CI runs over a reporting window (default 7d, `window` a Go duration) into counts by substrate outcome, profile, and resolution source, a gate wall-time summary per substrate, a terminal-outcome taxonomy, and an estimated spend. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
+        "description": "Aggregate a workspace's CI runs over a reporting window (default 7d, `window` a Go duration) into counts by substrate outcome, profile, and resolution source, a gate wall-time summary per substrate, a terminal-outcome taxonomy, and an estimated spend. When the daily billing read has run, `billed` adds the cost the GCP billing export charged per UTC day, from the day the window starts in to yesterday (seven days for the default window), split into compute, egress, gateway, cache, and logs. Each day is a whole UTC day with its own run count, so `billed.runs` is the sum over the listed days, not the window's run count. The gateway figure is an upper bound because the gateway also serves the console and the APIs. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
         "operationId": "getV1_Workspaces_Workspace_Ci_Usage",
         "parameters": [
           {

@@ -2,6 +2,7 @@ package remotecache
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -152,5 +153,165 @@ func TestConfig_ResolveBearerInjectedTokenIsNotRenewable(t *testing.T) {
 	if got.Token != "pkt_injected" || got.Class != TokenClassEnv || got.Class.Renewable() {
 		t.Fatalf("bearer = %+v (renewable=%t), want the injected token classed env and non-renewable",
 			got, got.Class.Renewable())
+	}
+}
+
+// A session that holds a workspace machine token and no signed-in user cannot
+// run the canonical recipe. The machine token then is the bearer, classed so a
+// refusal names its true source and never re-mints it.
+func TestConfig_MachineTokenReplacesTheCanonicalRecipe(t *testing.T) {
+	t.Setenv(TokenEnv, "")
+	metadataRan := false
+	for _, test := range []struct {
+		name   string
+		source TokenSource
+	}{
+		{name: "canonical recipe", source: TokenSource{Command: cacheTokenRecipe()}},
+		{name: "canonical recipe through the wrapper", source: TokenSource{Command: []string{"./putnamiw", "cloud", "token", "--for", "cache"}}},
+		{name: "no source", source: TokenSource{metadataToken: func(context.Context, string) (string, error) {
+			metadataRan = true
+			return "metadata-id-token", nil
+		}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c := &Config{URL: "https://cache.putnami.cloud", Token: test.source}
+			if !c.TakesMachineToken() {
+				t.Fatal("TakesMachineToken = false; this source yields to a machine token")
+			}
+			if c.SendsMachineToken() {
+				t.Fatal("SendsMachineToken = true before a token was handed over")
+			}
+			c.UseMachineToken("pkt_workspace_read")
+			got, err := c.ResolveBearer(context.Background())
+			if err != nil {
+				t.Fatalf("ResolveBearer: %v", err)
+			}
+			if got.Token != "pkt_workspace_read" || got.Class != TokenClassCloudEnv || got.Class.Renewable() {
+				t.Fatalf("bearer class = %q (renewable=%t), want the machine token classed cloud-env and non-renewable",
+					got.Class, got.Class.Renewable())
+			}
+			if metadataRan {
+				t.Fatal("the metadata source ran while a machine token is the bearer")
+			}
+		})
+	}
+}
+
+// Only the exact canonical recipe yields. A near miss is a custom command, and
+// a custom command keeps precedence. Nothing here is resolved, so no command
+// runs.
+func TestConfig_OnlyTheExactCanonicalRecipeYieldsToAMachineToken(t *testing.T) {
+	t.Setenv(TokenEnv, "")
+	for _, command := range [][]string{
+		{"putnami", "cloud", "token", "--for", "cache", "--verbose"},
+		{"putnami", "cloud", "token", "--for", "npm"},
+		{"putnami", "cloud", "token"},
+		{"putnami-cloud", "cloud", "token", "--for", "cache"},
+		{"sh", "-c", "putnami cloud token --for cache"},
+	} {
+		c := &Config{URL: "https://cache.putnami.cloud", Token: TokenSource{Command: command}}
+		c.UseMachineToken("pkt_workspace_read")
+		if c.TakesMachineToken() || c.SendsMachineToken() {
+			t.Errorf("command %q yielded to a machine token; only the canonical recipe does", strings.Join(command, " "))
+		}
+	}
+}
+
+// Every explicit source keeps precedence over a machine token: the cache token
+// override, a custom command, a URL source, a persisted metadata audience and
+// the metadata selector. The check runs when the bearer is resolved, so a
+// machine token handed over earlier is never sent in their place.
+func TestConfig_ExplicitSourcesKeepPrecedenceOverAMachineToken(t *testing.T) {
+	const machine = "pkt_workspace_read"
+	metadata := func(context.Context, string) (string, error) { return "metadata-id-token", nil }
+	for _, test := range []struct {
+		name     string
+		cacheEnv string
+		selector string
+		source   TokenSource
+		token    string
+		class    TokenClass
+	}{
+		{name: "PUTNAMI_CACHE_TOKEN over the canonical recipe", cacheEnv: "pkt_cache_override",
+			source: TokenSource{Command: cacheTokenRecipe()}, token: "pkt_cache_override", class: TokenClassEnv},
+		{name: "PUTNAMI_CACHE_TOKEN with no source", cacheEnv: "pkt_cache_override",
+			source: TokenSource{}, token: "pkt_cache_override", class: TokenClassEnv},
+		{name: "custom command", source: TokenSource{Command: []string{"sh", "-c", "printf custom-command-token"}},
+			token: "custom-command-token", class: TokenClassCommand},
+		{name: "persisted metadata audience", source: TokenSource{Audience: "https://cache.example", metadataToken: metadata},
+			token: "metadata-id-token", class: TokenClassMetadata},
+		{name: "metadata selector over the canonical recipe", selector: "metadata",
+			source: TokenSource{Command: cacheTokenRecipe(), metadataToken: metadata},
+			token:  "metadata-id-token", class: TokenClassMetadata},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv(TokenEnv, test.cacheEnv)
+			t.Setenv(TokenSourceEnv, test.selector)
+			t.Setenv(URLEnv, "")
+			t.Setenv(ModeEnv, "")
+			t.Setenv(ReadOnlyEnv, "")
+			c := &Config{URL: "https://cache.putnami.cloud", Token: test.source}
+			if err := c.ApplyEnv(); err != nil {
+				t.Fatalf("ApplyEnv: %v", err)
+			}
+			if c.TakesMachineToken() {
+				t.Fatal("TakesMachineToken = true; this source keeps precedence")
+			}
+			c.UseMachineToken(machine)
+			if c.SendsMachineToken() {
+				t.Fatal("SendsMachineToken = true; this source keeps precedence")
+			}
+			got, err := c.ResolveBearer(context.Background())
+			if err != nil {
+				t.Fatalf("ResolveBearer: %v", err)
+			}
+			if got.Token != test.token || got.Class != test.class {
+				t.Fatalf("bearer class = %q, want %q from the configured source, not the machine token", got.Class, test.class)
+			}
+		})
+	}
+}
+
+// A URL source keeps precedence too. It is checked without a request: the
+// config must not yield, and the machine token must not be the bearer.
+func TestConfig_URLSourceKeepsPrecedenceOverAMachineToken(t *testing.T) {
+	t.Setenv(TokenEnv, "")
+	t.Setenv(AllowInsecureCacheEnv, "")
+	c := &Config{URL: "https://cache.putnami.cloud", Token: TokenSource{URL: "http://tokens.invalid/cache"}}
+	c.UseMachineToken("pkt_workspace_read")
+	if c.TakesMachineToken() || c.SendsMachineToken() {
+		t.Fatal("a URL token source yielded to a machine token")
+	}
+	got, err := c.ResolveBearer(context.Background())
+	if err == nil {
+		t.Fatal("ResolveBearer answered without the URL source; plain http to a remote host must be refused")
+	}
+	if got.Token != "" || got.Class != TokenClassURL {
+		t.Fatalf("bearer class = %q with a token of %d bytes, want an empty url-class bearer", got.Class, len(got.Token))
+	}
+}
+
+// The machine token is execution-local: a config that holds one marshals
+// without it, and a nil or empty config never sends one.
+func TestConfig_MachineTokenIsNeverPersisted(t *testing.T) {
+	t.Setenv(TokenEnv, "")
+	c := &Config{URL: "https://cache.putnami.cloud", Token: TokenSource{Command: cacheTokenRecipe()}}
+	c.UseMachineToken("pkt_workspace_read")
+	data, err := json.Marshal(c)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if strings.Contains(string(data), "pkt_workspace_read") {
+		t.Fatal("the marshaled config carries the machine token")
+	}
+
+	var absent *Config
+	if absent.TakesMachineToken() || absent.SendsMachineToken() {
+		t.Fatal("a nil config takes a machine token")
+	}
+	empty := &Config{URL: "https://cache.putnami.cloud"}
+	empty.UseMachineToken("")
+	if empty.SendsMachineToken() {
+		t.Fatal("an empty machine token is sent")
 	}
 }

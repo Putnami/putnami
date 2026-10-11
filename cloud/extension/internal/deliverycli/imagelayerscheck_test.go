@@ -228,6 +228,8 @@ func TestImageLayersCheckRefusesAStaleExtensionPin(t *testing.T) {
 	cases := map[string]struct {
 		lock  string
 		wants []string
+		// refuses names text the refusal must not contain.
+		refuses []string
 	}{
 		"the workspace repinned an extension": {
 			lock: `{"cli":{"version":"0.1.0-dedb6e331","integrities":{"linux/amd64":"` + strings.Repeat("a", 64) + `"}},` +
@@ -240,6 +242,23 @@ func TestImageLayersCheckRefusesAStaleExtensionPin(t *testing.T) {
 				`"extensions":{"@putnami/go":{"version":"0.1.0-goext"},` +
 				`"@putnami/typescript":{"version":"0.1.0-tsext","integrities":{"linux/amd64":"` + strings.Repeat("c", 64) + `"}}}}`,
 			wants: []string{"putnami-warm", `records no extensions["@putnami/go"].integrities`},
+		},
+		// The warm set is the lock's whole extensions block, so a
+		// lock that gains or loses an extension describes another store. The
+		// restored staticcheck layer reads only @putnami/go and stays current.
+		"the workspace added an extension": {
+			lock: `{"cli":{"version":"0.1.0-dedb6e331","integrities":{"linux/amd64":"` + strings.Repeat("a", 64) + `"}},` +
+				`"extensions":{"@putnami/go":{"version":"0.1.0-goext","integrities":{"linux/amd64":"` + imageLayersCheckGoExtensionSHA + `"}},` +
+				`"@putnami/typescript":{"version":"0.1.0-tsext","integrities":{"linux/amd64":"` + strings.Repeat("c", 64) + `"}},` +
+				`"@putnami/cloud":{"version":"0.1.0-cloudext","integrities":{"linux/amd64":"` + strings.Repeat("d", 64) + `"}}}}`,
+			wants:   []string{"putnami-warm", "now declares @putnami/cloud 0.1.0-cloudext " + strings.Repeat("d", 64)},
+			refuses: []string{"staticcheck:"},
+		},
+		"the workspace dropped an extension": {
+			lock: `{"cli":{"version":"0.1.0-dedb6e331","integrities":{"linux/amd64":"` + strings.Repeat("a", 64) + `"}},` +
+				`"extensions":{"@putnami/go":{"version":"0.1.0-goext","integrities":{"linux/amd64":"` + imageLayersCheckGoExtensionSHA + `"}}}}`,
+			wants:   []string{"putnami-warm", "now declares @putnami/go 0.1.0-goext " + imageLayersCheckGoExtensionSHA + "\n"},
+			refuses: []string{"staticcheck:"},
 		},
 	}
 	for name, tc := range cases {
@@ -255,6 +274,11 @@ func TestImageLayersCheckRefusesAStaleExtensionPin(t *testing.T) {
 			for _, want := range tc.wants {
 				if !strings.Contains(err.Error(), want) {
 					t.Fatalf("refusal %q does not name %q", err, want)
+				}
+			}
+			for _, refused := range tc.refuses {
+				if strings.Contains(err.Error(), refused) {
+					t.Fatalf("refusal %q also names %q", err, refused)
 				}
 			}
 		})

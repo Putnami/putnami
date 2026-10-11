@@ -65,7 +65,7 @@
     }
   },
   "info": {
-    "description": "The auth-server routes a Putnami workload calls with its own identity: RFC 8693 token exchange, API keys, bounded delegations, cache-write and dependency-read leases, identity-outbox control, and the operator reader and executor surfaces. Consumers call them through the generated client in clients/go. The OAuth 2.0 and OpenID Connect legs this server also serves are owned by their standards and are not in this document.",
+    "description": "The auth-server routes a Putnami workload calls with its own identity: RFC 8693 token exchange, API keys, bounded delegations, the cache-write lease, identity-outbox control, and the operator reader and executor surfaces. Consumers call them through the generated client in clients/go. The OAuth 2.0 and OpenID Connect legs this server also serves are owned by their standards and are not in this document.",
     "title": "Putnami Auth Server",
     "version": "1.0.0"
   },

@@ -138,7 +138,7 @@ func TestTokenClass_OnlyReMintableSourcesAreRenewable(t *testing.T) {
 	}
 	// A credential the runner holds as opaque bytes cannot be re-derived, so
 	// "refreshing" it would resend the rejected bytes — a fake refresh.
-	for _, class := range []TokenClass{TokenClassNone, TokenClassEnv, TokenClassStatic} {
+	for _, class := range []TokenClass{TokenClassNone, TokenClassEnv, TokenClassStatic, TokenClassCloudEnv} {
 		if class.Renewable() {
 			t.Errorf("%s.Renewable() = true; this source cannot be re-minted by the runner", class)
 		}
@@ -205,6 +205,105 @@ func TestDoAuthed_StaticEnvTokenIsNeverRefreshed(t *testing.T) {
 	}
 	if failures[0].Refreshed {
 		t.Error("Refreshed = true for a static env token; there is no source to re-run")
+	}
+}
+
+// A workspace machine token from PUTNAMI_CLOUD_TOKEN is bytes the session
+// cannot re-derive, like the static cache token. A refusal sends it once and
+// reports it under its own class: the canonical recipe it replaced (which would
+// fail loudly if it ran here) is never invoked to "refresh" it, and the
+// refusal record does not carry the bearer.
+func TestDoAuthed_MachineTokenIsNeverRefreshed(t *testing.T) {
+	t.Setenv(TokenEnv, "")
+	const machine = "pkt_workspace_machine_token"
+	server := &cacheServer{}
+	srv := server.start(t)
+
+	rec := &authRecorder{}
+	cfg := &Config{URL: srv.URL, Token: TokenSource{Command: []string{"/nonexistent/putnami", "cloud", "token", "--for", "cache"}}}
+	cfg.UseMachineToken(machine)
+	c := NewClient(srv.URL, "", WithBearerFunc(cfg.ResolveBearer), WithAuthObserver(rec.observe))
+
+	err := negotiateOnce(c)
+	if err == nil {
+		t.Fatal("negotiate succeeded against a server that refuses every bearer")
+	}
+	if strings.Contains(err.Error(), machine) {
+		t.Fatal("the refusal error carries the machine token")
+	}
+
+	sent := server.seen()
+	if len(sent) != 1 {
+		t.Fatalf("sent %d request(s); a machine token must never be replayed", len(sent))
+	}
+	if sent[0] != machine {
+		t.Fatal("the bearer on the wire is not the machine token")
+	}
+	failures := rec.all()
+	if len(failures) != 1 {
+		t.Fatalf("recorded %d refusal(s), want exactly 1: %+v", len(failures), failures)
+	}
+	if failures[0].Source != TokenClassCloudEnv {
+		t.Errorf("Source = %q, want %q", failures[0].Source, TokenClassCloudEnv)
+	}
+	if failures[0].Refreshed {
+		t.Error("Refreshed = true for a machine token; there is no source to re-run")
+	}
+	if line := failures[0].String(); strings.Contains(line, machine) || !strings.Contains(line, "source=cloud-env") {
+		t.Errorf("refusal line = %q, want source=cloud-env and no bearer", line)
+	}
+}
+
+// A caller turns a refused answer into a StatusError and logs it. A server
+// that echoes the bearer in its code or its reason must not reach the run log
+// that way either: the error carries the same redaction as the refusal record,
+// for a refusal and for any other failed answer.
+func TestDoAuthed_EchoedBearerNeverReachesTheReturnedError(t *testing.T) {
+	const bearer = "pkt_echoed_machine_token"
+	for _, test := range []struct {
+		name   string
+		status int
+		body   cache.ErrorResponse
+		want   string
+	}{
+		{name: "refusal reason", status: http.StatusUnauthorized,
+			body: cache.ErrorResponse{ProtocolVersion: cache.ProtocolVersion, Code: cache.CodeUnauthorized, Message: "token " + bearer + " is revoked"},
+			want: "negotiate failed: HTTP 401: unauthorized: [redacted: server echoed the bearer]"},
+		{name: "scope denial reason", status: http.StatusForbidden,
+			body: cache.ErrorResponse{ProtocolVersion: cache.ProtocolVersion, Code: cache.CodeUnauthorized, Message: bearer},
+			want: "negotiate failed: HTTP 403: unauthorized: [redacted: server echoed the bearer]"},
+		{name: "server error reason", status: http.StatusInternalServerError,
+			body: cache.ErrorResponse{ProtocolVersion: cache.ProtocolVersion, Code: "internal", Message: "panic while reading " + bearer},
+			want: "negotiate failed: HTTP 500: internal: [redacted: server echoed the bearer]"},
+		{name: "code", status: http.StatusBadRequest,
+			body: cache.ErrorResponse{ProtocolVersion: cache.ProtocolVersion, Code: bearer, Message: "bad request"},
+			want: "negotiate failed: HTTP 400: redacted: bad request"},
+		{name: "no echo", status: http.StatusUnauthorized,
+			body: cache.ErrorResponse{ProtocolVersion: cache.ProtocolVersion, Code: cache.CodeUnauthorized, Message: "the token is revoked"},
+			want: "negotiate failed: HTTP 401: unauthorized: the token is revoked"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv(TokenEnv, "")
+			server := &cacheServer{status: test.status, body: test.body}
+			srv := server.start(t)
+			cfg := &Config{URL: srv.URL}
+			cfg.UseMachineToken(bearer)
+			c := NewClient(srv.URL, "", WithBearerFunc(cfg.ResolveBearer))
+
+			err := negotiateOnce(c)
+			if err == nil {
+				t.Fatal("negotiate succeeded against a server that fails every request")
+			}
+			if strings.Contains(err.Error(), bearer) {
+				t.Fatal("the returned error carries the bearer")
+			}
+			if err.Error() != test.want {
+				t.Fatalf("error = %q, want %q", err.Error(), test.want)
+			}
+			if !IsStatus(err, test.status) {
+				t.Fatalf("error = %v, want a surfaced HTTP %d", err, test.status)
+			}
+		})
 	}
 }
 

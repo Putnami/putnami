@@ -67,7 +67,7 @@ func ActiveAuth(params map[string]any, env map[string]string, ioctx IO) (*Stored
 // machine token is valid, and ActiveAuth never accepts it. Any other error is
 // returned as is.
 func UserSessionError(err error, env map[string]string) error {
-	if err == nil || ExitCode(err) != ExitAuth || !machineTokenOnly(env) {
+	if err == nil || ExitCode(err) != ExitAuth || !MachineTokenOnly(env) {
 		return err
 	}
 	return NewError("needs a signed-in user; PUTNAMI_CLOUD_TOKEN cannot read it", ExitAuth)
@@ -79,15 +79,16 @@ func UserSessionError(err error, env map[string]string) error {
 // fix to name.
 func UserSessionStatus(id, title string, err error, env map[string]string) StatusNode {
 	fix := ""
-	if ExitCode(err) == ExitAuth && !machineTokenOnly(env) {
+	if ExitCode(err) == ExitAuth && !MachineTokenOnly(env) {
 		fix = "putnami cloud login"
 	}
 	return UnknownStatus(id, title, UserSessionError(err, env), fix)
 }
 
-// machineTokenOnly reports whether the command runs on PUTNAMI_CLOUD_TOKEN
-// with no stored user session.
-func machineTokenOnly(env map[string]string) bool {
+// MachineTokenOnly reports whether the command runs on PUTNAMI_CLOUD_TOKEN
+// with no stored user session. The build cache provider uses it too: it reads
+// the cache with that token only when no signed-in user can mint one.
+func MachineTokenOnly(env map[string]string) bool {
 	if EnvGet(env, "PUTNAMI_CLOUD_TOKEN") == "" {
 		return false
 	}

@@ -17,12 +17,12 @@ import (
 )
 
 // The control operations (negotiate, capabilities, store, commit, find-missing,
-// commit-batch, download-batch, object lookup and store, run-marker lookup and
-// publish) go through cache-server's generated client. The generated call owns
-// the route, the request and answer schemas, the X-Client-Id identity and the
-// redirect refusal. This client keeps what the contract cannot state: the
-// bearer's lifecycle (doAuthed), the shared strict-v1 parsers that read the
-// answer, and the redacted refusal record.
+// upload-batch, commit-batch, download-batch, object lookup and store,
+// run-marker lookup and publish) go through cache-server's generated client.
+// The generated call owns the route, the request and answer schemas, the
+// X-Client-Id identity and the redirect refusal. This client keeps what the
+// contract cannot state: the bearer's lifecycle (doAuthed), the shared
+// strict-v1 parsers that read the answer, and the redacted refusal record.
 //
 // The same calls also reach any third-party server that speaks protocol/cache
 // at PUTNAMI_CACHE_URL. controlTransport holds the branches that keep those

@@ -23,6 +23,16 @@ func setupCacheEnv(t *testing.T) (home, workspaceRoot string) {
 	return home, workspaceRoot
 }
 
+// clearCacheOverrides keeps the host's PUTNAMI_CACHE_* overrides out of a cache
+// status test: the status builds its config from them, the way a build does,
+// and a hosted runner exports them to its gate.
+func clearCacheOverrides(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{"PUTNAMI_CACHE_URL", "PUTNAMI_CACHE_MODE", "PUTNAMI_CACHE_READ_ONLY", "PUTNAMI_CACHE_TOKEN_SOURCE"} {
+		t.Setenv(name, "")
+	}
+}
+
 func runSetup(t *testing.T, home, workspaceRoot string, args ...string) []string {
 	t.Helper()
 	fake := newFakeTransport(t)
@@ -375,9 +385,10 @@ func TestSetupHonorsCacheModeAndURL(t *testing.T) {
 
 // TestCloudTokenForCacheEmitsBareBearer proves the cache-purpose contract end
 // to end: an ordinary fresh workspace cache cannot satisfy it, the ephemeral
-// key and OAuth exchange both request exactly cache.read+cache.write for the
-// configured workspace, the backing key is cleaned up, and stdout is one bare
-// least-privilege bearer even with --json present.
+// key and OAuth exchange both request exactly cache.read for the configured
+// workspace (a developer reads the shared cache and writes nothing), the
+// backing key is cleaned up, and stdout is one bare least-privilege bearer even
+// with --json present.
 func TestCloudTokenForCacheEmitsBareBearer(t *testing.T) {
 	for _, extra := range [][]string{{"--for", "cache"}, {"--for", "cache", "--json"}} {
 		home := t.TempDir()
@@ -436,15 +447,18 @@ func TestCloudTokenForCacheEmitsBareBearer(t *testing.T) {
 		if claims["aud"] != cacheOAuthClientID {
 			t.Fatalf("cloud token %v aud = %v, want %q", extra, claims["aud"], cacheOAuthClientID)
 		}
-		if claims["scope"] != cacheAllowedScopes {
-			t.Fatalf("cloud token %v scope = %v, want %q", extra, claims["scope"], cacheAllowedScopes)
+		if claims["scope"] != cacheReadScope {
+			t.Fatalf("cloud token %v scope = %v, want %q", extra, claims["scope"], cacheReadScope)
 		}
 		if len(fake.mintedKeys) != 1 {
 			t.Fatalf("cloud token %v minted keys = %d, want 1", extra, len(fake.mintedKeys))
 		}
 		minted := fake.mintedKeys[0]
-		if minted["allowed_scopes"] != cacheAllowedScopes || minted["workspace_id"] != "ws-acme" {
-			t.Fatalf("cloud token %v key scope/workspace = %v/%v, want %q/ws-acme", extra, minted["allowed_scopes"], minted["workspace_id"], cacheAllowedScopes)
+		if minted["allowed_scopes"] != "cache.read" {
+			t.Fatalf("cloud token %v key scope = %v, want cache.read only (no cache.write)", extra, minted["allowed_scopes"])
+		}
+		if minted["allowed_scopes"] != cacheReadScope || minted["workspace_id"] != "ws-acme" {
+			t.Fatalf("cloud token %v key scope/workspace = %v/%v, want %q/ws-acme", extra, minted["allowed_scopes"], minted["workspace_id"], cacheReadScope)
 		}
 		if minted["expires_at"] != fixedNow().Add(10*time.Minute).Format(time.RFC3339Nano) {
 			t.Fatalf("cloud token %v key expires_at = %v, want ten-minute bound", extra, minted["expires_at"])
@@ -460,7 +474,7 @@ func TestCloudTokenForCacheEmitsBareBearer(t *testing.T) {
 		if grant == nil {
 			t.Fatalf("cloud token %v did not exchange the cache api key", extra)
 		}
-		if grant.Body["client_id"] != cacheOAuthClientID || grant.Body["scope"] != cacheAllowedScopes || grant.Body["workspace_id"] != "ws-acme" {
+		if grant.Body["client_id"] != cacheOAuthClientID || grant.Body["scope"] != cacheReadScope || grant.Body["workspace_id"] != "ws-acme" {
 			t.Fatalf("cloud token %v grant client/scope/workspace = %v/%v/%v", extra, grant.Body["client_id"], grant.Body["scope"], grant.Body["workspace_id"])
 		}
 		if len(fake.revokedIDs) != 1 || fake.revokedIDs[0] != minted["id"] {
@@ -492,9 +506,9 @@ func TestCloudTokenForCacheFailsClosedAndCleansUpEphemeralKey(t *testing.T) {
 		{
 			name: "missing required token scope",
 			configure: func(fake *fakeTransport) {
-				fake.apiKeyGrantScope = "cache.read"
+				fake.apiKeyGrantScope = "openid"
 			},
-			wantError: "without required scopes \"cache.read cache.write\"",
+			wantError: "without required scopes \"cache.read\"",
 		},
 	}
 
@@ -557,6 +571,7 @@ func TestCloudTokenForCacheCompatibilityFlagIsRemoved(t *testing.T) {
 // TestCacheStatusReportsConfig proves `cloud cache status` surfaces the
 // persisted config, bound workspace, and local identity.
 func TestCacheStatusReportsConfig(t *testing.T) {
+	clearCacheOverrides(t)
 	home, workspaceRoot := setupCacheEnv(t)
 	runSetup(t, home, workspaceRoot)
 
@@ -594,6 +609,7 @@ func TestCacheStatusReportsConfig(t *testing.T) {
 }
 
 func TestCacheStatusNotConfigured(t *testing.T) {
+	clearCacheOverrides(t)
 	workspaceRoot := t.TempDir()
 	var output []string
 	err := RunCommand("cache", IO{

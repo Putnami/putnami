@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -18,8 +19,9 @@ import (
 // These collapse that: FindMissing dedups a whole window's blobs in one request
 // and CommitBatch finalizes the window's entries in one request. Capabilities
 // lets the client discover whether the server implements the batched path and
-// fall back to store/commit otherwise. Bytes still stream per blob — only the
-// control plane is batched.
+// fall back to store/commit otherwise. Bytes still stream per blob, except the
+// small ones: UploadBatch carries those inline, a few requests per window, on
+// a server that advertises it.
 
 // Capabilities probes the server for the optional capabilities it supports
 // beyond the v1 baseline. The endpoint is a discovery PROBE only, and the server
@@ -89,6 +91,7 @@ func (c *Client) FindMissing(ctx context.Context, req *cache.FindMissingRequest)
 			return nil, fmt.Errorf("find-missing response requested upload for digest %s outside request", up.Digest)
 		}
 	}
+	c.writes.accept()
 	return out, nil
 }
 
@@ -127,6 +130,30 @@ func (c *Client) CommitBatch(ctx context.Context, req *cache.CommitBatchRequest)
 			return nil, fmt.Errorf("commit-batch response missing result for key %q", key)
 		}
 	}
+	c.writes.accept()
+	return out, nil
+}
+
+// UploadBatch stores several small blobs inline in one request (the analog of
+// Bazel's BatchUpdateBlobs). Used only when the server advertises
+// CapabilityUploadBatch. cache-server serves the route and stores the blobs of
+// one request as one pack object, so the call goes through its generated
+// client like the other control operations.
+func (c *Client) UploadBatch(ctx context.Context, req *cache.UploadBatchRequest) (*cache.UploadBatchResponse, error) {
+	if diags := cache.ValidateUploadBatchRequest(req); diag.HasErrors(diags) {
+		return nil, fmt.Errorf("invalid upload-batch request: %s", firstError(diags))
+	}
+
+	data, err := postControl(ctx, c, "upload-batch", req, (*cacheserverclient.CacheClient).CreateV1CacheUploadBatch)
+	if err != nil {
+		return nil, err
+	}
+
+	out, diags := cache.ParseAndValidateUploadBatchResponse(data)
+	if diag.HasErrors(diags) {
+		return nil, fmt.Errorf("invalid upload-batch response: %s", firstError(diags))
+	}
+	c.writes.accept()
 	return out, nil
 }
 
@@ -178,8 +205,15 @@ type PresenceCache interface {
 // verified present in CAS (uploaded or server-deduped), so the caller can add
 // them to its PresenceCache; it deliberately excludes digests that were skipped
 // because the PresenceCache already had them.
+//
+// Failed holds, by key, why an entry was not stored: a blob of its manifest
+// could not be uploaded, or its own store failed after the window was split.
+// Such an entry was never sent to commit-batch with a blob missing, so it is
+// never in Committed. An entry in neither map was sent and the server answered
+// that it did not commit it.
 type BatchOutcome struct {
 	Committed     map[string]bool
+	Failed        map[string]error
 	BlobsUploaded int
 	BytesUploaded int64
 	BytesDeduped  int64
@@ -196,6 +230,129 @@ type WritePath struct {
 	// cache.MaxInlineBlobBytes inline in one upload-batch request; larger blobs
 	// still take the Grant/find-missing path.
 	CoalesceSmall bool
+	// BlobConcurrency bounds how many blobs upload at once over their presigned
+	// PUTs after a find-missing. Zero selects blobUploadConcurrency, the bound
+	// for one key's blobs; a caller that stores many keys in one window raises it.
+	BlobConcurrency int
+	// Retry bounds the retries of a control exchange that fails for a transient
+	// reason, and says whether a window that still fails is split. The zero
+	// value sends each exchange once and splits nothing.
+	Retry WriteRetry
+}
+
+// TaskWritePath reads the task-cache write path from a capabilities probe.
+// batched is true only when the server advertises both find-missing and
+// commit-batch, the two exchanges StoreBatch sends; otherwise the caller stores
+// entry by entry with StoreResult, which every server serves. A nil probe
+// selects the per-entry path. CoalesceSmall follows upload-batch, as it does for
+// ObjectWritePath.
+func TaskWritePath(caps *cache.CapabilitiesResponse) (wp WritePath, batched bool) {
+	if caps == nil {
+		return WritePath{}, false
+	}
+	var findMissing, commitBatch bool
+	for _, capability := range caps.Capabilities {
+		switch capability {
+		case cache.CapabilityFindMissing:
+			findMissing = true
+		case cache.CapabilityCommitBatch:
+			commitBatch = true
+		case cache.CapabilityUploadBatch:
+			wp.CoalesceSmall = true
+		}
+	}
+	if !findMissing || !commitBatch {
+		return WritePath{}, false
+	}
+	return wp, true
+}
+
+// blobState is what one StoreBatch or StoreObjects call knows about its blobs.
+// It outlives the passes of the call (the window, the entries of a split
+// window, the recovery of an evicted blob), so no pass sends a blob that an
+// earlier pass stored, and none tries again a blob whose upload failed.
+type blobState struct {
+	mu  sync.Mutex
+	out *BatchOutcome
+	// stored holds the digests this call saw in CAS: it uploaded them, or the
+	// server reported that it already had them.
+	stored map[string]bool
+	// failed holds the digests whose upload failed, with the cause. A failed
+	// digest stays failed for the whole call.
+	failed map[string]error
+	// first is the first failure recorded.
+	first error
+}
+
+func newBlobState(out *BatchOutcome) *blobState {
+	return &blobState{out: out, stored: make(map[string]bool), failed: make(map[string]error)}
+}
+
+// uploaded records a blob this call stored.
+func (st *blobState) uploaded(digest string, size int64) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.stored[digest] = true
+	st.out.BlobsUploaded++
+	st.out.BytesUploaded += size
+	st.out.Confirmed = append(st.out.Confirmed, digest)
+}
+
+// present records a blob the server already had.
+func (st *blobState) present(digest string, size int64) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.stored[digest] = true
+	st.out.BytesDeduped += size
+	st.out.Confirmed = append(st.out.Confirmed, digest)
+}
+
+// fail records a blob that could not be uploaded.
+func (st *blobState) fail(digest string, err error) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if _, already := st.failed[digest]; already {
+		return
+	}
+	st.failed[digest] = err
+	if st.first == nil {
+		st.first = err
+	}
+}
+
+// settled reports whether the call already has an answer for the blob: it is
+// stored, or its upload failed.
+func (st *blobState) settled(digest string) bool {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.stored[digest] {
+		return true
+	}
+	_, failed := st.failed[digest]
+	return failed
+}
+
+// failure returns why a manifest cannot be stored: the first of its blobs, in
+// file order, whose upload failed. It returns nil when none failed.
+func (st *blobState) failure(m *cache.Manifest) error {
+	if m == nil {
+		return nil
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	for _, f := range m.Files {
+		if err, failed := st.failed[f.Digest]; failed {
+			return err
+		}
+	}
+	return nil
+}
+
+// firstFailure returns the first blob failure of the call, or nil.
+func (st *blobState) firstFailure() error {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	return st.first
 }
 
 // StoreBatch runs the batched write path for a window of built entries (the same
@@ -206,6 +363,26 @@ type WritePath struct {
 // an upload-batch request and the rest go via the direct grant or find-missing;
 // commit-batch always finalizes.
 //
+// A failure costs as few entries as it can:
+//
+//   - A blob that cannot be uploaded (its PUT failed, or its bytes cannot be
+//     read) fails only the entries whose manifest names it. They are reported
+//     in BatchOutcome.Failed and are not sent to commit-batch; the other
+//     entries of the window are committed. An entry is never committed, or
+//     reported stored, without every one of its blobs in CAS.
+//   - A control exchange that fails for a transient reason is sent again, as
+//     wp.Retry allows.
+//   - A window that still fails as a whole is stored one entry at a time, once
+//     and without retries, when wp.Retry.SplitWindow is set: one entry the
+//     server cannot take then costs that entry alone. A blob an earlier pass
+//     stored is not sent again. The split ends after splitStopAfter entries in
+//     a row failed for a transient reason.
+//
+// StoreBatch returns an error, and no outcome, when the window stored nothing
+// for a reason every entry shares: the server refused the credential (a 401 or
+// a 403, never retried and never split), ctx is done, or the server kept
+// failing. Otherwise it returns the outcome, with the entries that failed.
+//
 // When known is non-nil, blobs it reports present are skipped from the
 // discovery/upload step. That skip is an optimistic bet: a blob the cache evicted
 // since the prior run would then be absent, so its entry fails to commit.
@@ -214,31 +391,34 @@ type WritePath struct {
 // never risks a bad commit — commit-batch verifies blob presence server-side —
 // only an extra round for the rare eviction.
 func (c *Client) StoreBatch(ctx context.Context, in []StoreInput, src BlobSource, known PresenceCache, wp WritePath) (*BatchOutcome, error) {
-	out := &BatchOutcome{Committed: make(map[string]bool, len(in))}
+	out := &BatchOutcome{Committed: make(map[string]bool, len(in)), Failed: make(map[string]error)}
 	if len(in) == 0 {
 		return out, nil
 	}
+	st := newBlobState(out)
 
-	flush := func(entries []StoreInput, knownArg PresenceCache) error {
-		return c.flushBatch(ctx, entries, src, knownArg, wp, out)
-	}
-
-	if err := flush(in, known); err != nil {
-		return nil, err
+	if err := c.flushBatch(ctx, in, src, known, wp, st); err != nil {
+		if !wp.Retry.SplitWindow || len(in) < 2 || authRefused(err) || ctx.Err() != nil {
+			return nil, err
+		}
+		if err := c.storeSplit(ctx, in, src, known, wp, st, err); err != nil {
+			return nil, err
+		}
 	}
 
 	// Recovery: any entry that did not commit referenced a blob the optimistic
 	// skip wrongly assumed present (the cache evicted it). Re-run those entries
-	// with no presence filter so the upload re-sends the evicted blob.
+	// with no presence filter so the upload re-sends the evicted blob. An entry
+	// that failed for a cause of its own is left as it is.
 	if known != nil {
 		var retry []StoreInput
 		for _, e := range in {
-			if !out.Committed[e.Key] {
+			if _, failed := out.Failed[e.Key]; !failed && !out.Committed[e.Key] {
 				retry = append(retry, e)
 			}
 		}
 		if len(retry) > 0 {
-			if err := flush(retry, nil); err != nil {
+			if err := c.flushBatch(ctx, retry, src, nil, wp, st); err != nil {
 				return nil, err
 			}
 		}
@@ -246,15 +426,72 @@ func (c *Client) StoreBatch(ctx context.Context, in []StoreInput, src BlobSource
 	return out, nil
 }
 
-// flushBatch uploads a window's blobs and commit-batches its entries, into out.
-// Blobs that known reports present are skipped (counted as deduped). With
-// wp.CoalesceSmall, blobs at or below cache.MaxInlineBlobBytes are sent via
-// upload-batch; the rest take the direct grant or find-missing. Confirmed gains
-// every blob this pass verified present — not the known-skipped ones, which the
-// caller already has.
-func (c *Client) flushBatch(ctx context.Context, entries []StoreInput, src BlobSource, known PresenceCache, wp WritePath, out *BatchOutcome) error {
+// storeSplit stores the entries of a window that failed as a whole one at a
+// time, once, and records in the outcome why each one that fails did. cause is
+// the window's failure. It returns an error when the split stored nothing: the
+// server refused the credential, or no entry got through, and the window's
+// failure is then the one to report.
+func (c *Client) storeSplit(ctx context.Context, in []StoreInput, src BlobSource, known PresenceCache, wp WritePath, st *blobState, cause error) error {
+	out := st.out
+	single := wp
+	single.Retry = WriteRetry{} // each entry is sent once: the window already had its retries
+
+	var (
+		last      = cause
+		transient int
+		stored    bool
+	)
+	for _, e := range in {
+		if out.Committed[e.Key] {
+			stored = true
+			continue
+		}
+		if _, failed := out.Failed[e.Key]; failed {
+			continue
+		}
+		if ctx.Err() != nil || transient >= splitStopAfter {
+			out.Failed[e.Key] = last
+			continue
+		}
+		err := c.flushBatch(ctx, []StoreInput{e}, src, known, single, st)
+		switch {
+		case err == nil:
+			transient = 0
+			stored = stored || out.Committed[e.Key]
+		case authRefused(err):
+			return err
+		default:
+			out.Failed[e.Key] = err
+			last = err
+			if transientFailure(err) {
+				transient++
+			} else {
+				transient = 0
+			}
+		}
+	}
+	if !stored {
+		return cause
+	}
+	return nil
+}
+
+// flushBatch uploads the blobs of entries and commit-batches the entries whose
+// blobs are all in CAS, into the call's outcome. Blobs that known reports
+// present are skipped (counted as deduped), and so are the blobs an earlier
+// pass of the call already settled. An entry with a blob that could not be
+// uploaded is recorded in Failed and left out of the commit; it does not fail
+// the pass.
+//
+// The error it returns is a failure of the pass as a whole: a control exchange
+// failed, and nothing says which entry is the cause.
+func (c *Client) flushBatch(ctx context.Context, entries []StoreInput, src BlobSource, known PresenceCache, wp WritePath, st *blobState) error {
+	out := st.out
 	sizeByDigest := make(map[string]int64)
 	for _, e := range entries {
+		if st.failure(e.Manifest) != nil {
+			continue // already lost: none of its other blobs is worth sending
+		}
 		for d, s := range manifestSizes(e.Manifest) {
 			if _, ok := sizeByDigest[d]; !ok {
 				sizeByDigest[d] = s
@@ -265,175 +502,335 @@ func (c *Client) flushBatch(ctx context.Context, entries []StoreInput, src BlobS
 	// Partition into blobs to upload vs. blobs a prior run already confirmed.
 	toUpload := make([]cache.BlobRef, 0, len(sizeByDigest))
 	for d, s := range sizeByDigest {
+		if st.settled(d) {
+			continue
+		}
 		if known != nil && known.Present(d) {
 			out.BytesDeduped += s // already present remotely; not sent or uploaded
 			continue
 		}
 		toUpload = append(toUpload, cache.BlobRef{Digest: d, SizeBytes: s})
 	}
+	// A stable order: the requests of a window do not depend on map iteration.
+	slices.SortFunc(toUpload, func(a, b cache.BlobRef) int { return strings.Compare(a.Digest, b.Digest) })
 
-	// Coalesce small blobs into upload-batch when enabled; the rest take the
-	// per-blob path.
-	perBlob := toUpload
-	if wp.CoalesceSmall {
-		var small, large []cache.BlobRef
-		for _, b := range toUpload {
-			if b.SizeBytes <= cache.MaxInlineBlobBytes {
-				small = append(small, b)
-			} else {
-				large = append(large, b)
-			}
-		}
-		if err := c.uploadInlineBatches(ctx, small, src, out); err != nil {
-			return err
-		}
-		perBlob = large
-	}
-
-	if wp.Grant != nil {
-		if err := c.directUploadBlobs(ctx, wp.Grant, perBlob, src, out); err != nil {
-			return err
-		}
-	} else if err := c.findMissingUpload(ctx, perBlob, src, sizeByDigest, out); err != nil {
+	if err := c.uploadBlobSet(ctx, toUpload, src, wp, st); err != nil {
 		return err
 	}
 
-	commitReq := &cache.CommitBatchRequest{ProtocolVersion: cache.ProtocolVersion}
+	// Commit only the entries whose blobs are all in CAS. The server checks
+	// presence too; leaving the others out keeps a known-incomplete entry off
+	// the wire, and names its cause.
+	commit := make([]cache.CommitEntry, 0, len(entries))
 	for _, e := range entries {
-		commitReq.Entries = append(commitReq.Entries, cache.CommitEntry{
-			Key:      e.Key,
-			Result:   e.Result,
-			Manifest: e.Manifest,
+		if cause := st.failure(e.Manifest); cause != nil {
+			out.Failed[e.Key] = cause
+			continue
+		}
+		commit = append(commit, cache.CommitEntry{Key: e.Key, Result: e.Result, Manifest: e.Manifest})
+	}
+	// commit-batch takes at most cache.MaxKeysPerRequest entries a request.
+	for chunk := range slices.Chunk(commit, cache.MaxKeysPerRequest) {
+		commitReq := &cache.CommitBatchRequest{ProtocolVersion: cache.ProtocolVersion, Entries: chunk}
+		cache.NormalizeCommitBatchRequest(commitReq)
+		commitResp, err := retryWrite(ctx, wp.Retry, func() (*cache.CommitBatchResponse, error) {
+			return c.CommitBatch(ctx, commitReq)
 		})
-	}
-	cache.NormalizeCommitBatchRequest(commitReq)
-	commitResp, err := c.CommitBatch(ctx, commitReq)
-	if err != nil {
-		return err
-	}
-	for _, r := range commitResp.Results {
-		out.Committed[r.Key] = r.Committed
+		if err != nil {
+			return err
+		}
+		for _, r := range commitResp.Results {
+			out.Committed[r.Key] = r.Committed
+		}
 	}
 	return nil
 }
 
-// findMissingUpload uploads blobs via the find-missing path: one batched
-// existence check, then a presigned PUT for each blob the server lacks. Blobs the
-// server already has are counted deduped; all are confirmed present afterward.
-func (c *Client) findMissingUpload(ctx context.Context, blobs []cache.BlobRef, src BlobSource, sizeByDigest map[string]int64, out *BatchOutcome) error {
+// uploadBlobSet puts a set of distinct blobs into CAS, by the path wp selects,
+// and records each blob's outcome in st. StoreBatch and StoreObjects share it.
+//
+// The exchanges go in an order that keeps blob bytes off the wire until the
+// server has accepted a write of this client's bearer (see firstWrite):
+//
+//  1. find-missing for the blobs that go over a PUT. When no write has been
+//     accepted yet and there are small blobs to send inline, it is sent even
+//     with no blob to ask about: one small request, once per session.
+//  2. upload-batch for the small blobs, when the server advertises it.
+//  3. find-missing for the small blobs upload-batch did not take.
+//  4. The PUTs.
+//
+// A direct grant replaces the find-missing of steps 1 and 3: the server issued
+// it to this bearer for writing, which is the accepted write.
+//
+// The error it returns is a control exchange that failed. A blob whose own
+// upload failed is recorded in st instead, and the other blobs go on.
+func (c *Client) uploadBlobSet(ctx context.Context, blobs []cache.BlobRef, src BlobSource, wp WritePath, st *blobState) error {
 	if len(blobs) == 0 {
 		return nil
 	}
+	var small []cache.BlobRef
+	perBlob := blobs
+	if wp.CoalesceSmall {
+		perBlob = nil
+		for _, b := range blobs {
+			if b.SizeBytes <= cache.MaxInlineBlobBytes {
+				small = append(small, b)
+			} else {
+				perBlob = append(perBlob, b)
+			}
+		}
+	}
 
-	findReq := &cache.FindMissingRequest{ProtocolVersion: cache.ProtocolVersion, Blobs: blobs}
-	cache.NormalizeFindMissingRequest(findReq)
-	findResp, err := c.FindMissing(ctx, findReq)
+	if wp.Grant != nil {
+		rest, err := c.uploadInlineBatches(ctx, small, src, wp.Retry, st)
+		if err != nil {
+			return err
+		}
+		c.directUploadBlobs(ctx, wp.Grant, append(perBlob, rest...), src, st)
+		return nil
+	}
+
+	probe := false
+	if len(small) > 0 {
+		var err error
+		if probe, err = c.writes.enter(ctx); err != nil {
+			return err
+		}
+	}
+	var transfers []cache.BlobTransfer
+	if len(perBlob) > 0 || probe {
+		var err error
+		transfers, err = c.findMissingBlobs(ctx, perBlob, wp.Retry, st)
+		if probe {
+			c.writes.leave()
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	rest, err := c.uploadInlineBatches(ctx, small, src, wp.Retry, st)
 	if err != nil {
 		return err
 	}
-
-	so := &StoreOutcome{}
-	if err := c.uploadBlobs(ctx, findResp.Uploads, src, sizeByDigest, so); err != nil {
-		return err
-	}
-	out.BlobsUploaded += so.BlobsUploaded
-	out.BytesUploaded += so.BytesUploaded
-
-	requested := make(map[string]bool, len(findResp.Uploads))
-	for _, up := range findResp.Uploads {
-		requested[up.Digest] = true
-	}
-	for _, b := range blobs {
-		if !requested[b.Digest] {
-			out.BytesDeduped += sizeByDigest[b.Digest]
+	if len(rest) > 0 {
+		more, err := c.findMissingBlobs(ctx, rest, wp.Retry, st)
+		if err != nil {
+			return err
 		}
-		out.Confirmed = append(out.Confirmed, b.Digest)
+		transfers = append(transfers, more...)
 	}
+
+	sizes := make(map[string]int64, len(blobs))
+	for _, b := range blobs {
+		sizes[b.Digest] = b.SizeBytes
+	}
+	c.putBlobs(ctx, transfers, src, sizes, wp.BlobConcurrency, st)
 	return nil
 }
 
-// maxInlineBatchBytes bounds one upload-batch request's total inline payload, so
-// a window's small blobs split across a few requests rather than one body the
-// server would reject.
+// findMissingBlobs asks the server which of blobs it lacks and returns the PUT
+// transfers for those. The blobs it already has are recorded present. One
+// find-missing takes at most cache.MaxKeysPerRequest blobs, so a larger set is
+// asked about in several requests: an entry with more files than that is stored
+// like any other. An empty set still sends one request, the write without
+// bytes that opens a session (see uploadBlobSet).
+func (c *Client) findMissingBlobs(ctx context.Context, blobs []cache.BlobRef, retry WriteRetry, st *blobState) ([]cache.BlobTransfer, error) {
+	var transfers []cache.BlobTransfer
+	for first := true; first || len(blobs) > 0; first = false {
+		chunk := blobs[:min(len(blobs), cache.MaxKeysPerRequest)]
+		blobs = blobs[len(chunk):]
+
+		// A copy: the request is sorted in place, and an empty set is sent as
+		// an empty list, not as null.
+		findReq := &cache.FindMissingRequest{ProtocolVersion: cache.ProtocolVersion, Blobs: append([]cache.BlobRef{}, chunk...)}
+		cache.NormalizeFindMissingRequest(findReq)
+		findResp, err := retryWrite(ctx, retry, func() (*cache.FindMissingResponse, error) {
+			return c.FindMissing(ctx, findReq)
+		})
+		if err != nil {
+			return nil, err
+		}
+		requested := make(map[string]bool, len(findResp.Uploads))
+		for _, up := range findResp.Uploads {
+			requested[up.Digest] = true
+		}
+		for _, b := range chunk {
+			if !requested[b.Digest] {
+				st.present(b.Digest, b.SizeBytes)
+			}
+		}
+		transfers = append(transfers, findResp.Uploads...)
+	}
+	return transfers, nil
+}
+
+// putBlobs uploads each transfer's blob over its PUT, at most limit at once
+// (blobUploadConcurrency when limit is not positive), and records each blob's
+// outcome in st. A PUT that fails does not stop the others: it costs the
+// entries that name its blob, and no other.
+func (c *Client) putBlobs(ctx context.Context, ups []cache.BlobTransfer, src BlobSource, sizes map[string]int64, limit int, st *blobState) {
+	if len(ups) == 0 {
+		return
+	}
+	if limit <= 0 {
+		limit = blobUploadConcurrency
+	}
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, limit)
+	for _, up := range ups {
+		wg.Add(1)
+		go func(up cache.BlobTransfer) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				st.fail(up.Digest, fmt.Errorf("upload blob %s: %w", up.Digest, ctx.Err()))
+				return
+			}
+			defer func() { <-sem }()
+
+			size := blobSize(up, sizes)
+			if err := c.uploadFrom(ctx, up, src, size); err != nil {
+				st.fail(up.Digest, err)
+				return
+			}
+			st.uploaded(up.Digest, size)
+		}(up)
+	}
+	wg.Wait()
+}
+
+// maxInlineBatchBytes bounds the blob bytes of one upload-batch request, so a
+// window's small blobs split across a few requests rather than one body the
+// server would reject. 4 MiB of blob bytes is about 5.4 MiB of JSON.
+// cache-server reads an upload-batch body of up to 16 MiB and stores at most
+// 16 MiB of decoded content per request (cas.MaxPackBytes), so one request
+// stays well inside both bounds.
 const maxInlineBatchBytes = 4 << 20 // 4 MiB
 
 // uploadInlineBatches sends small blobs inline via upload-batch, chunked so no
-// request exceeds maxInlineBatchBytes. Each blob the server reports stored is
-// counted uploaded and confirmed; a blob omitted from the response is left
-// unconfirmed, so its entry fails commit and the recovery pass retries it.
-func (c *Client) uploadInlineBatches(ctx context.Context, blobs []cache.BlobRef, src BlobSource, out *BatchOutcome) error {
+// request exceeds maxInlineBatchBytes of blob bytes or the protocol's
+// cache.MaxKeysPerRequest blobs. Each blob the server reports stored is
+// recorded uploaded in st. A blob whose bytes cannot be read is recorded
+// failed there, and the others go on.
+//
+// It returns the blobs upload-batch did not take, which the caller sends
+// through the per-blob path so they are not lost:
+//
+//   - a blob the answer omits: the contract lets a server store a subset;
+//   - every blob not stored yet once the server answers that it does not serve
+//     the route (uploadBatchUnserved). No later chunk is sent.
+//
+// Any other failure is returned and fails the pass, after the retries the
+// policy allows: the server refused the write or is failing, and the per-blob
+// path would meet the same answer.
+func (c *Client) uploadInlineBatches(ctx context.Context, blobs []cache.BlobRef, src BlobSource, retry WriteRetry, st *blobState) ([]cache.BlobRef, error) {
 	var (
 		chunk    []cache.InlineBlob
+		refs     []cache.BlobRef
 		chunkLen int64
-		sizes    = make(map[string]int64, len(blobs))
+		rest     []cache.BlobRef
+		unserved bool
 	)
 	flush := func() error {
 		if len(chunk) == 0 {
 			return nil
 		}
-		resp, err := c.UploadBatch(ctx, &cache.UploadBatchRequest{ProtocolVersion: cache.ProtocolVersion, Blobs: chunk})
-		if err != nil {
+		req := &cache.UploadBatchRequest{ProtocolVersion: cache.ProtocolVersion, Blobs: chunk}
+		resp, err := retryWrite(ctx, retry, func() (*cache.UploadBatchResponse, error) {
+			return c.UploadBatch(ctx, req)
+		})
+		switch {
+		case uploadBatchUnserved(err):
+			unserved = true
+			rest = append(rest, refs...)
+		case err != nil:
 			return err
-		}
-		stored := make(map[string]bool, len(resp.Stored))
-		for _, d := range resp.Stored {
-			stored[d] = true
-		}
-		for _, b := range chunk {
-			if stored[b.Digest] {
-				out.BlobsUploaded++
-				out.BytesUploaded += sizes[b.Digest]
-				out.Confirmed = append(out.Confirmed, b.Digest)
+		default:
+			stored := make(map[string]bool, len(resp.Stored))
+			for _, d := range resp.Stored {
+				stored[d] = true
+			}
+			for _, b := range refs {
+				if !stored[b.Digest] {
+					rest = append(rest, b)
+					continue
+				}
+				st.uploaded(b.Digest, b.SizeBytes)
 			}
 		}
-		chunk, chunkLen = nil, 0
+		chunk, refs, chunkLen = nil, nil, 0
 		return nil
 	}
 
-	for _, b := range blobs {
-		rc, err := src.OpenBlob(b.Digest)
+	for i, b := range blobs {
+		data, err := readInlineBlob(src, b)
 		if err != nil {
-			return fmt.Errorf("open blob %s: %w", b.Digest, err)
+			st.fail(b.Digest, err)
+			continue
 		}
-		data, err := io.ReadAll(rc)
-		_ = rc.Close()
-		if err != nil {
-			return fmt.Errorf("read blob %s: %w", b.Digest, err)
-		}
-		if int64(len(data)) > cache.MaxInlineBlobBytes {
-			return fmt.Errorf("blob %s: %d bytes exceed declared size %d", b.Digest, len(data), b.SizeBytes)
-		}
-		if chunkLen+int64(len(data)) > maxInlineBatchBytes {
+		if len(chunk) == cache.MaxKeysPerRequest || chunkLen+int64(len(data)) > maxInlineBatchBytes {
 			if err := flush(); err != nil {
-				return err
+				return nil, err
+			}
+			if unserved {
+				return append(rest, blobs[i:]...), nil
 			}
 		}
-		sizes[b.Digest] = b.SizeBytes
 		chunk = append(chunk, cache.InlineBlob{Digest: b.Digest, Data: data})
+		refs = append(refs, b)
 		chunkLen += int64(len(data))
 	}
-	return flush()
+	if err := flush(); err != nil {
+		return nil, err
+	}
+	return rest, nil
+}
+
+// readInlineBlob reads the bytes of a small blob to send inline.
+func readInlineBlob(src BlobSource, b cache.BlobRef) ([]byte, error) {
+	if src == nil {
+		return nil, fmt.Errorf("blob %s: no blob source", b.Digest)
+	}
+	rc, err := src.OpenBlob(b.Digest)
+	if err != nil {
+		return nil, fmt.Errorf("open blob %s: %w", b.Digest, err)
+	}
+	// One byte past the inline limit, so a longer source is detected without
+	// reading it whole.
+	data, err := io.ReadAll(io.LimitReader(rc, cache.MaxInlineBlobBytes+1))
+	_ = rc.Close()
+	if err != nil {
+		return nil, fmt.Errorf("read blob %s: %w", b.Digest, err)
+	}
+	if int64(len(data)) > cache.MaxInlineBlobBytes {
+		return nil, fmt.Errorf("blob %s: its bytes exceed the declared size %d", b.Digest, b.SizeBytes)
+	}
+	return data, nil
+}
+
+// uploadBatchUnserved reports an answer that says the server does not serve
+// upload-batch: 404, 405 or 501. A server can give one after it advertised the
+// route, for example while a deploy that removes it rolls out and an older
+// probe answer is still in use. The blobs then take the per-blob path, which
+// every server with the batched write path serves.
+func uploadBatchUnserved(err error) bool {
+	return IsStatus(err, http.StatusNotFound) ||
+		IsStatus(err, http.StatusMethodNotAllowed) ||
+		IsStatus(err, http.StatusNotImplemented)
 }
 
 // directUploadBlobs conditionally PUTs each blob straight to CAS, concurrently
-// (bounded by blobUploadConcurrency), accumulating the upload/dedup split and the
-// confirmed digests into out. Every attempted blob is present afterward (either
-// it was already there — the conditional create was rejected — or it was just
-// uploaded), so all are confirmed. The first error cancels the rest, matching the
-// find-missing path's behavior.
-func (c *Client) directUploadBlobs(ctx context.Context, grant *cache.UploadGrant, blobs []cache.BlobRef, src BlobSource, out *BatchOutcome) error {
+// (bounded by blobUploadConcurrency), and records each blob's outcome in st.
+// A blob the conditional create rejected was already there, so it is recorded
+// present. A PUT that fails does not stop the others, as on the find-missing
+// path.
+func (c *Client) directUploadBlobs(ctx context.Context, grant *cache.UploadGrant, blobs []cache.BlobRef, src BlobSource, st *blobState) {
 	if len(blobs) == 0 {
-		return nil
+		return
 	}
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	var (
-		mu       sync.Mutex
-		firstErr error
-		wg       sync.WaitGroup
-	)
+	var wg sync.WaitGroup
 	sem := make(chan struct{}, blobUploadConcurrency)
 	for _, b := range blobs {
 		wg.Add(1)
@@ -442,38 +839,31 @@ func (c *Client) directUploadBlobs(ctx context.Context, grant *cache.UploadGrant
 			select {
 			case sem <- struct{}{}:
 			case <-ctx.Done():
+				st.fail(b.Digest, fmt.Errorf("direct upload %s: %w", b.Digest, ctx.Err()))
 				return
 			}
 			defer func() { <-sem }()
 
 			uploaded, err := c.uploadDirect(ctx, grant, b, src)
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil {
-				if firstErr == nil {
-					firstErr = err
-					cancel()
-				}
-				return
+			switch {
+			case err != nil:
+				st.fail(b.Digest, err)
+			case uploaded:
+				st.uploaded(b.Digest, b.SizeBytes)
+			default:
+				st.present(b.Digest, b.SizeBytes) // conditional create rejected: already present
 			}
-			if uploaded {
-				out.BlobsUploaded++
-				out.BytesUploaded += b.SizeBytes
-			} else {
-				out.BytesDeduped += b.SizeBytes // conditional create rejected: already present
-			}
-			out.Confirmed = append(out.Confirmed, b.Digest)
 		}(b)
 	}
 	wg.Wait()
-	return firstErr
 }
 
 // uploadDirect PUTs one blob to its grant-derived URL. It returns uploaded=true
 // when the bytes were stored (2xx) and uploaded=false when the blob already
 // existed (the grant's ConditionalExistsStatus — a dedup skip, not an error).
 // The grant's headers (credential, content type, conditional-create header) are
-// sent verbatim, keeping the client backend-agnostic.
+// sent verbatim, keeping the client backend-agnostic. The PUT has the deadline
+// and the redirect policy of UploadBlob.
 func (c *Client) uploadDirect(ctx context.Context, grant *cache.UploadGrant, b cache.BlobRef, src BlobSource) (bool, error) {
 	if src == nil {
 		return false, fmt.Errorf("blob %s: no blob source", b.Digest)
@@ -481,13 +871,16 @@ func (c *Client) uploadDirect(ctx context.Context, grant *cache.UploadGrant, b c
 	hexDigest := strings.TrimPrefix(b.Digest, cache.DigestAlgorithm+":")
 	url := strings.ReplaceAll(grant.URLTemplate, cache.DigestPlaceholder, hexDigest)
 
-	body, length, cleanup, err := compressedBody(src, b.Digest, b.SizeBytes)
+	body, length, cleanup, err := compressedBody(ctx, src, b.Digest, b.SizeBytes)
 	if err != nil {
 		return false, fmt.Errorf("open blob %s: %w", b.Digest, err)
 	}
 	defer func() { _ = cleanup() }()
 
-	req, err := http.NewRequestWithContext(ctx, grant.Method, url, body)
+	timeout := c.blobPutTimeout(length)
+	putCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(putCtx, grant.Method, url, body)
 	if err != nil {
 		return false, fmt.Errorf("build direct upload for %s: %w", b.Digest, err)
 	}
@@ -496,13 +889,16 @@ func (c *Client) uploadDirect(ctx context.Context, grant *cache.UploadGrant, b c
 	}
 	setUserAgent(req)
 	req.ContentLength = length
+	replayable(req, body)
+	trackUpload(req)
 
-	resp, err := c.httpClient.Do(req) //nolint:gosec // G704: request targets the cache server's presigned upload grant, not user-tainted input
+	resp, err := c.transfers.Do(req) //nolint:gosec // G704: request targets the cache server's presigned upload grant, not user-tainted input
 	if err != nil {
-		return false, fmt.Errorf("direct upload %s: %w", b.Digest, err)
+		return false, fmt.Errorf("direct upload %s: %w", b.Digest, putFailure(ctx, putCtx, timeout, err))
 	}
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxResponseBytes))
+	reportUploadProgress(ctx)
 
 	if grant.ConditionalExistsStatus != 0 && resp.StatusCode == grant.ConditionalExistsStatus {
 		return false, nil // already present: conditional create rejected → dedup

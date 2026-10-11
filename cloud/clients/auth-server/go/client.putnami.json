@@ -16,7 +16,7 @@
       }
     ]
   },
-  "contractSha256": "0404165019522ca63ce9d53ce8a1ba51b87efc808ff74fec135a647794a018bc",
+  "contractSha256": "53713e42b236358a1924edeb0a692da61055e68f99698cca49ee082157475808",
   "operations": [
     {
       "operationId": "deleteApikeys_id",

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -290,22 +291,39 @@ func TestCIResponseWireKeys(t *testing.T) {
 	// client (deliveryapiclient.CIRunLogFrame), and the clientgen contract test
 	// pins that shape against the provider.
 
+	perRun := 2.5
 	usageDoc := marshalToDoc(t, CIUsageResponse{
 		Workspace: "ws", WindowHours: 168, ScannedRuns: 10, ScanLowerBound: true,
 		Substrates: map[string]int{"gce-spot": 1}, Profiles: map[string]int{"heavy": 1},
 		Sources: map[string]int{"explicit": 1}, Outcomes: map[string]int{"success": 1},
 		Gate:  map[string]CIUsageWallSummary{"gce-spot": {N: 1, MinSecs: 1, MaxSecs: 1, AvgSecs: 1}},
 		Spend: CIUsageSpend{Currency: "EUR", Estimated: true, SpotEUR: 1, CloudRunEUR: 2, TotalEUR: 3, RunsWithDuration: 4},
+		Billed: &CIUsageBilled{
+			Currency: "EUR", Runs: 2, ComputeEUR: 1, EgressEUR: 1, GatewayEUR: 1, CacheEUR: 1, LogsEUR: 1, TotalEUR: 5, PerRunEUR: &perRun,
+			Days: []CIUsageBilledDay{{Day: "2026-10-09", Runs: 2, ComputeEUR: 1, EgressEUR: 1, GatewayEUR: 1, CacheEUR: 1, LogsEUR: 1, TotalEUR: 5, PerRunEUR: &perRun}},
+		},
 	})
 	assertExactKeys(t, "usage", usageDoc, []string{
 		"workspace", "windowHours", "scannedRuns", "scanLowerBound",
-		"substrates", "profiles", "sources", "outcomes", "gate", "spend",
+		"substrates", "profiles", "sources", "outcomes", "gate", "spend", "billed",
 	})
 	gate, _ := usageDoc["gate"].(map[string]any)
 	assertExactKeys(t, "usage gate", gate["gce-spot"], []string{"n", "minSecs", "maxSecs", "avgSecs"})
 	assertExactKeys(t, "usage spend", usageDoc["spend"], []string{
 		"currency", "estimated", "spotEur", "cloudRunEur", "totalEur", "runsWithDuration",
 	})
+	billedKeys := []string{"runs", "computeEur", "egressEur", "gatewayEur", "cacheEur", "logsEur", "totalEur", "perRunEur"}
+	assertExactKeys(t, "usage billed", usageDoc["billed"], append([]string{"currency", "days"}, billedKeys...))
+	billedDays, _ := usageDoc["billed"].(map[string]any)["days"].([]any)
+	assertExactKeys(t, "usage billed day", billedDays[0], append([]string{"day"}, billedKeys...))
+	// A rollup with no billed section, and a day with no run, leave the keys
+	// out instead of sending a null or a zero.
+	if doc := marshalToDoc(t, CIUsageResponse{Workspace: "ws"}); doc["billed"] != nil {
+		t.Fatalf("usage without a billed section carries billed = %v", doc["billed"])
+	}
+	if _, ok := marshalToDoc(t, CIUsageBilledDay{Day: "2026-10-09"})["perRunEur"]; ok {
+		t.Fatal("a billed day with no run carries perRunEur")
+	}
 }
 
 func marshalToDoc(t *testing.T, v any) map[string]any {
@@ -484,6 +502,126 @@ func TestCIUsageHitsUsageRoute(t *testing.T) {
 	}
 	if got.Query != "window=24h" {
 		t.Fatalf("query = %q, want the window forwarded", got.Query)
+	}
+}
+
+// billedUsage is a usage rollup with three billed days, newest first. The 7th
+// was billed without a dispatched run, so it has no per-run cost.
+func billedUsage() CIUsageResponse {
+	perRun9, perRun8, perRunWindow := 0.31, 0.24, 0.29
+	return CIUsageResponse{
+		Workspace: "ws-acme", WindowHours: 168, ScannedRuns: 70,
+		Spend: CIUsageSpend{Currency: "EUR", Estimated: true, SpotEUR: 9.5, CloudRunEUR: 0.5, TotalEUR: 10, RunsWithDuration: 68},
+		Billed: &CIUsageBilled{
+			Currency: "EUR", Runs: 70, ComputeEUR: 9.14, EgressEUR: 4.62, GatewayEUR: 3.74, CacheEUR: 2.38, LogsEUR: 0.42, TotalEUR: 20.3, PerRunEUR: &perRunWindow,
+			Days: []CIUsageBilledDay{
+				{Day: "2026-10-09", Runs: 40, ComputeEUR: 5.32, EgressEUR: 2.67, GatewayEUR: 2.09, CacheEUR: 1.3, LogsEUR: 1.04, TotalEUR: 12.42, PerRunEUR: &perRun9},
+				{Day: "2026-10-08", Runs: 30, ComputeEUR: 3.82, EgressEUR: 1.95, GatewayEUR: 1.65, CacheEUR: 0.08, LogsEUR: -0.32, TotalEUR: 7.18, PerRunEUR: &perRun8},
+				{Day: "2026-10-07", Runs: 0, CacheEUR: 1, LogsEUR: -0.3, TotalEUR: 0.7},
+			},
+		},
+	}
+}
+
+// TestCIUsageRendersTheBilledCost pins the billed section: one line per day,
+// newest first, with the runs, the per-run cost and the total; a dash for a
+// day without a run; the window's line; and the split by category with the
+// gateway marked as an upper bound. The estimate keeps its own lines.
+func TestCIUsageRendersTheBilledCost(t *testing.T) {
+	fake := &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/ci/usage": {status: 200, body: billedUsage()},
+	}}
+	lines, err := captureCI(t, fake, []string{"usage"})
+	if err != nil {
+		t.Fatalf("usage: %v", err)
+	}
+	want := []string{
+		"Spend (estimated, EUR, over 68 runs with a measured duration):",
+		"  spot=9.50  cloudrun=0.50  total=10.00",
+		"Billed cost (EUR, net of credits, per UTC day; the newest day can still grow):",
+		"  day           runs   per run      total",
+		"  2026-10-09      40      0.31      12.42",
+		"  2026-10-08      30      0.24       7.18",
+		"  2026-10-07       0         -       0.70",
+		"  all days        70      0.29      20.30",
+		"  compute=9.14  egress=4.62  cache=2.38  logs=0.42  gateway=3.74 (upper bound: it also serves the console and the APIs)",
+	}
+	if len(lines) < len(want) {
+		t.Fatalf("usage printed %d lines, want at least %d:\n%s", len(lines), len(want), strings.Join(lines, "\n"))
+	}
+	if got := lines[len(lines)-len(want):]; !reflect.DeepEqual(got, want) {
+		t.Fatalf("usage ends with:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if out := strings.Join(lines, "\n"); strings.Contains(out, "not available") {
+		t.Fatalf("a rollup with billed days also says they are not available:\n%s", out)
+	}
+}
+
+// TestCIUsageSaysWhenNoBilledCostIsStored pins the one line a rollup without
+// a billed section ends with, in place of the section. The answer does not
+// say why the section is missing, so the line must not name a cause either.
+func TestCIUsageSaysWhenNoBilledCostIsStored(t *testing.T) {
+	usage := billedUsage()
+	usage.Billed = nil
+	fake := &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/ci/usage": {status: 200, body: usage},
+	}}
+	lines, err := captureCI(t, fake, []string{"usage"})
+	if err != nil {
+		t.Fatalf("usage: %v", err)
+	}
+	if len(lines) == 0 || lines[len(lines)-1] != "billed cost: not available for this window" {
+		t.Fatalf("usage ends with %q, want the line that says no billed cost is available:\n%s", lines[len(lines)-1:], strings.Join(lines, "\n"))
+	}
+	if out := strings.Join(lines, "\n"); strings.Contains(out, "Billed cost (") || !strings.Contains(out, "  spot=9.50  cloudrun=0.50  total=10.00") {
+		t.Fatalf("usage without billed days must keep the estimate and print no billed section:\n%s", out)
+	}
+}
+
+// TestCIUsageJSONCarriesTheBilledCost pins the structured output: the billed
+// section travels as data with the provider's keys, and a rollup without it
+// carries no billed key.
+func TestCIUsageJSONCarriesTheBilledCost(t *testing.T) {
+	fake := &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/ci/usage": {status: 200, body: billedUsage()},
+	}}
+	lines, err := captureCI(t, fake, []string{"usage", "--output", "json"})
+	if err != nil {
+		t.Fatalf("usage --output=json: %v", err)
+	}
+	if len(lines) != 1 {
+		t.Fatalf("usage --output=json printed %d lines, want one document:\n%s", len(lines), strings.Join(lines, "\n"))
+	}
+	var got CIUsageResponse
+	if err := json.Unmarshal([]byte(lines[0]), &got); err != nil {
+		t.Fatalf("decode %s: %v", lines[0], err)
+	}
+	if want := billedUsage(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("usage --output=json =\n %s\nwant the provider's rollup\n %+v", lines[0], want.Billed)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &doc); err != nil {
+		t.Fatalf("decode %s: %v", lines[0], err)
+	}
+	days, _ := doc["billed"].(map[string]any)["days"].([]any)
+	if len(days) != 3 {
+		t.Fatalf("billed days = %v, want 3", days)
+	}
+	if _, ok := days[2].(map[string]any)["perRunEur"]; ok {
+		t.Fatalf("the day without a run carries perRunEur: %v", days[2])
+	}
+
+	usage := billedUsage()
+	usage.Billed = nil
+	fake = &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/ci/usage": {status: 200, body: usage},
+	}}
+	lines, err = captureCI(t, fake, []string{"usage", "--output", "json"})
+	if err != nil || len(lines) != 1 {
+		t.Fatalf("usage --output=json without billed days: %v, %d lines", err, len(lines))
+	}
+	if strings.Contains(lines[0], "billed") {
+		t.Fatalf("a rollup without billed days carries a billed key: %s", lines[0])
 	}
 }
 

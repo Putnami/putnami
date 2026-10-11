@@ -41,7 +41,8 @@ const entryProvenanceVersion = "v1"
 // commit). It is applied per attempt via the context in doAuthed rather than as
 // a blanket http.Client.Timeout, so it deliberately does NOT cap blob
 // upload/download streams — a large artifact must not fail just because it takes
-// longer than a control round trip. Blob transfers are bounded by the caller's
+// longer than a control round trip. A blob upload has its own deadline, scaled
+// by its size (see blobPutTimeout); a download is bounded by the caller's
 // context and the transport's own dial/handshake/response-header timeouts.
 const DefaultTimeout = 30 * time.Second
 
@@ -52,7 +53,7 @@ const maxResponseBytes = 64 << 20 // 64 MiB
 
 // maxIdleConnsPerHost sizes the kept-alive (idle) connection pool per host. The
 // whole build's CAS traffic — concurrent blob uploads (jobs.uploadConcurrency ×
-// blobUploadConcurrency) plus speculative downloads (jobs.prefetchConcurrency) —
+// blobUploadConcurrency) plus the restores' downloads (prefetch downloads none) —
 // fans out against one or two hosts (control plane and CAS). This does not cap
 // live concurrency (Go opens as many connections as the fan-out needs); it caps
 // reuse. The stdlib default keeps only 2 idle connections per host, so beyond
@@ -110,12 +111,24 @@ type Client struct {
 	// exchange. Nil disables reporting; it never affects request behavior.
 	authObserver func(AuthFailure)
 
-	// httpClient carries the presigned blob transfers and the protocol routes
-	// cache-server does not serve; controls wraps a copy of it for the
-	// generated control calls, so both share one connection pool.
+	// httpClient carries the one protocol route cache-server does not serve
+	// (upload-grant). controls wraps a copy of it for the generated control
+	// calls, and transfers is a copy of it for the blob transfers, with their
+	// redirect policy (see transferClient). All three share one connection pool.
 	httpClient *http.Client
+	transfers  *http.Client
 	controls   controlClients
 	mode       cache.Mode
+
+	// writes orders the client's writes until the server has accepted one, so
+	// the first write carries no blob bytes (see firstWrite).
+	writes *firstWrite
+
+	// putFloor and putBytesPerSecond set the deadline of one blob PUT (see
+	// blobPutTimeout). They are fields so a test can shorten them on its own
+	// client; NewClient always sets the production values.
+	putFloor          time.Duration
+	putBytesPerSecond int64
 }
 
 // resolvedBearer is a memoized credential tagged with the generation it belongs
@@ -180,13 +193,17 @@ func NewClient(baseURL, token string, opts ...Option) *Client {
 		bearerFn: func(context.Context) (Bearer, error) { return Bearer{Token: token, Class: class}, nil },
 		// No client-wide Timeout: it would also cap blob upload/download streams.
 		// The control-plane timeout is applied per attempt in doAuthed instead.
-		httpClient: &http.Client{Transport: newTransport()},
-		mode:       cache.DefaultMode,
+		httpClient:        &http.Client{Transport: newTransport()},
+		mode:              cache.DefaultMode,
+		writes:            newFirstWrite(),
+		putFloor:          blobPutFloor,
+		putBytesPerSecond: blobPutMinBytesPerSecond,
 	}
 	for _, opt := range opts {
 		opt(c)
 	}
 	c.controls = newControlClients(c.baseURL, c.httpClient)
+	c.transfers = transferClient(c.httpClient)
 	return c
 }
 
@@ -218,6 +235,9 @@ func (c *Client) bearer(ctx context.Context) (*resolvedBearer, error) {
 // run-scoped cache token Delivery issued for the hosted run's credential: it
 // is classed TokenClassRun, so a refusal never re-mints it, and the configured
 // source never runs again for this client. The token stays in memory.
+//
+// What the server answered to the bearer it replaces says nothing about this
+// one, so the next write is again a first write, sent without blob bytes.
 func (c *Client) UseRunBearer(token string) {
 	run := Bearer{Token: token, Class: TokenClassRun}
 	c.tokenMu.Lock()
@@ -225,6 +245,7 @@ func (c *Client) UseRunBearer(token string) {
 	c.bearerFn = func(context.Context) (Bearer, error) { return run, nil }
 	c.tokenGen++
 	c.tokenCur = &resolvedBearer{Bearer: run, gen: c.tokenGen}
+	c.writes.reset()
 }
 
 // refreshBearer drops the memoized credential if it is still the generation
@@ -421,7 +442,7 @@ func (c *Client) doAuthed(ctx context.Context, op string, attempt func(context.C
 	for try := 0; ; try++ {
 		cred, err := c.bearer(ctx)
 		if err != nil {
-			return nil, 0, fmt.Errorf("%s: resolve cache token: %w", op, err)
+			return nil, 0, fmt.Errorf("%s: resolve cache token: %w", op, &bearerError{err: err})
 		}
 		attemptCtx, cancel := context.WithTimeout(ctx, DefaultTimeout)
 		data, status, err := attempt(attemptCtx, cred)
@@ -430,6 +451,9 @@ func (c *Client) doAuthed(ctx context.Context, op string, attempt func(context.C
 			return nil, status, err
 		}
 		if status != http.StatusUnauthorized && status != http.StatusForbidden {
+			if status < 200 || status >= 300 {
+				data = redactRefusalBody(data, cred.Token)
+			}
 			return data, status, nil
 		}
 
@@ -451,7 +475,7 @@ func (c *Client) doAuthed(ctx context.Context, op string, attempt func(context.C
 		if refreshed {
 			continue
 		}
-		return data, status, nil
+		return redactRefusalBody(data, cred.Token), status, nil
 	}
 }
 
@@ -564,6 +588,34 @@ func redactReason(message, token string) string {
 		return message[:maxReasonBytes] + "…"
 	}
 	return message
+}
+
+// redactRefusalBody returns the body of a non-2xx answer with the bearer taken
+// out of its code and its reason, the two members a StatusError carries.
+// doAuthed applies it to every such body it hands back: a caller turns the body
+// into an error and logs it, so a server that echoes the bearer would otherwise
+// reach the run log past the redaction of the AuthFailure record. A body that
+// does not carry the bearer is returned unchanged.
+func redactRefusalBody(body []byte, token string) []byte {
+	if token == "" {
+		return body
+	}
+	var e cache.ErrorResponse
+	if err := json.Unmarshal(body, &e); err != nil {
+		return body
+	}
+	if !strings.Contains(e.Code, token) && !strings.Contains(e.Message, token) {
+		return body
+	}
+	if strings.Contains(e.Code, token) {
+		e.Code = "redacted"
+	}
+	e.Message = redactReason(e.Message, token)
+	redacted, err := json.Marshal(e)
+	if err != nil {
+		return nil
+	}
+	return redacted
 }
 
 func firstError(diags []diag.Diagnostic) string {

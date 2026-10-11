@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	"go.putnami.dev/cloud/extension/internal/deliverycli/internal/remotecache"
@@ -50,22 +51,23 @@ func CacheProvider(_ map[string]any, _ []string, workspaceRoot string, _ map[str
 // restoreConcurrency bounds the restore transfers running at once: core's
 // workers restore in parallel, so serving them one at a time would serialize
 // the whole warm rebuild behind single-key network round trips.
-// prefetchConcurrency bounds the background blob-warming downloads.
-const (
-	restoreConcurrency  = 16
-	prefetchConcurrency = 8
-)
+const restoreConcurrency = 16
 
 // providerSession holds the per-run state established by initialize and used by
 // the data-plane ops: the configured remote-cache client and the blob-exchange
 // directory core hands blobs through. Control-plane requests are served from
 // the read loop one at a time; prefetch and upload return promptly and do their
 // work on background goroutines, and restores run concurrently on a bounded
-// pool (all tracked by bg, which summary and shutdown drain) — core's session
-// matches responses by ID, so answering out of order is part of the protocol.
+// pool (all tracked by bg, which summary and shutdown drain within a bound, see
+// cachedrain.go) — core's session matches responses by ID, so answering out of
+// order is part of the protocol.
 type providerSession struct {
 	workspaceRoot string
 	logw          io.Writer
+	// managedCacheURL is the cache URL a linked workspace with no
+	// .putnami/cache.json reads (see linkedCacheDefault): DefaultCacheURL,
+	// which a test replaces with its own server.
+	managedCacheURL string
 
 	exchangeDir string
 	mode        cache.Mode
@@ -83,12 +85,25 @@ type providerSession struct {
 	// capability with BOTH core and the cache server, which is the feature's
 	// whole off switch: no socket, no capability echo, nothing exported to jobs.
 	objects *objectCache
+	// uploads queues the entries upload accepted until the uploader stores them
+	// a window at a time (see cacheupload.go).
+	uploads uploadWindow
+	// capsProbe holds the session's capabilities probe, shared by the object
+	// cache at initialize and the uploader's choice of write path.
+	capsProbe capabilitiesProbe
 
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	bg         sync.WaitGroup // background prefetch + upload + restore work
-	restoreSem chan struct{}  // bounds concurrent restore transfers
+	bg         background    // background prefetch + upload + restore work
+	restoreSem chan struct{} // bounds concurrent restore transfers
+	// limits are the run-end drain bounds, read once here (see cachedrain.go).
+	limits drainLimits
+	// now is the session's clock and transferMaxAge the age past which a
+	// restore negotiates a key again before it downloads (see
+	// restoreTransferMaxAge). A test replaces them.
+	now            func() time.Time
+	transferMaxAge time.Duration
 
 	mu    sync.Mutex
 	stats cache.SummaryResult
@@ -106,6 +121,17 @@ type providerSession struct {
 	// session's single first-refusal slot that the cache-401 investigation reads.
 	// See observeObjectAuthRefusal.
 	firstObjectAuthRefusal string
+	// writesRefused latches the TASK-cache write path shut once the server
+	// refused a write with 403: a scope verdict that cannot change inside one
+	// run, so every later upload and marker write is answered locally, as on a
+	// read-only session, and nothing more is sent. developerRefusal records that
+	// the refusal is the expected one for a developer credential (see
+	// expectedDeveloperRefusal), which the summary states plainly instead of
+	// warning. hosted is set at initialize when a hosted launcher started the
+	// run (see hostedLaunch).
+	writesRefused    bool
+	developerRefusal bool
+	hosted           bool
 	// tokenCommandFailureLogged collapses the memoized token-command error into
 	// one actionable session warning. Without this guard every prefetch,
 	// restore, upload, and marker operation repeats the same opaque failure.
@@ -115,10 +141,12 @@ type providerSession struct {
 	// instead of issuing its own single-key negotiate round trip — before this
 	// index a fully warm rebuild spent its entire wall time on serialized
 	// per-restore negotiates. prefetchDone is closed once the index is
-	// populated (or the batched negotiate failed, leaving the index nil), so a
+	// populated (a negotiate that failed leaves its keys out of it), so a
 	// restore racing the batch waits for it rather than duplicating it. The
 	// batch is the run's consistency window — the same single build-wide
 	// negotiate semantics the in-core client had before the provider split.
+	// Each outcome records the mode it was negotiated in: a result-only key is
+	// negotiated in minimal mode and carries no download (see runPrefetch).
 	negotiateIdx map[string]providerCacheResult
 	prefetchDone chan struct{}
 
@@ -135,26 +163,101 @@ type providerSession struct {
 // a run credential. Tests replace it.
 var cacheProviderDenyInspection = procguard.DenyInspection
 
+// providerCacheResult is one key's negotiate outcome. mode is the mode the
+// server answered in: a minimal answer carries the result and the manifest but
+// no download. at is when the negotiate was sent, which is before the server
+// signed the downloads: a download is good for at least its lifetime counted
+// from at.
 type providerCacheResult struct {
 	result     cache.KeyResult
 	provenance remotecache.EntryProvenance
+	mode       cache.Mode
+	at         time.Time
+}
+
+// restoreTransferMaxAge is how old a negotiated download may be when a restore
+// starts to use it. A download does not last: the cache server signs a URL for
+// 15 minutes, or hands out a storage token that lasts 20 to 60 minutes. The
+// prefetch negotiates every key when the run starts, and a restore can come
+// much later. Past 5 minutes a restore that needs a download negotiates its key
+// again first, one small request, which leaves at least 10 minutes for its
+// downloads to start. It is a variable so a test can change it; a session reads
+// it once, when it is created.
+var restoreTransferMaxAge = 5 * time.Minute
+
+// lacksDownloads reports whether the outcome cannot serve a restore of the
+// files in a session of the given mode: it is a hit negotiated in minimal mode,
+// which names no download, while the session's mode names them.
+func (r providerCacheResult) lacksDownloads(session cache.Mode) bool {
+	return r.result.Hit && r.mode == cache.ModeMinimal && session != cache.ModeMinimal
 }
 
 func newProviderSession(workspaceRoot string, logw io.Writer) *providerSession {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &providerSession{
-		workspaceRoot: workspaceRoot,
-		logw:          logw,
-		ctx:           ctx,
-		cancel:        cancel,
-		known:         make(map[string]bool),
-		restoreSem:    make(chan struct{}, restoreConcurrency),
+	s := &providerSession{
+		workspaceRoot:   workspaceRoot,
+		logw:            logw,
+		managedCacheURL: DefaultCacheURL,
+		ctx:             ctx,
+		cancel:          cancel,
+		known:           make(map[string]bool),
+		restoreSem:      make(chan struct{}, restoreConcurrency),
+		limits:          readDrainLimits(),
+		now:             time.Now,
 	}
+	s.transferMaxAge = restoreTransferMaxAge
+	s.uploads.init()
+	return s
+}
+
+// capabilitiesProbeTimeout bounds the capabilities probe. The client's own
+// control-plane budget is 30s, which is the right bound for a negotiate but not
+// for a discovery probe that sits in front of the first op of a run (the object
+// cache probes at initialize) or of the first upload window: an unreachable or
+// wedged cache server must cost the build a few seconds, not half a minute.
+const capabilitiesProbeTimeout = 5 * time.Second
+
+// capabilitiesProbe memoizes the cache server's capabilities for the session,
+// so the object cache and the uploader share one probe.
+type capabilitiesProbe struct {
+	mu   sync.Mutex
+	done bool
+	caps *cache.CapabilitiesResponse
+	err  error
+}
+
+// serverCapabilities returns the session's capabilities probe, sending it on
+// the first call. The client degrades a refused probe (any non-2xx) to an empty
+// capability set, the baseline write path, so only a transport fault or an
+// invalid answer is an error.
+func (s *providerSession) serverCapabilities() (*cache.CapabilitiesResponse, error) {
+	p := &s.capsProbe
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.done {
+		ctx, cancel := context.WithTimeout(s.ctx, capabilitiesProbeTimeout)
+		p.caps, p.err = s.client.Capabilities(ctx)
+		cancel()
+		p.done = true
+	}
+	return p.caps, p.err
+}
+
+// forgetServerCapabilities drops the memoized probe when the session's bearer
+// changes: initialize probed with the configured token, which a hosted run
+// replaces with its own cache token at authenticate, and a probe refused to
+// that token source says nothing about what the run's token may do.
+func (s *providerSession) forgetServerCapabilities() {
+	p := &s.capsProbe
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.done, p.caps, p.err = false, nil, nil
 }
 
 // close cancels the session context (aborting any in-flight background transfer)
 // and waits for the background goroutines to exit, so the process never returns
-// while a goroutine still writes to the exchange directory.
+// while a goroutine still writes to the exchange directory. It is the hard
+// stop: what the run-end drain did not store is dropped here.
 func (s *providerSession) close() {
 	s.cancel()
 	s.objects.close()
@@ -241,6 +344,15 @@ func (s *providerSession) observeAuthRefusal(f remotecache.AuthFailure) {
 	if cacheWriteOps[f.Op] {
 		s.authWriteRefusals++
 	}
+	// A 403 on a write is a verdict on the credential's scope; the client does
+	// not even re-mint on it. Latch so the run stops sending writes the server
+	// will refuse again. A 401 does not latch: it can be a transient auth
+	// failure, and a renewable bearer is re-minted once on it.
+	latched := cacheWriteOps[f.Op] && f.Status == http.StatusForbidden && !s.writesRefused
+	if latched {
+		s.writesRefused = true
+		s.developerRefusal = s.expectedDeveloperRefusal(f)
+	}
 	first := s.firstAuthRefusal == ""
 	if first {
 		s.firstAuthRefusal = f.String()
@@ -249,6 +361,50 @@ func (s *providerSession) observeAuthRefusal(f remotecache.AuthFailure) {
 	if first {
 		s.log(f.String())
 	}
+	if latched {
+		s.log(fmt.Sprintf("the cache server refused a %s with HTTP 403; this run sends no further cache writes, reads continue", f.Op))
+	}
+}
+
+// expectedDeveloperRefusal reports whether a refused write is the expected
+// refusal of a developer credential: the cache server lets only hosted CI
+// write, so a laptop's credential reads the shared cache and writes nothing.
+// Any sign of a hosted run makes it unexpected, so a hosted run whose writes
+// are refused keeps the summary warning: a launcher-exported ingest
+// base, the run's own cache token, or a service-account identity, which only a
+// cloud machine has. Callers hold s.mu.
+func (s *providerSession) expectedDeveloperRefusal(f remotecache.AuthFailure) bool {
+	if s.hosted {
+		return false
+	}
+	switch f.Source {
+	case remotecache.TokenClassRun, remotecache.TokenClassMetadata:
+		return false
+	default:
+		return true
+	}
+}
+
+// hostedLaunch reports whether a hosted CI launcher started this run. The
+// launcher exports the Delivery ingest base the run reports to and exchanges
+// its run credential at (SessionReporterIngestURLEnv); a developer machine
+// never sets it.
+func hostedLaunch() bool {
+	return hostedLaunchIn(nil)
+}
+
+// hostedLaunchIn is hostedLaunch read from env. A nil env is the process
+// environment.
+func hostedLaunchIn(env map[string]string) bool {
+	return strings.TrimSpace(clicore.EnvGet(env, SessionReporterIngestURLEnv)) != ""
+}
+
+// writesLatched reports whether a refused write closed the task-cache write
+// path for the rest of the run.
+func (s *providerSession) writesLatched() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.writesRefused
 }
 
 // observeObjectAuthRefusal records an object-cache refusal WITHOUT touching the
@@ -279,9 +435,21 @@ func (s *providerSession) observeObjectAuthRefusal(f remotecache.AuthFailure) {
 // runCacheProviderSession runs the request/response loop until stdin closes
 // (core went away — the crash/normal-exit path) or a shutdown op is received.
 // It is separated from CacheProvider so tests can drive it over buffers.
+//
+// Every way out stores the queued uploads first, within a bound. The shutdown
+// drains before its acknowledgement. When stdin closes, or the response pipe
+// breaks, without a shutdown, the entries already accepted are still stored
+// before the process exits: core was told they were accepted. Only a signal
+// that kills the process drops them.
 func runCacheProviderSession(in io.Reader, out io.Writer, logw io.Writer, workspaceRoot string) error {
 	sess := newProviderSession(workspaceRoot, logw)
-	defer sess.close()
+	shutdown := false
+	defer func() {
+		if !shutdown {
+			sess.drainUploader(time.Now().Add(sess.limits.budget), "they are dropped")
+		}
+		sess.close()
+	}()
 
 	sc := bufio.NewScanner(in)
 	sc.Buffer(make([]byte, 0, 64*1024), maxProviderRequestBytes)
@@ -337,9 +505,13 @@ func runCacheProviderSession(in io.Reader, out io.Writer, logw io.Writer, worksp
 			continue
 		}
 		if req.Op == cache.OpShutdown {
-			// Let in-flight restores answer before acking the shutdown; core
-			// stops reading once the ack lands.
-			sess.bg.Wait()
+			// Let in-flight restores answer and queued uploads store before
+			// acking the shutdown; core stops reading once the ack lands. Core
+			// waits 5 s for the ack, so the wait is bounded under it. The
+			// summary already drained, so this wait is over at once unless
+			// core sent no summary.
+			shutdown = true
+			sess.drainBackground(time.Now().Add(sess.limits.shutdown), "they are dropped")
 		}
 		resp := sess.handle(req)
 		if err := writeResp(resp); err != nil {
@@ -433,18 +605,17 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 		s.known[d] = true
 	}
 
-	cfg, err := remotecache.LoadConfig(CachePath(s.workspaceRoot))
-	if err != nil {
-		s.log(fmt.Sprintf("initialize: load cache config: %v", err))
-		cfg = &remotecache.Config{}
+	built := buildCacheConfig(s.workspaceRoot, s.managedCacheURL)
+	if built.loadErr != nil {
+		s.log(fmt.Sprintf("initialize: load cache config: %v", built.loadErr))
 	}
-	if err := cfg.ApplyEnv(); err != nil { // PUTNAMI_CACHE_URL/MODE/READ_ONLY overrides (the CI path)
-		s.log(fmt.Sprintf("initialize: apply cache environment: %v", err))
-		disabled := false
-		cfg = &remotecache.Config{Enabled: &disabled}
+	if built.envErr != nil {
+		s.log(fmt.Sprintf("initialize: apply cache environment: %v", built.envErr))
 	}
-	s.applyLinkedCacheDefault(cfg)
+	cfg := built.cfg
 	s.readOnly = cfg.ReadOnly
+	s.hosted = hostedLaunch()
+	s.applyMachineToken(cfg)
 
 	mode := p.Mode
 	if !mode.Valid() {
@@ -467,8 +638,8 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 			remotecache.WithMode(mode),
 			// ResolveBearer, not ResolveToken: the client needs the token SOURCE
 			// class to know whether a refused bearer can be re-minted. A static
-			// PUTNAMI_CACHE_TOKEN is never re-minted; the command and metadata
-			// recipes are.
+			// PUTNAMI_CACHE_TOKEN and a machine token from PUTNAMI_CLOUD_TOKEN are
+			// never re-minted; the command and metadata recipes are.
 			remotecache.WithBearerFunc(cfg.ResolveBearer),
 			remotecache.WithAuthObserver(s.observeAuthRefusal),
 		)
@@ -491,6 +662,13 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 	}
 	if slices.Contains(p.Capabilities, cache.CapabilityRunCredential) && s.acceptRunCredential() {
 		result.Capabilities = append(result.Capabilities, cache.CapabilityRunCredential)
+	}
+	// Core lists restore-result-only when it can serve a hit from its result
+	// alone. After the echo it names the keys whose files it will not read:
+	// prefetch negotiates them without downloads and restore places no blob for
+	// them. Without core's offer nothing is echoed, and core sends neither field.
+	if slices.Contains(p.Capabilities, cache.CapabilityRestoreResultOnly) {
+		result.Capabilities = append(result.Capabilities, cache.CapabilityRestoreResultOnly)
 	}
 	return providerOK(req, result)
 }
@@ -544,6 +722,7 @@ func (s *providerSession) authenticate(req *cache.ProviderRequest, p *cache.Auth
 			return s.keepConfiguredCacheToken(req, p.Credential, fmt.Sprintf("Delivery answered HTTP %d with a cache token this provider cannot use (%v)", answer.status, err))
 		}
 		s.client.UseRunBearer(token)
+		s.forgetServerCapabilities()
 		s.log("run credential: the remote cache uses the run's cache token")
 		return providerOK(req, &cache.AuthenticateResult{})
 	case answer.outcome == capabilityAbsent:
@@ -611,9 +790,70 @@ func runCacheToken(body []byte) (string, error) {
 	return granted.Token, nil
 }
 
-// applyLinkedCacheDefault synthesizes the managed remote-cache default when no
-// .putnami/cache.json is present but this workspace is linked to a Cloud
-// workspace via the committed manifest (putnami.workspace.json).
+// cacheURLOrigin names the step that set the URL of a built cache config.
+type cacheURLOrigin int
+
+const (
+	cacheURLUnset cacheURLOrigin = iota
+	cacheURLFromFile
+	cacheURLFromEnv
+	cacheURLFromLink
+)
+
+// builtCacheConfig is the remote-cache config of a build and what the steps
+// that built it found.
+type builtCacheConfig struct {
+	cfg *remotecache.Config
+	// fileExists reports whether .putnami/cache.json exists.
+	fileExists bool
+	origin     cacheURLOrigin
+	// loadErr is a .putnami/cache.json that cannot be read: the build goes on
+	// with an empty config. envErr is a malformed PUTNAMI_CACHE_* override: it
+	// turns the remote cache off for the build.
+	loadErr error
+	envErr  error
+}
+
+// buildCacheConfig builds the remote-cache config of a build in workspaceRoot:
+// .putnami/cache.json, then the PUTNAMI_CACHE_* overrides from the process
+// environment (the CI path), then the workspace link default with managedURL.
+// providerSession.initialize and the cache status both call it, so the status
+// reports the config a build uses.
+func buildCacheConfig(workspaceRoot, managedURL string) builtCacheConfig {
+	path := CachePath(workspaceRoot)
+	_, statErr := os.Stat(path)
+	b := builtCacheConfig{fileExists: statErr == nil}
+	cfg, err := remotecache.LoadConfig(path)
+	if err != nil {
+		b.loadErr = err
+		cfg = &remotecache.Config{}
+	}
+	fileURL := cfg.URL
+	if err := cfg.ApplyEnv(); err != nil {
+		b.envErr = err
+		disabled := false
+		cfg = &remotecache.Config{Enabled: &disabled}
+	}
+	envURL := cfg.URL
+	linkedCacheDefault(cfg, workspaceRoot, managedURL)
+	switch {
+	case cfg.URL == "":
+		b.origin = cacheURLUnset
+	case envURL == "":
+		b.origin = cacheURLFromLink
+	case envURL != fileURL:
+		b.origin = cacheURLFromEnv
+	default:
+		b.origin = cacheURLFromFile
+	}
+	b.cfg = cfg
+	return b
+}
+
+// linkedCacheDefault synthesizes the managed remote-cache default, managedURL
+// with the canonical token recipe, when no .putnami/cache.json is present but
+// this workspace is linked to a Cloud workspace via the committed manifest
+// (putnami.workspace.json).
 //
 // A fresh git worktree inherits that committed link and the global
 // ~/.putnami/auth.json credential, but not the git-ignored cache.json pointer —
@@ -631,11 +871,11 @@ func runCacheToken(body []byte) (string, error) {
 // `cloud cache disable` that sets enabled:false with the URL kept) and the
 // PUTNAMI_CACHE_URL env override both win untouched; an unlinked checkout stays
 // local-only.
-func (s *providerSession) applyLinkedCacheDefault(cfg *remotecache.Config) {
-	if cfg.URL != "" || !workspaceLinked(s.workspaceRoot) {
+func linkedCacheDefault(cfg *remotecache.Config, workspaceRoot, managedURL string) {
+	if cfg.URL != "" || !workspaceLinked(workspaceRoot) {
 		return
 	}
-	cfg.URL = DefaultCacheURL
+	cfg.URL = managedURL
 	if !cfg.Token.Configured() {
 		cfg.Token = remotecache.TokenSource{Command: cacheTokenCommand()}
 	}
@@ -663,35 +903,86 @@ func (s *providerSession) serving() bool {
 // miss). Eligibility/break-even filtering is core's call at this point — the
 // provider restores exactly the key core asked for, so it builds the negotiate
 // request directly rather than through the eligibility-filtering BuildRequest.
+//
+// A result-only restore (p.ResultOnly) places no blob: core reads the entry's
+// result and none of its files. It is answered from the prefetch index, or from
+// one minimal negotiate of the key. Core cannot verify such a hit, so the answer
+// is the entry the server reported under exactly this key, and a miss otherwise.
+// A restore of the files needs the downloads, which a minimal answer lacks: it
+// then negotiates the key once more, in the session's mode.
+//
+// The downloads of the index do not last (see restoreTransferMaxAge), so a
+// restore of the files negotiates its key again, once, in two cases: before it
+// downloads, when the indexed downloads are too old and it needs one of them;
+// and after a download the storage refused the way it refuses an expired one.
+// It reports an error only when the download fails with downloads this restore
+// negotiated itself. A key the server no longer holds is a miss.
 func (s *providerSession) restore(req *cache.ProviderRequest, p *cache.RestoreParams) *cache.ProviderResponse {
 	if !s.serving() {
 		return providerOK(req, &cache.RestoreResult{Status: cache.RestoreMiss})
 	}
 	cacheResult, negotiated := s.negotiatedResult(p.Key)
+	if negotiated && !p.ResultOnly && cacheResult.lacksDownloads(s.mode) {
+		negotiated = false
+	}
+	// renegotiated is set once this restore asked the server for the key
+	// itself: its downloads are then as fresh as they can be, and a refused
+	// download is final.
+	renegotiated := !negotiated
 	if !negotiated {
-		// The key was not covered by a prefetch batch (or the batch failed):
-		// negotiate it individually. With core handing the whole build's key
-		// set to prefetch, this is the exception path, not the per-restore tax.
-		nreq := &cache.NegotiateRequest{
-			ProtocolVersion: cache.ProtocolVersion,
-			Mode:            s.mode,
-			Keys:            []cache.KeyRequest{{Key: p.Key}},
+		// The key was not covered by a prefetch batch (or the batch failed), or
+		// the batch answered it for its result only: negotiate it individually.
+		// With core handing the whole build's key set to prefetch, this is the
+		// exception path, not the per-restore tax.
+		mode := s.mode
+		if p.ResultOnly {
+			mode = cache.ModeMinimal
 		}
-		cache.NormalizeRequest(nreq)
-		results, err := s.negotiate(nreq)
+		results, err := s.negotiateKeys(mode, []string{p.Key})
 		if err != nil {
 			s.logCacheError(fmt.Sprintf("restore %s negotiate", short(p.Key)), err)
 			return providerOK(req, &cache.RestoreResult{Status: cache.RestoreError})
 		}
 		cacheResult = results[p.Key]
+	} else if !p.ResultOnly && s.transfersStale(cacheResult) {
+		// Too old to rely on: ask for downloads signed now. When that negotiate
+		// fails, the indexed downloads are still tried; they may have a longer
+		// life than the bound assumes.
+		renegotiated = true
+		results, err := s.negotiateKeys(s.mode, []string{p.Key})
+		if err != nil {
+			s.logCacheError(fmt.Sprintf("restore %s negotiate again", short(p.Key)), err)
+		} else {
+			cacheResult = results[p.Key]
+		}
 	}
 	if !cacheResult.result.Hit {
 		return providerOK(req, &cache.RestoreResult{Status: cache.RestoreMiss})
 	}
-	n, err := s.materializeHit(s.ctx, cacheResult.result)
-	if err != nil {
-		s.log(fmt.Sprintf("restore %s: materialize: %v", short(p.Key), err))
-		return providerOK(req, &cache.RestoreResult{Status: cache.RestoreError})
+	var n int64
+	if !p.ResultOnly {
+		var err error
+		n, err = s.materializeHit(s.ctx, cacheResult.result)
+		if err != nil && !renegotiated && remotecache.DownloadRefused(err) {
+			// The storage refused a download of the index. Blobs already placed
+			// stay placed; the second pass fetches the rest.
+			results, nerr := s.negotiateKeys(s.mode, []string{p.Key})
+			if nerr != nil {
+				s.logCacheError(fmt.Sprintf("restore %s negotiate again", short(p.Key)), nerr)
+				return providerOK(req, &cache.RestoreResult{Status: cache.RestoreError})
+			}
+			cacheResult = results[p.Key]
+			if !cacheResult.result.Hit {
+				return providerOK(req, &cache.RestoreResult{Status: cache.RestoreMiss})
+			}
+			var more int64
+			more, err = s.materializeHit(s.ctx, cacheResult.result)
+			n += more
+		}
+		if err != nil {
+			s.log(fmt.Sprintf("restore %s: materialize: %v", short(p.Key), err))
+			return providerOK(req, &cache.RestoreResult{Status: cache.RestoreError})
+		}
 	}
 	s.addStats(func(st *cache.SummaryResult) {
 		st.RestoredCount++
@@ -710,20 +1001,46 @@ func (s *providerSession) restore(req *cache.ProviderRequest, p *cache.RestorePa
 	return providerOK(req, result)
 }
 
-// prefetch negotiates a set of keys in one batch and speculatively materializes
-// the hits' blobs into the exchange directory in the background, warming them
-// for later restores. It returns promptly with the count it accepted; the work
-// is drained at summary. The batch's negotiate outcome is kept as the session's
-// negotiate index (installed synchronously here, before the response, so a
+// transfersStale reports whether a restore of r must negotiate again before it
+// downloads: r is older than the session's bound, and the restore would use one
+// of its downloads. A blob core already has, or one an earlier restore placed,
+// is not downloaded. A blob of at most cache.MaxInlineBlobBytes comes inline
+// through download-batch, which uses the session's own credential and no
+// download of r; if the server leaves it out of that answer, the refused
+// download is caught after the fact.
+func (s *providerSession) transfersStale(r providerCacheResult) bool {
+	if !r.result.Hit || r.at.IsZero() || s.now().Sub(r.at) < s.transferMaxAge {
+		return false
+	}
+	for _, t := range r.result.Downloads {
+		if s.known[t.Digest] {
+			continue
+		}
+		if t.SizeBytes > 0 && t.SizeBytes <= cache.MaxInlineBlobBytes {
+			continue
+		}
+		if path, ok := cache.BlobExchangePath(s.exchangeDir, t.Digest); ok && blobPresent(path, t.SizeBytes) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// prefetch negotiates a set of keys ahead of their restores and downloads
+// nothing: a restore fetches a key's files, and only when core asks for them.
+// It returns promptly with the count it accepted; the work is drained at
+// summary. The outcome is kept as the session's negotiate index. The first
+// prefetch installs prefetchDone synchronously here, before the response, so a
 // restore dispatched right after this op always finds the in-flight batch to
-// wait on). Only the first prefetch installs the index — core sends exactly
-// one; a hypothetical second batch still warms blobs but leaves the index and
-// its already-released waiters untouched.
+// wait on. Core sends exactly one prefetch; a hypothetical second one adds its
+// keys to the index and leaves the already-released waiters untouched.
 func (s *providerSession) prefetch(req *cache.ProviderRequest, p *cache.PrefetchParams) *cache.ProviderResponse {
 	if !s.serving() || len(p.Keys) == 0 {
 		return providerOK(req, &cache.PrefetchResult{Started: 0})
 	}
-	keys := p.Keys // owned by ParseAndValidatePrefetchParams; safe to hand to the goroutine
+	// The keys are owned by ParseAndValidatePrefetchParams; safe to hand to the goroutine.
+	batches := prefetchBatches(p.Keys, p.ResultOnlyKeys, s.mode)
 	var done chan struct{}
 	s.mu.Lock()
 	if s.prefetchDone == nil {
@@ -734,72 +1051,103 @@ func (s *providerSession) prefetch(req *cache.ProviderRequest, p *cache.Prefetch
 	s.bg.Add(1)
 	go func() {
 		defer s.bg.Done()
-		s.runPrefetch(keys, done)
+		s.runPrefetch(batches, done)
 	}()
-	return providerOK(req, &cache.PrefetchResult{Started: len(keys)})
+	return providerOK(req, &cache.PrefetchResult{Started: len(p.Keys)})
 }
 
-// runPrefetch performs the batched negotiate, publishes its outcome as the
-// negotiate index (releasing any restores waiting on done), then downloads the
-// hits' blobs on a bounded pool. done is nil when a prior prefetch already owns
-// the index.
-func (s *providerSession) runPrefetch(keys []string, done chan struct{}) {
-	nreq := &cache.NegotiateRequest{ProtocolVersion: cache.ProtocolVersion, Mode: s.mode}
+// prefetchBatch is one negotiate of a prefetch: its mode, its keys, and the
+// outcome runPrefetch fills in.
+type prefetchBatch struct {
+	mode    cache.Mode
+	keys    []string
+	results map[string]providerCacheResult
+	err     error
+}
+
+// prefetchBatches splits a prefetch into its negotiates, two at most: the
+// result-only keys in minimal mode, so the server checks and signs no download
+// for files core will not read, and the other keys in the session's mode. A
+// session already in minimal mode, or a prefetch without result-only keys, is
+// one batch.
+func prefetchBatches(keys, resultOnly []string, mode cache.Mode) []prefetchBatch {
+	if mode == cache.ModeMinimal || len(resultOnly) == 0 {
+		return []prefetchBatch{{mode: mode, keys: keys}}
+	}
+	only := make(map[string]bool, len(resultOnly))
+	for _, k := range resultOnly {
+		only[k] = true
+	}
+	var minimal, rest []string
 	for _, k := range keys {
-		nreq.Keys = append(nreq.Keys, cache.KeyRequest{Key: k})
-	}
-	cache.NormalizeRequest(nreq)
-	results, err := s.negotiate(nreq)
-	if err != nil {
-		s.logCacheError("prefetch negotiate", err)
-		if done != nil {
-			close(done) // index stays nil: restores fall back to per-key negotiate
+		if only[k] {
+			minimal = append(minimal, k)
+		} else {
+			rest = append(rest, k)
 		}
-		return
 	}
-	if done != nil {
+	var batches []prefetchBatch
+	if len(minimal) > 0 {
+		batches = append(batches, prefetchBatch{mode: cache.ModeMinimal, keys: minimal})
+	}
+	if len(rest) > 0 {
+		batches = append(batches, prefetchBatch{mode: mode, keys: rest})
+	}
+	return batches
+}
+
+// runPrefetch negotiates the batches side by side and publishes their outcomes
+// as the negotiate index, releasing any restores waiting on done. A batch whose
+// negotiate failed leaves its keys out of the index, so each of their restores
+// negotiates its own key. done is nil when a prior prefetch already owns the
+// waiters; the outcomes then join the index without replacing an earlier one.
+//
+// PrefetchedCount counts the prefetched keys the server holds an entry for. It
+// no longer counts warmed blobs: prefetch downloads none.
+func (s *providerSession) runPrefetch(batches []prefetchBatch, done chan struct{}) {
+	var wg sync.WaitGroup
+	for i := range batches {
+		wg.Add(1)
+		go func(b *prefetchBatch) {
+			defer wg.Done()
+			b.results, b.err = s.negotiateKeys(b.mode, b.keys)
+		}(&batches[i])
+	}
+	wg.Wait()
+
+	found := 0
+	s.mu.Lock()
+	for _, b := range batches {
+		if b.err != nil {
+			continue
+		}
+		if s.negotiateIdx == nil {
+			s.negotiateIdx = make(map[string]providerCacheResult, len(b.keys))
+		}
 		// Record an explicit outcome for every batched key — misses too — so a
 		// restore for a batched miss is answered from the index instead of
 		// re-asking the server for a key this run already knows is absent.
-		full := make(map[string]providerCacheResult, len(keys))
-		for _, k := range keys {
-			full[k] = results[k] // zero result (Hit=false) for misses
+		for _, k := range b.keys {
+			if _, held := s.negotiateIdx[k]; held {
+				continue
+			}
+			result := b.results[k] // zero result (Hit=false) for misses
+			s.negotiateIdx[k] = result
+			if result.result.Hit {
+				found++
+			}
 		}
-		s.mu.Lock()
-		s.negotiateIdx = full
-		s.mu.Unlock()
+	}
+	s.mu.Unlock()
+	if done != nil {
 		close(done)
 	}
-
-	// Warm the hits' blobs concurrently: they are independent transfers, and a
-	// restore for a not-yet-warmed key downloads its own blobs anyway (atomic
-	// staging makes the duplicate harmless), so the only cost of sequential
-	// warming was that it never kept up with the build.
-	sem := make(chan struct{}, prefetchConcurrency)
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var warmed int
-	for _, k := range keys {
-		result, ok := results[k]
-		if !ok || !result.result.Hit {
-			continue
+	for _, b := range batches {
+		if b.err != nil {
+			s.logCacheError("prefetch negotiate", b.err)
 		}
-		wg.Add(1)
-		go func(k string, result providerCacheResult) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			if _, err := s.materializeHit(s.ctx, result.result); err != nil {
-				s.log(fmt.Sprintf("prefetch %s: %v", short(k), err))
-				return
-			}
-			mu.Lock()
-			warmed++
-			mu.Unlock()
-		}(k, result)
 	}
-	wg.Wait()
-	s.addStats(func(st *cache.SummaryResult) { st.PrefetchedCount += warmed })
+	s.addStats(func(st *cache.SummaryResult) { st.PrefetchedCount += found })
 }
 
 // negotiatedResult returns the batched negotiate outcome for key, waiting for
@@ -824,9 +1172,22 @@ func (s *providerSession) negotiatedResult(key string) (providerCacheResult, boo
 	return result, ok
 }
 
+// negotiateKeys negotiates keys in the given mode. The outcomes are indexed by
+// the key the server reported, so a key it did not answer reads as a miss.
+func (s *providerSession) negotiateKeys(mode cache.Mode, keys []string) (map[string]providerCacheResult, error) {
+	nreq := &cache.NegotiateRequest{ProtocolVersion: cache.ProtocolVersion, Mode: mode}
+	for _, k := range keys {
+		nreq.Keys = append(nreq.Keys, cache.KeyRequest{Key: k})
+	}
+	cache.NormalizeRequest(nreq)
+	return s.negotiate(nreq)
+}
+
 // negotiate preserves the shared HTTP cache response for v1 sessions and asks
 // for Cloud provenance only after the provider-RPC v2 handshake selected it.
+// Each outcome carries the time the request was sent.
 func (s *providerSession) negotiate(req *cache.NegotiateRequest) (map[string]providerCacheResult, error) {
+	at := s.now()
 	if s.provenanceEnabled() {
 		response, err := s.client.NegotiateWithProvenance(s.ctx, req)
 		if err != nil {
@@ -835,7 +1196,7 @@ func (s *providerSession) negotiate(req *cache.NegotiateRequest) (map[string]pro
 		indexed := remotecache.Index(response.Response)
 		out := make(map[string]providerCacheResult, len(indexed))
 		for key, result := range indexed {
-			out[key] = providerCacheResult{result: result, provenance: response.Provenance[key]}
+			out[key] = providerCacheResult{result: result, provenance: response.Provenance[key], mode: req.Mode, at: at}
 		}
 		return out, nil
 	}
@@ -846,7 +1207,7 @@ func (s *providerSession) negotiate(req *cache.NegotiateRequest) (map[string]pro
 	indexed := remotecache.Index(response)
 	out := make(map[string]providerCacheResult, len(indexed))
 	for key, result := range indexed {
-		out[key] = providerCacheResult{result: result}
+		out[key] = providerCacheResult{result: result, mode: req.Mode, at: at}
 	}
 	return out, nil
 }
@@ -855,31 +1216,19 @@ func (s *providerSession) provenanceEnabled() bool {
 	return cache.ProviderProtocolHasProvenance(s.providerProtocolVersion)
 }
 
-// upload stores a freshly built entry in the background: its blobs are already in
-// the exchange directory (core exported them), so a BlobSource reads them from
-// there. It returns promptly; the bytes are confirmed durable at summary.
+// upload queues a freshly built entry for the uploader (see cacheupload.go):
+// its blobs are already in the exchange directory (core exported them), so a
+// BlobSource reads them from there. It returns promptly; the entries are stored
+// a window at a time and confirmed durable at summary.
 func (s *providerSession) upload(req *cache.ProviderRequest, p *cache.UploadParams) *cache.ProviderResponse {
-	if !s.serving() || s.readOnly {
+	if !s.serving() || s.readOnly || s.writesLatched() {
 		return providerOK(req, &cache.UploadResult{Accepted: false})
 	}
 	// UploadParams provenance is deliberately ignored. The cache server derives
 	// and persists producer/channel from the bearer it verifies at commit time,
 	// so a caller cannot turn a developer upload into a trusted CI entry by
 	// forging these optional v2 fields.
-	in := remotecache.StoreInput{Key: p.Key, Result: p.Result, Manifest: p.Manifest}
-	s.bg.Add(1)
-	go func() {
-		defer s.bg.Done()
-		out, err := s.client.StoreResult(s.ctx, in, blobExchangeSource{dir: s.exchangeDir})
-		if err != nil {
-			s.logCacheError("upload "+short(p.Key), err)
-			return
-		}
-		s.addStats(func(st *cache.SummaryResult) {
-			st.UploadedCount++
-			st.UploadedBytes += out.BytesUploaded
-		})
-	}()
+	s.enqueueUpload(remotecache.StoreInput{Key: p.Key, Result: p.Result, Manifest: p.Manifest})
 	return providerOK(req, &cache.UploadResult{Accepted: true})
 }
 
@@ -900,7 +1249,7 @@ func (s *providerSession) markerLookup(req *cache.ProviderRequest, p *cache.Mark
 }
 
 func (s *providerSession) markerWrite(req *cache.ProviderRequest, p *cache.MarkerWriteParams) *cache.ProviderResponse {
-	if !s.serving() || s.readOnly {
+	if !s.serving() || s.readOnly || s.writesLatched() {
 		return providerOK(req, &cache.MarkerWriteResult{Published: false})
 	}
 	mreq := s.client.BuildPublishRunMarkerRequest(p.Workspace, p.Branch, p.Commands, p.ParamsHash, p.SHA, p.ObservedSHA)
@@ -923,15 +1272,24 @@ func (s *providerSession) markerWrite(req *cache.ProviderRequest, p *cache.Marke
 // rather than folded into SummaryResult: those counters have always meant TASK
 // entries, and quietly adding compiler objects to them would change what every
 // existing reading of uploadedCount means.
+//
+// The drain is bounded (see cachedrain.go): core discards a summary that takes
+// more than 60 s, with every count in it. The uploader starts to flush before
+// the object drain, so the two run side by side. Uploads the drain gives up on
+// are not canceled here; they go on until the shutdown, and the counts leave
+// them out.
 func (s *providerSession) summary(req *cache.ProviderRequest) *cache.ProviderResponse {
+	deadline := time.Now().Add(s.limits.budget)
+	s.drainUploads()
 	s.objects.drain()
 	s.objects.report()
-	s.bg.Wait()
+	s.drainBackground(deadline, "the summary does not count them")
 	s.mu.Lock()
 	stats := s.stats
 	refusals, writeRefusals, first := s.authRefusals, s.authWriteRefusals, s.firstAuthRefusal
+	developer := s.writesRefused && s.developerRefusal
 	s.mu.Unlock()
-	s.reportAuthRefusals(stats, refusals, writeRefusals, first)
+	s.reportAuthRefusals(stats, refusals, writeRefusals, first, developer)
 	return providerOK(req, &stats)
 }
 
@@ -941,10 +1299,22 @@ func (s *providerSession) summary(req *cache.ProviderRequest) *cache.ProviderRes
 // Reported as uploadedCount=0 alone that is indistinguishable
 // from a fully warm run, so the refusal is said out loud instead.
 //
+// A developer credential is the exception: the cache server lets only hosted CI
+// write, so its refused write is the expected outcome, not a cold cache to
+// investigate. developer says so, and the summary states it plainly instead of
+// warning. Read refusals are still reported in full.
+//
 // Object-cache refusals are not counted here and never reach this warning: they
 // speak on the object cache's own line (see cacheWriteOps and objectCache.report).
-func (s *providerSession) reportAuthRefusals(stats cache.SummaryResult, refusals, writeRefusals int, first string) {
+func (s *providerSession) reportAuthRefusals(stats cache.SummaryResult, refusals, writeRefusals int, first string, developer bool) {
 	if refusals == 0 {
+		return
+	}
+	if developer {
+		if refusals > writeRefusals {
+			s.log(fmt.Sprintf("%d cache read request(s) refused by the server this run; first refusal of the run: %s", refusals-writeRefusals, first))
+		}
+		s.log("this credential reads the shared cache and writes nothing to it: only hosted CI runs write, so the tasks built here stay in the local cache")
 		return
 	}
 	s.log(fmt.Sprintf("%d cache request(s) refused by the server this run, %d of them on the write path; first: %s",
@@ -955,7 +1325,7 @@ func (s *providerSession) reportAuthRefusals(stats cache.SummaryResult, refusals
 }
 
 // materializeHit downloads every blob of a negotiate hit into the blob-exchange
-// directory, skipping digests already present (warmed by a prefetch or a prior
+// directory, skipping digests already present (placed by an earlier
 // restore), and returns the bytes downloaded. Each blob is content-verified by
 // the fetcher and written atomically (temp + rename) so core never ingests a
 // half-written file.
@@ -1028,7 +1398,7 @@ func writeExchangeBlob(fetch func(string) (io.ReadCloser, error), digest, path s
 
 // blobPresent reports whether the exchange directory already holds the blob at
 // the expected size (digest-addressed content the fetcher verified when it was
-// written), so a prefetch-then-restore does not download it twice.
+// written), so two restores that share a blob do not download it twice.
 func blobPresent(path string, size int64) bool {
 	fi, err := os.Stat(path)
 	if err != nil {

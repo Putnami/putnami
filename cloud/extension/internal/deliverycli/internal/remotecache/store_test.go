@@ -75,17 +75,112 @@ type fakeCAS struct {
 	// findMissingSeen accumulates every digest find-missing was asked about, so
 	// tests can assert known-present blobs are excluded from the probe.
 	findMissingSeen map[string]bool
+	// uploadBatchStatus, when non-zero, makes upload-batch refuse every request
+	// with that status and store nothing. uploadBatchOmit lists digests the
+	// route leaves out of its answer and does not store, as the contract allows.
+	// uploadBatchBlobs records how many blobs each upload-batch request carried.
+	uploadBatchStatus int
+	uploadBatchOmit   map[string]bool
+	uploadBatchBlobs  []int
+
+	// The fault knobs. A route is a request path; the path of a blob PUT is
+	// "/up/<digest>". script lists the statuses of the next requests of a
+	// route, in order: 0 lets one through, dropConnection closes the
+	// connection without an answer. Once a route's script is used up, always
+	// gives the status of every later request (0 or unset lets it through).
+	// hold makes a route wait, after it read the request, until the channel is
+	// closed or the client goes away. commitPoison makes commit-batch answer
+	// the given status to a request that carries the key.
+	script       map[string][]int
+	always       map[string]int
+	hold         map[string]chan struct{}
+	commitPoison map[string]int
+	// requests counts the requests of each route, the failed ones included,
+	// and requestBytes their body bytes. Every blob PUT counts under "/up/".
+	requests     map[string]int
+	requestBytes map[string]int64
+	// findMissingBlobs records how many blobs each find-missing request asked
+	// about, and commitBatchEntries how many entries each commit-batch carried.
+	findMissingBlobs   []int
+	commitBatchEntries []int
+	// findMissingAuth is the Authorization header of the last find-missing.
+	findMissingAuth string
 }
 
+// dropConnection, in a fakeCAS script, closes the connection without an answer.
+const dropConnection = -1
+
 func newFakeCAS(present ...string) *fakeCAS {
-	f := &fakeCAS{present: map[string]bool{}, uploaded: map[string][]byte{}, findMissingSeen: map[string]bool{}}
+	f := &fakeCAS{
+		present: map[string]bool{}, uploaded: map[string][]byte{}, findMissingSeen: map[string]bool{},
+		script: map[string][]int{}, always: map[string]int{}, hold: map[string]chan struct{}{},
+		commitPoison: map[string]int{}, requests: map[string]int{}, requestBytes: map[string]int64{},
+	}
 	for _, d := range present {
 		f.present[d] = true
 	}
 	return f
 }
 
+// handler serves the fake. Every request passes through the fault knobs
+// before it reaches its route.
 func (f *fakeCAS) handler(t *testing.T) http.Handler {
+	t.Helper()
+	routes := f.routes(t)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		route := r.URL.Path
+		counted := route
+		if strings.HasPrefix(route, "/up/") {
+			counted = "/up/"
+		}
+		f.mu.Lock()
+		f.requests[counted]++
+		f.requestBytes[counted] += int64(len(body))
+		status := f.always[route]
+		if next := f.script[route]; len(next) > 0 {
+			status, f.script[route] = next[0], next[1:]
+		}
+		held := f.hold[route]
+		f.mu.Unlock()
+
+		if held != nil {
+			select {
+			case <-held:
+			case <-r.Context().Done():
+				return
+			}
+		}
+		switch {
+		case status == dropConnection:
+			conn, _, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				t.Errorf("hijack: %v", err)
+				return
+			}
+			_ = conn.Close()
+			return
+		case status != 0:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(status)
+			_ = json.NewEncoder(w).Encode(cache.ErrorResponse{
+				ProtocolVersion: cache.ProtocolVersion, Code: "scripted", Message: "scripted failure",
+			})
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		routes.ServeHTTP(w, r)
+	})
+}
+
+// count returns how many requests a route received, the failed ones included.
+func (f *fakeCAS) count(route string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.requests[route]
+}
+
+func (f *fakeCAS) routes(t *testing.T) http.Handler {
 	t.Helper()
 	mux := http.NewServeMux()
 
@@ -215,6 +310,7 @@ func (f *fakeCAS) handler(t *testing.T) http.Handler {
 	mux.HandleFunc(cache.FindMissingPath, func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.nFindMissing++
+		f.findMissingAuth = r.Header.Get(cache.AuthorizationHeader)
 		f.mu.Unlock()
 
 		body, _ := io.ReadAll(r.Body)
@@ -224,6 +320,9 @@ func (f *fakeCAS) handler(t *testing.T) http.Handler {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		f.mu.Lock()
+		f.findMissingBlobs = append(f.findMissingBlobs, len(req.Blobs))
+		f.mu.Unlock()
 
 		var uploads []cache.BlobTransfer
 		for _, b := range req.Blobs {
@@ -258,6 +357,23 @@ func (f *fakeCAS) handler(t *testing.T) http.Handler {
 		if req == nil {
 			t.Errorf("server got invalid commit-batch request: %v", diags)
 			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		f.mu.Lock()
+		f.commitBatchEntries = append(f.commitBatchEntries, len(req.Entries))
+		poison := 0
+		for _, e := range req.Entries {
+			if status := f.commitPoison[e.Key]; status != 0 {
+				poison = status
+			}
+		}
+		f.mu.Unlock()
+		if poison != 0 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(poison)
+			_ = json.NewEncoder(w).Encode(cache.ErrorResponse{
+				ProtocolVersion: cache.ProtocolVersion, Code: "poison", Message: "the request carries an entry the server cannot take",
+			})
 			return
 		}
 		var results []cache.CommitResult
@@ -336,17 +452,35 @@ func (f *fakeCAS) handler(t *testing.T) http.Handler {
 	mux.HandleFunc(cache.UploadBatchPath, func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.nUploadBatch++
+		refuse := f.uploadBatchStatus
 		f.mu.Unlock()
 
 		body, _ := io.ReadAll(r.Body)
+		if refuse != 0 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(refuse)
+			_ = json.NewEncoder(w).Encode(cache.ErrorResponse{
+				ProtocolVersion: cache.ProtocolVersion, Code: "refused", Message: "upload-batch refused",
+			})
+			return
+		}
 		req, diags := cache.ParseAndValidateUploadBatchRequest(body)
 		if req == nil {
 			t.Errorf("server got invalid upload-batch request: %v", diags)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		f.mu.Lock()
+		f.uploadBatchBlobs = append(f.uploadBatchBlobs, len(req.Blobs))
+		f.mu.Unlock()
 		var stored []string
 		for _, b := range req.Blobs {
+			f.mu.Lock()
+			omit := f.uploadBatchOmit[b.Digest]
+			f.mu.Unlock()
+			if omit {
+				continue
+			}
 			content, gzipped := casIngest(b.Data)
 			if got := cache.DigestOf(content); got != b.Digest {
 				t.Errorf("inline blob %s content-addresses to %s", b.Digest, got)
@@ -620,7 +754,7 @@ func TestUploadBlob_RejectsNonPut(t *testing.T) {
 	c := NewClient("https://cache.example", "tok")
 	err := c.UploadBlob(context.Background(), cache.BlobTransfer{
 		Digest: cache.DigestOf([]byte("x")), URL: "https://cas/x", Method: cache.TransferGet,
-	}, strings.NewReader("x"))
+	}, strings.NewReader("x"), 1)
 	if err == nil {
 		t.Fatal("expected an error for a non-PUT transfer")
 	}

@@ -328,6 +328,13 @@ func TestCacheStatusNodeFromReadsTheConfigAndIdentity(t *testing.T) {
 	if noSource.State != clicore.StatusDegraded || noSource.Children[1].Fix != "putnami cloud setup" {
 		t.Fatalf("no token source = %+v, want degraded with the setup command", noSource)
 	}
+	if want := "dev@example.com, no token source in " + CacheFileRelative; noSource.Children[1].Detail != want {
+		t.Fatalf("no token source detail = %q, want %q", noSource.Children[1].Detail, want)
+	}
+	envOnly := CacheStatusNodeFrom(&CacheConfig{Enabled: true, URL: "https://cache.test", urlOrigin: cacheURLFromEnv, noFile: true}, nil, identity, nil, nil)
+	if want := "dev@example.com, no token source: " + CacheFileRelative + " does not exist"; envOnly.Children[1].Detail != want {
+		t.Fatalf("env-only identity detail = %q, want %q", envOnly.Children[1].Detail, want)
+	}
 	broken := CacheStatusNodeFrom(nil, errors.New("parse .putnami/cache.json: unexpected end of JSON input"), identity, nil, nil)
 	if broken.State != clicore.StatusUnknown || broken.Children[0].State != clicore.StatusUnknown {
 		t.Fatalf("unreadable = %+v, want unknown", broken)

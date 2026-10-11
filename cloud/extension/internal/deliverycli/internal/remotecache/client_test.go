@@ -186,7 +186,9 @@ func TestNegotiate_ServerErrorBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.URL, "tok", WithHTTPClient(srv.Client()))
+	// The bearer is not part of the reason: a reason that echoes the bearer is
+	// redacted (TestDoAuthed_EchoedBearerNeverReachesTheReturnedError).
+	c := NewClient(srv.URL, "cache-bearer", WithHTTPClient(srv.Client()))
 	req := c.BuildRequest(sampleInputs())
 	_, err := c.Negotiate(context.Background(), req)
 	if err == nil {

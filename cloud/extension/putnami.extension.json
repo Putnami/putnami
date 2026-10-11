@@ -161,7 +161,7 @@
               "description": "Write the Go registry credential to ~/.netrc for one immediate invocation"
             },
             {
-              "command": "putnami cloud token create --name ci-cache --scopes cache.read,cache.write",
+              "command": "putnami cloud token create --name ci-cache --scopes cache.read",
               "description": "Create a workspace machine token (the raw pkt_* is shown once)"
             },
             {
@@ -514,7 +514,7 @@
           "interactive": true,
           "examples": [
             {
-              "command": "putnami cloud tokens create --name ci-cache --scopes cache.read,cache.write",
+              "command": "putnami cloud tokens create --name ci-cache --scopes cache.read",
               "description": "Create a workspace machine token (the raw pkt_* is shown once)"
             },
             {

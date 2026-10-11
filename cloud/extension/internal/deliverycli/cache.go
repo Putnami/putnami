@@ -48,6 +48,12 @@ type CacheConfig struct {
 	URL     string               `json:"url"`
 	Mode    string               `json:"mode"`
 	Token   *clicore.TokenSource `json:"token,omitempty"`
+
+	// urlOrigin and noFile describe a config the cache status built the way a
+	// build does (see statusCacheConfig): the step that set the URL, and
+	// whether .putnami/cache.json is absent. They are never written.
+	urlOrigin cacheURLOrigin
+	noFile    bool
 }
 
 // cacheTokenCommand is the token source `cloud setup` records by default: the

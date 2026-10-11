@@ -765,6 +765,42 @@
           }
         },
         "type": "object"
+      },
+      "UploadBatchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "blobs": {
+            "items": {
+              "$ref": "#/components/schemas/InlineBlob"
+            },
+            "type": "array"
+          },
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "UploadBatchResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "protocolVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "stored": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -2174,6 +2210,134 @@
             {
               "encoding": "json",
               "path": "/v1/cache/store",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/cache/upload-batch": {
+      "post": {
+        "description": "Store several small blobs carried inline in one request as one pack object (upload-batch coalescing).",
+        "operationId": "postV1_Cache_Upload-batch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadBatchResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "resilience": {
+            "maxResponseBytes": 67108864,
+            "retry": {
+              "maxAttempts": 1
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/cache/upload-batch",
               "protocol": "rest-json"
             }
           ]

@@ -1,12 +1,14 @@
 package remotecache
 
 import (
-	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
+	"time"
 
 	cacheserverclient "go.putnami.dev/cloud/clients/cache-server/go"
 	cache "go.putnami.dev/protocol/cache"
@@ -81,6 +83,7 @@ func (c *Client) Store(ctx context.Context, req *cache.StoreRequest) (*cache.Sto
 			return nil, fmt.Errorf("store response requested upload for digest %s outside manifest", up.Digest)
 		}
 	}
+	c.writes.accept()
 	return out, nil
 }
 
@@ -104,20 +107,89 @@ func (c *Client) Commit(ctx context.Context, req *cache.CommitRequest) (*cache.C
 	if out.Key != req.Key {
 		return nil, fmt.Errorf("commit response key %q does not match request key %q", out.Key, req.Key)
 	}
+	c.writes.accept()
 	return out, nil
 }
 
-// UploadBlob uploads one CAS blob over its presigned PUT URL. The presigned URL
-// is self-authenticating (its credential is in the URL), so the per-user bearer
-// token is deliberately NOT attached — only the server-supplied Headers are
-// sent. body is streamed as the request entity; when it is a *bytes.Reader (a
-// buffered, possibly gzip-compressed blob) its own length is authoritative,
-// otherwise the transfer's declared (uncompressed) size is used.
-func (c *Client) UploadBlob(ctx context.Context, t cache.BlobTransfer, body io.Reader) error {
+// createOnlyHeader is the storage precondition a transfer carries when its PUT
+// may only CREATE the blob's object: the upload succeeds when no object exists
+// and answers 412 when one does.
+const createOnlyHeader = "x-goog-if-generation-match"
+
+// createOnly reports whether the transfer's PUT is create-only. Header names
+// are case-insensitive, and the server's spelling is not this client's to
+// assume.
+func createOnly(t cache.BlobTransfer) bool {
+	for name := range t.Headers {
+		if strings.EqualFold(name, createOnlyHeader) {
+			return true
+		}
+	}
+	return false
+}
+
+// A blob PUT has a deadline of its own. Without one, a storage endpoint that
+// stops reading holds the upload, and every upload queued behind it, for as
+// long as the connection stays open. The deadline is a floor plus the time the
+// entity takes at a low minimum throughput:
+//
+//	deadline = 60 s + entity bytes / 256 KiB/s
+//
+// The floor covers the connection, the TLS handshake and the storage answer
+// for a small blob. 256 KiB/s is about 2 Mbit/s per PUT, far below what a CI
+// machine reaches, so a healthy upload is never cut: a 1 MiB entity gets 64 s,
+// a 20 MiB one 140 s, a 100 MiB one 460 s and a 1 GiB one 69 min. The entity is
+// what is sent, so a blob that gzip shrinks is timed on its compressed size.
+// The provider runs up to 16 PUTs at once; all of them stay inside their
+// deadlines on a link that carries 4 MiB/s.
+const (
+	blobPutFloor             = 60 * time.Second
+	blobPutMinBytesPerSecond = 256 << 10
+)
+
+// blobPutTimeout returns the deadline of one PUT of length bytes.
+func (c *Client) blobPutTimeout(length int64) time.Duration {
+	if length < 0 || c.putBytesPerSecond <= 0 {
+		return c.putFloor
+	}
+	return c.putFloor + time.Duration(float64(length)/float64(c.putBytesPerSecond)*float64(time.Second))
+}
+
+// putFailure names a PUT that ran past its own deadline. The transport reports
+// it as a bare "context deadline exceeded", which reads like a canceled run.
+func putFailure(parent, put context.Context, timeout time.Duration, err error) error {
+	if parent.Err() == nil && errors.Is(put.Err(), context.DeadlineExceeded) {
+		return fmt.Errorf("no answer within the %s this upload is given: %w", timeout, err)
+	}
+	return err
+}
+
+// UploadBlob uploads one CAS blob over its PUT transfer. The transfer is
+// self-authenticating — a presigned URL carries its credential in the URL, and
+// a plain object URL comes with a storage token in its Headers — so the per-user
+// bearer token is deliberately NOT attached: only the server-supplied Headers
+// are sent, verbatim. body is streamed as the request entity and must yield
+// exactly length bytes, which is sent as the Content-Length. The length is the
+// entity's own, never the transfer's declared size: a gzip-compressed blob is
+// shorter than the blob it encodes.
+//
+// A 412 on a create-only transfer means another writer stored the same digest
+// first: the object the upload was to create exists, so the blob is reported
+// as stored. Nothing is lost by not replacing it, because every reader checks
+// a blob against its digest. A 412 on any other transfer, and every other
+// refusal (a 403 included), still fails the upload.
+//
+// The PUT ends at its deadline (see blobPutTimeout), whatever the caller's
+// context allows. A redirect that leaves the transfer's origin is followed
+// without the transfer's credential (see transferClient).
+func (c *Client) UploadBlob(ctx context.Context, t cache.BlobTransfer, body io.Reader, length int64) error {
 	if t.Method != cache.TransferPut {
 		return fmt.Errorf("blob %s: transfer method %q, want %s", t.Digest, t.Method, cache.TransferPut)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, t.URL, body)
+	timeout := c.blobPutTimeout(length)
+	putCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(putCtx, http.MethodPut, t.URL, body)
 	if err != nil {
 		return fmt.Errorf("build upload request for %s: %w", t.Digest, err)
 	}
@@ -125,19 +197,21 @@ func (c *Client) UploadBlob(ctx context.Context, t cache.BlobTransfer, body io.R
 		req.Header.Set(k, v)
 	}
 	setUserAgent(req)
-	if br, ok := body.(*bytes.Reader); ok {
-		req.ContentLength = int64(br.Len())
-	} else if t.SizeBytes > 0 {
-		req.ContentLength = t.SizeBytes
-	}
+	req.ContentLength = length
+	replayable(req, body)
+	trackUpload(req)
 
-	resp, err := c.httpClient.Do(req) //nolint:gosec // G704: request targets the cache server's presigned upload grant, not user-tainted input
+	resp, err := c.transfers.Do(req) //nolint:gosec // G704: request targets the cache server's presigned upload grant, not user-tainted input
 	if err != nil {
-		return fmt.Errorf("upload blob %s: %w", t.Digest, err)
+		return fmt.Errorf("upload blob %s: %w", t.Digest, putFailure(ctx, putCtx, timeout, err))
 	}
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxResponseBytes))
+	reportUploadProgress(ctx)
 
+	if resp.StatusCode == http.StatusPreconditionFailed && createOnly(t) {
+		return nil
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("upload blob %s: HTTP %d", t.Digest, resp.StatusCode)
 	}
@@ -174,7 +248,7 @@ func (c *Client) StoreResult(ctx context.Context, in StoreInput, src BlobSource)
 	// Upload the missing blobs concurrently: they are independent presigned PUTs,
 	// so transferring them in parallel turns N sequential round trips into ~N/cap
 	// and shortens the post-build write that was stalling the worker.
-	if err := c.uploadBlobs(ctx, storeResp.Uploads, src, sizeByDigest, out); err != nil {
+	if err := c.uploadBlobs(ctx, storeResp.Uploads, src, sizeByDigest, out, blobUploadConcurrency); err != nil {
 		return nil, err
 	}
 	// Everything in the manifest the server did NOT ask for was already in CAS.
@@ -232,12 +306,16 @@ func blobSize(t cache.BlobTransfer, sizeByDigest map[string]int64) int64 {
 // per-request latency without flooding the link.
 const blobUploadConcurrency = 4
 
-// uploadBlobs transfers the missing blobs concurrently, accumulating the
-// uploaded blob/byte counts into out. It returns the first upload error (and
-// cancels the rest) so a failed write surfaces just as it did when serial.
-func (c *Client) uploadBlobs(ctx context.Context, ups []cache.BlobTransfer, src BlobSource, sizeByDigest map[string]int64, out *StoreOutcome) error {
+// uploadBlobs transfers the missing blobs concurrently, at most limit at once
+// (blobUploadConcurrency when limit is not positive), accumulating the uploaded
+// blob/byte counts into out. It returns the first upload error (and cancels the
+// rest) so a failed write surfaces just as it did when serial.
+func (c *Client) uploadBlobs(ctx context.Context, ups []cache.BlobTransfer, src BlobSource, sizeByDigest map[string]int64, out *StoreOutcome, limit int) error {
 	if len(ups) == 0 {
 		return nil
+	}
+	if limit <= 0 {
+		limit = blobUploadConcurrency
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -248,7 +326,7 @@ func (c *Client) uploadBlobs(ctx context.Context, ups []cache.BlobTransfer, src 
 		firstErr error
 		wg       sync.WaitGroup
 	)
-	sem := make(chan struct{}, blobUploadConcurrency)
+	sem := make(chan struct{}, limit)
 	for _, up := range ups {
 		wg.Add(1)
 		go func(up cache.BlobTransfer) {
@@ -280,14 +358,15 @@ func (c *Client) uploadBlobs(ctx context.Context, ups []cache.BlobTransfer, src 
 }
 
 // uploadFrom opens one blob from src and uploads it (gzip-compressed when that
-// shrinks it), ensuring the source is closed even when the upload fails.
+// shrinks it), ensuring the source is closed and any spool file removed even
+// when the upload fails.
 func (c *Client) uploadFrom(ctx context.Context, t cache.BlobTransfer, src BlobSource, sizeBytes int64) error {
-	body, _, cleanup, err := compressedBody(src, t.Digest, sizeBytes)
+	body, length, cleanup, err := compressedBody(ctx, src, t.Digest, sizeBytes)
 	if err != nil {
 		return fmt.Errorf("open blob %s: %w", t.Digest, err)
 	}
 	defer func() { _ = cleanup() }()
-	return c.UploadBlob(ctx, t, body)
+	return c.UploadBlob(ctx, t, body, length)
 }
 
 func manifestDigests(m *cache.Manifest) map[string]bool {

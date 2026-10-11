@@ -35,7 +35,7 @@
           "path": "cloud/extension/internal/deliverycli/internal/remotecache/protocolroutes.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "d4c2e3b0695190a876fa05cff56d330c5469f4731a19b49f8d19b9a2cbd38c04"
+          "fingerprint": "2ad9878f6d67203cf1abe8041e4f0febca38474512680db55d0a228e70aaa49f"
         }
       ],
       "owner": "@putnami/cloud-extension",
@@ -43,7 +43,7 @@
         "cloud/extension/internal/deliverycli/internal/remotecache/batch_test.go",
         "cloud/extension/internal/deliverycli/internal/remotecache/control_test.go"
       ],
-      "reason": "The protocol/cache upload-grant and upload-batch routes. cache-server serves neither and never advertises direct-cas-put or upload-batch, so the client calls them only on a user-configured server at PUTNAMI_CACHE_URL that advertises them; the endpoint and its contract belong to that server."
+      "reason": "The protocol/cache upload-grant route. cache-server does not serve it and never advertises direct-cas-put, so the client calls it only on a user-configured server at PUTNAMI_CACHE_URL that advertises it; the endpoint and its contract belong to that server. upload-batch is not here: cache-server serves it, so batch.go calls it through the generated client."
     },
     {
       "runtime": "@putnami/cloud-extension",

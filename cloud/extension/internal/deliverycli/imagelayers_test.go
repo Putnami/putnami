@@ -2732,45 +2732,129 @@ func imageLayersWarmProduce(t *testing.T, ws, project string) error {
 	return ImageLayers(map[string]any{"project": project}, nil, ws, nil, imageLayersIO(&out))
 }
 
-func TestImageLayersWarmIncludesLockedSDD(t *testing.T) {
-	for _, integrity := range []string{strings.Repeat("3c", 32), ""} {
-		t.Run("integrity="+integrity, func(t *testing.T) {
+// TestImageLayersWarmSetIsTheLockSet: the warm layer carries
+// every extension putnami.lock.json pins, so a runner on a current image
+// downloads none of them. An extension the lock adds is warmed and one it drops
+// is left out, with no code change either way.
+func TestImageLayersWarmSetIsTheLockSet(t *testing.T) {
+	cloudDigest := strings.Repeat("5e", 32)
+	goEntry := map[string]string{"version": "0.1.0-8885222db", "linux/amd64": warmGoDigest}
+	tsEntry := map[string]string{"version": "0.1.0-8885222db", "linux/amd64": warmTSDigest}
+	cases := map[string]struct {
+		lock map[string]map[string]string
+		tree func() warmFixtureTree
+	}{
+		"the lock adds an extension": {
+			lock: map[string]map[string]string{
+				"@putnami/go":         goEntry,
+				"@putnami/typescript": tsEntry,
+				"@putnami/cloud":      {"version": "0.1.0-cloud", "linux/amd64": cloudDigest},
+			},
+			tree: func() warmFixtureTree {
+				tree := warmFixtureStore()
+				tree[cloudDigest] = map[string]string{"putnami.extension.json": `{"name":"@putnami/cloud"}`}
+				return tree
+			},
+		},
+		"the lock drops an extension": {
+			lock: map[string]map[string]string{"@putnami/go": goEntry},
+			tree: func() warmFixtureTree {
+				tree := warmFixtureStore()
+				delete(tree, warmTSDigest)
+				return tree
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
 			ws := imageLayersWarmWorkspaceFixture(t)
-			imageLayersWarmLock(t, ws, map[string]map[string]string{
-				"@putnami/go":         {"version": "0.1.0-8885222db", "linux/amd64": warmGoDigest},
-				"@putnami/typescript": {"version": "0.1.0-8885222db", "linux/amd64": warmTSDigest},
-				"@putnami/sdd":        {"version": "0.1.0-sdd", "linux/amd64": integrity},
-			})
-			tree := warmFixtureStore()
-			if integrity != "" {
-				tree[integrity] = map[string]string{"putnami.extension.json": `{"name":"@putnami/sdd"}`}
-			}
-			fake := &fakeWarmInstall{tree: tree}
+			imageLayersWarmLock(t, ws, tc.lock)
+			fake := &fakeWarmInstall{tree: tc.tree()}
 			installWarmRun(t, fake)
 			project := imageLayersProject(t, imageLayersWarmManifestJSON)
-			err := imageLayersWarmProduce(t, ws, project)
-			if integrity == "" {
-				if err == nil || !strings.Contains(err.Error(), "@putnami/sdd") || len(fake.manifests) != 0 {
-					t.Fatalf("unverifiable SDD must fail before install: %v", err)
-				}
-				return
+			if err := imageLayersWarmProduce(t, ws, project); err != nil {
+				t.Fatalf("cloud image-layers: %v", err)
 			}
-			if err != nil {
+			want := make([]string, 0, len(tc.lock))
+			for name := range tc.lock {
+				want = append(want, name)
+			}
+			slices.Sort(want)
+
+			// The install pins exactly the lock's extensions, at their locked versions.
+			var installed struct {
+				Extensions map[string]string `json:"extensions"`
+			}
+			if err := json.Unmarshal([]byte(fake.manifests[0]), &installed); err != nil {
 				t.Fatal(err)
 			}
-			if !strings.Contains(fake.manifests[0], `"@putnami/sdd": "0.1.0-sdd"`) {
-				t.Fatalf("SDD missing from install: %s", fake.manifests[0])
+			pinned := make([]string, 0, len(installed.Extensions))
+			for name, version := range installed.Extensions {
+				pinned = append(pinned, name)
+				if version != tc.lock[name]["version"] {
+					t.Fatalf("install pins %s at %q, want the locked %q", name, version, tc.lock[name]["version"])
+				}
 			}
+			slices.Sort(pinned)
+			if !slices.Equal(pinned, want) {
+				t.Fatalf("install pins %v, want the lock's extensions %v", pinned, want)
+			}
+
+			// The record states the same set, sorted by name, and so does the label
+			// `--check` compares.
+			record := imageLayersReadRecord(t, project, "putnami-warm")
+			recorded := make([]string, 0, len(record.Source.Extensions))
+			labels := make([]string, 0, len(record.Source.Extensions))
+			for _, extension := range record.Source.Extensions {
+				recorded = append(recorded, extension.Name)
+				labels = append(labels, extension.Name+" "+tc.lock[extension.Name]["version"]+" "+tc.lock[extension.Name]["linux/amd64"])
+			}
+			if !slices.Equal(recorded, want) {
+				t.Fatalf("record extensions %v, want %v", recorded, want)
+			}
+			if label := strings.Join(labels, ", "); record.Version != label {
+				t.Fatalf("record version %q, want %q", record.Version, label)
+			}
+
+			// The layer carries one artifact per locked extension, and no other.
 			layer, err := os.ReadFile(filepath.Join(project, ".gen", "layers", "putnami-warm.tar"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := "root/.putnami/artifacts/sha256/" + integrity[:2] + "/" + integrity + "/putnami.extension.json"
-			if !slices.Contains(headerNames(readTarEntries(t, layer)), want) {
-				t.Fatalf("SDD artifact absent from warm layer: %s", want)
+			baked := map[string]bool{}
+			for _, entry := range headerNames(readTarEntries(t, layer)) {
+				parts := strings.Split(entry, "/")
+				if len(parts) > 5 && imageLayersSHA256Pattern.MatchString(parts[5]) {
+					baked[parts[5]] = true
+				}
+			}
+			if len(baked) != len(want) {
+				t.Fatalf("the layer carries %d artifact(s), want %d", len(baked), len(want))
+			}
+			for _, name := range want {
+				if !baked[tc.lock[name]["linux/amd64"]] {
+					t.Fatalf("the layer does not carry %s", name)
+				}
 			}
 		})
 	}
+
+	// An extension the lock adds without a linux/amd64 integrity cannot be
+	// verified, so the producer refuses before it runs the install.
+	t.Run("the lock adds an extension it cannot verify", func(t *testing.T) {
+		ws := imageLayersWarmWorkspaceFixture(t)
+		imageLayersWarmLock(t, ws, map[string]map[string]string{
+			"@putnami/go":         goEntry,
+			"@putnami/typescript": tsEntry,
+			"@putnami/cloud":      {"version": "0.1.0-cloud"},
+		})
+		fake := &fakeWarmInstall{tree: warmFixtureStore()}
+		installWarmRun(t, fake)
+		err := imageLayersWarmProduce(t, ws, imageLayersProject(t, imageLayersWarmManifestJSON))
+		if err == nil || !strings.Contains(err.Error(), `records no extensions["@putnami/cloud"].integrities`) || len(fake.manifests) != 0 {
+			t.Fatalf("an unverifiable extension must fail before the install: %v", err)
+		}
+	})
 }
 
 func TestImageLayersWarmPreservesHostCredentialProviderOutsideTheLayer(t *testing.T) {
@@ -3118,6 +3202,14 @@ func TestImageLayersWarmRefusesWithoutADerivedPin(t *testing.T) {
 		"no extensions at all": {
 			extensions: map[string]map[string]string{},
 			wants:      `pins no extensions["@putnami/go"].version`,
+		},
+		// The set follows the lock, but the lint-tool extension is not optional:
+		// the cross-check and the go-tool layers read it.
+		"a lock without the lint-tool extension": {
+			extensions: map[string]map[string]string{
+				"@putnami/typescript": {"version": "0.1.0-8885222db", "linux/amd64": warmTSDigest},
+			},
+			wants: `pins no extensions["@putnami/go"].version`,
 		},
 	}
 	for name, tc := range cases {

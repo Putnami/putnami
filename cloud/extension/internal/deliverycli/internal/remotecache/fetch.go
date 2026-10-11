@@ -5,9 +5,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sync"
 
 	cache "go.putnami.dev/protocol/cache"
@@ -20,11 +22,38 @@ import (
 // verified single-blob primitive (the counterpart to UploadBlob); HitFetcher
 // adapts a hit's downloads into a per-digest opener the local store drives.
 
-// DownloadBlob fetches one CAS blob over its presigned GET URL into dst,
-// verifying the streamed bytes content-address to t.Digest. Like UploadBlob,
-// the presigned URL is self-authenticating (its credential is in the URL), so
-// the per-user bearer token is deliberately NOT attached — only the
-// server-supplied Headers are sent. It returns the number of bytes written.
+// downloadOp labels the StatusError of a refused blob download.
+const downloadOp = "download"
+
+// DownloadRefused reports whether err is a blob download the storage refused
+// in a way an expired or withdrawn transfer produces: 400 (the storage answers
+// an expired signed URL with it), 401 (an expired storage token), 403, 404 or
+// 410. A transfer negotiated again may then succeed; a transport failure or a
+// 5xx says nothing about the transfer.
+func DownloadRefused(err error) bool {
+	var status *StatusError
+	if !errors.As(err, &status) || status.Op != downloadOp {
+		return false
+	}
+	switch status.Status {
+	case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusGone:
+		return true
+	}
+	return false
+}
+
+// DownloadBlob fetches one CAS blob over its GET transfer into dst, verifying
+// the streamed bytes content-address to t.Digest. Like UploadBlob, the transfer
+// is self-authenticating — a presigned URL carries its credential in the URL,
+// and a plain object URL comes with a storage token in its Headers — so the
+// per-user bearer token is deliberately NOT attached: only the server-supplied
+// Headers are sent, verbatim. A redirect that leaves the transfer's origin is
+// followed without the transfer's credential (see transferClient). It returns
+// the number of bytes written.
+//
+// A refusal is a *StatusError whose Op is "download", so a caller can tell a
+// transfer the storage no longer accepts (its signature or token expired, or
+// the object is gone) from a failure of the bytes themselves.
 func (c *Client) DownloadBlob(ctx context.Context, t cache.BlobTransfer, dst io.Writer) (int64, error) {
 	if t.Method != cache.TransferGet {
 		return 0, fmt.Errorf("blob %s: transfer method %q, want %s", t.Digest, t.Method, cache.TransferGet)
@@ -38,7 +67,7 @@ func (c *Client) DownloadBlob(ctx context.Context, t cache.BlobTransfer, dst io.
 	}
 	setUserAgent(req)
 
-	resp, err := c.httpClient.Do(req) //nolint:gosec // G704: request targets the cache server's presigned download grant, not user-tainted input
+	resp, err := c.transfers.Do(req) //nolint:gosec // G704: request targets the cache server's presigned download grant, not user-tainted input
 	if err != nil {
 		return 0, fmt.Errorf("download blob %s: %w", t.Digest, err)
 	}
@@ -46,7 +75,7 @@ func (c *Client) DownloadBlob(ctx context.Context, t cache.BlobTransfer, dst io.
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-		return 0, statusError("download", resp.StatusCode, body)
+		return 0, statusError(downloadOp, resp.StatusCode, body)
 	}
 
 	// The blob may be stored gzipped (transport compression); decompress so the
@@ -109,7 +138,8 @@ func (c *Client) HitFetcher(ctx context.Context, result cache.KeyResult) func(di
 // BatchHitFetcher returns a blob opener for a negotiate hit that first asks the
 // cache server for all small blobs inline through download-batch, then falls
 // back to each blob's presigned GET when the batch path fails or omits a digest.
-// Large blobs always use their presigned GET to keep response size bounded.
+// Large blobs always use their presigned GET to keep response size bounded. It
+// asks for at most cache.MaxKeysPerRequest blobs a request.
 func (c *Client) BatchHitFetcher(ctx context.Context, result cache.KeyResult) func(digest string) (io.ReadCloser, error) {
 	single := c.HitFetcher(ctx, result)
 	small := make(map[string]cache.BlobTransfer)
@@ -134,25 +164,29 @@ func (c *Client) BatchHitFetcher(ctx context.Context, result cache.KeyResult) fu
 		batch error
 	)
 	load := func() {
-		req := &cache.DownloadBatchRequest{ProtocolVersion: cache.ProtocolVersion, Digests: digests}
-		cache.NormalizeDownloadBatchRequest(req)
-		resp, err := c.DownloadBatch(ctx, req)
-		if err != nil {
-			batch = err
-			return
-		}
-		got = make(map[string][]byte, len(resp.Blobs))
+		got = make(map[string][]byte, len(digests))
 		sizeByDigest := make(map[string]int64, len(small))
 		for d, t := range small {
 			sizeByDigest[d] = t.SizeBytes
 		}
-		for _, b := range resp.Blobs {
-			data, err := verifiedInlineBlob(b, sizeByDigest[b.Digest])
+		// download-batch takes at most cache.MaxKeysPerRequest digests a
+		// request, so a hit with more small files asks in several requests.
+		for chunk := range slices.Chunk(digests, cache.MaxKeysPerRequest) {
+			req := &cache.DownloadBatchRequest{ProtocolVersion: cache.ProtocolVersion, Digests: chunk}
+			cache.NormalizeDownloadBatchRequest(req)
+			resp, err := c.DownloadBatch(ctx, req)
 			if err != nil {
 				batch = err
 				return
 			}
-			got[b.Digest] = data
+			for _, b := range resp.Blobs {
+				data, err := verifiedInlineBlob(b, sizeByDigest[b.Digest])
+				if err != nil {
+					batch = err
+					return
+				}
+				got[b.Digest] = data
+			}
 		}
 	}
 
