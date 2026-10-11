@@ -207,8 +207,12 @@ func (s *Scheduler) openTask(
 	// nothing: the producer is pruned here, and its finalizer is never armed
 	// (settleFinalizers records the skipped row). The CONSUMERS are not pruned —
 	// they are the reason the relation was, so each one falls through to the
-	// lookup below and is served the entry that made the pruning decision.
-	if s.invocations.isPruned(job) {
+	// lookup below and is served the entry that made the pruning decision. A
+	// decision taken on a consumer key that may have moved since is confirmed
+	// first, from the key that consumer computes now.
+	if s.invocations.isPruned(job, func(consumer *ScheduledJob) bool {
+		return s.cachedAtCurrentKey(consumer, mu, hashes)
+	}) {
 		s.renderer.JobStart(job)
 		return nil, jobDone{job: job, result: &JobResult{
 			Status:   "skipped",
@@ -747,6 +751,12 @@ func (s *Scheduler) finalizeExecutedJob(
 	// long poles first. Only successful real executions teach the store.
 	s.taskStats.record(job, result)
 
+	// The task wrote its declared outputs, whatever its verdict. Every memoized
+	// input digest those paths can move is dropped before its result is
+	// published, so a task that reads them keys the bytes it reads
+	// (key_movement.go).
+	s.cache.InvalidateFileHashesUnder(declaredOutputPaths(s.outputRoots(), job, result))
+
 	// A task that may have rewritten the worktree's sources invalidates the
 	// memoized input digests for every later job. When caching is active,
 	// recompute its keyed project-source digest: only unchanged source bytes
@@ -1035,11 +1045,11 @@ func (s *Scheduler) refreshVersionFile(job *ScheduledJob) {
 // stale identity is briefly on disk. Nothing in the same project can observe it:
 // serializeWriteResources puts every declared READER of the `gen` resource
 // either after the writer it derives from or before the first writer, so a gen
-// reader never runs concurrently with the gen restore — and with a remote cache
-// configured, Negotiate's PrecomputeKeys has already memoized every file hash
-// before the first task opens. Widening the window would mean giving the stamp a
-// lock every key computation has to take, which is a cost paid on every task to
-// close a window nothing reaches.
+// reader never runs concurrently with the gen restore, and the restore drops the
+// memoized digests of the paths it rewrote only after this call, so no digest
+// of the stale stamp outlives the restore. Widening the window would mean
+// giving the stamp a lock every key computation has to take, which is a cost
+// paid on every task to close a window nothing reaches.
 func (s *Scheduler) restampRestoredVersionStamp(job *ScheduledJob, entry *store.TaskEntry) {
 	if job == nil || job.Project == nil || !restoreReplacesVersionStamp(entry) {
 		return

@@ -1,0 +1,462 @@
+package jobs
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"reflect"
+	"sync"
+	"testing"
+	"time"
+
+	cache "go.putnami.dev/protocol/cache"
+	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/store"
+)
+
+// layersProducer declares its project's .gen/layers tree, the shape of a task
+// that produces image layers.
+func layersProducer() *ScheduledJob {
+	return declaredJob("package~layers", "layers", &extension.TaskDeclaration{
+		Outputs: map[string]extension.DeclaredOutput{
+			"layers": dirDeclaration(extension.OutputRootProject, ".gen/layers", false),
+		},
+	})
+}
+
+// layersCheck keys on the producer's layers and records a verdict only, the
+// shape of a check that verifies them.
+func layersCheck() *ScheduledJob {
+	job := declaredJob("package~layers-check", "layers-check", &extension.TaskDeclaration{})
+	job.JobDef.FilePatterns = []string{".gen/layers/**"}
+	job.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{NoOutput: true}
+	return job
+}
+
+func layerPath(f *captureFixture) string {
+	return filepath.Join(f.ws.Root, captureTestProject, ".gen", "layers", "base.tar")
+}
+
+// keyOf computes job's key through cm, from no published dependency key.
+func keyOf(t *testing.T, f *captureFixture, job *ScheduledJob, cm *store.CacheManager) string {
+	t.Helper()
+	hash, err := computeJobCacheHash(f.ws, job, nil, nil, cm, nil)
+	if err != nil || hash == "" {
+		t.Fatalf("compute the key of %s: %q (err=%v)", job.Key(), hash, err)
+	}
+	return hash
+}
+
+// An executed task's declared outputs move the key of a later job that reads
+// them, whatever the task's verdict: the key that job computes when it starts
+// is the key of the bytes it reads, not the memoized key of the bytes before.
+func TestAnExecutedOutputMovesTheKeyOfAJobThatReadsIt(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
+		"an-earlier-task-output-moves-the-key-of-its-reader")
+	for _, status := range []string{"success", "failed"} {
+		t.Run(status, func(t *testing.T) {
+			producer, check := layersProducer(), layersCheck()
+			f := newCaptureFixture(t, producer, check)
+			writeFileAt(t, layerPath(f), "old layer\n")
+			stale := keyOf(t, f, check, f.cache)
+
+			writeFileAt(t, layerPath(f), "new layer\n")
+			if memoized := keyOf(t, f, check, f.cache); memoized != stale {
+				t.Fatal("the memo did not hold the key of the old layer, so this test cannot prove anything")
+			}
+
+			var mu sync.Mutex
+			f.sched.finalizeExecutedJob(t.Context(), producer, &JobResult{Status: status},
+				false, "", "", &mu, map[string]string{})
+
+			if got, want := keyOf(t, f, check, f.cache), keyOf(t, f, check, store.NewCacheManager(nil)); got != want {
+				t.Fatalf("after the producer ran, the check keys %q, want %q: the key of the layers it reads", got, want)
+			}
+		})
+	}
+}
+
+// A restore rewrites the outputs it records, so it moves the key of a later job
+// that reads them exactly as an execution does.
+func TestARestoredOutputMovesTheKeyOfAJobThatReadsIt(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
+		"an-earlier-task-output-moves-the-key-of-its-reader")
+	producer, check := layersProducer(), layersCheck()
+	f := newCaptureFixture(t, producer, check)
+	writeFileAt(t, layerPath(f), "new layer\n")
+	if !f.sched.storeDeclaredCapture(producer, capturedResult(nil), captureHashA) {
+		t.Fatal("declared capture published no entry")
+	}
+	// This checkout still holds the old layers when the run keys the check.
+	writeFileAt(t, layerPath(f), "old layer\n")
+	stale := keyOf(t, f, check, f.cache)
+
+	f.hitOrFail(t, producer, captureHashA)
+	if got := readFileAt(t, layerPath(f)); got != "new layer\n" {
+		t.Fatalf("the restore left %q, so this test cannot prove anything", got)
+	}
+
+	got, want := keyOf(t, f, check, f.cache), keyOf(t, f, check, store.NewCacheManager(nil))
+	if got != want || got == stale {
+		t.Fatalf("after the restore, the check keys %q, want %q: the key of the restored layers", got, want)
+	}
+}
+
+// A key moves when another planned job may write a file it reads, or when it
+// folds the key of a job whose key moves. A job no write reaches keeps its key.
+// A port-reported output is unknown before its task runs, so its whole root
+// counts as written.
+func TestPlanKeyMovementFollowsWritersAndFoldedKeys(t *testing.T) {
+	t.Run("a declared path", func(t *testing.T) {
+		producer, check := layersProducer(), layersCheck()
+		summary := declaredJob("package~summary", "summary", &extension.TaskDeclaration{})
+		summary.JobDef.FilePatterns = []string{"summary.json"}
+		summary.DependsOn = []string{check.Key()}
+		lint := declaredJob("lint~lint", "lint", &extension.TaskDeclaration{})
+		lint.JobDef.FilePatterns = []string{"src/**"}
+		planned := []*ScheduledJob{producer, check, summary, lint}
+		f := newCaptureFixture(t, planned...)
+
+		movement := planKeyMovement(keyInputs{ws: f.ws}, planned)
+		want := map[string]bool{check.Key(): true, summary.Key(): true}
+		if !reflect.DeepEqual(movement.moving, want) {
+			t.Fatalf("moving = %v, want %v", movement.moving, want)
+		}
+		if got := movement.writers[check.Key()]; !reflect.DeepEqual(got, []string{producer.Key()}) {
+			t.Fatalf("writers of the check = %v, want the producer alone", got)
+		}
+	})
+
+	t.Run("a source rewriter", func(t *testing.T) {
+		sources := extension.ResourceRef{ID: extension.ResourceIDSources, Scope: extension.ResourceScopeProject}
+		fixer := declaredJob("lint~fix", "fix", &extension.TaskDeclaration{MutatesSources: true}, sources)
+		fixer.JobDef.FilePatterns = []string{"src/**"}
+		compile := declaredJob("build~compile", "compile", &extension.TaskDeclaration{})
+		compile.JobDef.FilePatterns = []string{"src/**/*.ts"}
+		docs := declaredJob("build~docs", "docs", &extension.TaskDeclaration{})
+		docs.JobDef.FilePatterns = []string{"doc/**"}
+		planned := []*ScheduledJob{fixer, compile, docs}
+		f := newCaptureFixture(t, planned...)
+
+		movement := planKeyMovement(keyInputs{ws: f.ws}, planned)
+		if !movement.moving[compile.Key()] {
+			t.Fatal("a job that reads the sources a rewriter rewrites keeps its precomputed key")
+		}
+		if movement.moving[docs.Key()] {
+			t.Fatal("a job that reads none of the rewriter's sources was moved by it")
+		}
+	})
+
+	t.Run("a port-reported path", func(t *testing.T) {
+		client := declaredJob("build~client", "client", &extension.TaskDeclaration{
+			Outputs: map[string]extension.DeclaredOutput{
+				"client": {Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true},
+			},
+		})
+		lint := declaredJob("lint~lint", "lint", &extension.TaskDeclaration{})
+		lint.JobDef.FilePatterns = []string{"src/**"}
+		planned := []*ScheduledJob{client, lint}
+		f := newCaptureFixture(t, planned...)
+
+		if movement := planKeyMovement(keyInputs{ws: f.ws}, planned); !movement.moving[lint.Key()] {
+			t.Fatal("a job that reads the project was not moved by an output whose path is unknown before its task runs")
+		}
+	})
+}
+
+// A movable consumer key can be confirmed when the producer starts only if
+// every job that can move it finishes before then or runs after the consumer.
+func TestSettlesBeforeOrdersEveryWriterAroundTheProducer(t *testing.T) {
+	job := func(name string, dependsOn ...string) *ScheduledJob {
+		planned := declaredJob(name, name, &extension.TaskDeclaration{})
+		planned.DependsOn = dependsOn
+		return planned
+	}
+	before := job("test~layers")
+	producer := job("test~env", before.Key())
+	consumer := job("test~run", producer.Key())
+	after := job("package~layers", consumer.Key())
+	concurrent := job("build~layers")
+	byKey := jobsByKey([]*ScheduledJob{before, producer, consumer, after, concurrent})
+
+	cases := []struct {
+		name    string
+		writers []string
+		want    bool
+	}{
+		{name: "a writer the producer waits for", writers: []string{before.Key()}, want: true},
+		{name: "a writer that waits for the consumer", writers: []string{after.Key()}, want: true},
+		{name: "a writer the schedule does not order", writers: []string{before.Key(), concurrent.Key()}, want: false},
+	}
+	for _, tc := range cases {
+		movement := keyMovement{writers: map[string][]string{consumer.Key(): tc.writers}}
+		if got := settlesBefore(producer, consumer, movement, byKey); got != tc.want {
+			t.Errorf("%s: settlesBefore = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+
+	folded := job("test~run", producer.Key(), concurrent.Key())
+	byKey[folded.Key()] = folded
+	if settlesBefore(producer, folded, keyMovement{}, byKey) {
+		t.Error("a consumer that folds the key of a job the producer does not wait for was confirmed")
+	}
+}
+
+// providerKeysAsked returns every key the provider was asked about in op.
+func providerKeysAsked(server *fakeCacheServer, op cache.ProviderOp) []string {
+	var keys []string
+	for _, line := range server.requestLines() {
+		request, _ := cache.ParseAndValidateProviderRequest([]byte(line))
+		if request == nil || request.Op != op {
+			continue
+		}
+		switch op {
+		case cache.OpRestore:
+			if params, _ := cache.ParseAndValidateRestoreParams(request.Payload); params != nil {
+				keys = append(keys, params.Key)
+			}
+		case cache.OpUpload:
+			if params, _ := cache.ParseAndValidateUploadParams(request.Payload); params != nil {
+				keys = append(keys, params.Key)
+			}
+		}
+	}
+	return keys
+}
+
+// A remote negotiation precomputes the check's key over the layers the
+// checkout holds before the producer rewrites them. That key is never recorded
+// as the check's key, never looked up and never uploaded: the check is looked
+// up, and its verdict shared, at the key of the layers it reads.
+func TestAPrecomputedKeyAnEarlierWriteMovesIsNeverLookedUpNorUploaded(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
+		"a-precomputed-key-a-write-may-move-is-never-looked-up-or-shared")
+	server := newFakeCacheServer()
+	enableProviderRemoteCache(t)
+	useSharedFakeProvider(t, server)
+
+	producer, check := layersProducer(), layersCheck()
+	planned := []*ScheduledJob{producer, check}
+	f := newCaptureFixture(t, planned...)
+	remote, notice := LoadRemoteCache(context.Background(), f.ws.Root,
+		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny)
+	if remote == nil || !remote.isProviderBacked() {
+		t.Fatalf("expected a provider-backed remote cache, got %+v (notice %q)", remote, notice)
+	}
+	t.Cleanup(remote.Close)
+	f.sched.setRemoteCache(remote)
+
+	writeFileAt(t, layerPath(f), "old layer\n")
+	stale := keyOf(t, f, check, store.NewCacheManager(nil))
+
+	remote.Negotiate(t.Context(), f.ws, planned, nil, nil, f.cache, CacheBypass{})
+	if recorded, ok := remote.keys[check.Key()]; ok {
+		t.Fatalf("the negotiation recorded %q as the check's key, though the producer may rewrite its input", recorded)
+	}
+	if remote.keys[producer.Key()] == "" {
+		t.Fatal("the negotiation dropped the key of a job no planned write can move")
+	}
+
+	writeFileAt(t, layerPath(f), "new layer\n")
+	var mu sync.Mutex
+	f.sched.finalizeExecutedJob(t.Context(), producer, capturedResult(nil), false, "", "", &mu, map[string]string{})
+	fresh := keyOf(t, f, check, store.NewCacheManager(nil))
+
+	hash, served := f.declaredLookup(t.Context(), check)
+	if hash != fresh {
+		t.Fatalf("the check was looked up at %q, want %q: the key of the layers it reads", hash, fresh)
+	}
+	if served != nil {
+		t.Fatalf("the check was served %+v with no entry at its key", served)
+	}
+	f.sched.finalizeExecutedJob(t.Context(), check, capturedResult(nil), true, hash, "", &mu, map[string]string{})
+	remote.DrainUploads()
+
+	for _, op := range []cache.ProviderOp{cache.OpRestore, cache.OpUpload} {
+		for _, key := range providerKeysAsked(server, op) {
+			if key == store.RemoteTaskEntryKey(stale) {
+				t.Errorf("the provider received a %s at the precomputed key of the old layers", op)
+			}
+		}
+	}
+	if !server.has(store.RemoteTaskEntryKey(fresh)) {
+		t.Fatal("the check's verdict was not shared at the key of the layers it read")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// invocation pruning on a consumer key a planned write may move
+// ---------------------------------------------------------------------------
+
+// layersOf is the file the layers writer rewrites and the consumer keys on.
+func (f *invocationFixture) layersOf() string {
+	return filepath.Join(f.ws.Root, "layers", "base.tar")
+}
+
+// cacheConsumerOfLayers makes the consumer cacheable and keyed on the project's
+// layers tree.
+func (f *invocationFixture) cacheConsumerOfLayers() {
+	f.consumer.Step.Task = "consume-cached"
+	f.consumer.JobDef.Cache = true
+	f.consumer.JobDef.FilePatterns = []string{"layers/**"}
+	f.consumer.Extension.Tasks["consume-cached"] = extension.TaskDefinition{
+		Kind:    "command",
+		Command: f.consumer.JobDef.Command,
+		Declares: &extensionproto.TaskDeclaration{
+			Outputs: map[string]extensionproto.DeclaredOutput{
+				"report": {Kind: extensionproto.OutputKindFile, Path: "report.txt", OptionalEmpty: true},
+			},
+		},
+	}
+}
+
+// planLayersWriter plans an uncached task that writes content into the
+// project's layers tree, which it declares, after the jobs named in after.
+func (f *invocationFixture) planLayersWriter(t *testing.T, content string, after ...string) *ScheduledJob {
+	t.Helper()
+	ext := f.producer.Extension
+	step := extension.PipelineStep{ID: "layers", Task: "layers"}
+	writer := &ScheduledJob{
+		Project:   f.producer.Project,
+		Extension: ext,
+		Step:      &step,
+		JobDef: &extension.JobDefinition{
+			Name:          extension.StepJobName("test", step.ID),
+			ExtensionName: ext.Name,
+			CommandName:   "test",
+			StepID:        step.ID,
+			TimeoutMs:     unboundedJobTimeoutMs,
+		},
+		DependsOn: after,
+	}
+	fixtureTask(t, writer.JobDef, fixtureScript{{"write", content, f.layersOf()}})
+	ext.Tasks[step.Task] = extension.TaskDefinition{
+		Kind:    "command",
+		Command: writer.JobDef.Command,
+		Declares: &extensionproto.TaskDeclaration{
+			Outputs: map[string]extensionproto.DeclaredOutput{
+				"layers": {Kind: extensionproto.OutputKindDirectory, Path: "layers"},
+			},
+		},
+	}
+	f.planned = append([]*ScheduledJob{writer}, f.planned...)
+	return writer
+}
+
+// publishConsumerEntry records the green verdict a previous run left at the
+// consumer's key over the tree as it stands.
+func (f *invocationFixture) publishConsumerEntry(t *testing.T, cm *store.CacheManager) {
+	t.Helper()
+	resolveInvocationRelations(f.planned)
+	keys, err := PrecomputeKeys(f.ws, f.planned, nil, nil, cm, CacheBypass{})
+	if err != nil {
+		t.Fatalf("PrecomputeKeys: %v", err)
+	}
+	hash := keys[f.consumer.Key()]
+	if hash == "" {
+		t.Fatal("the consumer must be cacheable for this case to mean anything")
+	}
+	if _, err := cm.IngestTaskEntry(t.TempDir(), store.TaskEntrySpec{
+		Key:      hash,
+		Result:   &store.EntryResult{Status: "success"},
+		Metadata: &store.EntryMetadata{Extension: "@acme/provider", Task: "test~run", Project: "proj"},
+	}); err != nil {
+		t.Fatalf("publish consumer entry: %v", err)
+	}
+}
+
+// A relation pruned on a consumer key that a write before the producer may
+// move is confirmed when the producer starts. A write that left the layers as
+// they were keeps the pruning; a write that changed them withdraws it, so the
+// producer provisions the resource the consumer then runs against, instead of
+// the consumer being served a verdict about bytes it no longer reads.
+func TestInvocation_PruningOnAMovableConsumerKeyIsConfirmedWhenTheProducerStarts(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
+		"pruning-on-a-movable-consumer-key-is-confirmed-when-the-producer-starts")
+	cases := []struct {
+		name       string
+		written    string
+		wantPruned bool
+	}{
+		{name: "the write leaves the layers as they were", written: "old layer\n", wantPruned: true},
+		{name: "the write changes the layers", written: "new layer\n", wantPruned: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newInvocationFixture(t, provisionBody, consumeBody)
+			fixture.cacheConsumerOfLayers()
+			writer := fixture.planLayersWriter(t, tc.written)
+			fixture.producer.DependsOn = append(fixture.producer.DependsOn, writer.Key())
+			writeFileAt(t, fixture.layersOf(), "old layer\n")
+			cm := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
+			fixture.publishConsumerEntry(t, cm)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			result := fixture.run(t, ctx, SchedulerConfig{MaxParallel: 2}, cm)
+
+			producer := result.Results[fixture.producer.Key()]
+			consumer := result.Results[fixture.consumer.Key()]
+			if consumer == nil || consumer.Status != "success" {
+				t.Fatalf("consumer result = %+v, want success", consumer)
+			}
+			if tc.wantPruned {
+				if producer == nil || producer.Status != "skipped" {
+					t.Fatalf("producer result = %+v, want pruned", producer)
+				}
+				if !consumer.CacheHit {
+					t.Fatalf("consumer result = %+v, want the cached verdict it was pruned for", consumer)
+				}
+				if got := fixture.teardownCount(t); got != 0 {
+					t.Fatalf("pruned finalizer ran %d times, want never", got)
+				}
+				return
+			}
+			if producer == nil || producer.Status != "success" {
+				t.Fatalf("producer result = %+v, want it to provision for a consumer whose key moved", producer)
+			}
+			if consumer.CacheHit {
+				t.Fatalf("consumer result = %+v, want an execution over the new layers", consumer)
+			}
+			if _, err := os.Stat(fixture.consumed); err != nil {
+				t.Fatalf("the consumer did not run against the provisioned resource: %v", err)
+			}
+			if got := fixture.teardownCount(t); got != 1 {
+				t.Fatalf("finalizer ran %d times, want exactly once", got)
+			}
+		})
+	}
+}
+
+// A consumer key that a write may move after the producer starts cannot be
+// confirmed in time, so the relation is not pruned: the producer provisions,
+// and the consumer runs against the resource once the write moved its key.
+func TestInvocation_ConsumerKeyAWriteMayMoveAfterTheProducerStartsIsNeverPruned(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
+		"pruning-on-a-movable-consumer-key-is-confirmed-when-the-producer-starts")
+	t.Parallel()
+	fixture := newInvocationFixture(t, provisionBody, consumeBody)
+	fixture.cacheConsumerOfLayers()
+	writer := fixture.planLayersWriter(t, "new layer\n", fixture.producer.Key())
+	fixture.consumer.DependsOn = append(fixture.consumer.DependsOn, writer.Key())
+	writeFileAt(t, fixture.layersOf(), "old layer\n")
+	cm := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
+	fixture.publishConsumerEntry(t, cm)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	result := fixture.run(t, ctx, SchedulerConfig{MaxParallel: 2}, cm)
+
+	if producer := result.Results[fixture.producer.Key()]; producer == nil || producer.Status != "success" {
+		t.Fatalf("producer result = %+v, want it to provision", producer)
+	}
+	if consumer := result.Results[fixture.consumer.Key()]; consumer == nil || consumer.Status != "success" || consumer.CacheHit {
+		t.Fatalf("consumer result = %+v, want an execution over the new layers", consumer)
+	}
+	if got := fixture.teardownCount(t); got != 1 {
+		t.Fatalf("finalizer ran %d times, want exactly once", got)
+	}
+}

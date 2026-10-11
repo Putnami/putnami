@@ -860,7 +860,11 @@ the private path), because bytes it did not read cannot be redacted.
 **Cache identity.** A consumer's cache key folds in the producing action's
 digest — derived from the producer's declared inputs, never from what it
 produced. Negotiation runs before provisioning: when every consumer in the
-frontier is already cached, the producer and its finalizer are both skipped.
+frontier is already cached, the producer and its finalizer are both skipped. A
+consumer whose inputs another planned task may write is checked again when the
+producer starts, at the key it computes then; when a task that can move that
+key may finish after the producer starts, the producer is not skipped (see
+[Outputs written earlier in the session](10-caching.md#outputs-written-earlier-in-the-session)).
 
 **Exactly once.** Producer start arms the finalizer. It runs once when the
 consumer frontier becomes terminal, and once at the end of the run otherwise —

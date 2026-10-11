@@ -119,9 +119,12 @@ type RemoteCache struct {
 	// provider hits can warm CAS blobs but cannot return a successful JobResult.
 	trust store.CacheTrust
 
-	// keys maps a job key to its precomputed cache key (from Negotiate); localHits
+	// keys maps a job key to its precomputed cache key (from Negotiate), only
+	// for a job whose key no planned write can move (planKeyMovement); localHits
 	// records keys already present locally before negotiation. Together they let
 	// computeRequiredInputs tell "will execute locally" from "already satisfied".
+	// Neither addresses a restore or an upload: both use the key the scheduler
+	// computes when the job starts.
 	keys      map[string]string
 	localHits map[string]bool
 	// requiredInputs records hit dependency keys that feed a job expected to
@@ -263,6 +266,11 @@ func loadRemoteCacheConfig(wsRoot string) (*remoteCacheConfig, error) {
 // the key set: a run whose jobs will execute locally needs the provider even with
 // nothing to warm, because the object cache those jobs reach lives behind the
 // same session (the socket path is negotiated at initialize).
+//
+// A precomputed key that an earlier task's writes may move is still offered to
+// the provider to warm, and still counts as warm when the local store holds it:
+// both are hints, right whenever those writes leave the bytes as they were. It
+// is never recorded as the job's key.
 func (r *RemoteCache) Negotiate(
 	ctx context.Context,
 	ws *workspace.Workspace,
@@ -283,6 +291,14 @@ func (r *RemoteCache) Negotiate(
 		return
 	}
 	r.keys = keys
+	if movement := planKeyMovement(keyInputs{ws: ws, commandParams: commandParams}, planned); len(movement.moving) > 0 {
+		r.keys = make(map[string]string, len(keys))
+		for jobKey, hash := range keys {
+			if !movement.moving[jobKey] {
+				r.keys[jobKey] = hash
+			}
+		}
+	}
 	r.localHits = make(map[string]bool)
 
 	var providerKeys []string
