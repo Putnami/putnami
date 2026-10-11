@@ -60,8 +60,8 @@ func Version(tag, pattern string) (version string, ok bool) {
 // reaches no release tag of the line, which is the state of a line that never
 // released. A release tag that points at no commit is not a release. A pattern
 // that does not carry exactly one version placeholder, a repository without a
-// commit, a release tag whose object git cannot read and a history git cannot
-// read are errors.
+// commit, a release tag of the line whose object git cannot read, reached or
+// not, and a history git cannot read are errors.
 func LastRelease(dir, pattern string) (release Release, ok bool, err error) {
 	prefix, suffix, usable := splitPattern(pattern)
 	if !usable {
@@ -70,25 +70,13 @@ func LastRelease(dir, pattern string) (release Release, ok bool, err error) {
 	if _, err := runGit(dir, nil, nil, "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}"); err != nil {
 		return Release{}, false, fmt.Errorf("read the last release: %w", err)
 	}
-	// --merged lists every tag HEAD reaches in one walk of the history. On a
-	// history it cannot read it still exits 0, naming the missing object on
-	// stderr only, so any stderr is a failure. GIT_TRACE* settings write to
-	// stderr too, so this call runs without them.
-	refs, stderr, err := runGitCapture(dir, withoutGitTrace(os.Environ()), nil,
-		"for-each-ref", "--merged=HEAD", "--format=%(refname)", "refs/tags")
-	if err == nil && strings.TrimSpace(stderr) != "" {
-		err = fmt.Errorf("git for-each-ref (in %s): %s", dir, strings.TrimSpace(stderr))
-	}
+	// Listing tag names reads no object, so every release tag of the line is a
+	// candidate here, whether git can read its object or not.
+	refs, err := runGit(dir, nil, nil, "for-each-ref", "--format=%(refname)", "refs/tags")
 	if err != nil {
 		return Release{}, false, fmt.Errorf("read the last release: %w", err)
 	}
-	var candidates []Release
-	for ref := range strings.SplitSeq(refs, "\n") {
-		tag := strings.TrimPrefix(ref, "refs/tags/")
-		if version, isRelease := releaseVersion(tag, prefix, suffix); isRelease {
-			candidates = append(candidates, Release{Tag: tag, Version: version})
-		}
-	}
+	candidates := releases(refs, prefix, suffix)
 	if len(candidates) == 0 {
 		return Release{}, false, nil
 	}
@@ -108,17 +96,51 @@ func LastRelease(dir, pattern string) (release Release, ok bool, err error) {
 	if len(lines) != len(candidates) {
 		return Release{}, false, fmt.Errorf("read the last release: git cat-file answered %d lines for %d tags", len(lines), len(candidates))
 	}
-	for i, candidate := range candidates {
+	for i := range candidates {
 		fields := strings.Fields(lines[i])
 		if len(fields) != 3 {
-			return Release{}, false, fmt.Errorf("read the last release: git cannot read tag %s: %s", candidate.Tag, lines[i])
+			return Release{}, false, fmt.Errorf("read the last release: git cannot read tag %s: %s", candidates[i].Tag, lines[i])
 		}
 		if fields[1] == "commit" {
-			candidate.Commit = fields[0]
+			candidates[i].Commit = fields[0]
+		}
+	}
+
+	// --merged lists every tag HEAD reaches in one walk of the history. On a
+	// history it cannot read it still exits 0, naming the missing object on
+	// stderr only, so any stderr is a failure. GIT_TRACE* settings write to
+	// stderr too, so this call runs without them.
+	merged, stderr, err := runGitCapture(dir, withoutGitTrace(os.Environ()), nil,
+		"for-each-ref", "--merged=HEAD", "--format=%(refname)", "refs/tags")
+	if err == nil && strings.TrimSpace(stderr) != "" {
+		err = fmt.Errorf("git for-each-ref (in %s): %s", dir, strings.TrimSpace(stderr))
+	}
+	if err != nil {
+		return Release{}, false, fmt.Errorf("read the last release: %w", err)
+	}
+	reached := map[string]bool{}
+	for _, release := range releases(merged, prefix, suffix) {
+		reached[release.Tag] = true
+	}
+	for _, candidate := range candidates {
+		if candidate.Commit != "" && reached[candidate.Tag] {
 			return candidate, true, nil
 		}
 	}
 	return Release{}, false, nil
+}
+
+// releases returns the release tags of the line among refs, one ref name per
+// line.
+func releases(refs, prefix, suffix string) []Release {
+	var found []Release
+	for ref := range strings.SplitSeq(refs, "\n") {
+		tag := strings.TrimPrefix(ref, "refs/tags/")
+		if version, isRelease := releaseVersion(tag, prefix, suffix); isRelease {
+			found = append(found, Release{Tag: tag, Version: version})
+		}
+	}
+	return found
 }
 
 // withoutGitTrace is env without git's GIT_TRACE* settings.
