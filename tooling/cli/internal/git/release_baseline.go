@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/sdk/extension/linetag"
 )
 
 // The repository states a release baseline distinguishes. A check that
@@ -22,9 +23,9 @@ const (
 	// ReleaseBaselineShallow: the clone is shallow, so its tags and history
 	// are incomplete.
 	ReleaseBaselineShallow = "shallow"
-	// ReleaseBaselineUntagged: HEAD reaches no tag of the line.
+	// ReleaseBaselineUntagged: the line has no last release (linetag.LastRelease).
 	ReleaseBaselineUntagged = "untagged"
-	// ReleaseBaselineTagged: HEAD reaches a tag of the line.
+	// ReleaseBaselineTagged: the line has a last release.
 	ReleaseBaselineTagged = "tagged"
 )
 
@@ -41,7 +42,7 @@ type ReleaseBaseline struct {
 	// HasTags reports, for an untagged line, whether the repository has a
 	// tag of any line.
 	HasTags bool `json:"hasTags,omitempty"`
-	// Tag is the line's last tag HEAD reaches, when State is tagged.
+	// Tag is the tag of the line's last release, when State is tagged.
 	Tag string `json:"tag,omitempty"`
 	// Object is the type and ID of the object Tag holds at the project
 	// directory ("tree <id>"); empty when the directory is absent at Tag.
@@ -67,7 +68,7 @@ func (b ReleaseBaseline) Value() string {
 //
 // It reads in the order the check does, and stops where the check stops:
 // outside a work tree, then without a commit, then in a shallow clone, then
-// without a reachable line tag. A tagged line adds the object the tag holds
+// without a release of the line. A tagged line adds the object the tag holds
 // at dir and whether a commit since the tag that touches dir declares a
 // breaking change. A git failure is an error, never a state: a state read
 // from a failure would key the check's verdict to a baseline it did not see.
@@ -107,7 +108,7 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 		return baseline, nil
 	}
 
-	tag, commit, ok, err := LastReachableTag(dir, tagPattern)
+	last, ok, err := linetag.LastRelease(dir, tagPattern)
 	if err != nil {
 		return ReleaseBaseline{}, err
 	}
@@ -120,11 +121,11 @@ func ReadReleaseBaseline(dir, tagPattern string) (ReleaseBaseline, error) {
 		return baseline, nil
 	}
 
-	baseline.State, baseline.Tag = ReleaseBaselineTagged, tag
-	if baseline.Object, err = objectAtTag(dir, tag, prefix); err != nil {
+	baseline.State, baseline.Tag = ReleaseBaselineTagged, last.Tag
+	if baseline.Object, err = objectAtTag(dir, last.Tag, prefix); err != nil {
 		return ReleaseBaseline{}, err
 	}
-	commits, err := CommitsSince(dir, commit, []string{"."})
+	commits, err := CommitsSince(dir, last.Commit, []string{"."})
 	if err != nil {
 		return ReleaseBaseline{}, err
 	}

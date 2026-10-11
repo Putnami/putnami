@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"go.putnami.dev/go/extension/internal/apisurface"
-	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // gitTimeout bounds one git call. Every call reads local objects only.
@@ -88,48 +87,6 @@ func readRepoState(dir string) (repoState, error) {
 	return state, nil
 }
 
-// lastReachableTag returns the nearest tag reachable from HEAD that matches a
-// complete line tag pattern, with the semantics of the version bump's own
-// reading (tooling/cli/internal/git LastReachableTag): `git describe` finds the
-// nearest tag matching the pattern's prefix glob, and a tag the pattern could
-// never render reads as no tag. ok is false for a line with no reachable tag.
-// A git failure is an error, even when it exits as the untagged line does.
-func lastReachableTag(dir, pattern string) (tag string, ok bool, err error) {
-	placeholder := wsproto.LineTagPlaceholder
-	if strings.Count(pattern, placeholder) != 1 || strings.ContainsAny(pattern, " \t\n*?[") || strings.HasPrefix(pattern, "-") {
-		return "", false, fmt.Errorf("%q is not a usable line tag pattern", pattern)
-	}
-	match := strings.Replace(pattern, placeholder, "*", 1)
-	output, stderr, runErr := gitCapture(dir, nil, nil, "describe", "--tags", "--abbrev=0", "--match", match)
-	if runErr != nil {
-		describeErr := fmt.Errorf("git describe: %w: %s", runErr, strings.TrimSpace(stderr))
-		return "", false, describeUntagged(dir, match, describeErr)
-	}
-	tag = strings.TrimSpace(output)
-	prefix, suffix, _ := strings.Cut(pattern, placeholder)
-	if len(tag) <= len(prefix)+len(suffix) || !strings.HasPrefix(tag, prefix) || !strings.HasSuffix(tag, suffix) {
-		return "", false, nil
-	}
-	return tag, true, nil
-}
-
-// describeUntagged returns nil only when a failed `git describe` is the
-// untagged line: `git tag --merged HEAD` answers cleanly with no matching tag.
-// Any other answer, a stderr line included, is the failure it reports.
-func describeUntagged(dir, match string, describeErr error) error {
-	reachable, stderr, err := gitCapture(dir, withoutGitTrace(os.Environ()), nil,
-		"tag", "--list", "--merged", "HEAD", "--", match)
-	switch tags := strings.Fields(reachable); {
-	case err != nil:
-		return fmt.Errorf("read the last tag: %w; git tag --merged: %w: %s", describeErr, err, strings.TrimSpace(stderr))
-	case strings.TrimSpace(stderr) != "":
-		return fmt.Errorf("read the last tag: %w; git tag --merged: %s", describeErr, strings.TrimSpace(stderr))
-	case len(tags) > 0:
-		return fmt.Errorf("read the last tag: %w; HEAD reaches %s", describeErr, strings.Join(tags, ", "))
-	}
-	return nil
-}
-
 // hasTags reports whether the repository has at least one tag, of any line.
 func hasTags(dir string) (bool, error) {
 	output, err := gitOutput(dir, "for-each-ref", "--count=1", "--format=%(refname)", "refs/tags")
@@ -137,18 +94,6 @@ func hasTags(dir string) (bool, error) {
 		return false, err
 	}
 	return strings.TrimSpace(output) != "", nil
-}
-
-// withoutGitTrace is env without git's GIT_TRACE* settings, which write to
-// stderr.
-func withoutGitTrace(env []string) []string {
-	kept := make([]string, 0, len(env))
-	for _, entry := range env {
-		if !strings.HasPrefix(entry, "GIT_TRACE") {
-			kept = append(kept, entry)
-		}
-	}
-	return kept
 }
 
 // filesAtTag returns the files under dir the API surface reads, as the tag

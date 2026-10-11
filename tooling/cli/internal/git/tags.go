@@ -2,7 +2,6 @@ package git
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -33,72 +32,6 @@ func TagsAtHead(repoRoot string) ([]string, error) {
 		return nil, fmt.Errorf("read the tags at HEAD: %w", err)
 	}
 	return splitLines(output), nil
-}
-
-// LastReachableTag returns the nearest tag reachable from HEAD that matches one
-// complete line tag pattern, and the commit it points at. Matching only the
-// literal prefix is insufficient for patterns with a suffix: a nearer tag that
-// the line could never render would otherwise become its version baseline.
-// ok is false when the line has no reachable tag, which is an ordinary state —
-// a line yields 0.0.0 until it is tagged for the first time — and never an
-// error. A git failure is an error, even when it exits as the untagged line
-// does.
-func LastReachableTag(repoRoot, tagPattern string) (tag, commit string, ok bool, err error) {
-	if strings.Count(tagPattern, lineTagPlaceholder) != 1 || strings.ContainsAny(tagPattern, " \t\n*?[") || strings.HasPrefix(tagPattern, "-") {
-		return "", "", false, fmt.Errorf("read the last tag: %q is not a usable line tag pattern", tagPattern)
-	}
-	match := strings.Replace(tagPattern, lineTagPlaceholder, "*", 1)
-	output, stderr, runErr := runCapture(repoRoot, "describe", "--tags", "--abbrev=0", "--match", match)
-	if runErr != nil {
-		describeErr := fmt.Errorf("git describe (in %s): %w: %s", repoRoot, runErr, strings.TrimSpace(stderr))
-		return "", "", false, describeUntagged(repoRoot, match, describeErr)
-	}
-	tag = strings.TrimSpace(output)
-	if version, matches := versionFromLineTag(tag, tagPattern); tag == "" || !matches || version == "" {
-		return "", "", false, nil
-	}
-	commit, err = ResolveCommit(repoRoot, "refs/tags/"+tag)
-	if err != nil {
-		return "", "", false, err
-	}
-	return tag, commit, true, nil
-}
-
-// describeUntagged decides whether a failed `git describe` is the untagged
-// line, and returns nil only then. Describe exits non-zero when nothing
-// matches, but also when it cannot run or read the history, and its last
-// message does not tell the two apart: on a history with a missing object it
-// prints the untagged line's own "No tags can describe". Read as untagged, that
-// failure would silently version the line at 0.0.0.
-//
-// So the tags HEAD reaches decide. The line is untagged only when `git tag
-// --merged` answers cleanly with none: it exits 0 on that same history and
-// names the unreadable object on stderr only, so any stderr is a failure. The
-// GIT_TRACE* debug settings write to stderr too, so this call runs without
-// them: set to debug git, they must not turn every untagged line into an error.
-func describeUntagged(repoRoot, match string, describeErr error) error {
-	reachable, stderr, err := runCaptureEnv(repoRoot, withoutGitTrace(os.Environ()),
-		"tag", "--list", "--merged", "HEAD", "--", match)
-	switch tags := splitLines(reachable); {
-	case err != nil:
-		return fmt.Errorf("read the last tag: %w; git tag --merged: %w: %s", describeErr, err, strings.TrimSpace(stderr))
-	case strings.TrimSpace(stderr) != "":
-		return fmt.Errorf("read the last tag: %w; git tag --merged: %s", describeErr, strings.TrimSpace(stderr))
-	case len(tags) > 0:
-		return fmt.Errorf("read the last tag: %w; HEAD reaches %s", describeErr, strings.Join(tags, ", "))
-	}
-	return nil
-}
-
-// withoutGitTrace is env without git's GIT_TRACE* settings.
-func withoutGitTrace(env []string) []string {
-	kept := make([]string, 0, len(env))
-	for _, entry := range env {
-		if !strings.HasPrefix(entry, "GIT_TRACE") {
-			kept = append(kept, entry)
-		}
-	}
-	return kept
 }
 
 // Commit is one commit of a line's history: what conventional-commit parsing

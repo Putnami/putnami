@@ -26,7 +26,7 @@ For each line, in order:
 | a shallow clone, or a checkout with no tags | refused for `version` and `publish`: `git fetch --unshallow --tags` |
 | a full clone with no tag on the line | `0.0.0`, with no bump |
 
-`<next>` starts from the line's last reachable tag and advances by the **conventional commits** that touch a project of the line, attributed by the files each commit changed:
+`<next>` starts from the line's last release: its highest release tag on the first-parent history of `HEAD`, which is `HEAD` and the chain of first parents behind it. A release tag carries a `MAJOR.MINOR.PATCH` version, so a tag such as `ts/vnext` or `ts/v1.0.0-rc.1` is never the last release, and neither is a tag that only a merged branch holds. `<next>` advances from that release by the **conventional commits** that touch a project of the line, attributed by the files each commit changed:
 
 | Commit | Stable, before 1.0 | Stable, from 1.0 | Only preview or experimental |
 |---|---|---|---|
@@ -67,7 +67,7 @@ Pushing the tag is what triggers the cohort publication: a publish on a tagged c
 
 ### Seeding a line
 
-Until a line has a reachable tag, every commit on it computes `0.0.0-<suffix>`, and `version tag` proposes `0.0.1`. To start a line at another version, tag the commit by hand once, then push that tag by name. `git push --tags` would also push every other tag of the local clone.
+Until a line has a release tag on the first-parent history, every commit on it computes `0.0.0-<suffix>`, and `version tag` proposes `0.0.1`. To start a line at another version, tag the commit by hand once, then push that tag by name. `git push --tags` would also push every other tag of the local clone.
 
 ```bash
 git tag -a ts/v0.2.0 -m 'ts 0.2.0' <commit>

@@ -150,6 +150,8 @@ var spawnSites = map[string]spawnSite{
 		why: "read verbs only: rev-parse, status, config --get"},
 	"commands/versioncmd/version_release.go:gitTagExists": {spawns: 1, verdict: noRepositoryCode,
 		why: "git rev-parse"},
+	"commands/versioncmd/version_release.go:lastRelease": {spawns: 1, verdict: noRepositoryCode,
+		why: "git log, through linetag.LastRelease"},
 	"compose/lease.go:defaultReapDeps": {spawns: 1, verdict: noRepositoryCode,
 		why: "docker with the digest-pinned postgres image of dbtestenv"},
 	"compose/process_start_ps.go:processStartTime": {spawns: 1, verdict: noRepositoryCode,
@@ -158,8 +160,12 @@ var spawnSites = map[string]spawnSite{
 		why: "docker with the digest-pinned postgres image of dbtestenv"},
 	"git/candidate.go:CandidatePaths": {spawns: 1, verdict: noRepositoryCode,
 		why: "git ls-files"},
+	"git/git.go:GetVersionInfo": {spawns: 1, verdict: noRepositoryCode,
+		why: "git log, through linetag.LastRelease"},
 	"git/git.go:runCaptureEnv": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only: show, rev-parse, rev-list, status, diff, merge-base, config --get, for-each-ref, ls-files, symbolic-ref"},
+	"git/release_baseline.go:ReadReleaseBaseline": {spawns: 1, verdict: noRepositoryCode,
+		why: "git log, through linetag.LastRelease"},
 	"githooks/install.go:Install": {spawns: 1, verdict: noRepositoryCode,
 		why: "git rev-parse"},
 	"jobs/environment.go:hostCPUModel": {spawns: 1, verdict: noRepositoryCode,
@@ -616,6 +622,7 @@ func scanSpawnSites(t *testing.T, root string) (map[string][]token.Pos, map[stri
 //   - a releaseset client starts `putnami cloud release-set`;
 //   - a dbtestenv provider or job starts docker;
 //   - the SDK's exec.Run starts the command it names;
+//   - linetag.LastRelease starts `git log`;
 //   - the oci daemon helpers start docker: the export saves a daemon image,
 //     and a content push without a layout tags and pushes one. The CLI
 //     uploads a packed layout with oci.PushLayout, which starts nothing.
@@ -633,7 +640,8 @@ var spawnCalls = map[string]map[string]bool{
 	"go.putnami.dev/sdk/extension/dbtestenv": {
 		"SelectProvider": true, "NewProvisioner": true, "UpJob": true, "DownJob": true,
 	},
-	"go.putnami.dev/sdk/extension/exec": {"Run": true},
+	"go.putnami.dev/sdk/extension/exec":    {"Run": true},
+	"go.putnami.dev/sdk/extension/linetag": {"LastRelease": true},
 	"go.putnami.dev/sdk/extension/oci": {
 		"ExportDaemonImageToLayout": true, "PushContent": true, "PushContentWithDigest": true,
 	},

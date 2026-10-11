@@ -50,10 +50,14 @@ catalog reads no tag, so the check runs there with any context.
 
 ## What it compares
 
-1. The baseline is the last tag of the project's version line that HEAD can
-   reach: the line of the nearest ancestor scope that declares one, else the root
-   line `v{version}`. A line with no reachable tag has no released API, so the
-   check passes and says so.
+1. The baseline is the last release of the project's version line: the line of
+   the nearest ancestor scope that declares one, else the root line
+   `v{version}`. The last release is the line's highest release tag on the
+   first-parent history of HEAD, which is HEAD and the chain of first parents
+   behind it. A release tag carries a `MAJOR.MINOR.PATCH` version: a tag such as
+   `go/vnext` or `go/v1.0.0-rc.1` is never the baseline, and neither is a tag
+   that only a merged branch holds. The version bump reads the same release. A
+   line with no such tag has no released API, so the check passes and says so.
 2. The API is read from source with `go/parser`, from the files at that tag and
    from the working tree, uncommitted edits included. Nothing is compiled or
    type-checked, and no module is downloaded.
@@ -289,8 +293,9 @@ CLI refuses this extension. See CLI
   warning diagnostic coded `api-compat-not-compared`, when:
   - the workspace is not in a git repository, for example a copied snapshot;
   - the clone is shallow, so it lacks the tags and history the check needs;
-  - no tag of the line is reachable from HEAD while the repository has tags of
-    other lines, which suggests the line's tags were not fetched.
+  - no release tag of the line is on the first-parent history of HEAD while
+    the repository has other tags, which suggests the line's tags were not
+    fetched.
 
   A clone with no tags at all, such as one fetched with `--no-tags`, reads as a
   line with no release: it passes with an information line, not a warning.

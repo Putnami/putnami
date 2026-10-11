@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/sdk/extension/linetag"
 )
 
 // LineSpec names one version line to git: where it lives, how its tags are
@@ -79,10 +80,10 @@ func OrderedSuffix(committedAt time.Time, sha, dirtyHash string) string {
 //  2. HEAD carrying this line's tag IS the version: Base and Full are the
 //     tag's, with no suffix, because that commit is the release. Two of the
 //     line's tags on one commit is ambiguous and refused.
-//  3. Otherwise the version is the last reachable tag of the line advanced by
-//     the conventional commits that touch it since that tag, floored at a
-//     patch. A line with no reachable tag starts at 0.0.0 with no advance: it
-//     has never released, so there is nothing to advance from.
+//  3. Otherwise the version is the last release of the line
+//     (linetag.LastRelease) advanced by the conventional commits that touch
+//     it since that release, floored at a patch. A line with no release
+//     starts at 0.0.0 with no advance: there is nothing to advance from.
 //  4. An untagged commit carries the ordered suffix, which is what makes two
 //     builds of one base version comparable and unique.
 func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
@@ -127,7 +128,7 @@ func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
 		return info, nil
 	}
 
-	lastTag, lastCommit, found, err := LastReachableTag(repoRoot, line.TagPattern)
+	last, found, err := linetag.LastRelease(repoRoot, line.TagPattern)
 	if err != nil {
 		return nil, err
 	}
@@ -136,17 +137,16 @@ func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
 		info.Full = info.Base + "-" + info.Suffix
 		return info, nil
 	}
-	lastVersion, _ := versionFromLineTag(lastTag, line.TagPattern)
-	commits, err := CommitsSince(repoRoot, lastCommit, line.Pathspecs)
+	commits, err := CommitsSince(repoRoot, last.Commit, line.Pathspecs)
 	if err != nil {
 		return nil, err
 	}
-	major, _, _ := parseSemverCore(lastVersion)
+	major, _, _ := parseSemverCore(last.Version)
 	bump, err := BumpFor(commits, major == 0, LineStableTest(repoRoot, line))
 	if err != nil {
 		return nil, err
 	}
-	info.Base = NextVersion(lastVersion, bump, true)
+	info.Base = NextVersion(last.Version, bump, true)
 	info.Full = info.Base + "-" + info.Suffix
 	return info, nil
 }

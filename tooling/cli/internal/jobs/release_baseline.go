@@ -17,7 +17,7 @@ import (
 //
 // The value is the project's release baseline under its version line's tag
 // pattern (putnamigit.ReadReleaseBaseline): the repository state, the pattern,
-// the line's last tag HEAD reaches, the object that tag holds at the project
+// the tag of the line's last release, the object that tag holds at the project
 // directory, and whether a commit since the tag that touches the project
 // declares a breaking change. It names no commit HEAD reaches, no ref and no
 // path, so a branch and its squash merge share the key when the squash message
