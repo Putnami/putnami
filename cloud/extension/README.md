@@ -294,8 +294,6 @@ files, so the key holds everything the step judges:
 
 Packaging and publishing read the disk, so they still check a file Git
 ignores and refuse an empty section directory.
-[#163](https://github.com/putnami/putnami/issues/163) tracks making them read
-the same candidate files.
 
 Outside a Git work tree the CLI computes no key for the step, so the step
 runs every time and reads the disk, where it refuses an empty section
@@ -454,7 +452,6 @@ a task finalizes another, and a release-set publication. The check then starts
 with the early key. That key holds the layers and the Cloud CLI binary as they
 were before this session's `build` rewrote them, while the result stored under
 it describes the layers this session produced.
-[#162](https://github.com/putnami/putnami/issues/162) tracks this defect.
 
 Pass the Docker or config artifact flag explicitly when you invoke `publish`
 directly. Cloud config publication consumes the optional typed task input named
