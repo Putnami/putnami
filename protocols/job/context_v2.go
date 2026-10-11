@@ -52,6 +52,13 @@ package job
 // stays core's. Splitting it any other way would mean either core keeping
 // language knowledge or every extension rebuilding the workspace graph.
 //
+// `project.tags` is a third resolved fact: the project's tags after the
+// authored-over-provider-over-scope merge, in the form the orchestrator's task
+// cache key holds them. A task that reads its tags here cannot be judged by
+// tags its key does not hold. Its empty value is an answer: `[]` says the
+// project resolves to no tags, and an absent member says the producer did not
+// resolve them.
+//
 // `selection` is the same kind of member for the same reason: the orchestrator
 // has already resolved WHAT THE USER ASKED FOR into a mode, a baseline and a
 // project set, and an extension that re-derived it would need the CLI's flag
@@ -75,8 +82,10 @@ package job
 //
 // Optional is not unconstrained: a v1 document may not carry them, an absolute
 // path is required when a path IS present, metadata must be a namespaced JSON
-// object, and project config must be a non-null JSON object. A producer cannot
-// invent a second meaning later.
+// object, project config must be a non-null JSON object, and project tags must
+// be a non-null, sorted list of distinct, non-empty tags with no surrounding
+// spaces. A producer cannot invent a
+// second meaning later.
 //
 // A document without `protocolVersion` is version 1, exactly as before, and v1
 // documents may not carry v2 members. Both versions are accepted; the Putnami

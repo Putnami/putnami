@@ -19,6 +19,7 @@ type contextPresence struct {
 	projectMetadata          bool
 	projectType              bool
 	projectDependencyClosure bool
+	projectTags              bool
 	invocation               bool
 	selection                bool
 	workspaceProjects        bool
@@ -91,6 +92,12 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 		if ctx.presence.projectDependencyClosure || ctx.Project.DependencyClosure != nil {
 			diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField, "project.dependencyClosure",
 				"project.dependencyClosure requires protocolVersion %d", ProtocolVersion2))
+		}
+		// An empty list is a resolved answer, so a v1 document may not carry
+		// it either.
+		if ctx.presence.projectTags || ctx.Project.Tags != nil {
+			diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField, "project.tags",
+				"project.tags requires protocolVersion %d", ProtocolVersion2))
 		}
 		if ctx.presence.invocation || ctx.Invocation != nil {
 			diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField, "invocation",
@@ -170,6 +177,7 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 		diags = append(diags, validateProjectMetadata(ctx.Project.Metadata, ctx.presence.projectMetadata)...)
 		diags = append(diags, validateDependencyClosure(
 			ctx.Project.DependencyClosure, ctx.presence.projectDependencyClosure)...)
+		diags = append(diags, validateProjectTags(ctx.Project.Tags, ctx.presence.projectTags)...)
 		diags = append(diags, validateInvocation(ctx.Invocation, ctx.presence.invocation)...)
 		diags = append(diags, validateUserScope(ctx.UserScope, ctx.presence.userScope)...)
 		diags = append(diags, validateSelection(ctx.Selection, ctx.presence.selection)...)
@@ -385,6 +393,45 @@ func validateDependencyClosure(closure []ProjectRef, present bool) []diag.Diagno
 			}
 		}
 		diags = append(diags, validateProjectRefConfig(prefix, project.Config)...)
+	}
+	return diags
+}
+
+// validateProjectTags checks the project's resolved tags.
+//
+// The list is a set in one spelling, the form the orchestrator's task cache key
+// holds: every tag is non-empty and carries no surrounding white space, and the
+// list is sorted in byte order and free of duplicates. Order and repetition are
+// not facts about a project. The white-space rule makes the duplicate rule
+// checkable: " go" and "go" are one tag in two spellings.
+//
+// A PRESENT-but-null member is rejected for the same reason as everywhere else:
+// the producer either resolved the tags or it did not, and null is neither
+// answer. An empty array IS an answer — a project that resolves to no tags.
+func validateProjectTags(tags []string, present bool) []diag.Diagnostic {
+	present = present || tags != nil
+	if !present {
+		return nil
+	}
+	if tags == nil {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidValue, "project.tags",
+			"project.tags must be omitted or contain a non-null array of tags; "+
+				"a project with no tags is an empty array")}
+	}
+	var diags []diag.Diagnostic
+	for i, tag := range tags {
+		if tag == "" || strings.TrimSpace(tag) != tag {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, fmt.Sprintf("project.tags[%d]", i),
+				"project.tags[%d] must be a non-empty tag with no surrounding white space, got %q", i, tag))
+		}
+	}
+	for i := 1; i < len(tags); i++ {
+		if tags[i-1] >= tags[i] {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "project.tags",
+				"project.tags must be sorted and free of duplicates; %q precedes %q",
+				tags[i-1], tags[i]))
+			break
+		}
 	}
 	return diags
 }

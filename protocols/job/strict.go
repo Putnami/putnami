@@ -93,6 +93,7 @@ func parseContextPresence(data []byte) (contextPresence, error) {
 		projectMetadata:          nestedHas("project", "metadata"),
 		projectType:              nestedHas("project", "type"),
 		projectDependencyClosure: nestedHas("project", "dependencyClosure"),
+		projectTags:              nestedHas("project", "tags"),
 		invocation:               invocation,
 		selection:                selection,
 		userScope:                userScope,

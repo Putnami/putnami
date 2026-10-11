@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -47,6 +48,10 @@ type fixture struct {
 	// options are the project's options: check passes them to Check, and run
 	// delivers them as task parameters.
 	options Options
+	// tags are the project's resolved tags as the job context carries them:
+	// check passes them to Check, and run delivers them as project.tags. They
+	// start as the tags the project's putnami.json declares, sorted.
+	tags []string
 }
 
 func newFixture(t *testing.T, supportCatalog string, projectTags ...string) *fixture {
@@ -58,7 +63,9 @@ func newFixture(t *testing.T, supportCatalog string, projectTags ...string) *fix
 		f.write("putnami.support.json", supportCatalog+"\n")
 	}
 	f.write("lib/putnami.json", `{"line":{},"includes":["greet"]}`+"\n")
-	tags, err := json.Marshal(append([]string{"go"}, projectTags...))
+	f.tags = append([]string{"go"}, projectTags...)
+	slices.Sort(f.tags)
+	tags, err := json.Marshal(f.tags)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +118,7 @@ func (f *fixture) commit(message string) {
 
 func (f *fixture) check() *Report {
 	f.t.Helper()
-	report, err := Check(f.root, f.project, projectName, f.options)
+	report, err := Check(f.root, f.project, projectName, f.tags, f.options)
 	if err != nil {
 		f.t.Fatalf("Check: %v", err)
 	}
@@ -125,7 +132,7 @@ func (f *fixture) run() (string, map[string]any, []runtime.Event) {
 	f.t.Helper()
 	ctx := &pctx.Context{
 		WorkspaceRoot: f.root,
-		Project:       pctx.Project{Name: projectName, Path: "lib/greet", FullPath: f.project},
+		Project:       pctx.Project{Name: projectName, Path: "lib/greet", FullPath: f.project, Tags: f.tags},
 	}
 	if f.options.CommandSurface != "" {
 		value, err := json.Marshal(f.options.CommandSurface)
@@ -371,35 +378,206 @@ func TestTheProtocolTagSelectsTheProtocolSubject(t *testing.T) {
 	}
 }
 
-// Tags resolve as the workspace loader resolves them: a project's own tags,
-// else its scope's, and an authored empty list blocks the scope's.
-func TestScopeTagsApplyWhenTheProjectDeclaresNone(t *testing.T) {
-	t.Parallel()
+// The check reads the project's tags from the job context and from no file:
+// the tags the project's putnami.json and its scope's declare do not select
+// the catalog subject.
+func TestTheSupportSubjectFollowsTheContextTags(t *testing.T) {
+	const (
+		unlistedPackage  = "does not list the package " + projectName
+		unlistedProtocol = "does not list the protocol " + projectName
+	)
 	for _, testCase := range []struct {
-		project string
-		want    []string
+		name string
+		// project and scope are the tags the two putnami.json files declare;
+		// nil declares none.
+		project, scope []string
+		// context are the tags the job context carries.
+		context []string
+		// listed is the kind the catalog lists the project under, as stable.
+		listed string
+		// skip is part of the reason the project is not checked; empty when
+		// the context makes it the listed subject, so it is checked.
+		skip string
 	}{
-		{project: `{"name":"` + projectName + `"}`, want: []string{"protocol"}},
-		{project: `{"name":"` + projectName + `","tags":[]}`, want: []string{}},
-		{project: `{"name":"` + projectName + `","tags":["go"]}`, want: []string{"go"}},
+		{
+			name:    "the context says protocol and the project declares another tag",
+			project: []string{"go"}, context: []string{"go", "protocol"},
+			listed: "protocol",
+		},
+		{
+			name:    "the context says protocol and no file declares a tag",
+			context: []string{"protocol"},
+			listed:  "protocol",
+		},
+		{
+			name:    "the context says protocol against a package entry",
+			project: []string{"go"}, context: []string{"go", "protocol"},
+			listed: "package", skip: unlistedProtocol,
+		},
+		{
+			name:    "the project declares protocol and the context does not carry it",
+			project: []string{"go", "protocol"}, context: []string{"go"},
+			listed: "protocol", skip: unlistedPackage,
+		},
+		{
+			name:  "the scope declares protocol and the context does not carry it",
+			scope: []string{"protocol"}, context: []string{"go"},
+			listed: "protocol", skip: unlistedPackage,
+		},
+		{
+			name:    "the files declare protocol against a package entry",
+			project: []string{"protocol"}, scope: []string{"protocol"}, context: []string{"go"},
+			listed: "package",
+		},
+		{
+			name:    "the context carries an empty list",
+			project: []string{"protocol"}, scope: []string{"protocol"}, context: []string{},
+			listed: "package",
+		},
+		{
+			name:    "an empty list against a protocol entry",
+			project: []string{"protocol"}, context: []string{},
+			listed: "protocol", skip: unlistedPackage,
+		},
 	} {
-		root := t.TempDir()
-		project := filepath.Join(root, "protocols", "lib")
-		for path, content := range map[string]string{
-			"protocols/putnami.json":     `{"tags":["protocol"],"includes":["lib"]}`,
-			"protocols/lib/putnami.json": testCase.project,
-		} {
-			full := filepath.Join(root, filepath.FromSlash(path))
-			if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-				t.Fatal(err)
+		t.Run(testCase.name, func(t *testing.T) {
+			f := newFixture(t, catalog(testCase.listed, "stable"))
+			declared := func(tags []string) string {
+				if tags == nil {
+					return ""
+				}
+				encoded, err := json.Marshal(tags)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return `,"tags":` + string(encoded)
 			}
-			if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-				t.Fatal(err)
+			f.write("lib/putnami.json", `{"line":{},"includes":["greet"]`+declared(testCase.scope)+`}`+"\n")
+			f.write("lib/greet/putnami.json", `{"name":"`+projectName+`"`+declared(testCase.project)+`}`+"\n")
+			f.write("lib/greet/greet.go", waveOnlySource)
+			f.commit("feat: drop the greeting")
+			f.tags = testCase.context
+
+			report := f.check()
+			status, _, events := f.run()
+			if testCase.skip != "" {
+				if !strings.Contains(report.Skip, testCase.skip) {
+					t.Errorf("skip = %q, want it to hold %q", report.Skip, testCase.skip)
+				}
+				if status != "SKIP" {
+					t.Errorf("status = %q, want SKIP", status)
+				}
+				return
 			}
+			if report.Skip != "" || len(report.Changes) != 1 {
+				t.Errorf("report = %+v, want the project checked and one change", report)
+			}
+			if found := diagnostics(events, runtime.SeverityError); status != "FAILED" || len(found) != 1 {
+				t.Errorf("status = %q, error diagnostics = %+v, want FAILED with one", status, found)
+			}
+		})
+	}
+}
+
+// The tags of a project that declares none come from a workspace provider or
+// from its scopes, and the job context carries the resolved list. An edit to
+// the scope's putnami.json alone does not change the verdict: the context
+// carries the same tags before and after.
+func TestAScopeTagEditAloneDoesNotChangeTheVerdict(t *testing.T) {
+	f := newFixture(t, catalog("package", "stable"))
+	f.write("lib/greet/putnami.json", `{"name":"`+projectName+`"}`+"\n")
+	f.write("lib/greet/greet.go", waveOnlySource)
+	f.commit("feat: drop the greeting")
+	f.tags = []string{"provided"}
+
+	before := f.check()
+	beforeStatus, beforeData, _ := f.run()
+	if before.Skip != "" || len(before.Changes) != 1 || beforeStatus != "FAILED" {
+		t.Fatalf("report = %+v, status = %q, want the package checked and failed", before, beforeStatus)
+	}
+
+	f.write("lib/putnami.json", `{"line":{},"includes":["greet"],"tags":["protocol"]}`+"\n")
+	after := f.check()
+	afterStatus, afterData, _ := f.run()
+	if !reflect.DeepEqual(after, before) {
+		t.Errorf("the scope edit changed the report:\nbefore %+v\nafter  %+v", before, after)
+	}
+	if afterStatus != beforeStatus || !reflect.DeepEqual(afterData, beforeData) {
+		t.Errorf("the scope edit changed the result: %q %v, then %q %v", beforeStatus, beforeData, afterStatus, afterData)
+	}
+}
+
+// A job context without project.tags gives no subject to read the catalog
+// for. The check fails as an invalid configuration and names the member. It
+// does not read the tags the files declare, and it does not read the absent
+// member as "no tags".
+// When the catalog gives the project the same answer as a package and as a
+// protocol, the tags cannot change the verdict, so a job context without
+// project.tags gets that answer.
+func TestAContextWithoutTagsTakesTheVerdictBothKindsShare(t *testing.T) {
+	both := `{"protocolVersion":1,"entries":[` +
+		`{"id":"` + projectName + `","kind":"package","status":"stable"},` +
+		`{"id":"` + projectName + `","kind":"protocol","status":"stable"}]}`
+	f := newFixture(t, both)
+	f.write("lib/greet/greet.go", waveOnlySource)
+	f.commit("feat: drop the greeting")
+	report, err := Check(f.root, f.project, projectName, nil, f.options)
+	if err != nil || report.Skip != "" || len(report.Changes) != 1 {
+		t.Fatalf("listed stable both ways: report = %+v, err = %v, want the project checked", report, err)
+	}
+
+	f = newFixture(t, `{"protocolVersion":1,"entries":[{"id":"other","kind":"package","status":"stable"}]}`)
+	report, err = Check(f.root, f.project, projectName, nil, f.options)
+	if err != nil || !strings.Contains(report.Skip, "neither a stable package nor a stable protocol") {
+		t.Fatalf("not listed: report = %+v, err = %v, want the project skipped", report, err)
+	}
+}
+
+func TestAContextWithoutTagsFailsTheCheckWhenACatalogExists(t *testing.T) {
+	for _, listed := range []string{"package", "protocol"} {
+		f := newFixture(t, catalog(listed, "stable"), "protocol")
+		f.write("lib/greet/greet.go", waveOnlySource)
+		f.commit("feat: drop the greeting")
+
+		report, err := Check(f.root, f.project, projectName, nil, f.options)
+		if err == nil {
+			t.Fatalf("listed as %s: report = %+v, want an error", listed, report)
 		}
-		if tags := projectTags(root, project); !slices.Equal(tags, testCase.want) {
-			t.Errorf("projectTags for %s = %v, want %v", testCase.project, tags, testCase.want)
+		if !errors.Is(err, protocolcli.ErrInvalidConfig) {
+			t.Errorf("listed as %s: err = %v, want it classified as invalid configuration", listed, err)
 		}
+		if !strings.Contains(err.Error(), "`project.tags`") || !strings.Contains(err.Error(), projectName) {
+			t.Errorf("listed as %s: err = %v, want the member and the project named", listed, err)
+		}
+
+		ctx := &pctx.Context{
+			WorkspaceRoot: f.root,
+			Project:       pctx.Project{Name: projectName, Path: "lib/greet", FullPath: f.project},
+		}
+		var status string
+		var runErr error
+		captureStdout(t, func() {
+			status, _, runErr = Run(ctx, jsonl.NewForVersion(1), nil)
+		})
+		if status != "FAILED" || !errors.Is(runErr, protocolcli.ErrInvalidConfig) {
+			t.Errorf("listed as %s: status = %q, err = %v, want FAILED as invalid configuration", listed, status, runErr)
+		}
+	}
+}
+
+// A workspace with no catalog reads no tag, so a job context without
+// project.tags is checked like any other.
+func TestAContextWithoutTagsIsCheckedWhenThereIsNoCatalog(t *testing.T) {
+	f := newFixture(t, "")
+	f.write("lib/greet/greet.go", waveOnlySource)
+	f.commit("feat: drop the greeting")
+	f.tags = nil
+
+	if report := f.check(); report.Skip != "" || len(report.Changes) != 1 {
+		t.Fatalf("report = %+v, want the project checked and one change", report)
+	}
+	if status, _, _ := f.run(); status != "FAILED" {
+		t.Fatalf("status = %q, want FAILED", status)
 	}
 }
 
@@ -415,7 +593,7 @@ func TestAWorkspaceWithoutACatalogChecksEveryProject(t *testing.T) {
 func TestAnInvalidCatalogFailsTheTask(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, `{"protocolVersion":1,"entries":[{"id":"x","kind":"package","status":"beta"}]}`)
-	_, err := Check(f.root, f.project, projectName, Options{})
+	_, err := Check(f.root, f.project, projectName, f.tags, Options{})
 	if err == nil || !strings.Contains(err.Error(), "putnami.support.json is invalid") {
 		t.Fatalf("err = %v, want the invalid catalog named", err)
 	}
@@ -514,7 +692,7 @@ func TestAWorkspaceOutsideGitHasNothingToCompare(t *testing.T) {
 	}
 	// The temporary directory may sit inside a repository; git must not find it.
 	t.Setenv("GIT_CEILING_DIRECTORIES", root)
-	report, err := Check(root, project, projectName, Options{})
+	report, err := Check(root, project, projectName, []string{"go"}, Options{})
 	if err != nil || !strings.Contains(report.Warning, "not in a git repository") || report.Note != "" {
 		t.Fatalf("report = %+v, err = %v", report, err)
 	}
@@ -604,7 +782,7 @@ func TestARepositoryWithoutACommitHasNothingToCompare(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	runGit(t, root, "init", "-q")
-	report, err := Check(root, root, projectName, Options{})
+	report, err := Check(root, root, projectName, []string{"go"}, Options{})
 	if err != nil || !strings.Contains(report.Note, "no commit") {
 		t.Fatalf("report = %+v, err = %v", report, err)
 	}
@@ -616,7 +794,7 @@ func TestAShallowCloneWarnsInsteadOfComparing(t *testing.T) {
 	f.commit("chore: a second commit")
 	clone := filepath.Join(t.TempDir(), "clone")
 	runGit(t, f.root, "clone", "-q", "--depth", "1", "file://"+f.root, clone)
-	report, err := Check(clone, filepath.Join(clone, "lib", "greet"), projectName, Options{})
+	report, err := Check(clone, filepath.Join(clone, "lib", "greet"), projectName, f.tags, Options{})
 	if err != nil || !strings.Contains(report.Warning, "shallow") {
 		t.Fatalf("report = %+v, err = %v", report, err)
 	}

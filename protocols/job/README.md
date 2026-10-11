@@ -47,7 +47,7 @@ both, and the v1 corpus is unchanged.
 | Version | Members | Corpus |
 | --- | --- | --- |
 | 1 | everything above | `fixtures/{valid,invalid}` |
-| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `ProjectRef.config` and `ProjectRef.extensions` | `fixtures/v2/{valid,invalid}` |
+| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `ProjectRef.config` and `ProjectRef.extensions` | `fixtures/v2/{valid,invalid}` |
 
 **Putnami's orchestrator produces v2 only.** The CLI requires an extension
 contract whose SDK reads v2, so a subprocess that reaches this context is
@@ -127,6 +127,25 @@ needs it instead of being re-derived across the process boundary.
 They exist because extension-owned infra aggregation replaced a core gate that
 walked the graph itself: the policy (what a workload declares, what its runtime
 defaults are) is the language extension's, the graph is core's.
+
+- **`project.tags`** — the project's resolved tags: the tags its `putnami.json`
+  declares, else the tags a workspace provider reports, else the tags of its
+  scopes. The orchestrator's task cache key holds the same value, so a task
+  that reads its tags here reads what its key holds. A task does not resolve
+  tags from manifests: the key does not hold the scope manifests.
+
+  A present value is a set in one spelling, the form the key holds. Every tag
+  is non-empty and carries no surrounding white space (`job.invalid_value` at
+  `project.tags[i]`). The list is sorted in byte order and free of duplicates
+  (`job.invalid_value` at `project.tags`). The order of the tags and a repeated
+  tag are not facts about a project, so they are not on the wire.
+
+  Absent and empty are two answers. `[]` says the project resolves to no tags.
+  An absent member says the producer did not resolve them: an orchestrator
+  older than the member, for example. A consumer whose answer depends on a tag
+  declines an absent member; it does not read it as "no tags" and it does not
+  resolve the tags itself. `null` is neither answer and is rejected. A version
+  1 document does not carry the member, even empty (`job.unexpected_field`).
 
 - **`selection`** — how the command invocation chose the projects in scope:
   `mode` (`all`, `projects` or `impacted`), `scoped`, the `baseline` and
@@ -339,8 +358,8 @@ honest.
 
 - v1 corpus: [`fixtures/valid`](fixtures/valid) (3) and
   [`fixtures/invalid`](fixtures/invalid) (8).
-- v2 corpus: [`fixtures/v2/valid`](fixtures/v2/valid) (10) and
-  [`fixtures/v2/invalid`](fixtures/v2/invalid) (46).
+- v2 corpus: [`fixtures/v2/valid`](fixtures/v2/valid) (12) and
+  [`fixtures/v2/invalid`](fixtures/v2/invalid) (54).
 
 ## Support status
 

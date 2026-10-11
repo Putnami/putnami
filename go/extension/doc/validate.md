@@ -36,9 +36,17 @@ none. A breaking change there still needs its marker for the bump.
 
 A project is looked up as a `protocol` subject when it carries the `protocol`
 tag, and as a `package` subject otherwise, under its project name. The tags
-are the project's own `tags` in `putnami.json`, else the tags of its scopes; an
-authored `"tags": []` blocks the scopes' tags. The version bump classifies
-projects the same way.
+are the ones the CLI resolves: the project's own `tags` in `putnami.json`, else
+the tags a workspace provider reports, else the tags of its scopes. An authored
+`"tags": []` blocks the other two. The CLI passes the resolved tags to the
+check in the job context, as `project.tags`, and keys the task on them. The
+check reads no tag from a `putnami.json`, so its verdict and its cache key move
+together. The version bump also classifies projects by the `protocol` tag.
+
+When the job context carries no `project.tags`, the check reads the catalog
+both as a package and as a protocol. It fails and names the member only when
+the two readings disagree on whether the API is checked. A workspace without a
+catalog reads no tag, so the check runs there with any context.
 
 ## What it compares
 
@@ -249,6 +257,8 @@ The task is cached. Its key holds what the verdict reads:
   and the files their `//go:embed` directives select;
 - the project's `go.mod` files and `.json` files;
 - the root `putnami.support.json`;
+- the project's resolved tags, which the job context carries as
+  `project.tags`;
 - the `command-surface` option, in both spellings;
 - the project's release baseline, which the CLI reads from git before the task
   runs (the `releaseBaseline` runtime input): the repository state, the line's

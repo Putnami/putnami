@@ -134,6 +134,9 @@ func TestV2InvalidFixtureCoverage(t *testing.T) {
 		"project.type",
 		"project.dependencyClosure",
 		"project.dependencyClosure[1].path",
+		"project.tags",
+		"project.tags[0]",
+		"project.tags[1]",
 		"selectedProjects[1].sourceName",
 		"selectedProjects[1].version",
 		"selectedProjects[1].dependencies",
@@ -186,6 +189,9 @@ func TestV1FixturesStayV1(t *testing.T) {
 		}
 		if ctx.Project.Type != "" || ctx.Project.DependencyClosure != nil {
 			t.Errorf("v1 fixture %s carries the v2 project-graph members", path)
+		}
+		if ctx.Project.Tags != nil {
+			t.Errorf("v1 fixture %s carries the v2 project.tags member", path)
 		}
 		if ctx.Selection != nil {
 			t.Errorf("v1 fixture %s carries the v2 selection member", path)
@@ -394,6 +400,7 @@ func TestValidate_V1RejectsLifecycleMembers(t *testing.T) {
 				{ID: "/p", Name: "p", Path: "p", FullPath: "/ws/p"},
 			}
 		}},
+		{"project.tags", func(c *Context) { c.Project.Tags = []string{"go"} }},
 		{"invocation", func(c *Context) {
 			c.Invocation = &Invocation{ID: "inv-1", ArtifactRoot: "/tmp/inv-1"}
 		}},
@@ -495,6 +502,9 @@ func TestV2LifecycleMembersAreOmittedWhenAbsent(t *testing.T) {
 	}
 	if _, ok := document.Project["metadata"]; ok {
 		t.Error("project.metadata must be omitted when unset")
+	}
+	if _, ok := document.Project["tags"]; ok {
+		t.Error("project.tags must be omitted when unset")
 	}
 	if document.Invocation != nil {
 		t.Error("invocation must be omitted when unset")

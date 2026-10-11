@@ -113,7 +113,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string
 	options, err := optionsFromParams(ctx.Params)
 	var report *Report
 	if err == nil {
-		report, err = Check(ctx.WorkspaceRoot, ctx.Project.FullPath, ctx.Project.Name, options)
+		report, err = Check(ctx.WorkspaceRoot, ctx.Project.FullPath, ctx.Project.Name, ctx.Project.Tags, options)
 	}
 	if err != nil {
 		emit.PhaseEnd(phase, "failed")
@@ -127,8 +127,10 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string
 // one. When they declare none, it still reads the declaration at the tag and
 // warns when there was one. name is the project's resolved name: its
 // support-catalog identity, and the module path used when the project has no
-// go.mod.
-func Check(workspaceRoot, projectDir, name string, options Options) (*Report, error) {
+// go.mod. tags are the project's resolved tags as the job context carries
+// them, nil when it carries none: they decide whether the support catalog
+// lists the project as a protocol or as a package.
+func Check(workspaceRoot, projectDir, name string, tags []string, options Options) (*Report, error) {
 	var surfacePath string
 	if options.CommandSurface != "" {
 		var err error
@@ -139,7 +141,7 @@ func Check(workspaceRoot, projectDir, name string, options Options) (*Report, er
 			return nil, err
 		}
 	}
-	skip, err := notChecked(workspaceRoot, projectDir, name)
+	skip, err := notChecked(workspaceRoot, name, tags)
 	if err != nil {
 		return nil, protocolcli.Classify(err, protocolcli.ErrInvalidConfig)
 	}
