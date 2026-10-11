@@ -270,6 +270,47 @@ func TestProcessDeadlineCountsTheTimeAProcessDoesNotWait(t *testing.T) {
 	}
 }
 
+// TestProcessDeadlineKeepsTheWaitAlreadyRead pins that a read that fails, or
+// that reads a lower wait, as a thread's exit does on Linux, does not throw
+// away the wait already read: the deadline keeps it and counts only the time
+// after it.
+func TestProcessDeadlineKeepsTheWaitAlreadyRead(t *testing.T) {
+	t.Parallel()
+	const (
+		run    = 3 * processDeadlineMinRearm
+		waited = processDeadlineMinRearm / 2
+	)
+	calls := 0
+	progress := func(*os.Process) func() processSample {
+		return func() processSample {
+			calls++
+			switch {
+			case calls == 1:
+				// The sample that sees the process run.
+				return processSample{measured: true}
+			case calls == 2:
+				return processSample{waitedForCPU: waited, measured: true}
+			case calls%2 == 1:
+				return processSample{}
+			default:
+				return processSample{measured: true}
+			}
+		}
+	}
+	watch := processDeadline{run: run, uncounted: elapsesNever, progress: progress}.watch(nil, nil)
+	<-watch.expired
+	timing := watch.stop()
+	if calls < 3 {
+		t.Fatalf("the deadline fired after %d samples, want a read past the one that measured a wait", calls)
+	}
+	if timing.waitedForCPU != waited || !timing.waitMeasured {
+		t.Errorf("timing = %+v, want the wait of %s read before the failed and lower reads", timing, waited)
+	}
+	if timing.uncountedPastBound || timing.ran < run {
+		t.Errorf("timing = %+v, want a run deadline that ran at least %s", timing, run)
+	}
+}
+
 // TestProcessDeadlineBoundsTheTimeNotCounted pins that a process that keeps
 // waiting for a CPU is stopped once its hold and its wait reach the bound,
 // and that the watch says so.

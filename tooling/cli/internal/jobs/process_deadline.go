@@ -147,11 +147,12 @@ type processTiming struct {
 	// did. It is not counted.
 	held time.Duration
 	// waitedForCPU is how long the process, once seen running, was ready to
-	// run and had no CPU, as of the last time its deadline read it. It is not
-	// counted. It is zero unless waitMeasured is set.
+	// run and had no CPU: the most its deadline read. It is not counted. It
+	// is zero unless waitMeasured is set.
 	waitedForCPU time.Duration
-	// waitMeasured reports that the deadline read waitedForCPU. Without it,
-	// the time the process waited for a CPU is part of ran.
+	// waitMeasured reports that the deadline read waitedForCPU at least once
+	// after the baseline. Without it, the time the process waited for a CPU
+	// is part of ran.
 	waitMeasured bool
 	// ran is how long the process ran or was blocked in its own work under
 	// its deadline: the time since it was seen running, less waitedForCPU.
@@ -198,7 +199,6 @@ func (w *processWatch) follow(d processDeadline, sample func() processSample, on
 		}
 	}
 	held := w.running.Sub(w.armed)
-	w.waitMeasured = baseline.measured
 	var elapsed time.Duration
 	for {
 		next, over, pastBound := d.check(held, elapsed, w.waitedForCPU)
@@ -221,7 +221,13 @@ func (w *processWatch) follow(d processDeadline, sample func() processSample, on
 			current = sample()
 		}
 		elapsed = time.Since(w.running)
-		w.waitedForCPU, w.waitMeasured = cpuWaitBetween(baseline, current, elapsed)
+		// The wait only grows. A read that fails, or that a thread's exit
+		// lowered, keeps the wait already read, so it counts the time after
+		// that read and never the time already discounted.
+		if wait, measured := cpuWaitBetween(baseline, current, elapsed); measured {
+			w.waitedForCPU = max(w.waitedForCPU, wait)
+			w.waitMeasured = true
+		}
 	}
 }
 
