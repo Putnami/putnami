@@ -49,7 +49,7 @@
     },
     {
       "id": "powershell-installer-run-form",
-      "text": "install.ps1 takes the run form of install.sh: ?run=<command>, which the site bakes into its one $RunCommandDefault line, --run, PUTNAMI_RUN and PUTNAMI_COMMAND_MAP_URL. Before it installs anything, it refuses a command that does not match ^[a-z][a-z0-9-]{0,63}$, that is retired, or that a valid command map does not list. It pins the extension with extensions install --user --latest, runs putnami <command> in the caller's directory without writing there, and ends with its status: exit from a file, $LASTEXITCODE from text."
+      "text": "install.ps1 takes the run form of install.sh: ?run=<command>, which the site bakes into its one $RunCommandDefault line, --run, PUTNAMI_RUN and PUTNAMI_COMMAND_MAP_URL. Before it installs anything, it refuses a command that is retired, does not match ^[a-z][a-z0-9-]{0,63}$, or that a valid map omits. It pins the extension with extensions install --user --latest, runs putnami <command> in the caller's directory without writing there, and ends with its status: exit from a file, $LASTEXITCODE from text."
     }
   ],
   "decisions": [
