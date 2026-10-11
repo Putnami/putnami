@@ -1292,6 +1292,59 @@ chmod +x "$dir/go/bin/go"
 		"a-downloaded-go-is-installed-only-at-its-locked-or-published-sha256")
 }
 
+// sha256_of, which checks a downloaded Go archive, hashes with openssl on a
+// host that has neither sha256sum nor shasum.
+func TestPutnamiwSHA256OfFallsBackToOpenSSL(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("putnamiw is a bash script; skip on Windows")
+	}
+	bashPath, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash not available")
+	}
+	data, err := os.ReadFile(findPutnamiw(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	start := strings.Index(script, "\nsha256_of() {\n")
+	if start < 0 {
+		t.Fatal("putnamiw defines no sha256_of function")
+	}
+	end := strings.Index(script[start:], "\n}\n")
+	if end < 0 {
+		t.Fatal("sha256_of has no closing brace")
+	}
+	function := script[start : start+end+3]
+
+	tools := t.TempDir()
+	for _, tool := range []string{"awk", "openssl"} {
+		path, err := exec.LookPath(tool)
+		if err != nil {
+			t.Skipf("%s not available", tool)
+		}
+		if err := os.Symlink(path, filepath.Join(tools, tool)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	file := filepath.Join(t.TempDir(), "archive")
+	if err := os.WriteFile(file, []byte("FAKE-GO-ARCHIVE"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(bashPath, "-c", function+`sha256_of "$1"`, "bash", file)
+	cmd.Env = []string{"PATH=" + tools}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("sha256_of: %v\n%s", err, out)
+	}
+	sum := sha256.Sum256([]byte("FAKE-GO-ARCHIVE"))
+	if got, want := strings.TrimSpace(string(out)), hex.EncodeToString(sum[:]); got != want {
+		t.Errorf("sha256_of with openssl alone = %q, want %q", got, want)
+	}
+	spectest.Proves(t, "cli/engine-provenance", "build-toolchain-stays-in-the-build",
+		"a-downloaded-go-is-installed-only-at-its-locked-or-published-sha256")
+}
+
 // A concurrent `./putnamiw` at another tree state re-points the shared engine
 // link — legitimately, that is how the wrapper keeps the engine current. The pin
 // a live run already holds must be unaffected, because the blob it names is

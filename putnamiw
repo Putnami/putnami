@@ -257,13 +257,15 @@ resolve_link_target() {
   esac
 }
 
-# sha256_of prints the lowercase-hex SHA-256 of a file, or nothing when no
-# hashing tool is available (the caller then falls back to a per-worktree copy).
+# sha256_of prints the lowercase-hex SHA-256 of a file with sha256sum, shasum
+# or openssl, or nothing when none is available.
 sha256_of() {
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "$1" | awk '{print $1}'
   elif command -v shasum >/dev/null 2>&1; then
     shasum -a 256 "$1" | awk '{print $1}'
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$1" | awk '{print tolower($NF)}'
   fi
 }
 
@@ -826,7 +828,7 @@ resolve_go() {
   actual="$(sha256_of "$archive")"
   if [ -z "$expected" ] || [ -z "$actual" ]; then
     rm -rf "$stage"
-    fail "Cannot verify Go $version: no SHA-256 for $GO_OS/$GO_ARCH in putnami.lock.json or from go.dev, or no sha256sum or shasum"
+    fail "Cannot verify Go $version: no SHA-256 for $GO_OS/$GO_ARCH in putnami.lock.json or from go.dev, or no sha256sum, shasum or openssl"
   fi
   if [ "$actual" != "$expected" ]; then
     rm -rf "$stage"
