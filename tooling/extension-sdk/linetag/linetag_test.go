@@ -265,6 +265,24 @@ func TestAHistoryGitCannotReadIsAnError(t *testing.T) {
 	}
 }
 
+// A history git cannot read is an error even where the release tags sit
+// before the unreadable commit, so the walk of HEAD must cross it.
+func TestAHistoryGitCannotReadUnderGitTraceIsStillAnError(t *testing.T) {
+	dir := repository(t)
+	git(t, dir, "tag", "ts/v0.1.0")
+	commit(t, dir, "feat(ts): add")
+	commit(t, dir, "fix(ts): repair")
+	missing := git(t, dir, "rev-parse", "HEAD~1")
+	if err := os.Remove(filepath.Join(dir, ".git", "objects", missing[:2], missing[2:])); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_TRACE", "1")
+
+	if _, ok, err := LastRelease(dir, "ts/v{version}"); err == nil || ok || !strings.Contains(err.Error(), missing) {
+		t.Fatalf("LastRelease = %v/%v, want an error naming %s", ok, err, missing)
+	}
+}
+
 func TestARepositoryWithoutACommitIsAnError(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

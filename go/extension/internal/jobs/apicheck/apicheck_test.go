@@ -667,6 +667,23 @@ func TestAnOlderReleaseOfAMergedBranchIsNoBaseline(t *testing.T) {
 	}
 }
 
+// A branch that merged main reaches the release main tagged after the branch
+// started, through the merge's second parent: that release is the baseline.
+func TestAReleaseReachedThroughAMergeOfMainIsTheBaseline(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t, catalog("package", "stable"))
+	f.git("checkout", "-q", "-b", "feature")
+	f.commit("feat: start")
+	f.git("checkout", "-q", "main")
+	f.commit("feat: ship")
+	f.git("tag", "lib/v0.5.0")
+	f.git("checkout", "-q", "feature")
+	f.git("merge", "-q", "--no-ff", "-m", "merge main", "main")
+	if report := f.check(); report.Tag != "lib/v0.5.0" {
+		t.Fatalf("report = %+v, want the baseline lib/v0.5.0", report)
+	}
+}
+
 func TestAnAddedSymbolPasses(t *testing.T) {
 	spectest.Proves(t, feature, requirement, "an-addition-is-compatible")
 	f := newFixture(t, catalog("package", "stable"))

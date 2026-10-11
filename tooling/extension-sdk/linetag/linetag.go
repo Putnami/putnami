@@ -20,9 +20,9 @@ package linetag
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"slices"
 	"strings"
@@ -67,10 +67,18 @@ func LastRelease(dir, pattern string) (release Release, ok bool, err error) {
 	if !usable {
 		return Release{}, false, fmt.Errorf("read the last release: %q is not a usable line tag pattern", pattern)
 	}
-	if _, err := runGit(dir, nil, "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}"); err != nil {
+	if _, err := runGit(dir, nil, nil, "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}"); err != nil {
 		return Release{}, false, fmt.Errorf("read the last release: %w", err)
 	}
-	refs, err := runGit(dir, nil, "for-each-ref", "--format=%(refname)", "refs/tags")
+	// --merged lists every tag HEAD reaches in one walk of the history. On a
+	// history it cannot read it still exits 0, naming the missing object on
+	// stderr only, so any stderr is a failure. GIT_TRACE* settings write to
+	// stderr too, so this call runs without them.
+	refs, stderr, err := runGitCapture(dir, withoutGitTrace(os.Environ()), nil,
+		"for-each-ref", "--merged=HEAD", "--format=%(refname)", "refs/tags")
+	if err == nil && strings.TrimSpace(stderr) != "" {
+		err = fmt.Errorf("git for-each-ref (in %s): %s", dir, strings.TrimSpace(stderr))
+	}
 	if err != nil {
 		return Release{}, false, fmt.Errorf("read the last release: %w", err)
 	}
@@ -92,7 +100,7 @@ func LastRelease(dir, pattern string) (release Release, ok bool, err error) {
 	for _, candidate := range candidates {
 		names.WriteString("refs/tags/" + candidate.Tag + "^{}\n")
 	}
-	objects, err := runGit(dir, strings.NewReader(names.String()), "cat-file", "--batch-check")
+	objects, err := runGit(dir, nil, strings.NewReader(names.String()), "cat-file", "--batch-check")
 	if err != nil {
 		return Release{}, false, fmt.Errorf("read the last release: %w", err)
 	}
@@ -105,48 +113,50 @@ func LastRelease(dir, pattern string) (release Release, ok bool, err error) {
 		if len(fields) != 3 {
 			return Release{}, false, fmt.Errorf("read the last release: git cannot read tag %s: %s", candidate.Tag, lines[i])
 		}
-		if fields[1] != "commit" {
-			continue
-		}
-		candidate.Commit = fields[0]
-		reached, err := reachedFromHead(dir, candidate.Commit)
-		if err != nil {
-			return Release{}, false, fmt.Errorf("read the last release: %w", err)
-		}
-		if reached {
+		if fields[1] == "commit" {
+			candidate.Commit = fields[0]
 			return candidate, true, nil
 		}
 	}
 	return Release{}, false, nil
 }
 
-// reachedFromHead reports whether commit is HEAD or one of its ancestors.
-func reachedFromHead(dir, commit string) (bool, error) {
-	_, err := runGit(dir, nil, "merge-base", "--is-ancestor", commit, "HEAD")
-	var exit *exec.ExitError
-	if errors.As(err, &exit) && exit.ExitCode() == 1 {
-		return false, nil
+// withoutGitTrace is env without git's GIT_TRACE* settings.
+func withoutGitTrace(env []string) []string {
+	kept := make([]string, 0, len(env))
+	for _, entry := range env {
+		if !strings.HasPrefix(entry, "GIT_TRACE") {
+			kept = append(kept, entry)
+		}
 	}
-	return err == nil, err
+	return kept
 }
 
-// runGit runs git in dir with stdin and returns its stdout. A failure carries
-// git's stderr.
-func runGit(dir string, stdin io.Reader, args ...string) (string, error) {
+// runGit runs git in dir and returns its stdout. A failure carries git's
+// stderr.
+func runGit(dir string, env []string, stdin io.Reader, args ...string) (string, error) {
+	stdout, _, err := runGitCapture(dir, env, stdin, args...)
+	return stdout, err
+}
+
+// runGitCapture runs git in dir with env (nil inherits this process's) and
+// stdin, and returns its stdout and stderr. A failure carries git's stderr.
+func runGitCapture(dir string, env []string, stdin io.Reader, args ...string) (string, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
+	cmd.Env = env
 	cmd.Stdin = stdin
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("git %s (in %s): timed out after %s", args[0], dir, gitTimeout)
+			return "", stderr.String(), fmt.Errorf("git %s (in %s): timed out after %s", args[0], dir, gitTimeout)
 		}
-		return "", fmt.Errorf("git %s (in %s): %w: %s", args[0], dir, err, strings.TrimSpace(stderr.String()))
+		return "", stderr.String(), fmt.Errorf("git %s (in %s): %w: %s", args[0], dir, err, strings.TrimSpace(stderr.String()))
 	}
-	return stdout.String(), nil
+	return stdout.String(), stderr.String(), nil
 }
 
 // splitPattern returns what a line tag pattern holds before and after its

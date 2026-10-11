@@ -151,7 +151,7 @@ var spawnSites = map[string]spawnSite{
 	"commands/versioncmd/version_release.go:gitTagExists": {spawns: 1, verdict: noRepositoryCode,
 		why: "git rev-parse"},
 	"commands/versioncmd/version_release.go:lastRelease": {spawns: 1, verdict: noRepositoryCode,
-		why: "git log, through linetag.LastRelease"},
+		why: "read verbs only, through linetag.LastRelease: rev-parse, for-each-ref, cat-file"},
 	"compose/lease.go:defaultReapDeps": {spawns: 1, verdict: noRepositoryCode,
 		why: "docker with the digest-pinned postgres image of dbtestenv"},
 	"compose/process_start_ps.go:processStartTime": {spawns: 1, verdict: noRepositoryCode,
@@ -161,11 +161,11 @@ var spawnSites = map[string]spawnSite{
 	"git/candidate.go:CandidatePaths": {spawns: 1, verdict: noRepositoryCode,
 		why: "git ls-files"},
 	"git/git.go:GetVersionInfo": {spawns: 1, verdict: noRepositoryCode,
-		why: "git log, through linetag.LastRelease"},
+		why: "read verbs only, through linetag.LastRelease: rev-parse, for-each-ref, cat-file"},
 	"git/git.go:runCaptureEnv": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only: show, rev-parse, rev-list, status, diff, merge-base, config --get, for-each-ref, ls-files, symbolic-ref"},
 	"git/release_baseline.go:ReadReleaseBaseline": {spawns: 1, verdict: noRepositoryCode,
-		why: "git log, through linetag.LastRelease"},
+		why: "read verbs only, through linetag.LastRelease: rev-parse, for-each-ref, cat-file"},
 	"githooks/install.go:Install": {spawns: 1, verdict: noRepositoryCode,
 		why: "git rev-parse"},
 	"jobs/environment.go:hostCPUModel": {spawns: 1, verdict: noRepositoryCode,
@@ -622,7 +622,7 @@ func scanSpawnSites(t *testing.T, root string) (map[string][]token.Pos, map[stri
 //   - a releaseset client starts `putnami cloud release-set`;
 //   - a dbtestenv provider or job starts docker;
 //   - the SDK's exec.Run starts the command it names;
-//   - linetag.LastRelease starts `git log`;
+//   - linetag.LastRelease starts git with read verbs only;
 //   - the oci daemon helpers start docker: the export saves a daemon image,
 //     and a content push without a layout tags and pushes one. The CLI
 //     uploads a packed layout with oci.PushLayout, which starts nothing.

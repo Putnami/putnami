@@ -19,7 +19,7 @@ For each line, in order:
 
 | Situation | Version |
 |---|---|
-| HEAD carries the line's tag | the tag's version, exactly |
+| HEAD carries a release tag of the line | the tag's version, exactly |
 | HEAD carries the tags of several lines | `--scope <line>` names the one being released; without it a publish is refused |
 | any other commit | `<next>-<yyyymmddHHMMSS>-<sha>`, an ordered pre-release |
 | a dirty tree | the same, with the diff hash appended |
