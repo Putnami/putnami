@@ -763,8 +763,9 @@ without declaring such an output takes no lock there: the tasks that write
 the workspace-scoped `workspace-clients` declare no output, so a reader of
 `workspace-clients` is not protected from them. The `sources` resource takes
 no lock: the tasks that write it change source files, not declared outputs.
-Shared locks coexist: several sessions can read one project at once, and a
-task that writes there waits until all of them finished.
+Shared locks coexist: tasks of several sessions read one project at once,
+whatever else their sessions plan, and a task that writes there waits until
+all of them finished.
 
 A task holds these locks across a cache restore into its outputs, and for an
 execution from the output preparation through the capture into the cache:
@@ -781,14 +782,11 @@ long-running task such as `serve` that reads nothing another task writes
 does not keep another session's preparation out of its project.
 
 A task that needs one lock both to write and to read, or whose preparation
-writes the project tree, holds that lock exclusively until its capture. While
-a session has a planned task that writes under a lock and has not finished,
-every task of that session takes that lock exclusively, its readers
-included, so the session's readers and writers share one lock. Once the last
-such writer finished, executed, restored from cache, failed or skipped, the
-session's readers take the lock shared, and a reader of another session runs
-beside them. A lock a task already took exclusively stays so until its
-capture.
+writes the project tree, holds that lock exclusively until its capture.
+Tasks of one session share one lock, held in the mode of the task that took
+it first: a reader that starts while a task of its session writes joins that
+exclusive lock, which then stays exclusive until the session's last task
+holding it released it.
 
 A task takes its locks in one order shared by every session, whatever their
 mode: command-output directories first, then projects, then the workspace.
@@ -798,7 +796,10 @@ other. Tasks of one session share their locks, so the lock does not change
 the order within a session, with one exception: a task that needs a lock
 exclusively while its own session holds it only for reading waits until
 those readers finished, and the session's tasks that need the lock meanwhile
-wait behind it. That wait prints nothing. When another session holds a lock,
+wait behind it. That wait prints nothing, and it is the only way a lock
+changes mode within a session. A build's `infra` step, which writes
+`.gen/requirements.json` after the build steps, waits this way for the
+session's test step that still reads `.gen`. When another session holds a lock,
 the task prints one line to stderr that names that session and its tasks
 that hold the lock, then waits:
 
@@ -808,10 +809,10 @@ putnami: /tooling/cli:test~test waits for session 20260925-192012-876307 (pid 42
 
 When several tasks of that session share the lock, the line names the first
 one and counts the rest (`task /tooling/cli:test~test and 2 more`). It says
-`which is reading` instead when none of those tasks writes under the lock,
-and the session holds it exclusively only because its writer had not
-finished. The line never names a process that is gone; it then says `another
-putnami process`. A task that waits for shared locks names none of their
+`which is reading` instead when none of those tasks writes under the lock:
+they joined a writer's exclusive lock that the writer released since. The
+line never names a process that is gone; it then says `another putnami
+process`. A task that waits for shared locks names none of their
 holders: several sessions can read at once, and a reader records nothing in
 the lock file.
 

@@ -69,29 +69,29 @@ package jobs
 // Within one acquisition a key needed in both modes is exclusive: a task that
 // reads its project's gen and declares a project-rooted output, or whose
 // preparation writes the project tree, holds the project key exclusively
-// until its capture. While a task of the session's plan that takes a key as a
-// writer key has not finished, every task of the session takes that key
-// exclusively (seedExclusive), so the session's readers share the hold its
-// writers take. Once the last such writer finished, whatever its terminal
-// state (finished), a reader takes the key shared again, and readers in
-// several sessions run together; a hold taken exclusively before keeps its
-// mode until its release.
+// until its capture. Nothing else decides a mode: a reader needs its reader
+// key shared whatever else its session plans, so the readers of one resource
+// in several sessions run together.
 //
 // # What a hold covers
 //
 // Inside one session a key is reference-counted: every task of the session
-// that needs it references one flock, held in one mode. A shared need joins
-// the session's hold in either mode, and an exclusive need joins an exclusive
-// hold, so the in-session schedule is what the planner made it. An exclusive
-// need never converts the session's shared hold in place: converting a flock
-// is not atomic, and two sessions converting one at once would each wait for
-// the other. It waits until the session released its last shared reference,
-// then locks the file exclusively; a need that arrives meanwhile waits behind
-// it, so readers cannot starve it. Since a key stays exclusive while a planned
-// writer of it has not finished, that wait is left to the exclusive needs no
-// plan states: a preparation that writes the project tree, which only the run
-// decides, waits for the tasks of its session that read the project under a
-// shared hold.
+// that needs it references one flock, held in the mode of the need that
+// locked it. A shared need joins the session's hold in either mode, so a
+// reader that joins a writer's exclusive hold keeps it exclusive until the
+// session's last holder released it. An exclusive need joins an exclusive
+// hold. An exclusive need never converts the session's shared hold in place:
+// converting a flock is not atomic, and two sessions converting one at once
+// would each wait for the other. It waits until the session released its last
+// shared reference, then locks the file exclusively; a need that arrives
+// meanwhile waits behind it, so readers cannot starve it. That drain is the
+// only wait the locks add to the session's own schedule, and the only way a
+// key changes mode within a session. The planner orders a resource's writer
+// before the readers that derive from it, so the drain is met by a writer the
+// planner lets overlap the session's readers, such as a build's infra step,
+// which follows the build's readers but runs beside the session's test step,
+// and by a preparation that writes the project tree, which only the run
+// decides.
 //
 // Across sessions a shared flock coexists with other shared ones and an
 // exclusive flock with none: the readers of one resource in several sessions
@@ -135,10 +135,11 @@ package jobs
 // and holds no key: the cache lease, a shared-execution leader, a restore. A
 // task may hold its cache lease while it waits for a key, and no key holder
 // ever waits for a lease. Releasing the preparation keys early only shortens
-// a hold. A shared hold excludes fewer holders than an exclusive one, and an
-// exclusive need that waits for its own session's readers waits, like any
-// waiter of that key, for holders that obey the same rules; the needs queued
-// behind it wait for the same key. Under those rules the holder of the
+// a hold. A shared hold excludes fewer holders than an exclusive one. The
+// drain, the one in-session wait, keeps the argument: an exclusive need that
+// waits for its own session's readers waits, like any waiter of that key, for
+// holders that obey the same rules, and the needs queued behind it wait for
+// the same key. Under those rules the holder of the
 // highest contended key always progresses, so the waits form no cycle. A
 // shared flock is granted whenever no exclusive one is held, so a writer
 // whose key other sessions keep reading waits until none does.
@@ -244,12 +245,9 @@ type outputLockKey struct {
 	// preparation is true when no task of the acquisition needs the key after
 	// its preparation: the hold releases it before the subprocess starts.
 	preparation bool
-	// writes is true when a task of the acquisition writes under the key: a
-	// writer key, or a preparation that writes the project tree.
-	writes bool
-	// exclusive is true when the acquisition writes under the key, or a
-	// planned writer of the key in this session has not finished
-	// (seedExclusive); false when the acquisition only reads under it.
+	// exclusive is true when a task of the acquisition writes under the key:
+	// a writer key, or a preparation that writes the project tree. A key the
+	// acquisition only reads under is shared.
 	exclusive bool
 }
 
@@ -263,9 +261,9 @@ type outputLockHolder struct {
 	// Tasks are the session's tasks holding the lock, in acquisition order.
 	Tasks []string `json:"tasks,omitempty"`
 	Lock  string   `json:"lock,omitempty"`
-	// Reading is true when none of Tasks writes under the lock: the session
-	// holds it exclusively only because a planned writer of the key had not
-	// finished when they acquired it. A record without it names writers.
+	// Reading is true when none of Tasks writes under the lock: the task
+	// that locked it exclusively released, and readers of the session that
+	// joined its hold still hold it. A record without it names writers.
 	Reading bool `json:"reading,omitempty"`
 }
 
@@ -281,12 +279,6 @@ type taskOutputLocks struct {
 	inherited map[string]bool
 	// notify receives the one wait line of a contended acquisition.
 	notify func(message string)
-	// pendingWriters maps the id of a writer key of the session's plan to the
-	// planned tasks that write under it and have not finished (seedExclusive,
-	// finished). The mutex guards it.
-	pendingWriters map[string]map[string]bool
-	// writerKeys maps a planned task to the ids of its writer keys.
-	writerKeys map[string][]string
 	// onOwnSessionWait observes a task that waits for its own session's shared
 	// hold to drain, or queues behind such a task. Tests install it; production
 	// leaves it nil.
@@ -360,9 +352,6 @@ func newTaskOutputLocks(root string, holder outputLockHolder, inherited string, 
 		inherited: make(map[string]bool),
 		notify:    notify,
 		held:      make(map[string]*outputLockEntry),
-
-		pendingWriters: make(map[string]map[string]bool),
-		writerKeys:     make(map[string][]string),
 	}
 	for _, id := range strings.Split(inherited, ",") {
 		if id = strings.TrimSpace(id); id != "" {
@@ -465,62 +454,6 @@ func (m *taskOutputLocks) keyID(name string) string {
 	return hex.EncodeToString(sum[:16])
 }
 
-// seedExclusive records the writer keys of every task of the session's plan
-// but its finalizers, which take no lock. Until the last planned writer of a
-// key finished, every need of that key in this session takes it exclusively,
-// a reader's included, so the session's readers share the exclusive hold its
-// writers take instead of a writer waiting for its own session's readers to
-// drain. It is called once, before the first acquisition.
-func (m *taskOutputLocks) seedExclusive(plan []*ScheduledJob) {
-	if m == nil {
-		return
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, job := range plan {
-		if isFinalizerJob(job) {
-			continue
-		}
-		for _, name := range taskOutputLockNames(job) {
-			id := m.keyID(name)
-			if m.pendingWriters[id] == nil {
-				m.pendingWriters[id] = make(map[string]bool)
-			}
-			m.pendingWriters[id][job.Key()] = true
-			m.writerKeys[job.Key()] = append(m.writerKeys[job.Key()], id)
-		}
-	}
-}
-
-// finished records that a planned task reached its terminal state, whatever it
-// is: executed, restored, failed, skipped or canceled. Once the last planned
-// writer of a key finished, the session's later needs of that key take the
-// mode they need, and a reader takes it shared. A hold already taken keeps its
-// mode until its release. A second call changes nothing.
-func (m *taskOutputLocks) finished(job *ScheduledJob) {
-	if m == nil || job == nil {
-		return
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	key := job.Key()
-	for _, id := range m.writerKeys[key] {
-		delete(m.pendingWriters[id], key)
-		if len(m.pendingWriters[id]) == 0 {
-			delete(m.pendingWriters, id)
-		}
-	}
-	delete(m.writerKeys, key)
-}
-
-// writerPending reports whether a planned writer of the key id has not
-// finished.
-func (m *taskOutputLocks) writerPending(id string) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return len(m.pendingWriters[id]) > 0
-}
-
 // outputLockSubject renders a key name as the location the wait line names.
 func outputLockSubject(name string) string {
 	kind, rest, _ := strings.Cut(name, ":")
@@ -540,16 +473,15 @@ func outputLockSubject(name string) string {
 // the reader keys of the resources the jobs read: an execution reads them, a
 // restore does not. A key is a preparation key when every job that needs it
 // needs it for its preparation alone, and exclusive when any job writes under
-// it or a planned writer of it in this session has not finished.
+// it.
 func (m *taskOutputLocks) keysFor(jobs []*ScheduledJob, preparing func(*ScheduledJob) bool, reading bool) []outputLockKey {
 	index := make(map[string]int)
 	var keys []outputLockKey
-	add := func(name string, writes, preparation bool) {
+	add := func(name string, exclusive, preparation bool) {
 		id := m.keyID(name)
 		if i, seen := index[id]; seen {
 			keys[i].preparation = keys[i].preparation && preparation
-			keys[i].writes = keys[i].writes || writes
-			keys[i].exclusive = keys[i].exclusive || writes
+			keys[i].exclusive = keys[i].exclusive || exclusive
 			return
 		}
 		index[id] = len(keys)
@@ -558,8 +490,7 @@ func (m *taskOutputLocks) keysFor(jobs []*ScheduledJob, preparing func(*Schedule
 			name:        name,
 			subject:     outputLockSubject(name),
 			preparation: preparation,
-			writes:      writes,
-			exclusive:   writes || m.writerPending(id),
+			exclusive:   exclusive,
 		})
 	}
 	for _, job := range jobs {
@@ -709,7 +640,7 @@ func (m *taskOutputLocks) acquireOne(ctx context.Context, key outputLockKey, tas
 		if entry.lock != nil && entry.successor == nil {
 			if entry.exclusive || !key.exclusive {
 				entry.tasks = append(entry.tasks, task)
-				entry.writes = append(entry.writes, key.writes)
+				entry.writes = append(entry.writes, key.exclusive)
 				m.recordHolder(entry)
 				m.mu.Unlock()
 				return nil
@@ -753,7 +684,7 @@ func (m *taskOutputLocks) settle(ctx context.Context, entry *outputLockEntry, ta
 	} else {
 		entry.lock = lock
 		entry.tasks = []string{task}
-		entry.writes = []bool{entry.key.writes}
+		entry.writes = []bool{entry.key.exclusive}
 		m.recordHolder(entry)
 	}
 	close(entry.ready)

@@ -674,3 +674,140 @@ func TestScheduler_ReadersInTwoSessionsRunTogether(t *testing.T) {
 		t.Fatalf("the test step ended reading %q, want the .gen it started with", got)
 	}
 }
+
+// TestScheduler_AnInfraStepWaitsForItsSessionsReaders runs the shape of a
+// build plan: an infra step that writes under the project key and follows a
+// build step, beside a test step that still reads .gen. The test step and
+// another session's reader of the project read together; the infra step
+// writes only once both released the project, first its own session's
+// reader, then the other session's.
+func TestScheduler_AnInfraStepWaitsForItsSessionsReaders(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "concurrent-session-read-exclusion",
+		"readers-in-several-sessions-share-their-lock")
+	spectest.Proves(t, "cli/job-planning-execution", "concurrent-session-read-exclusion",
+		"a-reader-and-another-sessions-writer-exclude-each-other")
+	f := newOutputRaceFixture(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	writeFileAt(t, f.genData(), "initial\n")
+
+	fifo := func(name string) string {
+		t.Helper()
+		path := filepath.Join(f.root, name)
+		if err := syscall.Mkfifo(path, 0o600); err != nil {
+			t.Fatalf("mkfifo: %v", err)
+		}
+		return path
+	}
+	releaseFile := func(name string) string {
+		path := filepath.Join(f.root, name)
+		t.Cleanup(func() { _ = os.WriteFile(path, []byte("release"), 0o644) })
+		return path
+	}
+	release := func(path string) {
+		t.Helper()
+		if err := os.WriteFile(path, []byte("release"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	script := func(name, body string) string {
+		t.Helper()
+		path := filepath.Join(f.root, name)
+		writeExecutable(t, path, "#!/bin/sh\n"+body)
+		return path
+	}
+	heldStarted, heldRelease := fifo("held.fifo"), releaseFile("held-release")
+	otherStarted, otherRelease := fifo("other-read.fifo"), releaseFile("other-release")
+	testReading := filepath.Join(f.root, "test-reading")
+	testDone := filepath.Join(f.root, "test-done")
+	otherDone := filepath.Join(f.root, "other-done")
+	infraSaw := filepath.Join(f.root, "infra-saw")
+	requirements := filepath.Join(f.root, "proj", ".gen", "requirements.json")
+
+	// The other session stamps the project, then a step with no project key
+	// keeps its reader back until the first session's test step reads.
+	stamp := f.resourceJob("lint~stamp", f.noopScript(t), nil, nil)
+	held := f.resourceJob("lint~hold", script("hold.sh",
+		"printf 'started\\n' > "+shellQuote(heldStarted)+"\n"+releaseWaitScript(heldRelease, os.Getpid())), nil, nil)
+	held.DependsOn = []string{stamp.Key()}
+	otherRead := f.resourceJob("package~docker", script("other-read.sh",
+		"printf 'started\\n' > "+shellQuote(otherStarted)+"\n"+releaseWaitScript(otherRelease, os.Getpid())+
+			"touch "+shellQuote(otherDone)+"\n"), nil, genReads())
+	otherRead.DependsOn = []string{held.Key()}
+	otherWaits := make(chan string, 1)
+	otherScheduler := f.plan("20260925-192013-000001", nil, stamp, held, otherRead)
+	otherScheduler.onOutputLockWait = func(message string) { otherWaits <- message }
+	other := runAsync(ctx, otherScheduler)
+	awaitStarted(t, heldStarted, other, "the other session's holding step")
+
+	// The build session: its test step reads and blocks, its build step reads
+	// and ends, and its infra step follows the build step only.
+	buildStamp := f.resourceJob("build~stamp", f.noopScript(t), nil, nil)
+	testRun := f.resourceJob("test~run", script("test-run.sh",
+		"touch "+shellQuote(testReading)+"\n"+
+			"printf 'started\\n' > "+shellQuote(f.started)+"\n"+releaseWaitScript(f.release, os.Getpid())+
+			"touch "+shellQuote(testDone)+"\n"), nil, genReads())
+	testRun.DependsOn = []string{buildStamp.Key()}
+	// The build step ends only once the test step reads, so the infra step
+	// always meets the test step's hold.
+	compile := f.resourceJob("build~compile", script("compile.sh", releaseWaitScript(testReading, os.Getpid())), nil, genReads())
+	compile.DependsOn = []string{buildStamp.Key()}
+	infra := f.resourceJob("build~infra", script("infra.sh",
+		"seen=''\n"+
+			"[ -f "+shellQuote(testDone)+" ] && seen=\"$seen test\"\n"+
+			"[ -f "+shellQuote(otherDone)+" ] && seen=\"$seen other\"\n"+
+			"printf '%s\\n' \"$seen\" > "+shellQuote(infraSaw)+"\n"+
+			"printf '{}\\n' > "+shellQuote(requirements)+"\n"),
+		map[string]extension.DeclaredOutput{
+			"requirements": fileDeclaration(extension.OutputRootProject, ".gen/requirements.json", true),
+		}, nil)
+	infra.DependsOn = []string{compile.Key()}
+	building := f.plan(outputRaceSessionA, nil, buildStamp, testRun, compile, infra)
+	building.cfg.MaxParallel = 2
+	ownWaits := make(chan string, 4)
+	building.outputLocks.onOwnSessionWait = func(task string) { ownWaits <- task }
+	buildWaits := make(chan string, 1)
+	building.onOutputLockWait = func(message string) { buildWaits <- message }
+	first := runAsync(ctx, building)
+	f.awaitFirstStarted(t, first)
+	if task := waitMessage(t, ownWaits, "the infra step never waited for its session's test step"); task != infra.Key() {
+		t.Fatalf("task waiting for its own session = %s, want the infra step", task)
+	}
+
+	// The other session's reader reads beside the test step.
+	release(heldRelease)
+	read := make(chan error, 1)
+	go func() {
+		_, err := os.ReadFile(otherStarted)
+		read <- err
+	}()
+	select {
+	case err := <-read:
+		if err != nil {
+			t.Fatalf("read start FIFO: %v", err)
+		}
+	case message := <-otherWaits:
+		t.Fatalf("the other session's reader waited for the build session: %s", message)
+	case result := <-other:
+		t.Fatalf("the other session ended before its reader started: %+v", result.Results)
+	case <-time.After(answerWaitBudget):
+		t.Fatal("the other session's reader never started")
+	}
+
+	// The test step ends; the infra step now waits for the other session's
+	// reader.
+	release(f.release)
+	message := waitMessage(t, buildWaits, "the infra step never waited for the other session's reader")
+	if want := infra.Key() + " waits for another putnami process, which is reading the project-rooted outputs of proj"; message != want {
+		t.Errorf("wait line = %q, want %q", message, want)
+	}
+	release(otherRelease)
+	requireSuccess(t, "other", <-other, otherRead.Key())
+	result := <-first
+	for _, job := range []*ScheduledJob{testRun, compile, infra} {
+		requireSuccess(t, "building", result, job.Key())
+	}
+	if got := readFileAt(t, infraSaw); got != " test other\n" {
+		t.Fatalf("the infra step saw %q finished, want both readers", got)
+	}
+}
