@@ -33,6 +33,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/linetag"
 )
 
 // Code is the diagnostic code of an incompatible API change.
@@ -173,20 +174,22 @@ func Check(workspaceRoot, projectDir, name string, tags []string, options Option
 		return &Report{Warning: fmt.Sprintf("the clone is shallow, so the tags and history of line %s are incomplete "+
 			"and the API is not compared; fetch the full history to run the check", pattern)}, nil
 	}
-	tag, ok, err := lastReachableTag(projectDir, pattern)
+	release, ok, err := linetag.LastRelease(projectDir, pattern)
 	if err != nil {
 		return nil, err
 	}
+	tag := release.Tag
 	if !ok {
 		tagged, err := hasTags(projectDir)
 		if err != nil {
 			return nil, err
 		}
 		if tagged {
-			return &Report{Warning: fmt.Sprintf("no tag of line %s is reachable from HEAD, though the repository has other tags, "+
-				"so the API is not compared; fetch the line's tags if it has released", pattern)}, nil
+			return &Report{Warning: fmt.Sprintf("no release tag of line %s is reachable from HEAD, though the repository has other tags, "+
+				"so the API is not compared; fetch the line's tags if it has released. A tag with a pre-release "+
+				"or any other text in place of MAJOR.MINOR.PATCH is not a release", pattern)}, nil
 		}
-		return &Report{Note: fmt.Sprintf("no tag of line %s is reachable from HEAD: there is no released API to compare with", pattern)}, nil
+		return &Report{Note: fmt.Sprintf("no release tag of line %s is reachable from HEAD: there is no released API to compare with", pattern)}, nil
 	}
 
 	oldFiles, err := filesAtTag(projectDir, tag)

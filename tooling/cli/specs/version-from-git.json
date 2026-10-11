@@ -15,11 +15,15 @@
   "requirements": [
     {
       "id": "tag-sets-the-version",
-      "text": "A commit tagged with its line's pattern has the tag's version; a dirty tree is refused for publish; several tags on HEAD need --scope."
+      "text": "A commit carrying a release tag of its line, the line's pattern with a MAJOR.MINOR.PATCH version, has the tag's version; a dirty tree is refused for publish; several release tags on HEAD need --scope."
     },
     {
       "id": "conventional-advance",
-      "text": "An untagged commit takes the line's last tag advanced by the conventional commits that touch the line, at least a patch, plus the ordered suffix; breaking is a minor before 1.0 and a major after, feat a patch before 1.0 and a minor after, fix and perf a patch; with a support catalog, a commit that touches no project it lists as stable advances a patch at most."
+      "text": "An untagged commit takes the line's last release advanced by the conventional commits that touch the line, at least a patch, plus the ordered suffix; breaking is a minor before 1.0 and a major after, feat a patch before 1.0 and a minor after, fix and perf a patch; with a support catalog, a commit that touches no project it lists as stable advances a patch at most."
+    },
+    {
+      "id": "last-release-is-the-baseline",
+      "text": "The last release of a line is its highest release tag that HEAD reaches. A tag of the line that is not a MAJOR.MINOR.PATCH release, such as a pre-release, is never the last release, and an older release that a merged branch carries never replaces a later one."
     },
     {
       "id": "full-clone-required",

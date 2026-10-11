@@ -14,7 +14,9 @@ import (
 	"strings"
 	"time"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/sdk/extension/linetag"
 )
 
 // LineSpec names one version line to git: where it lives, how its tags are
@@ -76,13 +78,15 @@ func OrderedSuffix(committedAt time.Time, sha, dirtyHash string) string {
 //  1. A shallow clone is refused. Its history and tags are a fraction of the
 //     repository, so every answer below would be a plausible number computed
 //     from an arbitrary cut of the past.
-//  2. HEAD carrying this line's tag IS the version: Base and Full are the
-//     tag's, with no suffix, because that commit is the release. Two of the
-//     line's tags on one commit is ambiguous and refused.
-//  3. Otherwise the version is the last reachable tag of the line advanced by
-//     the conventional commits that touch it since that tag, floored at a
-//     patch. A line with no reachable tag starts at 0.0.0 with no advance: it
-//     has never released, so there is nothing to advance from.
+//  2. HEAD carrying a release tag of this line (linetag.Version) IS the
+//     version: Base and Full are the tag's, with no suffix, because that
+//     commit is the release. Two of the line's release tags on one commit is
+//     ambiguous and refused. A tag of the line that is not a release, such as
+//     a pre-release, does not tag HEAD.
+//  3. Otherwise the version is the last release of the line
+//     (linetag.LastRelease) advanced by the conventional commits that touch
+//     it since that release, floored at a patch. A line with no release
+//     starts at 0.0.0 with no advance: there is nothing to advance from.
 //  4. An untagged commit carries the ordered suffix, which is what makes two
 //     builds of one base version comparable and unique.
 func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
@@ -99,9 +103,9 @@ func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
 	}
 	info.Line = line.ScopePath
 
-	if strings.Count(line.TagPattern, lineTagPlaceholder) != 1 {
+	if strings.Count(line.TagPattern, wsproto.LineTagPlaceholder) != 1 {
 		return nil, fmt.Errorf("line %q has tag pattern %q, which carries no %s placeholder",
-			line.ScopePath, line.TagPattern, lineTagPlaceholder)
+			line.ScopePath, line.TagPattern, wsproto.LineTagPlaceholder)
 	}
 
 	atHead, err := TagsAtHead(repoRoot)
@@ -110,7 +114,7 @@ func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
 	}
 	var lineTags []string
 	for _, tag := range atHead {
-		if version, ok := versionFromLineTag(tag, line.TagPattern); ok && version != "" {
+		if _, ok := linetag.Version(tag, line.TagPattern); ok {
 			lineTags = append(lineTags, tag)
 		}
 	}
@@ -119,7 +123,7 @@ func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
 			len(lineTags), line.ScopePath, strings.Join(lineTags, ", "))
 	}
 	if len(lineTags) == 1 {
-		version, _ := versionFromLineTag(lineTags[0], line.TagPattern)
+		version, _ := linetag.Version(lineTags[0], line.TagPattern)
 		info.Tagged = true
 		info.Tag = lineTags[0]
 		info.Base = version
@@ -127,7 +131,7 @@ func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
 		return info, nil
 	}
 
-	lastTag, lastCommit, found, err := LastReachableTag(repoRoot, line.TagPattern)
+	last, found, err := linetag.LastRelease(repoRoot, line.TagPattern)
 	if err != nil {
 		return nil, err
 	}
@@ -136,39 +140,18 @@ func GetVersionInfo(repoRoot string, line LineSpec) (*VersionInfo, error) {
 		info.Full = info.Base + "-" + info.Suffix
 		return info, nil
 	}
-	lastVersion, _ := versionFromLineTag(lastTag, line.TagPattern)
-	commits, err := CommitsSince(repoRoot, lastCommit, line.Pathspecs)
+	commits, err := CommitsSince(repoRoot, last.Commit, line.Pathspecs)
 	if err != nil {
 		return nil, err
 	}
-	major, _, _ := parseSemverCore(lastVersion)
+	major, _, _ := parseSemverCore(last.Version)
 	bump, err := BumpFor(commits, major == 0, LineStableTest(repoRoot, line))
 	if err != nil {
 		return nil, err
 	}
-	info.Base = NextVersion(lastVersion, bump, true)
+	info.Base = NextVersion(last.Version, bump, true)
 	info.Full = info.Base + "-" + info.Suffix
 	return info, nil
-}
-
-// lineTagPlaceholder mirrors workspace.LineTagPlaceholder. It is restated here
-// rather than imported because this package is the git boundary and must not
-// depend on the workspace protocol; the drift is guarded by a test that renders
-// a pattern through the protocol and reads it back through this file.
-const lineTagPlaceholder = "{version}"
-
-// versionFromLineTag reads the version a tag carries under one line pattern.
-// ok is false when the tag does not belong to the line, which is the ordinary
-// case for every other line's tags on the same commit.
-func versionFromLineTag(tag, pattern string) (string, bool) {
-	prefix, suffix, found := strings.Cut(pattern, lineTagPlaceholder)
-	if !found || len(tag) <= len(prefix)+len(suffix) {
-		return "", false
-	}
-	if !strings.HasPrefix(tag, prefix) || !strings.HasSuffix(tag, suffix) {
-		return "", false
-	}
-	return tag[len(prefix) : len(tag)-len(suffix)], true
 }
 
 // commitTime returns the committer time of revision. The committer time, not

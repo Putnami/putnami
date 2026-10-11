@@ -50,9 +50,13 @@ catalog reads no tag, so the check runs there with any context.
 
 ## What it compares
 
-1. The baseline is the last tag of the project's version line that HEAD can
-   reach: the line of the nearest ancestor scope that declares one, else the root
-   line `v{version}`. A line with no reachable tag has no released API, so the
+1. The baseline is the last release of the project's version line: the line of
+   the nearest ancestor scope that declares one, else the root line
+   `v{version}`. The last release is the line's highest release tag that HEAD
+   reaches. A release tag carries a `MAJOR.MINOR.PATCH` version: a tag such as
+   `go/vnext` or `go/v1.0.0-rc.1` is never the baseline, and an older release
+   that a merged branch carries never replaces a later one. The version bump
+   reads the same release. A line with no such tag has no released API, so the
    check passes and says so.
 2. The API is read from source with `go/parser`, from the files at that tag and
    from the working tree, uncommitted edits included. Nothing is compiled or
@@ -277,8 +281,8 @@ on the main branch share the verdict when they hold one tree and their
 messages declare the same break: put the marker in the pull request title. A
 squash title that adds or drops the breaking marker (`!` or a
 `BREAKING CHANGE:` footer) moves the key, and the verdict moves with it. A new
-tag, a moved tag, a commit that adds or drops a marker, or a shallow clone
-changes the key. A skip for a project the catalog does not list as stable is
+last release, a moved release tag, a commit that adds or drops a marker, or a
+shallow clone changes the key. A skip for a project the catalog does not list as stable is
 cached as well. The input needs a CLI that implements CLI contract 7; an older
 CLI refuses this extension. See CLI
 [ADR 0062](../../../tooling/cli/doc/adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md).
@@ -289,8 +293,8 @@ CLI refuses this extension. See CLI
   warning diagnostic coded `api-compat-not-compared`, when:
   - the workspace is not in a git repository, for example a copied snapshot;
   - the clone is shallow, so it lacks the tags and history the check needs;
-  - no tag of the line is reachable from HEAD while the repository has tags of
-    other lines, which suggests the line's tags were not fetched.
+  - no release tag of the line is reachable from HEAD while the repository has
+    other tags, which suggests the line's tags were not fetched.
 
   A clone with no tags at all, such as one fetched with `--no-tags`, reads as a
   line with no release: it passes with an information line, not a warning.

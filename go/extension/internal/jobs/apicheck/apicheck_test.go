@@ -615,7 +615,7 @@ func TestALineWithoutATagHasNothingToCompare(t *testing.T) {
 	if found := diagnostics(events, runtime.SeverityError); len(found) != 0 {
 		t.Fatalf("error diagnostics = %+v, want none", found)
 	}
-	if report := f.check(); !strings.Contains(report.Note, "no tag of line lib/v{version} is reachable") || report.Warning != "" {
+	if report := f.check(); !strings.Contains(report.Note, "no release tag of line lib/v{version} is reachable from HEAD") || report.Warning != "" {
 		t.Fatalf("report = %+v", report)
 	}
 
@@ -627,24 +627,60 @@ func TestALineWithoutATagHasNothingToCompare(t *testing.T) {
 	}
 	warnings := diagnostics(events, runtime.SeverityWarning)
 	if len(warnings) != 1 || warnings[0].Code != NotComparedCode ||
-		!strings.Contains(warnings[0].Message, "no tag of line lib/v{version} is reachable from HEAD, though the repository has other tags") {
+		!strings.Contains(warnings[0].Message, "no release tag of line lib/v{version} is reachable from HEAD, though the repository has other tags") {
 		t.Fatalf("warnings = %+v", warnings)
 	}
 }
 
-// The nearest tag the line's glob matches is the baseline candidate, as it is
-// for the version bump: when the line's pattern could not render it, the line
-// has no baseline, even with an older renderable tag behind it.
-func TestATagTheLineCouldNotRenderIsNoBaseline(t *testing.T) {
+// A tag that is not a release of the line is never the baseline, however near
+// HEAD it sits.
+func TestATagThatIsNotAReleaseIsNoBaseline(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, catalog("package", "stable"))
 	f.commit("chore: a later commit")
-	f.git("tag", "lib/v")
-	f.write("lib/greet/greet.go", waveOnlySource)
-	// The repository still has tags, lib/v0.4.0 among them, so the missing
-	// baseline is a warning.
-	if report := f.check(); report.Warning == "" || report.Tag != "" {
-		t.Fatalf("report = %+v, want no baseline", report)
+	f.git("tag", "lib/vnext-experiment")
+	f.git("tag", "lib/v0.5.0-rc.1")
+	f.commit("chore: one more commit")
+	if report := f.check(); report.Tag != firstTag || report.Warning != "" {
+		t.Fatalf("report = %+v, want the baseline %s", report, firstTag)
+	}
+}
+
+// An older release a merged branch carries does not replace a later release:
+// the baseline is the highest release tag HEAD reaches. The branch holds two
+// commits before its tag, so `git describe` finds that tag nearest.
+func TestAnOlderReleaseOfAMergedBranchIsNoBaseline(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t, catalog("package", "stable"))
+	f.commit("feat: more")
+	f.git("tag", "lib/v0.5.0")
+	f.commit("fix: repair")
+	f.commit("docs: explain")
+	f.git("checkout", "-q", "-b", "hotfix", firstTag)
+	f.commit("fix: hotfix")
+	f.commit("test: cover the hotfix")
+	f.git("tag", "lib/v0.4.1")
+	f.git("checkout", "-q", "main")
+	f.git("merge", "-q", "--no-ff", "-m", "merge the hotfix", "hotfix")
+	if report := f.check(); report.Tag != "lib/v0.5.0" {
+		t.Fatalf("report = %+v, want the baseline lib/v0.5.0", report)
+	}
+}
+
+// A branch that merged main reaches the release main tagged after the branch
+// started, through the merge's second parent: that release is the baseline.
+func TestAReleaseReachedThroughAMergeOfMainIsTheBaseline(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t, catalog("package", "stable"))
+	f.git("checkout", "-q", "-b", "feature")
+	f.commit("feat: start")
+	f.git("checkout", "-q", "main")
+	f.commit("feat: ship")
+	f.git("tag", "lib/v0.5.0")
+	f.git("checkout", "-q", "feature")
+	f.git("merge", "-q", "--no-ff", "-m", "merge main", "main")
+	if report := f.check(); report.Tag != "lib/v0.5.0" {
+		t.Fatalf("report = %+v, want the baseline lib/v0.5.0", report)
 	}
 }
 
@@ -813,14 +849,5 @@ func TestLinePatternFollowsTheNearestLineScope(t *testing.T) {
 	f.write("lib/putnami.json", `{"includes":["greet"]}`)
 	if got := linePattern(f.root, f.project); got != "v{version}" {
 		t.Fatalf("linePattern = %q, want the root line", got)
-	}
-}
-
-func TestAnUnusableTagPatternIsAnError(t *testing.T) {
-	t.Parallel()
-	for _, pattern := range []string{"v*", "lib/v{version}/{version}", "-v{version}", "no-placeholder"} {
-		if _, _, err := lastReachableTag(t.TempDir(), pattern); err == nil {
-			t.Errorf("lastReachableTag(%q) succeeded, want an error", pattern)
-		}
 	}
 }

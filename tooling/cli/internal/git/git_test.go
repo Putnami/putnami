@@ -435,7 +435,7 @@ func TestGetVersionInfo_UntaggedLineStartsAtZero(t *testing.T) {
 		t.Fatalf("GetVersionInfo: %v", err)
 	}
 	if info.Base != "0.0.0" {
-		t.Errorf("Base = %q, want 0.0.0: a line with no reachable tag has never released", info.Base)
+		t.Errorf("Base = %q, want 0.0.0: a line with no release has never released", info.Base)
 	}
 	if info.Tagged || info.Tag != "" {
 		t.Errorf("Tagged/Tag = %v/%q, want an untagged commit", info.Tagged, info.Tag)
@@ -485,6 +485,25 @@ func TestGetVersionInfo_AnotherLinesTagDoesNotTagThisLine(t *testing.T) {
 	}
 	if info.Tagged {
 		t.Fatalf("Tagged = true for tag %q, want the go line's tag ignored", info.Tag)
+	}
+}
+
+// A tag of the line that is not a release does not tag HEAD: the version is
+// computed from the last release, as on any other commit.
+func TestGetVersionInfo_ATagThatIsNotAReleaseDoesNotTagHEAD(t *testing.T) {
+	t.Parallel()
+	dir := initGitRepo(t)
+	gitDo(t, dir, "tag", "-a", "ts/v0.4.0", "-m", "release")
+	writeCommit(t, dir, "typescript/a.ts", "fix(ts): repair")
+	gitDo(t, dir, "tag", "ts/vnext-experiment")
+	gitDo(t, dir, "tag", "ts/v0.4.1-rc.1")
+
+	info, err := GetVersionInfo(dir, LineSpec{ScopePath: "typescript", TagPattern: "ts/v{version}", Pathspecs: []string{"typescript"}})
+	if err != nil {
+		t.Fatalf("GetVersionInfo: %v", err)
+	}
+	if info.Tagged || info.Base != "0.4.1" {
+		t.Fatalf("Tagged/Tag/Base = %v/%q/%q, want an untagged 0.4.1", info.Tagged, info.Tag, info.Base)
 	}
 }
 

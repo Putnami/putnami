@@ -448,7 +448,7 @@ There is no flag and no configuration field that sets it:
 | Commit | Version output |
 |------|---------------|
 | untagged | `0.1.0-20260902173000-a1b2c3d` — the line's next version plus the ordered suffix |
-| tagged with the line's tag | `0.1.0` — the tag's version, exactly |
+| tagged with a release tag of the line | `0.1.0` — the tag's version, exactly |
 | dirty tree | the untagged shape plus the diff hash; refused for a tagged publish |
 
 `<next>` is the line's last tag advanced by the conventional commits that touch

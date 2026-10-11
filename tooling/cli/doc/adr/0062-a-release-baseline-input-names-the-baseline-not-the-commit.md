@@ -28,11 +28,11 @@ one verdict still gave two outputs.
    baseline from git (`git.ReadReleaseBaseline`) and adds it to the key's
    runtime identity. The baseline has these fields:
    - the repository state: no work tree, no commit, a shallow clone, no
-     reachable tag of the line, or tagged;
+     release of the line, or tagged;
    - the line's tag pattern;
    - for an untagged line, whether the repository has a tag of another line;
-   - the line's last tag HEAD reaches, and the tree that tag holds at the
-     project directory;
+   - the tag of the line's last release (`linetag.LastRelease` of the
+     extension SDK), and the tree that tag holds at the project directory;
    - whether a commit since that tag that touches the project declares a
      breaking change, read by the version bump's own parser
      (`ParseConventionalCommit` of the CLI protocol).

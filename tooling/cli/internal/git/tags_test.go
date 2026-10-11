@@ -5,14 +5,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-
-	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 func TestIsShallowOnAFullClone(t *testing.T) {
@@ -40,144 +37,6 @@ func TestTagsAtHead(t *testing.T) {
 	}
 	if len(tags) != 2 {
 		t.Fatalf("TagsAtHead = %v, want both tags", tags)
-	}
-}
-
-// An untagged line is an ordinary state, not an error: it has never released.
-func TestLastReachableTag(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-	if _, _, ok, err := LastReachableTag(dir, "ts/v{version}"); err != nil || ok {
-		t.Fatalf("LastReachableTag on an untagged line = %v/%v, want not found and no error", ok, err)
-	}
-	gitDo(t, dir, "tag", "-a", "ts/v0.1.0", "-m", "a")
-	writeCommit(t, dir, "typescript/a.ts", "feat(ts): add")
-
-	tag, commit, ok, err := LastReachableTag(dir, "ts/v{version}")
-	if err != nil || !ok {
-		t.Fatalf("LastReachableTag = %v/%v", ok, err)
-	}
-	if tag != "ts/v0.1.0" || len(commit) != 40 {
-		t.Fatalf("tag/commit = %q/%q, want the tag and its full commit id", tag, commit)
-	}
-	// The other line's prefix must not match this one's tag.
-	if _, _, ok, err := LastReachableTag(dir, "go/v{version}"); err != nil || ok {
-		t.Fatalf("LastReachableTag(go) = %v/%v, want not found", ok, err)
-	}
-}
-
-func TestLastReachableTagMatchesTheCompletePattern(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-	gitDo(t, dir, "tag", "-a", "release-v0.4.0-stable", "-m", "release")
-	writeCommit(t, dir, "typescript/a.ts", "feat(ts): add")
-	// This tag is nearer and shares the literal prefix, but the line pattern
-	// cannot render it because it lacks the required suffix.
-	gitDo(t, dir, "tag", "-a", "release-v9.9.9-nightly", "-m", "other convention")
-	writeCommit(t, dir, "typescript/b.ts", "fix(ts): repair")
-
-	tag, _, ok, err := LastReachableTag(dir, "release-v{version}-stable")
-	if err != nil || !ok || tag != "release-v0.4.0-stable" {
-		t.Fatalf("LastReachableTag with suffix = %q/%v/%v, want release-v0.4.0-stable", tag, ok, err)
-	}
-}
-
-// A line whose only tags sit on another branch has never released from HEAD:
-// git describe fails there, and that failure is the untagged line.
-func TestLastReachableTagIgnoresATagHEADCannotReach(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-	gitDo(t, dir, "checkout", "-b", "release")
-	writeCommit(t, dir, "typescript/a.ts", "feat(ts): add")
-	gitDo(t, dir, "tag", "-a", "ts/v0.1.0", "-m", "a")
-	gitDo(t, dir, "checkout", "main")
-
-	if _, _, ok, err := LastReachableTag(dir, "ts/v{version}"); err != nil || ok {
-		t.Fatalf("LastReachableTag with the tag on another branch = %v/%v, want not found and no error", ok, err)
-	}
-}
-
-// A history git cannot read makes git describe print the untagged line's own
-// message. It is still a failure, and it must say so: read as untagged, the
-// line would silently version at 0.0.0.
-func TestLastReachableTagReportsAHistoryGitCannotRead(t *testing.T) {
-	t.Parallel()
-	dir := initGitRepo(t)
-	gitDo(t, dir, "tag", "-a", "ts/v0.1.0", "-m", "a")
-	writeCommit(t, dir, "typescript/a.ts", "feat(ts): add")
-	writeCommit(t, dir, "typescript/b.ts", "fix(ts): repair")
-	missing := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD~1"))
-	if err := os.Remove(filepath.Join(dir, ".git", "objects", missing[:2], missing[2:])); err != nil {
-		t.Fatal(err)
-	}
-
-	_, _, ok, err := LastReachableTag(dir, "ts/v{version}")
-	if err == nil || ok {
-		t.Fatalf("LastReachableTag on a history with a missing commit = %v/%v, want an error", ok, err)
-	}
-	if !strings.Contains(err.Error(), missing) {
-		t.Fatalf("error %q does not name the unreadable commit %s", err, missing)
-	}
-}
-
-// A describe that fails on a line HEAD has tagged, or a tag listing that fails
-// behind it, is named in the error rather than read as the untagged line. The
-// failures are injected by a git on PATH that refuses the named subcommands.
-// Not parallel: it replaces PATH.
-func TestLastReachableTagNamesAFailureOnATaggedLine(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		// The error naming is platform-independent and proven on Unix; the
-		// injecting git is a #! script, which Windows cannot run from PATH.
-		t.Skip("the injecting git is a POSIX shell script")
-	}
-	dir := initGitRepo(t)
-	gitDo(t, dir, "tag", "-a", "ts/v0.1.0", "-m", "a")
-	writeCommit(t, dir, "typescript/a.ts", "feat(ts): add")
-	realGit, err := exec.LookPath("git")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for name, tc := range map[string]struct {
-		refused []string
-		want    []string
-	}{
-		"describe fails":         {refused: []string{"describe"}, want: []string{"injected describe failure", "HEAD reaches ts/v0.1.0"}},
-		"tag listing fails also": {refused: []string{"describe", "tag"}, want: []string{"injected describe failure", "injected tag failure"}},
-	} {
-		t.Run(name, func(t *testing.T) {
-			bin := t.TempDir()
-			var script strings.Builder
-			script.WriteString("#!/bin/sh\n")
-			for _, sub := range tc.refused {
-				script.WriteString("[ \"$1\" = " + sub + " ] && { echo 'fatal: injected " + sub + " failure' >&2; exit 128; }\n")
-			}
-			script.WriteString("exec '" + realGit + "' \"$@\"\n")
-			if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script.String()), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-
-			_, _, ok, err := LastReachableTag(dir, "ts/v{version}")
-			if err == nil || ok {
-				t.Fatalf("LastReachableTag = %v/%v, want an error", ok, err)
-			}
-			for _, want := range tc.want {
-				if !strings.Contains(err.Error(), want) {
-					t.Fatalf("error %q does not name %q", err, want)
-				}
-			}
-		})
-	}
-}
-
-// Set to debug git, GIT_TRACE writes to stderr; an untagged line must still
-// read as untagged rather than as a failure. Not parallel: it sets GIT_TRACE.
-func TestLastReachableTagUnderGitTrace(t *testing.T) {
-	dir := initGitRepo(t)
-	t.Setenv("GIT_TRACE", "1")
-	if _, _, ok, err := LastReachableTag(dir, "ts/v{version}"); err != nil || ok {
-		t.Fatalf("LastReachableTag on an untagged line under GIT_TRACE = %v/%v, want not found and no error", ok, err)
 	}
 }
 
@@ -286,20 +145,6 @@ func TestTreeStateReadsACommitDatedAtTheEpoch(t *testing.T) {
 	}
 	if !strings.HasPrefix(state.Suffix, "19700101000000-") {
 		t.Fatalf("suffix = %q, want the epoch's time", state.Suffix)
-	}
-}
-
-// The line tag placeholder is restated in this package rather than imported.
-// This is the guard that keeps the two spellings equal.
-func TestLineTagPlaceholderMatchesTheWorkspaceProtocol(t *testing.T) {
-	t.Parallel()
-	if lineTagPlaceholder != wsproto.LineTagPlaceholder {
-		t.Fatalf("placeholder = %q, want the workspace protocol's %q", lineTagPlaceholder, wsproto.LineTagPlaceholder)
-	}
-	pattern := wsproto.LineTagPattern("typescript", &wsproto.LineConfig{Tag: "ts/v{version}"})
-	version, ok := versionFromLineTag(wsproto.RenderLineTag(pattern, "1.2.3"), pattern)
-	if !ok || version != "1.2.3" {
-		t.Fatalf("versionFromLineTag = %q/%v, want the rendered version back", version, ok)
 	}
 }
 

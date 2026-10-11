@@ -116,11 +116,12 @@ release, such as the Go `validate-api` check, declares the `releaseBaseline`
 runtime input. Before the task runs, the CLI reads the project's baseline from
 git and adds it to the key:
 
-- the repository state: no work tree, no commit, a shallow clone, no reachable
-  tag of the line, or tagged;
+- the repository state: no work tree, no commit, a shallow clone, no release
+  of the line, or tagged;
 - the line's tag pattern, and for an untagged line whether the repository has
   a tag of another line;
-- the line's last tag HEAD reaches, and the tree that tag holds at the project
+- the tag of the line's last release, which is its highest release tag that
+  HEAD reaches, and the tree that tag holds at the project
   directory;
 - whether a commit since that tag that touches the project declares a breaking
   change.

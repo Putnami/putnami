@@ -14,6 +14,7 @@ import (
 	"time"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/linetag"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -217,22 +218,23 @@ func requireSourceRevisionAtHead(wsRoot string) error {
 // releases a version the commits did not ask for.
 func proposedTag(wsRoot string, spec git.LineSpec, explicit string) (version, tagName string, err error) {
 	if explicit != "" {
-		parsed, ok := versionFromPattern(explicit, spec.TagPattern)
+		parsed, ok := linetag.Version(explicit, spec.TagPattern)
 		if !ok {
 			return "", "", cmderr.InvalidConfigf(
-				"tag %q does not match the pattern %q of line %s", explicit, spec.TagPattern, printableLine(spec.ScopePath))
+				"tag %q is not a release tag of line %s: the pattern %q with a MAJOR.MINOR.PATCH version",
+				explicit, printableLine(spec.ScopePath), spec.TagPattern)
 		}
 		return parsed, explicit, nil
 	}
-	lastTag, lastCommit, found, err := lastLineTag(wsRoot, spec)
+	release, found, err := lastRelease(wsRoot, spec)
 	if err != nil {
 		return "", "", err
 	}
 	last := "0.0.0"
 	bump := git.BumpNone
 	if found {
-		last, _ = versionFromPattern(lastTag, spec.TagPattern)
-		commits, commitsErr := git.CommitsSince(wsRoot, lastCommit, spec.Pathspecs)
+		last = release.Version
+		commits, commitsErr := git.CommitsSince(wsRoot, release.Commit, spec.Pathspecs)
 		if commitsErr != nil {
 			return "", "", commitsErr
 		}
@@ -248,26 +250,21 @@ func proposedTag(wsRoot string, spec git.LineSpec, explicit string) (version, ta
 // lineCommits are the commits the changelog renders: everything since the
 // line's last tag that touches it, or its whole history when it has none.
 func lineCommits(wsRoot string, spec git.LineSpec) ([]git.Commit, error) {
-	_, lastCommit, found, err := lastLineTag(wsRoot, spec)
+	release, _, err := lastRelease(wsRoot, spec)
 	if err != nil {
 		return nil, err
 	}
-	if !found {
-		lastCommit = ""
-	}
-	return git.CommitsSince(wsRoot, lastCommit, spec.Pathspecs)
+	return git.CommitsSince(wsRoot, release.Commit, spec.Pathspecs)
 }
 
-// lastLineTag is the line's last reachable tag, matched against the complete
-// pattern so a similarly-prefixed tag from another convention cannot become
-// the version baseline.
-func lastLineTag(wsRoot string, spec git.LineSpec) (tag, commit string, ok bool, err error) {
+// lastRelease is the line's last release (linetag.LastRelease).
+func lastRelease(wsRoot string, spec git.LineSpec) (linetag.Release, bool, error) {
 	if strings.Count(spec.TagPattern, wsproto.LineTagPlaceholder) != 1 {
-		return "", "", false, cmderr.InvalidConfigf(
+		return linetag.Release{}, false, cmderr.InvalidConfigf(
 			"line %s has tag pattern %q, which carries no %s placeholder",
 			printableLine(spec.ScopePath), spec.TagPattern, wsproto.LineTagPlaceholder)
 	}
-	return git.LastReachableTag(wsRoot, spec.TagPattern)
+	return linetag.LastRelease(wsRoot, spec.TagPattern)
 }
 
 // lineSpecs are the workspace's version lines, in sorted scope-path order, each
@@ -354,18 +351,6 @@ func changelogRelPath(scopePath string) string {
 		return "CHANGELOG.md"
 	}
 	return scopePath + "/CHANGELOG.md"
-}
-
-// versionFromPattern reads the version a tag carries under a line pattern.
-func versionFromPattern(tag, pattern string) (string, bool) {
-	prefix, suffix, found := strings.Cut(pattern, wsproto.LineTagPlaceholder)
-	if !found || len(tag) <= len(prefix)+len(suffix) {
-		return "", false
-	}
-	if !strings.HasPrefix(tag, prefix) || !strings.HasSuffix(tag, suffix) {
-		return "", false
-	}
-	return tag[len(prefix) : len(tag)-len(suffix)], true
 }
 
 // majorOf reads the major number of a version, or 0 when it has none.

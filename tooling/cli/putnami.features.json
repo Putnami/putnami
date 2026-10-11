@@ -1745,6 +1745,21 @@
           }
         },
         {
+          "id": "last-release-is-the-baseline",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-tag-that-is-not-a-release-is-no-baseline",
+              "an-older-release-of-a-merged-branch-is-no-baseline",
+              "a-release-reached-through-a-merge-of-main-is-the-baseline"
+            ]
+          }
+        },
+        {
           "id": "full-clone-required",
           "stage": "coded",
           "evidenceKinds": [

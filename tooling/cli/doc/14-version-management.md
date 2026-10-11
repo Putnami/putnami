@@ -19,14 +19,14 @@ For each line, in order:
 
 | Situation | Version |
 |---|---|
-| HEAD carries the line's tag | the tag's version, exactly |
+| HEAD carries a release tag of the line | the tag's version, exactly |
 | HEAD carries the tags of several lines | `--scope <line>` names the one being released; without it a publish is refused |
 | any other commit | `<next>-<yyyymmddHHMMSS>-<sha>`, an ordered pre-release |
 | a dirty tree | the same, with the diff hash appended |
 | a shallow clone, or a checkout with no tags | refused for `version` and `publish`: `git fetch --unshallow --tags` |
 | a full clone with no tag on the line | `0.0.0`, with no bump |
 
-`<next>` starts from the line's last reachable tag and advances by the **conventional commits** that touch a project of the line, attributed by the files each commit changed:
+`<next>` starts from the line's last release: its highest release tag that `HEAD` reaches. A release tag is the line's pattern with a `MAJOR.MINOR.PATCH` version, so a tag such as `ts/vnext` or `ts/v1.0.0-rc.1` is never the last release, and an older release that a merged branch carries never replaces a later one. Such a tag on `HEAD` does not tag the commit either, and `version tag` refuses it as an explicit name. `<next>` advances from that release by the **conventional commits** that touch a project of the line, attributed by the files each commit changed:
 
 | Commit | Stable, before 1.0 | Stable, from 1.0 | Only preview or experimental |
 |---|---|---|---|
@@ -45,9 +45,9 @@ The dependencies are today's: a commit from before a dependency was added is rea
 
 A breaking change outside the stable projects still needs its migration in the release notes.
 
-The marker is checked, not trusted. For a stable Go project, `putnami validate` compares the exported API with the line's last tag, and fails an incompatible change that no commit since the tag declares breaking. A project that ships a CLI holds its commands and flags to the same rule through a committed command-surface document: this CLI renders `command-surface.json` from its command catalog, so a removed command, flag, short alias or accepted value without a `!` fails `validate`. See [the Go extension's validate command](../../../go/extension/doc/validate.md).
+The marker is checked, not trusted. For a stable Go project, `putnami validate` compares the exported API with the line's last release, and fails an incompatible change that no commit since that release declares breaking. A project that ships a CLI holds its commands and flags to the same rule through a committed command-surface document: this CLI renders `command-surface.json` from its command catalog, so a removed command, flag, short alias or accepted value without a `!` fails `validate`. See [the Go extension's validate command](../../../go/extension/doc/validate.md).
 
-A pre-release is always at least a patch above the last tag, so a docs-only commit still produces a new, ordered version. Versions of one line are totally ordered by their timestamp segment, which is what lets a registry answer "the newest build of this channel" without any Putnami-specific metadata.
+A pre-release is always at least a patch above the last release, so a docs-only commit still produces a new, ordered version. Versions of one line are totally ordered by their timestamp segment, which is what lets a registry answer "the newest build of this channel" without any Putnami-specific metadata.
 
 ```bash
 putnami version get                   # one line per version line: "<line> <version>"
@@ -67,7 +67,7 @@ Pushing the tag is what triggers the cohort publication: a publish on a tagged c
 
 ### Seeding a line
 
-Until a line has a reachable tag, every commit on it computes `0.0.0-<suffix>`, and `version tag` proposes `0.0.1`. To start a line at another version, tag the commit by hand once, then push that tag by name. `git push --tags` would also push every other tag of the local clone.
+Until a line has a release tag that `HEAD` reaches, every commit on it computes `0.0.0-<suffix>`, and `version tag` proposes `0.0.1`. To start a line at another version, tag the commit by hand once, then push that tag by name. `git push --tags` would also push every other tag of the local clone.
 
 ```bash
 git tag -a ts/v0.2.0 -m 'ts 0.2.0' <commit>
