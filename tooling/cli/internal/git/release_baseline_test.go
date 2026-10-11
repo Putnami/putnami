@@ -122,7 +122,7 @@ func TestReadReleaseBaselineIsTheSameForABranchAndItsSquash(t *testing.T) {
 
 	gitDo(t, root, "checkout", "-q", "main")
 	gitDo(t, root, "merge", "-q", "--squash", "feature")
-	gitDo(t, root, "commit", "-q", "-m", "feat(api)!: drop the old call (#12)")
+	gitDo(t, root, "commit", "-q", "-m", "feat(api)!: drop the old call")
 	squash := baselineOf(t, api, apiPattern)
 	squashHead := strings.TrimSpace(runGit(t, root, "rev-parse", "HEAD"))
 

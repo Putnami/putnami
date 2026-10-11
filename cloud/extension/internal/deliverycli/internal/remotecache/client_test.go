@@ -21,7 +21,7 @@ var (
 func sampleInputs() []KeyInput {
 	return []KeyInput{
 		{Key: keyBuild, Extension: "@putnami/typescript", Task: "build~transpile", Project: "web", DurationMs: 60_000, SizeBytes: 5_000_000},
-		{Key: keyCheap, Task: "build~transpile", Project: "web", DurationMs: 50, SizeBytes: 1000},        // below floor
+		{Key: keyCheap, Task: "build~transpile", Project: "web", DurationMs: 50, SizeBytes: 1000},        // cheap: shared all the same
 		{Key: keyPublish, Task: "publish~npm", Project: "web", DurationMs: 60_000, SizeBytes: 5_000_000}, // side-effecting
 	}
 }
@@ -36,11 +36,11 @@ func TestBuildRequest_FiltersAndNormalizes(t *testing.T) {
 	if req.Mode != cache.ModeMinimal {
 		t.Errorf("Mode = %q, want %q", req.Mode, cache.ModeMinimal)
 	}
-	if len(req.Keys) != 1 {
-		t.Fatalf("expected 1 eligible key (cheap + publish filtered), got %d: %+v", len(req.Keys), req.Keys)
+	if len(req.Keys) != 2 {
+		t.Fatalf("expected 2 eligible keys (publish filtered, cheap kept), got %d: %+v", len(req.Keys), req.Keys)
 	}
-	if req.Keys[0].Key != keyBuild {
-		t.Errorf("eligible key = %q, want %q", req.Keys[0].Key, keyBuild)
+	if req.Keys[0].Key != keyBuild || req.Keys[1].Key != keyCheap {
+		t.Errorf("eligible keys = %q, %q; want %q, %q", req.Keys[0].Key, req.Keys[1].Key, keyBuild, keyCheap)
 	}
 }
 

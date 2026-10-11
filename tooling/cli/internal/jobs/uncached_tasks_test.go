@@ -21,14 +21,14 @@ var uncachedByVerdict = map[string]string{
 	"cloud/extension/putnami.extension.json:cloud-package-site-content":  "its bundle embeds the HEAD commit",
 }
 
-// uncachedUntilFixed names the tasks that break the rule today, each with the
-// issue that removes it from this list. An entry is a debt, not an exemption:
-// the test fails when its task is fixed or deleted and the entry remains.
+// uncachedUntilFixed names the tasks that break the rule today, each with what
+// fixes it. An entry is a debt, not an exemption: the test fails when its task
+// is fixed or deleted and the entry remains.
 var uncachedUntilFixed = map[string]string{
-	"cloud/extension/putnami.extension.json:cloud-image-layers-check":    "https://github.com/Putnami/putnami/issues/145",
-	"cloud/extension/putnami.extension.json:cloud-validate-site-content": "https://github.com/Putnami/putnami/issues/145",
-	"cloud/extension/putnami.extension.json:cloud-help":                  "https://github.com/Putnami/putnami/issues/145",
-	"cloud/extension/putnami.extension.json:cloud":                       "https://github.com/Putnami/putnami/issues/145",
+	"cloud/extension/putnami.extension.json:cloud-image-layers-check":    "a pure read of the produced layers: key it on them",
+	"cloud/extension/putnami.extension.json:cloud-validate-site-content": "a pure read of the section trees: key it on them",
+	"cloud/extension/putnami.extension.json:cloud-help":                  "the cloud command group shadows its command: delete it",
+	"cloud/extension/putnami.extension.json:cloud":                       "no command runs it: delete it",
 }
 
 // interactiveTasks returns the tasks of a manifest that run only as
@@ -148,7 +148,7 @@ func TestUncachedTaskExemptionsRestOnStructuredFacts(t *testing.T) {
 }
 
 // Every task of this repository's extension manifests is cached unless its run
-// has an effect a cache entry cannot replay (#82): a declared effect, the
+// has an effect a cache entry cannot replay: a declared effect, the
 // terminal of an interactive subcommand, or a result about the commit or the
 // invocation itself. A task that turns its cache off for any other reason
 // re-executes on every lane and every run, whatever its inputs.
@@ -226,9 +226,9 @@ func TestEveryUncachedTaskHasAnEffectACacheEntryCannotReplay(t *testing.T) {
 			t.Errorf("uncachedByVerdict lists %s, which is no uncached task of this repository: remove the entry", key)
 		}
 	}
-	for key, issue := range uncachedUntilFixed {
+	for key := range uncachedUntilFixed {
 		if !listed[key] {
-			t.Errorf("uncachedUntilFixed lists %s, which no longer breaks the rule: remove the entry and close %s", key, issue)
+			t.Errorf("uncachedUntilFixed lists %s, which no longer breaks the rule: remove the entry", key)
 		}
 	}
 }
