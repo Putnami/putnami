@@ -13,6 +13,7 @@ import (
 
 	cache "go.putnami.dev/protocol/cache"
 	proto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/sdk/extension/dirlink"
 )
 
 // The one atomic materialize primitive for task-owned entries.
@@ -458,7 +459,116 @@ func mergeIn(staging, dest string, keep []string) error {
 			return err
 		}
 	}
-	return pruneAround(dest, staging, keep, replaced)
+	if err := pruneAround(dest, staging, keep, replaced); err != nil {
+		return fmt.Errorf("publish output directory: %w", err)
+	}
+	return nil
+}
+
+// renameStale is os.Rename for the renames that move a stale entry out of a
+// directory (pruneAround). It is a variable only so a test can fail them the
+// way a rename out of a mounted directory does.
+var renameStale = os.Rename
+
+// EmptyTaskOutput removes everything a task owns under dest, a declared
+// directory output, so that the execution about to write it starts from an
+// empty directory. It is the pruning half of a restore (mergeIn) with nothing
+// staged to put back: after it, dest holds what a restore of an entry with no
+// file for this output would leave there.
+//
+// keep lists, output-relative and in slash form, the subpaths the task does not
+// own, as MaterializeTaskOutput takes them. Whatever dest holds at each of them
+// is never renamed, copied or read, and a directory on the way to one keeps
+// its inode.
+//
+// dest itself stays, with its mode: a task that expects its output directory
+// to exist finds it, and a reader that holds it open keeps a valid handle. An
+// absent dest is left absent. A file or a symlink at dest holds nothing the
+// task owns as a directory, so the entry itself is removed, without following
+// a link: a link's target is never read or written.
+//
+// Each owned entry leaves dest in one rename, so a reader finds it whole or
+// gone, and is reclaimed afterward from a private directory. That directory is
+// created in stagingRoot under the conditions MaterializeTaskOutput states,
+// beside dest when a rename from dest cannot reach stagingRoot, and inside
+// dest, under a hidden unique `.tmp-empty-*` name, when dest is a mount of its
+// own that no outside directory shares. On Windows a rename that fails because
+// another process holds a handle inside the entry is waited out (holderWait).
+//
+// An error means dest may still hold owned entries. The caller must not let
+// the task run, or capture dest, after one.
+func EmptyTaskOutput(dest, stagingRoot string, keep ...string) error {
+	info, err := os.Lstat(dest)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("empty output directory: %w", err)
+	}
+	if !info.IsDir() || dirlink.IsLink(dest, info) {
+		if err := os.Remove(dest); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("empty output directory: %w", err)
+		}
+		return nil
+	}
+
+	parent := filepath.Dir(dest)
+	candidates := []string{stagingDirFor(dest, stagingRoot)}
+	if candidates[0] != parent {
+		candidates = append(candidates, parent)
+	}
+	candidates = append(candidates, dest)
+	for _, dir := range candidates {
+		err = emptyInto(dest, dir, keep)
+		if !crossDevice(err) {
+			break
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("empty output directory: %w", err)
+	}
+	return nil
+}
+
+// emptyInto moves every entry of dest that keep does not cover into a new
+// private directory of dir, then reclaims that directory. dir may be dest
+// itself: the private directory is then the one entry the prune keeps besides
+// the caller's.
+func emptyInto(dest, dir string, keep []string) error {
+	pattern := "." + filepath.Base(dest) + ".tmp-empty-"
+	if dir == dest {
+		pattern = ".tmp-empty-"
+	}
+	trash, err := os.MkdirTemp(dir, pattern)
+	if err != nil {
+		return err
+	}
+	// The trash holds only entries the task owns, never a kept path, so
+	// reclaiming it is always safe. A failure to reclaim it is not a failure
+	// to empty dest: outside dest the scratch reaper or the next run finds it,
+	// and inside dest it is reported below.
+	defer func() { _ = os.RemoveAll(trash) }()
+
+	kept := keep
+	if dir == dest {
+		kept = append(append([]string(nil), keep...), filepath.Base(trash))
+	}
+	var wait holderWait
+	for {
+		err := pruneAround(dest, trash, kept, nil)
+		if err == nil {
+			break
+		}
+		if !wait.retry(err) {
+			return err
+		}
+	}
+	if dir != dest {
+		return nil
+	}
+	// Inside dest the trash is itself an entry of the output, so the directory
+	// is empty only once it is gone.
+	return os.RemoveAll(trash)
 }
 
 // refuseCededBytes fails with errKeptConflict, before dest is touched, when the
@@ -505,7 +615,7 @@ func refuseCededBytes(staging string, keep []string) error {
 func pruneAround(dir, trash string, keep []string, replaced []string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("publish output directory: %w", err)
+		return err
 	}
 	for _, e := range entries {
 		name := e.Name()
@@ -520,8 +630,8 @@ func pruneAround(dir, trash string, keep []string, replaced []string) error {
 			}
 			continue
 		}
-		if err := os.Rename(p, filepath.Join(trash, "stale-"+randomSuffix())); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("publish output directory: remove stale %s: %w", p, err)
+		if err := renameStale(p, filepath.Join(trash, "stale-"+randomSuffix())); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("remove stale %s: %w", p, err)
 		}
 	}
 	return nil

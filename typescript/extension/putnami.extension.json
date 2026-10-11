@@ -2173,7 +2173,7 @@
             "kind": "file",
             "path": "schema/config.json",
             "optionalEmpty": true,
-            "description": "Committed config manifest. Absent when the workload registers no config blocks, or when options.generate.schema=false routes the manifest to the .gen/config-schema.json fallback — that fallback lives inside the .gen subtree build-generate owns, so it is captured there and is deliberately not claimed here."
+            "description": "Committed config manifest. Absent when the workload registers no config blocks, or when options.generate.schema=false routes the manifest to the .gen/config-schema.json fallback — that fallback lives inside the .gen subtree build-generate owns and is deliberately not claimed here: an executing build-generate starts from an empty .gen and removes it, and the next run of this task writes it again."
           },
           "jsonSchema": {
             "kind": "file",

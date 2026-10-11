@@ -40,16 +40,24 @@
 // OUTSIDE the declaration; that needs the process-level isolation this
 // workspace cannot take yet, and it is not this file's promise.
 //
-// KNOWN RESIDUE, deliberately not fixed here: a declared DIRECTORY output is
-// captured as it stands after the run, so a stale file an earlier session left
-// INSIDE it (a binary for a platform no longer targeted, a generated file the
-// generator no longer emits) is captured too. Clearing declared outputs before
-// the run would fix it and is tempting — the declaration owns the path, after
-// all — but .gen is written by more tasks than its owner in practice (the
-// config-extract schema fallback lands there under a different command), so a
-// pre-run wipe would delete files nothing restores. An earlier decision
-// inventoried it and left it standing: clearing a declared output is a change to what the
-// DECLARED path produces, not a deletion of superseded machinery.
+// # An executing task starts from an empty owned directory
+//
+// A declared DIRECTORY output is captured as it stands after the run. So that
+// it holds only what that run wrote, the scheduler empties what the task owns
+// in it before the task executes (emptyOwnedOutputs, ADR 0064): every entry
+// but the subpaths the declaration cedes or preserves (outputSkippedSubpaths)
+// and the scheduler's own build stamp. That is the set a restore replaces, so
+// an execution and a restore leave the same paths untouched. A file another
+// task wrote inside the owned region, such as the config-extract schema
+// fallback under .gen, is removed with the rest, exactly as a restore of the
+// owner's entry removes it: a path that must outlive its neighbor's execution
+// has to be ceded by the owner and declared by its writer.
+//
+// Three outputs are not emptied (emptiedOutputDeclarations): a file, which the
+// task replaces whole; an invocation-scoped output, which lives in a private
+// tree created for the run; and a pathFrom output, whose path is known only
+// after the task ran. A file a generator stops emitting therefore stays in a
+// pathFrom directory until the generator removes it.
 //
 // # Which tasks take this path
 //
@@ -173,6 +181,144 @@ func declaresCommandOutput(job *ScheduledJob) bool {
 	}
 	return false
 }
+
+// emptiedOutputDeclaration is one declared output the scheduler empties before
+// its task executes, with its path in canonical form.
+type emptiedOutputDeclaration struct {
+	id     string
+	rel    string
+	output extension.DeclaredOutput
+}
+
+// emptiedOutputDeclarations returns, in id order, the declared outputs of job
+// that the scheduler empties before the job executes: every durable directory
+// output whose path the declaration states.
+//
+// A pathFrom output is left out because its path is known only after the run,
+// and an invocation-scoped one because it lives in a tree created for the run.
+// An output whose path does not normalize is left out too: manifest validation
+// reports it, and no capture is taken from a path nobody can name. A literal
+// path never names its root (extension.NormalizeOutputPath), so the project
+// root, the workspace root and a command-output directory are never emptied.
+//
+// It reads the plan node's declaration alone, because the cache key names the
+// same set (emptiedOutputIDs): what an entry may hold and the address it is
+// stored at are decided by one predicate.
+func emptiedOutputDeclarations(job *ScheduledJob) []emptiedOutputDeclaration {
+	declaration := taskDeclarationOf(job)
+	if declaration == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(declaration.Outputs))
+	for id := range declaration.Outputs {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	var emptied []emptiedOutputDeclaration
+	for _, id := range ids {
+		output := declaration.Outputs[id]
+		if output.Kind != extension.OutputKindDirectory || output.PathFrom != "" || output.IsInvocationScoped() {
+			continue
+		}
+		switch output.EffectiveRoot() {
+		case extension.OutputRootProject, extension.OutputRootWorkspace, extension.OutputRootCommandOutput:
+		default:
+			continue
+		}
+		rel, err := extension.NormalizeOutputPath(output.Path)
+		if err != nil {
+			continue
+		}
+		emptied = append(emptied, emptiedOutputDeclaration{id: id, rel: rel, output: output})
+	}
+	return emptied
+}
+
+// emptiedOutputIDs returns the ids of the outputs the scheduler empties before
+// job executes, which is the value the cache key carries for them
+// (store.CacheKey.EmptiedOutputs). It is a variable only so a test can key a
+// job the way an engine that emptied nothing did.
+var emptiedOutputIDs = func(job *ScheduledJob) []string {
+	emptied := emptiedOutputDeclarations(job)
+	if len(emptied) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(emptied))
+	for _, output := range emptied {
+		ids = append(ids, output.id)
+	}
+	return ids
+}
+
+// versionStampWithin returns the path of the scheduler's build stamp relative
+// to a directory output at rel under root, and whether that output holds it.
+// The stamp lives under the project root only. The containment folds case, as
+// every ownership comparison does.
+func versionStampWithin(root, rel string) (string, bool) {
+	if root != extension.OutputRootProject {
+		return "", false
+	}
+	if len(versionStampRelPath) <= len(rel)+1 || versionStampRelPath[len(rel)] != '/' ||
+		!strings.EqualFold(versionStampRelPath[:len(rel)], rel) {
+		return "", false
+	}
+	return versionStampRelPath[len(rel)+1:], true
+}
+
+// emptyOwnedOutputs empties what job owns in each of its declared directory
+// outputs (emptiedOutputDeclarations), so the execution that follows writes
+// into a directory holding nothing of an earlier run.
+//
+// What it leaves in place is what a restore of the same output leaves in place
+// (cededSubpathsOf): the subpaths the declaration cedes to another task or
+// preserves for the workspace. It also leaves the build stamp, which is the
+// scheduler's file and not the task's: refreshVersionFile writes it once per
+// project and session, and a second task of the session that owns the
+// directory holding it must still find it there.
+//
+// The caller holds the task-output locks that cover every emptied path: the
+// command-output key always, and the project or workspace key because an
+// emptied output is durable (task_output_lock.go). A command-output directory
+// must already be detached from a previous session's link
+// (ensureCommandOutputWritable), so no rename here reaches a store blob.
+//
+// An error leaves an output that may still hold an earlier run's files. The
+// caller fails the task instead of executing it: a capture of that directory
+// would publish those files under this run's key.
+func (s *Scheduler) emptyOwnedOutputs(job *ScheduledJob) error {
+	emptied := emptiedOutputDeclarations(job)
+	if len(emptied) == 0 {
+		return nil
+	}
+	roots := s.outputRoots()
+	if roots.root == "" {
+		// Without a workspace root an output path would resolve against the
+		// working directory, which is nobody's declared output.
+		return fmt.Errorf("no workspace root to resolve declared outputs against")
+	}
+	stagingRoot := store.ResolveScratchRoot(roots.root)
+	for _, declared := range emptied {
+		root := declared.output.EffectiveRoot()
+		base, ok := roots.outputRoot(job, root)
+		if !ok {
+			return fmt.Errorf("declared output %q has unknown root %q", declared.id, root)
+		}
+		keep := outputSkippedSubpaths(declared.rel, declared.output)
+		if stamp, held := versionStampWithin(root, declared.rel); held {
+			keep = append(append([]string(nil), keep...), stamp)
+		}
+		dest := filepath.Join(base, filepath.FromSlash(declared.rel))
+		if err := emptyTaskOutput(dest, stagingRoot, keep...); err != nil {
+			return fmt.Errorf("declared output %q: %w", declared.id, err)
+		}
+	}
+	return nil
+}
+
+// emptyTaskOutput is store.EmptyTaskOutput. It is a variable only so a test can
+// make the emptying fail.
+var emptyTaskOutput = store.EmptyTaskOutput
 
 // declaredOutputPlan is one declared output resolved for the run being
 // captured: what the entry must record, and where its bytes actually live.

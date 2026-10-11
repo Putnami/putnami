@@ -1443,6 +1443,13 @@ channel.
 
 Hook timeouts default to 120 seconds.
 
+An executing task starts from an empty owned directory (see
+[10-caching.md](10-caching.md#task-owned-entries-declared-outputs)). A file the
+hook writes inside a task's declared directory output is gone once that task
+executes later in the session. Write hook files outside every declared directory
+output, or under a subpath the owning task cedes (`excludes`) or preserves
+(`preserves`).
+
 #### Hook invocation order
 
 Several extensions can declare `preBuild` for one project, and they share that

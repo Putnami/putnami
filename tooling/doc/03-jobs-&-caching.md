@@ -290,7 +290,7 @@ If any file matched by the input declaration changes, the hash changes and the c
 
 **Flags:**
 
-- `--no-cache` — Skip cache reads but still write results
+- `--no-cache` — Skip cache reads and writes for this run. A successful run does not replace the entry stored at its key
 - `putnami cache clean` — Delete all cached data
 
 ## Watch mode
