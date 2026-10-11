@@ -608,7 +608,7 @@ nothing to merge writes no merged config file, a workload that authors
 and a library's `bin/` is empty because its build evidence is a compile check.
 
 `build-generate` does NOT own every subpath of `.gen`. It declares the subtree
-with eleven paths excluded. Seven of them exist because it runs FIRST and its
+with twelve paths excluded. Seven of them exist because it runs FIRST and its
 snapshot predates everything `build-describe` writes there — so a run serving
 both tasks from cache used to restore a `.gen` missing all of it; five of those
 `build-describe` declares, at the documented contract path rather than a
@@ -618,7 +618,8 @@ declares it as its one required output (see
 [Package](package.md#deployment-channel)). `.gen/requirements.json` and
 `.gen/infra/runtime.json` are ceded for the same reason: the `build` command's
 `infra` step writes them after generate's snapshot and declares them, the
-manifest as a required output. The last, `.gen/conf/`, is ceded for
+manifest as a required output. `.gen/layers/` is ceded to `cloud-image-layers`
+of `@putnami/cloud`, which declares it. The last, `.gen/conf/`, is ceded for
 the opposite ordering: `config-merge` runs BEFORE generate, so generate's snapshot adopted
 whatever merged file was on disk at capture and its restore deleted the file
 whenever the snapshot lacked it, while a `config-merge` cache hit reproduced
@@ -634,6 +635,7 @@ nothing because the task declared no output:
 | `.gen/deployment.json` | `package-deployment` | the publication of the workload's release-set member of kind `deployment` |
 | `.gen/requirements.json` | `build-infra` | deployers and `putnami infra` read the workload's aggregated manifest |
 | `.gen/infra/runtime.json` | `build-infra` | none: it shows operators the runtime defaults. Ceded so that a `build-infra` cache hit restores it after `build-generate` deleted it |
+| `.gen/layers/` | `cloud-image-layers` of `@putnami/cloud` | the Cloud image-layer check and the image packaging step read the produced layers |
 | `.gen/conf/` | `config-merge-test-exec` (`.gen/conf/.env.test.yaml`) and `config-merge-exec` (`.gen/conf/.env.<APP_ENV or local>.yaml`, via the `mergedConfig` port) | `test-exec`'s database binding fallback reads `.gen/conf/.env.test.yaml`; every dependent's `config-merge` reads its dependencies' merged file. The `.manifest.json` sidecar beside them is claimed by nobody: it carries a `generatedAt` timestamp and no consumer reads it |
 | `.gen/.describe.lock` | nobody | none: a run-scoped `lockedfile` mutex |
 | `.gen/config-deps.json` | nobody | none: a fragment the same describe run folds into `schema/config.json` |

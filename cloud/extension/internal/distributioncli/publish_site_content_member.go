@@ -74,6 +74,12 @@ func resolveSiteContentProject(params map[string]any, args []string, workspaceRo
 	if err != nil {
 		return siteContentProject{}, false, err
 	}
+	return siteContentProjectNamed(workspaceRoot, app)
+}
+
+// siteContentProjectNamed locates the project named app and reports whether it
+// declares site-content publication.
+func siteContentProjectNamed(workspaceRoot, app string) (siteContentProject, bool, error) {
 	projectPath, err := projectRelPath(workspaceRoot, app)
 	if err != nil {
 		return siteContentProject{}, false, err

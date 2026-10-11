@@ -1034,7 +1034,7 @@
       }
     },
     "build-generate": {
-      "description": "Generate code into the project's .gen subtree (and, when the project generates one, the configured TypeScript client directory). Ownership decision: build-generate is the SINGLE producer of <project>/.gen, minus the .gen/deployment.json it cedes to package-deployment and the .gen/requirements.json and .gen/infra/runtime.json it cedes to build-infra, which write them after this task's snapshot — every other task that writes inside it (config-extract-exec's .gen/config-schema.json fallback) writes into generate-owned territory rather than claiming a slice of it. This task deletes the .gen/infra fragments at the start of every run, the runtime defaults file with them, which build-infra writes again after this task. Its v3 `declares` block is deliberately still absent: six commands (build, test, serve, run, package, config-extract) schedule this one task, and the plan-time owner check counts each of those plan nodes as a separate owner of <project>/.gen, so declaring it today makes every multi-command TypeScript plan (`putnami lint,test,build`) unplannable. The declaration lands with the CLI change that treats repeated scheduling of ONE task for ONE project as one owner; until then this task keeps v2 inferred capture via its gen/clients write resources.",
+      "description": "Generate code into the project's .gen subtree (and, when the project generates one, the configured TypeScript client directory). Ownership decision: build-generate is the SINGLE producer of <project>/.gen, minus the .gen/deployment.json it cedes to package-deployment, the .gen/requirements.json and .gen/infra/runtime.json it cedes to build-infra, which write them after this task's snapshot, and the .gen/layers it cedes to cloud-image-layers of @putnami/cloud, which declares it — every other task that writes inside it (config-extract-exec's .gen/config-schema.json fallback) writes into generate-owned territory rather than claiming a slice of it. This task deletes the .gen/infra fragments at the start of every run, the runtime defaults file with them, which build-infra writes again after this task.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1122,9 +1122,10 @@
             "excludes": [
               ".gen/deployment.json",
               ".gen/infra/runtime.json",
+              ".gen/layers",
               ".gen/requirements.json"
             ],
-            "description": "Generated sources: the whole project-rooted .gen subtree, owned exclusively by this task (config-extract's schema fallback inside .gen is this task's output, not a second owner), minus .gen/deployment.json, which it cedes to package-deployment, and .gen/requirements.json and .gen/infra/runtime.json, which it cedes to build-infra: those tasks write the files after this task's snapshot and declare them."
+            "description": "Generated sources: the whole project-rooted .gen subtree, owned exclusively by this task (config-extract's schema fallback inside .gen is this task's output, not a second owner), minus .gen/deployment.json, which it cedes to package-deployment, and .gen/requirements.json and .gen/infra/runtime.json, which it cedes to build-infra: those tasks write the files after this task's snapshot and declare them. .gen/layers is ceded to cloud-image-layers of @putnami/cloud, which declares it."
           },
           "client": {
             "kind": "directory",

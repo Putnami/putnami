@@ -37,27 +37,35 @@ func TestOrdinaryValidateSiteContentPlanHasOnlySourceChecks(t *testing.T) {
 	if !reflect.DeepEqual(step, map[string]any{"id": "cloud-site-content", "if": "params.site-content", "task": "cloud-validate-site-content"}) {
 		t.Fatalf("unrelated projects must not schedule site validation: %v", step)
 	}
+	// TestValidateSiteContentCacheContract pins the task's cache key.
 	task := manifest["tasks"].(map[string]any)["cloud-validate-site-content"].(map[string]any)
-	if task["cache"] != false || task["cwd"] != "{projectRoot}" || !reflect.DeepEqual(task["args"], []any{"validate-site-content"}) {
-		t.Fatalf("source validation must run fresh in the selected project: %v", task)
+	if task["cwd"] != "{projectRoot}" || !reflect.DeepEqual(task["args"], []any{"validate-site-content"}) {
+		t.Fatalf("source validation must run in the selected project: %v", task)
 	}
-	if !reflect.DeepEqual(task["inputs"], map[string]any{"declaration": map[string]any{"from": "project", "files": []any{"putnami.json"}}}) {
-		t.Fatalf("uncached directory checks must not hash payload contents or require generated inputs: %v", task["inputs"])
-	}
-	for _, field := range []string{"writes", "outputs", "declares"} {
+	for _, field := range []string{"writes", "outputs"} {
 		if value, found := task[field]; found {
-			t.Fatalf("source validation must not produce artifacts or effects: %s=%v", field, value)
+			t.Fatalf("source validation must not produce artifacts: %s=%v", field, value)
 		}
+	}
+	if !reflect.DeepEqual(task["declares"], map[string]any{}) {
+		t.Fatalf("source validation must declare no output and no effect: %v", task["declares"])
 	}
 }
 
+// TestRunValidateSiteContentRejectsThenAcceptsCorrectedSources runs the check
+// outside a Git work tree, where no cache key exists and the check walks the
+// disk: an empty section directory is refused there.
 func TestRunValidateSiteContentRejectsThenAcceptsCorrectedSources(t *testing.T) {
 	root := t.TempDir()
+	isolateGit(t)
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(root))
 	project := filepath.Join(root, "docs", "example.test")
 	if err := os.MkdirAll(filepath.Join(project, "guide"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	writeJSONFile(t, filepath.Join(project, "putnami.json"), map[string]any{"name": "docs/example.test", "publish": []string{"site-content"}})
+	// The task runs from {projectRoot}.
+	t.Chdir(project)
 	contextFile := filepath.Join(t.TempDir(), "context.json")
 	writeJSONFile(t, contextFile, map[string]any{"workspaceRoot": root, "params": map[string]any{"app": "docs/example.test", "json": true}})
 	var output []string

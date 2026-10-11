@@ -16,14 +16,14 @@ import (
 	configcli "go.putnami.dev/cloud/extension/internal/configcli"
 )
 
-// These tests pin the cache key of cloud-validate-config-project, the
-// only cached task in this manifest. A cache hit replays the verdict of an
-// earlier run, so the key must name every file the check reads. The framework
-// keys the task from its declared input ports, the project name and this
-// extension's runtime digest, which hashes the extension's go.mod replace
-// closure. Each test below fails when the check starts to read a file its
-// ports do not select. The one exception is .gen/version.json: the CLI writes
-// a canonical stamp for every planned project before it computes any key.
+// These tests pin the cache key of cloud-validate-config-project. A cache hit
+// replays the verdict of an earlier run, so the key must name every file the
+// check reads. The framework keys the task from its declared input ports, the
+// project name and this extension's runtime digest, which hashes the
+// extension's go.mod replace closure. Each test below fails when the check
+// starts to read a file its ports do not select. The one exception is
+// .gen/version.json: the CLI writes a canonical stamp for every planned
+// project before it computes any key.
 
 const validateConfigTaskName = "cloud-validate-config-project"
 
@@ -407,12 +407,14 @@ func copyFixtureFile(t *testing.T, from, to string) {
 	}
 }
 
-// TestOnlyProjectConfigValidationIsCached keeps every other task uncached and
-// requires each pipeline task to state why in its description.
-func TestOnlyProjectConfigValidationIsCached(t *testing.T) {
+// TestOnlyThePureReadChecksAreCached keeps every task but the three checks
+// uncached and requires each uncached pipeline task to state why in its
+// description. Each cached check has a test file that pins its key.
+func TestOnlyThePureReadChecksAreCached(t *testing.T) {
 	tasks := readCloudManifestTasks(t)
+	cached := []string{validateConfigTaskName, validateSiteContentTaskName, imageLayersCheckTaskName}
 	for name, raw := range tasks {
-		if name == validateConfigTaskName {
+		if slices.Contains(cached, name) {
 			continue
 		}
 		var task struct {
@@ -426,8 +428,7 @@ func TestOnlyProjectConfigValidationIsCached(t *testing.T) {
 		}
 	}
 	for _, name := range []string{
-		"cloud-validate-site-content", "cloud-package-config-member", "cloud-package-site-content",
-		"cloud-image-layers-check", "cloud-image-layers", "cloud-shell-test",
+		"cloud-package-config-member", "cloud-package-site-content", imageLayersTaskName, "cloud-shell-test",
 	} {
 		var task struct {
 			Description string `json:"description"`

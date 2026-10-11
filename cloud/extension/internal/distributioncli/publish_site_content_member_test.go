@@ -45,6 +45,20 @@ func writeSiteContentProject(t *testing.T, publish string) string {
 	return ws
 }
 
+// inSiteContentProject moves the test into docs/example.dev, where the
+// validation task runs, and keeps git from finding a work tree there. Outside
+// a work tree the check walks the disk, as packaging does.
+func inSiteContentProject(t *testing.T, root string) {
+	t.Helper()
+	// The test runs with GIT_DIR unset.
+	t.Setenv("GIT_DIR", "") // restores the inherited value at cleanup
+	if err := os.Unsetenv("GIT_DIR"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(root))
+	t.Chdir(filepath.Join(root, "docs", "example.dev"))
+}
+
 func siteContentPlan(coordinate string, channels ...string) *releaseset.Plan {
 	heads := make(map[string]*distributionproto.ChannelHead, len(channels))
 	for _, channel := range channels {
@@ -358,6 +372,7 @@ func TestValidateSiteContentSourcesSharesPackageRejections(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			inSiteContentProject(t, root)
 			for _, check := range []func(map[string]any, []string, string, clicore.IO) error{ValidateSiteContentSources, PackageSiteContent} {
 				err := check(map[string]any{"app": "docs/example.dev"}, nil, root, quietIO(nil))
 				if err == nil || !strings.Contains(err.Error(), test.want) {
@@ -383,6 +398,7 @@ func TestValidateSiteContentSourcesReadsMetadataOnly(t *testing.T) {
 			return nil, nil
 		})},
 	}
+	inSiteContentProject(t, root)
 	if err := ValidateSiteContentSources(map[string]any{"app": "docs/example.dev", "json": true}, nil, root, ioctx); err != nil {
 		t.Fatalf("unreadable payload does not prevent source metadata validation: %v", err)
 	}
@@ -394,6 +410,7 @@ func TestValidateSiteContentSourcesReadsMetadataOnly(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(plain, "docs", "example.dev", "Uppercase"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	inSiteContentProject(t, plain)
 	if err := ValidateSiteContentSources(map[string]any{"app": "docs/example.dev", "json": true}, nil, plain, ioctx); err != nil {
 		t.Fatal(err)
 	}

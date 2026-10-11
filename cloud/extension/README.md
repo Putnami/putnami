@@ -257,22 +257,59 @@ the check only requires a GitHub origin. After you change the origin of a
 checkout, run `putnami validate --no-cache` to check it again.
 
 For projects declaring `publish: ["site-content"]`, ordinary validation also
-runs `validate~cloud-site-content`. It checks section mount slugs, nonempty
-sections, regular files (no symlinks or special files), and payload-relative
-paths with the same source predicates used by packaging. It traverses only
-the selected site's section trees, inspecting directory metadata without
-reading or hashing file contents. This step is uncached because the cache key
-does not cover directory metadata, such as an empty section directory or a
-symlink that replaces a regular file. Additions, removals, renames and
-file-type corrections are checked on the next run even with warm caches. Its
-task identity reads only `putnami.json`; unrelated projects do not launch the
-site checker. The cached Config step still launches for every project with a
-`putnami.json`, then skips those without a Config namespace.
+runs `validate~cloud-site-content`. It checks section mount slugs, regular
+files (no symlinks or special files), and payload-relative paths with the same
+source predicates used by packaging, without reading or hashing file contents.
+Inside a Git work tree it counts the project's Git candidate files, and a
+section is the first directory of a candidate path. Outside a work tree it
+walks the selected site's section trees on disk and refuses an empty section.
+Only a project that declares
+`site-content` launches the site checker. The cached Config step still
+launches for every project with a `putnami.json`, then skips those without a
+Config namespace.
 
-Every other task of this extension is uncached. Tasks that call Putnami Cloud,
-such as login, token, publish, deploy and install, have effects that a cache
-hit cannot reproduce. The remaining pipeline tasks state their reason in the
-task description of [`putnami.extension.json`](putnami.extension.json).
+This step is cached, and a skip is cached too. The step runs again when any
+input it reads changes:
+
+- the project's `putnami.json`
+- the project's Git candidate files: every file under the project directory
+  that Git tracks, or that is untracked and matches no ignore rule. A regular
+  file counts by its bytes and its executable bit, a symbolic link by its
+  target text.
+- the `--app` parameter
+- the workspace's projects: their names, paths, `putnami.json` files and
+  dependencies. The CLI keys them for every task that reads the Git candidate
+  files.
+- the extension's own code, as for the Config step
+
+Inside a Git work tree the step reads the sections through the same candidate
+files, so the key holds everything the step judges:
+
+- A file Git ignores does not exist for the step, as it does not exist in a
+  clone.
+- An empty directory does not exist for the step either: Git lists files, not
+  directories.
+- A symbolic link is a candidate, keyed by its target text. Replacing a page
+  with a link changes the key, and the step refuses the link.
+
+Packaging and publishing read the disk, so they still check a file Git
+ignores and refuse an empty section directory.
+[#163](https://github.com/putnami/putnami/issues/163) tracks making them read
+the same candidate files.
+
+Outside a Git work tree the CLI computes no key for the step, so the step
+runs every time and reads the disk, where it refuses an empty section
+directory. Like the Config step, it checks only the project in its working
+directory and refuses `--app` naming another project.
+
+The Git candidate input needs a CLI that implements CLI contract 7, so the
+extension is stamped at contract 7 and an older CLI refuses it.
+
+Every other task of this extension is uncached, except the image-layer check
+described below. Tasks that call Putnami Cloud, such as login, token, publish,
+deploy and install, have effects that a cache hit cannot reproduce. The
+remaining pipeline tasks state their reason in the task description of
+[`putnami.extension.json`](putnami.extension.json).
 
 These source checks do not assemble even an in-memory bundle. No build,
 package, publish, copy, generation, archive or compression, install or network
@@ -386,6 +423,38 @@ entrypoint, and no language extension provides a `test` job for it. Its task
 is uncached: a shell harness that drives real git and process fixtures has
 inputs wider than any declarable file set, and a stale hit would report a
 green gate for an unexercised entrypoint.
+
+`build~cloud-image-layers` produces the layers. It is uncached, because it
+downloads upstream artifacts, and it declares `.gen/layers` as its output, so
+no other task of a plan may write there. For an image project, `package`
+runs `build` first in the same session, then
+`package~cloud-image-layers-check` verifies the layers. The check is cached.
+It runs again when any file it reads changes:
+
+- the project's `image-layers.json`
+- the produced layers: each `<name>.json` record, `<name>.tar` tarball and
+  file under `.gen/layers/bin/`
+- the workspace files a layer's version derives from: `go.work`,
+  `package.json`, `putnami.lock.json` and
+  `.putnami/bin/extensions/putnami-go/tools/versions.json`
+- the Cloud CLI binary a `cloud-cli` layer copies:
+  `.putnami/out/cloud/extension/build/bin/linux-x64/putnami-cloud`
+- the extension's own code, as for the Config step
+
+The task passes `--project <project directory>` to the check, and that
+argument wins over every parameter that selects a project, so the check
+always reads the project its key hashes. A record names the file it
+describes, and the check refuses a record that names any file other than
+`<name>.tar` for a tarball layer or `bin/<name>` for a single-file layer.
+
+The CLI computes the check's key when the check starts, after `build` wrote
+the layers, unless the session hashed the check's files before it ran any
+task. Three kinds of session do that: a run with a remote cache, a plan where
+a task finalizes another, and a release-set publication. The check then starts
+with the early key. That key holds the layers and the Cloud CLI binary as they
+were before this session's `build` rewrote them, while the result stored under
+it describes the layers this session produced.
+[#162](https://github.com/putnami/putnami/issues/162) tracks this defect.
 
 Pass the Docker or config artifact flag explicitly when you invoke `publish`
 directly. Cloud config publication consumes the optional typed task input named

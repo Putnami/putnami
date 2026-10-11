@@ -21,16 +21,6 @@ var uncachedByVerdict = map[string]string{
 	"cloud/extension/putnami.extension.json:cloud-package-site-content":  "its bundle embeds the HEAD commit",
 }
 
-// uncachedUntilFixed names the tasks that break the rule today, each with what
-// fixes it. An entry is a debt, not an exemption: the test fails when its task
-// is fixed or deleted and the entry remains.
-var uncachedUntilFixed = map[string]string{
-	"cloud/extension/putnami.extension.json:cloud-image-layers-check":    "a pure read of the produced layers: key it on them",
-	"cloud/extension/putnami.extension.json:cloud-validate-site-content": "a pure read of the section trees: key it on them",
-	"cloud/extension/putnami.extension.json:cloud-help":                  "the cloud command group shadows its command: delete it",
-	"cloud/extension/putnami.extension.json:cloud":                       "no command runs it: delete it",
-}
-
 // interactiveTasks returns the tasks of a manifest that run only as
 // interactive subcommands: every command that runs the task is the target of a
 // subcommand marked interactive, and of no other. The CLI gives such a run the
@@ -182,7 +172,7 @@ func TestEveryUncachedTaskHasAnEffectACacheEntryCannotReplay(t *testing.T) {
 
 	var offenders []string
 	uncached := 0
-	listed := make(map[string]bool, len(uncachedByVerdict)+len(uncachedUntilFixed))
+	listed := make(map[string]bool, len(uncachedByVerdict))
 	for _, path := range manifests {
 		manifest, err := extension.LoadManifest(path)
 		if err != nil {
@@ -199,14 +189,8 @@ func TestEveryUncachedTaskHasAnEffectACacheEntryCannotReplay(t *testing.T) {
 			}
 			uncached++
 			key, exempt := uncachedTaskExemption(relative, name, task, interactive[name])
-			if exempt && uncachedUntilFixed[key] != "" {
-				t.Errorf("uncachedUntilFixed lists %s, which now has an effect a cache entry cannot replay: remove the entry", key)
-			}
 			if !exempt {
-				listed[key] = true
-				if uncachedUntilFixed[key] == "" {
-					offenders = append(offenders, key)
-				}
+				offenders = append(offenders, key)
 			} else if uncachedByVerdict[key] != "" {
 				listed[key] = true
 			}
@@ -224,11 +208,6 @@ func TestEveryUncachedTaskHasAnEffectACacheEntryCannotReplay(t *testing.T) {
 	for key := range uncachedByVerdict {
 		if !listed[key] {
 			t.Errorf("uncachedByVerdict lists %s, which is no uncached task of this repository: remove the entry", key)
-		}
-	}
-	for key := range uncachedUntilFixed {
-		if !listed[key] {
-			t.Errorf("uncachedUntilFixed lists %s, which no longer breaks the rule: remove the entry", key)
 		}
 	}
 }

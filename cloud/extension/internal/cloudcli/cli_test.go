@@ -24,6 +24,7 @@ import (
 	"go.putnami.dev/cloud/extension/internal/clicore/hometest"
 	deliverycli "go.putnami.dev/cloud/extension/internal/deliverycli"
 	distributioncli "go.putnami.dev/cloud/extension/internal/distributioncli"
+	extproto "go.putnami.dev/protocol/extension"
 )
 
 const testBaseURL = "https://control.test"
@@ -1504,8 +1505,14 @@ func TestExtensionManifestDeclaresV3RuntimeAndTypedCloudContributions(t *testing
 	if got := manifest["version"]; got != cloudRuntimeVersion {
 		t.Fatalf("manifest version = %v, want %s", got, cloudRuntimeVersion)
 	}
-	if got := manifest["cliContract"]; got != float64(cloudCLIContract) {
-		t.Fatalf("cliContract = %v, want %d", got, cloudCLIContract)
+	// The manifest is stamped at the contract its vocabulary requires, which
+	// a git: file pattern raises above the contract the runtime implements.
+	typed, err := extproto.NegotiateManifest("putnami.extension.json", data)
+	if err != nil {
+		t.Fatalf("the manifest does not load: %v", err)
+	}
+	if got, want := manifest["cliContract"], extproto.RequiredCLIContract(typed); got != float64(want) {
+		t.Fatalf("cliContract = %v, want %d, the contract the manifest's vocabulary requires", got, want)
 	}
 	runtime, ok := manifest["runtime"].(map[string]any)
 	if !ok {

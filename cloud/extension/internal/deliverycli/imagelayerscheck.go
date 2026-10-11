@@ -32,6 +32,11 @@ import (
 // declares the pin, so it runs on any host, in any worktree, in well under a
 // second per layer.
 //
+// The cloud-image-layers-check task is cached on those files, so every file
+// this check reads must be an input of that task: the extension README lists
+// them, and TestImageLayersCheckReadsOnlyKeyedFiles fails on a read the key
+// does not hold.
+//
 // The worker's `dockerBaseProject` graph edge packages this image before the
 // consumer. That makes this check the single freshness gate for both the runner
 // artifact and every workload package that consumes it.
@@ -140,6 +145,10 @@ func imageLayersVerifyLayer(spec imageLayerSpec, workspaceRoot, outDir string) (
 	if artifact == "" {
 		return "", fmt.Sprintf("%s: its record names no produced file", spec.Name)
 	}
+	if produced := imageLayersArtifact(spec); artifact != produced {
+		return "", fmt.Sprintf("%s: its record names the produced file %s, but this layer is produced as %s",
+			spec.Name, artifact, produced)
+	}
 	path := filepath.Join(outDir, filepath.FromSlash(artifact))
 	sum, size, err := imageLayersHashFile(path)
 	if err != nil {
@@ -158,6 +167,16 @@ func imageLayersVerifyLayer(spec imageLayerSpec, workspaceRoot, outDir string) (
 			spec.Name, record.Version, declared)
 	}
 	return declared, ""
+}
+
+// imageLayersArtifact names the file a producer writes for one layer, relative
+// to the output directory: <name>.tar for a tarball producer, bin/<name> for a
+// single file. The check reads no other produced file.
+func imageLayersArtifact(spec imageLayerSpec) string {
+	if imageLayerProducers[spec.Producer].tarball {
+		return spec.Name + ".tar"
+	}
+	return imageLayersBinDir + "/" + spec.Name
 }
 
 // imageLayersDeclaredVersion resolves the IDENTITY a layer WOULD be produced
