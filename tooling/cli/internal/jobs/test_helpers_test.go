@@ -57,7 +57,7 @@ const answerWaitBudget = 60 * time.Second
 //
 // A fork in another parallel test inherits every descriptor open at that
 // moment, until its child calls exec; while that copy of the write descriptor
-// lives, starting the script fails with "text file busy" (golang/go#22315).
+// lives, starting the script fails with "text file busy".
 // Go takes syscall.ForkLock for writing around each fork, so holding it for
 // reading from open to close keeps the descriptor out of every child. Every
 // test that writes a program it starts goes through this helper, which
