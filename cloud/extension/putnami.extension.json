@@ -3010,6 +3010,11 @@
       ],
       "cwd": "{workspaceRoot}",
       "cache": false,
+      "declares": {
+        "effects": [
+          "workspace-files"
+        ]
+      },
       "description": "Replay declared local wiring and caches for a linked workspace, offline and without changing the session. An unlinked workspace is a successful skip; never creates, links, subscribes or activates.",
       "timeoutMs": 120000
     },
