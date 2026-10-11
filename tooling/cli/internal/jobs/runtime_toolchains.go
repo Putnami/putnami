@@ -571,14 +571,32 @@ func newRuntimeToolchainMismatchError(extensionName, ref, version string, reject
 	if detail != "" {
 		detail = ": " + detail
 	}
-	err := &runtimeToolchainMismatchError{message: fmt.Sprintf(
-		"resolve extension %q runtime toolchain %q: no candidate matched locked version %q%s", extensionName, ref, version, detail)}
+	err := &runtimeToolchainMismatchError{}
 	for _, rejection := range rejections {
 		if rejection.err != nil {
 			err.probes = append(err.probes, rejection.err)
 		}
 	}
+	err.message = fmt.Sprintf(
+		"resolve extension %q runtime toolchain %q: no candidate matched locked version %q%s%s",
+		extensionName, ref, version, runtimeToolchainInstallRemedy(err.probes), detail)
 	return err
+}
+
+// runtimeToolchainInstallRemedy names the command that installs the release
+// the lock pins, or "" when that command does not help: a probe that timed out
+// found a toolchain that is there and slow, and a hosted run installs no
+// toolchain.
+func runtimeToolchainInstallRemedy(probes []error) string {
+	if runcredential.Hosted() {
+		return ""
+	}
+	for _, probe := range probes {
+		if errors.Is(probe, ErrToolchainProbeTimeout) {
+			return ""
+		}
+	}
+	return "; run `putnami install` to install it"
 }
 
 func (e *runtimeToolchainMismatchError) Error() string { return e.message }

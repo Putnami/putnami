@@ -956,23 +956,26 @@ build_cli_package() {
     /*) ;;
     *) out="$PWD/$out" ;;
   esac
-  (cd "$SCRIPT_DIR" && "$GO_BINARY" build -o "$out" -ldflags="$CLI_LDFLAGS" "$CLI_SOURCE") >&2
-}
-
-build_cli() {
-  info "Building putnami CLI..."
-
-  # Pin GOROOT to the resolved Go binary. Cloud shells and version managers
-  # may export GOROOT for a different Go installation; inheriting that path can
-  # make a newer toolchain compile against an older standard library cache.
+  # The Go that compiles the CLI is set for the build alone. Exported, GOROOT
+  # and PATH would reach the CLI this script then runs: an install on a run
+  # that builds would find that Go and skip the release the lock pins, and the
+  # next run, which reuses the blob and exports nothing, would find no Go.
+  #
+  # GOROOT is pinned to the resolved Go binary. Cloud shells and version
+  # managers may export GOROOT for a different Go installation; inheriting that
+  # path can make a newer toolchain compile against an older standard library
+  # cache.
   local go_root
   go_root="$(env -u GOROOT "$GO_BINARY" env GOROOT 2>/dev/null || true)"
   if [ -z "$go_root" ]; then
     go_root="$(cd "$(dirname "$GO_BINARY")/.." && pwd)"
   fi
-  export GOROOT="$go_root"
-  export PATH="$go_root/bin:$PATH"
-  export GOTOOLCHAIN=local
+  (cd "$SCRIPT_DIR" && GOROOT="$go_root" PATH="$go_root/bin:$PATH" GOTOOLCHAIN=local \
+    "$GO_BINARY" build -o "$out" -ldflags="$CLI_LDFLAGS" "$CLI_SOURCE") >&2
+}
+
+build_cli() {
+  info "Building putnami CLI..."
 
   if [ "$PRINT_ENGINE" = "false" ]; then
     mkdir -p "$(dirname "$CLI_BINARY")"

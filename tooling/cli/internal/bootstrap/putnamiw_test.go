@@ -556,6 +556,9 @@ echo RAN_BUILT
 echo "SELF=$0"
 echo "FROM_SOURCE=${PUTNAMI_FROM_SOURCE:-<unset>}"
 echo "FROM_SOURCE_KEY=${PUTNAMI_FROM_SOURCE_KEY:-<unset>}"
+echo "GOROOT=${GOROOT:-<unset>}"
+echo "GOTOOLCHAIN=${GOTOOLCHAIN:-<unset>}"
+echo "PATH_HEAD=${PATH%%:*}"
 SENTINEL
          chmod +x "$out"; };;
 esac
@@ -1077,6 +1080,40 @@ func TestPutnamiwSourceKey_ExecsTheBlobAndExportsTheSessionPin(t *testing.T) {
 	}
 	spectest.Proves(t, "cli/engine-provenance", "foreign-engine-refused",
 		"a-keyed-from-source-run-execs-the-immutable-blob-and-exports-its-key")
+}
+
+// The Go that compiles the CLI must not reach the CLI the wrapper then runs.
+// A run that builds and a run that reuses the blob would otherwise resolve
+// different toolchains: an install on the building run finds the build's Go on
+// PATH and in GOROOT, skips the release the lock pins, and the next run finds
+// no Go that matches the lock.
+func TestPutnamiwSourceKey_BuildEnvironmentStaysOutOfTheCLI(t *testing.T) {
+	repo, _, env := gitSourceRepo(t)
+	stubBin := strings.Split(envValue(env, "PATH"), string(os.PathListSeparator))[0]
+	env = append(env, "GOROOT=/caller/goroot", "GOTOOLCHAIN=auto")
+
+	assertCallerEnvironment := func(path, out string) {
+		t.Helper()
+		for key, want := range map[string]string{"GOROOT": "/caller/goroot", "GOTOOLCHAIN": "auto", "PATH_HEAD": stubBin} {
+			if got := sentinelField(t, out, key); got != want {
+				t.Errorf("%s ran the CLI with %s=%q, want the caller's %q", path, key, got, want)
+			}
+		}
+	}
+
+	out, code := runIn(t, repo, env, "ping")
+	if code != 0 {
+		t.Fatalf("cold run failed (%d):\n%s", code, out)
+	}
+	if got := goBuildCount(t, env); got != 1 {
+		t.Fatalf("cold run invoked `go build` %d times, want 1", got)
+	}
+	assertCallerEnvironment("the cold build", out)
+
+	if out, code = runIn(t, repo, env, "ping"); code != 0 {
+		t.Fatalf("warm run failed (%d):\n%s", code, out)
+	}
+	assertCallerEnvironment("the warm fast path", out)
 }
 
 // A concurrent `./putnamiw` at another tree state re-points the shared engine
