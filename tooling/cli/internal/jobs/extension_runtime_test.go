@@ -1799,6 +1799,13 @@ func mustCopyRuntimeFile(t *testing.T, source, target string) {
 
 func mustWriteRuntimeFile(t *testing.T, path, content string, mode os.FileMode) {
 	t.Helper()
+	if mode&0o111 != 0 {
+		writeExecutable(t, path, content)
+		if err := os.Chmod(path, mode); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}

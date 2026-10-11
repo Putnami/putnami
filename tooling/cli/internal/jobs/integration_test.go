@@ -190,9 +190,7 @@ func makeResultEmittingWorkspace(t *testing.T) (*workspace.Workspace, []*extensi
 		"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"success\",\"data\":{\"testSummary\":{\"total\":4,\"passed\":4,\"failed\":0},\"coverageSummary\":{\"pct\":87.5}," +
 		"\"testCasesDropped\":2,\"testCases\":[{\"name\":\"TestA\",\"suite\":\"s\",\"status\":\"passed\",\"durationMs\":3},{\"name\":\"TestB\",\"suite\":\"s\",\"status\":\"passed\"}]}}}'\n"
 	scriptPath := filepath.Join(wsRoot, "emit-test-result.sh")
-	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-		t.Fatalf("write emit script: %v", err)
-	}
+	writeExecutable(t, scriptPath, script)
 
 	langs := []struct{ name, ext, path string }{
 		{"go-lib", "@test/go", "packages/go-lib"},

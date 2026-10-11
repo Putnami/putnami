@@ -21,9 +21,7 @@ import (
 func writeCapabilityCommand(t *testing.T, root, name, script string) string {
 	t.Helper()
 	path := filepath.Join(root, name)
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
-		t.Fatalf("write capability probe %s: %v", name, err)
-	}
+	writeExecutable(t, path, script)
 	return path
 }
 

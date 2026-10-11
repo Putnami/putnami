@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -52,12 +53,124 @@ const unboundedJobTimeoutMs = -1
 // gates to scheduling delay alone, so it sits far above any host load.
 const answerWaitBudget = 60 * time.Second
 
+// writeExecutable writes a fixture program a test then starts directly.
+//
+// A fork in another parallel test inherits every descriptor open at that
+// moment, until its child calls exec; while that copy of the write descriptor
+// lives, starting the script fails with "text file busy" (golang/go#22315).
+// Go takes syscall.ForkLock for writing around each fork, so holding it for
+// reading from open to close keeps the descriptor out of every child. Every
+// test that writes a program it starts goes through this helper, which
+// TestExecutableFixturesAreWrittenUnderTheForkLock enforces.
 func writeExecutable(t *testing.T, path, contents string) {
 	t.Helper()
-	writeTestFile(t, path, contents)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	syscall.ForkLock.RLock()
+	err := os.WriteFile(path, []byte(contents), 0o755) //nolint:gosec // an executable test fixture
+	syscall.ForkLock.RUnlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Chmod(path, 0o755); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// TestExecutableFixturesAreWrittenUnderTheForkLock keeps every executable
+// fixture on writeExecutable: an os.WriteFile or os.OpenFile with an
+// executable mode elsewhere reopens the "text file busy" race that helper
+// closes. A mode the guard cannot read is refused too, except in a helper
+// listed here that sends every executable mode to writeExecutable itself.
+func TestExecutableFixturesAreWrittenUnderTheForkLock(t *testing.T) {
+	t.Parallel()
+
+	routesExecutablesToTheHelper := map[string]bool{
+		"mustWriteRuntimeFile": true,
+	}
+
+	files, err := filepath.Glob("*_test.go")
+	if err != nil || len(files) == 0 {
+		t.Fatalf("glob package test files: %v (%d files)", err, len(files))
+	}
+	fset := token.NewFileSet()
+	helperTakesTheLock := false
+	routesToTheHelper := map[string]bool{}
+	for _, file := range files {
+		parsed, err := parser.ParseFile(fset, file, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", file, err)
+		}
+		for _, decl := range parsed.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
+			}
+			if fn.Name.Name == "writeExecutable" {
+				ast.Inspect(fn.Body, func(node ast.Node) bool {
+					if call, ok := node.(*ast.CallExpr); ok && isSelector(call.Fun, "syscall", "ForkLock", "RLock") {
+						helperTakesTheLock = true
+					}
+					return true
+				})
+				continue
+			}
+			ast.Inspect(fn.Body, func(node ast.Node) bool {
+				call, ok := node.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				if ident, ok := call.Fun.(*ast.Ident); ok && ident.Name == "writeExecutable" && routesExecutablesToTheHelper[fn.Name.Name] {
+					routesToTheHelper[fn.Name.Name] = true
+				}
+				if len(call.Args) != 3 {
+					return true
+				}
+				if !isSelector(call.Fun, "os", "WriteFile") && !isSelector(call.Fun, "os", "OpenFile") {
+					return true
+				}
+				modeArg := call.Args[2]
+				if conversion, ok := modeArg.(*ast.CallExpr); ok && len(conversion.Args) == 1 {
+					modeArg = conversion.Args[0] // os.FileMode(0o755)
+				}
+				lit, ok := modeArg.(*ast.BasicLit)
+				if !ok || lit.Kind != token.INT {
+					if !routesExecutablesToTheHelper[fn.Name.Name] {
+						t.Errorf("%s: %s writes a file with a mode the guard cannot read; pass a literal, or use writeExecutable for an executable", fset.Position(call.Pos()), fn.Name.Name)
+					}
+					return true
+				}
+				mode, err := strconv.ParseUint(lit.Value, 0, 32)
+				if err == nil && mode&0o111 != 0 {
+					t.Errorf("%s: %s writes an executable outside writeExecutable; use writeExecutable", fset.Position(call.Pos()), fn.Name.Name)
+				}
+				return true
+			})
+		}
+	}
+	if !helperTakesTheLock {
+		t.Error("writeExecutable no longer calls syscall.ForkLock.RLock; a fork in a parallel test can inherit its descriptor again")
+	}
+	for name := range routesExecutablesToTheHelper {
+		if !routesToTheHelper[name] {
+			t.Errorf("%s is exempt from this guard but no longer calls writeExecutable; route its executables there or drop the exemption", name)
+		}
+	}
+}
+
+// isSelector reports whether expr is the selector chain names spells, such as
+// os.WriteFile or syscall.ForkLock.RLock.
+func isSelector(expr ast.Expr, names ...string) bool {
+	for i := len(names) - 1; i > 0; i-- {
+		sel, ok := expr.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != names[i] {
+			return false
+		}
+		expr = sel.X
+	}
+	ident, ok := expr.(*ast.Ident)
+	return ok && ident.Name == names[0]
 }
 
 func shellQuote(value string) string {

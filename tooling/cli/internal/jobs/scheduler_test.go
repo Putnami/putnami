@@ -326,9 +326,7 @@ func TestScheduler_CoalescesConcurrentColdMissAcrossWorktrees(t *testing.T) {
 	script := "#!/bin/sh\n" +
 		"printf 'run\\n' >> '" + counterPath + "'\n" +
 		boundedReleaseWaitScript(releasePath, os.Getpid(), releaseWaitMaxPolls)
-	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-		t.Fatalf("write cold-job script: %v", err)
-	}
+	writeExecutable(t, scriptPath, script)
 	t.Cleanup(func() { _ = os.WriteFile(releasePath, []byte("release"), 0o644) })
 
 	type schedulerRun struct {
@@ -477,9 +475,7 @@ func TestScheduler_CoalescedSourceFixReexecutesInEveryWorktree(t *testing.T) {
 		"printf 'run\\n' >> '" + counterPath + "'\n" +
 		boundedReleaseWaitScript(releasePath, os.Getpid(), releaseWaitMaxPolls) +
 		"printf 'fixed\\n' > input.txt\n"
-	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-		t.Fatalf("write source-fix script: %v", err)
-	}
+	writeExecutable(t, scriptPath, script)
 	t.Cleanup(func() { _ = os.WriteFile(releasePath, []byte("release"), 0o644) })
 
 	type schedulerRun struct {
@@ -643,9 +639,7 @@ func TestBoundedReleaseWaitScriptExitsWithoutItsParentRelease(t *testing.T) {
 			script := "#!/bin/sh\n" + boundedReleaseWaitScript(
 				filepath.Join(t.TempDir(), "never"), tc.parentPID, tc.maxPolls,
 			)
-			if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-				t.Fatal(err)
-			}
+			writeTestFile(t, scriptPath, script)
 			// The shell reads the script instead of executing it. A parallel
 			// test's fork can still hold this file open for writing, and
 			// executing it would then fail with "text file busy".
@@ -1198,9 +1192,7 @@ func TestScheduler_PublishSubtaskNonZeroExitFailsSession(t *testing.T) {
 		"printf '%s\\n' '{\"v\":2,\"type\":\"log\",\"level\":\"error\",\"message\":\"Invalid or expired refresh token. Run `putnami cloud login`.\"}'\n" +
 		"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"SKIP\"}}'\n" +
 		"exit 7\n"
-	if err := os.WriteFile(failScript, []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake publish script: %v", err)
-	}
+	writeExecutable(t, failScript, script)
 
 	ext := &extension.ExtensionDescription{Name: "@putnami/cloud", Path: wsRoot}
 	publishJob := func(name, command string, deps []string) *ScheduledJob {
@@ -1330,9 +1322,7 @@ func TestScheduler_SerializeAfterPreventsConcurrentWriters(t *testing.T) {
 		"  exit 0\n" +
 		"fi\n" +
 		"exit 17\n"
-	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
-		t.Fatalf("write writer script: %v", err)
-	}
+	writeExecutable(t, script, body)
 
 	ext := &extension.ExtensionDescription{Name: "@putnami/test", Path: wsRoot}
 	writer := func(name string) *ScheduledJob {

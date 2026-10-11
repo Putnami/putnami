@@ -138,9 +138,7 @@ fi
 printf '%s\n' '{"v":2,"type":"result","data":{"status":"success"}}'
 exit 0
 `
-	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-		t.Fatalf("write leaky script: %v", err)
-	}
+	writeExecutable(t, scriptPath, script)
 	descendantOutput := "job-pipes"
 	if leavePipes {
 		descendantOutput = "detached"
