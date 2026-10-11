@@ -622,9 +622,11 @@ func copyDeclaredFile(src, dst string, mode os.FileMode) error {
 // always a correct answer, serving a half-restored tree is not.
 //
 // It is the one place a hit writes the workspace, so it holds the task's
-// task-output locks for the whole restore: another session executing or
-// restoring the same outputs finishes first. A lock it cannot take (the
-// session is canceled) is a restore failure like any other.
+// task-output writer keys for the whole restore: another session executing or
+// restoring the same outputs finishes first. It takes no reader key: a
+// restore writes the recorded outputs and reads no resource another task
+// writes. A lock it cannot take (the session is canceled) is a restore failure
+// like any other.
 func (s *Scheduler) restoreDeclaredCacheHit(
 	ctx context.Context,
 	job *ScheduledJob,
@@ -643,7 +645,7 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 		// successful status would skip the edits in this worktree.
 		return nil
 	}
-	_, outputs, err := s.lockTaskOutputs(ctx, []*ScheduledJob{job}, nil)
+	_, outputs, err := s.lockTaskOutputs(ctx, []*ScheduledJob{job}, nil, false)
 	defer outputs.release()
 	if err != nil {
 		if ctx.Err() == nil {

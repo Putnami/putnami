@@ -30,8 +30,8 @@ func TestTaskOutputLockIdsAgreeAcrossADirectoryLinkedRoot(t *testing.T) {
 	if direct.root != linked.root {
 		t.Fatalf("canonical roots differ: %q through the root, %q through the link", direct.root, linked.root)
 	}
-	want := direct.keysFor([]*ScheduledJob{job}, nil)
-	got := linked.keysFor([]*ScheduledJob{job}, nil)
+	want := direct.keysFor([]*ScheduledJob{job}, nil, false)
+	got := linked.keysFor([]*ScheduledJob{job}, nil, false)
 	if len(want) == 0 || len(got) != len(want) {
 		t.Fatalf("keys through the link = %v, want %v", got, want)
 	}

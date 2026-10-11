@@ -740,38 +740,58 @@ coordination less reliable than independent execution.
 ### Concurrent sessions in one workspace
 
 Two sessions in the same worktree can schedule the same project task with
-different flags. Their cache keys differ, so the lease does not coalesce
-them, yet both write the same output directory. A task-output lock keeps
-them apart: a task execution never reads or writes its outputs while another
-session's task writes them.
+different flags, or two tasks of one project that write and read the same
+generated files. Their cache keys differ, so the lease does not coalesce
+them. A task-output lock keeps them apart: a task never writes its outputs
+while another session's task writes them, and never reads what another
+task writes while another session writes it.
 
-Each task locks:
+Each task locks, exclusively:
 
 - its command-output directory, `.putnami/out/<project>/<command>`, always;
 - its project, when it declares a project-rooted output (such as `.gen`);
 - the workspace, when it declares a workspace-rooted output.
 
+An executing task also takes a shared lock for each resource its definition
+reads and does not write: its project for a project-scoped resource, such as
+`reads: ["gen"]`, and the workspace for a workspace-scoped one. That is the
+lock the resource's writers take, so a build step never reads `.gen` while
+another session's `generate` empties or writes it. The `sources` resource
+takes no lock: the tasks that write it change source files, not declared
+outputs. Shared locks coexist: several sessions can read one project at
+once, and a task that writes there waits until all of them finished.
+
 A task holds these locks across a cache restore into its outputs, and for an
 execution from the output preparation through the capture into the cache:
 the version-stamp refresh, the preBuild hook, the subprocess with its
-retries, and the capture.
+retries, and the capture. A cache restore takes no shared lock: it writes
+the task's own outputs and reads nothing another task writes.
 
 An executing task also locks its project for its preparation alone when the
 preparation writes the project tree: the session has not yet started its
 extension's preBuild hook for that project, or has not yet refreshed the
 project's `.gen/version.json`. The task releases that lock before its
-subprocess starts, unless its declared outputs need it, so a long-running task
-such as `serve` does not keep another session's preparation out of its
-project.
+subprocess starts, unless its declared outputs or its reads need it, so a
+long-running task such as `serve` that reads nothing another task writes
+does not keep another session's preparation out of its project.
 
-A task takes its locks in one order shared by every session: command-output
-directories first, then projects, then the workspace. A task that waits for
-another session's command output therefore holds no project lock meanwhile,
-and two top-level sessions never wait for each other. Tasks
-of one session share their locks, so the lock never changes the order within
-a session. When another session holds a lock, the task prints one line
-to stderr that names that session and its tasks that hold the lock, then
-waits:
+A task that needs one lock both to write and to read, or whose preparation
+writes the project tree, holds that lock exclusively until its capture. When
+a session plans a task that writes under a lock, every task of that session
+takes that lock exclusively, its readers included, so the session's readers
+and writers share one lock.
+
+A task takes its locks in one order shared by every session, whatever their
+mode: command-output directories first, then projects, then the workspace.
+A task that waits for another session's command output therefore holds no
+project lock meanwhile, and two top-level sessions never wait for each
+other. Tasks of one session share their locks, so the lock does not change
+the order within a session, with one exception: a task that needs a lock
+exclusively while its own session holds it only for reading waits until
+those readers finished, and the session's tasks that need the lock meanwhile
+wait behind it. That wait prints nothing. When another session holds a lock,
+the task prints one line to stderr that names that session and its tasks
+that hold the lock, then waits:
 
 ```
 putnami: /tooling/cli:test~test waits for session 20260925-192012-876307 (pid 4242, task /tooling/cli:test~test), which is writing .putnami/out/tooling/cli/test
@@ -780,15 +800,28 @@ putnami: /tooling/cli:test~test waits for session 20260925-192012-876307 (pid 42
 When several tasks of that session share the lock, the line names the first
 one and counts the rest (`task /tooling/cli:test~test and 2 more`). The line
 never names a process that is gone; it then says `another putnami process`.
+A task that waits for readers names none of them: several sessions can read
+at once, and a reader records nothing in the lock file.
+
+```
+putnami: /app:build~generate waits for another putnami process, which is reading the project-rooted outputs of app
+```
+
+A writer waits until no other session reads, so readers of one project in
+sessions that keep overlapping keep its writers waiting.
 
 The wait has no time limit and ends on Ctrl-C. A task that another session
 delays waits instead of failing, with one exception below. A nested session
 that a task or its preBuild hook starts in the same workspace inherits the
-locks the task holds at that moment, so it never waits for its own parent.
-It still waits for any other session: when that other session in turn waits
-for a lock the parent task holds, neither progresses until one is canceled
-or the parent task's own time limit expires. The parent task then fails with
-a timeout, and the wait line printed before names the other session.
+locks the task holds at that moment, shared or not, so it never waits for
+its own parent. A nested task can therefore write under a lock its parent
+holds only for reading: another session's writer still waits for the parent,
+but another session's reader does not wait for the nested task. A nested
+session still waits for any other session: when that other session in turn
+waits for a lock the parent task holds, neither progresses until one is
+canceled or the parent task's own time limit expires. The parent task then
+fails with a timeout, and the wait line printed before names the other
+session.
 The lock files live in `.putnami/locks/task-outputs/`. No input pattern or
 declared output covers that directory. The lock is not a cache input. On
 hosts without `flock(2)` there is no lock.

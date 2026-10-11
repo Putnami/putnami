@@ -82,6 +82,10 @@
       "text": "Sessions of one workspace never write one task output at once. A task locks, in one global order, its command-output directory plus the project or workspace with a durable output, across a cache restore and an execution through capture; a preparation writing the project tree locks the project until the subprocess starts. A contended task prints one line naming the holder's session, pid and tasks, then waits for release or cancellation. Nested sessions hold their spawner's locks. No lock is a cache input."
     },
     {
+      "id": "concurrent-session-read-exclusion",
+      "text": "An executing task that reads a resource it does not write shares the lock its writers hold: its project's, or the workspace's for a workspace-scoped resource, from its preparation through its capture. The sources resource takes none, and a restore reads nothing. Readers in several sessions hold the lock together, a writer in another session waits for all of them, and a reader waits for that writer. A wait behind readers prints one line saying another putnami process is reading, naming no holder."
+    },
+    {
       "id": "scratch-generation-retention",
       "text": "Workspace scratch has a 30-day generation lifetime. The next idle execution, install hook, or workspace cache gc reclaims the expired generation independently of extension names or project inventory. Shared leases protect runs and subprocesses; nested consumers never wait for exclusive ownership. An active lease is the only silent skip; others warn. Reaping requires cross-process locks, never follows symlinks, and retries failed deletion without extending retention. This is retention, not a byte quota."
     },
