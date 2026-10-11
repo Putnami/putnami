@@ -16,7 +16,7 @@
       }
     ]
   },
-  "contractSha256": "73bdcf7f2359730069780ae4288b7b7d2466c92a2b08e3600536dcbf02698bf7",
+  "contractSha256": "1eb04d7aa25f8789ad4c0c6eafb1f240fcff7689f94d8a2ef00c8b92fca02044",
   "operations": [
     {
       "operationId": "getV1_Cache_Capabilities",
@@ -160,12 +160,25 @@
           "encoding": "json"
         }
       ]
+    },
+    {
+      "operationId": "postV1_Cache_Upload-batch",
+      "service": "cache-server",
+      "methodSymbol": "CreateV1CacheUploadBatch",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/cache/upload-batch",
+          "encoding": "json"
+        }
+      ]
     }
   ],
   "files": [
     {
       "path": "client.gen.go",
-      "sha256": "42429f9045ef6c1722ad412827925321c7119ae36ac01b5bb838b82cc2b7ecad"
+      "sha256": "eb9f1b408ce0bc632acbc8ad226e3e5bd725b49f795910251e2c1c7df9f3026b"
     }
   ]
 }

@@ -690,9 +690,10 @@ surfaces the server's 403 cleanly.
   paste-ready hints (a GitHub Actions `gh secret set PUTNAMI_CLOUD_TOKEN` line,
   plus `PUTNAMI_CACHE_TOKEN` and `PUTNAMI_E2E_TOKEN` exports). The CLI never
   persists the secret. Use resource-owned machine scopes such as `cache.read`,
-  `cache.write`, `deploy.read`, `deploy.write`, and `delivery.ingest`; human
-  management scopes like `apikeys:write` belong to the signed-in session that
-  calls `/apikeys`, not to the workspace machine token.
+  `deploy.read`, `deploy.write`, and `delivery.ingest`. `cache.write` gives a
+  workspace machine token nothing: only a hosted CI run writes to the build
+  cache. Human management scopes like `apikeys:write` belong to the signed-in
+  session that calls `/apikeys`, not to the workspace machine token.
 - `putnami cloud token list` prints the workspace's active tokens (name, scopes,
   created, expires, last-used, id). It never prints the secret and hides
   already-revoked tokens.
@@ -879,9 +880,10 @@ and `--env` to target an environment other than the configured default
 
 `putnami cloud setup` provisions the remote build cache by writing
 `.putnami/cache.json` at the workspace root. A stock CLI picks this file up on
-the next build: it negotiates against the cache, restores hits, and uploads
-misses using a per-user bearer. The file is safe to commit. It never contains a
-token, only a token *source*:
+the next build: it negotiates against the cache and restores hits using a
+per-user bearer. A laptop reads the shared cache and writes nothing to it; only
+hosted CI writes. The file is safe to commit. It never contains a token, only a
+token *source*:
 
 ```json
 {
@@ -901,18 +903,46 @@ token, only a token *source*:
   - `{ "url": "https://..." }`: the CLI fetches the trimmed response body.
 
 **No shared secrets.** Setup records `putnami cloud token --for cache` as the
-source. That command mints an ephemeral key restricted to `cache.read` and
-`cache.write`, exchanges it once for a short-lived `cache` audience JWT,
-and immediately revokes the backing key. It prints only the bare bearer on
-stdout. The key also has a bounded expiry if best-effort cleanup fails, and no
-long-lived secret is written to disk or committed. The managed cache server
-isolates entries by the JWT's `scope_ref.workspace_id` and enforces both cache
-scopes on this API-key-derived machine identity.
+source. That command mints an ephemeral key restricted to `cache.read`,
+exchanges it once for a short-lived `cache` audience JWT, and immediately
+revokes the backing key. It prints only the bare bearer on stdout. The key also
+has a bounded expiry if best-effort cleanup fails, and no long-lived secret is
+written to disk or committed. The managed cache server isolates entries by the
+JWT's `scope_ref.workspace_id` and enforces the cache scope on this
+API-key-derived machine identity.
 
-**CI.** Set `PUTNAMI_CACHE_TOKEN` to a pre-minted bearer to bypass the token
-source entirely (useful where interactive login isn't available).
-`PUTNAMI_CACHE_URL` and `PUTNAMI_CACHE_MODE` override the persisted `url` and
-`mode` for a single run.
+**Only hosted CI writes.** The managed cache server stores task results only
+from a hosted Putnami CI run: the per-run cache lease, which carries `cache.ci`,
+or the CI runner's service account. It refuses a write from every other
+credential with a 403, `a developer credential reads the shared cache; only CI
+writes to it`. That covers a signed-in laptop and a member's workspace machine
+token, even one created with `cache.write`: both read the shared cache and write
+nothing.
+
+**Sessions with no signed-in user.** A cloud agent session or a CI job holds
+one secret, `PUTNAMI_CLOUD_TOKEN`: a workspace machine token with the
+`cache.read` scope. The token command needs a signed-in user, so the cache
+provider sends `PUTNAMI_CLOUD_TOKEN` to the cache server instead. It does so
+only when all of these hold:
+
+- `PUTNAMI_CACHE_TOKEN` is not set.
+- No user session is stored in `~/.putnami/auth.json`. A signed-in user keeps
+  the token command.
+- No hosted Putnami CI launcher started the run.
+- The token source is absent or is `putnami cloud token --for cache`. A custom
+  command, a `url` source, and a metadata identity keep precedence.
+- The value is exactly one workspace machine token (`pkt_…`).
+
+The token reads the shared cache only. It is not written to
+`.putnami/cache.json` or to a log. The provider cannot re-mint it, so a request
+the cache server refuses is not retried. `putnami cloud cache status` names the
+variable on its identity line and does not read the last CI run, which needs a
+signed-in user.
+
+**Override.** Set `PUTNAMI_CACHE_TOKEN` to a pre-minted bearer to bypass every
+other source. When it is set, it wins. A member's machine token set this way
+reads the shared cache only. `PUTNAMI_CACHE_URL` and `PUTNAMI_CACHE_MODE`
+override the persisted `url` and `mode` for a single run.
 
 **Successful run markers.** The managed cache also stores a separate CI baseline
 marker for successful full-target runs. Fresh `main` or `master` CI checkouts
@@ -934,7 +964,9 @@ commit.
 
 **Inspect and disable.** `putnami cloud cache` (alias `cloud cache status`)
 checks the persisted config and the active identity, and shows how many tasks
-the last CI run took from the cache, read from that run's builds report.
+the last CI run took from the cache, read from that run's builds report. A
+linked workspace without `.putnami/cache.json` reports the default its builds
+use, `https://cache.putnami.cloud` from the workspace link.
 `putnami cloud cache disable` sets `enabled:false` (keeping the file so it can
 be re-enabled by re-running `putnami cloud setup`); add `--remove` to delete
 `.putnami/cache.json` outright.
@@ -984,7 +1016,11 @@ CAS here means content-addressed storage.
 
 The provider reads the same `.putnami/cache.json` (written by `cloud setup`) and
 the same `PUTNAMI_CACHE_URL`, `PUTNAMI_CACHE_MODE` and `PUTNAMI_CACHE_TOKEN`
-environment as a stock CLI's in-core cache, so CI configures it identically.
+environment as a stock CLI's in-core cache, so CI configures it identically. In
+a session with no signed-in user it also reads `PUTNAMI_CLOUD_TOKEN`, under the
+conditions listed in [Build cache](#build-cache). The
+[cache provider section](internal/deliverycli/README.md#cache-provider) of the
+Delivery commands gives the bounds of its uploads, restores and end of run.
 
 **Run credential.** On a hosted run core lists the `run-credential`
 capability in `initialize`. The provider echoes it only when all three hold:
@@ -1084,11 +1120,12 @@ db-gateway, delivery-api, distribution-api, identity-api, observability-api,
 oci-server, put-server, runtime-api and source-api.
 
 The schemas come from the Put package `cloud/doc-contents-cloud-cli-schema`,
-channel `canary`, version `0.0.0-20261010124957-95ec3b1f6`. Its file layout is
-`cloud-cli-schema/services/<service>/openapi.json`. Each file is copied byte
-for byte, except four `info.description` strings that lose their issue
-numbers; [`../clients/README.md`](../clients/README.md) lists them. To update
-the schemas:
+channel `canary`, the build published on 2026-10-11 (archive digest
+`sha256:2e51cc3be3ad5cee1bbfead0d9cdbf7b697088d6a861af181c001cacf73026f8`). Its
+file layout is `cloud-cli-schema/services/<service>/openapi.json`. Each file is
+copied byte for byte, except four `info.description` strings that lose their
+issue numbers; [`../clients/README.md`](../clients/README.md) lists them. To
+update the schemas:
 
 1. Fetch a newer version of `cloud/doc-contents-cloud-cli-schema`.
 2. Copy each `services/<service>/openapi.json` over

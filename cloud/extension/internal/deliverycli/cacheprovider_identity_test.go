@@ -12,8 +12,21 @@ import (
 
 // The host may select metadata for its real cache. Unit tests explicitly
 // choose their own source and must not inherit that host authentication policy.
+// An agent session exports its workspace machine token the same way; a test
+// that reads the cache with one sets it itself. A hosted runner exports the
+// cache URL, mode and read-only overrides to its gate, and the cache status
+// builds its config from them, so no test inherits those either.
 func TestMain(m *testing.M) {
-	_ = os.Unsetenv(remotecache.TokenSourceEnv)
+	for _, name := range []string{
+		remotecache.TokenSourceEnv,
+		remotecache.TokenEnv,
+		remotecache.URLEnv,
+		remotecache.ModeEnv,
+		remotecache.ReadOnlyEnv,
+		cloudTokenEnv,
+	} {
+		_ = os.Unsetenv(name)
+	}
 	os.Exit(m.Run())
 }
 

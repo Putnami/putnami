@@ -101,7 +101,7 @@
           "path": "cloud/extension/internal/deliverycli/internal/remotecache/batch.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "2d509e80f7484a5060e9cb465b8deaba201b991be69292e3b0995368e69c8c40"
+          "fingerprint": "216850bad2f32b1f474283202b6b6dd6f900250cbd5c721ea016ff63868e7f0f"
         }
       ],
       "owner": "@putnami/cloud-extension",
@@ -125,7 +125,7 @@
       "tests": [
         "cloud/extension/internal/deliverycli/internal/remotecache/fetch_test.go"
       ],
-      "reason": "Blob download from the presigned transfer URL the cache server granted."
+      "reason": "Blob download from the transfer the cache server granted: a presigned URL, or a plain object URL with the storage token the server put in the transfer's headers."
     },
     {
       "authority": "Google Cloud Storage signed URLs (cloud.google.com/storage/docs/access-control/signed-urls)",
@@ -135,14 +135,14 @@
           "path": "cloud/extension/internal/deliverycli/internal/remotecache/store.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "8f329cf4fbd27d9efa9981e27dd11dc9ad5d680cc0882a463074f4558f52719d"
+          "fingerprint": "cca509abaa337757b69bac2bb33d631d282039edad9bc49d02f9af5a88c3ee6c"
         }
       ],
       "owner": "@putnami/cloud-extension",
       "tests": [
         "cloud/extension/internal/deliverycli/internal/remotecache/store_test.go"
       ],
-      "reason": "Blob upload to the presigned transfer URL the cache server granted."
+      "reason": "Blob upload to the transfer the cache server granted: a presigned URL, or a plain object URL with the create-only storage token the server put in the transfer's headers."
     },
     {
       "authority": "Google Compute Engine metadata server v1 (cloud.google.com/compute/docs/metadata/overview)",

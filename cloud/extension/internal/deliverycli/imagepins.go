@@ -99,10 +99,10 @@ func imageBuildLockCLIVersion(workspaceRoot string) (string, error) {
 }
 
 // imageBuildLockExtensionVersion reads the exact extension version the lock
-// resolved. The runner's warm layer (imagelayers.go) consumes
-// these references directly — they become the throwaway manifest it
-// materializes against — instead of resolving an unversioned "latest"
-// extension and comparing it with another copied tool pin.
+// resolved, for the extension axes the runner pin guard names. The runner's
+// warm layer (imagelayers.go) does not read these axes: it warms every
+// extension the same lock pins, so these axes are a subset of what it bakes
+// and verifies.
 func imageBuildLockExtensionVersion(name string) func(string) (string, error) {
 	return func(workspaceRoot string) (string, error) {
 		lockPath := filepath.Join(workspaceRoot, "putnami.lock.json")

@@ -70,6 +70,11 @@ const (
 	// it in memory for the session and cannot mint another, so it is NOT
 	// renewable.
 	TokenClassRun TokenClass = "run"
+	// TokenClassCloudEnv is a workspace machine token read from
+	// PUTNAMI_CLOUD_TOKEN, sent when the session holds that one secret and no
+	// signed-in user (see Config.UseMachineToken). Like TokenClassEnv the
+	// session holds bytes it cannot re-derive, so this class is NOT renewable.
+	TokenClassCloudEnv TokenClass = "cloud-env"
 )
 
 // Renewable reports whether a REFUSED bearer of this class can be replaced by

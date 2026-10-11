@@ -2363,12 +2363,12 @@ func imageLayersCopyEntry(reader io.Reader, dest string, size int64) error {
 //
 // Both image invariants survive the move, and one of them gets stronger:
 //
-//   - Pins stay derived (invariant 2). The two extension versions come from
-//     imageBuildPins() — PUTNAMI_GO_EXTENSION_VERSION and
-//     PUTNAMI_TYPESCRIPT_EXTENSION_VERSION, which read putnami.lock.json — so
-//     the throwaway manifest this producer writes carries no literal. Those two
-//     axes had no live verification anywhere before this layer existed; the
-//     pin guard's table now names this producer as their enforcement.
+//   - Pins stay derived (invariant 2). The extension SET and every version in it
+//     come from putnami.lock.json's extensions block, so the
+//     throwaway manifest this producer writes carries no literal, and an
+//     extension the workspace adds or drops moves the layer with no code
+//     change. The pin guard's table names this producer as the enforcement of
+//     its extension axes.
 //   - An unverified artifact never becomes a layer (invariant 3). The store is
 //     content-addressed BY the same sha256 the lock records, so the check is an
 //     exact set comparison: every lock-pinned linux/amd64 integrity must be
@@ -2417,35 +2417,16 @@ const (
 // list and the runner manifest's `tool` layers from drifting apart.
 var imageLayersWarmTools = []string{"golangci-lint", "staticcheck"}
 
-// imageLayersWarmExtension is one extension the runner warms, named by the
-// imageBuildPins() axis that DERIVES its version. Naming the axis rather than
-// reading the lock directly is what keeps this producer inside the workspace's
-// one derivation table.
-type imageLayersWarmExtension struct {
-	name string
-	pin  string
-	// optional extensions are warmed only when the workspace lock declares them.
-	optional bool
-	// tools marks the extension carrying tools/versions.json.
-	tools bool
-}
+// imageLayersWarmToolExtension is the extension whose artifact carries
+// tools/versions.json and the prebuilt lint tools. The warm set must contain
+// it: the go-tool layers restore their binaries from it, and the warm producer
+// cross-checks its tool pins.
+const imageLayersWarmToolExtension = "@putnami/go"
 
-// imageLayersWarmExtensions is the set the runner warms: its language
-// extensions and SDD when the workspace declares it. A checkout pinning
-// other versions still fetches its own at run time — the layer pre-pays the
-// common case and claims nothing more.
-func imageLayersWarmExtensions() []imageLayersWarmExtension {
-	return []imageLayersWarmExtension{
-		{name: "@putnami/go", pin: "PUTNAMI_GO_EXTENSION_VERSION", tools: true},
-		{name: "@putnami/typescript", pin: "PUTNAMI_TYPESCRIPT_EXTENSION_VERSION"},
-		{name: "@putnami/sdd", pin: "PUTNAMI_SDD_EXTENSION_VERSION", optional: true},
-	}
-}
-
-// imageLayersWarmArtifact is one resolved extension: the version the pin table
-// derived and the linux/amd64 integrity the lock records for it.
+// imageLayersWarmArtifact is one resolved extension: the version the lock pins
+// and the linux/amd64 integrity the lock records for it.
 type imageLayersWarmArtifact struct {
-	imageLayersWarmExtension
+	name    string
 	version string
 	sha256  string
 }
@@ -2608,7 +2589,7 @@ func imageLayersWarmToolBinary(tool string) string {
 // of a resolved set.
 func imageLayersWarmToolSource(artifacts []imageLayersWarmArtifact) (imageLayersWarmArtifact, error) {
 	for _, artifact := range artifacts {
-		if artifact.tools {
+		if artifact.name == imageLayersWarmToolExtension {
 			return artifact, nil
 		}
 	}
@@ -2661,16 +2642,45 @@ func imageLayersProduceWarm(ctx context.Context, spec imageLayerSpec, workspaceR
 	}, nil
 }
 
-// imageLayersWarmResolve reads what the layer is made of: each extension's
-// version through the workspace's own derivation table, and the linux/amd64
-// integrity the lock records for it.
+// imageLayersWarmResolve reads what the layer is made of: EVERY extension
+// putnami.lock.json pins, sorted by name, each with its locked version and the
+// linux/amd64 integrity the lock records for it.
 //
-// Both are hard requirements. A version that reads back empty has no literal to
-// fall back on (invariant 2), and an absent integrity leaves the materialized
-// artifact with nothing to check it against — which is precisely the state the
-// retired Dockerfile shipped in.
+// The set is the lock's extensions block and nothing else. A hard-coded list
+// left every other locked extension to be downloaded on each run, and needed a
+// code change for each extension the workspace added. Reading the lock makes a
+// runner on a current image download no extension at all.
+//
+// Every entry's version and integrity are hard requirements. A version that
+// reads back empty has no literal to fall back on (invariant 2), and an absent
+// integrity leaves the materialized artifact with nothing to check it against —
+// which is precisely the state the retired Dockerfile shipped in. The lint-tool
+// extension is required as well, because the cross-check and the go-tool
+// layers read it.
 func imageLayersWarmResolve(workspaceRoot string) ([]imageLayersWarmArtifact, error) {
-	return imageLayersWarmResolveSet(workspaceRoot, imageLayersWarmExtensions())
+	lockPath, lock, err := imageLayersWarmReadLock(workspaceRoot)
+	if err != nil {
+		return nil, err
+	}
+	if _, declared := lock.Extensions[imageLayersWarmToolExtension]; !declared {
+		return nil, imageLayersWarmNoVersion(lockPath, imageLayersWarmToolExtension)
+	}
+	names := make([]string, 0, len(lock.Extensions))
+	for name := range lock.Extensions {
+		names = append(names, name)
+	}
+	// Map order is random; the label, the record and the install manifest must
+	// not be.
+	slices.Sort(names)
+	artifacts := make([]imageLayersWarmArtifact, 0, len(names))
+	for _, name := range names {
+		artifact, err := imageLayersWarmResolveOne(lockPath, lock, name)
+		if err != nil {
+			return nil, err
+		}
+		artifacts = append(artifacts, artifact)
+	}
+	return artifacts, nil
 }
 
 // imageLayersWarmToolArtifact resolves ONLY the extension that supplies the
@@ -2678,66 +2688,63 @@ func imageLayersWarmResolve(workspaceRoot string) ([]imageLayersWarmArtifact, er
 // `--check` must re-derive it without resolving — or failing on — an unrelated
 // extension's pin.
 func imageLayersWarmToolArtifact(workspaceRoot string) (imageLayersWarmArtifact, error) {
-	wanted := make([]imageLayersWarmExtension, 0, 1)
-	for _, extension := range imageLayersWarmExtensions() {
-		if extension.tools {
-			wanted = append(wanted, extension)
-		}
-	}
-	artifacts, err := imageLayersWarmResolveSet(workspaceRoot, wanted)
+	lockPath, lock, err := imageLayersWarmReadLock(workspaceRoot)
 	if err != nil {
 		return imageLayersWarmArtifact{}, err
 	}
-	return imageLayersWarmToolSource(artifacts)
+	return imageLayersWarmResolveOne(lockPath, lock, imageLayersWarmToolExtension)
 }
 
-// imageLayersWarmResolveSet is the one resolution both callers read.
-func imageLayersWarmResolveSet(workspaceRoot string, extensions []imageLayersWarmExtension) ([]imageLayersWarmArtifact, error) {
+// imageLayersWarmLockFile is the part of putnami.lock.json the warm layer reads.
+type imageLayersWarmLockFile struct {
+	Extensions map[string]struct {
+		Version     string            `json:"version"`
+		Integrities map[string]string `json:"integrities"`
+	} `json:"extensions"`
+}
+
+// imageLayersWarmReadLock reads the workspace lock once, so the set, the
+// versions and the integrities all come from the same bytes.
+func imageLayersWarmReadLock(workspaceRoot string) (string, imageLayersWarmLockFile, error) {
 	lockPath := filepath.Join(workspaceRoot, "putnami.lock.json")
-	var lock struct {
-		Extensions map[string]struct {
-			Integrities map[string]string `json:"integrities"`
-		} `json:"extensions"`
-	}
+	var lock imageLayersWarmLockFile
 	if err := imageBuildReadJSON(lockPath, &lock); err != nil {
-		return nil, err
+		return "", imageLayersWarmLockFile{}, err
 	}
-	artifacts := make([]imageLayersWarmArtifact, 0, len(extensions))
-	for _, extension := range extensions {
-		if _, declared := lock.Extensions[extension.name]; extension.optional && !declared {
-			continue
-		}
-		read := imageLayersPinReader(extension.pin)
-		if read == nil {
-			return nil, fmt.Errorf("no workspace source derives %s", extension.pin)
-		}
-		version, err := read(workspaceRoot)
-		if err != nil {
-			return nil, err
-		}
-		if version == "" {
-			return nil, fmt.Errorf(
-				"%s pins no extensions[%q].version — the warm layer's versions are DERIVED from the workspace lock (%s), never literals, so there is nothing to materialize",
-				lockPath, extension.name, extension.pin)
-		}
-		integrity := strings.TrimSpace(lock.Extensions[extension.name].Integrities[imageLayersWarmPlatform])
-		if integrity == "" {
-			return nil, fmt.Errorf(
-				"%s records no extensions[%q].integrities[%q] for version %s — refusing to bake a store nothing can verify (re-run `putnami install` to repopulate it)",
-				lockPath, extension.name, imageLayersWarmPlatform, version)
-		}
-		if !imageLayersSHA256Pattern.MatchString(integrity) {
-			return nil, fmt.Errorf("%s records an unreadable extensions[%q].integrities[%q] value %q",
-				lockPath, extension.name, imageLayersWarmPlatform, integrity)
-		}
-		artifacts = append(artifacts, imageLayersWarmArtifact{imageLayersWarmExtension: extension, version: version, sha256: integrity})
+	return lockPath, lock, nil
+}
+
+// imageLayersWarmResolveOne is the one resolution both callers read.
+func imageLayersWarmResolveOne(lockPath string, lock imageLayersWarmLockFile, name string) (imageLayersWarmArtifact, error) {
+	entry := lock.Extensions[name]
+	version := strings.TrimSpace(entry.Version)
+	if version == "" {
+		return imageLayersWarmArtifact{}, imageLayersWarmNoVersion(lockPath, name)
 	}
-	return artifacts, nil
+	integrity := strings.TrimSpace(entry.Integrities[imageLayersWarmPlatform])
+	if integrity == "" {
+		return imageLayersWarmArtifact{}, fmt.Errorf(
+			"%s records no extensions[%q].integrities[%q] for version %s — refusing to bake a store nothing can verify (re-run `putnami install` to repopulate it)",
+			lockPath, name, imageLayersWarmPlatform, version)
+	}
+	if !imageLayersSHA256Pattern.MatchString(integrity) {
+		return imageLayersWarmArtifact{}, fmt.Errorf("%s records an unreadable extensions[%q].integrities[%q] value %q",
+			lockPath, name, imageLayersWarmPlatform, integrity)
+	}
+	return imageLayersWarmArtifact{name: name, version: version, sha256: integrity}, nil
+}
+
+// imageLayersWarmNoVersion is the refusal for an extension the lock does not
+// pin to a version.
+func imageLayersWarmNoVersion(lockPath, name string) error {
+	return fmt.Errorf(
+		"%s pins no extensions[%q].version — the warm layer's versions are DERIVED from the workspace lock, never literals, so there is nothing to materialize",
+		lockPath, name)
 }
 
 // imageLayersWarmLabel renders the resolved set as the layer's version — the
 // value `--check` compares against the workspace on the next run, so it states
-// every pin the layer depends on, in table order. The lock integrity is part
+// every pin the layer depends on, sorted by name. The lock integrity is part
 // of the label: a lock whose integrity moved under an unchanged version string
 // must read as stale, not current.
 func imageLayersWarmLabel(artifacts []imageLayersWarmArtifact) string {

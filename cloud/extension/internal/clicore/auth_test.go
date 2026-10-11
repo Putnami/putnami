@@ -73,3 +73,32 @@ func TestUserSessionErrorNamesTheMachineToken(t *testing.T) {
 		t.Fatalf("api error node = %+v", node)
 	}
 }
+
+// TestMachineTokenOnlyNeedsATokenAndNoStoredSession: the predicate holds only
+// when PUTNAMI_CLOUD_TOKEN is set and no user session is stored. The build
+// cache provider relies on it to keep a signed-in user on the command recipe.
+func TestMachineTokenOnlyNeedsATokenAndNoStoredSession(t *testing.T) {
+	home := t.TempDir()
+	machine := map[string]string{"PUTNAMI_HOME": home, "PUTNAMI_CLOUD_TOKEN": "pkt_workspace_ci"}
+	if !MachineTokenOnly(machine) {
+		t.Fatal("token set, no stored session: MachineTokenOnly = false")
+	}
+	if MachineTokenOnly(map[string]string{"PUTNAMI_HOME": home}) {
+		t.Fatal("no token: MachineTokenOnly = true")
+	}
+
+	// A stored file without an access token is not a session.
+	if err := WriteAuth(&StoredToken{TokenType: "Bearer"}, machine); err != nil {
+		t.Fatal(err)
+	}
+	if !MachineTokenOnly(machine) {
+		t.Fatal("stored file without an access token: MachineTokenOnly = false")
+	}
+
+	if err := WriteAuth(&StoredToken{AccessToken: "user-session", TokenType: "Bearer"}, machine); err != nil {
+		t.Fatal(err)
+	}
+	if MachineTokenOnly(machine) {
+		t.Fatal("stored user session: MachineTokenOnly = true")
+	}
+}

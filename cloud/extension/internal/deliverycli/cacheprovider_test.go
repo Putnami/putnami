@@ -271,10 +271,8 @@ func TestApplyLinkedCacheDefault_EnvTokenWins(t *testing.T) {
 	root := t.TempDir()
 	writeLinkedManifest(t, root)
 
-	s := newProviderSession(root, io.Discard)
-	defer s.close()
 	cfg := &remotecache.Config{}
-	s.applyLinkedCacheDefault(cfg)
+	linkedCacheDefault(cfg, root, DefaultCacheURL)
 
 	if cfg.URL != DefaultCacheURL {
 		t.Fatalf("synthesized URL = %q, want %q", cfg.URL, DefaultCacheURL)
@@ -563,7 +561,7 @@ func TestProviderSessionRestore_ServedFromPrefetchIndex(t *testing.T) {
 		t.Fatalf("restore status = %q, want miss", res.Status)
 	}
 
-	s.bg.Wait() // drain the prefetch warmer before counting
+	s.bg.Wait() // the prefetch only negotiates; let it finish before counting
 	if n := atomic.LoadInt32(negotiates); n != 1 {
 		t.Fatalf("negotiate round trips = %d, want exactly 1 (the prefetch batch)", n)
 	}
@@ -1095,6 +1093,12 @@ func TestCacheAuthRefusalsAreReportedProminentlyAtSummary(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == cache.NegotiatePath {
 			_ = json.NewEncoder(w).Encode(cache.NegotiateResponse{ProtocolVersion: cache.ProtocolVersion})
+			return
+		}
+		if r.URL.Path == cache.CapabilitiesPath {
+			// No batched write path: the refused write is the per-entry store.
+			// TestARefusedUploadWindowIsReportedAtSummary covers a window.
+			http.NotFound(w, r)
 			return
 		}
 		// Every write is refused, the way an expired or revoked bearer is.

@@ -50,7 +50,11 @@ const (
 	cloudRuntimeIdentity = "@putnami/cloud"
 	cloudCLIContract     = 4
 	cacheOAuthClientID   = "cache"
-	cacheAllowedScopes   = "cache.read cache.write"
+	// cacheReadScope is the only scope `cloud token --for cache` asks for: a
+	// developer reads the shared build cache and writes nothing to it. Only a
+	// hosted CI run writes, and cache-server refuses a developer's write
+	// whatever its scopes.
+	cacheReadScope = "cache.read"
 	// cloudRuntimeProtocol is the runtime EVENT protocol this extension can
 	// speak, taken from the protocol package rather than typed here so the
 	// handshake cannot claim a version putnamiEventIO does not emit.
@@ -918,7 +922,7 @@ func workspaceToken(params map[string]any, workspaceRoot string, env map[string]
 	}
 	workspaceID := stringValue(link["workspace_id"])
 	if purpose == "cache" {
-		auth, err := clicore.MintWorkspaceScopedAuth(params, env, ioctx, workspaceID, cacheOAuthClientID, cacheAllowedScopes)
+		auth, err := clicore.MintWorkspaceScopedAuth(params, env, ioctx, workspaceID, cacheOAuthClientID, cacheReadScope)
 		if err != nil {
 			return err
 		}

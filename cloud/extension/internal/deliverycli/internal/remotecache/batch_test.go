@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	cache "go.putnami.dev/protocol/cache"
 )
@@ -293,8 +296,11 @@ func TestStoreBatch_CoalescesSmallBlobs(t *testing.T) {
 	if f.nUploadBatch < 1 {
 		t.Errorf("small blobs should be coalesced into upload-batch, got %d", f.nUploadBatch)
 	}
-	if f.nFindMissing != 0 || f.nDirectPut != 0 {
-		t.Errorf("all-small window must not hit per-blob paths, got find-missing=%d direct=%d", f.nFindMissing, f.nDirectPut)
+	// The one find-missing is the session's first write, which carries no
+	// bytes: it asks about no blob, and no blob goes over a PUT.
+	if f.nFindMissing != 1 || len(f.findMissingSeen) != 0 || f.nDirectPut != 0 || f.requests["/up/"] != 0 {
+		t.Errorf("all-small window must not hit per-blob paths, got find-missing=%d asking about %d blobs, direct=%d, PUT=%d",
+			f.nFindMissing, len(f.findMissingSeen), f.nDirectPut, f.requests["/up/"])
 	}
 	for _, d := range digests {
 		if _, ok := f.uploaded[d]; !ok {
@@ -374,6 +380,193 @@ func TestStoreBatch_CoalesceWithDirectGrant(t *testing.T) {
 	}
 	if f.nDirectPut != 0 {
 		t.Errorf("no large blobs, so the direct path should be unused, got %d", f.nDirectPut)
+	}
+}
+
+// TestStoreBatch_FallsBackWhenUploadBatchIsNotServed proves a window loses
+// nothing when the server advertised upload-batch and answers that it does not
+// serve it. The window asks once, then sends the same blobs through
+// find-missing and presigned PUTs, and commits every entry.
+func TestStoreBatch_FallsBackWhenUploadBatchIsNotServed(t *testing.T) {
+	for _, status := range []int{http.StatusNotFound, http.StatusMethodNotAllowed, http.StatusNotImplemented} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			f := newFakeCAS()
+			f.uploadBatchStatus = status
+			srv := httptest.NewServer(f.handler(t))
+			defer srv.Close()
+
+			in, src, digests := batchFixture()
+			c := NewClient(srv.URL, "tok", WithHTTPClient(srv.Client()))
+			out, err := c.StoreBatch(context.Background(), in, src, nil, WritePath{CoalesceSmall: true})
+			if err != nil {
+				t.Fatalf("StoreBatch: %v", err)
+			}
+			for _, e := range in {
+				if !out.Committed[e.Key] {
+					t.Errorf("entry %s not committed", e.Key)
+				}
+			}
+			if out.BlobsUploaded != len(digests) {
+				t.Errorf("BlobsUploaded = %d, want %d", out.BlobsUploaded, len(digests))
+			}
+
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			// Two find-missing: the session's first write, which asks about no
+			// blob, then the one for the blobs upload-batch did not take.
+			if f.nUploadBatch != 1 || f.nCommitBatch != 1 || !slices.Equal(f.findMissingBlobs, []int{0, len(digests)}) {
+				t.Errorf("upload-batch=%d commit-batch=%d find-missing asked about %v blobs, want 1, 1 and [0 %d]",
+					f.nUploadBatch, f.nCommitBatch, f.findMissingBlobs, len(digests))
+			}
+			for _, d := range digests {
+				if !f.findMissingSeen[d] {
+					t.Errorf("blob %s was not sent through find-missing", d)
+				}
+				if _, ok := f.uploaded[d]; !ok {
+					t.Errorf("blob %s not stored", d)
+				}
+			}
+		})
+	}
+}
+
+// TestStoreBatch_AFailedUploadBatchFailsTheWindow pins what does NOT fall back.
+// A server that refuses the write (403) or fails (500) would answer the
+// per-blob path the same way, so the window fails with the status. The
+// provider reads a 403 on upload-batch as a closed write path.
+func TestStoreBatch_AFailedUploadBatchFailsTheWindow(t *testing.T) {
+	for _, status := range []int{http.StatusForbidden, http.StatusInternalServerError, http.StatusRequestEntityTooLarge} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			f := newFakeCAS()
+			f.uploadBatchStatus = status
+			srv := httptest.NewServer(f.handler(t))
+			defer srv.Close()
+
+			in, src, _ := batchFixture()
+			c := NewClient(srv.URL, "tok", WithHTTPClient(srv.Client()))
+			_, err := c.StoreBatch(context.Background(), in, src, nil, WritePath{CoalesceSmall: true})
+			if !IsStatus(err, status) {
+				t.Fatalf("err = %v, want HTTP %d", err, status)
+			}
+
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			// The one find-missing is the session's first write, sent before
+			// upload-batch; none follows the failure.
+			if f.nFindMissing != 1 || f.nCommitBatch != 0 || len(f.uploaded) != 0 {
+				t.Errorf("find-missing=%d commit-batch=%d uploaded=%d, want 1, 0 and 0 after a failed upload-batch",
+					f.nFindMissing, f.nCommitBatch, len(f.uploaded))
+			}
+		})
+	}
+}
+
+// TestStoreBatch_ABlobUploadBatchLeavesOutTakesThePerBlobPath proves a blob the
+// server did not store inline is not lost. The contract lets upload-batch
+// answer with a subset. The window sends the rest through find-missing, so the
+// entry that names it still commits.
+func TestStoreBatch_ABlobUploadBatchLeavesOutTakesThePerBlobPath(t *testing.T) {
+	f := newFakeCAS()
+	in, src, digests := batchFixture()
+	f.uploadBatchOmit = map[string]bool{digests[1]: true}
+	srv := httptest.NewServer(f.handler(t))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "tok", WithHTTPClient(srv.Client()))
+	out, err := c.StoreBatch(context.Background(), in, src, nil, WritePath{CoalesceSmall: true})
+	if err != nil {
+		t.Fatalf("StoreBatch: %v", err)
+	}
+	for _, e := range in {
+		if !out.Committed[e.Key] {
+			t.Errorf("entry %s not committed", e.Key)
+		}
+	}
+	if out.BlobsUploaded != len(digests) {
+		t.Errorf("BlobsUploaded = %d, want %d", out.BlobsUploaded, len(digests))
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	// Two find-missing: the session's first write, which asks about no blob,
+	// then the one for the blob upload-batch left out.
+	if f.nUploadBatch != 1 || !slices.Equal(f.findMissingBlobs, []int{0, 1}) {
+		t.Errorf("upload-batch=%d find-missing asked about %v blobs, want 1 and [0 1]", f.nUploadBatch, f.findMissingBlobs)
+	}
+	if len(f.findMissingSeen) != 1 || !f.findMissingSeen[digests[1]] {
+		t.Errorf("find-missing saw %v, want only the blob upload-batch left out", f.findMissingSeen)
+	}
+}
+
+// manySmallBlobs returns n distinct one-line blobs and a source that serves
+// them.
+func manySmallBlobs(n int) ([]cache.BlobRef, mapBlobSource) {
+	refs := make([]cache.BlobRef, n)
+	src := make(mapBlobSource, n)
+	for i := range refs {
+		content := []byte(fmt.Sprintf("blob %d\n", i))
+		digest := cache.DigestOf(content)
+		refs[i] = cache.BlobRef{Digest: digest, SizeBytes: int64(len(content))}
+		src[digest] = content
+	}
+	return refs, src
+}
+
+// TestUploadInlineBatches_SplitsAtTheBlobCountBound pins the second bound of
+// one upload-batch request. The contract refuses a request of more than
+// cache.MaxKeysPerRequest blobs, whatever their size, and the fake refuses one
+// as the server does. Blobs of a few bytes reach that bound long before the
+// byte bound.
+func TestUploadInlineBatches_SplitsAtTheBlobCountBound(t *testing.T) {
+	f := newFakeCAS()
+	srv := httptest.NewServer(f.handler(t))
+	defer srv.Close()
+
+	refs, src := manySmallBlobs(cache.MaxKeysPerRequest + 1)
+	c := NewClient(srv.URL, "tok", WithHTTPClient(srv.Client()))
+	out := &BatchOutcome{Committed: map[string]bool{}}
+	rest, err := c.uploadInlineBatches(context.Background(), refs, src, WriteRetry{}, newBlobState(out))
+	if err != nil {
+		t.Fatalf("uploadInlineBatches: %v", err)
+	}
+	if len(rest) != 0 || out.BlobsUploaded != len(refs) || len(out.Confirmed) != len(refs) {
+		t.Fatalf("rest=%d uploaded=%d confirmed=%d, want 0, %d and %d", len(rest), out.BlobsUploaded, len(out.Confirmed), len(refs), len(refs))
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if want := []int{cache.MaxKeysPerRequest, 1}; !slices.Equal(f.uploadBatchBlobs, want) {
+		t.Fatalf("upload-batch requests carried %v blobs, want %v", f.uploadBatchBlobs, want)
+	}
+}
+
+// TestUploadInlineBatches_SendsNoLaterRequestOnceUnserved proves the fallback
+// costs one request, however many requests the window would have needed, and
+// hands back every blob in the order it was given.
+func TestUploadInlineBatches_SendsNoLaterRequestOnceUnserved(t *testing.T) {
+	f := newFakeCAS()
+	f.uploadBatchStatus = http.StatusNotFound
+	srv := httptest.NewServer(f.handler(t))
+	defer srv.Close()
+
+	refs, src := manySmallBlobs(cache.MaxKeysPerRequest + 2)
+	c := NewClient(srv.URL, "tok", WithHTTPClient(srv.Client()))
+	out := &BatchOutcome{Committed: map[string]bool{}}
+	rest, err := c.uploadInlineBatches(context.Background(), refs, src, WriteRetry{}, newBlobState(out))
+	if err != nil {
+		t.Fatalf("uploadInlineBatches: %v", err)
+	}
+	if !slices.Equal(rest, refs) {
+		t.Fatalf("rest holds %d blob(s), want all %d in order", len(rest), len(refs))
+	}
+	if out.BlobsUploaded != 0 || len(out.Confirmed) != 0 {
+		t.Fatalf("uploaded=%d confirmed=%d, want nothing counted", out.BlobsUploaded, len(out.Confirmed))
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.nUploadBatch != 1 {
+		t.Fatalf("upload-batch requests=%d want 1", f.nUploadBatch)
 	}
 }
 
@@ -713,5 +906,109 @@ func TestStoreBatch_RecoversWhenKnownBlobEvicted(t *testing.T) {
 	// Two commit-batch round trips: the optimistic pass + the recovery pass.
 	if f.nCommitBatch != 2 {
 		t.Errorf("expected 2 commit-batch round trips (optimistic + recovery), got %d", f.nCommitBatch)
+	}
+}
+
+// TestTaskWritePathNeedsFindMissingAndCommitBatch pins the provider's choice of
+// task-cache write path: the batched path only when the server serves both
+// exchanges StoreBatch sends, and the per-entry store/commit otherwise.
+func TestTaskWritePathNeedsFindMissingAndCommitBatch(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		caps     *cache.CapabilitiesResponse
+		batched  bool
+		coalesce bool
+	}{
+		{name: "no probe", caps: nil},
+		{name: "baseline server", caps: &cache.CapabilitiesResponse{}},
+		{name: "find-missing only", caps: &cache.CapabilitiesResponse{Capabilities: []string{cache.CapabilityFindMissing}}},
+		{name: "commit-batch only", caps: &cache.CapabilitiesResponse{Capabilities: []string{cache.CapabilityCommitBatch}}},
+		{name: "upload-batch alone", caps: &cache.CapabilitiesResponse{Capabilities: []string{cache.CapabilityUploadBatch}}},
+		{
+			name:    "find-missing and commit-batch",
+			caps:    &cache.CapabilitiesResponse{Capabilities: []string{cache.CapabilityFindMissing, cache.CapabilityCommitBatch, cache.CapabilityObjectCache}},
+			batched: true,
+		},
+		{
+			name:     "with upload-batch",
+			caps:     &cache.CapabilitiesResponse{Capabilities: []string{cache.CapabilityUploadBatch, cache.CapabilityCommitBatch, cache.CapabilityFindMissing}},
+			batched:  true,
+			coalesce: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			wp, batched := TaskWritePath(test.caps)
+			if batched != test.batched {
+				t.Fatalf("batched = %t, want %t", batched, test.batched)
+			}
+			if wp.CoalesceSmall != test.coalesce || wp.Grant != nil {
+				t.Fatalf("write path = %+v, want CoalesceSmall=%t and no grant", wp, test.coalesce)
+			}
+		})
+	}
+}
+
+// TestStoreBatch_BlobConcurrencyBoundsTheWindowsUploads pins
+// WritePath.BlobConcurrency: a window's presigned PUTs run that many at once,
+// above the per-key default and never past the bound. Every PUT is held until
+// the bound is reached, so a client still limited to blobUploadConcurrency
+// never reaches it.
+func TestStoreBatch_BlobConcurrencyBoundsTheWindowsUploads(t *testing.T) {
+	const limit = 2 * blobUploadConcurrency
+	const blobs = 3 * limit
+
+	f := newFakeCAS()
+	inner := f.handler(t)
+	var (
+		mu             sync.Mutex
+		inflight, peak int
+		once           sync.Once
+	)
+	reached := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/up/") {
+			mu.Lock()
+			inflight++
+			peak = max(peak, inflight)
+			if inflight == limit {
+				once.Do(func() { close(reached) })
+			}
+			mu.Unlock()
+			select {
+			case <-reached:
+			case <-time.After(5 * time.Second):
+			}
+			defer func() {
+				mu.Lock()
+				inflight--
+				mu.Unlock()
+			}()
+		}
+		inner.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+
+	src := mapBlobSource{}
+	manifest := &cache.Manifest{}
+	for i := range blobs {
+		content := []byte(fmt.Sprintf("blob %d", i))
+		digest := cache.DigestOf(content)
+		src[digest] = content
+		manifest.Files = append(manifest.Files, cache.FileEntry{Path: fmt.Sprintf("out/%d", i), Digest: digest, Size: int64(len(content))})
+	}
+	in := []StoreInput{{Key: strings.Repeat("a", cache.KeyLength), Result: &cache.ActionResult{Status: "success"}, Manifest: manifest}}
+
+	c := NewClient(srv.URL, "tok", WithHTTPClient(srv.Client()))
+	out, err := c.StoreBatch(context.Background(), in, src, nil, WritePath{BlobConcurrency: limit})
+	if err != nil {
+		t.Fatalf("StoreBatch: %v", err)
+	}
+	if out.BlobsUploaded != blobs || !out.Committed[in[0].Key] {
+		t.Fatalf("outcome = %d blobs, committed=%t; want %d blobs committed", out.BlobsUploaded, out.Committed[in[0].Key], blobs)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if peak != limit {
+		t.Fatalf("peak uploads in flight = %d, want exactly the bound %d", peak, limit)
 	}
 }

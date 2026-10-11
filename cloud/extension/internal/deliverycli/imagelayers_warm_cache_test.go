@@ -31,6 +31,14 @@ func TestWarmSeedCopiesOnlyManifestBoundLockedArtifacts(t *testing.T) {
 			entry := extensions["@putnami/go"].(map[string]any)
 			entry["manifestHash"] = sha256Hex(manifest)
 			entry["source"] = "https://registry.invalid/host-only-source"
+			// A locked extension outside the language set is warmed,
+			// so its cached artifact is seeded under the same manifest binding.
+			cloudManifest := []byte(`{"name":"@putnami/cloud","version":"0.1.0-cloud"}`)
+			extensions["@putnami/cloud"] = map[string]any{
+				"version":      "0.1.0-cloud",
+				"integrities":  map[string]string{"linux/amd64": warmSeedCloudDigest},
+				"manifestHash": sha256Hex(cloudManifest),
+			}
 			data, err = json.Marshal(lock)
 			if err != nil {
 				t.Fatal(err)
@@ -38,19 +46,15 @@ func TestWarmSeedCopiesOnlyManifestBoundLockedArtifacts(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(workspace, "putnami.lock.json"), data, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			root := filepath.Join(store, "sha256", warmGoDigest[:2], warmGoDigest)
-			if err := os.MkdirAll(filepath.Join(root, "compiled"), 0o755); err != nil {
-				t.Fatal(err)
-			}
 			if !valid {
 				manifest = []byte(`{"name":"unexpected"}`)
+				cloudManifest = []byte(`{"name":"unexpected"}`)
 			}
-			if err := os.WriteFile(filepath.Join(root, "putnami.extension.json"), manifest, 0o644); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(root, "compiled", "go"), []byte("cached-linux-runtime"), 0o755); err != nil {
-				t.Fatal(err)
-			}
+			warmSeedHostArtifact(t, store, warmGoDigest, manifest)
+			warmSeedHostArtifact(t, store, warmSeedCloudDigest, cloudManifest)
+			// A cached artifact no lock entry pins is never a seed candidate, even
+			// with a well-formed manifest.
+			warmSeedHostArtifact(t, store, warmSeedUnlockedDigest, []byte(`{"name":"@putnami/other"}`))
 			if err := os.WriteFile(filepath.Join(store, "credentials.json"), []byte("must-not-copy"), 0o600); err != nil {
 				t.Fatal(err)
 			}
@@ -61,14 +65,19 @@ func TestWarmSeedCopiesOnlyManifestBoundLockedArtifacts(t *testing.T) {
 			if err := imageLayersSeedWarmStore(workspace, scratch, destination, artifacts); err != nil {
 				t.Fatal(err)
 			}
-			cached := filepath.Join(destination, "sha256", warmGoDigest[:2], warmGoDigest, "compiled", "go")
-			info, err := os.Stat(cached)
-			if valid {
-				if err != nil || info.Mode().Perm() != 0o755 {
-					t.Fatalf("bound executable not preserved: %v", err)
+			for _, digest := range []string{warmGoDigest, warmSeedCloudDigest} {
+				cached := filepath.Join(destination, "sha256", digest[:2], digest, "compiled", "runtime")
+				info, err := os.Stat(cached)
+				if valid {
+					if err != nil || info.Mode().Perm() != 0o755 {
+						t.Fatalf("bound executable %s not preserved: %v", digest, err)
+					}
+				} else if !os.IsNotExist(err) {
+					t.Fatalf("altered manifest seeded artifact %s: %v", digest, err)
 				}
-			} else if !os.IsNotExist(err) {
-				t.Fatalf("altered manifest seeded an artifact: %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(destination, "sha256", warmSeedUnlockedDigest[:2])); !os.IsNotExist(err) {
+				t.Fatalf("an artifact no lock entry pins entered materialization: %v", err)
 			}
 			if _, err := os.Stat(filepath.Join(destination, "credentials.json")); !os.IsNotExist(err) {
 				t.Fatal("host credential file entered materialization")
@@ -83,10 +92,33 @@ func TestWarmSeedCopiesOnlyManifestBoundLockedArtifacts(t *testing.T) {
 			if err := json.Unmarshal(materializedLock, &selected); err != nil {
 				t.Fatal(err)
 			}
-			if len(selected.Extensions) != 2 || selected.Extensions["@putnami/go"].ManifestHash != entry["manifestHash"] {
+			if len(selected.Extensions) != 3 || selected.Extensions["@putnami/go"].ManifestHash != entry["manifestHash"] ||
+				selected.Extensions["@putnami/cloud"].Integrities["linux/amd64"] != warmSeedCloudDigest {
 				t.Fatal("installer lost its exact platform/manifest lock")
 			}
 		})
+	}
+}
+
+// The host-store digests the seed test stages beside the fixture's own.
+var (
+	warmSeedCloudDigest    = strings.Repeat("5e", 32)
+	warmSeedUnlockedDigest = strings.Repeat("6f", 32)
+)
+
+// warmSeedHostArtifact writes one cached artifact into a host artifact store:
+// its manifest and an executable runtime file.
+func warmSeedHostArtifact(t *testing.T, store, digest string, manifest []byte) {
+	t.Helper()
+	root := filepath.Join(store, "sha256", digest[:2], digest)
+	if err := os.MkdirAll(filepath.Join(root, "compiled"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "putnami.extension.json"), manifest, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "compiled", "runtime"), []byte("cached-linux-runtime"), 0o755); err != nil {
+		t.Fatal(err)
 	}
 }
 

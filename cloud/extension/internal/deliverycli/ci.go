@@ -518,7 +518,7 @@ func ciHelp(params map[string]any, ioctx clicore.IO) error {
 		{"command": "cloud ci retry <run> --reason <why>", "description": "retry a run (whole run, or --phase <p>, with --size/--no-cache/--max-parallel)"},
 		{"command": "cloud ci logs <run>", "description": "read a run's logs, rendered for humans (--raw for the runner's protocol records); --follow tails live (--phase/--project/--q/--level/--from/--to/--cursor/--limit)"},
 		{"command": "cloud ci status", "description": "CI readiness checks, queue, last run reuse, and runs and spend over 7 days"},
-		{"command": "cloud ci usage", "description": "aggregate the workspace's runs over a window (--window <dur>, default 168h) by substrate, profile, source, gate wall, and estimated spend"},
+		{"command": "cloud ci usage", "description": "aggregate the workspace's runs over a window (--window <dur>, default 168h) by substrate, profile, source, gate wall, estimated spend, and billed cost per day"},
 		{"command": "cloud ci insights <run>", "description": "one run's contracted gate report — CPU balance sheet, cache economics, scheduler shape, per-command and per-job detail (--output=json for the whole document)"},
 		{"command": "cloud ci timings <run>", "description": "one run's per-task timeline — absolute start, end and CPU share per task, longest wall first — so a run's critical path can be reconstructed (--limit N, default 40, 0 for every row; --output=json emits the whole table unless --limit asks for fewer)"},
 		{"command": "cloud ci timings <run> --against <other-run>", "description": "why each task of the run executed instead of being served by the cache, read against a run that could have filled it: no cache key, a key that changed, or the same key with no entry"},
@@ -1688,6 +1688,36 @@ type CIUsageResponse struct {
 	Outcomes       map[string]int                `json:"outcomes,omitempty"`
 	Gate           map[string]CIUsageWallSummary `json:"gate,omitempty"`
 	Spend          CIUsageSpend                  `json:"spend"`
+	Billed         *CIUsageBilled                `json:"billed,omitempty"`
+}
+
+// CIUsageBilled mirrors apis.CIUsageBilled: the cost the GCP billing export
+// charged on each stored UTC day from the day the window starts in, newest
+// day first.
+type CIUsageBilled struct {
+	Currency   string             `json:"currency"`
+	Days       []CIUsageBilledDay `json:"days"`
+	Runs       int                `json:"runs"`
+	ComputeEUR float64            `json:"computeEur"`
+	EgressEUR  float64            `json:"egressEur"`
+	GatewayEUR float64            `json:"gatewayEur"`
+	CacheEUR   float64            `json:"cacheEur"`
+	LogsEUR    float64            `json:"logsEur"`
+	TotalEUR   float64            `json:"totalEur"`
+	PerRunEUR  *float64           `json:"perRunEur,omitempty"`
+}
+
+// CIUsageBilledDay mirrors apis.CIUsageBilledDay.
+type CIUsageBilledDay struct {
+	Day        string   `json:"day"`
+	Runs       int      `json:"runs"`
+	ComputeEUR float64  `json:"computeEur"`
+	EgressEUR  float64  `json:"egressEur"`
+	GatewayEUR float64  `json:"gatewayEur"`
+	CacheEUR   float64  `json:"cacheEur"`
+	LogsEUR    float64  `json:"logsEur"`
+	TotalEUR   float64  `json:"totalEur"`
+	PerRunEUR  *float64 `json:"perRunEur,omitempty"`
 }
 
 func ciUsage(params map[string]any, workspaceRoot string, env map[string]string, ioctx clicore.IO) error {
@@ -1734,6 +1764,43 @@ func ciRenderUsage(ioctx clicore.IO, u *CIUsageResponse) {
 	}
 	ioctx.Stdout(fmt.Sprintf("Spend (%s, %s, over %d runs with a measured duration):", label, u.Spend.Currency, u.Spend.RunsWithDuration))
 	ioctx.Stdout(fmt.Sprintf("  spot=%.2f  cloudrun=%.2f  total=%.2f", u.Spend.SpotEUR, u.Spend.CloudRunEUR, u.Spend.TotalEUR))
+	ciRenderBilled(ioctx, u.Billed)
+}
+
+// ciBilledUnavailable is the line a rollup without a billed section prints.
+// It names no cause, because the answer carries none: no day is stored for
+// the window yet, the window starts today, the daily job is not configured,
+// or the server could not read its store.
+const ciBilledUnavailable = "billed cost: not available for this window"
+
+// ciRenderBilled prints the billed cost: one line per UTC day, newest first,
+// so the per-run column reads as the trend, then the total of the listed days
+// and its split by category. The days are whole UTC days and the first one
+// starts before the window does, so the total row is labeled "all days", not
+// "window". The gateway also serves the console and the APIs, so its
+// figure is marked as an upper bound. A rollup without the section says so in
+// one line.
+func ciRenderBilled(ioctx clicore.IO, b *CIUsageBilled) {
+	if b == nil {
+		ioctx.Stdout(ciBilledUnavailable)
+		return
+	}
+	ioctx.Stdout(fmt.Sprintf("Billed cost (%s, net of credits, per UTC day; the newest day can still grow):", b.Currency))
+	ioctx.Stdout(fmt.Sprintf("  %-10s  %6s  %8s  %9s", "day", "runs", "per run", "total"))
+	for _, d := range b.Days {
+		ioctx.Stdout(fmt.Sprintf("  %-10s  %6d  %8s  %9.2f", d.Day, d.Runs, ciPerRunEUR(d.PerRunEUR), d.TotalEUR))
+	}
+	ioctx.Stdout(fmt.Sprintf("  %-10s  %6d  %8s  %9.2f", "all days", b.Runs, ciPerRunEUR(b.PerRunEUR), b.TotalEUR))
+	ioctx.Stdout(fmt.Sprintf("  compute=%.2f  egress=%.2f  cache=%.2f  logs=%.2f  gateway=%.2f (upper bound: it also serves the console and the APIs)",
+		b.ComputeEUR, b.EgressEUR, b.CacheEUR, b.LogsEUR, b.GatewayEUR))
+}
+
+// ciPerRunEUR renders a per-run cost, or a dash when no run was dispatched.
+func ciPerRunEUR(perRun *float64) string {
+	if perRun == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%.2f", *perRun)
 }
 
 func ciRenderCountSection(ioctx clicore.IO, title string, counts map[string]int) {

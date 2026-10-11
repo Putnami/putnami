@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 
 	cacheserverclient "go.putnami.dev/cloud/clients/cache-server/go"
 	cache "go.putnami.dev/protocol/cache"
@@ -173,32 +175,24 @@ func (c *Client) StoreObjects(ctx context.Context, namespace string, objects []O
 		blobs = append(blobs, cache.BlobRef{Digest: digest, SizeBytes: size})
 	}
 
-	// Reuse the batched blob write path verbatim: small blobs coalesced inline
-	// when the server advertises upload-batch, the rest through the direct grant
-	// or one find-missing plus presigned PUTs. The outcome's byte counts are not
-	// reported in the run summary (object bytes are not task-entry bytes), so a
-	// throwaway accumulator is enough.
-	out := &BatchOutcome{Committed: map[string]bool{}}
-	perBlob := blobs
-	if wp.CoalesceSmall {
-		var small, large []cache.BlobRef
-		for _, b := range blobs {
-			if b.SizeBytes <= cache.MaxInlineBlobBytes {
-				small = append(small, b)
-			} else {
-				large = append(large, b)
-			}
-		}
-		if err := c.uploadInlineBatches(ctx, small, src, out); err != nil {
-			return nil, err
-		}
-		perBlob = large
+	// A stable order: the requests of a batch do not depend on map iteration.
+	slices.SortFunc(blobs, func(a, b cache.BlobRef) int { return strings.Compare(a.Digest, b.Digest) })
+
+	// Reuse the batched blob write path verbatim (uploadBlobSet): small blobs
+	// coalesced inline when the server advertises upload-batch, the rest (and
+	// any small blob upload-batch did not take) through the direct grant or
+	// find-missing plus presigned PUTs. It also keeps blob bytes off the wire
+	// until the server has accepted a write of this bearer. The outcome's byte
+	// counts are not reported in the run summary (object bytes are not
+	// task-entry bytes), so a throwaway accumulator is enough.
+	//
+	// A blob that could not be uploaded fails the batch: its object would be
+	// refused by the index, and the caller counts a batch as a whole.
+	st := newBlobState(&BatchOutcome{Committed: map[string]bool{}, Failed: map[string]error{}})
+	if err := c.uploadBlobSet(ctx, blobs, src, wp, st); err != nil {
+		return nil, err
 	}
-	if wp.Grant != nil {
-		if err := c.directUploadBlobs(ctx, wp.Grant, perBlob, src, out); err != nil {
-			return nil, err
-		}
-	} else if err := c.findMissingUpload(ctx, perBlob, src, sizeByDigest, out); err != nil {
+	if err := st.firstFailure(); err != nil {
 		return nil, err
 	}
 

@@ -1,6 +1,7 @@
 package remotecache
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -460,7 +461,134 @@ func TestSplitUserinfo(t *testing.T) {
 	}
 }
 
-// --- protocol routes cache-server does not serve ---
+// --- upload-batch, a control call like the others ---
+
+// TestUploadBatch_GoesThroughTheGeneratedClient pins the transport of
+// upload-batch. cache-server serves the route, so the call is the generated
+// operation, like every other control call. X-Client-Id is the mark: only the
+// generated client sends it.
+//
+// The generated input re-encodes the request, so the test also checks that a
+// strict server reads back every blob byte for byte, binary content included.
+func TestUploadBatch_GoesThroughTheGeneratedClient(t *testing.T) {
+	text := []byte("small blob")
+	binary := make([]byte, 512)
+	for i := range binary {
+		binary[i] = byte(i)
+	}
+	blobs := map[string][]byte{cache.DigestOf(text): text, cache.DigestOf(binary): binary}
+	req := &cache.UploadBatchRequest{ProtocolVersion: cache.ProtocolVersion, Blobs: []cache.InlineBlob{
+		{Digest: cache.DigestOf(text), Data: text},
+		{Digest: cache.DigestOf(binary), Data: binary},
+	}}
+	rec, srv := startRecordingServer(t, answerJSON(http.StatusOK, fmt.Sprintf(`{"protocolVersion":%d,"stored":[%q,%q]}`,
+		cache.ProtocolVersion, cache.DigestOf(text), cache.DigestOf(binary))))
+	c := NewClient(srv.URL, "secret-token", WithHTTPClient(srv.Client()))
+
+	resp, err := c.UploadBatch(context.Background(), req)
+	if err != nil {
+		t.Fatalf("UploadBatch: %v", err)
+	}
+	if len(resp.Stored) != 2 {
+		t.Errorf("stored = %v, want both digests", resp.Stored)
+	}
+
+	seen := rec.requests()
+	if len(seen) != 1 || seen[0].method != http.MethodPost || seen[0].path != cache.UploadBatchPath {
+		t.Fatalf("requests = %+v, want one POST %s", seen, cache.UploadBatchPath)
+	}
+	for name, want := range map[string]string{
+		cache.AuthorizationHeader: "Bearer secret-token",
+		"Content-Type":            "application/json",
+		"Accept":                  "application/json",
+		"User-Agent":              cliUserAgent(),
+		"X-Client-Id":             controlClientID,
+	} {
+		if value := seen[0].header.Get(name); value != want {
+			t.Errorf("%s = %q, want %q", name, value, want)
+		}
+	}
+	sent, diags := cache.ParseAndValidateUploadBatchRequest(seen[0].body)
+	if sent == nil {
+		t.Fatalf("server could not read the request: %v", diags)
+	}
+	if len(sent.Blobs) != len(blobs) {
+		t.Fatalf("server read %d blob(s), want %d", len(sent.Blobs), len(blobs))
+	}
+	for _, b := range sent.Blobs {
+		if want, ok := blobs[b.Digest]; !ok || !bytes.Equal(b.Data, want) {
+			t.Errorf("blob %s: server read %d byte(s), want the %d sent", b.Digest, len(b.Data), len(want))
+		}
+	}
+}
+
+// TestUploadBatch_KeepsTheRefusal proves a refused upload-batch reaches the
+// caller as a StatusError with the server's code. uploadInlineBatches reads the
+// status to tell an unserved route from a failed write.
+func TestUploadBatch_KeepsTheRefusal(t *testing.T) {
+	_, srv := startRecordingServer(t, answerJSON(http.StatusServiceUnavailable, fmt.Sprintf(`{"protocolVersion":%d,"code":"unavailable","message":"later"}`, cache.ProtocolVersion)))
+	c := NewClient(srv.URL, "tok", WithHTTPClient(srv.Client()))
+
+	content := []byte("small blob")
+	_, err := c.UploadBatch(context.Background(), &cache.UploadBatchRequest{
+		ProtocolVersion: cache.ProtocolVersion,
+		Blobs:           []cache.InlineBlob{{Digest: cache.DigestOf(content), Data: content}},
+	})
+	var se *StatusError
+	if !errors.As(err, &se) || se.Status != http.StatusServiceUnavailable || se.Code != "unavailable" {
+		t.Errorf("UploadBatch err = %v, want HTTP 503 unavailable", err)
+	}
+}
+
+// TestUploadBatch_RefusesAnInvalidRequestOrAnswer proves the protocol's own
+// validation still frames the generated call on both sides.
+func TestUploadBatch_RefusesAnInvalidRequestOrAnswer(t *testing.T) {
+	rec, srv := startRecordingServer(t, answerJSON(http.StatusOK, `{"protocolVersion":0,"stored":[]}`))
+	c := NewClient(srv.URL, "tok", WithHTTPClient(srv.Client()))
+
+	content := []byte("small blob")
+	if _, err := c.UploadBatch(context.Background(), &cache.UploadBatchRequest{
+		Blobs: []cache.InlineBlob{{Digest: cache.DigestOf(content), Data: content}},
+	}); err == nil || !strings.Contains(err.Error(), "invalid upload-batch request") {
+		t.Errorf("err = %v, want the request refused before it is sent", err)
+	}
+	if seen := rec.requests(); len(seen) != 0 {
+		t.Fatalf("requests = %+v, want none for an invalid request", seen)
+	}
+
+	if _, err := c.UploadBatch(context.Background(), &cache.UploadBatchRequest{
+		ProtocolVersion: cache.ProtocolVersion,
+		Blobs:           []cache.InlineBlob{{Digest: cache.DigestOf(content), Data: content}},
+	}); err == nil || !strings.Contains(err.Error(), "invalid upload-batch response") {
+		t.Errorf("err = %v, want the answer refused", err)
+	}
+}
+
+func TestUploadBatch_SendsNoBearerWhenNoneIsSet(t *testing.T) {
+	t.Setenv(TokenEnv, "")
+	rec, srv := startRecordingServer(t, answerJSON(http.StatusOK, fmt.Sprintf(`{"protocolVersion":%d,"stored":[]}`, cache.ProtocolVersion)))
+	c := NewClient(srv.URL, "", WithHTTPClient(srv.Client()))
+
+	content := []byte("small blob")
+	if _, err := c.UploadBatch(context.Background(), &cache.UploadBatchRequest{
+		ProtocolVersion: cache.ProtocolVersion,
+		Blobs:           []cache.InlineBlob{{Digest: cache.DigestOf(content), Data: content}},
+	}); err != nil {
+		t.Fatalf("UploadBatch: %v", err)
+	}
+	seen := rec.requests()
+	if len(seen) != 1 || seen[0].method != http.MethodPost || seen[0].path != cache.UploadBatchPath {
+		t.Fatalf("requests = %+v, want one POST %s", seen, cache.UploadBatchPath)
+	}
+	if got := seen[0].header.Get(cache.AuthorizationHeader); got != "" {
+		t.Errorf("Authorization = %q, want none", got)
+	}
+	if got := seen[0].header.Get("Content-Type"); got != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", got)
+	}
+}
+
+// --- upload-grant, the protocol route cache-server does not serve ---
 
 func validUploadGrant(r *http.Request) string {
 	return fmt.Sprintf(`{"protocolVersion":%d,"urlTemplate":"http://%s/dput/%s","method":"PUT","conditionalExistsStatus":412}`,
@@ -512,38 +640,30 @@ func TestProtocolRoutes_MapARefusalToAStatusError(t *testing.T) {
 	if !errors.As(err, &se) || se.Status != http.StatusServiceUnavailable || se.Code != "unavailable" {
 		t.Errorf("UploadGrant err = %v, want HTTP 503 unavailable", err)
 	}
-
-	content := []byte("small blob")
-	_, err = c.UploadBatch(context.Background(), &cache.UploadBatchRequest{
-		ProtocolVersion: cache.ProtocolVersion,
-		Blobs:           []cache.InlineBlob{{Digest: cache.DigestOf(content), Data: content}},
-	})
-	if !IsStatus(err, http.StatusServiceUnavailable) {
-		t.Errorf("UploadBatch err = %v, want HTTP 503", err)
-	}
 }
 
-func TestProtocolRoutes_SendTheBatchWithoutABearerWhenNoneIsSet(t *testing.T) {
+// TestProtocolRoutes_SendTheGrantRequestWithoutABearerWhenNoneIsSet proves the
+// hand-written upload-grant request carries no Authorization header when the
+// client has no credential, and none of the generated client's own headers.
+func TestProtocolRoutes_SendTheGrantRequestWithoutABearerWhenNoneIsSet(t *testing.T) {
 	t.Setenv(TokenEnv, "")
-	rec, srv := startRecordingServer(t, answerJSON(http.StatusOK, fmt.Sprintf(`{"protocolVersion":%d,"stored":[]}`, cache.ProtocolVersion)))
+	rec, srv := startRecordingServer(t, func(w http.ResponseWriter, r *http.Request) {
+		answerJSON(http.StatusOK, validUploadGrant(r))(w, r)
+	})
 	c := NewClient(srv.URL, "", WithHTTPClient(srv.Client()))
 
-	content := []byte("small blob")
-	if _, err := c.UploadBatch(context.Background(), &cache.UploadBatchRequest{
-		ProtocolVersion: cache.ProtocolVersion,
-		Blobs:           []cache.InlineBlob{{Digest: cache.DigestOf(content), Data: content}},
-	}); err != nil {
-		t.Fatalf("UploadBatch: %v", err)
+	if _, err := c.UploadGrant(context.Background()); err != nil {
+		t.Fatalf("UploadGrant: %v", err)
 	}
 	seen := rec.requests()
-	if len(seen) != 1 || seen[0].method != http.MethodPost || seen[0].path != cache.UploadBatchPath {
-		t.Fatalf("requests = %+v, want one POST %s", seen, cache.UploadBatchPath)
+	if len(seen) != 1 || seen[0].method != http.MethodGet || seen[0].path != cache.UploadGrantPath {
+		t.Fatalf("requests = %+v, want one GET %s", seen, cache.UploadGrantPath)
 	}
 	if got := seen[0].header.Get(cache.AuthorizationHeader); got != "" {
 		t.Errorf("Authorization = %q, want none", got)
 	}
-	if got := seen[0].header.Get("Content-Type"); got != "application/json" {
-		t.Errorf("Content-Type = %q, want application/json", got)
+	if got := seen[0].header.Get("X-Client-Id"); got != "" {
+		t.Errorf("X-Client-Id = %q, want none: upload-grant is not a generated operation", got)
 	}
 }
 

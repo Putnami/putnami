@@ -64,6 +64,46 @@ type Config struct {
 	// metadataIdentity is an execution-local override, never persisted. The
 	// native cache provider owns identity resolution, not a runner-written file.
 	metadataIdentity bool
+
+	// machineToken is an execution-local workspace machine token, never
+	// persisted. The native cache provider sets it from PUTNAMI_CLOUD_TOKEN (see
+	// UseMachineToken); ResolveBearer sends it only while TakesMachineToken holds.
+	machineToken string
+}
+
+// UseMachineToken hands the config a workspace machine token for this
+// execution. The caller decides whether the session may use one: this package
+// does not read PUTNAMI_CLOUD_TOKEN. The token is not written by
+// encoding/json, and ResolveBearer never re-mints it.
+func (c *Config) UseMachineToken(token string) {
+	c.machineToken = token
+}
+
+// TakesMachineToken reports whether the configured token source yields to a
+// workspace machine token. It yields in two cases: no source is configured, or
+// the source is the canonical `putnami cloud token --for cache` recipe, which
+// needs a signed-in user. PUTNAMI_CACHE_TOKEN, a custom command, a URL source,
+// a persisted metadata audience and the PUTNAMI_CACHE_TOKEN_SOURCE=metadata
+// selector all keep precedence. Like TokenSource.Class it reads the environment
+// at call time.
+func (c *Config) TakesMachineToken() bool {
+	if c == nil || c.metadataIdentity {
+		return false
+	}
+	switch c.Token.Class() {
+	case TokenClassNone:
+		return true
+	case TokenClassCommand:
+		return isPutnamiCacheTokenCommand(c.Token.Command)
+	default:
+		return false
+	}
+}
+
+// SendsMachineToken reports whether ResolveBearer answers the machine token:
+// one was handed over, and the configured source still yields to it.
+func (c *Config) SendsMachineToken() bool {
+	return c != nil && c.machineToken != "" && c.TakesMachineToken()
 }
 
 // ResolveToken resolves the configured bearer, defaulting the metadata-token
@@ -79,9 +119,16 @@ func (c *Config) ResolveToken(ctx context.Context) (string, error) {
 // credential. The client needs the class to decide whether a bearer the cache
 // server refused can be re-minted, so this — not ResolveToken — is what the
 // cache provider wires in.
+//
+// A machine token handed over with UseMachineToken is checked first, with the
+// same test TakesMachineToken applies, so its class cannot disagree with the
+// credential sent and PUTNAMI_CACHE_TOKEN still wins when both are set.
 func (c *Config) ResolveBearer(ctx context.Context) (Bearer, error) {
 	if c == nil {
 		return Bearer{Class: TokenClassNone}, nil
+	}
+	if c.SendsMachineToken() {
+		return Bearer{Token: c.machineToken, Class: TokenClassCloudEnv}, nil
 	}
 	source := c.Token
 	if c.metadataIdentity {

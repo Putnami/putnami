@@ -3,6 +3,7 @@ package deliverycli
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -56,14 +57,34 @@ func shortExchangeDir(t *testing.T) string {
 // blob halves the object write path rides on. It records what it was asked, so a
 // test can assert the SHAPE of a request (no asserted channel) and not merely
 // its effect.
+//
+// It keeps object storage and the CAS index apart, as cache-server does. A
+// presigned PUT writes storage and no index row. A route answers "present"
+// from the index alone, and indexes a stored object when it records it
+// (indexStoredLocked). A fake that answered from storage once hid a defect: the real
+// objects/store route answered stored:false for every object uploaded through
+// a presigned PUT, and this fake answered stored:true.
 type fakeObjectServer struct {
 	srv *httptest.Server
 
 	mu sync.Mutex
 	// objects is the keyed index: namespace\x00id -> record.
 	objects map[string]fakeObject
-	// blobs is the CAS: digest -> uncompressed bytes.
+	// blobs is object storage: digest -> uncompressed bytes.
 	blobs map[string][]byte
+	// storedLen is the length of each object as it was written (gzip or raw).
+	// That, and not the content, is what the server knows of a presigned PUT.
+	storedLen map[string]int64
+	// index is the CAS index: the digests the server answers as present.
+	index map[string]bool
+	// findMissings and uploadBatches count the requests of each blob route, and
+	// findMissingBlobs the blobs find-missing was asked about.
+	findMissings     int
+	findMissingBlobs int
+	uploadBatches    int
+	// uploadBatchStatus, when non-zero, is answered to every upload-batch — the
+	// shape of a server that advertised the route and does not serve it.
+	uploadBatchStatus int
 	// storeBodies keeps every objects/store request body verbatim.
 	storeBodies [][]byte
 	lookups     int
@@ -112,6 +133,8 @@ func newFakeObjectServer(t *testing.T) *fakeObjectServer {
 	f := &fakeObjectServer{
 		objects:     map[string]fakeObject{},
 		blobs:       map[string][]byte{},
+		storedLen:   map[string]int64{},
+		index:       map[string]bool{},
 		crossWired:  map[string]string{},
 		channel:     cache.ChannelTrusted,
 		inlineBound: cache.MaxInlineBlobBytes,
@@ -143,6 +166,8 @@ func (f *fakeObjectServer) handle(w http.ResponseWriter, r *http.Request) {
 		f.store(w, r)
 	case r.URL.Path == cache.FindMissingPath:
 		f.findMissing(w, r)
+	case r.URL.Path == cache.UploadBatchPath:
+		f.uploadBatch(w, r)
 	case strings.HasPrefix(r.URL.Path, "/blob/"):
 		f.blob(w, r)
 	default:
@@ -165,7 +190,7 @@ func (f *fakeObjectServer) lookup(w http.ResponseWriter, r *http.Request) {
 			continue // a miss is an omission
 		}
 		content, ok := f.blobs[obj.digest]
-		if !ok {
+		if !ok || !f.index[obj.digest] {
 			continue // a dangling index row is a miss, never a phantom hit
 		}
 		record := remotecache.ObjectRecord{
@@ -232,7 +257,7 @@ func (f *fakeObjectServer) store(w http.ResponseWriter, r *http.Request) {
 	f.storeBodies = append(f.storeBodies, body)
 	resp := remotecache.ObjectStoreResponse{ProtocolVersion: cache.ProtocolVersion}
 	for _, obj := range req.Objects {
-		_, present := f.blobs[obj.Digest]
+		present := f.indexStoredLocked(obj.Digest, obj.SizeBytes)
 		if present {
 			// Provenance comes from the credential this server verified, never
 			// from the request: the offer carries no channel at all.
@@ -254,9 +279,11 @@ func (f *fakeObjectServer) findMissing(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := cache.FindMissingResponse{ProtocolVersion: cache.ProtocolVersion}
 	f.mu.Lock()
+	f.findMissings++
+	f.findMissingBlobs += len(req.Blobs)
 	for _, b := range req.Blobs {
-		if _, ok := f.blobs[b.Digest]; ok {
-			continue // already in CAS: dedup, no upload
+		if f.indexStoredLocked(b.Digest, b.SizeBytes) {
+			continue // indexed, or stored and indexed now: dedup, no upload
 		}
 		resp.Uploads = append(resp.Uploads, cache.BlobTransfer{
 			Digest:    b.Digest,
@@ -269,8 +296,75 @@ func (f *fakeObjectServer) findMissing(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
+// indexStoredLocked reports whether the CAS index holds digest, indexing it
+// first when storage holds an object the blob can be. It is the rule of
+// cas.Writer.AdoptMany, which find-missing and objects/store both apply: the
+// stored object is at most the declared size, and not empty unless the blob is.
+// The caller holds f.mu.
+func (f *fakeObjectServer) indexStoredLocked(digest string, declared int64) bool {
+	if f.index[digest] {
+		return true
+	}
+	stored, ok := f.storedLen[digest]
+	if !ok || stored > declared || (stored == 0 && declared != 0) {
+		return false
+	}
+	f.index[digest] = true
+	return true
+}
+
+// uploadBatch stores a window of small blobs sent inline and indexes each one
+// in the same request, as cache-server's upload-batch does. A server that does
+// not advertise the route does not serve it.
+func (f *fakeObjectServer) uploadBatch(w http.ResponseWriter, r *http.Request) {
+	var req cache.UploadBatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.uploadBatches++
+	status := f.uploadBatchStatus
+	if status == 0 && !advertises(f.capabilities, cache.CapabilityUploadBatch) {
+		status = http.StatusNotFound
+	}
+	if status != 0 {
+		w.WriteHeader(status)
+		_ = json.NewEncoder(w).Encode(cache.ErrorResponse{Code: "refused", Message: "upload-batch is not served"})
+		return
+	}
+	resp := cache.UploadBatchResponse{ProtocolVersion: cache.ProtocolVersion}
+	for _, b := range req.Blobs {
+		if cache.DigestOf(b.Data) != b.Digest {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(cache.ErrorResponse{Code: cache.CodeInvalidDigest, Message: "an inline blob does not match its digest"})
+			return
+		}
+	}
+	for _, b := range req.Blobs {
+		f.blobs[b.Digest] = b.Data
+		f.storedLen[b.Digest] = int64(len(b.Data))
+		f.index[b.Digest] = true
+		resp.Stored = append(resp.Stored, b.Digest)
+	}
+	cache.NormalizeUploadBatchResponse(&resp)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// advertises reports whether capabilities lists capability.
+func advertises(capabilities []string, capability string) bool {
+	for _, c := range capabilities {
+		if c == capability {
+			return true
+		}
+	}
+	return false
+}
+
 // blob is the presigned transfer target: PUT stores the bytes (un-gzipping the
-// transport layer, exactly as the real CAS reader does), GET serves them.
+// transport layer, exactly as the real CAS reader does) and writes no index
+// row, GET serves them.
 func (f *fakeObjectServer) blob(w http.ResponseWriter, r *http.Request) {
 	digest := cache.DigestAlgorithm + ":" + strings.TrimPrefix(r.URL.Path, "/blob/")
 	switch r.Method {
@@ -291,6 +385,7 @@ func (f *fakeObjectServer) blob(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		stored := int64(len(body))
 		if zr, err := gzip.NewReader(bytes.NewReader(body)); err == nil {
 			if raw, err := io.ReadAll(zr); err == nil {
 				body = raw
@@ -298,6 +393,7 @@ func (f *fakeObjectServer) blob(w http.ResponseWriter, r *http.Request) {
 		}
 		f.mu.Lock()
 		f.blobs[digest] = body
+		f.storedLen[digest] = stored
 		f.blobPuts++
 		f.mu.Unlock()
 		w.WriteHeader(http.StatusOK)
@@ -322,6 +418,8 @@ func (f *fakeObjectServer) seed(namespace, id, content, meta string, channel cac
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.blobs[digest] = []byte(content)
+	f.storedLen[digest] = int64(len(content))
+	f.index[digest] = true
 	f.objects[namespace+"\x00"+id] = fakeObject{
 		id: id, digest: digest, size: int64(len(content)), meta: meta, channel: channel,
 	}
@@ -372,11 +470,41 @@ func (f *fakeObjectServer) stats() (lookups, stores int) {
 	return f.lookups, f.stores
 }
 
-// uploadedBlobs is how many blobs the CAS received.
+// uploadedBlobs is how many blobs the CAS received through a presigned PUT.
 func (f *fakeObjectServer) uploadedBlobs() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.blobPuts
+}
+
+// blobRequests is how many blobs find-missing was asked about and how many
+// upload-batch requests arrived.
+func (f *fakeObjectServer) blobRequests() (findMissingBlobs, uploadBatches int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.findMissingBlobs, f.uploadBatches
+}
+
+// storedGzip reports whether the object for digest was written smaller than
+// its content, which is how the client writes a blob that compresses.
+func (f *fakeObjectServer) storedGzip(digest string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.storedLen[digest] < int64(len(f.blobs[digest]))
+}
+
+// advertise replaces the capabilities the discovery probe answers.
+func (f *fakeObjectServer) advertise(capabilities ...string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.capabilities = capabilities
+}
+
+// refuseUploadBatch answers every upload-batch with status.
+func (f *fakeObjectServer) refuseUploadBatch(status int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.uploadBatchStatus = status
 }
 
 // startedBlobPuts is how many presigned uploads ARRIVED, gated or not.
@@ -1978,4 +2106,227 @@ func mustPayload(t *testing.T, params any) json.RawMessage {
 		t.Fatalf("marshal payload: %v", err)
 	}
 	return raw
+}
+
+// fixtureObject is one object a compiler offers.
+type fixtureObject struct {
+	id      string
+	content []byte
+}
+
+// highEntropy returns n bytes that do not compress, so the client stores them
+// raw.
+func highEntropy(n int) []byte {
+	out := make([]byte, 0, n+sha256.Size)
+	block := sha256.Sum256([]byte("object fixture"))
+	for len(out) < n {
+		out = append(out, block[:]...)
+		block = sha256.Sum256(block[:])
+	}
+	return out[:n]
+}
+
+// objectFixture is what one run offers: every shape the write path treats
+// differently. Two objects are small, two are over the inline bound, and one of
+// each pair compresses, so the client stores it gzip through a presigned PUT.
+// The last one is empty.
+func objectFixture() []fixtureObject {
+	return []fixtureObject{
+		{objectID('a'), highEntropy(4 << 10)},
+		{objectID('b'), bytes.Repeat([]byte("export data that compresses\n"), 300)},
+		{objectID('c'), highEntropy(cache.MaxInlineBlobBytes + 1)},
+		{objectID('d'), bytes.Repeat([]byte("x"), cache.MaxInlineBlobBytes+1)},
+		{objectID('e'), []byte{}},
+	}
+}
+
+// objectRunResult is what one run saw.
+type objectRunResult struct {
+	hits     int
+	accepted int
+	stored   int
+}
+
+// objectRun is one CI run against f: a new provider session over a new, empty
+// exchange directory. It asks for every object, checks the bytes of each hit,
+// then offers every object and waits for the uploads.
+func objectRun(t *testing.T, f *fakeObjectServer, objects []fixtureObject) objectRunResult {
+	t.Helper()
+	exchangeDir := shortExchangeDir(t)
+	s, result := startObjectSession(t, f, exchangeDir, coreCapabilities()...)
+	assertSocket(t, result, exchangeDir)
+	client := dialObjects(t, result.ObjectCacheSocket)
+
+	ids := make([]string, len(objects))
+	contentByID := make(map[string][]byte, len(objects))
+	for i, o := range objects {
+		ids[i] = o.id
+		contentByID[o.id] = o.content
+	}
+	got, err := client.Get(&cache.ObjectGetParams{Namespace: objectNamespace, IDs: ids})
+	if err != nil {
+		t.Fatalf("object-get: %v", err)
+	}
+	for _, hit := range got.Objects {
+		path, ok := cache.BlobExchangePath(exchangeDir, hit.Digest)
+		if !ok {
+			t.Fatalf("invalid digest %s", hit.Digest)
+		}
+		staged, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("hit %s: its bytes are not staged: %v", short(hit.ID), err)
+		}
+		if !bytes.Equal(staged, contentByID[hit.ID]) {
+			t.Fatalf("hit %s: staged %d bytes, want the %d stored", short(hit.ID), len(staged), len(contentByID[hit.ID]))
+		}
+	}
+
+	puts := make([]cache.ObjectPut, len(objects))
+	for i, o := range objects {
+		digest, err := objectcachetest.StageBlob(exchangeDir, o.content)
+		if err != nil {
+			t.Fatalf("stage %s: %v", short(o.id), err)
+		}
+		puts[i] = cache.ObjectPut{ID: o.id, Digest: digest, Size: int64(len(o.content))}
+	}
+	if _, err := client.Put(&cache.ObjectPutParams{Namespace: objectNamespace, Objects: puts}); err != nil {
+		t.Fatalf("object-put: %v", err)
+	}
+	s.objects.drain()
+
+	res := objectRunResult{hits: len(got.Objects)}
+	s.objects.observe(func(o *objectCache) { res.accepted, res.stored = o.accepted, o.stored })
+	return res
+}
+
+// TestProviderObjectCache_TheSecondRunUploadsNothing is that object-cache
+// defect, seen from the client. A run uploads its objects and offers them. The
+// server must record every one of them in that run, so the next run reads them
+// all and uploads none.
+//
+// Before the fix the server recorded none of the objects a run uploaded through
+// a presigned PUT. The next run rebuilt them, and uploaded again the ones the
+// client stores gzip. The fake keeps storage and the index apart to show this:
+// with a fake that answered from storage, the test passed against a server
+// that had the defect.
+//
+// Both write paths are covered. A server without upload-batch takes every
+// object through find-missing and a presigned PUT. A server with it takes the
+// small objects inline and only the large ones through a presigned PUT.
+func TestProviderObjectCache_TheSecondRunUploadsNothing(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		uploadBatch bool
+		// puts is the presigned PUTs of the first run, and batches its
+		// upload-batch requests.
+		puts, batches int
+	}{
+		{"presigned PUTs only", false, 5, 0},
+		{"small objects through upload-batch", true, 2, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFakeObjectServer(t)
+			if tc.uploadBatch {
+				f.advertise(cache.CapabilityFindMissing, cache.CapabilityCommitBatch, cache.CapabilityDownloadBatch,
+					cache.CapabilityObjectCache, cache.CapabilityUploadBatch)
+			}
+			objects := objectFixture()
+
+			t.Run("run 1 stores every object it uploads", func(t *testing.T) {
+				res := objectRun(t, f, objects)
+				if res.hits != 0 {
+					t.Fatalf("hits=%d want 0 on an empty cache", res.hits)
+				}
+				if res.accepted != len(objects) || res.stored != len(objects) {
+					t.Fatalf("accepted=%d stored=%d want %d and %d: the server holds the bytes of every object",
+						res.accepted, res.stored, len(objects), len(objects))
+				}
+				if got := f.uploadedBlobs(); got != tc.puts {
+					t.Fatalf("presigned PUTs=%d want %d", got, tc.puts)
+				}
+				asked, batches := f.blobRequests()
+				if batches != tc.batches || asked != tc.puts {
+					t.Fatalf("upload-batch requests=%d want %d; find-missing was asked about %d blob(s), want %d",
+						batches, tc.batches, asked, tc.puts)
+				}
+				// The case is only worth its name while the client stores a
+				// compressible object gzip: that is the object the server used
+				// to refuse forever.
+				if digest := cache.DigestOf(objects[3].content); !f.storedGzip(digest) {
+					t.Fatal("the large compressible object was not stored gzip: the fixture no longer covers that case")
+				}
+				for _, o := range objects {
+					if _, ok := f.storedObject(objectNamespace, o.id); !ok {
+						t.Errorf("object %s has no index row", short(o.id))
+					}
+				}
+			})
+
+			t.Run("run 2 reads every object and uploads none", func(t *testing.T) {
+				res := objectRun(t, f, objects)
+				if res.hits != len(objects) {
+					t.Fatalf("hits=%d want %d: the first run stored every object", res.hits, len(objects))
+				}
+				if res.accepted != len(objects) || res.stored != len(objects) {
+					t.Fatalf("accepted=%d stored=%d want %d and %d", res.accepted, res.stored, len(objects), len(objects))
+				}
+				if got := f.uploadedBlobs(); got != tc.puts {
+					t.Fatalf("presigned PUTs=%d want %d: the second run must send none", got, tc.puts)
+				}
+			})
+		})
+	}
+}
+
+// TestProviderObjectCache_FallsBackWhenUploadBatchIsNotServed proves a server
+// that advertised upload-batch and answers that it does not serve it costs
+// nothing but the one request: the small objects take find-missing and a
+// presigned PUT in the same batch, and every object is stored.
+func TestProviderObjectCache_FallsBackWhenUploadBatchIsNotServed(t *testing.T) {
+	for _, status := range []int{http.StatusNotFound, http.StatusMethodNotAllowed, http.StatusNotImplemented} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			f := newFakeObjectServer(t)
+			f.advertise(cache.CapabilityFindMissing, cache.CapabilityCommitBatch, cache.CapabilityDownloadBatch,
+				cache.CapabilityObjectCache, cache.CapabilityUploadBatch)
+			f.refuseUploadBatch(status)
+			objects := objectFixture()
+
+			res := objectRun(t, f, objects)
+			if res.accepted != len(objects) || res.stored != len(objects) {
+				t.Fatalf("accepted=%d stored=%d want %d and %d", res.accepted, res.stored, len(objects), len(objects))
+			}
+			asked, batches := f.blobRequests()
+			if batches != 1 {
+				t.Fatalf("upload-batch requests=%d want 1: the batch asks once, then falls back", batches)
+			}
+			if asked != len(objects) || f.uploadedBlobs() != len(objects) {
+				t.Fatalf("find-missing was asked about %d blob(s) and %d were PUT, want %d and %d",
+					asked, f.uploadedBlobs(), len(objects), len(objects))
+			}
+		})
+	}
+}
+
+// TestProviderObjectCache_AFailingUploadBatchStoresNothing pins the other side
+// of the fallback: an upload-batch the server fails is not an unserved route.
+// The batch stops there, uploads nothing through the other path, and offers no
+// object, so no index row is asked for bytes the server does not hold.
+// find-missing comes before upload-batch, for the two objects too large to
+// send inline; the small ones are never asked about, and nothing is PUT.
+func TestProviderObjectCache_AFailingUploadBatchStoresNothing(t *testing.T) {
+	f := newFakeObjectServer(t)
+	f.advertise(cache.CapabilityFindMissing, cache.CapabilityCommitBatch, cache.CapabilityDownloadBatch,
+		cache.CapabilityObjectCache, cache.CapabilityUploadBatch)
+	f.refuseUploadBatch(http.StatusInternalServerError)
+
+	res := objectRun(t, f, objectFixture())
+	if res.stored != 0 {
+		t.Fatalf("stored=%d want 0", res.stored)
+	}
+	if _, stores := f.stats(); stores != 0 {
+		t.Fatalf("objects/store requests=%d want 0", stores)
+	}
+	if asked, _ := f.blobRequests(); asked != 2 || f.uploadedBlobs() != 0 {
+		t.Fatalf("find-missing was asked about %d blob(s) and %d were PUT, want the 2 large ones and no PUT", asked, f.uploadedBlobs())
+	}
 }

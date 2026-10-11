@@ -2,12 +2,14 @@ package deliverycli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 
 	deliveryapiclient "go.putnami.dev/cloud/clients/delivery-api/go"
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/cloud/extension/internal/deliverycli/internal/remotecache"
 )
 
 // The ci and cache statuses. Each entry has one builder that both its
@@ -343,18 +345,80 @@ func statusSentence(text string) string {
 }
 
 // CacheStatusNode is the build cache status. Two checks read this machine:
-// the cache config in .putnami/cache.json and the identity its token source
-// signs in with. When the cache is enabled, the reuse of the last CI run is
-// read from the ci status; that read is best effort, and an unknown check
-// says when it failed. No endpoint serves the cache size yet.
+// the cache config a build uses (see buildCacheConfig) and the identity its
+// token source signs in with. When the cache is enabled, the reuse of the last
+// CI run is read from the ci status; that read is best effort, and an unknown
+// check says when it failed. No endpoint serves the cache size yet.
 func CacheStatusNode(params map[string]any, workspaceRoot string, env map[string]string, ioctx clicore.IO) clicore.StatusNode {
-	cfg, cfgErr := ReadCacheConfig(workspaceRoot)
+	built := buildCacheConfig(workspaceRoot, DefaultCacheURL)
+	cfg, cfgErr := statusCacheConfig(built)
+	identity := cacheIdentity(built, env)
 	var lastRun *CIStatusResponse
 	var lastRunErr error
-	if cfgErr == nil && cfg != nil && cfg.Enabled {
+	// The ci status route denies workspace machine tokens, so a session that
+	// reads the cache with one does not ask it for the last run.
+	if cfgErr == nil && cfg != nil && cfg.Enabled && cfg.URL != "" && identity[machineTokenIdentityKey] == nil {
 		lastRun, lastRunErr = readLastRunCache(params, workspaceRoot, env, ioctx)
 	}
-	return CacheStatusNodeFrom(cfg, cfgErr, localIdentity(env), lastRun, lastRunErr)
+	return CacheStatusNodeFrom(cfg, cfgErr, identity, lastRun, lastRunErr)
+}
+
+// cacheEnvError is a malformed PUTNAMI_CACHE_* override. It turns the remote
+// cache off for a build; `putnami cloud setup` cannot fix it.
+type cacheEnvError struct{ err error }
+
+func (e cacheEnvError) Error() string {
+	return "the remote cache is off for builds here: " + e.err.Error()
+}
+
+// statusCacheConfig is the built config in the shape the cache status renders.
+// It is nil when the build has no cache file and no cache URL.
+func statusCacheConfig(built builtCacheConfig) (*CacheConfig, error) {
+	switch {
+	case built.loadErr != nil:
+		return nil, built.loadErr
+	case built.envErr != nil:
+		return nil, cacheEnvError{err: built.envErr}
+	case !built.fileExists && built.origin == cacheURLUnset:
+		return nil, nil
+	}
+	cfg := &CacheConfig{
+		Enabled:   built.cfg.Enabled == nil || *built.cfg.Enabled,
+		URL:       built.cfg.URL,
+		Mode:      string(built.cfg.Mode),
+		urlOrigin: built.origin,
+		noFile:    !built.fileExists,
+	}
+	if token := built.cfg.Token; len(token.Command) > 0 || token.URL != "" {
+		cfg.Token = &clicore.TokenSource{Command: token.Command, URL: token.URL}
+	}
+	return cfg, nil
+}
+
+// cacheModeText is the mode suffix of a config row, empty when no mode is set.
+func cacheModeText(mode string) string {
+	if mode == "" {
+		return ""
+	}
+	return " (mode " + mode + ")"
+}
+
+// machineTokenIdentityKey marks the identity of a session that reads the cache
+// with a workspace machine token. Its value names the variable that carries
+// the token, never the token.
+const machineTokenIdentityKey = "machine_token_env"
+
+// cacheIdentity is the identity a build with the config built reads the cache
+// with: the signed-in user, or the workspace machine token of a session that
+// holds PUTNAMI_CLOUD_TOKEN and no stored user session.
+func cacheIdentity(built builtCacheConfig, env map[string]string) map[string]any {
+	if identity := localIdentity(env); identity != nil {
+		return identity
+	}
+	if cacheReadsMachineToken(built, env) {
+		return map[string]any{machineTokenIdentityKey: cloudTokenEnv}
+	}
+	return nil
 }
 
 func readLastRunCache(params map[string]any, workspaceRoot string, env map[string]string, ioctx clicore.IO) (*CIStatusResponse, error) {
@@ -374,7 +438,11 @@ func CacheStatusNodeFrom(cfg *CacheConfig, cfgErr error, identity map[string]any
 	config := clicore.StatusNode{ID: "cache.config", Title: "config"}
 	switch {
 	case cfgErr != nil:
-		config = clicore.UnknownStatus(config.ID, config.Title, cfgErr, "putnami cloud setup")
+		fix := "putnami cloud setup"
+		if errors.As(cfgErr, new(cacheEnvError)) {
+			fix = ""
+		}
+		config = clicore.UnknownStatus(config.ID, config.Title, cfgErr, fix)
 		node.Detail = "config not read"
 	case cfg == nil:
 		config.State = clicore.StatusDegraded
@@ -383,11 +451,31 @@ func CacheStatusNodeFrom(cfg *CacheConfig, cfgErr error, identity map[string]any
 		node.Detail = "not configured"
 	case !cfg.Enabled:
 		config.State = clicore.StatusOK
-		config.Detail = fmt.Sprintf("disabled in %s, %s (mode %s)", CacheFileRelative, cfg.URL, cfg.Mode)
+		config.Detail = "disabled in " + CacheFileRelative
+		if cfg.URL != "" {
+			config.Detail += ", " + cfg.URL
+		}
+		config.Detail += cacheModeText(cfg.Mode)
 		node.Detail = "disabled"
+	case cfg.URL == "":
+		config.State = clicore.StatusDegraded
+		config.Detail = "not configured: no cache URL in " + CacheFileRelative
+		config.Fix = "putnami cloud setup"
+		node.Detail = "not configured"
+	case cfg.urlOrigin == cacheURLFromLink:
+		config.State = clicore.StatusOK
+		config.Detail = "enabled from the workspace link, " + cfg.URL
+		if cfg.noFile {
+			config.Detail += "; no " + CacheFileRelative
+		}
+		node.Detail = "enabled"
+	case cfg.urlOrigin == cacheURLFromEnv:
+		config.State = clicore.StatusOK
+		config.Detail = "enabled by " + remotecache.URLEnv + ", " + cfg.URL + cacheModeText(cfg.Mode)
+		node.Detail = "enabled"
 	default:
 		config.State = clicore.StatusOK
-		config.Detail = fmt.Sprintf("enabled in %s, %s (mode %s)", CacheFileRelative, cfg.URL, cfg.Mode)
+		config.Detail = "enabled in " + CacheFileRelative + ", " + cfg.URL + cacheModeText(cfg.Mode)
 		node.Detail = "enabled"
 	}
 	node.Children = append(node.Children, config, cacheIdentityNode(cfg, identity))
@@ -416,8 +504,14 @@ func CacheStatusNodeFrom(cfg *CacheConfig, cfgErr error, identity map[string]any
 
 // cacheIdentityNode says who the cache token source signs in as. An enabled
 // cache without a token source, or without a session, cannot read the cache.
+// A session that reads the cache with a workspace machine token needs neither:
+// the node names the variable that carries the token.
 func cacheIdentityNode(cfg *CacheConfig, identity map[string]any) clicore.StatusNode {
 	node := clicore.StatusNode{ID: "cache.identity", Title: "identity", State: clicore.StatusOK}
+	if variable := clicore.StringValue(identity[machineTokenIdentityKey]); variable != "" {
+		node.Detail = "workspace machine token from " + variable + ", no signed-in user"
+		return node
+	}
 	who := identityText(identity)
 	source := cfg.tokenSourceText()
 	switch {
@@ -428,6 +522,9 @@ func cacheIdentityNode(cfg *CacheConfig, identity map[string]any) clicore.Status
 	case cfg != nil && cfg.Enabled && source == "":
 		node.State = clicore.StatusDegraded
 		node.Detail = who + ", no token source in " + CacheFileRelative
+		if cfg.noFile {
+			node.Detail = who + ", no token source: " + CacheFileRelative + " does not exist"
+		}
 		node.Fix = "putnami cloud setup"
 	case source != "":
 		node.Detail = who + ", token from `" + source + "`"
