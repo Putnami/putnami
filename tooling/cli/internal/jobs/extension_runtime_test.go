@@ -1277,19 +1277,19 @@ func TestRuntimeHandshakeFailsClosed(t *testing.T) {
 }
 
 // handshakeClockProbe is a runtimeHandshakeClock a test controls. With fire
-// set, the deadline has elapsed by the time the runtime is seen running;
-// without it, the deadline never elapses, so the runtime's own outcome
-// decides. With held set, the runtime is never seen running, as if the host
-// held it before its first instruction, and with heldPastBound also set, the
-// host admission bound has elapsed by the time the deadline is armed.
-// armedPids records the process each arming received, which proves the clock
-// started only once the runtime process existed.
+// set, the deadline is one nanosecond of time counted, so it fires at its
+// first read of a runtime whose time counts; without it, the deadline never
+// elapses, so the runtime's own outcome decides. progress, when set, samples
+// the runtime in place of runningAtStart. With pastBound set, the bound on
+// time not counted has elapsed by the time the deadline is armed. armedPids
+// records the process each arming received, which proves the clock started
+// only once the runtime process existed.
 type handshakeClockProbe struct {
-	fire          bool
-	held          bool
-	heldPastBound bool
-	onArm         func()
-	armedPids     []int
+	fire      bool
+	progress  processProgress
+	pastBound bool
+	onArm     func()
+	armedPids []int
 }
 
 func (p *handshakeClockProbe) clock(process *os.Process) *processWatch {
@@ -1301,15 +1301,15 @@ func (p *handshakeClockProbe) clock(process *os.Process) *processWatch {
 	if p.onArm != nil {
 		p.onArm()
 	}
-	deadline := processDeadline{run: elapsesNever, admission: elapsesNever, progress: runningAtStart}
+	deadline := processDeadline{run: elapsesNever, uncounted: elapsesNever, progress: runningAtStart}
+	if p.progress != nil {
+		deadline.progress = p.progress
+	}
 	if p.fire {
-		deadline.run = 0
+		deadline.run = time.Nanosecond
 	}
-	if p.held {
-		deadline.progress = neverRunning
-	}
-	if p.heldPastBound {
-		deadline.admission = 0
+	if p.pastBound {
+		deadline.uncounted = 0
 	}
 	return deadline.watch(process, nil)
 }
@@ -1319,13 +1319,15 @@ func (p *handshakeClockProbe) clock(process *os.Process) *processWatch {
 // runtime.handshake_timeout. A runtime that exits non-zero, dies on a signal,
 // or prints malformed runtime-info keeps runtime.handshake_failed, whatever the
 // machine's load. The clock is armed once, with a started process, and its
-// deadline counts only once the runtime is seen running: a runtime the host
-// holds past the deadline before its first instruction is accepted when it
-// answers. A hold past the host admission bound times out, and says so.
+// deadline counts only once the runtime is seen running, less the time it
+// waits for a CPU: a runtime the host holds past the deadline before its
+// first instruction, or that waits for a CPU past it, is accepted when it
+// answers. A hold past the bound on time not counted times out, and says so.
 //
 // The blocked runtimes cannot answer before the probe's deadline or bound,
 // which has elapsed by the time it applies, and the other runtimes face a
-// deadline that never fires. So no case depends on how fast the host runs.
+// deadline that never fires or counts none of their time. So no case depends
+// on how fast the host runs.
 //
 // Every case's executable is written before the parallel subtests start, so
 // no subtest's fork ever inherits another subtest's still-open write
@@ -1348,18 +1350,18 @@ func TestRuntimeHandshakeTimeoutIsItsOwnVerdict(t *testing.T) {
 
 	ranPastDeadline := []string{
 		"timed out", "counted from its first instruction", "starting the process took", "the host held it",
-		"not a malformed build", "less loaded", "CPU used",
+		"for a CPU", "not a malformed build", "less loaded", "CPU used",
 	}
 	cases := []struct {
-		name          string
-		script        string
-		fire          bool
-		held          bool
-		heldPastBound bool
-		cancel        bool
-		wantCode      string
-		wantMessage   []string
-		executable    string
+		name        string
+		script      string
+		fire        bool
+		progress    processProgress
+		pastBound   bool
+		cancel      bool
+		wantCode    string
+		wantMessage []string
+		executable  string
 	}{
 		{
 			// exec hands the process holding the pipes to sleep, so the kill
@@ -1368,25 +1370,43 @@ func TestRuntimeHandshakeTimeoutIsItsOwnVerdict(t *testing.T) {
 			script:      "#!/bin/sh\nexec sleep 3600\n",
 			fire:        true,
 			wantCode:    extensionproto.FailureRuntimeHandshakeTimeout,
-			wantMessage: ranPastDeadline,
+			wantMessage: append(ranPastDeadline, "could not be read, so it is counted"),
+		},
+		{
+			name:        "a blocked runtime whose wait for a CPU is read times out and states it",
+			script:      "#!/bin/sh\nexec sleep 3600\n",
+			fire:        true,
+			progress:    neverWaitingForCPU,
+			wantCode:    extensionproto.FailureRuntimeHandshakeTimeout,
+			wantMessage: append(ranPastDeadline, "it waited 0s for a CPU, neither counted"),
 		},
 		{
 			// The deadline has elapsed by the time it could arm, so only a
 			// deadline that waits for the first instruction lets it answer.
-			name:   "a runtime the host holds past its deadline is accepted when it answers",
-			script: "#!/bin/sh\nprintf '%s\\n' '" + answer + "'\n",
-			fire:   true,
-			held:   true,
+			name:     "a runtime the host holds past its deadline is accepted when it answers",
+			script:   "#!/bin/sh\nprintf '%s\\n' '" + answer + "'\n",
+			fire:     true,
+			progress: neverRunning,
 		},
 		{
-			name:          "a runtime the host holds past the admission bound times out",
-			script:        "#!/bin/sh\nexec sleep 3600\n",
-			held:          true,
-			heldPastBound: true,
-			wantCode:      extensionproto.FailureRuntimeHandshakeTimeout,
+			// Every read finds the runtime waited for a CPU since the last
+			// one, so only a deadline that does not count that wait lets it
+			// answer.
+			name:     "a runtime that waits for a CPU past its deadline is accepted when it answers",
+			script:   "#!/bin/sh\nprintf '%s\\n' '" + answer + "'\n",
+			fire:     true,
+			progress: alwaysWaitingForCPU,
+		},
+		{
+			name:      "a runtime the host holds past the bound on time not counted times out",
+			script:    "#!/bin/sh\nexec sleep 3600\n",
+			progress:  neverRunning,
+			pastBound: true,
+			wantCode:  extensionproto.FailureRuntimeHandshakeTimeout,
 			wantMessage: []string{
-				"timed out", "the host held the runtime", "host admission bound " + hostAdmissionBound.String(),
-				"starting the process took", "not a malformed build", "less loaded", "CPU used",
+				"timed out at its " + uncountedTimeBound.String() + " bound on time not counted",
+				"the host held it", "without letting it run", "starting the process took", "not a malformed build",
+				"less loaded", "CPU used",
 			},
 		},
 		{
@@ -1428,7 +1448,7 @@ func TestRuntimeHandshakeTimeoutIsItsOwnVerdict(t *testing.T) {
 			executable := tc.executable
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			probe := &handshakeClockProbe{fire: tc.fire, held: tc.held, heldPastBound: tc.heldPastBound}
+			probe := &handshakeClockProbe{fire: tc.fire, progress: tc.progress, pastBound: tc.pastBound}
 			if tc.cancel {
 				probe.onArm = cancel
 			}
@@ -1467,6 +1487,52 @@ func TestRuntimeHandshakeTimeoutIsItsOwnVerdict(t *testing.T) {
 				t.Errorf("timeout message %q does not name the executable %s", message, executable)
 			}
 		})
+	}
+}
+
+// TestRuntimeHandshakeTimeoutStatesTheWaitForACPU pins that both handshake
+// timeout messages state the time the runtime waited for a CPU apart from the
+// time it ran.
+func TestRuntimeHandshakeTimeoutStatesTheWaitForACPU(t *testing.T) {
+	t.Parallel()
+	ext := &extension.ExtensionDescription{Name: "@putnami/test", Version: "1.2.3"}
+	executable := filepath.Join(t.TempDir(), "runtime")
+	cases := []struct {
+		name   string
+		timing processTiming
+		want   []string
+	}{
+		{
+			name:   "at its deadline",
+			timing: processTiming{held: time.Second, waitedForCPU: 4 * time.Second, waitMeasured: true, ran: 10 * time.Second},
+			want: []string{
+				"the runtime ran 10s without answering", "deadline " + runtimeHandshakeDeadline.String(),
+				"the host held it 1s before its first instruction and it waited 4s for a CPU, neither counted",
+			},
+		},
+		{
+			name: "at the bound on time not counted",
+			timing: processTiming{
+				held: time.Second, waitedForCPU: 119 * time.Second, waitMeasured: true, ran: 2 * time.Second,
+				uncountedPastBound: true,
+			},
+			want: []string{
+				"timed out at its " + uncountedTimeBound.String() + " bound on time not counted",
+				"the host held it 1s before its first instruction and it waited 1m59s for a CPU, neither counted",
+			},
+		},
+	}
+	for _, tc := range cases {
+		err := runtimeHandshakeTimeout(ext, executable, time.Millisecond, tc.timing, time.Millisecond, "")
+		var runtimeErr *extensionRuntimeError
+		if !errors.As(err, &runtimeErr) || runtimeErr.code != extensionproto.FailureRuntimeHandshakeTimeout {
+			t.Fatalf("%s: error = %v, want %s", tc.name, err, extensionproto.FailureRuntimeHandshakeTimeout)
+		}
+		for _, want := range tc.want {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%s: message %q missing %q", tc.name, err, want)
+			}
+		}
 	}
 }
 

@@ -181,15 +181,15 @@ func TestRuntimeToolchainProbeTimeoutIsFiveSecondsUnlessTheCallerSetsOne(t *test
 func TestRuntimeToolchainMismatchUnwrapsToAProbeThatTimedOut(t *testing.T) {
 	path := fixtureproc.Write(t, filepath.Join(t.TempDir(), "compiler"), fixtureproc.Program{Sleep: 5 * time.Second})
 	_, probeErr := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, hostProcessDeadline(100*time.Millisecond))
-	if probeErr == nil {
-		t.Fatal("a probe that sleeps 5s answered within 100ms")
+	if want := "probe timed out after 100ms: "; probeErr == nil || !strings.HasPrefix(probeErr.Error(), want) {
+		t.Fatalf("probe of a program that sleeps 5s = %v, want an error starting with %q", probeErr, want)
 	}
 	absent := runtimeToolchainRejection{candidate: `candidate 1 (path "compiler")`, reason: "path missing"}
 	timedOut := runtimeToolchainRejection{candidate: `candidate 2 (path "compiler") at ` + path, reason: probeErr.Error(), err: probeErr}
 
 	err := newRuntimeToolchainMismatchError("example", "compiler", "1.2.3", []runtimeToolchainRejection{absent, timedOut})
 	want := `resolve extension "example" runtime toolchain "compiler": no candidate matched locked version "1.2.3": ` +
-		`candidate 1 (path "compiler"): path missing; candidate 2 (path "compiler") at ` + path + `: probe timed out after 100ms`
+		`candidate 1 (path "compiler"): path missing; candidate 2 (path "compiler") at ` + path + `: ` + probeErr.Error()
 	if err.Error() != want {
 		t.Fatalf("error = %v\nwant %s", err, want)
 	}
@@ -217,7 +217,7 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 		deadline    processDeadline
 		want        string
 	}{
-		{"timeout", fixtureproc.Program{}, false, true, hostProcessDeadline(100 * time.Millisecond), "probe timed out after 100ms"},
+		{"timeout", fixtureproc.Program{}, false, true, hostProcessDeadline(100 * time.Millisecond), "probe timed out after 100ms: the host held it "},
 		{"exit status", fixtureproc.Program{Exit: 3}, false, false, hostProcessDeadline(toolVersionProbeTimeout), "probe failed: exit status 3"},
 		{"empty", fixtureproc.Program{}, false, false, hostProcessDeadline(toolVersionProbeTimeout), "probe output empty"},
 		{"too long", fixtureproc.Program{Stdout: strings.Repeat("0", 70) + "\n"}, false, false, hostProcessDeadline(toolVersionProbeTimeout), "probe output too long (70 bytes, limit 64)"},
@@ -237,11 +237,14 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 			}
 			path := fixtureproc.Write(t, filepath.Join(dir, "compiler"), program)
 			got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, tc.deadline)
-			if err == nil || err.Error() != tc.want {
+			timedOut := strings.HasPrefix(tc.want, "probe timed out")
+			// A timeout goes on with the times the host decides, so only its
+			// start is fixed.
+			if err == nil || err.Error() != tc.want && !(timedOut && strings.HasPrefix(err.Error(), tc.want)) {
 				t.Fatalf("probe = %q, %v; want error %q", got, err, tc.want)
 			}
 			// Only a timeout is ErrToolchainProbeTimeout.
-			if timedOut := strings.HasPrefix(tc.want, "probe timed out"); errors.Is(err, ErrToolchainProbeTimeout) != timedOut {
+			if errors.Is(err, ErrToolchainProbeTimeout) != timedOut {
 				t.Fatalf("errors.Is(%q, ErrToolchainProbeTimeout) = %t, want %t", err, !timedOut, timedOut)
 			}
 		})
@@ -262,29 +265,70 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 }
 
 // TestRuntimeToolchainProbeDeadlineCountsFromTheFirstInstruction pins that a
-// probe the host holds before its first instruction is not charged for the
-// hold: held past a deadline that has already elapsed, it still answers. A
-// hold past the admission bound times out and says the host held it. No case
+// probe the host holds before its first instruction, or that waits for a CPU,
+// is not charged for that time: held past a deadline that has already
+// elapsed, or waiting for a CPU past it, it still answers. A hold past the
+// bound on time not counted times out and says the host held it. No case
 // depends on how fast the host runs.
 func TestRuntimeToolchainProbeDeadlineCountsFromTheFirstInstruction(t *testing.T) {
 	t.Run("held past its deadline, it answers", func(t *testing.T) {
 		path := fixtureproc.Write(t, filepath.Join(t.TempDir(), "compiler"), fixtureproc.Program{Stdout: "1.2.3\n"})
-		deadline := processDeadline{run: 0, admission: elapsesNever, progress: neverRunning}
+		deadline := processDeadline{run: 0, uncounted: elapsesNever, progress: neverRunning}
 		got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, deadline)
 		if err != nil || got != "1.2.3" {
 			t.Fatalf("probe = %q, %v; want 1.2.3", got, err)
 		}
 	})
-	t.Run("held past the admission bound, it times out", func(t *testing.T) {
+	t.Run("waiting for a CPU past its deadline, it answers", func(t *testing.T) {
+		path := fixtureproc.Write(t, filepath.Join(t.TempDir(), "compiler"), fixtureproc.Program{Stdout: "1.2.3\n"})
+		deadline := processDeadline{run: time.Nanosecond, uncounted: elapsesNever, progress: alwaysWaitingForCPU}
+		got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, deadline)
+		if err != nil || got != "1.2.3" {
+			t.Fatalf("probe = %q, %v; want 1.2.3", got, err)
+		}
+	})
+	t.Run("held past the bound on time not counted, it times out", func(t *testing.T) {
 		dir := t.TempDir()
 		program := fixtureproc.Program{WaitFor: []string{filepath.Join(dir, "never")}}
 		path := fixtureproc.Write(t, filepath.Join(dir, "compiler"), program)
-		deadline := processDeadline{run: elapsesNever, admission: 0, progress: neverRunning}
+		deadline := processDeadline{run: elapsesNever, uncounted: 0, progress: neverRunning}
 		got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, deadline)
-		if want := "probe timed out: the host held it "; err == nil || !strings.HasPrefix(err.Error(), want) {
+		if want := "probe timed out at its 0s bound on time not counted: the host held it "; err == nil ||
+			!strings.HasPrefix(err.Error(), want) {
 			t.Fatalf("probe = %q, %v; want an error starting with %q", got, err, want)
 		}
 	})
+}
+
+// TestProbeTimeoutStatesTheTimeNotCounted pins both probe timeout messages.
+// They unwrap to ErrToolchainProbeTimeout and hold no "; ", which separates
+// the candidates of a mismatch.
+func TestProbeTimeoutStatesTheTimeNotCounted(t *testing.T) {
+	deadline := processDeadline{run: 5 * time.Second, uncounted: 2 * time.Minute}
+	cases := []struct {
+		name   string
+		timing processTiming
+		want   string
+	}{
+		{
+			"at its deadline",
+			processTiming{held: 300 * time.Millisecond, waitedForCPU: 2 * time.Second, waitMeasured: true, ran: 5 * time.Second},
+			"probe timed out after 5s: the host held it 300ms before its first instruction and it waited 2s for a CPU, " +
+				"neither counted",
+		},
+		{
+			"at the bound on time not counted",
+			processTiming{held: time.Second, waitedForCPU: 119 * time.Second, waitMeasured: true, uncountedPastBound: true},
+			"probe timed out at its 2m0s bound on time not counted: the host held it 1s before its first instruction " +
+				"and it waited 1m59s for a CPU, neither counted",
+		},
+	}
+	for _, tc := range cases {
+		err := probeTimeout(deadline, tc.timing)
+		if err.Error() != tc.want || !errors.Is(err, ErrToolchainProbeTimeout) || strings.Contains(err.Error(), "; ") {
+			t.Errorf("%s: probeTimeout = %v, want %q unwrapping to %v", tc.name, err, tc.want, ErrToolchainProbeTimeout)
+		}
+	}
 }
 
 func TestOptionalRuntimeToolchainPublishesUnavailableBindingWithoutAmbientFallback(t *testing.T) {

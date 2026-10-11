@@ -878,11 +878,7 @@ func probeRuntimeToolchain(ctx context.Context, path string, args, env []string,
 	}
 	if timing, err := waitUnderDeadline(cmd, deadline, cancel); err != nil {
 		if ctx.Err() == nil && errors.Is(context.Cause(probeCtx), errProcessDeadline) {
-			if timing.heldPastBound {
-				return "", fmt.Errorf("%w: the host held it %s without letting it run, "+
-					"or it blocked before it was first sampled", ErrToolchainProbeTimeout, timing.held.Round(time.Millisecond))
-			}
-			return "", fmt.Errorf("%w after %s", ErrToolchainProbeTimeout, deadline.run)
+			return "", probeTimeout(deadline, timing)
 		}
 		if errors.Is(err, exec.ErrWaitDelay) {
 			return "", fmt.Errorf("probe output stayed open after exit (wait delay %s)", toolVersionProbeWaitDelay)
@@ -906,6 +902,17 @@ func probeRuntimeToolchain(ctx context.Context, path string, args, env []string,
 		return "", errors.New("probe output malformed (more than one line)")
 	}
 	return value, nil
+}
+
+// probeTimeout reports a probe whose deadline fired, with the time the
+// deadline did not count. A mismatch joins the reasons of its candidates with
+// "; ", so the text holds none.
+func probeTimeout(deadline processDeadline, timing processTiming) error {
+	if timing.uncountedPastBound {
+		return fmt.Errorf("%w at its %s bound on time not counted: %s",
+			ErrToolchainProbeTimeout, deadline.uncounted, timing.uncounted())
+	}
+	return fmt.Errorf("%w after %s: %s", ErrToolchainProbeTimeout, deadline.run, timing.uncounted())
 }
 
 func deriveRuntimeToolchainEnvironment(executable, version string, bindings map[string]extensionproto.RuntimeToolchainEnvironment) (map[string]string, bool) {

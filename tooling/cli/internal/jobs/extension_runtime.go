@@ -1407,7 +1407,8 @@ func describeRuntimeExecutable(executable string) string {
 }
 
 // runtimeHandshakeDeadline is how long a runtime may take to answer
-// `__putnami runtime-info`, counted from its first instruction.
+// `__putnami runtime-info`, counted from its first instruction, less the time
+// it waits for a CPU.
 //
 // The value is settled. Raising it would only move the load at which a
 // healthy runtime is refused — the same rule applied to the capability probes.
@@ -1439,11 +1440,13 @@ func hostHandshakeDeadline(process *os.Process) *processWatch {
 // request and not from the return of exec.Cmd.Start. On darwin, Start returns
 // before the host has finished checking a binary written moments earlier: the
 // host holds the new process until the check ends, and the check queues behind
-// every other fresh binary on a loaded machine. The hold consumes none of the
-// runtime's own time, so it is not charged to the deadline; hostAdmissionBound
-// bounds it instead. A deadline that does fire is reported as
-// runtime.handshake_timeout, with the measured start, hold, run, and CPU times,
-// so no reader mistakes load for a malformed build.
+// every other fresh binary on a loaded machine. Once the runtime runs, the
+// deadline does not count the time it is ready to run and waits for a CPU
+// either. Neither consumes the runtime's own time, so neither is charged to
+// the deadline; uncountedTimeBound bounds both together instead. A deadline
+// that does fire is reported as runtime.handshake_timeout, with the measured
+// start, hold, CPU wait, run, and CPU times, so no reader mistakes load for a
+// malformed build.
 func validateRuntimeHandshake(
 	ctx context.Context,
 	executable string,
@@ -1577,9 +1580,9 @@ func runRuntimeHandshake(
 }
 
 // runtimeHandshakeTimeout reports a handshake whose deadline fired. It states
-// apart the time Start took and the time the host held the runtime before its
-// first instruction, which the deadline does not count, and the time the
-// runtime ran, which it does.
+// apart the time Start took, the time the host held the runtime before its
+// first instruction, and the time the runtime waited for a CPU, which the
+// deadline does not count, and the time the runtime ran, which it does.
 func runtimeHandshakeTimeout(
 	ext *extension.ExtensionDescription,
 	executable string,
@@ -1588,24 +1591,22 @@ func runtimeHandshakeTimeout(
 	cpu time.Duration,
 	stderr string,
 ) error {
-	if timing.heldPastBound {
+	if timing.uncountedPastBound {
 		return runtimeFailure(extensionproto.FailureRuntimeHandshakeTimeout,
-			"extension %q runtime-info timed out: the host held the runtime %s without letting it run its first "+
-				"instruction, or the runtime blocked before the CLI first sampled it, and it was stopped "+
-				"(host admission bound %s; starting the process took %s; CPU used %s). A runtime held by a loaded "+
-				"host is not a malformed build: rerun when the machine is less loaded, and if it repeats run "+
+			"extension %q runtime-info timed out at its %s bound on time not counted, and the runtime was stopped: "+
+				"%s (starting the process took %s, not counted; CPU used %s). A runtime held or starved of CPU by a "+
+				"loaded host is not a malformed build: rerun when the machine is less loaded, and if it repeats run "+
 				"`%s __putnami runtime-info` by hand: stderr=%q: %s",
-			ext.Name, timing.held.Round(time.Millisecond), hostAdmissionBound, starting.Round(time.Millisecond),
+			ext.Name, uncountedTimeBound, timing.uncounted(), starting.Round(time.Millisecond),
 			cpu, executable, stderr, describeRuntimeExecutable(executable))
 	}
 	return runtimeFailure(extensionproto.FailureRuntimeHandshakeTimeout,
 		"extension %q runtime-info timed out: the runtime ran %s without answering and was stopped "+
-			"(deadline %s, counted from its first instruction; starting the process took %s and the host held it "+
-			"%s before its first instruction, neither counted; CPU used %s). A runtime starved of CPU or blocked "+
-			"is not a malformed build: rerun when the machine is less loaded, and if it repeats run "+
-			"`%s __putnami runtime-info` by hand: stderr=%q: %s",
+			"(deadline %s, counted from its first instruction; starting the process took %s, not counted; "+
+			"%s; CPU used %s). A runtime blocked or starved of CPU is not a malformed build: rerun when the "+
+			"machine is less loaded, and if it repeats run `%s __putnami runtime-info` by hand: stderr=%q: %s",
 		ext.Name, timing.ran.Round(time.Millisecond), runtimeHandshakeDeadline, starting.Round(time.Millisecond),
-		timing.held.Round(time.Millisecond), cpu, executable, stderr, describeRuntimeExecutable(executable))
+		timing.uncounted(), cpu, executable, stderr, describeRuntimeExecutable(executable))
 }
 
 // hashRuntimeReplacementTree fingerprints exactly the entries stageRuntimeSourceView
