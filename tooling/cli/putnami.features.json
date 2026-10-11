@@ -884,6 +884,7 @@
               "a-failure-to-empty-fails-the-task-before-it-runs",
               "a-retry-starts-from-an-empty-directory",
               "a-path-from-output-is-left-as-it-stands",
+              "an-optional-output-is-left-as-it-stands",
               "an-entry-stored-without-emptying-is-never-served"
             ]
           }

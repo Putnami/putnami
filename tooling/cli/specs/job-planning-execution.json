@@ -111,7 +111,7 @@
     },
     {
       "id": "executed-directory-output-starts-empty",
-      "text": "Before a task executes, the engine empties each durable directory output declared by a literal path, except its ceded and preserved subpaths and the build stamp, so execution and restore leave the same paths and the entry holds only that run's files. A hit or an adopted result empties nothing; a retry empties again. A failure to empty fails the task before it runs. File, invocation-scoped and pathFrom outputs are not emptied. A key marker keeps entries stored without emptying from being served."
+      "text": "Before a task executes, the engine empties each required durable directory output declared by a literal path, except its ceded and preserved subpaths and the build stamp, so execution and restore leave the same paths and the entry holds only that run's files. A hit or an adopted result empties nothing; a retry empties again. A failure to empty fails the task before it runs. OptionalEmpty, file, invocation-scoped and pathFrom outputs are not emptied, since a restore leaves an output recorded empty as it stands. A key marker keeps entries stored without emptying from being served."
     }
   ],
   "decisions": [

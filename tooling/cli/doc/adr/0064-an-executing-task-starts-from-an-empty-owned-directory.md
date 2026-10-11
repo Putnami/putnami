@@ -26,11 +26,12 @@ declaration, so it can give every task the same starting point.
 
 ## Decision
 
-1. **Before a task executes, the scheduler empties each durable directory
-   output whose path the declaration states.** It removes every entry the task
-   owns there and keeps the subpaths a restore keeps: the ceded and preserved
-   ones, resolved by `outputSkippedSubpaths`, the one resolution capture,
-   restore and drift already share. The output directory stays, with its mode.
+1. **Before a task executes, the scheduler empties each required durable
+   directory output whose path the declaration states.** It removes every
+   entry the task owns there and keeps the subpaths a restore keeps: the ceded
+   and preserved ones, resolved by `outputSkippedSubpaths`, the one resolution
+   capture, restore and drift already share. The output directory stays, with
+   its mode.
    An absent output stays absent. A file or a symbolic link at the path is
    removed without being followed.
 2. **The build stamp stays.** `.gen/version.json` belongs to the scheduler.
@@ -60,13 +61,24 @@ declaration, so it can give every task the same starting point.
    whose error names the output. The subprocess never starts and nothing is
    captured. A retry that cannot be given an empty directory is not attempted,
    and the task keeps the failure it already has.
-7. **Three outputs are not emptied.** A file output, which the task replaces
-   whole. An invocation-scoped output, which lives in a private tree created
-   for the run. A `pathFrom` output, whose path is known only after the run. A
-   literal path never names its root (`extension.NormalizeOutputPath`), so the
-   project root, the workspace root and a command-output directory are never
-   emptied.
-8. **The key names the emptied outputs.** `store.CacheKey.EmptiedOutputs`
+7. **Only a required directory output is emptied.** An `optionalEmpty` output
+   is not. A run may write nothing there, and its entry then records the
+   output empty. A restore of that record leaves the path as it stands
+   ([ADR 0034](0034-a-declared-output-polices-its-own-drift.md)), so an
+   execution that emptied it would leave another tree than the restore. A
+   required output is recorded present in every entry, because ingest rejects
+   an empty one, so its restore removes exactly what the emptying removes. An
+   optional output can also hold a file no task writes. Each `cloud/clients`
+   provider slice commits `.gen/clientgen/config.json` inside the
+   `.gen/clientgen` output of the Go `build-describe`, which skips for a
+   project with no main package, and `clientgen` reads that file afterward.
+8. **Three other outputs are not emptied.** A file output, which the task
+   replaces whole. An invocation-scoped output, which lives in a private tree
+   created for the run. A `pathFrom` output, whose path is known only after
+   the run. A literal path never names its root
+   (`extension.NormalizeOutputPath`), so the project root, the workspace root
+   and a command-output directory are never emptied.
+9. **The key names the emptied outputs.** `store.CacheKey.EmptiedOutputs`
    holds their ids. The hash writes `emptiedOutputs` and the sorted ids after
    the source-state block, and writes nothing when the list is empty. An entry
    stored by a CLI that emptied nothing therefore sits at an address no key of
@@ -82,8 +94,10 @@ declaration, so it can give every task the same starting point.
   entry holds only what its run wrote. Deleting a page or the last island
   removes their output on the next build, and no later restore brings it back.
 - Every task with an emptied output misses once after the upgrade, and so does
-  every task whose key folds one of their hashes. A task with no emptied output,
-  such as a lint or test task that declares none, keeps its address.
+  every task whose key folds one of their hashes. In this repository those are
+  the Go and TypeScript `build-generate` and the shell sample's `build-exec`.
+  A task with no emptied output keeps its address: a lint or test task that
+  declares none, and a task whose directory outputs are all optional.
 - The selection fingerprint of each release-set member whose key moved moves
   once, so the next publication republishes those members once, as after
   [ADR 0060](0060-the-base-version-is-not-a-cache-key-input.md).
@@ -94,17 +108,13 @@ declaration, so it can give every task the same starting point.
   and its JSON Schema companion, written when `options.generate.schema=false`,
   because only `config-extract` writes them and `cloud config publish` reads the
   fallback after a build.
-- A `pathFrom` output keeps a file its generator stops emitting, in the
-  worktree and in the entries captured from it. The generator owns that
-  removal. Every drift-policed output in this repository is a `pathFrom`
-  output, so no drift verdict changes.
-- A restore of an output recorded empty leaves the path as it is
-  ([ADR 0034](0034-a-declared-output-polices-its-own-drift.md)), while an
-  execution empties it. The Go `build-generate` writes static contracts into
-  `.gen/schema`, which it cedes to `build-describe`. For a project with no
-  describe phase, an executing `build-describe` that skips now empties
-  `.gen/schema`, and a replayed skip leaves it. Each reader of those contracts
-  falls back to the committed `schema/` copy.
+- An `optionalEmpty` or `pathFrom` output keeps a file its task stops
+  writing, in the worktree and in the entries captured from it. The task owns
+  that removal. In this repository that covers the four Go `build-describe`
+  outputs, the command-output directories of the compile, transpile, types and
+  package steps, and the generated client directories. Every drift-policed
+  output in this repository is a `pathFrom` output, so no drift verdict
+  changes.
 - A reader in another session, such as a development server, sees an owned
   directory empty from the emptying until the task writes it again. The
   task-output locks order writers across sessions, not readers. A task of

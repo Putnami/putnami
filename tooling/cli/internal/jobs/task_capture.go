@@ -43,21 +43,26 @@
 // # An executing task starts from an empty owned directory
 //
 // A declared DIRECTORY output is captured as it stands after the run. So that
-// it holds only what that run wrote, the scheduler empties what the task owns
-// in it before the task executes (emptyOwnedOutputs, ADR 0064): every entry
-// but the subpaths the declaration cedes or preserves (outputSkippedSubpaths)
-// and the scheduler's own build stamp. That is the set a restore replaces, so
-// an execution and a restore leave the same paths untouched. A file another
-// task wrote inside the owned region, such as the config-extract schema
-// fallback under .gen, is removed with the rest, exactly as a restore of the
-// owner's entry removes it: a path that must outlive its neighbor's execution
-// has to be ceded by the owner and declared by its writer.
+// a required one holds only what that run wrote, the scheduler empties what
+// the task owns in it before the task executes (emptyOwnedOutputs, ADR 0064):
+// every entry but the subpaths the declaration cedes or preserves
+// (outputSkippedSubpaths) and the scheduler's own build stamp. That is the set
+// a restore replaces, so an execution and a restore leave the same paths
+// untouched. A file another task wrote inside the owned region, such as the
+// config-extract schema fallback under .gen, is removed with the rest, exactly
+// as a restore of the owner's entry removes it: a path that must outlive its
+// neighbor's execution has to be ceded by the owner and declared by its
+// writer.
 //
-// Three outputs are not emptied (emptiedOutputDeclarations): a file, which the
-// task replaces whole; an invocation-scoped output, which lives in a private
-// tree created for the run; and a pathFrom output, whose path is known only
-// after the task ran. A file a generator stops emitting therefore stays in a
-// pathFrom directory until the generator removes it.
+// Only a required directory output with a literal path is emptied
+// (emptiedOutputDeclarations). An optionalEmpty output is not: a run that
+// writes nothing there is recorded empty, and a restore of that record leaves
+// the path as it stands, so the execution must leave it too. A file is not
+// emptied because the task replaces it whole; an invocation-scoped output
+// because it lives in a private tree created for the run; a pathFrom output
+// because its path is known only after the task ran. A file a generator stops
+// emitting therefore stays in an output of those shapes until the generator
+// removes it.
 //
 // # Which tasks take this path
 //
@@ -191,8 +196,15 @@ type emptiedOutputDeclaration struct {
 }
 
 // emptiedOutputDeclarations returns, in id order, the declared outputs of job
-// that the scheduler empties before the job executes: every durable directory
-// output whose path the declaration states.
+// that the scheduler empties before the job executes: every required durable
+// directory output whose path the declaration states.
+//
+// An optionalEmpty output is left out. A run may write nothing there, and its
+// entry then records the output empty, which a restore leaves as it stands
+// (store.TaskOutputEmpty). Emptying it would make an execution remove what a
+// restore keeps, such as a committed file the task reads when it writes
+// nothing. A required output is recorded present in every entry, so a restore
+// prunes exactly what the emptying removes.
 //
 // A pathFrom output is left out because its path is known only after the run,
 // and an invocation-scoped one because it lives in a tree created for the run.
@@ -218,7 +230,8 @@ func emptiedOutputDeclarations(job *ScheduledJob) []emptiedOutputDeclaration {
 	var emptied []emptiedOutputDeclaration
 	for _, id := range ids {
 		output := declaration.Outputs[id]
-		if output.Kind != extension.OutputKindDirectory || output.PathFrom != "" || output.IsInvocationScoped() {
+		if output.Kind != extension.OutputKindDirectory || output.OptionalEmpty ||
+			output.PathFrom != "" || output.IsInvocationScoped() {
 			continue
 		}
 		switch output.EffectiveRoot() {
