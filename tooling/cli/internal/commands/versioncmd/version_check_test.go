@@ -62,7 +62,7 @@ func TestVersionCheckPassesATitleThatCarriesTheMarker(t *testing.T) {
 	spectest.Proves(t, "cli/version-from-git", "squash-keeps-the-breaking-marker", "title-with-the-marker-passes")
 	dir, _ := branchWithCommits(t, "feat(cli)!: drop the --all flag")
 
-	out, err := runVersionCheck(t, dir, "--base", "main", "--title", "feat(cli)!: rework the selection (#12)")
+	out, err := runVersionCheck(t, dir, "--base", "main", "--title", "feat(cli)!: rework the selection")
 	if err != nil {
 		t.Fatalf("VersionCheck: %v", err)
 	}
