@@ -744,7 +744,7 @@ different flags, or two tasks of one project that write and read the same
 generated files. Their cache keys differ, so the lease does not coalesce
 them. A task-output lock keeps them apart: a task never writes its outputs
 while another session's task writes them, and never reads what another
-task writes while another session writes it.
+task declares as its output while another session writes it.
 
 Each task locks, exclusively:
 
@@ -754,12 +754,17 @@ Each task locks, exclusively:
 
 An executing task also takes a shared lock for each resource its definition
 reads and does not write: its project for a project-scoped resource, such as
-`reads: ["gen"]`, and the workspace for a workspace-scoped one. That is the
-lock the resource's writers take, so a build step never reads `.gen` while
-another session's `generate` empties or writes it. The `sources` resource
-takes no lock: the tasks that write it change source files, not declared
-outputs. Shared locks coexist: several sessions can read one project at
-once, and a task that writes there waits until all of them finished.
+`reads: ["gen"]`, and the workspace for a workspace-scoped one. A shared lock
+keeps out only the tasks that lock the same project or the workspace
+exclusively, the tasks that declare an output rooted there. The `generate`
+task declares `.gen`, so a build step never reads `.gen` while another
+session's `generate` empties or writes it. A task that writes a resource
+without declaring such an output takes no lock there: the tasks that write
+the workspace-scoped `workspace-clients` declare no output, so a reader of
+`workspace-clients` is not protected from them. The `sources` resource takes
+no lock: the tasks that write it change source files, not declared outputs.
+Shared locks coexist: several sessions can read one project at once, and a
+task that writes there waits until all of them finished.
 
 A task holds these locks across a cache restore into its outputs, and for an
 execution from the output preparation through the capture into the cache:
@@ -776,10 +781,14 @@ long-running task such as `serve` that reads nothing another task writes
 does not keep another session's preparation out of its project.
 
 A task that needs one lock both to write and to read, or whose preparation
-writes the project tree, holds that lock exclusively until its capture. When
-a session plans a task that writes under a lock, every task of that session
-takes that lock exclusively, its readers included, so the session's readers
-and writers share one lock.
+writes the project tree, holds that lock exclusively until its capture. While
+a session has a planned task that writes under a lock and has not finished,
+every task of that session takes that lock exclusively, its readers
+included, so the session's readers and writers share one lock. Once the last
+such writer finished, executed, restored from cache, failed or skipped, the
+session's readers take the lock shared, and a reader of another session runs
+beside them. A lock a task already took exclusively stays so until its
+capture.
 
 A task takes its locks in one order shared by every session, whatever their
 mode: command-output directories first, then projects, then the workspace.
@@ -798,10 +807,13 @@ putnami: /tooling/cli:test~test waits for session 20260925-192012-876307 (pid 42
 ```
 
 When several tasks of that session share the lock, the line names the first
-one and counts the rest (`task /tooling/cli:test~test and 2 more`). The line
-never names a process that is gone; it then says `another putnami process`.
-A task that waits for readers names none of them: several sessions can read
-at once, and a reader records nothing in the lock file.
+one and counts the rest (`task /tooling/cli:test~test and 2 more`). It says
+`which is reading` instead when none of those tasks writes under the lock,
+and the session holds it exclusively only because its writer had not
+finished. The line never names a process that is gone; it then says `another
+putnami process`. A task that waits for shared locks names none of their
+holders: several sessions can read at once, and a reader records nothing in
+the lock file.
 
 ```
 putnami: /app:build~generate waits for another putnami process, which is reading the project-rooted outputs of app
@@ -817,14 +829,18 @@ locks the task holds at that moment, shared or not, so it never waits for
 its own parent. A nested task can therefore write under a lock its parent
 holds only for reading: another session's writer still waits for the parent,
 but another session's reader does not wait for the nested task. A nested
-session still waits for any other session: when that other session in turn
-waits for a lock the parent task holds, neither progresses until one is
-canceled or the parent task's own time limit expires. The parent task then
-fails with a timeout, and the wait line printed before names the other
-session.
+session still waits for any other lock holder, and two cases never resolve
+on their own. Another session can in turn wait for a lock the parent task
+holds. Or the parent task reads under a shared lock, and a task of its own
+session that holds a lock the nested session needs waits for the parent's
+shared lock to be released. Neither progresses until one is canceled or the
+parent task's own time limit expires. The parent task then fails with a
+timeout; a wait line printed before names the other session, and a wait for
+the parent's own session prints none.
+
 The lock files live in `.putnami/locks/task-outputs/`. No input pattern or
-declared output covers that directory. The lock is not a cache input. On
-hosts without `flock(2)` there is no lock.
+declared output covers that directory. The lock is not a cache input. It is
+`flock(2)` on Unix and `LockFileEx` on Windows, in shared or exclusive mode.
 
 The version stamp a session seeds before it computes any cache key takes no
 lock. The seed changes `.gen/version.json` only when the revision, the dirty

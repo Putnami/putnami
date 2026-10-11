@@ -947,11 +947,12 @@ func TestTaskOutputLockReaderKeyModes(t *testing.T) {
 	}
 }
 
-// TestTaskOutputLockPlanSeedsTheExclusiveMode pins seedExclusive: once the
-// session's plan writes under a key, every need of that key in the session is
-// exclusive, a reader's included, so the session's writer joins the hold its
-// reader took instead of waiting for it, and another session's reader waits
-// for the session's reader as for a writer.
+// TestTaskOutputLockPlanSeedsTheExclusiveMode pins seedExclusive: while a
+// planned writer of a key has not finished, every need of that key in the
+// session is exclusive, a reader's included. The session's writer joins the
+// hold its reader took instead of waiting for it, and another session's
+// reader waits for the session's reader, whose record says it reads until the
+// writer joins. A key no planned task writes stays shared.
 func TestTaskOutputLockPlanSeedsTheExclusiveMode(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -959,19 +960,27 @@ func TestTaskOutputLockPlanSeedsTheExclusiveMode(t *testing.T) {
 	reader := genReader("build~transpile")
 	otherProject := readerJob("other", "build~transpile", nil, extension.ResourceRef{ID: "gen"})
 	clients := readerJob("proj", "test~run", nil, extension.ResourceRef{ID: "workspace-clients", Scope: extension.ResourceScopeWorkspace})
+	finalizer := genWriter("test~env-down")
+	finalizer.Step.RunOn = extensionproto.StepRunOnFinally
+	finalizer.Step.Finalizes = &extensionproto.FinalizesRelation{Producer: "setup", Consumers: []string{"run"}}
 
 	session := newTestOutputLocks(t, root, "20260925-192012-876307", "", noWaitLine(t))
 	session.onOwnSessionWait = func(task string) { t.Errorf("%s waited for its own session", task) }
 	session.seedExclusive([]*ScheduledJob{writer, reader, otherProject, clients})
 	project := keyNamed(t, session.keysFor([]*ScheduledJob{reader}, nil, true), "project:proj")
-	if !project.exclusive {
-		t.Fatal("a reader of a key its session's plan writes took it shared")
+	if !project.exclusive || project.writes {
+		t.Fatalf("reader key = %+v, want exclusive while the planned writer has not finished, and not a write", project)
 	}
 	if key := keyNamed(t, session.keysFor([]*ScheduledJob{otherProject}, nil, true), "project:other"); key.exclusive {
 		t.Fatal("a key no task of the plan writes became exclusive")
 	}
 	if key := keyNamed(t, session.keysFor([]*ScheduledJob{clients}, nil, true), "workspace:"); key.exclusive {
 		t.Fatal("a workspace key no task of the plan writes became exclusive")
+	}
+	finalizing := newTestOutputLocks(t, root, "finalizing", "", nil)
+	finalizing.seedExclusive([]*ScheduledJob{finalizer})
+	if key := keyNamed(t, finalizing.keysFor([]*ScheduledJob{reader}, nil, true), "project:proj"); key.exclusive {
+		t.Fatal("a planned finalizer, which takes no lock, made a reader key exclusive")
 	}
 
 	readHold, err := session.acquire(t.Context(), []*ScheduledJob{reader}, nil, true)
@@ -981,24 +990,97 @@ func TestTaskOutputLockPlanSeedsTheExclusiveMode(t *testing.T) {
 	if probeShared(t, session, project) {
 		t.Fatal("another session could read under a key the seeded session holds")
 	}
-	writeHold, err := session.acquire(t.Context(), []*ScheduledJob{writer}, nil, true)
-	if err != nil {
-		t.Fatalf("writer acquire: %v", err)
+	lockPath := filepath.Join(session.dir, project.id+".lock")
+	if holder, known := readOutputLockHolder(lockPath); !known || !holder.Reading || !slices.Equal(holder.Tasks, []string{reader.Key()}) {
+		t.Fatalf("record of the seeded reader = %+v (known %v), want its task, reading", holder, known)
 	}
 
 	messages := make(chan string, 1)
 	other := newTestOutputLocks(t, root, "20260925-192013-000001", "", func(message string) { messages <- message })
-	waiting := acquireAsync(t.Context(), other, genReader("test~run"))
+	otherReader := genReader("test~run")
+	waiting := acquireAsync(t.Context(), other, otherReader)
 	message := waitMessage(t, messages, "another session's reader never reported the seeded session")
-	for _, want := range []string{"session 20260925-192012-876307", "task " + reader.Key() + " and 1 more", "which is writing the project-rooted outputs of proj"} {
-		if !strings.Contains(message, want) {
-			t.Errorf("wait line %q does not contain %q", message, want)
-		}
+	want := fmt.Sprintf("%s waits for session 20260925-192012-876307 (pid %d, task %s), which is reading the project-rooted outputs of proj",
+		otherReader.Key(), os.Getpid(), reader.Key())
+	if message != want {
+		t.Errorf("wait line = %q, want %q", message, want)
+	}
+
+	writeHold, err := session.acquire(t.Context(), []*ScheduledJob{writer}, nil, true)
+	if err != nil {
+		t.Fatalf("writer acquire: %v", err)
+	}
+	if holder, known := readOutputLockHolder(lockPath); !known || holder.Reading || !slices.Equal(holder.Tasks, []string{reader.Key(), writer.Key()}) {
+		t.Fatalf("record after the writer joined = %+v (known %v), want both tasks, writing", holder, known)
 	}
 	readHold.release()
 	requirePending(t, waiting, "another session's reader")
 	writeHold.release()
 	awaitAcquired(t, waiting, "another session's reader").release()
+}
+
+// TestTaskOutputLockReadersShareOnceThePlannedWriterFinished pins the end of
+// the seeded mode: once the session's last planned writer of a key finished,
+// whatever its terminal state, a reader of the session takes the key shared,
+// and a reader of another session runs beside it. A hold taken exclusively
+// before keeps its mode until its release.
+func TestTaskOutputLockReadersShareOnceThePlannedWriterFinished(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "concurrent-session-read-exclusion",
+		"readers-in-several-sessions-share-their-lock")
+	root := t.TempDir()
+	writer := genWriter("build~generate")
+	restored := genWriter("test~generate")
+	reader := genReader("build~transpile")
+	early := genReader("lint~docs")
+
+	session := newTestOutputLocks(t, root, "session", "", noWaitLine(t))
+	session.onOwnSessionWait = func(task string) { t.Errorf("%s waited for its own session", task) }
+	session.seedExclusive([]*ScheduledJob{writer, restored, reader, early})
+	project := keyNamed(t, session.keysFor([]*ScheduledJob{reader}, nil, true), "project:proj")
+
+	earlyHold, err := session.acquire(t.Context(), []*ScheduledJob{early}, nil, true)
+	if err != nil {
+		t.Fatalf("early reader acquire: %v", err)
+	}
+	session.finished(writer)
+	session.finished(reader)
+	if key := keyNamed(t, session.keysFor([]*ScheduledJob{reader}, nil, true), "project:proj"); !key.exclusive {
+		t.Fatal("a reader key became shared while a planned writer of it has not finished")
+	}
+	session.finished(restored)
+	session.finished(restored)
+	if key := keyNamed(t, session.keysFor([]*ScheduledJob{reader}, nil, true), "project:proj"); key.exclusive {
+		t.Fatal("a reader key stayed exclusive after every planned writer of it finished")
+	}
+	if key := keyNamed(t, session.keysFor([]*ScheduledJob{genWriter("build~generate")}, nil, false), "project:proj"); !key.exclusive {
+		t.Fatal("a writer key became shared")
+	}
+	if exclusive, _, ok := heldEntry(session, project); !ok || !exclusive {
+		t.Fatal("the hold taken before the writers finished changed its mode")
+	}
+	earlyHold.release()
+
+	readHold, err := session.acquire(t.Context(), []*ScheduledJob{reader}, nil, true)
+	if err != nil {
+		t.Fatalf("reader acquire: %v", err)
+	}
+	other := newTestOutputLocks(t, root, "other", "", noWaitLine(t))
+	otherHold, err := other.acquire(t.Context(), []*ScheduledJob{genReader("test~run")}, nil, true)
+	if err != nil {
+		t.Fatalf("another session's reader: %v", err)
+	}
+	if exclusive, _, ok := heldEntry(session, project); !ok || exclusive {
+		t.Fatal("the session's reader took the key exclusively after its writers finished")
+	}
+	if probeFree(t, session, project) {
+		t.Fatal("a writer could lock the key two sessions read")
+	}
+	readHold.release()
+	otherHold.release()
+	if !probeFree(t, session, project) {
+		t.Fatal("the key is still held after both readers released")
+	}
 }
 
 // TestTaskOutputLockReadersShareAcrossSessions pins the shared mode across

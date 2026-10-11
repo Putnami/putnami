@@ -914,9 +914,10 @@ func (s *Scheduler) startWorkers(
 }
 
 // recordCompletedGroup applies one finished dispatch group to the run's shared
-// state: it records each task's terminal result, renders and records its
-// job:end, tells the invocation runtime what the producer delivered, and
-// returns whether the group failed together with the dependents it unblocked.
+// state: it records each task's terminal result, tells the task-output locks
+// the task finished, renders and records its job:end, tells the invocation
+// runtime what the producer delivered, and returns whether the group failed
+// together with the dependents it unblocked.
 //
 // It is a pure state transition over (results, state): it owns no channel, no
 // goroutine and no cancellation, which is why it can sit outside the inline
@@ -940,6 +941,7 @@ func (s *Scheduler) recordCompletedGroup(
 		mu.Lock()
 		results[done.job.Key()] = done.result
 		mu.Unlock()
+		s.outputLocks.finished(done.job)
 
 		s.renderer.JobComplete(done.job, done.result)
 		s.emitSessionJobEnd(done.job, done.result)
@@ -1269,6 +1271,7 @@ func (s *Scheduler) drainInFlight(doneCh <-chan jobGroupDone, count int, results
 				results[done.job.Key()] = done.result
 			}
 			mu.Unlock()
+			s.outputLocks.finished(done.job)
 			s.renderer.JobComplete(done.job, done.result)
 			s.emitSessionJobEnd(done.job, done.result)
 			s.invocations.observe(done.job, done.result)
@@ -1295,6 +1298,7 @@ func (s *Scheduler) skipJob(job *ScheduledJob, state *dagState, results map[stri
 	mu.Lock()
 	results[job.Key()] = skipped
 	mu.Unlock()
+	s.outputLocks.finished(job)
 	s.renderer.JobStart(job)
 	s.renderer.JobComplete(job, skipped)
 	s.emitSessionJobEnd(job, skipped)

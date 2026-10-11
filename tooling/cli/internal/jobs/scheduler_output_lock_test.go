@@ -599,3 +599,78 @@ func TestScheduler_AWriterWaitsForAnotherSessionsReader(t *testing.T) {
 		t.Fatalf(".gen/data.txt = %q after both sessions, want the writer that ran last", got)
 	}
 }
+
+// TestScheduler_ReadersInTwoSessionsRunTogether pins that two build or test
+// sessions of one project read .gen together once each session's own generate
+// finished: the second session's build step runs to completion while the
+// first session's test step still reads, without a wait line.
+func TestScheduler_ReadersInTwoSessionsRunTogether(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "concurrent-session-read-exclusion",
+		"readers-in-several-sessions-share-their-lock")
+	f := newOutputRaceFixture(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	heldStarted := filepath.Join(f.root, "held.fifo")
+	if err := syscall.Mkfifo(heldStarted, 0o600); err != nil {
+		t.Fatalf("mkfifo: %v", err)
+	}
+	heldRelease := filepath.Join(f.root, "held-release")
+	t.Cleanup(func() { _ = os.WriteFile(heldRelease, []byte("release"), 0o644) })
+	holdScript := filepath.Join(f.root, "hold.sh")
+	writeExecutable(t, holdScript, "#!/bin/sh\n"+
+		"printf 'started\\n' > "+shellQuote(heldStarted)+"\n"+
+		releaseWaitScript(heldRelease, os.Getpid()))
+	data := shellQuote(f.genData())
+	writeScript := filepath.Join(f.root, "write.sh")
+	writeExecutable(t, writeScript, "#!/bin/sh\nmkdir -p "+shellQuote(filepath.Dir(f.genData()))+"\nprintf 'a\\n' > "+data+"\n")
+	blockingRead := filepath.Join(f.root, "blocking-read.sh")
+	writeExecutable(t, blockingRead, "#!/bin/sh\n"+
+		"printf 'started\\n' > "+shellQuote(f.started)+"\n"+
+		releaseWaitScript(f.release, os.Getpid())+
+		"cp "+data+" "+shellQuote(f.endState)+"\n")
+	readScript := filepath.Join(f.root, "read.sh")
+	writeExecutable(t, readScript, "#!/bin/sh\ncp "+data+" "+shellQuote(f.seen)+"\n")
+
+	// The second session's generate finishes first, and a step with no
+	// project key keeps its build step back.
+	generateB := f.resourceJob("build~generate", f.noopScript(t), genDataOutputs(), nil)
+	held := f.resourceJob("lint~hold", holdScript, nil, nil)
+	held.DependsOn = []string{generateB.Key()}
+	transpile := f.resourceJob("build~transpile", readScript, nil, genReads())
+	transpile.DependsOn = []string{generateB.Key(), held.Key()}
+	waits := make(chan string, 1)
+	building := f.plan("20260925-192013-000001", nil, generateB, held, transpile)
+	building.onOutputLockWait = func(message string) { waits <- message }
+	second := runAsync(ctx, building)
+	awaitStarted(t, heldStarted, second, "the second session's holding step")
+
+	// The first session generates, then its test step reads .gen and blocks.
+	generateA := f.resourceJob("test~generate", writeScript, genDataOutputs(), nil)
+	run := f.resourceJob("test~run", blockingRead, nil, genReads())
+	run.DependsOn = []string{generateA.Key()}
+	first := runAsync(ctx, f.plan(outputRaceSessionA, nil, generateA, run))
+	f.awaitFirstStarted(t, first)
+
+	if err := os.WriteFile(heldRelease, []byte("release"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case message := <-waits:
+		t.Fatalf("the second session's build step waited for the first session's reader: %s", message)
+	case result := <-second:
+		requireSuccess(t, "building", result, transpile.Key())
+	case <-time.After(answerWaitBudget):
+		t.Fatal("the second session's build step neither finished nor waited")
+	}
+	if got := readFileAt(t, f.seen); got != "a\n" {
+		t.Fatalf("the build step read %q, want the first session's complete .gen", got)
+	}
+	if err := os.WriteFile(f.release, []byte("release"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	requireSuccess(t, "testing", <-first, run.Key())
+	if got := readFileAt(t, f.endState); got != "a\n" {
+		t.Fatalf("the test step ended reading %q, want the .gen it started with", got)
+	}
+}
