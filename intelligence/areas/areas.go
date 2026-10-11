@@ -118,8 +118,8 @@ const maxInferredDepth = 3
 // top-level directories become areas of their own.
 const maxRootShare = 0.5
 
-// maxAreaPath keeps a path usable as an area name, which the contract bounds
-// to 128 bytes. A longer or unusual path folds into its parent area.
+// maxAreaPath is the longest path, in bytes, that names an area. A longer or
+// unusual path folds into its parent area.
 const maxAreaPath = 128
 
 var safePath = regexp.MustCompile(`^[A-Za-z0-9._@+-]+(/[A-Za-z0-9._@+-]+)*$`)

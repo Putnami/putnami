@@ -948,6 +948,7 @@ func TestInstallPS1RunReadsTheShippedMap(t *testing.T) {
 // the command map.
 func TestInstallPS1RunSaysARetiredCommandIsRetired(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "cli/windows-consumers", "powershell-installer-run-form", "the-run-form-refuses-before-installing")
 	r := newPS1RunEnv(t, commandMap("agent-readiness @acme/revived"), 0)
 	res := r.run(t, "--run", "agent-readiness")
 	r.assertRefusedBeforeInstalling(t, res)

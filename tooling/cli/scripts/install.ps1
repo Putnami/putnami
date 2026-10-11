@@ -85,9 +85,8 @@ $CommandMapUrlEnv = 'PUTNAMI_COMMAND_MAP_URL'
 $CommandMapHeader = 'putnami.install-commands.v1'
 $RunEnv = 'PUTNAMI_RUN'
 
-# Commands the installer ran once and no longer does. A one-liner that names
-# one is still in circulation, so it installs nothing and says the command is
-# retired instead of reporting an unlisted command.
+# Retired commands. The installer refuses one before any network call: it
+# installs nothing and says the command is retired.
 $RetiredCommands = @('agent-readiness')
 
 # The patterns of install.sh, matched with -cmatch. A case-sensitive .NET range

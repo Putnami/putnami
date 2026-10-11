@@ -284,10 +284,6 @@
       "formatter": { "enabled": false }
     },
     {
-      "includes": ["**/sites/putnami.dev/hosted-schemas/**"],
-      "formatter": { "enabled": false }
-    },
-    {
       "includes": ["**/package.json"],
       "json": {
         "formatter": {

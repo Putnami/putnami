@@ -48,9 +48,8 @@ COMMAND_MAP_URL_ENV="PUTNAMI_COMMAND_MAP_URL"
 COMMAND_MAP_HEADER="putnami.install-commands.v1"
 RUN_ENV="PUTNAMI_RUN"
 
-# Commands the installer ran once and no longer does, each between two spaces.
-# A one-liner that names one is still in circulation, so it installs nothing
-# and says the command is retired instead of reporting an unlisted command.
+# Retired commands, each between two spaces. The installer refuses one before
+# any network call: it installs nothing and prints one line.
 RETIRED_COMMANDS=" agent-readiness "
 
 # Character sets are spelled out rather than written as ranges: a range such as

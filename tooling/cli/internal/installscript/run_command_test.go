@@ -794,8 +794,7 @@ func TestRunRejectsAnInvalidCommandBeforeAnyNetworkCall(t *testing.T) {
 }
 
 // A retired command installs nothing and says so in one line, before the
-// installer reads the command map: a one-liner that names it may still be in
-// circulation.
+// installer reads the command map.
 func TestRunSaysARetiredCommandIsRetired(t *testing.T) {
 	t.Parallel()
 	site := newRunSite(t, runSiteOptions{commandMap: commandMap("agent-readiness @acme/revived")})
