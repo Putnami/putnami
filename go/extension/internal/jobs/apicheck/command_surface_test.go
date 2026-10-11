@@ -286,7 +286,7 @@ func TestAMalformedCommandSurfaceFailsTheCheck(t *testing.T) {
 	t.Parallel()
 	inTree := newSurfaceFixture(t)
 	inTree.write(surfaceLocation, `{"protocolVersion":1}`+"\n")
-	_, err := Check(inTree.root, inTree.project, projectName, inTree.options)
+	_, err := Check(inTree.root, inTree.project, projectName, inTree.tags, inTree.options)
 	if err == nil || !strings.Contains(err.Error(), "the command surface command-surface.json is invalid") ||
 		!errors.Is(err, protocolcli.ErrInvalidConfig) {
 		t.Fatalf("err = %v, want the invalid document named as invalid configuration", err)
@@ -299,7 +299,7 @@ func TestAMalformedCommandSurfaceFailsTheCheck(t *testing.T) {
 	atTag.commit("feat: a document")
 	atTag.git("tag", surfaceTag)
 	atTag.write(surfaceLocation, surfaceDocument(t, loudFlag()))
-	_, err = Check(atTag.root, atTag.project, projectName, atTag.options)
+	_, err = Check(atTag.root, atTag.project, projectName, atTag.tags, atTag.options)
 	if err == nil || !strings.Contains(err.Error(), "the command surface command-surface.json at lib/v0.5.0 is invalid") {
 		t.Fatalf("err = %v, want the released document named invalid", err)
 	}
@@ -319,7 +319,7 @@ func TestACommandSurfaceAtTheTagMustBeARegularFileWithinTheBound(t *testing.T) {
 		t.Fatal(err)
 	}
 	link.write(surfaceLocation, surfaceDocument(t, loudFlag()))
-	if _, err := Check(link.root, link.project, projectName, link.options); err == nil ||
+	if _, err := Check(link.root, link.project, projectName, link.tags, link.options); err == nil ||
 		!strings.Contains(err.Error(), "command-surface.json at lib/v0.5.0 is not a regular file") {
 		t.Fatalf("err = %v, want the linked document refused", err)
 	}
@@ -330,7 +330,7 @@ func TestACommandSurfaceAtTheTagMustBeARegularFileWithinTheBound(t *testing.T) {
 	large.commit("feat: a large document")
 	large.git("tag", surfaceTag)
 	large.write(surfaceLocation, surfaceDocument(t, loudFlag()))
-	if _, err := Check(large.root, large.project, projectName, large.options); err == nil ||
+	if _, err := Check(large.root, large.project, projectName, large.tags, large.options); err == nil ||
 		!strings.Contains(err.Error(), "over the limit") {
 		t.Fatalf("err = %v, want the oversized document refused unread", err)
 	}
@@ -365,12 +365,12 @@ func TestADeclaredCommandSurfaceMustBeAFileOfTheProject(t *testing.T) {
 		"../surface.json":      `option command-surface is "../surface.json", want the path of a file of the project`,
 		".":                    `option command-surface is ".", want the path of a file of the project`,
 	} {
-		_, err := Check(f.root, f.project, projectName, Options{CommandSurface: option})
+		_, err := Check(f.root, f.project, projectName, f.tags, Options{CommandSurface: option})
 		if err == nil || !strings.Contains(err.Error(), want) || !errors.Is(err, protocolcli.ErrInvalidConfig) {
 			t.Errorf("option %q: err = %v, want %q as invalid configuration", option, err, want)
 		}
 	}
-	if report, err := Check(f.root, f.project, projectName, Options{CommandSurface: "./real/../real/surface.json"}); err != nil || report.CommandSurface != "real/surface.json" {
+	if report, err := Check(f.root, f.project, projectName, f.tags, Options{CommandSurface: "./real/../real/surface.json"}); err != nil || report.CommandSurface != "real/surface.json" {
 		t.Errorf("a path with dot segments: report = %+v, err = %v, want it cleaned", report, err)
 	}
 }
@@ -393,7 +393,7 @@ func TestADeclaredCommandSurfaceIsAFileTheCacheKeyReads(t *testing.T) {
 		"vendor/surface.json":    `option command-surface is "vendor/surface.json", which is inside vendor`,
 		"node_modules/s.json":    `option command-surface is "node_modules/s.json", which is inside node_modules`,
 	} {
-		_, err := Check(f.root, f.project, projectName, Options{CommandSurface: option})
+		_, err := Check(f.root, f.project, projectName, f.tags, Options{CommandSurface: option})
 		if err == nil || !strings.Contains(err.Error(), want) || !errors.Is(err, protocolcli.ErrInvalidConfig) {
 			t.Errorf("option %q: err = %v, want %q as invalid configuration", option, err, want)
 		}
@@ -401,7 +401,7 @@ func TestADeclaredCommandSurfaceIsAFileTheCacheKeyReads(t *testing.T) {
 	f.write("lib/greet/.surface.json", surfaceDocument(t, loudFlag()))
 	f.write("lib/greet/_docs/surface.json", surfaceDocument(t, loudFlag()))
 	for _, option := range []string{".surface.json", "_docs/surface.json"} {
-		if _, err := Check(f.root, f.project, projectName, Options{CommandSurface: option}); err != nil {
+		if _, err := Check(f.root, f.project, projectName, f.tags, Options{CommandSurface: option}); err != nil {
 			t.Errorf("option %q: err = %v, want the keyed document read", option, err)
 		}
 	}
@@ -412,11 +412,11 @@ func TestADeclaredCommandSurfaceIsAFileTheCacheKeyReads(t *testing.T) {
 func TestASkippedProjectDoesNotReadItsCommandSurface(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, catalog("package", "experimental"))
-	report, err := Check(f.root, f.project, projectName, Options{CommandSurface: "missing.json"})
+	report, err := Check(f.root, f.project, projectName, f.tags, Options{CommandSurface: "missing.json"})
 	if err != nil || report.Skip == "" {
 		t.Fatalf("report = %+v, err = %v, want the project skipped", report, err)
 	}
-	if _, err := Check(f.root, f.project, projectName, Options{CommandSurface: "../x.json"}); !errors.Is(err, protocolcli.ErrInvalidConfig) {
+	if _, err := Check(f.root, f.project, projectName, f.tags, Options{CommandSurface: "../x.json"}); !errors.Is(err, protocolcli.ErrInvalidConfig) {
 		t.Fatalf("err = %v, want the option refused", err)
 	}
 }

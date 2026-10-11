@@ -1,0 +1,15 @@
+{
+  "workspaceRoot": "/ws",
+  "outputPath": "/o",
+  "cacheRoot": "/c",
+  "workspace": {"name": "w"},
+  "project": {
+    "name": "p",
+    "path": "p",
+    "fullPath": "/ws/p",
+    "tags": []
+  },
+  "extension": {"name": "e", "root": "/e"},
+  "job": {"name": "build"},
+  "params": {}
+}

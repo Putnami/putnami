@@ -1,0 +1,26 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/protocols/job/validate",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {"name": "putnami"},
+  "project": {
+    "name": "go.putnami.dev/protocol/job",
+    "path": "protocols/job",
+    "fullPath": "/ws/protocols/job",
+    "tags": ["go", "protocol"]
+  },
+  "extension": {
+    "name": "@putnami/go",
+    "root": "/ws/go/extension"
+  },
+  "job": {"name": "validate"},
+  "identity": {
+    "key": "/protocols/job:validate~api",
+    "scope": "project",
+    "project": {"id": "/protocols/job", "name": "go.putnami.dev/protocol/job"},
+    "task": {"name": "validate~api", "command": "validate", "kind": "validate"},
+    "provider": {"extension": "@putnami/go"}
+  },
+  "params": {}
+}

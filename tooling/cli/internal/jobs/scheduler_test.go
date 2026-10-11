@@ -646,7 +646,10 @@ func TestBoundedReleaseWaitScriptExitsWithoutItsParentRelease(t *testing.T) {
 			if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			err := exec.Command(scriptPath).Run()
+			// The shell reads the script instead of executing it. A parallel
+			// test's fork can still hold this file open for writing, and
+			// executing it would then fail with "text file busy".
+			err := exec.Command("/bin/sh", scriptPath).Run()
 			var exitErr *exec.ExitError
 			if !errors.As(err, &exitErr) || exitErr.ExitCode() != tc.wantExit {
 				t.Fatalf("bounded waiter error = %v, want exit %d", err, tc.wantExit)
