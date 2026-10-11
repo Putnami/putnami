@@ -36,7 +36,7 @@
     },
     {
       "id": "squash-keeps-the-breaking-marker",
-      "text": "version check fails when a commit between the base and HEAD declares a breaking change and the squash commit message, the title with the body when given, declares none, and names each such commit; a title with the marker passes, and so does any title when no commit declares a break."
+      "text": "version check fails when a commit between the base and HEAD declares a breaking change and the squash commit message, a title or a message file, declares none, and names each such commit; it refuses a shallow clone; a title with the marker passes, and so does any title when no commit declares a break."
     }
   ],
   "decisions": [

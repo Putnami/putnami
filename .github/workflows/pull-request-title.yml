@@ -43,13 +43,15 @@ jobs:
           go-version-file: go.work
           cache: false
 
-      # The title and the body reach the shell through the environment, never
-      # through the script text: a pull request from a fork writes both.
+      # The title and the body reach the shell through the environment and the
+      # CLI through a file, never through the script text or an argument: a
+      # pull request from a fork writes both, and a title such as "--help"
+      # passed as an argument would be read as a flag.
       #
-      # The body is passed because the repository squashes with the pull
-      # request body (squash_merge_commit_message: PR_BODY), so a footer in it
-      # is in the commit `putnami version` reads. Drop --body-file if that
-      # setting changes.
+      # The body is in the message because the repository squashes with the
+      # pull request body (squash_merge_commit_message: PR_BODY), so a footer
+      # in it is in the commit `putnami version` reads. Write the title alone
+      # if that setting changes.
       - name: Check the breaking marker
         env:
           TITLE: ${{ github.event.pull_request.title }}
@@ -57,6 +59,6 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
-          printf '%s' "$BODY" > "$RUNNER_TEMP/pull-request-body.md"
-          ./putnamiw version check --base "origin/$BASE_REF" --title "$TITLE" \
-            --body-file "$RUNNER_TEMP/pull-request-body.md"
+          printf '%s\n\n%s\n' "$TITLE" "$BODY" > "$RUNNER_TEMP/squash-message.txt"
+          ./putnamiw version check --base "origin/$BASE_REF" \
+            --message-file "$RUNNER_TEMP/squash-message.txt"

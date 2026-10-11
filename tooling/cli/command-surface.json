@@ -1048,7 +1048,7 @@
           "type": "value"
         },
         {
-          "long": "--body-file",
+          "long": "--message-file",
           "type": "value"
         },
         {

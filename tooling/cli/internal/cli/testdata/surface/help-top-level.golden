@@ -25,7 +25,7 @@ Workspace:
   upgrade                      Upgrade CLI, extensions, and dependencies
   pin                          Pin the CLI version this workspace uses
   workspace describe           Describe the active workspace
-  version get|tag|check|list|use Versions derived from git, release tags, and installed CLI binaries
+  version <subcommand>         Versions derived from git, release tags, and installed CLI binaries
   infra plan                   Plan workspace infra (--output=jsonl)
 
 Extensions & Templates:

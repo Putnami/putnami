@@ -142,7 +142,7 @@ _putnami_flags_for() {
         'templates install') printf '%s\n' '--latest' ;;
         'tree verify') printf '%s\n' '--base --gate --record --ref --report --snapshot' ;;
         'upgrade') printf '%s\n' '--channel --cli --deps --dry-run --extensions --from-source --global --namespace --release --version' ;;
-        'version check') printf '%s\n' '--base --body-file --title' ;;
+        'version check') printf '%s\n' '--base --message-file --title' ;;
         'version get') printf '%s\n' '--scope' ;;
         'version list') printf '%s\n' '--global' ;;
         'version tag') printf '%s\n' '--dry-run --push --scope --yes' ;;

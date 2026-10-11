@@ -367,12 +367,12 @@ example: putnami version list --global
 example: putnami version use go-dev
 ═══ version check ═══
 description: Fail when a commit since the base declares a breaking change and the squash commit message does not
-usage: putnami version check --base <ref> --title <title> [--body-file <path>]
+usage: putnami version check --base <ref> (--title <title> | --message-file <path>)
 flag: --base | <ref> | The branch or commit the change merges into; the commits read are those from it to HEAD
-flag: --title | <title> | The subject of the squash commit, which is the pull request title
-flag: --body-file | <path> | A file holding the body of the squash commit; pass it only when the squash commit keeps the pull request body
+flag: --title | <title> | The subject of the squash commit, which is the pull request title; a squash commit with a body, or a title that starts with a dash, goes through --message-file
+flag: --message-file | <path> | A file holding the squash commit message: the subject on the first line, then the body when the squash commit keeps the pull request body
 example: putnami version check --base origin/main --title "feat(cli)!: drop the --all flag"
-example: putnami version check --base origin/main --title "refactor: drop the greeting" --body-file body.md
+example: putnami version check --base origin/main --message-file squash-message.txt
 ═══ version get ═══
 description: Show the version every version line is at, derived from its git tags
 usage: putnami version get [--scope <line>] [--output <format>]

@@ -168,7 +168,7 @@ Flags can be combined. When no flags are given, all phases run against the `stab
 
 - `putnami version get` — Print the version each line is at, one line per version line
 - `putnami version tag --scope <line>` — Release a line: regenerate its changelog, create the release commit, then the annotated tag on it (`--push` pushes both, `--yes` skips the confirmation, `--dry-run` only prints)
-- `putnami version check --base <ref> --title <title>` — Fail when a commit since the base declares a breaking change and the squash commit message does not (`--body-file` adds the body when the squash commit keeps it)
+- `putnami version check --base <ref> --title <title>` — Fail when a commit since the base declares a breaking change and the squash commit message does not (`--message-file` replaces `--title` with a file that holds the subject and the body)
 
 A version is derived from git, never declared: there is no `version set` and no
 `version bump`. `--scope <line>` is required when the workspace declares more

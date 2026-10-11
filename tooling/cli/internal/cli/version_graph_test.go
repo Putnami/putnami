@@ -127,3 +127,48 @@ func versionGraphRepo(t *testing.T, withCatalog bool) string {
 	}
 	return dir
 }
+
+// `version check` receives its flags through the CLI's argument parser, which
+// reads an argument that starts with a dash as a flag. A squash title is
+// free text, so the message goes through a file: a title that spells a flag
+// still reaches the check.
+func TestVersionCheckReadsATitleThatSpellsAFlagFromTheMessageFile(t *testing.T) {
+	t.Parallel()
+	wsRoot := versionGraphRepo(t, false)
+	for _, args := range [][]string{
+		{"checkout", "-b", "change"},
+		{"commit", "--allow-empty", "-m", "feat(cli)!: drop the --all flag"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = wsRoot
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	message := filepath.Join(t.TempDir(), "squash-message.txt")
+	if err := os.WriteFile(message, []byte("--help\n\nkey=value\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	parsed := ParseArgs([]string{"version", "check", "--base=main", "--message-file", message}, nil, nil)
+	if parsed.Err != nil || parsed.Global.Help {
+		t.Fatalf("ParseArgs: err = %v, help = %v; want the invocation to reach the command", parsed.Err, parsed.Global.Help)
+	}
+	registered, ok := lookupCommand("version")
+	if !ok {
+		t.Fatal("version command is not registered")
+	}
+	err := registered.run(&CommandEnv{
+		Ctx:    context.Background(),
+		Cfg:    wsproto.Load(wsRoot),
+		WsRoot: wsRoot,
+		Sub:    parsed.Subcommand,
+		Args:   parsed.RawJobArgs,
+	})
+	if err == nil || !strings.Contains(err.Error(), "feat(cli)!: drop the --all flag") {
+		t.Fatalf("version check = %v, want the failure that names the breaking commit", err)
+	}
+	if code := exitCodeForError(err); code != ExitError {
+		t.Errorf("exit code = %d, want %d", code, ExitError)
+	}
+}

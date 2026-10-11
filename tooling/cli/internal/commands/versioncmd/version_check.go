@@ -13,13 +13,13 @@ import (
 )
 
 // versionCheckUsage is the usage line of `version check`.
-const versionCheckUsage = "usage: putnami version check --base <ref> --title <title> [--body-file <path>]"
+const versionCheckUsage = "usage: putnami version check --base <ref> (--title <title> | --message-file <path>)"
 
 // versionCheckFlags are the flags of `version check`.
 type versionCheckFlags struct {
-	Base     string
-	Title    string
-	BodyFile string
+	Base        string
+	Title       string
+	MessageFile string
 }
 
 // VersionCheck holds the breaking marker across a squash merge. A squash
@@ -29,21 +29,35 @@ type versionCheckFlags struct {
 // branch commit is lost.
 //
 // The check reads the commits between --base and HEAD and fails when one
-// declares a breaking change and the squash message, --title with the content
-// of --body-file, declares none. It names each such commit. It reads every
-// message with the reader the version bump uses, so the two cannot disagree.
+// declares a breaking change and the squash commit message declares none. It
+// names each such commit. The message is --title alone, or the content of
+// --message-file: its first line is the subject and the rest is the body. The
+// check reads every message with the reader the version bump uses, so the two
+// cannot disagree.
 func VersionCheck(wsRoot string, args []string) error {
 	flags, err := parseVersionCheckFlags(args)
 	if err != nil {
 		return err
 	}
-	body := ""
-	if flags.BodyFile != "" {
-		data, readErr := os.ReadFile(flags.BodyFile)
+	title, body := flags.Title, ""
+	if flags.MessageFile != "" {
+		data, readErr := os.ReadFile(flags.MessageFile)
 		if readErr != nil {
-			return cmderr.Usagef("version check: read --body-file: %v", readErr)
+			return cmderr.Usagef("version check: read --message-file: %v", readErr)
 		}
-		body = string(data)
+		title, body, _ = strings.Cut(string(data), "\n")
+		if title = strings.TrimSpace(title); title == "" {
+			return cmderr.Usagef("version check: the first line of --message-file is empty; it is the subject of the squash commit")
+		}
+	}
+	// A shallow clone holds a fraction of the range, so a branch commit that
+	// declares a break may be missing: the check would pass without reading it.
+	shallow, err := git.IsShallow(wsRoot)
+	if err != nil {
+		return fmt.Errorf("version check: %w", err)
+	}
+	if shallow {
+		return fmt.Errorf("version check: the clone is shallow, so the commits since %s are incomplete; fetch the full history", flags.Base)
 	}
 	commits, err := git.CommitsSince(wsRoot, flags.Base, nil)
 	if err != nil {
@@ -54,7 +68,7 @@ func VersionCheck(wsRoot string, args []string) error {
 		iox.Fprintf(os.Stdout, "  No commit since %s declares a breaking change.\n", flags.Base)
 		return nil
 	}
-	squash, conventional := protocolcli.ParseConventionalCommit(flags.Title, body)
+	squash, conventional := protocolcli.ParseConventionalCommit(title, body)
 	if conventional && squash.Breaking {
 		iox.Fprintf(os.Stdout, "  The squash commit keeps the breaking change that %s since %s.\n",
 			declaringCommits(len(breaking)), flags.Base)
@@ -63,12 +77,12 @@ func VersionCheck(wsRoot string, args []string) error {
 
 	var message strings.Builder
 	fmt.Fprintf(&message, "version check: the squash commit %q drops the breaking change that %s since %s:\n",
-		flags.Title, declaringCommits(len(breaking)), flags.Base)
+		title, declaringCommits(len(breaking)), flags.Base)
 	for _, commit := range breaking {
 		fmt.Fprintf(&message, "  %s %s\n", shortCommit(commit.SHA), commit.Subject)
 	}
 	if conventional {
-		message.WriteString(`Add "!" before the colon of the title, or a "BREAKING CHANGE:" footer to the body when the squash commit keeps it.`)
+		message.WriteString(`Add "!" before the colon of the title, or a "BREAKING CHANGE:" footer to the body when the squash commit keeps the body.`)
 	} else {
 		message.WriteString(`The title is not a conventional commit, so nothing in the body counts: write it as "type(scope)!: summary".`)
 	}
@@ -94,26 +108,25 @@ func shortCommit(sha string) string {
 	return sha
 }
 
+// parseVersionCheckFlags reads the flags of `version check`. The CLI's argument
+// parser has already split a "--flag=value" into two arguments.
 func parseVersionCheckFlags(args []string) (versionCheckFlags, error) {
 	var flags versionCheckFlags
-	targets := map[string]*string{"--base": &flags.Base, "--title": &flags.Title, "--body-file": &flags.BodyFile}
+	targets := map[string]*string{"--base": &flags.Base, "--title": &flags.Title, "--message-file": &flags.MessageFile}
 	for i := 0; i < len(args); i++ {
-		name, value, inline := strings.Cut(args[i], "=")
-		target, known := targets[name]
+		target, known := targets[args[i]]
 		if !known {
 			return flags, cmderr.Usagef("version check: unexpected argument %q\n  %s", args[i], versionCheckUsage)
 		}
-		if !inline {
-			i++
-			if i >= len(args) {
-				return flags, cmderr.Usagef("version check: %s requires a value\n  %s", name, versionCheckUsage)
-			}
-			value = args[i]
+		i++
+		if i >= len(args) {
+			return flags, cmderr.Usagef("version check: %s requires a value\n  %s", args[i-1], versionCheckUsage)
 		}
-		*target = value
+		*target = args[i]
 	}
-	if flags.Base == "" || strings.TrimSpace(flags.Title) == "" {
-		return flags, cmderr.Usagef("version check: --base and --title are required\n  %s", versionCheckUsage)
+	hasTitle := strings.TrimSpace(flags.Title) != ""
+	if flags.Base == "" || hasTitle == (flags.MessageFile != "") {
+		return flags, cmderr.Usagef("version check: --base and one of --title or --message-file are required\n  %s", versionCheckUsage)
 	}
 	return flags, nil
 }

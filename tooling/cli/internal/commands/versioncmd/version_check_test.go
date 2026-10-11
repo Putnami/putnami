@@ -94,21 +94,31 @@ func TestVersionCheckReadsTheBreakingFooterOfABranchCommit(t *testing.T) {
 	}
 }
 
-// The body counts only when the caller passes it: a host that squashes with
-// the pull request body keeps its footer in the commit `putnami version` reads.
-func TestVersionCheckCountsABreakingFooterInTheBodyFile(t *testing.T) {
-	dir, _ := branchWithCommits(t, "feat(cli)!: drop the --all flag")
-	body := filepath.Join(t.TempDir(), "body.md")
-	// A host returns a body with CRLF line ends.
-	if err := os.WriteFile(body, []byte("Drop the flag.\r\n\r\nBREAKING CHANGE: --all is gone.\r\n"), 0o644); err != nil {
+// writeSquashMessage writes a squash commit message file and returns its path.
+func writeSquashMessage(t *testing.T, message string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "squash-message.txt")
+	if err := os.WriteFile(path, []byte(message), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	return path
+}
 
-	if _, err := runVersionCheck(t, dir, "--base", "main", "--title", "feat(cli): rework the selection", "--body-file", body); err != nil {
+// The body counts only when the caller writes it in the message: a host that
+// squashes with the pull request body keeps its footer in the commit
+// `putnami version` reads.
+func TestVersionCheckCountsABreakingFooterInTheMessageFile(t *testing.T) {
+	dir, _ := branchWithCommits(t, "feat(cli)!: drop the --all flag")
+	// A host returns a body with CRLF line ends.
+	withFooter := writeSquashMessage(t, "feat(cli): rework the selection\n\nDrop the flag.\r\n\r\nBREAKING CHANGE: --all is gone.\r\n")
+	titleAlone := writeSquashMessage(t, "feat(cli): rework the selection\n\n\n")
+
+	if _, err := runVersionCheck(t, dir, "--base", "main", "--message-file", withFooter); err != nil {
 		t.Fatalf("VersionCheck with a breaking footer in the body: %v", err)
 	}
-	if _, err := runVersionCheck(t, dir, "--base", "main", "--title", "feat(cli): rework the selection"); err == nil {
-		t.Fatal("VersionCheck passed without the body: the footer counts only when the body is given")
+	_, err := runVersionCheck(t, dir, "--base", "main", "--message-file", titleAlone)
+	if err == nil || !strings.Contains(err.Error(), `"feat(cli): rework the selection"`) {
+		t.Fatalf("error = %v, want a failure that quotes the subject of the message file", err)
 	}
 }
 
@@ -116,14 +126,24 @@ func TestVersionCheckCountsABreakingFooterInTheBodyFile(t *testing.T) {
 // body says: the version bump reads the squash commit the same way.
 func TestVersionCheckFailsATitleThatIsNotAConventionalCommit(t *testing.T) {
 	dir, _ := branchWithCommits(t, "feat(cli)!: drop the --all flag")
-	body := filepath.Join(t.TempDir(), "body.md")
-	if err := os.WriteFile(body, []byte("BREAKING CHANGE: --all is gone.\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	message := writeSquashMessage(t, "Rework the selection\n\nBREAKING CHANGE: --all is gone.\n")
 
-	_, err := runVersionCheck(t, dir, "--base", "main", "--title", "Rework the selection", "--body-file", body)
+	_, err := runVersionCheck(t, dir, "--base", "main", "--message-file", message)
 	if err == nil || !strings.Contains(err.Error(), "not a conventional commit") {
 		t.Fatalf("error = %v, want a failure that says the title is not a conventional commit", err)
+	}
+}
+
+// A shallow clone holds part of the range: the check refuses it instead of
+// passing without the commit that declares the break.
+func TestVersionCheckRefusesAShallowClone(t *testing.T) {
+	origin, _ := branchWithCommits(t, "feat(cli)!: drop the --all flag", "fix(cli): stop the leak")
+	clone := filepath.Join(t.TempDir(), "clone")
+	gitInRepo(t, t.TempDir(), "clone", "--depth", "1", "--no-single-branch", "file://"+origin, clone)
+
+	_, err := runVersionCheck(t, clone, "--base", "origin/main", "--title", "feat(cli): rework the selection")
+	if err == nil || !strings.Contains(err.Error(), "shallow") {
+		t.Fatalf("error = %v, want a refusal that names the shallow clone", err)
 	}
 }
 
@@ -145,20 +165,23 @@ func TestVersionCheckIgnoresTheCommitsOfTheBase(t *testing.T) {
 
 func TestVersionCheckRefusesIncompleteArguments(t *testing.T) {
 	dir, _ := branchWithCommits(t, "feat(cli): add a flag")
+	empty := writeSquashMessage(t, "\nfeat: add\n")
 	for name, args := range map[string][]string{
-		"no base":          {"--title", "feat: add"},
-		"no title":         {"--base", "main"},
-		"blank title":      {"--base", "main", "--title", " "},
-		"missing value":    {"--base", "main", "--title"},
-		"unknown argument": {"--base", "main", "--title", "feat: add", "extra"},
-		"unreadable body":  {"--base", "main", "--title", "feat: add", "--body-file", filepath.Join(dir, "missing.md")},
+		"no base":            {"--title", "feat: add"},
+		"no title":           {"--base", "main"},
+		"blank title":        {"--base", "main", "--title", " "},
+		"missing value":      {"--base", "main", "--title"},
+		"unknown argument":   {"--base", "main", "--title", "feat: add", "extra"},
+		"title and message":  {"--base", "main", "--title", "feat: add", "--message-file", empty},
+		"unreadable message": {"--base", "main", "--message-file", filepath.Join(dir, "missing.txt")},
+		"empty first line":   {"--base", "main", "--message-file", empty},
 	} {
 		_, err := runVersionCheck(t, dir, args...)
 		if code := protocolcli.ExitCodeForError(err); code != protocolcli.ExitUsage {
 			t.Errorf("%s: exit code = %d (%v), want the usage code %d", name, code, err, protocolcli.ExitUsage)
 		}
 	}
-	if _, err := runVersionCheck(t, dir, "--base=no-such-ref", "--title=feat: add"); err == nil {
+	if _, err := runVersionCheck(t, dir, "--base", "no-such-ref", "--title", "feat: add"); err == nil {
 		t.Error("VersionCheck passed with a base that names no commit")
 	}
 }

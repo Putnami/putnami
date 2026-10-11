@@ -376,14 +376,14 @@ Read the version each line is at (`get`), release a line (`tag`), hold the break
 putnami version get                   # one line per version line: "<line> <version>"
 putnami version tag --scope typescript --dry-run
 putnami version tag --scope typescript --yes --push
-putnami version check --base origin/main --title "$TITLE"   # fail a title that drops a breaking marker
+putnami version check --base origin/main --title "feat: add"   # fail a title that drops a breaking marker
 
 putnami version list                  # installed CLI binaries (* = active)
 putnami version list --global         # ...in ~/.putnami/bin
 putnami version use go-dev            # switch the active CLI binary
 ```
 
-There is no `version set` and no `version bump`: a version is **derived from git**, never declared. A commit carrying a release tag of its line has the tag's version; any other commit takes the line's last release advanced by the conventional commits that touch the line, plus an ordered pre-release suffix. `version tag` regenerates the line's changelog from the same commits, creates the release commit, then the annotated tag on it; `--push` pushes both. `version check` fails when a commit since `--base` declares a breaking change and the squash commit message, `--title` with the optional `--body-file`, does not; it names the commit. See [Version Management](14-version-management.md).
+There is no `version set` and no `version bump`: a version is **derived from git**, never declared. A commit carrying a release tag of its line has the tag's version; any other commit takes the line's last release advanced by the conventional commits that touch the line, plus an ordered pre-release suffix. `version tag` regenerates the line's changelog from the same commits, creates the release commit, then the annotated tag on it; `--push` pushes both. `version check` fails when a commit since `--base` declares a breaking change and the squash commit message, `--title` or the content of `--message-file`, does not; it names the commit. See [Version Management](14-version-management.md).
 
 `list`/`use` manage the binaries in `.putnami/bin` (or `~/.putnami/bin` with `--global`).
 

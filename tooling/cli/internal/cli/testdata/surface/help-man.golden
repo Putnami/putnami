@@ -204,7 +204,7 @@ Pin the CLI version this workspace uses.
 .B workspace describe
 Describe the active workspace.
 .TP
-.B version get|tag|check|list|use
+.B version <subcommand>
 Versions derived from git, release tags, and installed CLI binaries.
 .TP
 .B infra plan
@@ -527,16 +527,16 @@ Fail when a commit since the base declares a breaking change and the squash comm
 .PP
 .B Usage:
 .br
-putnami version check --base <ref> --title <title> [--body-file <path>]
+putnami version check --base <ref> (--title <title> | --message-file <path>)
 .TP
 .B --base
 The branch or commit the change merges into; the commits read are those from it to HEAD.
 .TP
 .B --title
-The subject of the squash commit, which is the pull request title.
+The subject of the squash commit, which is the pull request title; a squash commit with a body, or a title that starts with a dash, goes through --message-file.
 .TP
-.B --body-file
-A file holding the body of the squash commit; pass it only when the squash commit keeps the pull request body.
+.B --message-file
+A file holding the squash commit message: the subject on the first line, then the body when the squash commit keeps the pull request body.
 .SS version list
 List the installed putnami CLI binaries in .putnami/bin (or ~/.putnami/bin with --global) and mark the active one.
 .PP

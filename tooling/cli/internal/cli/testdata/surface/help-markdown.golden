@@ -120,7 +120,7 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | `putnami upgrade` | Upgrade CLI, extensions, and dependencies |
 | `putnami pin` | Pin the CLI version this workspace uses |
 | `putnami workspace describe` | Describe the active workspace |
-| `putnami version get|tag|check|list|use` | Versions derived from git, release tags, and installed CLI binaries |
+| `putnami version <subcommand>` | Versions derived from git, release tags, and installed CLI binaries |
 | `putnami infra plan` | Plan workspace infra (--output=jsonl) |
 
 ## Extensions & Templates
@@ -551,7 +551,7 @@ Fail when a commit since the base declares a breaking change and the squash comm
 **Usage**
 
 ```
-putnami version check --base <ref> --title <title> [--body-file <path>]
+putnami version check --base <ref> (--title <title> | --message-file <path>)
 ```
 
 **Flags**
@@ -559,13 +559,13 @@ putnami version check --base <ref> --title <title> [--body-file <path>]
 | Flag | Description |
 |------|-------------|
 | `--base` <ref> | The branch or commit the change merges into; the commits read are those from it to HEAD |
-| `--title` <title> | The subject of the squash commit, which is the pull request title |
-| `--body-file` <path> | A file holding the body of the squash commit; pass it only when the squash commit keeps the pull request body |
+| `--title` <title> | The subject of the squash commit, which is the pull request title; a squash commit with a body, or a title that starts with a dash, goes through --message-file |
+| `--message-file` <path> | A file holding the squash commit message: the subject on the first line, then the body when the squash commit keeps the pull request body |
 
 **Examples**
 
 - `putnami version check --base origin/main --title "feat(cli)!: drop the --all flag"`
-- `putnami version check --base origin/main --title "refactor: drop the greeting" --body-file body.md`
+- `putnami version check --base origin/main --message-file squash-message.txt`
 
 ### `putnami version list`
 
