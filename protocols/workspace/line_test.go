@@ -33,14 +33,17 @@ func TestLineTagPatternDefaults(t *testing.T) {
 }
 
 func TestRenderLineTag(t *testing.T) {
-	cases := map[string]string{
-		LineTagPattern("", nil): "v0.3.0",
-		LineTagPattern("typescript", &LineConfig{Tag: "ts/v{version}"}): "ts/v0.3.0",
-		LineTagPattern("go", nil): "go/v0.3.0",
+	cases := []struct {
+		pattern string
+		want    string
+	}{
+		{LineTagPattern("", nil), "v0.3.0"},
+		{LineTagPattern("typescript", &LineConfig{Tag: "ts/v{version}"}), "ts/v0.3.0"},
+		{LineTagPattern("go", nil), "go/v0.3.0"},
 	}
-	for pattern, want := range cases {
-		if got := RenderLineTag(pattern, "0.3.0"); got != want {
-			t.Errorf("RenderLineTag(%q, 0.3.0) = %q, want %q", pattern, got, want)
+	for _, tc := range cases {
+		if got := RenderLineTag(tc.pattern, "0.3.0"); got != tc.want {
+			t.Errorf("RenderLineTag(%q, 0.3.0) = %q, want %q", tc.pattern, got, tc.want)
 		}
 	}
 }
