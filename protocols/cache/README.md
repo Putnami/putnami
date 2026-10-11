@@ -421,8 +421,8 @@ caching end to end, its spec links to these ADRs instead of restating them.
 
 ## Support
 
-- **Status:** `stable`, recorded as
-  `{"id": "go.putnami.dev/protocol/cache", "kind": "protocol", "status": "stable"}`
+- **Status:** `preview`, recorded as
+  `{"id": "go.putnami.dev/protocol/cache", "kind": "protocol", "status": "preview"}`
   in the workspace-root [`putnami.support.json`](../../putnami.support.json)
   catalog (contract: [`protocols/support`](../support/README.md)).
 - **Owner:** the Putnami maintainers, as repository owners of `protocols/`.
@@ -432,3 +432,7 @@ caching end to end, its spec links to these ADRs instead of restating them.
   fixture corpus above plus determinism tests; compatibility is enforced in code
   by capability gating and by v2↔v1 provider negotiation with a fake-provider
   end-to-end test.
+- **Why not `stable`:** the only provider on the other side of this contract is
+  the Putnami cloud cache server. No provider across a boundary this repository
+  does not control implements it, and the contract is still expected to move
+  with that server — a stable commitment needs both settled.

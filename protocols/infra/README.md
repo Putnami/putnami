@@ -388,8 +388,8 @@ restating them.
 
 ## Support
 
-- **Status:** `stable`, recorded as
-  `{"id": "go.putnami.dev/protocol/infra", "kind": "protocol", "status": "stable"}`
+- **Status:** `preview`, recorded as
+  `{"id": "go.putnami.dev/protocol/infra", "kind": "protocol", "status": "preview"}`
   in the workspace-root [`putnami.support.json`](../../putnami.support.json)
   catalog (contract: [`protocols/support`](../support/README.md)).
 - **Owner:** the Putnami maintainers, as repository owners of `protocols/`.
@@ -401,3 +401,7 @@ restating them.
   `putnami infra plan` consume it, committed `infra/requirements.json` markers
   live in the repository today, and the version guard, drift test, determinism
   test, and cross-language equivalence goldens pin the contract on every run.
+- **Why not `stable`:** every deployer that reads the manifest today is
+  Putnami's own. No deployment target across a boundary this repository does not
+  control consumes it, and the shape is still expected to move as targets are
+  added — a stable commitment needs both settled.

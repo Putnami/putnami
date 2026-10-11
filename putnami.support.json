@@ -340,7 +340,7 @@
     {
       "id": "go.putnami.dev/protocol/cache",
       "kind": "protocol",
-      "status": "stable"
+      "status": "preview"
     },
     {
       "id": "go.putnami.dev/protocol/capabilities",
@@ -425,7 +425,7 @@
     {
       "id": "go.putnami.dev/protocol/infra",
       "kind": "protocol",
-      "status": "stable"
+      "status": "preview"
     },
     {
       "id": "go.putnami.dev/protocol/job",
