@@ -22,7 +22,8 @@ import (
 // resultOnlyCacheServer is a fake cache server for the result-only tests. It
 // answers negotiate as cache-server does: an entry's result and manifest in
 // every mode, and its downloads in every mode but minimal. It records each
-// negotiate, and counts every other request: they are all blob transfers.
+// negotiate and the digests of each download-batch, which it does not serve,
+// and counts every other request: they are all blob transfers.
 type resultOnlyCacheServer struct {
 	srv *httptest.Server
 	// entries maps a cache key to the one blob of its entry.
@@ -32,6 +33,7 @@ type resultOnlyCacheServer struct {
 
 	mu         sync.Mutex
 	negotiates []negotiateCall
+	inlineAsks [][]string
 	transfers  int
 	// failNext answers the next negotiate of a mode with a 400, once.
 	failNext map[cache.Mode]bool
@@ -52,13 +54,22 @@ func newResultOnlyCacheServer(t *testing.T, entries map[string][]byte) *resultOn
 }
 
 func (f *resultOnlyCacheServer) handle(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == cache.DownloadBatchPath {
+		// download-batch is not served: the fetcher falls back to GET.
+		var req cache.DownloadBatchRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		f.mu.Lock()
+		f.inlineAsks = append(f.inlineAsks, req.Digests)
+		f.mu.Unlock()
+		http.NotFound(w, r)
+		return
+	}
 	if r.URL.Path != cache.NegotiatePath {
 		f.mu.Lock()
 		f.transfers++
 		f.mu.Unlock()
 		blob, ok := f.entries[strings.TrimPrefix(r.URL.Path, "/blob/")]
 		if !ok {
-			// download-batch and anything else miss: the fetcher falls back to GET.
 			http.NotFound(w, r)
 			return
 		}
@@ -135,13 +146,27 @@ func sameCalls(got, want []negotiateCall) bool {
 	})
 }
 
-// wantNegotiatesOnly fails unless the server received exactly these negotiates
-// and not one blob transfer.
+// wantNegotiatesOnly fails unless the server received exactly these negotiates,
+// no download-batch and not one blob transfer.
 func (f *resultOnlyCacheServer) wantNegotiatesOnly(t *testing.T, want ...negotiateCall) {
+	t.Helper()
+	f.wantNegotiatesAndInline(t, want, nil)
+}
+
+// wantNegotiatesAndInline fails unless the server received exactly these
+// negotiates, download-batch requests for exactly these digests, in order, and
+// not one blob transfer.
+func (f *resultOnlyCacheServer) wantNegotiatesAndInline(t *testing.T, want []negotiateCall, inline [][]string) {
 	t.Helper()
 	got, transfers := f.calls()
 	if !sameCalls(got, want) {
 		t.Fatalf("negotiates = %+v, want %+v", got, want)
+	}
+	f.mu.Lock()
+	asks := slices.Clone(f.inlineAsks)
+	f.mu.Unlock()
+	if !slices.EqualFunc(asks, inline, slices.Equal[[]string]) {
+		t.Fatalf("download-batch digests = %v, want %v", asks, inline)
 	}
 	if transfers != 0 {
 		t.Fatalf("blob transfers = %d, want none", transfers)
@@ -249,22 +274,25 @@ func TestInitializeEchoesRestoreResultOnlyOnlyWhenCoreAdvertisesIt(t *testing.T)
 }
 
 // A prefetch asks for the result-only keys in minimal mode and for the others in
-// the session's mode, in two negotiates, and downloads nothing. The summary
-// counts the prefetched keys the server holds.
-func TestPrefetchNegotiatesResultOnlyKeysInMinimalModeAndDownloadsNothing(t *testing.T) {
+// the session's mode, in two negotiates. It asks download-batch for the small
+// files of the keys core reads the files of, and for no file of a result-only
+// key. It sends no blob GET. The summary counts the prefetched keys the server
+// holds.
+func TestPrefetchNegotiatesResultOnlyKeysInMinimalModeAndFetchesOnlyFilesCoreReads(t *testing.T) {
 	onlyHit, onlyMiss := resultOnlyKey("a"), resultOnlyKey("b")
 	filesHit, filesMiss := resultOnlyKey("c"), resultOnlyKey("d")
-	f := newResultOnlyCacheServer(t, map[string][]byte{onlyHit: []byte("result only"), filesHit: []byte("with files")})
+	filesBlob := []byte("with files")
+	f := newResultOnlyCacheServer(t, map[string][]byte{onlyHit: []byte("result only"), filesHit: filesBlob})
 	s, exchangeDir := startResultOnlySession(t, f, cache.ModeFull, cache.CapabilityRestoreResultOnly)
 
 	prefetchKeys(t, s, []string{onlyHit, onlyMiss, filesHit, filesMiss}, []string{onlyHit, onlyMiss})
 
-	f.wantNegotiatesOnly(t,
-		negotiateCall{cache.ModeFull, []string{filesHit, filesMiss}},
-		negotiateCall{cache.ModeMinimal, []string{onlyHit, onlyMiss}},
-	)
+	f.wantNegotiatesAndInline(t, []negotiateCall{
+		{cache.ModeFull, []string{filesHit, filesMiss}},
+		{cache.ModeMinimal, []string{onlyHit, onlyMiss}},
+	}, [][]string{{cache.DigestOf(filesBlob)}})
 	if n := exchangeFiles(t, exchangeDir); n != 0 {
-		t.Fatalf("the prefetch placed %d files, want none", n)
+		t.Fatalf("the prefetch placed %d files from a download-batch the server does not serve, want none", n)
 	}
 	if stats := mustSummary(t, s); stats.PrefetchedCount != 2 {
 		t.Fatalf("prefetchedCount = %d, want 2: the prefetched keys the server holds", stats.PrefetchedCount)
@@ -386,13 +414,15 @@ func TestAResultOnlyRestoreNeverAnswersWithAnotherKeysEntry(t *testing.T) {
 
 // A restore without resultOnly downloads the entry's files. The prefetch
 // answered the key in the session's mode, so the restore needs no negotiate.
+// The server does not serve the prefetch's download-batch, so the restore
+// fetches the file itself.
 func TestAFullRestoreDownloadsTheEntrysFiles(t *testing.T) {
 	key := resultOnlyKey("a")
 	blob := []byte("compiled output bytes")
 	f := newResultOnlyCacheServer(t, map[string][]byte{key: blob})
 	s, exchangeDir := startResultOnlySession(t, f, cache.ModeFull, cache.CapabilityRestoreResultOnly)
 	prefetchKeys(t, s, []string{key}, nil)
-	f.wantNegotiatesOnly(t, negotiateCall{cache.ModeFull, []string{key}})
+	f.wantNegotiatesAndInline(t, []negotiateCall{{cache.ModeFull, []string{key}}}, [][]string{{cache.DigestOf(blob)}})
 
 	if got := restoreKey(t, s, key, false).Status; got != cache.RestoreHit {
 		t.Fatalf("restore status = %q, want hit", got)
@@ -444,27 +474,30 @@ func TestAFullRestoreOfAResultOnlyKeyNegotiatesItAgainInTheSessionMode(t *testin
 // keeps the outcomes of the one that succeeded.
 func TestAFailedPrefetchNegotiateLeavesOnlyItsKeysToTheirRestores(t *testing.T) {
 	only, files := resultOnlyKey("a"), resultOnlyKey("c")
-	f := newResultOnlyCacheServer(t, map[string][]byte{only: []byte("result only"), files: []byte("with files")})
+	filesBlob := []byte("with files")
+	f := newResultOnlyCacheServer(t, map[string][]byte{only: []byte("result only"), files: filesBlob})
 	f.failNext[cache.ModeMinimal] = true
 	s, _ := startResultOnlySession(t, f, cache.ModeFull, cache.CapabilityRestoreResultOnly)
 	prefetchKeys(t, s, []string{only, files}, []string{only})
+	// The prefetch asks for the small file of the key it negotiated in full mode.
+	inline := [][]string{{cache.DigestOf(filesBlob)}}
 
 	if got := restoreKey(t, s, files, true).Status; got != cache.RestoreHit {
 		t.Fatalf("restore of the key whose negotiate succeeded = %q, want hit", got)
 	}
-	f.wantNegotiatesOnly(t,
-		negotiateCall{cache.ModeFull, []string{files}},
-		negotiateCall{cache.ModeMinimal, []string{only}},
-	)
+	f.wantNegotiatesAndInline(t, []negotiateCall{
+		{cache.ModeFull, []string{files}},
+		{cache.ModeMinimal, []string{only}},
+	}, inline)
 
 	if got := restoreKey(t, s, only, true).Status; got != cache.RestoreHit {
 		t.Fatalf("restore of the key whose negotiate failed = %q, want hit from its own negotiate", got)
 	}
-	f.wantNegotiatesOnly(t,
-		negotiateCall{cache.ModeFull, []string{files}},
-		negotiateCall{cache.ModeMinimal, []string{only}},
-		negotiateCall{cache.ModeMinimal, []string{only}},
-	)
+	f.wantNegotiatesAndInline(t, []negotiateCall{
+		{cache.ModeFull, []string{files}},
+		{cache.ModeMinimal, []string{only}},
+		{cache.ModeMinimal, []string{only}},
+	}, inline)
 }
 
 // A second prefetch adds the keys the index does not hold yet, and the summary

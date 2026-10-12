@@ -109,14 +109,30 @@ sends. A blob that gzip shrinks is timed on its compressed size.
 
 ### Restores
 
-`prefetch` negotiates the run's keys once, when the run starts. A restore
-uses the downloads of that answer. They do not last: the cache server signs a
-URL for 15 minutes, or hands out a storage token that lasts 20 to 60 minutes.
+`prefetch` negotiates the run's keys once, when the run starts. Then it
+fetches the small files of every hit, the files of at most 256 KiB, through
+`download-batch`:
+
+- It asks only for files core does not have and will read. It asks for no
+  file of a key core restores for its result only.
+- One request asks for at most 5,000 files and 4 MiB of them, so its answer
+  stays near 5.4 MiB: cache-server bounds each file, not the whole answer.
+  4 requests run at once.
+- A restore that needs one of those files waits for the request that carries
+  it, then finds the file in the exchange directory. A run sends a few
+  `download-batch` requests, not one per restored entry.
+- When that request fails, each restore asks for its own small files in one
+  `download-batch`, as before. A file the server left out of its answer comes
+  through its own download.
+
+A restore uses the downloads of the negotiate answer. They do not last: the
+cache server signs a URL for 15 minutes, or hands out a storage token that
+lasts 20 to 60 minutes.
 
 - A restore that starts 5 minutes or more after its negotiate, and needs a
   download, negotiates its key again first. A file needs no download when core
-  already has it, when an earlier restore placed it, or when it is at most
-  256 KiB: small files come through `download-batch`.
+  already has it, when the prefetch or an earlier restore placed it, or when
+  it is at most 256 KiB: small files come through `download-batch`.
 - When the storage refuses a download with 400, 401, 403, 404 or 410, the
   restore negotiates its key again and downloads the files it still lacks.
 - A restore negotiates again once at most. A download refused after that is

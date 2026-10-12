@@ -118,7 +118,7 @@
           "path": "cloud/extension/internal/deliverycli/internal/remotecache/fetch.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "564a2a7c2572e968ab52af175e3670db6dfb346b357bbd397824b2d2d859f818"
+          "fingerprint": "20ea8d0ad3178c3190564e6d117e72a0c8733b33e46072bc537cf878b3c97135"
         }
       ],
       "owner": "@putnami/cloud-extension",

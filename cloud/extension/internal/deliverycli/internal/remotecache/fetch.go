@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
-	"slices"
 	"sync"
 
 	cache "go.putnami.dev/protocol/cache"
@@ -135,26 +135,96 @@ func (c *Client) HitFetcher(ctx context.Context, result cache.KeyResult) func(di
 	}
 }
 
+// maxDownloadBatchBytes bounds the declared size of the blobs one
+// download-batch request asks for. cache-server answers with every blob it can
+// serve inline and bounds only each blob (cache.MaxInlineBlobBytes), never the
+// whole answer, while Cloud Run refuses a response over 32 MiB and the client
+// reads at most maxResponseBytes. JSON carries the bytes in base64, a third
+// more, so 4 MiB of blobs comes back in about 5.4 MiB, plus about 100 bytes a
+// blob. It is the bound of one upload-batch request (maxInlineBatchBytes), so
+// cache-server holds about as much for one download-batch as for one
+// upload-batch.
+const maxDownloadBatchBytes = 4 << 20 // 4 MiB
+
+// InlineDownload reports whether download-batch may carry the blob: its size
+// is known and at most cache.MaxInlineBlobBytes. Any other blob takes its own
+// download.
+func InlineDownload(t cache.BlobTransfer) bool {
+	return t.SizeBytes > 0 && t.SizeBytes <= cache.MaxInlineBlobBytes
+}
+
+// DownloadBatches splits small blobs into download-batch requests and keeps
+// their order. A request asks for at most cache.MaxKeysPerRequest blobs and at
+// most maxDownloadBatchBytes of declared size. The caller passes each blob
+// once, and only blobs InlineDownload accepts, so one blob always fits. Each
+// request is a slice of blobs whose capacity ends with it, so appending to one
+// request never overwrites the next.
+func DownloadBatches(blobs []cache.BlobTransfer) [][]cache.BlobTransfer {
+	var out [][]cache.BlobTransfer
+	start, size := 0, int64(0)
+	for i, b := range blobs {
+		if i > start && (i-start == cache.MaxKeysPerRequest || size+b.SizeBytes > maxDownloadBatchBytes) {
+			out = append(out, blobs[start:i:i])
+			start, size = i, 0
+		}
+		size += b.SizeBytes
+	}
+	if start < len(blobs) {
+		out = append(out, blobs[start:len(blobs):len(blobs)])
+	}
+	return out
+}
+
+// DownloadInline sends one download-batch request for blobs and returns the
+// bytes of each blob the answer carries, by digest. Each blob is verified
+// against its digest and declared size. A blob the answer leaves out is not an
+// error: the caller downloads it another way. A failed request, or a blob that
+// does not verify, is an error, and then no blob is returned.
+func (c *Client) DownloadInline(ctx context.Context, blobs []cache.BlobTransfer) (map[string][]byte, error) {
+	size := make(map[string]int64, len(blobs))
+	digests := make([]string, 0, len(blobs))
+	for _, b := range blobs {
+		if _, dup := size[b.Digest]; dup {
+			continue
+		}
+		size[b.Digest] = b.SizeBytes
+		digests = append(digests, b.Digest)
+	}
+	req := &cache.DownloadBatchRequest{ProtocolVersion: cache.ProtocolVersion, Digests: digests}
+	cache.NormalizeDownloadBatchRequest(req)
+	resp, err := c.DownloadBatch(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	got := make(map[string][]byte, len(resp.Blobs))
+	for _, b := range resp.Blobs {
+		data, err := verifiedInlineBlob(b, size[b.Digest])
+		if err != nil {
+			return nil, err
+		}
+		got[b.Digest] = data
+	}
+	return got, nil
+}
+
 // BatchHitFetcher returns a blob opener for a negotiate hit that first asks the
 // cache server for all small blobs inline through download-batch, then falls
 // back to each blob's presigned GET when the batch path fails or omits a digest.
 // Large blobs always use their presigned GET to keep response size bounded. It
-// asks for at most cache.MaxKeysPerRequest blobs a request.
+// splits the small blobs with DownloadBatches, so one request asks for at most
+// cache.MaxKeysPerRequest blobs and maxDownloadBatchBytes of them.
 func (c *Client) BatchHitFetcher(ctx context.Context, result cache.KeyResult) func(digest string) (io.ReadCloser, error) {
 	single := c.HitFetcher(ctx, result)
-	small := make(map[string]cache.BlobTransfer)
-	var digests []string
+	small := make(map[string]bool)
+	var blobs []cache.BlobTransfer
 	for _, t := range result.Downloads {
-		if t.SizeBytes <= 0 || t.SizeBytes > cache.MaxInlineBlobBytes {
+		if !InlineDownload(t) || small[t.Digest] {
 			continue
 		}
-		if _, ok := small[t.Digest]; ok {
-			continue
-		}
-		small[t.Digest] = t
-		digests = append(digests, t.Digest)
+		small[t.Digest] = true
+		blobs = append(blobs, t)
 	}
-	if len(digests) == 0 {
+	if len(blobs) == 0 {
 		return single
 	}
 
@@ -164,34 +234,19 @@ func (c *Client) BatchHitFetcher(ctx context.Context, result cache.KeyResult) fu
 		batch error
 	)
 	load := func() {
-		got = make(map[string][]byte, len(digests))
-		sizeByDigest := make(map[string]int64, len(small))
-		for d, t := range small {
-			sizeByDigest[d] = t.SizeBytes
-		}
-		// download-batch takes at most cache.MaxKeysPerRequest digests a
-		// request, so a hit with more small files asks in several requests.
-		for chunk := range slices.Chunk(digests, cache.MaxKeysPerRequest) {
-			req := &cache.DownloadBatchRequest{ProtocolVersion: cache.ProtocolVersion, Digests: chunk}
-			cache.NormalizeDownloadBatchRequest(req)
-			resp, err := c.DownloadBatch(ctx, req)
+		got = make(map[string][]byte, len(blobs))
+		for _, chunk := range DownloadBatches(blobs) {
+			data, err := c.DownloadInline(ctx, chunk)
 			if err != nil {
 				batch = err
 				return
 			}
-			for _, b := range resp.Blobs {
-				data, err := verifiedInlineBlob(b, sizeByDigest[b.Digest])
-				if err != nil {
-					batch = err
-					return
-				}
-				got[b.Digest] = data
-			}
+			maps.Copy(got, data)
 		}
 	}
 
 	return func(digest string) (io.ReadCloser, error) {
-		if _, ok := small[digest]; !ok {
+		if !small[digest] {
 			return single(digest)
 		}
 		once.Do(load)
