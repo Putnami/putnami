@@ -40,7 +40,7 @@ func cloudCLIBinary(module string, settings ...string) string {
 // The helper comes from the pinned @putnami/cloud artifact, out of the one
 // store the warm layer bakes, whichever repository built that artifact.
 func TestImageLayersCloudCLIRestoresThePinnedExtensionBinary(t *testing.T) {
-	for _, module := range []string{"go.putnami.dev/cloud/extension", "go.putnami.cloud/cloud/workloads/putnami-cloud"} {
+	for _, module := range []string{"go.putnami.dev/cloud/extension", "example.com/fork/putnami-cloud"} {
 		t.Run(module, func(t *testing.T) {
 			binary := cloudCLIBinary(module)
 			ws, fake := imageLayersCloudCLIWorkspace(t, binary)
