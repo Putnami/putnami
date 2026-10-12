@@ -549,7 +549,7 @@ var catalog = []Command{
 		Kind:        KindStructured,
 		Category:    "Extensions & Templates",
 		Summary:     "List installed extensions",
-		Description: "List installed extensions with their version constraint, installed version and source",
+		Description: "List installed extensions with their versions and source",
 		Usage:       "putnami extensions list [--user] [--output <format>]",
 		Flags: []Flag{
 			userScopeFlag("List the extensions pinned in the user scope (~/.putnami/user) instead of the workspace"),

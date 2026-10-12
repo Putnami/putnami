@@ -596,7 +596,7 @@ putnami extensions update           # Update extension versions (lock and exact 
 putnami extensions remove <name>    # Remove an extension
 ```
 
-`extensions list` shows each extension's name, version constraint, installed version, and source: `config` for an extension `putnami.workspace.json` declares, `workspace` for one found in the workspace without a declaration. Use `--output=jsonl` for machine-readable output.
+`extensions list` shows one row per extension with its version constraint, installed version, and source. A `config` row is an entry of `extensions` in `putnami.workspace.json`, named by its key, which can be a path; its installed version comes from the lock. A `workspace` row is a loaded extension whose name is not such a key, for example one a workspace project or a `node_modules` package provides. Use `--output=jsonl` for machine-readable output.
 
 #### The user scope: `--user`
 
@@ -619,6 +619,8 @@ putnami extensions remove --user @acme/audit           # Drop a pin
   install hook and touches nothing in the current directory. A re-run keeps
   the recorded pin; `--latest` moves it to the newest release.
 - A local path, `--platform` and `--dest` are usage errors with `--user`.
+- `list --user` shows each pin's name, installed version, and source `user`;
+  a pin has no version constraint.
 - `install` and `list` accept `--output=json|jsonl`.
 - `update` does not take `--user`: run `install --user --latest`, or install
   an explicit version, to move a pin.

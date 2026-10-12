@@ -108,8 +108,8 @@ Check what the CLI actually discovered:
 putnami extensions list
 ```
 
-A `Skipped` row names the reason. The most common one is a runtime that has not
-been prepared yet, which `putnami extensions install` fixes.
+The `INSTALLED` column shows the version the lock records. A `-` there means
+nothing is installed yet, which `putnami extensions install` fixes.
 
 ## Where the decisions are recorded
 

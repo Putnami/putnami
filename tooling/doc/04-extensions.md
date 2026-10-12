@@ -734,7 +734,7 @@ Higher priority value wins (default: 0). Only the highest-priority matching comm
 ## Managing extensions
 
 ```bash
-putnami extensions list              # List all active extensions
+putnami extensions list              # List extensions with their versions and source
 putnami extensions install           # Install extensions from workspace config
 putnami extensions update            # Update to latest compatible versions
 putnami extensions remove <ext>      # Remove an installed extension
