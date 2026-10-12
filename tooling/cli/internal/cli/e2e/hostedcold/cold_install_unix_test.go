@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -611,7 +612,11 @@ func assertProvider(t *testing.T, record, runCredential string, processes int) {
 	}
 	var requests []string
 	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
-		if entry, ok := strings.CutPrefix(line, "env "); ok {
+		if quoted, ok := strings.CutPrefix(line, "env "); ok {
+			entry, err := strconv.Unquote(quoted)
+			if err != nil {
+				t.Fatalf("the provider record holds an unquoted environment entry %s: %v", quoted, err)
+			}
 			for _, secret := range []string{runCredential, registryBearer(runCredential)} {
 				if strings.Contains(entry, secret) {
 					t.Errorf("the provider's environment holds a credential: %s", entry)

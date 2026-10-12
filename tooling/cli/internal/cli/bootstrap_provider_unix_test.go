@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -73,8 +74,9 @@ func serveBootstrapProvider(record, bearer string, hosts []string) int {
 	}
 	defer func() { _ = file.Close() }()
 	note := func(line string) { _, _ = file.WriteString(line + "\n") }
+	// Quoted, so a value that holds a newline stays on its line of the record.
 	for _, entry := range os.Environ() {
-		note("env " + entry)
+		note("env " + strconv.Quote(entry))
 	}
 	write := func(response registry.CredentialResponse) {
 		line, _ := json.Marshal(response)
@@ -389,7 +391,11 @@ func testBootstrapProviderServesTheLockedDownloads(t *testing.T) {
 	// are not in its environment.
 	var requests []string
 	for _, line := range readRecord(t, record) {
-		if entry, ok := strings.CutPrefix(line, "env "); ok {
+		if quoted, ok := strings.CutPrefix(line, "env "); ok {
+			entry, err := strconv.Unquote(quoted)
+			if err != nil {
+				t.Fatalf("the provider record holds an unquoted environment entry %s: %v", quoted, err)
+			}
 			if strings.HasPrefix(entry, credentialprovider.ProvidersEnv+"=") || strings.Contains(entry, bootstrapRunCredential) {
 				t.Errorf("the provider's environment holds %s", entry)
 			}
