@@ -262,6 +262,7 @@ would have produced:
 | Task declares `cache.deterministic` | The manifest's own statement that identical inputs give identical outputs. |
 | Task declares a complete `inputs` contract | "The same declared inputs" is only a complete statement when the task declares them; contract-declared params and explicit step literals are compared. |
 | Task declares at least one `writes` resource, and none of them is the project `gen` tree | A shared run's side effects must be ones the planner can serialize, and `.gen` is a subtree other tasks write into without owning it. |
+| Task declares no `command-output` output | That directory resolves per command: the leader never writes the follower's, and the follower runs nothing, so it never empties it and would capture an earlier run's files. |
 | Same resolved deadline, file/env patterns, runtime inputs, selected projects | Everything else a cache key would have distinguished, minus the command name. |
 
 Nothing designates a leader in advance, which is what keeps the mechanism correct

@@ -298,6 +298,14 @@ func TestSharedExecutions_RequireDeclaredWritesAndDeterminism(t *testing.T) {
 		{"not deterministic", func(task *extension.TaskDefinition) { task.Cache.Deterministic = false }},
 		{"no declared writes", func(task *extension.TaskDefinition) { task.Writes = nil }},
 		{"no declared inputs", func(task *extension.TaskDefinition) { task.Inputs = nil }},
+		{"a declared command-output directory", func(task *extension.TaskDefinition) {
+			task.Declares = &extension.TaskDeclaration{
+				Outputs: map[string]extension.DeclaredOutput{
+					"client": task.Declares.Outputs["client"],
+					"report": {Kind: extension.OutputKindDirectory, Root: extension.OutputRootCommandOutput, Path: "report"},
+				},
+			}
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ext := sharedProbeExtension()
