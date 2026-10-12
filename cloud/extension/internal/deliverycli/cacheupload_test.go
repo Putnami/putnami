@@ -345,6 +345,16 @@ func pinUploadIdle(t *testing.T, d time.Duration) {
 	t.Cleanup(func() { uploadWindowIdle = prev })
 }
 
+// pinUploadWindowEntries caps the entries of a window at n for the sessions a
+// test creates after the call, and restores the cap afterwards. It lets a test
+// fill windows with a few entries.
+func pinUploadWindowEntries(t *testing.T, n int) {
+	t.Helper()
+	prev := uploadWindowLimits
+	uploadWindowLimits.entries = n
+	t.Cleanup(func() { uploadWindowLimits = prev })
+}
+
 // pinUploadRetryWait keeps the production retry policy, without the wait
 // between two attempts, for the sessions a test creates after the call.
 func pinUploadRetryWait(t *testing.T) {
@@ -651,22 +661,24 @@ func TestUploadWindowDoesNotForwardAssertedProvenance(t *testing.T) {
 // summary, and the entries after it wait for the next window.
 func TestAFullUploadWindowFlushesBeforeTheSummary(t *testing.T) {
 	pinUploadIdle(t, time.Hour)
+	const entries = 64
+	pinUploadWindowEntries(t, entries)
 	f := newUploadCacheServer(t, batchedCapabilities()...)
 	s, exchangeDir := startUploadSession(t, f, io.Discard)
 	output := stageBlob(t, exchangeDir, "the same output for every entry")
 
-	for i := range uploadWindowEntries {
+	for i := range entries {
 		mustUpload(t, s, uploadKey(i), output)
 	}
 	f.awaitWindow(t)
-	if c := f.counts(); len(c.windows) != 1 || len(c.windows[0]) != uploadWindowEntries {
-		t.Fatalf("windows = %d, first carries %d entries; want one full window of %d", len(c.windows), len(c.windows[0]), uploadWindowEntries)
+	if c := f.counts(); len(c.windows) != 1 || len(c.windows[0]) != entries {
+		t.Fatalf("windows = %d, first carries %d entries; want one full window of %d", len(c.windows), len(c.windows[0]), entries)
 	}
 
-	mustUpload(t, s, uploadKey(uploadWindowEntries), output)
+	mustUpload(t, s, uploadKey(entries), output)
 	stats := mustSummary(t, s)
-	if stats.UploadedCount != uploadWindowEntries+1 {
-		t.Fatalf("summary counted %d entries, want %d", stats.UploadedCount, uploadWindowEntries+1)
+	if stats.UploadedCount != entries+1 {
+		t.Fatalf("summary counted %d entries, want %d", stats.UploadedCount, entries+1)
 	}
 	c := f.counts()
 	if len(c.windows) != 2 || len(c.windows[1]) != 1 {
@@ -674,6 +686,68 @@ func TestAFullUploadWindowFlushesBeforeTheSummary(t *testing.T) {
 	}
 	if c.probes != 1 {
 		t.Fatalf("capabilities probes = %d, want 1 for the session", c.probes)
+	}
+}
+
+// A window is stored as soon as its commit entries fill one commit-batch body,
+// without waiting for the idle delay or the summary. Before, only the entry
+// count woke the uploader, so a window full of large manifests waited.
+func TestAWindowOfLargeManifestsFlushesBeforeTheSummary(t *testing.T) {
+	pinUploadIdle(t, time.Hour)
+	f := newUploadCacheServer(t, batchedCapabilities()...)
+	s, exchangeDir := startUploadSession(t, f, io.Discard)
+	output := stageBlob(t, exchangeDir, "one output under many paths")
+	// Each entry names the same blob under 1000 paths: about 150 KiB of
+	// commit entry and one blob.
+	files := make([]cache.FileEntry, 1000)
+	for i := range files {
+		files[i] = output
+		files[i].Path = fmt.Sprintf("out/%04d/%s", i, strings.Repeat("p", 40))
+	}
+
+	const entries = 4
+	for i := range entries {
+		mustUpload(t, s, uploadKey(i), files...)
+	}
+	f.awaitWindow(t)
+	c := f.counts()
+	if len(c.windows) != 1 || len(c.windows[0]) >= entries {
+		t.Fatalf("windows before the summary = %v, want one that the commit-batch bound closed", c.windows)
+	}
+	if stats := mustSummary(t, s); stats.UploadedCount != entries {
+		t.Fatalf("summary counted %d entries, want %d", stats.UploadedCount, entries)
+	}
+	for i, body := range f.commitBatchBodies {
+		if len(body) > 1<<20 {
+			t.Errorf("commit-batch %d carried %d bytes, more than the 1 MiB the server reads", i, len(body))
+		}
+	}
+}
+
+// A window is stored as soon as its blobs reach the size bound, so the blobs of
+// a build move while it runs and the summary has little left to send. The
+// queue's load is back to zero once every window is stored.
+func TestAWindowOfLargeBlobsFlushesBeforeTheSummary(t *testing.T) {
+	pinUploadIdle(t, time.Hour)
+	prev := uploadWindowLimits
+	uploadWindowLimits.blobBytes = 1 << 10
+	t.Cleanup(func() { uploadWindowLimits = prev })
+	f := newUploadCacheServer(t, batchedCapabilities()...)
+	s, exchangeDir := startUploadSession(t, f, io.Discard)
+
+	mustUpload(t, s, uploadKey(0), stageBlob(t, exchangeDir, strings.Repeat("a", 600)))
+	mustUpload(t, s, uploadKey(1), stageBlob(t, exchangeDir, strings.Repeat("b", 600)))
+	f.awaitWindow(t)
+	if c := f.counts(); len(c.windows) != 1 || !slices.Equal(c.windows[0], []string{uploadKey(0)}) {
+		t.Fatalf("windows before the summary = %v, want the first entry alone", c.windows)
+	}
+	if stats := mustSummary(t, s); stats.UploadedCount != 2 {
+		t.Fatalf("summary counted %d entries, want 2", stats.UploadedCount)
+	}
+	s.uploads.mu.Lock()
+	defer s.uploads.mu.Unlock()
+	if s.uploads.load != (uploadLoad{}) || len(s.uploads.queue) != 0 {
+		t.Fatalf("after the summary the queue holds %d entries and a load of %+v, want none", len(s.uploads.queue), s.uploads.load)
 	}
 }
 
@@ -996,6 +1070,8 @@ func TestShutdownStoresTheQueuedUploads(t *testing.T) {
 // run sends the one refused exchange and nothing after it.
 func TestARefusedWindowDropsTheQueuedOnesUnsent(t *testing.T) {
 	pinUploadIdle(t, time.Hour)
+	const entries = 64
+	pinUploadWindowEntries(t, entries)
 	enableCacheWritesForTest(t)
 	srv, writes := writeRefusingCacheServer(t)
 	t.Setenv("PUTNAMI_CACHE_URL", srv.URL)
@@ -1006,7 +1082,7 @@ func TestARefusedWindowDropsTheQueuedOnesUnsent(t *testing.T) {
 	t.Cleanup(s.close)
 	mustInit(t, s, &cache.InitializeParams{ProtocolVersion: cache.ProviderProtocolMinVersion, BlobExchangeDir: t.TempDir()})
 
-	for i := range 2*uploadWindowEntries + 5 {
+	for i := range 2*entries + 5 {
 		s.upload(&cache.ProviderRequest{ProtocolVersion: cache.ProviderProtocolVersion, ID: 2, Op: cache.OpUpload}, latchTestUpload(uploadKey(i)))
 	}
 	if stats := mustSummary(t, s); stats.UploadedCount != 0 {
@@ -1024,15 +1100,24 @@ func TestARefusedWindowDropsTheQueuedOnesUnsent(t *testing.T) {
 }
 
 // uploadWindowSize cuts a window at the entry count, at one find-missing's
-// blob limit, and at the encoded size that fits one commit-batch body. An entry
-// too large for any window still goes, alone.
+// blob limit, at the encoded size that fits one commit-batch body, and at the
+// size of its blobs. An entry too large for any window still goes, alone.
 func TestUploadWindowSize(t *testing.T) {
+	limit := uploadWindowLimits
+	if limit.entries != cache.MaxKeysPerRequest {
+		t.Fatalf("a window takes %d entries, want the %d of one commit-batch", limit.entries, cache.MaxKeysPerRequest)
+	}
 	entry := func(bytes int, digests ...string) pendingUpload {
 		manifest := &cache.Manifest{}
 		for _, digest := range digests {
 			manifest.Files = append(manifest.Files, cache.FileEntry{Path: "out", Digest: digest, Size: 1})
 		}
 		return pendingUpload{in: remotecache.StoreInput{Manifest: manifest}, bytes: bytes}
+	}
+	// sized is an entry of one file of the given size.
+	sized := func(digest string, size int64) pendingUpload {
+		manifest := &cache.Manifest{Files: []cache.FileEntry{{Path: "out", Digest: digest, Size: size}}}
+		return pendingUpload{in: remotecache.StoreInput{Manifest: manifest}, bytes: 100, blobBytes: size}
 	}
 	digests := func(from, n int) []string {
 		out := make([]string, n)
@@ -1057,25 +1142,40 @@ func TestUploadWindowSize(t *testing.T) {
 	}{
 		{name: "empty queue", queue: nil, n: 0},
 		{name: "partial window", queue: repeat(3, entry(100, digests(0, 1)...)), n: 3},
-		{name: "exactly one window", queue: repeat(uploadWindowEntries, entry(100)), n: uploadWindowEntries, full: true},
-		{name: "more than one window", queue: repeat(uploadWindowEntries+7, entry(100)), n: uploadWindowEntries, full: true},
+		{name: "exactly one window", queue: repeat(limit.entries, entry(100)), n: limit.entries, full: true},
+		{name: "more than one window", queue: repeat(limit.entries+7, entry(100)), n: limit.entries, full: true},
 		{
 			name: "blob limit",
 			queue: []pendingUpload{
-				entry(100, digests(0, uploadWindowBlobs-1)...),
+				entry(100, digests(0, limit.blobs-1)...),
 				entry(100, digests(0, 1)...), // already counted: still fits
-				entry(100, digests(uploadWindowBlobs, 2)...),
+				entry(100, digests(limit.blobs, 2)...),
 			},
 			n: 2, full: true,
 		},
 		{
 			name:  "encoded size",
-			queue: []pendingUpload{entry(uploadWindowBytes / 2), entry(uploadWindowBytes / 2), entry(1)},
+			queue: []pendingUpload{entry(limit.bytes / 2), entry(limit.bytes / 2), entry(1)},
 			n:     2, full: true,
 		},
 		{
 			name:  "an oversized entry goes alone",
-			queue: []pendingUpload{entry(2 * uploadWindowBytes), entry(1)},
+			queue: []pendingUpload{entry(2 * limit.bytes), entry(1)},
+			n:     1, full: true,
+		},
+		{
+			name: "blob size",
+			queue: []pendingUpload{
+				sized(digests(0, 1)[0], limit.blobBytes/2),
+				sized(digests(0, 1)[0], limit.blobBytes/2), // the same blob: counted once
+				sized(digests(1, 1)[0], limit.blobBytes/2),
+				sized(digests(2, 1)[0], 1),
+			},
+			n: 3, full: true,
+		},
+		{
+			name:  "a blob larger than the bound goes alone",
+			queue: []pendingUpload{sized(digests(0, 1)[0], 2*limit.blobBytes), sized(digests(1, 1)[0], 1)},
 			n:     1, full: true,
 		},
 		{
@@ -1085,7 +1185,7 @@ func TestUploadWindowSize(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			n, full := uploadWindowSize(test.queue)
+			n, full := uploadWindowSize(test.queue, limit)
 			if n != test.n || full != test.full {
 				t.Fatalf("uploadWindowSize = (%d, %t), want (%d, %t)", n, full, test.n, test.full)
 			}
@@ -1249,6 +1349,8 @@ func TestAnEntryWithMoreBlobsThanOneFindMissingTakesIsStored(t *testing.T) {
 // to be told 403.
 func TestAReadOnlyRunSendsNoBlobBytes(t *testing.T) {
 	pinUploadIdle(t, time.Hour)
+	const entries = 64
+	pinUploadWindowEntries(t, entries)
 	pinUploadRetryWait(t)
 	enableCacheWritesForTest(t)
 	var mu sync.Mutex
@@ -1284,7 +1386,7 @@ func TestAReadOnlyRunSendsNoBlobBytes(t *testing.T) {
 	// More than two windows of small blobs, 64 KiB each. Once the refusal
 	// closes the write path, the provider declines the uploads that follow.
 	staged, accepted := 0, 0
-	for i := range 2*uploadWindowEntries + 5 {
+	for i := range 2*entries + 5 {
 		file := stageBlob(t, exchangeDir, strings.Repeat(fmt.Sprintf("%04d", i), 16<<10))
 		staged += int(file.Size)
 		resp := s.upload(&cache.ProviderRequest{ProtocolVersion: cache.ProviderProtocolVersion, ID: 2, Op: cache.OpUpload},
@@ -1293,8 +1395,8 @@ func TestAReadOnlyRunSendsNoBlobBytes(t *testing.T) {
 			accepted++
 		}
 	}
-	if accepted < uploadWindowEntries {
-		t.Fatalf("the provider accepted %d uploads, want at least the %d of a first window", accepted, uploadWindowEntries)
+	if accepted < entries {
+		t.Fatalf("the provider accepted %d uploads, want at least the %d of a first window", accepted, entries)
 	}
 	if stats := mustSummary(t, s); stats.UploadedCount != 0 {
 		t.Fatalf("summary counted %d entries after every write was refused", stats.UploadedCount)

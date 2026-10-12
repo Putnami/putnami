@@ -149,10 +149,13 @@ type providerSession struct {
 	// negotiated in minimal mode and carries no download (see runPrefetch).
 	negotiateIdx map[string]providerCacheResult
 	prefetchDone chan struct{}
-	// inline records the download-batch requests the prefetch sends for the
-	// small files of its hits (see cacheinline.go). Every request is recorded
-	// before prefetchDone is closed.
-	inline inlinePrefetch
+	// inline records the download-batch requests the prefetch and the late
+	// negotiates send for the small files of their hits (see cacheinline.go).
+	// The prefetch records every request before prefetchDone is closed.
+	inline inlineRequests
+	// late gathers the restores that negotiate their own key into shared
+	// negotiates (see cachenegotiate.go).
+	late lateNegotiates
 
 	// runCredentialCaller is set when initialize echoed
 	// cache.CapabilityRunCredential: core then sends the hosted run's
@@ -211,6 +214,7 @@ func newProviderSession(workspaceRoot string, logw io.Writer) *providerSession {
 	}
 	s.transferMaxAge = restoreTransferMaxAge
 	s.uploads.init()
+	s.late.init()
 	return s
 }
 
@@ -921,6 +925,9 @@ func (s *providerSession) serving() bool {
 // and after a download the storage refused the way it refuses an expired one.
 // It reports an error only when the download fails with downloads this restore
 // negotiated itself. A key the server no longer holds is a miss.
+//
+// A restore that negotiates its key shares the request with the restores that
+// arrive with it (see cachenegotiate.go).
 func (s *providerSession) restore(req *cache.ProviderRequest, p *cache.RestoreParams) *cache.ProviderResponse {
 	if !s.serving() {
 		return providerOK(req, &cache.RestoreResult{Status: cache.RestoreMiss})
@@ -935,29 +942,28 @@ func (s *providerSession) restore(req *cache.ProviderRequest, p *cache.RestorePa
 	renegotiated := !negotiated
 	if !negotiated {
 		// The key was not covered by a prefetch batch (or the batch failed), or
-		// the batch answered it for its result only: negotiate it individually.
-		// With core handing the whole build's key set to prefetch, this is the
-		// exception path, not the per-restore tax.
+		// the batch answered it for its result only: negotiate it, with the
+		// other restores that need a negotiate now (see cachenegotiate.go).
 		mode := s.mode
 		if p.ResultOnly {
 			mode = cache.ModeMinimal
 		}
-		results, err := s.negotiateKeys(mode, []string{p.Key})
+		result, err := s.negotiateKey(mode, p.Key)
 		if err != nil {
 			s.logCacheError(fmt.Sprintf("restore %s negotiate", short(p.Key)), err)
 			return providerOK(req, &cache.RestoreResult{Status: cache.RestoreError})
 		}
-		cacheResult = results[p.Key]
+		cacheResult = result
 	} else if !p.ResultOnly && s.transfersStale(cacheResult) {
 		// Too old to rely on: ask for downloads signed now. When that negotiate
 		// fails, the indexed downloads are still tried; they may have a longer
 		// life than the bound assumes.
 		renegotiated = true
-		results, err := s.negotiateKeys(s.mode, []string{p.Key})
+		result, err := s.negotiateKey(s.mode, p.Key)
 		if err != nil {
 			s.logCacheError(fmt.Sprintf("restore %s negotiate again", short(p.Key)), err)
 		} else {
-			cacheResult = results[p.Key]
+			cacheResult = result
 		}
 	}
 	if !cacheResult.result.Hit {
@@ -970,12 +976,12 @@ func (s *providerSession) restore(req *cache.ProviderRequest, p *cache.RestorePa
 		if err != nil && !renegotiated && remotecache.DownloadRefused(err) {
 			// The storage refused a download of the index. Blobs already placed
 			// stay placed; the second pass fetches the rest.
-			results, nerr := s.negotiateKeys(s.mode, []string{p.Key})
+			again, nerr := s.negotiateKey(s.mode, p.Key)
 			if nerr != nil {
 				s.logCacheError(fmt.Sprintf("restore %s negotiate again", short(p.Key)), nerr)
 				return providerOK(req, &cache.RestoreResult{Status: cache.RestoreError})
 			}
-			cacheResult = results[p.Key]
+			cacheResult = again
 			if !cacheResult.result.Hit {
 				return providerOK(req, &cache.RestoreResult{Status: cache.RestoreMiss})
 			}
@@ -1161,7 +1167,7 @@ func (s *providerSession) runPrefetch(batches []prefetchBatch, done chan struct{
 		}
 	}
 	s.addStats(func(st *cache.SummaryResult) { st.PrefetchedCount += found })
-	s.fetchInlinePrefetch(inline)
+	s.fetchInline("prefetch", inline)
 }
 
 // negotiatedResult returns the batched negotiate outcome for key, waiting for
@@ -1344,9 +1350,10 @@ func (s *providerSession) reportAuthRefusals(stats cache.SummaryResult, refusals
 // is content-verified by the fetcher and written atomically (temp + rename) so
 // core never ingests a half-written file.
 //
-// A blob a prefetch download-batch asks for is not fetched here until that
-// request ends (see cacheinline.go): the restore downloads its other blobs
-// first, then waits, then fetches what the request did not place.
+// A blob that a download-batch of the prefetch or of a late negotiate asks for
+// is not fetched here until that request ends (see cacheinline.go): the
+// restore downloads its other blobs first, then waits, then fetches what the
+// request did not place.
 //
 // It materializes the blobs the server returned for the negotiated mode; the
 // guarantee that every Manifest digest is present (full vs minimal/toplevel

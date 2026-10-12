@@ -49,6 +49,8 @@ type inlineCacheServer struct {
 	inlineAsks  [][]string
 	inlineBytes []int
 	gets        []string
+	// negotiates records each negotiate, its mode and its keys.
+	negotiates []negotiateCall
 }
 
 func newInlineCacheServer(t *testing.T, entries map[string][][]byte) *inlineCacheServer {
@@ -101,6 +103,13 @@ func (f *inlineCacheServer) handle(w http.ResponseWriter, r *http.Request) {
 func (f *inlineCacheServer) negotiate(w http.ResponseWriter, r *http.Request) {
 	var nreq cache.NegotiateRequest
 	_ = json.NewDecoder(r.Body).Decode(&nreq)
+	call := negotiateCall{mode: nreq.Mode}
+	for _, k := range nreq.Keys {
+		call.keys = append(call.keys, k.Key)
+	}
+	f.mu.Lock()
+	f.negotiates = append(f.negotiates, call)
+	f.mu.Unlock()
 	resp := cache.NegotiateResponse{ProtocolVersion: cache.ProtocolVersion}
 	for _, k := range nreq.Keys {
 		blobs, hit := f.entries[k.Key]
@@ -170,6 +179,13 @@ func (f *inlineCacheServer) seen() (asks [][]string, gets []string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return slices.Clone(f.inlineAsks), slices.Clone(f.gets)
+}
+
+// negotiateCalls returns the negotiates the server received, in order.
+func (f *inlineCacheServer) negotiateCalls() []negotiateCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.negotiates)
 }
 
 // answered returns the bytes of files each download-batch answer carried.
