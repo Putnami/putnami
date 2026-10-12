@@ -77,8 +77,6 @@ func TestImageLayersCheckCacheContract(t *testing.T) {
 			"go.work", "package.json", "putnami.lock.json",
 			".putnami/bin/extensions/putnami-go/tools/versions.json",
 		}},
-		// The binary a cloud-cli layer copies.
-		"cloud-cli": {From: "workspace", Files: []string{".putnami/out/cloud/extension/build/bin/linux-x64/putnami-cloud"}},
 	}
 	if !reflect.DeepEqual(task.Inputs, want) {
 		t.Fatalf("input ports = %v, want %v", task.Inputs, want)

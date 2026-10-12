@@ -438,8 +438,6 @@ It runs again when any file it reads changes:
 - the workspace files a layer's version derives from: `go.work`,
   `package.json`, `putnami.lock.json` and
   `.putnami/bin/extensions/putnami-go/tools/versions.json`
-- the Cloud CLI binary a `cloud-cli` layer copies:
-  `.putnami/out/cloud/extension/build/bin/linux-x64/putnami-cloud`
 - the extension's own code, as for the Config step
 
 The task passes `--project <project directory>` to the check, and that
@@ -452,9 +450,9 @@ The CLI computes the check's key when the check starts, after `build` wrote
 the layers, unless the session hashed the check's files before it ran any
 task. Three kinds of session do that: a run with a remote cache, a plan where
 a task finalizes another, and a release-set publication. The check then starts
-with the early key. That key holds the layers and the Cloud CLI binary as they
-were before this session's `build` rewrote them, while the result stored under
-it describes the layers this session produced.
+with the early key. That key holds the layers as they were before this
+session's `build` rewrote them, while the result stored under it describes the
+layers this session produced.
 
 Pass the Docker or config artifact flag explicitly when you invoke `publish`
 directly. Cloud config publication consumes the optional typed task input named

@@ -2903,8 +2903,7 @@
       "inputs": {
         "manifest": {"from": "project", "files": ["image-layers.json"]},
         "layers": {"from": "project", "files": [".gen/layers/*.json", ".gen/layers/*.tar", ".gen/layers/bin/*"]},
-        "pins": {"from": "workspace", "files": ["go.work", "package.json", "putnami.lock.json", ".putnami/bin/extensions/putnami-go/tools/versions.json"]},
-        "cloud-cli": {"from": "workspace", "files": [".putnami/out/cloud/extension/build/bin/linux-x64/putnami-cloud"]}
+        "pins": {"from": "workspace", "files": ["go.work", "package.json", "putnami.lock.json", ".putnami/bin/extensions/putnami-go/tools/versions.json"]}
       },
       "description": "Verify the project's produced layers against image-layers.json and the workspace sources that derive their versions: every declared layer has a record, its produced file still hashes to what that record claims, and its version is the one the workspace declares today. Reads only — no network, no registry, no execution. Cached on the files the extension README lists, which are the only files it reads: it refuses a record that names a file other than the one its producer writes, and the --project argument pins it to its own project, so no parameter redirects it.",
       "timeoutMs": 120000

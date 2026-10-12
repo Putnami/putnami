@@ -230,8 +230,11 @@ func imageLayersDeclaredVersion(spec imageLayerSpec, workspaceRoot string) (stri
 		}
 		return imageLayersCLILabel(version, integrity), nil
 	case "cloud-cli":
-		_, _, sum, err := imageLayersCloudCLI(workspaceRoot)
-		return "workspace:" + sum, err
+		artifact, err := imageLayersCloudCLIArtifact(workspaceRoot)
+		if err != nil {
+			return "", err
+		}
+		return imageLayersCloudCLILabel(artifact), nil
 	case "putnami-warm":
 		// Resolving the whole set — versions AND the integrities they are
 		// verified against — is deliberate: a lock that repinned an extension

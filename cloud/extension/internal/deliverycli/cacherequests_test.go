@@ -161,14 +161,15 @@ func restoreCalls(keys []string) []providerCall {
 // the windows grew, the same run sent 60: one negotiate and one download-batch
 // per late restore, and one window per pause of the build.
 //
-// Time is scaled down a hundred times: the build pauses 50 ms between bursts
-// of uploads, and the idle delay of a window is a hundredth of its production
-// value. Each wave of restores comes at once, as when a finished task releases
-// the tasks that depend on it. The quiet delay of a late negotiate is long
-// enough that every restore of a wave joins it on a loaded machine.
+// The build pauses 50 ms between bursts of uploads, as a build pauses well
+// under the production idle delay of a window. The test keeps that delay at
+// its production value: staging a burst takes longer than any scaled-down
+// delay on a loaded machine, which flushed a second window. Each wave of
+// restores comes at once, as when a finished task releases the tasks that
+// depend on it. The quiet delay of a late negotiate is long enough that every
+// restore of a wave joins it on a loaded machine.
 func TestARealisticRunSendsFewCacheServerRequests(t *testing.T) {
 	pinLateNegotiate(t, 250*time.Millisecond, time.Second, cache.MaxKeysPerRequest)
-	pinUploadIdle(t, uploadWindowIdle/100)
 	pinUploadRetryWait(t)
 	enableCacheWritesForTest(t)
 

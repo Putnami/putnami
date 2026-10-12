@@ -1,107 +1,140 @@
 package deliverycli
 
 import (
-	"context"
 	"os"
 	"path/filepath"
-	"runtime/debug"
+	"slices"
 	"strings"
 	"testing"
-
-	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 )
 
-func imageLayersCloudCLIFixture(t *testing.T) (string, string, *debug.BuildInfo) {
+const imageLayersCloudCLILayer = `{"name":"putnami-ci-next","producer":"cloud-cli","path":"/usr/local/libexec/putnami-ci-next"}`
+
+var warmCloudDigest = strings.Repeat("3c", 32)
+
+// imageLayersCloudCLIWorkspace pins @putnami/go and @putnami/cloud, and stages
+// a store whose @putnami/cloud artifact ships the given binary.
+func imageLayersCloudCLIWorkspace(t *testing.T, binary string) (string, *fakeWarmInstall) {
 	t.Helper()
-	workspace := t.TempDir()
-	if err := os.WriteFile(filepath.Join(workspace, "go.work"), []byte("go 1.26.1\n"), 0o600); err != nil {
-		t.Fatal(err)
+	installGoBuild(t, &fakeGoBuild{})
+	ws := imageLayersToolWorkspaceBase(t)
+	imageLayersWarmLock(t, ws, map[string]map[string]string{
+		"@putnami/go":    {"version": "0.1.0-8885222db", "linux/amd64": warmGoDigest},
+		"@putnami/cloud": {"version": "0.0.0-20261012-cloud", "linux/amd64": warmCloudDigest},
+	})
+	tree := warmFixtureStore()
+	delete(tree, warmTSDigest)
+	tree[warmCloudDigest] = map[string]string{"putnami.extension.json": `{"name":"@putnami/cloud"}`}
+	if binary != "" {
+		tree[warmCloudDigest][imageLayersCloudCLIBinary] = binary
 	}
-	binary := filepath.Join(workspace, ".putnami/out/cloud/extension/build/bin/linux-x64/putnami-cloud")
-	if err := os.MkdirAll(filepath.Dir(binary), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(binary, []byte("workspace CLI prerequisite bytes"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	info := &debug.BuildInfo{
-		GoVersion: "go1.26.1", Path: imageLayersCloudCLIModule + "/cmd/putnami-cloud",
-		Main:     debug.Module{Path: imageLayersCloudCLIModule, Version: "(devel)"},
-		Settings: []debug.BuildSetting{{Key: "GOOS", Value: "linux"}, {Key: "GOARCH", Value: "amd64"}, {Key: "CGO_ENABLED", Value: "0"}, {Key: "-trimpath", Value: "true"}},
-	}
-	previous := imageLayersReadBuildInfo
-	t.Cleanup(func() { imageLayersReadBuildInfo = previous })
-	imageLayersReadBuildInfo = func(path string) (*debug.BuildInfo, error) {
-		if path != binary {
-			t.Fatalf("producer selected wrong prerequisite: %s", path)
-		}
-		if _, err := os.Stat(path); err != nil {
-			return nil, err
-		}
-		return info, nil
-	}
-	return workspace, binary, info
+	fake := &fakeWarmInstall{tree: tree}
+	installWarmRun(t, fake)
+	return ws, fake
 }
 
-func TestImageLayersCloudCLIUsesVerifiedPrerequisiteWithoutMovingIt(t *testing.T) {
-	workspace, binary, _ := imageLayersCloudCLIFixture(t)
-	spec := imageLayerSpec{Name: "putnami-ci-next", Producer: "cloud-cli", Path: "/usr/local/libexec/putnami-ci-next"}
-	out := filepath.Join(workspace, "layers")
-	record, err := imageLayersProduceCloudCLI(context.Background(), spec, workspace, out, nil, clicore.IO{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	original, err := os.ReadFile(binary)
-	if err != nil {
-		t.Fatalf("producer moved or removed the prerequisite: %v", err)
-	}
-	installed := filepath.Join(out, record.File)
-	data, err := os.ReadFile(installed)
-	if err != nil || string(data) != string(original) || record.Version != "workspace:"+record.SHA256 {
-		t.Fatalf("layer identity/content mismatch: %+v err=%v", record, err)
-	}
-	if info, err := os.Stat(installed); err != nil || info.Mode().Perm() != 0o755 {
-		t.Fatalf("helper is not executable: %v, %v", info, err)
-	}
-	if err := imageLayersWriteRecord(out, record); err != nil {
-		t.Fatal(err)
-	}
-	if _, problem := imageLayersVerifyLayer(spec, workspace, out); problem != "" {
-		t.Fatal(problem)
-	}
-	if err := os.WriteFile(binary, []byte("newly built CLI"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if _, problem := imageLayersVerifyLayer(spec, workspace, out); !strings.Contains(problem, "workspace now declares") {
-		t.Fatalf("packaging accepted a helper from the prior prerequisite build: %s", problem)
-	}
+func cloudCLIBinary(module string, settings ...string) string {
+	return fakeToolBinary("go1.26.9", module, "(devel)", module+"/cmd/putnami-cloud", settings...)
 }
 
-func TestImageLayersCloudCLIRefusesWrongOrMissingPrerequisite(t *testing.T) {
-	for _, mutation := range []string{"missing", "toolchain", "module", "entrypoint", "GOOS", "GOARCH", "CGO_ENABLED", "-trimpath"} {
-		t.Run(mutation, func(t *testing.T) {
-			workspace, binary, info := imageLayersCloudCLIFixture(t)
-			switch mutation {
-			case "missing":
-				if err := os.Remove(binary); err != nil {
-					t.Fatal(err)
-				}
-			case "toolchain":
-				info.GoVersion = "go1.25.0"
-			case "module":
-				info.Main.Path = "other/module"
-			case "entrypoint":
-				info.Path = imageLayersCloudCLIModule + "/cmd/other"
-			default:
-				for i := range info.Settings {
-					if info.Settings[i].Key == mutation {
-						info.Settings[i].Value = "wrong"
-					}
-				}
+// The helper comes from the pinned @putnami/cloud artifact, out of the one
+// store the warm layer bakes, whichever repository built that artifact.
+func TestImageLayersCloudCLIRestoresThePinnedExtensionBinary(t *testing.T) {
+	for _, module := range []string{"go.putnami.dev/cloud/extension", "go.putnami.cloud/cloud/workloads/putnami-cloud"} {
+		t.Run(module, func(t *testing.T) {
+			binary := cloudCLIBinary(module)
+			ws, fake := imageLayersCloudCLIWorkspace(t, binary)
+			project := imageLayersProject(t, `{"layers":[`+imageLayersCloudCLILayer+`,`+imageLayersWarmLayer+`]}`)
+			if err := ImageLayers(map[string]any{"project": project}, nil, ws, nil, imageLayersIO(new([]string))); err != nil {
+				t.Fatalf("cloud image-layers: %v", err)
 			}
-			if _, _, _, err := imageLayersCloudCLI(workspace); err == nil {
-				t.Fatalf("accepted %s prerequisite", mutation)
+			if len(fake.stores) != 1 {
+				t.Fatalf("the extension set was materialized %d time(s), want once", len(fake.stores))
+			}
+			installed := filepath.Join(project, ".gen", "layers", "bin", "putnami-ci-next")
+			data, err := os.ReadFile(installed) //nolint:gosec // G304: a path this test just produced
+			if err != nil || string(data) != binary {
+				t.Fatalf("helper = %q (%v), want the artifact's %s", data, err, imageLayersCloudCLIBinary)
+			}
+			if info, err := os.Stat(installed); err != nil || info.Mode().Perm() != imageLayersToolFileMode {
+				t.Fatalf("helper mode = %v (%v), want %v", info, err, imageLayersToolFileMode)
+			}
+			// The store is lent, not consumed: the warm layer still carries the
+			// artifact the helper was copied from.
+			tar, err := os.ReadFile(filepath.Join(project, ".gen", "layers", "putnami-warm.tar")) //nolint:gosec // G304: a path this test just produced
+			if err != nil {
+				t.Fatalf("read the warm layer: %v", err)
+			}
+			kept := "root/.putnami/artifacts/sha256/" + warmCloudDigest[:2] + "/" + warmCloudDigest + "/" + imageLayersCloudCLIBinary
+			if !slices.Contains(headerNames(readTarEntries(t, tar)), kept) {
+				t.Fatalf("the warm layer lost %s to the restore", kept)
+			}
+			record := imageLayersReadRecord(t, project, "putnami-ci-next")
+			want := "@putnami/cloud 0.0.0-20261012-cloud " + warmCloudDigest
+			if record.Version != want || record.Source.Module != module || record.SHA256 != sha256Hex(data) {
+				t.Fatalf("record = %+v, want version %q from module %s", record, want, module)
+			}
+			if len(record.Source.Extensions) != 1 || record.Source.Extensions[0].SHA256 != warmCloudDigest {
+				t.Fatalf("record names %+v, want the @putnami/cloud artifact", record.Source.Extensions)
+			}
+
+			spec := imageLayerSpec{Name: "putnami-ci-next", Producer: "cloud-cli", Path: "/usr/local/libexec/putnami-ci-next"}
+			out := filepath.Join(project, ".gen", "layers")
+			if _, problem := imageLayersVerifyLayer(spec, ws, out); problem != "" {
+				t.Fatal(problem)
+			}
+			imageLayersWarmLock(t, ws, map[string]map[string]string{
+				"@putnami/go":    {"version": "0.1.0-8885222db", "linux/amd64": warmGoDigest},
+				"@putnami/cloud": {"version": "0.0.0-20261012-cloud", "linux/amd64": strings.Repeat("4d", 32)},
+			})
+			if _, problem := imageLayersVerifyLayer(spec, ws, out); !strings.Contains(problem, "workspace now declares") {
+				t.Fatalf("packaging accepted a helper from a republished artifact: %q", problem)
 			}
 		})
+	}
+}
+
+func TestImageLayersCloudCLIRefusesAWrongArtifact(t *testing.T) {
+	module := "go.putnami.dev/cloud/extension"
+	cases := map[string]struct {
+		binary string
+		want   string
+	}{
+		"missing":     {"", "carries no compiled/putnami-cloud"},
+		"entrypoint":  {fakeToolBinary("go1.26.9", module, "(devel)", module+"/cmd/other"), "is not a build of a /cmd/putnami-cloud entrypoint"},
+		"GOOS":        {cloudCLIBinary(module, "GOOS", "darwin"), "GOOS=linux"},
+		"GOARCH":      {cloudCLIBinary(module, "GOARCH", "arm64"), "GOARCH=amd64"},
+		"CGO_ENABLED": {cloudCLIBinary(module, "CGO_ENABLED", "1"), "CGO_ENABLED=0"},
+		"-trimpath":   {cloudCLIBinary(module, "-trimpath", "false"), "-trimpath=true"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ws, _ := imageLayersCloudCLIWorkspace(t, tc.binary)
+			project := imageLayersProject(t, `{"layers":[`+imageLayersCloudCLILayer+`]}`)
+			err := ImageLayers(map[string]any{"project": project}, nil, ws, nil, imageLayersIO(new([]string)))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+			if _, err := os.Stat(filepath.Join(project, ".gen", "layers", "bin", "putnami-ci-next")); !os.IsNotExist(err) {
+				t.Fatalf("a refused artifact became a layer: %v", err)
+			}
+		})
+	}
+}
+
+// A lock that does not pin @putnami/cloud has no helper to restore, and
+// `--check` says so without materializing anything.
+func TestImageLayersCloudCLIRequiresTheLockPin(t *testing.T) {
+	ws := imageLayersWarmWorkspaceFixture(t)
+	fake := &fakeWarmInstall{tree: warmFixtureStore()}
+	installWarmRun(t, fake)
+	project := imageLayersProject(t, `{"layers":[`+imageLayersCloudCLILayer+`]}`)
+	err := ImageLayers(map[string]any{"project": project}, nil, ws, nil, imageLayersIO(new([]string)))
+	if err == nil || !strings.Contains(err.Error(), "no warmed extension is @putnami/cloud") {
+		t.Fatalf("error = %v, want a refusal naming the missing pin", err)
+	}
+	spec := imageLayerSpec{Name: "putnami-ci-next", Producer: "cloud-cli", Path: "/usr/local/libexec/putnami-ci-next"}
+	if _, err := imageLayersDeclaredVersion(spec, ws); err == nil || !strings.Contains(err.Error(), `pins no extensions["@putnami/cloud"].version`) {
+		t.Fatalf("check error = %v, want the missing lock pin", err)
 	}
 }

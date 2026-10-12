@@ -29,7 +29,7 @@ func TestRunnerNextBuiltCLIAgainstProviderFake(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read built CLI identity: %v", err)
 	}
-	if info.Path != imageLayersCloudCLIModule+"/cmd/putnami-cloud" || info.Main.Path != imageLayersCloudCLIModule {
+	if info.Main.Path == "" || info.Path != info.Main.Path+imageLayersCloudCLIEntrypoint {
 		t.Fatal("subprocess proof requires the actual production entrypoint")
 	}
 	settings := make(map[string]string, len(info.Settings))
