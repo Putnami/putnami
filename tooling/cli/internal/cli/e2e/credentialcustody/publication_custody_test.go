@@ -306,9 +306,9 @@ func writePublicationFixture(t *testing.T, self, endpoint, gate string) publicat
       "kind": "command",
       "command": %s,
       "cache": false,
-      "timeoutMs": %d,
+      "timeoutMs": -1,
       "env": { %s: "upload-probe", %s: %s, %s: %s }
-    },`, jsonString(self), 2*custodyGateTimeout.Milliseconds(),
+    },`, jsonString(self),
 			jsonString(custodyRoleEnv), jsonString(custodyReportEnv), jsonString(fx.probeReport),
 			jsonString(custodyGateEnv), jsonString(gate))
 	}

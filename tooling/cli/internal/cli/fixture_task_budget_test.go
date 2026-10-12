@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -22,7 +23,11 @@ import (
 // job then fails with "job timed out": the CLI exits 1, which reads as the
 // regression a test guards. Raising the number only moves the load at which
 // the verdict flips. The Go test binary's -timeout stays the backstop.
-var fixtureTaskBudget = regexp.MustCompile(`"timeoutMs"\s*:\s*(\d+)`)
+var fixtureTaskBudget = regexp.MustCompile(`"timeoutMs"\s*:\s*([^\s,}]+)`)
+
+// portableTaskDeadline names clitest.PortableTaskDeadlineMs, the one budget a
+// fixture may declare outside a "-1".
+const portableTaskDeadline = "PortableTaskDeadlineMs"
 
 // TestFixtureTasksCarryNoIncidentalWallClockBudget reads the test sources of
 // this package and of the e2e packages, and the clitest helpers they share,
@@ -56,24 +61,45 @@ func TestFixtureTasksCarryNoIncidentalWallClockBudget(t *testing.T) {
 					t.Fatalf("%s: unquote %s: %v", fset.Position(node.Pos()), node.Value, err)
 				}
 				for _, match := range fixtureTaskBudget.FindAllStringSubmatch(text, -1) {
-					if budget, err := strconv.ParseInt(match[1], 10, 64); err == nil && budget > 0 {
-						t.Errorf("%s: a fixture declares \"timeoutMs\": %d; declare -1 on a task, omit it on a tool", fset.Position(node.Pos()), budget)
+					if match[1] != "-1" {
+						t.Errorf("%s: a fixture declares a timeoutMs of %s; declare -1 on a task, omit it on a tool", fset.Position(node.Pos()), match[1])
 					}
 				}
 			case *ast.KeyValueExpr:
-				key, ok := node.Key.(*ast.Ident)
-				if !ok || key.Name != "TimeoutMs" {
-					return true
+				if key, ok := node.Key.(*ast.Ident); ok && key.Name == "TimeoutMs" {
+					checkFixtureBudget(t, fset, node.Value)
 				}
-				lit, ok := node.Value.(*ast.BasicLit)
-				if !ok || lit.Kind != token.INT {
-					return true // an identifier, a call, or a negative literal: no budget
-				}
-				if budget, err := strconv.ParseInt(lit.Value, 0, 64); err == nil && budget > 0 {
-					t.Errorf("%s: a fixture declares TimeoutMs: %d; declare -1 on a task, omit it on a tool", fset.Position(node.Pos()), budget)
+			case *ast.AssignStmt:
+				for i, lhs := range node.Lhs {
+					if sel, ok := lhs.(*ast.SelectorExpr); ok && sel.Sel.Name == "TimeoutMs" && i < len(node.Rhs) {
+						checkFixtureBudget(t, fset, node.Rhs[i])
+					}
 				}
 			}
 			return true
 		})
 	}
+}
+
+// checkFixtureBudget accepts a TimeoutMs value that is a negative literal or
+// names PortableTaskDeadlineMs, and refuses any other: a positive literal, or
+// a constant or expression the guard cannot read.
+func checkFixtureBudget(t *testing.T, fset *token.FileSet, value ast.Expr) {
+	t.Helper()
+	switch value := value.(type) {
+	case *ast.UnaryExpr:
+		if lit, ok := value.X.(*ast.BasicLit); ok && value.Op == token.SUB && lit.Kind == token.INT {
+			return
+		}
+	case *ast.Ident:
+		if value.Name == portableTaskDeadline {
+			return
+		}
+	case *ast.SelectorExpr:
+		if value.Sel.Name == portableTaskDeadline {
+			return
+		}
+	}
+	t.Errorf("%s: a fixture declares TimeoutMs %s; declare -1 on a task, omit it on a tool, or use clitest.%s where the ChangePlan needs a hard deadline",
+		fset.Position(value.Pos()), types.ExprString(value), portableTaskDeadline)
 }
