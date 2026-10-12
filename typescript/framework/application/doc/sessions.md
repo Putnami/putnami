@@ -38,6 +38,8 @@ session:
   ttl: 604800                # 1 week in seconds
 ```
 
+`cookieSecret` is sensitive, so `infra/requirements.json` lists it as the secret `session.cookie_secret`. The `oAuth2()` plugin declares the `session` block in `schema/config.json`. An app that uses sessions without that plugin declares the block itself, for example with `configToken(SessionConfig)` at module level.
+
 ### Generating Secrets
 
 Generate secure secrets:

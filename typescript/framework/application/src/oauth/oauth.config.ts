@@ -1,4 +1,4 @@
-import { ArrayOf, Config, Default, Int, Optional } from '@putnami/runtime';
+import { ArrayOf, Config, Default, Int, Optional, Sensitive } from '@putnami/runtime';
 
 /**
  * Configuration for the OAuth2 / OpenID Connect plugin.
@@ -35,7 +35,7 @@ export const OAuthConfig = Config('oauth', {
   /** OAuth2 client identifier issued by the authorization server. */
   clientId: Optional(String),
   /** OAuth2 client secret. Omit for public clients (`tokenEndpointAuthMethod: 'none'`). */
-  clientSecret: Optional(String),
+  clientSecret: Optional(Sensitive(String)),
 
   /** Local route that starts the login flow. Defaults to `/login`. */
   loginRoute: Default(String, '/login'),

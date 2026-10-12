@@ -57,6 +57,8 @@ oauth:
   defaultLoginRedirectUrl: /
 ```
 
+The plugin contributes the `oauth` and `session` config blocks, so `putnami config-extract` declares both in `schema/config.json` and Cloud publishes them. `oauth.clientSecret` and `session.cookieSecret` are sensitive: `infra/requirements.json` lists them as the secrets `oauth.client_secret` and `session.cookie_secret`.
+
 ### Explicit endpoint overrides
 
 If you don't use discovery — or want to override a specific endpoint that discovery returned — set any of the URI fields directly:

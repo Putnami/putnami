@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { resetConfigLoader } from '@putnami/runtime';
+import { collectSecretNames, resetConfigLoader } from '@putnami/runtime';
 import { application } from '../../src/application';
 import { config } from '../../src/config';
+import { extractConfigSchema } from '../../src/config/config-schema-extract';
 import { http } from '../../src/http/http.plugin';
 import { OAuthPlugin, oAuth2 } from '../../src/oauth/oauth.plugin';
 
@@ -50,6 +51,22 @@ describe('OAuthPlugin', () => {
     it('should accept configuration overrides', () => {
       const plugin = oAuth2({ loginRoute: '/custom-login' });
       expect(plugin).toBeInstanceOf(OAuthPlugin);
+    });
+  });
+
+  describe('Config contribution', () => {
+    // Read from the plugin, not the global registry: a registered `session`
+    // block is validated by every later app start in this process.
+    it('declares the oauth and session blocks and their secrets', () => {
+      const definitions = oAuth2().configDefinitions();
+      const manifest = extractConfigSchema({ appName: 'oauth-app', version: '0.0.0', definitions, output: false });
+      const sensitive = (path: string, field: string) =>
+        manifest?.configs.find((c) => c.path === path)?.fields.find((f) => f.name === field)?.sensitive;
+
+      expect(definitions.map((d) => d.path)).toEqual(['oauth', 'session']);
+      expect(sensitive('oauth', 'clientSecret')).toBe(true);
+      expect(sensitive('session', 'cookieSecret')).toBe(true);
+      expect(collectSecretNames(definitions)).toEqual(['oauth.client_secret', 'session.cookie_secret']);
     });
   });
 
