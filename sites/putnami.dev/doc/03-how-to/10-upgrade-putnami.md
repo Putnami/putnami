@@ -18,6 +18,11 @@ upgrade path and upgrades everything in sequence:
 5. **Framework dependencies** — pins `@putnami/*` packages (TypeScript) and `go.putnami.dev/*` modules (Go) to the selected release. Python has no Putnami framework package release; an explicitly enabled Python extension upgrades that workspace's own uv-resolved dependencies.
 6. **Workspace installers** — materializes lockfiles and workspace state (`bun install`, `go work sync`, `uv lock`, etc.)
 
+A workspace that adds `@putnami/python` and has no `uv` entry in
+`putnami.lock.json` yet needs one `putnami install` after the upgrade: it pins
+uv in the lock and in the root `pyproject.toml`. Commit both files. Until then,
+its Python tasks fail with `workspace lock has no exact "uv" pin`.
+
 Use `--dry-run` first when you want to inspect the resolved release before any
 file is changed:
 
