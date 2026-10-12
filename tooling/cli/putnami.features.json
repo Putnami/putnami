@@ -1553,7 +1553,9 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "only-go-and-bun-declarations-are-locked"
+              "only-go-and-bun-declarations-are-locked",
+              "only-an-exact-tool-uv-required-version-is-locked",
+              "a-uv-declaration-pins-nothing-without-an-extension-that-runs-uv"
             ]
           }
         },
@@ -1566,7 +1568,9 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "go-and-bun-pins-carry-version-source-and-digests"
+              "go-and-bun-pins-carry-version-source-and-digests",
+              "uv-pins-carry-version-source-and-digests",
+              "a-uv-release-older-than-the-minimum-is-refused"
             ]
           }
         },
@@ -2043,7 +2047,8 @@
             "checks": [
               "a-mismatching-ambient-binary-is-never-substituted",
               "an-optional-mismatch-publishes-an-empty-binding",
-              "a-first-party-bun-runtime-resolves-the-install-under-the-putnami-home"
+              "a-first-party-bun-runtime-resolves-the-install-under-the-putnami-home",
+              "a-first-party-uv-runtime-resolves-the-install-under-the-putnami-home"
             ]
           }
         },
@@ -2146,6 +2151,19 @@
             "kind": "acceptance",
             "checks": [
               "a-pinned-release-no-candidate-matches-names-putnami-install-unless-it-does-not-help"
+            ]
+          }
+        },
+        {
+          "id": "missing-uv-pin-names-the-declaration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-uv-pin-names-the-declaration-to-write"
             ]
           }
         }

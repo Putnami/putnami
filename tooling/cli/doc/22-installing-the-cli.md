@@ -32,8 +32,9 @@ Windows, run the PowerShell equivalent in
 Bash, `curl`, `tar`, a SHA-256 tool (`sha256sum` or `shasum`), network access to
 the public site/registry, and network access to the public package registry
 (`https://npm.putnami.dev`) used by `bun install`. The first run also reaches
-`github.com` and `api.github.com` for Bun, and `go.dev` for a Go project. No
-directory has to be on `PATH` beforehand.
+`github.com` and `api.github.com` for Bun, `go.dev` for a Go project, and
+`github.com` for uv in a Python project. No directory has to be on `PATH`
+beforehand.
 
 Bun is not a prerequisite. `putnami init` uses a Bun the machine already holds
 when it fits. Otherwise `@putnami/typescript` installs Bun at

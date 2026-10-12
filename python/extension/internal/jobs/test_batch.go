@@ -95,7 +95,8 @@ func TestBatch(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, m
 
 	// Sync the UV workspace once for the whole group (mirrors the solo sync). A
 	// failure here blocks every member, so failing the batch is correct.
-	if !syncWorkspaceFn(wsRoot, emit) {
+	uv, ok := syncWorkspaceFn(wsRoot, emit)
+	if !ok {
 		return "FAILED", nil, nil
 	}
 
@@ -121,7 +122,7 @@ func TestBatch(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, m
 	caseBytes := protocolcli.TestCaseBatchMemberBytes(len(projects))
 	results := make([]pyTestBatchProjectResult, 0, len(projects))
 	for _, proj := range projects {
-		results = append(results, runProjectPytestSuite(wsRoot, proj, withLog, updateSnapshots, testFilter, pluginDir, caseBytes))
+		results = append(results, runProjectPytestSuite(uv, wsRoot, proj, withLog, updateSnapshots, testFilter, pluginDir, caseBytes))
 	}
 	return "OK", map[string]any{"batchResults": results}, nil
 }
@@ -131,7 +132,7 @@ func TestBatch(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, m
 // per-project result. It never returns a process error, so a failure here is
 // isolated to this project. Its status/testSummary decisions mirror the solo
 // Test path exactly (plus the one-shot crash respawn).
-func runProjectPytestSuite(wsRoot string, proj pctx.ProjectRef, withLog, updateSnapshots bool, testFilter, specPluginDir string, caseBytes int) pyTestBatchProjectResult {
+func runProjectPytestSuite(uv, wsRoot string, proj pctx.ProjectRef, withLog, updateSnapshots bool, testFilter, specPluginDir string, caseBytes int) pyTestBatchProjectResult {
 	result := pyTestBatchProjectResult{ProjectID: proj.ID, Status: "OK"}
 	projectRoot := proj.FullPath
 
@@ -171,7 +172,7 @@ func runProjectPytestSuite(wsRoot string, proj pctx.ProjectRef, withLog, updateS
 	}
 	defer cases.remove()
 
-	cmdArgs := buildProjectPytestArgs(wsRoot, proj, withLog, updateSnapshots, testFilter, spec, cases)
+	cmdArgs := buildProjectPytestArgs(uv, wsRoot, proj, withLog, updateSnapshots, testFilter, spec, cases)
 
 	pyPath := projectRoot
 	if existing := os.Getenv("PYTHONPATH"); existing != "" {
@@ -230,12 +231,12 @@ func runProjectPytestSuite(wsRoot string, proj pctx.ProjectRef, withLog, updateS
 // mirroring the solo Test command construction so a batched suite runs the
 // exact same tool invocation. No --config is passed, so pytest/uv resolve each
 // project's configuration by directory as usual.
-func buildProjectPytestArgs(wsRoot string, proj pctx.ProjectRef, withLog, updateSnapshots bool, testFilter string, spec specProvision, cases *testCaseSink) []string {
+func buildProjectPytestArgs(uv, wsRoot string, proj pctx.ProjectRef, withLog, updateSnapshots bool, testFilter string, spec specProvision, cases *testCaseSink) []string {
 	packageName := resolvePackageNameForProject(proj)
 	cacheDir := filepath.Join(wsRoot, ".putnami/bin/extensions/putnami-python/.pytest_cache")
 
 	cmdArgs := []string{
-		"uv", "run",
+		uv, "run",
 		"--package", packageName,
 		"--directory", wsRoot,
 		"--extra", "dev",

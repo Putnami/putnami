@@ -54,7 +54,7 @@ func stubSync(t *testing.T) {
 	t.Helper()
 	orig := syncWorkspaceFn
 	t.Cleanup(func() { syncWorkspaceFn = orig })
-	syncWorkspaceFn = func(string, *jsonl.Emitter) bool { return true }
+	syncWorkspaceFn = func(string, *jsonl.Emitter) (string, bool) { return stubUV, true }
 }
 
 // stubRunner replaces the pytest command runner and restores it after the test.

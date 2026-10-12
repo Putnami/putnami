@@ -161,9 +161,11 @@ func slowWindows(t *testing.T, s *providerSession, f *uploadCacheServer, exchang
 
 // The stall bound is a bound on silence, not on the upload: a run whose
 // windows take longer in all than the bound, and keep moving, is stored whole.
+// Each window leaves the bound more than 2s of slack, so a loaded machine that
+// pauses the upload between two windows does not read as a stall.
 func TestTheSummaryWaitsForUploadsThatStillMove(t *testing.T) {
 	pinUploadIdle(t, time.Hour)
-	const stall, perWindow, windows = time.Second, 150 * time.Millisecond, 10
+	const stall, perWindow, windows = 3 * time.Second, 400 * time.Millisecond, 10
 	pinUploadDrain(t, stall, 40*time.Second, time.Second)
 	f := newUploadCacheServer(t, batchedCapabilities()...)
 	var logw lockedWriter

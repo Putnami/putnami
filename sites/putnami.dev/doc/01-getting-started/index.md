@@ -32,8 +32,9 @@ Prerequisites are Bash, `curl`, `tar`, either `sha256sum` or `shasum`, network
 access to `putnami.dev` and the public artifact registry, and network access to
 the public package registry (`https://npm.putnami.dev`) used by `bun install`.
 The first run also downloads the toolchains it needs: Bun from `github.com`,
-with its release read from `api.github.com`, and, for a Go project, Go from
-`go.dev`.
+with its release read from `api.github.com`, for a Go project, Go from
+`go.dev`, and, for a workspace that adds `@putnami/python`, uv from
+`github.com`.
 No directory has to be on `PATH` beforehand: a script running as the child of a
 pipe cannot change its parent shell, so the block sets `PATH` itself.
 

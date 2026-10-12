@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 
@@ -92,6 +93,16 @@ const LockCLISourceWorkspace = "workspace"
 var lockCLIPublishedPinFields = []string{
 	"version", "integrity", "integrities", "manifestHash", "protocolVersion",
 }
+
+// lockToolchainNames are the runtimes a lock may pin. Go, Bun and uv are the
+// runtimes Putnami provisions. v3 and v4 also admitted Node pins: historical
+// locks that carry one stay readable even though the current CLI no longer
+// declares or resolves Node, and a toolchain metadata refresh replaces the map
+// with the runtimes Putnami provisions.
+//
+// schemas/lock.json states the same list as the toolchains propertyNames enum;
+// TestLockSchemaToolchainNamesAgreeWithTheValidator reads both.
+var lockToolchainNames = []string{"go", "node", "bun", "uv"}
 
 // lockCLIPublishedPinFieldSet reports the fields a given entry actually sets,
 // in lockCLIPublishedPinFields order, so a diagnostic list is deterministic.
@@ -210,13 +221,9 @@ func ValidateLock(l *Lock) []diag.Diagnostic {
 		diags = append(diags, diag.Errorf("invalid-protocol-version", "cli.protocolVersion",
 			"cli protocolVersion must be at least 1"))
 	}
-	// v3 and v4 admitted Node pins. Keep those historical locks readable even
-	// though the current CLI no longer declares or resolves Node; a toolchain
-	// metadata refresh replaces the map with the runtimes Putnami provisions.
-	supportedToolchains := map[string]bool{"go": true, "node": true, "bun": true}
 	for _, name := range sortedLockKeys(l.Toolchains) {
 		entry := l.Toolchains[name]
-		if !supportedToolchains[name] {
+		if !slices.Contains(lockToolchainNames, name) {
 			diags = append(diags, diag.Errorf("unsupported-toolchain",
 				fmt.Sprintf("toolchains.%s", name), "toolchain %q is not supported", name))
 		}

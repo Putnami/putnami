@@ -11,7 +11,8 @@ compatibility or parity promise with Go or TypeScript.
 ## Prerequisites
 
 - Python 3.11 or higher installed
-- [uv](https://docs.astral.sh/uv/) installed
+- No [uv](https://docs.astral.sh/uv/) install: `putnami install` installs the
+  release the workspace pins (see [uv Release](./configuration.md#uv-release))
 - A Putnami workspace
 
 ## Installation
@@ -145,8 +146,9 @@ want this experimental surface:
 
 The manifest includes embedded `flags` for all jobs, making it self-describing. CLI metadata is read directly from the manifest without importing TypeScript modules. See the [Extension SDK](../../../tooling/extension-sdk/README.md) for the shared protocol and runtime helpers.
 
-Python jobs enter through the extension's prepared runtime, which invokes `uv`
-for Python tool and workload processes. Bun is not required at runtime.
+Python jobs enter through the extension's prepared runtime, which invokes the
+pinned `uv` for Python tool and workload processes. Bun is not required at
+runtime.
 
 ## Next Steps
 

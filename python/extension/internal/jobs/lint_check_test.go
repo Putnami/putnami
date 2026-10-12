@@ -206,11 +206,14 @@ func TestSingleProjectLintFormatScopesRuffToProjectRoot(t *testing.T) {
 			}
 
 			origSync := syncWorkspace
-			syncWorkspace = func(string, *jsonl.Emitter) bool { return true }
+			syncWorkspace = func(string, *jsonl.Emitter) (string, bool) { return stubUV, true }
 			t.Cleanup(func() { syncWorkspace = origSync })
 
 			origRun := ruffSingleRun
-			ruffSingleRun = func(_ string, args []string, dir string, _ []string) ([]byte, error) {
+			ruffSingleRun = func(name string, args []string, dir string, _ []string) ([]byte, error) {
+				if name != stubUV {
+					t.Fatalf("ruff command = %q, want the resolved uv %q", name, stubUV)
+				}
 				if dir != projectRoot {
 					t.Fatalf("ruff command directory = %q, want project root %q", dir, projectRoot)
 				}
@@ -273,13 +276,13 @@ func TestLintCheck_SoloMatchesBatchInvocationAndDiagnostics(t *testing.T) {
 	}
 
 	origSync := syncWorkspace
-	syncWorkspace = func(string, *jsonl.Emitter) bool { return true }
+	syncWorkspace = func(string, *jsonl.Emitter) (string, bool) { return stubUV, true }
 	t.Cleanup(func() { syncWorkspace = origSync })
 
 	origRun := ruffSingleCheckRun
 	ruffSingleCheckRun = func(name string, args []string, dir string, env []string) (ruffCheckResult, error) {
-		if name != "uv" {
-			t.Fatalf("ruff command = %q, want uv", name)
+		if name != stubUV {
+			t.Fatalf("ruff command = %q, want the resolved uv %q", name, stubUV)
 		}
 		if dir != workspaceRoot {
 			t.Fatalf("ruff command directory = %q, want workspace root %q", dir, workspaceRoot)

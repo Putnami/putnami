@@ -5,11 +5,15 @@ package workspace
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+
+	"go.putnami.dev/sdk/extension/robustio"
+	"go.putnami.dev/sdk/extension/uvtoolchain"
 )
 
 var nameRe = regexp.MustCompile(`^name\s*=\s*"([^"]+)"\s*$`)
@@ -214,7 +218,11 @@ func SyncUVWorkspace(workspaceRoot string) (bool, []string, error) {
 	workspacePattern := regexp.MustCompile(`\[tool\.uv\.workspace\][\s\S]*?members\s*=\s*\[[^\]]*\]`)
 	updated, membersChanged := replaceOrAppendSection(content, workspacePattern, workspaceSection)
 
-	sourcesPattern := regexp.MustCompile(`\[tool\.uv\.sources\][\s\S]*?(?:\n\[|$)`)
+	// The table ends where the next table starts, or at the end of the file.
+	// The white space and the "[" of the next header are captured and written
+	// back, so a table after [tool.uv.sources], such as a [tool.uv] that holds
+	// required-version, keeps its header.
+	sourcesPattern := regexp.MustCompile(`\[tool\.uv\.sources\][\s\S]*?(\s*(?:\n\[|$))`)
 	updated, sourcesChanged := replaceOrAppendSection(updated, sourcesPattern, sourcesSection)
 
 	changed := membersChanged || sourcesChanged
@@ -225,6 +233,125 @@ func SyncUVWorkspace(workspaceRoot string) (bool, []string, error) {
 	}
 
 	return changed, members, nil
+}
+
+// EnsureUVRequiredVersion declares version as the uv release of the workspace,
+// as required-version = "==<version>" in the [tool.uv] table of the root
+// pyproject.toml, when that file exists and its [tool.uv] table sets no
+// required-version yet. The CLI pins the lock's uv toolchain from this
+// declaration, and uv itself refuses to run the workspace with another
+// release. It reports whether it wrote the file.
+//
+// The declaration is read as the CLI reads it (uvtoolchain.ReadDeclaration).
+// An exact one is never changed. One that names no single release, such as a
+// range, is an error: the CLI pins nothing from it. So are uv settings written
+// as a dotted key or an inline table, such as uv.managed in the [tool] table:
+// a [tool.uv] table added beside them would define the table twice.
+//
+// The key goes on the line after the [tool.uv] header, or in a [tool.uv] table
+// appended to the file when it has none. The rest of the file is kept byte for
+// byte, and the new file replaces the old one in one rename.
+func EnsureUVRequiredVersion(workspaceRoot, version string) (bool, error) {
+	path := filepath.Join(workspaceRoot, "pyproject.toml")
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, err
+	}
+	content := string(data)
+	current := uvtoolchain.ReadDeclaration(content)
+	switch {
+	case current.Present && current.Version != "":
+		return false, nil
+	case current.Present:
+		return false, current.Problem()
+	case current.Outside != "":
+		return false, fmt.Errorf("it writes uv settings outside a [tool.uv] table header (%s), "+
+			"so a [tool.uv] table added for required-version would define the table twice: "+
+			"move the uv settings into a [tool.uv] table, with required-version = \"==%s\"", current.Outside, version)
+	}
+	declaration := `required-version = "==` + version + `"`
+	lines := strings.SplitAfter(content, "\n")
+	inserted := false
+	for i, line := range lines {
+		if uvTableHeader(line) {
+			newline := "\n"
+			if strings.HasSuffix(line, "\r\n") {
+				newline = "\r\n"
+			}
+			if !strings.HasSuffix(line, "\n") {
+				lines[i] = line + newline
+			}
+			lines = append(lines[:i+1], append([]string{declaration + newline}, lines[i+1:]...)...)
+			inserted = true
+			break
+		}
+	}
+	updated := strings.Join(lines, "")
+	if !inserted {
+		if updated != "" && !strings.HasSuffix(updated, "\n") {
+			updated += "\n"
+		}
+		updated += "\n[tool.uv]\n" + declaration + "\n"
+	}
+	if err := writeFileAtomic(path, []byte(updated), info.Mode().Perm()); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// writeFileAtomic replaces path with data, with the permissions perm. The
+// bytes go to a temporary file in the same directory, which is then renamed
+// over path, so a reader finds the old file or the new one, never a part of
+// one. robustio retries the rename while Windows reports the file busy.
+func writeFileAtomic(path string, data []byte, perm fs.FileMode) error {
+	temp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".putnami-*")
+	if err != nil {
+		return err
+	}
+	tempPath := temp.Name()
+	if err := writeAndClose(temp, data, perm); err != nil {
+		_ = os.Remove(tempPath)
+		return err
+	}
+	if err := robustio.Rename(tempPath, path); err != nil {
+		_ = os.Remove(tempPath)
+		return err
+	}
+	return nil
+}
+
+// writeAndClose sets the permissions of file, writes data to it, flushes it to
+// disk and closes it.
+func writeAndClose(file *os.File, data []byte, perm fs.FileMode) error {
+	err := file.Chmod(perm)
+	if err == nil {
+		_, err = file.Write(data)
+	}
+	if err == nil {
+		err = file.Sync()
+	}
+	if closeErr := file.Close(); err == nil {
+		err = closeErr
+	}
+	return err
+}
+
+// uvTableHeader reports whether line opens the [tool.uv] table, with any white
+// space around the name parts and an optional trailing comment.
+func uvTableHeader(line string) bool {
+	header, _, _ := strings.Cut(strings.TrimSpace(line), "#")
+	header = strings.TrimSpace(header)
+	if strings.HasPrefix(header, "[[") || !strings.HasPrefix(header, "[") || !strings.HasSuffix(header, "]") {
+		return false
+	}
+	return strings.Join(strings.Fields(strings.Trim(header, "[]")), "") == "tool.uv"
 }
 
 // DiscoverTestFiles walks the project tree finding test_*.py and *_test.py files.
@@ -287,10 +414,17 @@ func formatTOMLArray(items []string) string {
 	return strings.Join(parts, ", ")
 }
 
-// replaceOrAppendSection replaces a regex match in content, or appends the section.
+// replaceOrAppendSection replaces a regex match in content, or appends the
+// section. When pattern has a capture group, the text it captures is the end of
+// the match that does not belong to the section, and is kept after it.
 func replaceOrAppendSection(content string, pattern *regexp.Regexp, section string) (string, bool) {
 	if pattern.MatchString(content) {
-		updated := pattern.ReplaceAllString(content, section)
+		updated := pattern.ReplaceAllStringFunc(content, func(match string) string {
+			if sub := pattern.FindStringSubmatch(match); len(sub) > 1 {
+				return section + sub[1]
+			}
+			return section
+		})
 		return updated, updated != content
 	}
 

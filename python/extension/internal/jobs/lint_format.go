@@ -29,7 +29,8 @@ func LintFormat(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, 
 	wsRoot := ctx.WorkspaceRoot
 	projectRoot := ctx.Project.FullPath
 
-	if !syncWorkspace(wsRoot, emit) {
+	uv, ok := syncWorkspace(wsRoot, emit)
+	if !ok {
 		return "FAILED", nil, nil
 	}
 
@@ -40,7 +41,7 @@ func LintFormat(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, 
 	if !fix {
 		ruffArgs = append(ruffArgs, "--check")
 	}
-	cmdArgs := toolchain.UVRunWithToolArgs("ruff", packageName, projectRoot, ruffArgs...)
+	cmdArgs := toolchain.UVRunWithToolArgs(uv, "ruff", packageName, projectRoot, ruffArgs...)
 
 	emit.PhaseStart("format")
 	output, err := ruffSingleRun(cmdArgs[0], cmdArgs[1:], projectRoot, MakeEnv(wsRoot, projectRoot, nil))

@@ -1,0 +1,20 @@
+5cd5492f5df6b5144a43e2fa32418806fbbff018b8fbee2d8f14f2eb770fc364 *source.tar.gz
+ed336d0ba49db8ef89b2b41fffa372ce63bd032f22a56f001c265891aec32829 *uv-aarch64-apple-darwin.tar.gz
+a7427ea0440bb826b6716d1837ff3d173b8e7d496cb09ee8f456b4e023a2fdcd *uv-aarch64-pc-windows-msvc.zip
+4d4fa08d95b06642e5800df6a22bd71455f23f988269e18da2847971d8c0bf31 *uv-aarch64-unknown-linux-gnu.tar.gz
+d70cdae687feb6aad9a09fe8d686df8c8efaf69a1007fa581379a2025adc10a5 *uv-aarch64-unknown-linux-musl.tar.gz
+43b1c42483d15e94747699b5f718e829144d2b1b117e1c1658742e73d05527a3 *uv-arm-unknown-linux-musleabihf.tar.gz
+593e0f6b92cef908b23e3e3e0da2fd8ae24392afdb70eed05651869fea4a1b02 *uv-armv7-unknown-linux-gnueabihf.tar.gz
+cc169fc42b63970cb0cc10a1658c9833e79a5bfde8915ec5f6f5316d9e0cb95f *uv-armv7-unknown-linux-musleabihf.tar.gz
+e54e814a3963af3af607940f142169312d7550d44db8e2daa2bf6c524554ac3c *uv-i686-pc-windows-msvc.zip
+d4c53923c44dd060a42dbc6b88e349c86676d779b01603329d8c6b8f916e74cd *uv-i686-unknown-linux-gnu.tar.gz
+7704bf0270e1ef8421608c585e8016411a625314125fce473e01446fdcb1fcf3 *uv-i686-unknown-linux-musl.tar.gz
+0afff437b499f5919045fd0095b52dec18d818771f9a6bd0be0ff027b427fb16 *uv-powerpc64le-unknown-linux-gnu.tar.gz
+f10954d2263d407f6ffa6bfdd458d0fc0918f097f851ca3cf4907d4f7ebf2dae *uv-riscv64gc-unknown-linux-gnu.tar.gz
+3c58fc5e82589a77b2409a6c308f1a55361c29130cb3ff239e850d413433f97f *uv-riscv64gc-unknown-linux-musl.tar.gz
+9922ba31cd582f4d762ac88a3cfdf339be599063c689c64c36916f04139ed43d *uv-s390x-unknown-linux-gnu.tar.gz
+77f5ca26c0de20e992a3677a174fe1121ee25c36f9b1434a863f75bf077a05eb *uv-x86_64-apple-darwin.tar.gz
+acfde570451cfdb8689fa159a138ee805ba4e241c466432750302c86254b0984 *uv-x86_64-pc-windows-msvc.zip
+aab924fd522efd06f1c5f3b93a243864fc453132c94b2dc49f1371b528a4b967 *uv-x86_64-unknown-linux-gnu.tar.gz
+1fd052f196108d87e61fc3d98fe06b4ec758c9a1eb1466a6fd1a436fe45885f2 *uv-x86_64-unknown-linux-musl.tar.gz
+

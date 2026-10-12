@@ -2,21 +2,25 @@
 
 - **Status**: accepted
 - **Scope**: the workspace lock's toolchain pins (`tooling/cli` install, init,
-  `projects create`, `deps`, runtime toolchain resolution) and the Go and
-  TypeScript extensions' `workspace-install`
+  `projects create`, `deps`, runtime toolchain resolution) and the Go,
+  TypeScript and Python extensions' `workspace-install`
 
 ## Context
 
 A Putnami job runs with the exact toolchain release the workspace lock pins.
 The pins must reach every workspace that needs them, including a fresh one and
 one whose host has no toolchain installed, and must never name a runtime no
-workflow provisions. Go and Bun are the provisioned runtimes. Producing
+workflow provisions. Go, Bun and uv are the provisioned runtimes. Producing
 Node-compatible output uses Bun's compiler and needs no Node toolchain.
 
 ## Decision
 
-1. **Only Go and Bun are pinned.** The lock writer derives them from `go.work`
-   and `package.json#packageManager`. `package.json#engines.node` is not a
+1. **Only Go, Bun and uv are pinned.** The lock writer derives them from
+   `go.work`, `package.json#packageManager` and the exact `required-version`
+   of the `[tool.uv]` table in the root `pyproject.toml`; a uv range declares
+   nothing. A `pyproject.toml` also serves tools other than uv, so it declares
+   uv only while a declared extension's runtime resolves the `uv` lock
+   identity, as `@putnami/python` does. `package.json#engines.node` is not a
    Putnami toolchain declaration. The workspace protocol still reads Node
    entries in v3/v4 locks; the next refresh drops them. The TypeScript
    extension's `--target node` stays supported: it is a compilation target, not
@@ -47,8 +51,8 @@ Node-compatible output uses Bun's compiler and needs no Node toolchain.
    - `putnami init` ends with the refresh `putnami install` ends with, after
      its last dependency install.
    - An explicit `putnami install` pins, before its installers, each toolchain
-     `go.work` or `package.json#packageManager` declares at a release the lock
-     does not pin, then refreshes at the end.
+     `go.work`, `package.json#packageManager` or the root `pyproject.toml`
+     declares at a release the lock does not pin, then refreshes at the end.
    - The implicit install a command runs in a fresh checkout restores the
      committed lock without a refresh, except that it pins each declared
      toolchain the lock does not pin yet. It keeps every committed entry,
@@ -58,6 +62,10 @@ Node-compatible output uses Bun's compiler and needs no Node toolchain.
    - The TypeScript extension's `workspace-install` writes
      `package.json#packageManager` as `bun@<version>` of the Bun it installs
      with when the workspace declares none.
+   - The Python extension's `workspace-install` writes
+     `required-version = "==<version>"` into the `[tool.uv]` table of the root
+     `pyproject.toml`, for the uv it installs with, when the file declares no
+     `required-version`. A hosted run writes nothing.
 5. **Commands that need `go` use the pinned Go.** `putnami projects create`
    (for a Go template) and `putnami deps add|remove` find the go command the
    way a task finds its run toolchains (`jobs.RunToolchainEnvironment`): the

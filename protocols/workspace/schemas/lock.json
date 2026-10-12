@@ -70,9 +70,9 @@
     },
     "toolchains": {
       "type": "object",
-      "description": "Exact Go and Bun runtime releases with vendor-published per-platform archive digests. Node remains accepted only for compatibility with historical v3/v4 locks; current Putnami writers do not generate it.",
+      "description": "Exact Go, Bun and uv runtime releases with vendor-published per-platform archive digests. Node remains accepted only for compatibility with historical v3/v4 locks; current Putnami writers do not generate it.",
       "propertyNames": {
-        "enum": ["go", "node", "bun"]
+        "enum": ["go", "node", "bun", "uv"]
       },
       "additionalProperties": {
         "type": "object",

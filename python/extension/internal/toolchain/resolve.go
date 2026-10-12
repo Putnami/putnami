@@ -1,24 +1,13 @@
-// Package toolchain provides UV binary resolution and command building
-// for the Putnami Python extension.
+// Package toolchain selects and installs the uv release a workspace pins, and
+// builds the uv commands of the Putnami Python extension.
 package toolchain
 
 import (
-	"fmt"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"go.putnami.dev/sdk/extension/envkeys"
 )
-
-// ResolveUV finds the uv binary in PATH.
-func ResolveUV() (string, error) {
-	path, err := exec.LookPath("uv")
-	if err != nil {
-		return "", fmt.Errorf("'uv' is required but was not found in PATH")
-	}
-	return path, nil
-}
 
 // The variables uv reads for the two directories it writes outside the
 // project: managed Python installations and the package cache.
@@ -77,20 +66,22 @@ func envSetFold(base []string, name string, fold bool) bool {
 	return strings.TrimSpace(envkeys.Keys{Fold: fold}.Last(base, name)) != ""
 }
 
-// UVRunArgs builds a uv run command with standard arguments.
-// Returns: ["uv", "run", "--package", name, "--directory", workspaceRoot, extra...]
-func UVRunArgs(packageName, workspaceRoot string, extra ...string) []string {
+// UVRunArgs builds a uv run command with standard arguments, run by the uv
+// program at uv (see ResolveUV).
+// Returns: [uv, "run", "--package", name, "--directory", workspaceRoot, extra...]
+func UVRunArgs(uv, packageName, workspaceRoot string, extra ...string) []string {
 	args := make([]string, 0, 6+len(extra))
-	args = append(args, "uv", "run", "--package", packageName, "--directory", workspaceRoot)
+	args = append(args, uv, "run", "--package", packageName, "--directory", workspaceRoot)
 	args = append(args, extra...)
 	return args
 }
 
-// UVRunWithToolArgs builds a uv run command that invokes a tool in directory.
-// Returns: ["uv", "run", "--with", tool, "--package", name, "--directory", directory, tool, toolArgs...]
-func UVRunWithToolArgs(tool, packageName, directory string, toolArgs ...string) []string {
+// UVRunWithToolArgs builds a uv run command that invokes a tool in directory,
+// run by the uv program at uv (see ResolveUV).
+// Returns: [uv, "run", "--with", tool, "--package", name, "--directory", directory, tool, toolArgs...]
+func UVRunWithToolArgs(uv, tool, packageName, directory string, toolArgs ...string) []string {
 	args := make([]string, 0, 9+len(toolArgs))
-	args = append(args, "uv", "run", "--with", tool, "--package", packageName, "--directory", directory, tool)
+	args = append(args, uv, "run", "--with", tool, "--package", packageName, "--directory", directory, tool)
 	args = append(args, toolArgs...)
 	return args
 }

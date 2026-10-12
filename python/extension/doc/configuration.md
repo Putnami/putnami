@@ -143,6 +143,53 @@ addopts = "--tb=short"
 
 The extension passes `--cache-dir .putnami/bin/extensions/putnami-python/.pytest_cache` automatically.
 
+## uv Release
+
+Every Python task runs one uv release: the one `putnami.lock.json` pins under
+`toolchains.uv`, with its source and one SHA-256 per platform. The CLI resolves
+it for each task and keys the task's cache on it. It takes the first of these
+that reports the pinned release with `uv self version --short`:
+
+1. `uv` on `PATH`
+2. `toolchains/uv/uv-<version>/uv` under the Putnami home (`PUTNAMI_HOME`,
+   else `~/.putnami`)
+
+A uv of another release is never run. When neither holds the pinned release,
+`putnami install` downloads it from the pinned source, checks its SHA-256, and
+installs it under the Putnami home.
+
+The release comes from the root `pyproject.toml`:
+
+```toml
+[tool.uv]
+required-version = "==0.11.32"
+```
+
+When the file declares no `required-version`, `putnami workspace-install`
+declares the release it installs, 0.11.32 by default. To move to another
+release, change `required-version` and run `putnami install`: it pins the new
+release and installs it.
+
+The declaration must name one exact release, `"==X.Y.Z"`. Putnami refuses
+these, and `putnami install` and every task that runs uv fail with a message
+that names the declaration to write:
+
+| Declaration | Why it is refused |
+|-------------|-------------------|
+| A range or a wildcard, such as `">=0.11"` or `"==0.11.*"` | It names no single release to pin |
+| A value that is not a one-line string | It names no release |
+| A release older than 0.11.8 | An older uv prints more than its release with `uv self version --short`, so Putnami cannot tell which release it runs |
+
+`putnami workspace-install` also refuses a root `pyproject.toml` that writes uv
+settings outside a `[tool.uv]` table header, as dotted keys (`uv.managed = true`
+under `[tool]`) or as an inline table (`uv = { managed = true }`). A
+`[tool.uv]` table added for `required-version` would define the table twice.
+Move those settings into a `[tool.uv]` table.
+
+A workspace that a CLI older than the uv pin installed has no `toolchains.uv`
+in its lock. See
+[Upgrading an existing workspace](./workspace-install.md#upgrading-an-existing-workspace).
+
 ## uv Directories
 
 Every uv command the extension runs writes its managed Python installations and

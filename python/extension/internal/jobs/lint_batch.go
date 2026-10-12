@@ -80,7 +80,8 @@ func runLintBatch(ctx *pctx.Context, emit *jsonl.Emitter, mode string, fix bool)
 	wsRoot := ctx.WorkspaceRoot
 
 	// Synchronize the UV workspace exactly once for the grouped invocation.
-	if !syncWorkspace(wsRoot, emit) {
+	uv, ok := syncWorkspace(wsRoot, emit)
+	if !ok {
 		return "FAILED", nil, nil
 	}
 
@@ -98,9 +99,9 @@ func runLintBatch(ctx *pctx.Context, emit *jsonl.Emitter, mode string, fix bool)
 	var report ruffBatchReport
 	switch mode {
 	case lintBatchFormat:
-		report, err = runRuffFormat(wsRoot, cacheDir, packageName, targets, fix)
+		report, err = runRuffFormat(uv, wsRoot, cacheDir, packageName, targets, fix)
 	case lintBatchCheck:
-		report, err = runRuffCheck(wsRoot, cacheDir, packageName, targets, fix)
+		report, err = runRuffCheck(uv, wsRoot, cacheDir, packageName, targets, fix)
 	default:
 		return "FAILED", nil, fmt.Errorf("unsupported lint batch mode %q", mode)
 	}
@@ -139,13 +140,13 @@ func ruffBatchTargets(projects []pctx.ProjectRef) ([]string, error) {
 
 // runRuffFormat runs `ruff format` once over all targets. Without --fix it adds
 // --check so ruff reports (instead of writing) each file that needs formatting.
-func runRuffFormat(wsRoot, cacheDir, packageName string, targets []string, fix bool) (ruffBatchReport, error) {
+func runRuffFormat(uv, wsRoot, cacheDir, packageName string, targets []string, fix bool) (ruffBatchReport, error) {
 	ruffArgs := append([]string{"format"}, targets...)
 	ruffArgs = append(ruffArgs, "--cache-dir", cacheDir)
 	if !fix {
 		ruffArgs = append(ruffArgs, "--check")
 	}
-	res, err := runRuff(wsRoot, packageName, ruffArgs)
+	res, err := runRuff(uv, wsRoot, packageName, ruffArgs)
 	if err != nil {
 		return ruffBatchReport{}, err
 	}
@@ -166,14 +167,14 @@ func runRuffFormat(wsRoot, cacheDir, packageName string, targets []string, fix b
 // runRuffCheck runs `ruff check --output-format=json` once over all targets.
 // JSON output is required so each finding carries its filename for reliable
 // per-project attribution.
-func runRuffCheck(wsRoot, cacheDir, packageName string, targets []string, fix bool) (ruffBatchReport, error) {
+func runRuffCheck(uv, wsRoot, cacheDir, packageName string, targets []string, fix bool) (ruffBatchReport, error) {
 	ruffArgs := []string{"check", "--output-format=json"}
 	ruffArgs = append(ruffArgs, targets...)
 	ruffArgs = append(ruffArgs, "--cache-dir", cacheDir)
 	if fix {
 		ruffArgs = append(ruffArgs, "--fix")
 	}
-	res, err := runRuff(wsRoot, packageName, ruffArgs)
+	res, err := runRuff(uv, wsRoot, packageName, ruffArgs)
 	if err != nil {
 		return ruffBatchReport{}, err
 	}
@@ -186,8 +187,8 @@ func runRuffCheck(wsRoot, cacheDir, packageName string, targets []string, fix bo
 	return ruffBatchReport{findings: findings, success: res.Success, rawTail: toolchain.TailText(res.Stderr, res.Stdout, 10)}, nil
 }
 
-func runRuff(wsRoot, packageName string, ruffArgs []string) (*exec.Result, error) {
-	cmdArgs := toolchain.UVRunWithToolArgs("ruff", packageName, wsRoot, ruffArgs...)
+func runRuff(uv, wsRoot, packageName string, ruffArgs []string) (*exec.Result, error) {
+	cmdArgs := toolchain.UVRunWithToolArgs(uv, "ruff", packageName, wsRoot, ruffArgs...)
 	return ruffExecRun(cmdArgs[0], cmdArgs[1:], exec.Dir(wsRoot), exec.Env(batchRuffEnv(wsRoot)))
 }
 

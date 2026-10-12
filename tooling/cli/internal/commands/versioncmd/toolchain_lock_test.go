@@ -331,7 +331,7 @@ func TestRefreshToolchainLockReResolvesBunWhenPinDiffers(t *testing.T) {
 func TestReadToolchainDeclarationsRejectsMalformedPackageJSON(t *testing.T) {
 	ws := t.TempDir()
 	mustWriteToolchainTestFile(t, filepath.Join(ws, "package.json"), `{`)
-	_, err := readToolchainDeclarations(ws)
+	_, err := readToolchainDeclarations(ws, func() ([]string, error) { return nil, nil })
 	if err == nil || !strings.Contains(err.Error(), "parse package.json toolchains") {
 		t.Fatalf("error = %v", err)
 	}
@@ -533,13 +533,17 @@ func withToolchainTestEndpoints(t *testing.T, base string) {
 	withToolchainTestHome(t)
 	oldGoDownloads, oldGoSource := goDownloadsURL, goSourceURL
 	oldBunAPI, oldBunRelease := bunReleaseAPIURL, bunReleaseURL
+	oldUvChecksums, oldUvRelease := uvChecksumsURL, uvReleaseURL
 	goDownloadsURL = base + "/go"
 	goSourceURL = base + "/go-downloads/"
 	bunReleaseAPIURL = func(string) string { return base + "/bun" }
 	bunReleaseURL = func(version string) string { return base + "/bun/v" + version + "/" }
+	uvChecksumsURL = func(version string) string { return base + "/uv/" + version + "/sha256.sum" }
+	uvReleaseURL = func(version string) string { return base + "/uv/" + version + "/" }
 	t.Cleanup(func() {
 		goDownloadsURL, goSourceURL = oldGoDownloads, oldGoSource
 		bunReleaseAPIURL, bunReleaseURL = oldBunAPI, oldBunRelease
+		uvChecksumsURL, uvReleaseURL = oldUvChecksums, oldUvRelease
 	})
 }
 

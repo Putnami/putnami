@@ -28,7 +28,8 @@ func LintCheck(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, m
 
 	wsRoot := ctx.WorkspaceRoot
 
-	if !syncWorkspace(wsRoot, emit) {
+	uv, ok := syncWorkspace(wsRoot, emit)
+	if !ok {
 		return "FAILED", nil, nil
 	}
 
@@ -50,7 +51,7 @@ func LintCheck(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, m
 	if fix {
 		ruffArgs = append(ruffArgs, "--fix")
 	}
-	cmdArgs := toolchain.UVRunWithToolArgs("ruff", packageName, wsRoot, ruffArgs...)
+	cmdArgs := toolchain.UVRunWithToolArgs(uv, "ruff", packageName, wsRoot, ruffArgs...)
 
 	emit.PhaseStart("check")
 	result, err := ruffSingleCheckRun(cmdArgs[0], cmdArgs[1:], wsRoot, MakeEnv(wsRoot, wsRoot, nil))

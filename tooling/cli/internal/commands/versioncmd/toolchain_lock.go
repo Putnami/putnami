@@ -11,11 +11,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/uvtoolchain"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
@@ -42,6 +44,10 @@ var (
 	bunReleaseURL = func(version string) string {
 		return "https://github.com/oven-sh/bun/releases/download/bun-v" + version + "/"
 	}
+	// uvChecksumsURL is the checksum file a uv release publishes beside its
+	// archives: one "<sha256> *<archive>" line each.
+	uvChecksumsURL = uvtoolchain.ChecksumsURL
+	uvReleaseURL   = uvtoolchain.ReleaseURL
 )
 
 // SetGoReleaseEndpoints points the Go release index the lock step reads at
@@ -97,9 +103,10 @@ func RefreshLockMetadataWithResult(ctx context.Context, wsRoot, runningVersion s
 	return lockfile.WriteLockFileIfChanged(wsRoot, lf)
 }
 
-// FillMissingToolchainPins pins each toolchain that go.work or
-// package.json#packageManager declares and the existing lock does not pin
-// yet, resolved the way RefreshLockMetadata resolves it. It changes no other
+// FillMissingToolchainPins pins each toolchain that go.work,
+// package.json#packageManager or the [tool.uv] required-version of the root
+// pyproject.toml declares and the existing lock does not pin yet, resolved the
+// way RefreshLockMetadata resolves it. It changes no other
 // entry: a pin that differs from its declaration, a pin a declared extension
 // keeps, and the CLI entry stay as committed. Without a missing pin it reads no
 // metadata and writes nothing, and without a lock it writes none. The implicit
@@ -111,8 +118,9 @@ func FillMissingToolchainPins(ctx context.Context, wsRoot string) (bool, error) 
 	})
 }
 
-// PinDeclaredToolchains pins each toolchain that go.work or
-// package.json#packageManager declares at the release it declares, when the
+// PinDeclaredToolchains pins each toolchain that go.work,
+// package.json#packageManager or the [tool.uv] required-version of the root
+// pyproject.toml declares at the release it declares, when the
 // existing lock pins none or pins another release, resolved the way
 // RefreshLockMetadata resolves it. It changes no other entry. Without a pin to
 // change it reads no metadata and writes nothing, and without a lock it writes
@@ -133,12 +141,12 @@ func pinDeclaredToolchains(ctx context.Context, wsRoot string, repin func(declar
 	if err != nil || lf == nil {
 		return false, err
 	}
-	declared, err := readToolchainDeclarations(wsRoot)
+	declared, err := readToolchainDeclarations(wsRoot, func() ([]string, error) { return extensionToolchainLocks(wsRoot) })
 	if err != nil {
 		return false, err
 	}
 	filled := false
-	for _, name := range []string{"go", "bun"} {
+	for _, name := range lockedToolchainNames {
 		constraint, ok := declared[name]
 		if !ok {
 			continue
@@ -153,6 +161,8 @@ func pinDeclaredToolchains(ctx context.Context, wsRoot string, repin func(declar
 			entry, err = resolveGoToolchain(ctx, wsRoot, constraint)
 		case "bun":
 			entry, err = resolveBunToolchain(ctx, constraint, lockfile.LockEntry{})
+		case "uv":
+			entry, err = resolveUvToolchain(ctx, constraint, lockfile.LockEntry{})
 		}
 		if err != nil {
 			return false, fmt.Errorf("resolve %s toolchain: %w", name, err)
@@ -186,17 +196,17 @@ func sameCLIVersion(a, b string) bool {
 // version, whether or not a project of the toolchain's language exists. Once
 // no declared extension resolves it, the pin is dropped.
 func refreshToolchainLock(ctx context.Context, wsRoot string, lf *lockfile.LockFile) error {
-	declared, err := readToolchainDeclarations(wsRoot)
+	resolvedByExtensions, err := extensionToolchainLocks(wsRoot)
 	if err != nil {
 		return err
 	}
-	resolvedByExtensions, err := extensionToolchainLocks(wsRoot)
+	declared, err := readToolchainDeclarations(wsRoot, func() ([]string, error) { return resolvedByExtensions, nil })
 	if err != nil {
 		return err
 	}
 
 	resolved := make(map[string]lockfile.LockEntry, len(declared))
-	for _, name := range []string{"go", "bun"} {
+	for _, name := range lockedToolchainNames {
 		constraint, ok := declared[name]
 		if !ok {
 			continue
@@ -208,6 +218,9 @@ func refreshToolchainLock(ctx context.Context, wsRoot string, lf *lockfile.LockF
 		case "bun":
 			current, _ := lf.GetToolchain(name)
 			entry, err = resolveBunToolchain(ctx, constraint, current)
+		case "uv":
+			current, _ := lf.GetToolchain(name)
+			entry, err = resolveUvToolchain(ctx, constraint, current)
 		}
 		if err != nil {
 			return fmt.Errorf("resolve %s toolchain: %w", name, err)
@@ -261,7 +274,27 @@ func extensionToolchainLocks(wsRoot string) ([]string, error) {
 	return locks, nil
 }
 
-func readToolchainDeclarations(wsRoot string) (map[string]string, error) {
+// lockedToolchainNames are the runtimes a workspace declaration pins, in the
+// order they are resolved: Go from go.work, Bun from
+// package.json#packageManager, uv from the [tool.uv] required-version of the
+// root pyproject.toml.
+var lockedToolchainNames = []string{"go", "bun", "uv"}
+
+// uvLock is the lock identity of uv, which the runtime of the @putnami/python
+// extension resolves.
+const uvLock = "uv"
+
+// readToolchainDeclarations returns the exact release each runtime of
+// lockedToolchainNames declares in the workspace root, keyed by runtime. A
+// runtime that declares no exact release is absent.
+//
+// A pyproject.toml is not only a uv workspace manifest, so its uv declaration
+// counts only when a declared extension's runtime resolves the uv lock
+// identity: runtimeLocks returns those identities (extensionToolchainLocks),
+// and is called only when the file declares an exact release. A workspace that
+// runs no uv task therefore pins no uv, and never fails on a release Putnami
+// would refuse to pin.
+func readToolchainDeclarations(wsRoot string, runtimeLocks func() ([]string, error)) (map[string]string, error) {
 	declared := make(map[string]string)
 	if f, err := os.Open(filepath.Join(wsRoot, "go.work")); err == nil {
 		s := bufio.NewScanner(f)
@@ -291,6 +324,20 @@ func readToolchainDeclarations(wsRoot string) (map[string]string, error) {
 		return nil, fmt.Errorf("read go.work: %w", err)
 	}
 
+	uvVersion, err := readUvDeclaration(wsRoot)
+	if err != nil {
+		return nil, err
+	}
+	if uvVersion != "" {
+		locks, err := runtimeLocks()
+		if err != nil {
+			return nil, err
+		}
+		if slices.Contains(locks, uvLock) {
+			declared[uvLock] = uvVersion
+		}
+	}
+
 	data, err := os.ReadFile(filepath.Join(wsRoot, "package.json"))
 	if os.IsNotExist(err) {
 		return declared, nil
@@ -310,6 +357,37 @@ func readToolchainDeclarations(wsRoot string) (map[string]string, error) {
 		}
 	}
 	return declared, nil
+}
+
+// MissingPinCause explains why the workspace lock of wsRoot pins no release for
+// the lock identity lock (jobs.MissingPinCause): the uv pin derives from the
+// [tool.uv] required-version of the root pyproject.toml, and when that names no
+// release Putnami can pin, the error names it and the declaration to write
+// (uvtoolchain Declaration.Problem). It returns nil for every other lock
+// identity, and for a declaration `putnami install` pins.
+func MissingPinCause(wsRoot, lock string) error {
+	if lock != uvLock {
+		return nil
+	}
+	declaration, err := uvtoolchain.ReadWorkspaceDeclaration(wsRoot)
+	if err != nil {
+		return err
+	}
+	return declaration.Problem()
+}
+
+// readUvDeclaration returns the uv release the workspace root pyproject.toml
+// declares, or "" when it declares none: the exact required-version of its
+// [tool.uv] table, read by uvtoolchain.ReadWorkspaceDeclaration, which the
+// @putnami/python extension reads it with too. A range, a wildcard or another
+// form pins nothing here; the extension's workspace-install and a task's
+// missing uv pin report it. A missing pyproject.toml declares none.
+func readUvDeclaration(wsRoot string) (string, error) {
+	declaration, err := uvtoolchain.ReadWorkspaceDeclaration(wsRoot)
+	if err != nil {
+		return "", err
+	}
+	return declaration.Version, nil
 }
 
 func higherExactVersion(a, b string) string {
@@ -540,6 +618,38 @@ func resolveBunToolchain(ctx context.Context, version string, current lockfile.L
 	return lockfile.LockEntry{Version: version, Integrities: integrities, Source: bunReleaseURL(version)}, nil
 }
 
+// resolveUvToolchain returns the lock entry of one exact uv release: its
+// version, the release download source, and the SHA-256 of the archive of each
+// platform uvtoolchain.ArchiveFor names, read from the checksum file the
+// release publishes (uvtoolchain.PlatformDigests).
+//
+// A release older than uvtoolchain.MinimumVersion is refused before any
+// request: Putnami cannot tell such a uv by its version probe, and its
+// checksum file lists no archive.
+//
+// A current entry that already pins version with digests and a source is
+// returned as is, without a request, as resolveBunToolchain does: published
+// release archives do not change.
+func resolveUvToolchain(ctx context.Context, version string, current lockfile.LockEntry) (lockfile.LockEntry, error) {
+	if err := uvtoolchain.Supported(version); err != nil {
+		return lockfile.LockEntry{}, fmt.Errorf("%w: declare required-version = \"==%s\" or a later release in the [tool.uv] table of pyproject.toml",
+			err, uvtoolchain.MinimumVersion)
+	}
+	if current.Version == version && len(current.Integrities) > 0 && current.Source != "" {
+		return current, nil
+	}
+	checksums := uvChecksumsURL(version)
+	body, err := get(ctx, checksums)
+	if err != nil {
+		return lockfile.LockEntry{}, err
+	}
+	integrities := uvtoolchain.PlatformDigests(string(body))
+	if len(integrities) == 0 {
+		return lockfile.LockEntry{}, fmt.Errorf("uv %s publishes no SHA-256 for a supported archive in %s", version, checksums)
+	}
+	return lockfile.LockEntry{Version: version, Integrities: integrities, Source: uvReleaseURL(version)}, nil
+}
+
 func supportedPlatform(goos, goarch string) bool {
 	return (goos == "darwin" || goos == "linux" || goos == "windows") &&
 		(goarch == "amd64" || goarch == "arm64")
@@ -596,7 +706,7 @@ func get(ctx context.Context, url string) ([]byte, error) {
 		return nil, fmt.Errorf("build request %s: %w", url, err)
 	}
 	req.Header.Set("Accept", "application/json, text/plain")
-	// Callers pass only package-owned Go and Bun release endpoints. The
+	// Callers pass only package-owned Go, Bun and uv release endpoints. The
 	// client and endpoint vars are replaceable solely as in-process test seams.
 	resp, err := toolchainClient().Do(req) //nolint:gosec // G704: no user-controlled destination
 	if err != nil {

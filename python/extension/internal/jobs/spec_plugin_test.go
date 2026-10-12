@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/python/extension/internal/toolchain"
 )
 
 // The plugin's verdict capture is exercised through a REAL pytest run,
@@ -92,15 +93,21 @@ def test_forgets_to_measure():
     assert True
 `
 
-// skipUnlessPytestResolvable skips a test that needs the workspace's Python
-// environment when uv cannot materialize it. The hosted native DAG runs with
-// no package index (only Go and npm reads are brokered), so `uv run` cannot
-// create the example library's environment there; that is an environment
-// limit, not a plugin defect, and the message names it. Online hosts and hosts
-// with a synced .venv proceed to the real pytest run.
-func skipUnlessPytestResolvable(t *testing.T, repoRoot string) {
+// pytestUV returns the uv the jobs run for repoRoot, the release its lock pins,
+// and skips a test that needs the workspace's Python environment when the
+// machine holds no such uv or the uv cannot materialize the environment. The
+// hosted native DAG runs with no package index (only Go and npm reads are
+// brokered), so `uv run` cannot create the example library's environment
+// there; that is an environment limit, not a plugin defect, and the message
+// names it. Online hosts and hosts with a synced .venv proceed to the real
+// pytest run.
+func pytestUV(t *testing.T, repoRoot string) string {
 	t.Helper()
-	cmd := exec.Command("uv",
+	uv, err := toolchain.ResolveUV(repoRoot)
+	if err != nil {
+		t.Skipf("uv unavailable: %v", err)
+	}
+	cmd := exec.Command(uv,
 		"run", "--package", "py_example_library", "--directory", repoRoot, "--extra", "dev",
 		"python", "-c", "import pytest")
 	cmd.Dir = repoRoot
@@ -108,17 +115,15 @@ func skipUnlessPytestResolvable(t *testing.T, repoRoot string) {
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Skipf("uv cannot resolve the example library's pytest environment here (%v):\n%s", err, output)
 	}
+	return uv
 }
 
 func TestSpecPluginRecordsRealPytestVerdicts(t *testing.T) {
-	if _, err := exec.LookPath("uv"); err != nil {
-		t.Skipf("uv unavailable: %v", err)
-	}
 	repoRoot, err := filepath.Abs("../../../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	skipUnlessPytestResolvable(t, repoRoot)
+	uv := pytestUV(t, repoRoot)
 
 	suiteDir := t.TempDir()
 	suitePath := filepath.Join(suiteDir, "test_spec_plugin.py")
@@ -149,7 +154,7 @@ func TestSpecPluginRecordsRealPytestVerdicts(t *testing.T) {
 
 	extra := map[string]string{}
 	spec.decorateSpecEnv(extra)
-	cmd := exec.Command("uv", cmdArgs...)
+	cmd := exec.Command(uv, cmdArgs...)
 	cmd.Dir = suiteDir
 	cmd.Env = MakeTestEnv(repoRoot, suiteDir, extra)
 	output, runErr := cmd.CombinedOutput()
@@ -277,14 +282,11 @@ func TestSpecPluginRecordsRealPytestVerdicts(t *testing.T) {
 // PYTHONPATH entry, no fragment directory) executes every test exactly as
 // before and writes nothing.
 func TestSpecPluginInertWithoutAdapter(t *testing.T) {
-	if _, err := exec.LookPath("uv"); err != nil {
-		t.Skipf("uv unavailable: %v", err)
-	}
 	repoRoot, err := filepath.Abs("../../../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	skipUnlessPytestResolvable(t, repoRoot)
+	uv := pytestUV(t, repoRoot)
 	suiteDir := t.TempDir()
 	suite := "import pytest\n\n\n@pytest.mark.putnami_proves(\"py/demo\", \"lifecycle\", \"passing-check\")\ndef test_passes():\n    assert True\n"
 	suitePath := filepath.Join(suiteDir, "test_spec_inert.py")
@@ -292,7 +294,7 @@ func TestSpecPluginInertWithoutAdapter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmd := exec.Command("uv",
+	cmd := exec.Command(uv,
 		"run", "--package", "py_example_library", "--directory", repoRoot, "--extra", "dev",
 		"pytest", "-p", "no:cacheprovider", suitePath)
 	cmd.Dir = suiteDir

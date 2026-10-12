@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"fmt"
-	"os/exec"
 
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -17,17 +16,15 @@ func DepsUpgrade(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string,
 		return "OK", nil, nil
 	}
 
-	if !SyncWorkspace(wsRoot, emit) {
+	uv, ok := SyncWorkspace(wsRoot, emit)
+	if !ok {
 		return "FAILED", nil, nil
 	}
 
 	emit.PhaseStart("upgrade")
 
 	// Use uv lock --upgrade to resolve latest versions of all dependencies.
-	cmd := exec.Command("uv", "lock", "--upgrade")
-	cmd.Dir = wsRoot
-	cmd.Env = MakeEnv(wsRoot, wsRoot, nil)
-	output, err := cmd.CombinedOutput()
+	output, err := uvCommandRun(uv, []string{"lock", "--upgrade"}, wsRoot, MakeEnv(wsRoot, wsRoot, nil))
 
 	if err != nil {
 		emit.PhaseEnd("upgrade", "failed")

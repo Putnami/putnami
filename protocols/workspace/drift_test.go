@@ -566,6 +566,41 @@ func assertFieldParity(t *testing.T, typeName string, schemaFields, goFields []s
 	}
 }
 
+// The runtimes a lock may pin live in two places: ValidateLock checks
+// lockToolchainNames, and schemas/lock.json states them as the toolchains
+// propertyNames enum. A runtime added to one and not the other would make the
+// schema and the Go validator disagree on the same lock.
+func TestLockSchemaToolchainNamesAgreeWithTheValidator(t *testing.T) {
+	var schema struct {
+		Properties struct {
+			Toolchains struct {
+				PropertyNames struct {
+					Enum []string `json:"enum"`
+				} `json:"propertyNames"`
+			} `json:"toolchains"`
+		} `json:"properties"`
+	}
+	data, err := os.ReadFile("schemas/lock.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	got := slices.Clone(schema.Properties.Toolchains.PropertyNames.Enum)
+	sort.Strings(got)
+	want := slices.Clone(lockToolchainNames)
+	sort.Strings(want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("schema toolchain names %v, ValidateLock accepts %v", got, want)
+	}
+	for _, name := range []string{"go", "bun", "uv"} {
+		if !slices.Contains(lockToolchainNames, name) {
+			t.Errorf("lock must accept a %q pin: Putnami provisions that runtime", name)
+		}
+	}
+}
+
 // The `cli` entry is the one shape whose rule lives in two places: ValidateLock
 // enforces it in Go, and schemas/lock.json states it as a two-branch `oneOf` for
 // every non-Go consumer. Nothing in this module runs a JSON Schema validator —

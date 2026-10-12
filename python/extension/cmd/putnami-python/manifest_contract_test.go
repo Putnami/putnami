@@ -602,3 +602,49 @@ func TestLintDocsIsKeyedOnTheCandidateCut(t *testing.T) {
 		t.Errorf("lint-docs declares %+v, want no output, no effect and no source rewrite", task.Declares)
 	}
 }
+
+// Every task that runs uv requires the uv runtime toolchain, bound to the uv
+// pin of the workspace lock: the CLI resolves the pinned release for the task,
+// puts it first on PATH, and keys the task's cache on it. A uv found only by a
+// PATH lookup of the extension would run any release and key none.
+func TestUVTasksRequireThePinnedUVToolchain(t *testing.T) {
+	spectest.Proves(t, "python/experimental-workspace-integration", "pinned-uv", "every-uv-task-requires-the-pinned-uv-toolchain")
+	m := loadExtensionManifest(t)
+	if m.Runtime == nil {
+		t.Fatal("the manifest declares no runtime")
+	}
+	uv, ok := m.Runtime.Toolchains["uv"]
+	if !ok {
+		t.Fatal("the runtime declares no uv toolchain")
+	}
+	if uv.Lock != "uv" || uv.Optional || !uv.PrependPath {
+		t.Fatalf("uv toolchain = %+v, want a required toolchain locked on uv that is put first on PATH", uv)
+	}
+	wantCandidates := []proto.RuntimeToolchainCandidate{
+		{From: "path", Path: "uv"},
+		{From: "putnami-home", Path: "toolchains/uv/uv-{version}/uv"},
+	}
+	if !reflect.DeepEqual(uv.Candidates, wantCandidates) {
+		t.Fatalf("uv candidates = %+v, want %+v", uv.Candidates, wantCandidates)
+	}
+	// --color never keeps a FORCE_COLOR in the environment from wrapping the
+	// release in color codes, which would match no release.
+	if !reflect.DeepEqual(uv.Probe.Args, []string{"self", "version", "--short", "--color", "never"}) || uv.Probe.Expect != "{version}" {
+		t.Fatalf("uv probe = %+v, want `uv self version --short --color never` printing exactly the pinned release", uv.Probe)
+	}
+	if len(m.Runtime.RunToolchains) != 0 {
+		t.Fatalf("runToolchains = %v: workspace-sync runs before a uv is pinned and must not require one", m.Runtime.RunToolchains)
+	}
+
+	runsNoUV := map[string]bool{"lint-docs": true, "workspace-sync-exec": true}
+	for _, name := range sortedTaskNames(m) {
+		got := m.Tasks[name].Toolchains
+		want := []string{"uv"}
+		if runsNoUV[name] {
+			want = nil
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("task %s toolchains = %v, want %v", name, got, want)
+		}
+	}
+}

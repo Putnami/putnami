@@ -35,12 +35,13 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	wsRoot := ctx.WorkspaceRoot
 	projectRoot := ctx.Project.FullPath
 
-	if !SyncWorkspace(wsRoot, emit) {
+	uv, ok := SyncWorkspace(wsRoot, emit)
+	if !ok {
 		return "FAILED", nil, nil
 	}
 
 	packageName := ResolvePackageName(ctx)
-	cmdArgs := toolchain.UVRunArgs(packageName, wsRoot, entrypoint)
+	cmdArgs := toolchain.UVRunArgs(uv, packageName, wsRoot, entrypoint)
 
 	extra := map[string]string{}
 	if port > 0 {

@@ -80,15 +80,22 @@ func FileExists(path string) bool {
 	return err == nil
 }
 
-// SyncWorkspace runs the UV workspace sync phase and resolves the UV binary.
-// Returns false if the job should return early (on failure or missing UV).
-func SyncWorkspace(wsRoot string, emit *jsonl.Emitter) (ok bool) {
+// resolveUV returns the uv program the jobs of a workspace run
+// (toolchain.ResolveUV). It is a seam so the jobs can be tested without a uv of
+// the pinned release on the machine.
+var resolveUV = toolchain.ResolveUV
+
+// SyncWorkspace runs the UV workspace sync phase and resolves the uv program
+// of the release the workspace pins (toolchain.ResolveUV), which every uv
+// command of the job then runs. ok is false if the job should return early: the
+// sync failed, or the machine has no uv of that release.
+func SyncWorkspace(wsRoot string, emit *jsonl.Emitter) (uv string, ok bool) {
 	emit.PhaseStart("sync")
 	updated, members, err := workspace.SyncUVWorkspace(wsRoot)
 	if err != nil {
 		emit.PhaseEnd("sync", "failed")
 		emit.Diagnostic("error", fmt.Sprintf("Workspace sync failed: %v", err), "", 0)
-		return false
+		return "", false
 	}
 	if len(members) == 0 {
 		emit.PhaseEnd("sync", "skipped")
@@ -99,9 +106,10 @@ func SyncWorkspace(wsRoot string, emit *jsonl.Emitter) (ok bool) {
 		emit.PhaseEnd("sync", "success")
 	}
 
-	if _, err := toolchain.ResolveUV(); err != nil {
+	uv, err = resolveUV(wsRoot)
+	if err != nil {
 		emit.Diagnostic("error", err.Error(), "", 0)
-		return false
+		return "", false
 	}
-	return true
+	return uv, true
 }

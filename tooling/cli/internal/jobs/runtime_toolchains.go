@@ -402,8 +402,8 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 			if deferred {
 				continue
 			}
-			return fmt.Errorf("resolve extension %q runtime toolchain %q: workspace lock has no exact %q pin: "+
-				"add a project that declares it, or run `putnami install` to record the declared one", ext.Name, ref, requirement.Lock)
+			return fmt.Errorf("resolve extension %q runtime toolchain %q: workspace lock has no exact %q pin: %s",
+				ext.Name, ref, requirement.Lock, missingPinAdvice(workspaceRoot, requirement.Lock))
 		}
 		integrity := entry.IntegrityFor(runtime.GOOS, runtime.GOARCH)
 		if strings.TrimSpace(integrity) == "" {

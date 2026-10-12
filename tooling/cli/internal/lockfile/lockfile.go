@@ -124,8 +124,9 @@ type LockFile struct {
 	// extensions; note the CLI digest is of the binary, whereas an extension's
 	// is of its download archive.
 	CLI *LockEntry `json:"cli,omitempty"`
-	// Toolchains maps runtime names (go, node, bun) to exact, independently
-	// materializable release entries. It is lock format v3 vocabulary.
+	// Toolchains maps runtime names (go, bun, uv, and node in older locks) to
+	// exact, independently materializable release entries. It is lock format
+	// v3 vocabulary.
 	Toolchains map[string]LockEntry `json:"toolchains,omitempty"`
 	// Extensions maps extension names to their resolved entries.
 	Extensions map[string]LockEntry `json:"extensions"`
