@@ -75,6 +75,22 @@ func TestManifestExercisesTheV3TaskContract(t *testing.T) {
 	}
 }
 
+// bin/prepare compiles the runtime with Go. Without a prepare toolchain bound
+// to the `go` lock entry, the CLI passes no GOROOT and the script takes the
+// first `go` on PATH: a host with no Go, or an older one, fails the install.
+func TestPrepareBuildsWithTheLockedGo(t *testing.T) {
+	m := loadExtensionManifest(t)
+	if m.Runtime == nil || m.Runtime.Prepare == nil {
+		t.Fatal("the manifest declares no runtime prepare step")
+	}
+	for _, name := range m.Runtime.Prepare.Toolchains {
+		if m.Runtime.Toolchains[name].Lock == "go" {
+			return
+		}
+	}
+	t.Fatalf("prepare toolchains = %v; want one bound to the \"go\" lock entry", m.Runtime.Prepare.Toolchains)
+}
+
 // Ruff and pytest resolve the shared uv workspace. The root pyproject.toml and
 // uv.lock therefore belong in WorkspaceFiles, not in project-relative patterns
 // whose leading slash still resolves under each project root.
