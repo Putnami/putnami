@@ -19,8 +19,8 @@
 # token for each run, and it is not a repository secret.
 #
 # On a pull request the gate also checks that the squash commit keeps the
-# breaking marker the commits of the change declare. See the "Run the gate"
-# step.
+# breaking marker the commits of the change declare, and that it names no
+# agent. See the "Run the gate" step.
 name: Contributor CI (without credentials)
 
 # A draft pull request runs nothing: every proposal opens as a draft when work
@@ -256,7 +256,8 @@ jobs:
       #
       # On a pull request, PUTNAMI_PROPOSAL_MESSAGE carries the squash commit
       # message: the breaking-marker step of `validate-workspace` fails when a
-      # commit of the change declares a breaking change that the message drops.
+      # commit of the change declares a breaking change that the message drops,
+      # and the agent-attribution step fails when the message names an agent.
       # This repository squashes with the pull request title and body, so the
       # message is the title, a blank line and the body. Title and body are
       # untrusted text, so they reach the script through env and never through

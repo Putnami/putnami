@@ -13,16 +13,17 @@
 //
 // Jobs (the DAG's):
 //
-//	selfcheck                Report the runtime and the job context this extension receives
-//	features-validate        Validate one project's durable feature manifest and its evidence
-//	specs-validate           Validate one project's specs against the features they detail
-//	specs-ratchet-validate   Compare the enforced-spec floor against the committed baseline
-//	architecture-validate    Validate the workspace's ARC/DARC declarations and project graph
-//	decisions-validate       Prove the workspace's committed decisions.json registries against the worktree
-//	recipes-validate         Check every <lang>/samples/recipes.json against the worktree
-//	codeowners-sync          Write .github/CODEOWNERS from the owners each putnami.json declares
-//	docs-links-validate      Check the links of every README.md file and doc/ tree of the workspace
-//	breaking-marker-validate Check that the proposed squash commit keeps the breaking marker its commits declare
+//	selfcheck                  Report the runtime and the job context this extension receives
+//	features-validate          Validate one project's durable feature manifest and its evidence
+//	specs-validate             Validate one project's specs against the features they detail
+//	specs-ratchet-validate     Compare the enforced-spec floor against the committed baseline
+//	architecture-validate      Validate the workspace's ARC/DARC declarations and project graph
+//	decisions-validate         Prove the workspace's committed decisions.json registries against the worktree
+//	recipes-validate           Check every <lang>/samples/recipes.json against the worktree
+//	codeowners-sync            Write .github/CODEOWNERS from the owners each putnami.json declares
+//	docs-links-validate        Check the links of every README.md file and doc/ tree of the workspace
+//	breaking-marker-validate   Check that the proposed squash commit keeps the breaking marker its commits declare
+//	agent-attribution-validate Check that the proposed squash commit names no agent, when the workspace forbids it
 //
 // Command groups (the interactive surface):
 //
@@ -78,16 +79,17 @@ var runtimeVersion string
 // table to the manifest without one test's mutation reaching another's.
 func commandHandlers() map[string]cli.JobFunc {
 	return map[string]cli.JobFunc{
-		"selfcheck":                runSelfcheck,
-		"features-validate":        runFeaturesValidate,
-		"specs-validate":           runSpecsValidate,
-		"specs-ratchet-validate":   runSpecsRatchetValidate,
-		"architecture-validate":    runArchitectureValidate,
-		"decisions-validate":       runDecisionsValidate,
-		"recipes-validate":         runRecipesValidate,
-		"codeowners-sync":          runCodeownersSync,
-		"docs-links-validate":      runDocsLinksValidate,
-		"breaking-marker-validate": runBreakingMarkerValidate,
+		"selfcheck":                  runSelfcheck,
+		"features-validate":          runFeaturesValidate,
+		"specs-validate":             runSpecsValidate,
+		"specs-ratchet-validate":     runSpecsRatchetValidate,
+		"architecture-validate":      runArchitectureValidate,
+		"decisions-validate":         runDecisionsValidate,
+		"recipes-validate":           runRecipesValidate,
+		"codeowners-sync":            runCodeownersSync,
+		"docs-links-validate":        runDocsLinksValidate,
+		"breaking-marker-validate":   runBreakingMarkerValidate,
+		"agent-attribution-validate": runAgentAttributionValidate,
 	}
 }
 
