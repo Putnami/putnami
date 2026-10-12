@@ -548,13 +548,15 @@ rm -r "$TEST_DIR/work/internal"
 git -C "$TEST_DIR/work" branch -q -D fix/title-scope
 assert_no_proposal
 
-# The body is the squash commit message: no heading, no agent trailer or
-# "Generated with" line, and no longer than the policy allows. Each is refused
+# The body is the squash commit message: no heading, no agent trailer,
+# "Generated with" line or session link, and no longer than the policy allows. Each is refused
 # before the gate.
 printf '## Summary\n\nThe finalizer keeps the body plain.\n' >"$TEST_DIR/heading-body.md"
 printf 'The finalizer keeps the body plain.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n' >"$TEST_DIR/trailer-body.md"
 printf 'The finalizer keeps the body plain.\n\n\xf0\x9f\xa4\x96 Generated with [Claude Code](https://claude.com/claude-code)\n' >"$TEST_DIR/generated-body.md"
-for case_body in heading:"carries no markdown heading" trailer:"names an agent" generated:"names an agent"; do
+printf 'The finalizer keeps the body plain.\n\nhttps://claude.ai/code/session_012hURJ5SRvzZrxxzWyRUEY9\n' >"$TEST_DIR/session-body.md"
+printf 'The finalizer keeps the body plain.\n\nClaude-Session: https://example.com/run\n' >"$TEST_DIR/session-trailer-body.md"
+for case_body in heading:"carries no markdown heading" trailer:"names an agent" generated:"names an agent" session:"names an agent" session-trailer:"names an agent"; do
   name="${case_body%%:*}"
   if finalize --title "fix(test): portable finalizer" --body-file "$TEST_DIR/$name-body.md" \
     --proof-status passed --proof "real harness observed the expected behavior" \

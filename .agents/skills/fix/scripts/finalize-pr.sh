@@ -289,8 +289,9 @@ if grep -Eq '^#{1,6}[[:space:]]' "$BODY_FILE"; then
 fi
 
 # No published text names an agent: no Co-Authored-By trailer or "Generated
-# with" line for a model or an agent host. A human co-author stays allowed.
-AGENT_MARKER='^[[:space:]]*co-authored-by:.*(anthropic|openai|claude|codex|gpt-[0-9])|generated (with|by) \[?(claude|codex|chatgpt|openai|anthropic)'
+# with" line for a model or an agent host, and no link to an agent's session.
+# A human co-author stays allowed.
+AGENT_MARKER='^[[:space:]]*co-authored-by:.*(anthropic|openai|claude|codex|gpt-[0-9])|generated (with|by) \[?(claude|codex|chatgpt|openai|anthropic)|claude\.ai/code/session_|^[[:space:]]*claude-session:|chatgpt\.com/codex/'
 # grep reads its whole input: one that stopped at the first match would leave
 # the writer to die of SIGPIPE, and pipefail would end the run without a word.
 agent_marker_in() {

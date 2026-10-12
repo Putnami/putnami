@@ -217,6 +217,24 @@
           }
         },
         {
+          "id": "squash-names-no-agent",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-signature-fails-naming-the-line",
+              "technical-text-passes",
+              "an-allowing-workspace-passes-with-a-note",
+              "an-unset-message-passes-with-a-note",
+              "an-invalid-option-fails",
+              "the-step-is-never-served-from-cache"
+            ]
+          }
+        },
+        {
           "id": "authoring-never-grants-a-permission",
           "stage": "coded",
           "evidenceKinds": [
