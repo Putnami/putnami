@@ -715,9 +715,10 @@ outlive the owner's execution has to be ceded by the owner. The TypeScript
 its JSON Schema companion, which `config-extract` writes when
 `options.generate.schema=false`, so a build keeps them.
 
-A task of another session in the same worktree that reads an owned directory
-while its owner runs can see it empty. The task-output locks order writers
-across sessions, not readers.
+A reader in another session that takes no task-output lock, such as a
+development server, can see an owned directory empty while its owner runs. A
+task that declares a read of the resource the owner writes holds a shared lock
+on the owner's key, so it waits for the owner's run to end.
 
 Four outputs are not emptied:
 
