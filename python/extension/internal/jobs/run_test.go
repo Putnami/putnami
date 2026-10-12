@@ -4,10 +4,10 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 
 	"os"
-	osexec "os/exec"
 	"path/filepath"
 	"testing"
 
+	"go.putnami.dev/python/extension/internal/toolchain"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
@@ -55,10 +55,10 @@ func TestRun_ForwardsExitCodeInData(t *testing.T) {
 	// Without uv the workspace sync fails before the workload starts, so the
 	// job reports FAILED with no result data and there is no exit code to
 	// forward.
-	if _, err := osexec.LookPath("uv"); err != nil {
+	tmp := setupPythonWorkspace(t, "runpkg")
+	if _, err := toolchain.ResolveUV(tmp); err != nil {
 		t.Skipf("uv unavailable: %v", err)
 	}
-	tmp := setupPythonWorkspace(t, "runpkg")
 	pkgDir := filepath.Join(tmp, "pkg")
 
 	// A workload that exits non-zero must surface its exact code in result data

@@ -20,6 +20,8 @@ func TestLockVersionCompatibilityMatrix(t *testing.T) {
 		{"v3 cannot claim v4 field", `{"version":3,"extensions":{},"templates":{},"agentArtifacts":{}}`, "field-version"},
 		{"v4 section is optional when empty", `{"version":4,"extensions":{},"templates":{}}`, ""},
 		{"v4 current", `{"version":4,"extensions":{},"templates":{},"agentArtifacts":{}}`, ""},
+		{"v4 uv pin is accepted", `{"version":4,"toolchains":{"uv":{"version":"0.11.32","integrities":{"darwin/arm64":"ed336d0ba49db8ef89b2b41fffa372ce63bd032f22a56f001c265891aec32829"},"source":"https://github.com/astral-sh/uv/releases/download/0.11.32/"}},"extensions":{},"templates":{},"agentArtifacts":{}}`, ""},
+		{"v4 unknown runtime is rejected", `{"version":4,"toolchains":{"deno":{"version":"2.0.0","integrities":{"linux/amd64":"digest"},"source":"https://example.test/"}},"extensions":{},"templates":{},"agentArtifacts":{}}`, "unsupported-toolchain"},
 		{"v4 legacy Node pin remains readable", `{"version":4,"toolchains":{"node":{"version":"22.8.0","integrities":{"linux/amd64":"digest"},"source":"https://nodejs.org/dist/v22.8.0/"}},"extensions":{},"templates":{},"agentArtifacts":{}}`, ""},
 	}
 	for _, tc := range tests {

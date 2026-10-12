@@ -39,7 +39,8 @@ func Test(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[st
 	wsRoot := ctx.WorkspaceRoot
 	projectRoot := ctx.Project.FullPath
 
-	if !syncWorkspaceFn(wsRoot, emit) {
+	uv, ok := syncWorkspaceFn(wsRoot, emit)
+	if !ok {
 		return "FAILED", nil, nil
 	}
 
@@ -58,7 +59,7 @@ func Test(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[st
 	cacheDir := filepath.Join(wsRoot, ".putnami/bin/extensions/putnami-python/.pytest_cache")
 
 	cmdArgs := []string{
-		"uv", "run",
+		uv, "run",
 		"--package", packageName,
 		"--directory", wsRoot,
 		"--extra", "dev",

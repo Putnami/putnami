@@ -18,7 +18,8 @@ framework.
 ## Requirements and opt-in
 
 - Python 3.11+
-- [UV](https://astral.sh/uv/) in PATH
+- No uv on the machine: `putnami install` installs the uv release the
+  workspace lock pins (see [doc/configuration.md](./doc/configuration.md#uv-release))
 - An explicit workspace opt-in: `putnami deps add @putnami/python`, followed
   by `putnami extensions install`
 

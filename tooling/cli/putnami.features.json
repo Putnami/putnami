@@ -1553,7 +1553,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "only-go-and-bun-declarations-are-locked"
+              "only-go-and-bun-declarations-are-locked",
+              "only-an-exact-tool-uv-required-version-is-locked"
             ]
           }
         },
@@ -1566,7 +1567,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "go-and-bun-pins-carry-version-source-and-digests"
+              "go-and-bun-pins-carry-version-source-and-digests",
+              "uv-pins-carry-version-source-and-digests"
             ]
           }
         },
@@ -2043,7 +2045,8 @@
             "checks": [
               "a-mismatching-ambient-binary-is-never-substituted",
               "an-optional-mismatch-publishes-an-empty-binding",
-              "a-first-party-bun-runtime-resolves-the-install-under-the-putnami-home"
+              "a-first-party-bun-runtime-resolves-the-install-under-the-putnami-home",
+              "a-first-party-uv-runtime-resolves-the-install-under-the-putnami-home"
             ]
           }
         },

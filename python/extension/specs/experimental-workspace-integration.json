@@ -27,6 +27,10 @@
       "text": "The extension delegates Python dependency, lint, test, and workload execution to uv, Ruff, pytest, and the configured application entrypoint, exposing their result through Putnami jobs."
     },
     {
+      "id": "pinned-uv",
+      "text": "Every task that runs uv requires the uv runtime toolchain bound to the uv pin of the workspace lock, so it runs and is cache-keyed on that release: uv on PATH, then toolchains/uv/uv-<version> under the Putnami home, and a uv of another release never runs. workspace-install installs the pinned release there when the machine holds none, refuses an archive whose SHA-256 differs, and declares the release as the [tool.uv] required-version of the root pyproject.toml; a hosted run installs and writes nothing."
+    },
+    {
       "id": "experimental-boundary",
       "text": "The extension's support status is experimental, non-default, and unsupported for parity; upgrade documentation must not imply a supported Python framework release set."
     }

@@ -143,6 +143,34 @@ addopts = "--tb=short"
 
 The extension passes `--cache-dir .putnami/bin/extensions/putnami-python/.pytest_cache` automatically.
 
+## uv Release
+
+Every Python task runs one uv release: the one `putnami.lock.json` pins under
+`toolchains.uv`, with its source and one SHA-256 per platform. The CLI resolves
+it for each task and keys the task's cache on it. It takes the first of these
+that reports the pinned release with `uv self version --short`:
+
+1. `uv` on `PATH`
+2. `toolchains/uv/uv-<version>/uv` under the Putnami home (`PUTNAMI_HOME`,
+   else `~/.putnami`)
+
+A uv of another release is never run. When neither holds the pinned release,
+`putnami install` downloads it from the pinned source, checks its SHA-256, and
+installs it under the Putnami home.
+
+The release comes from the root `pyproject.toml`:
+
+```toml
+[tool.uv]
+required-version = "==0.11.32"
+```
+
+Only an exact release counts; a range such as `">=0.11"` pins nothing. When
+the file declares no `required-version`, `putnami workspace-install` declares
+the release it installs, 0.11.32 by default. To move to another release, change
+`required-version` and run `putnami install`: it pins the new release and
+installs it.
+
 ## uv Directories
 
 Every uv command the extension runs writes its managed Python installations and

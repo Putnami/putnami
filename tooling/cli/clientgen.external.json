@@ -25,7 +25,7 @@
       "reason": "Asks the @latest endpoint of the module proxies GOPROXY names, or of the module origin a go-import mod tag names, for the go.putnami.dev/app version a scaffolded project pins, as the go command does. The wire contract belongs to the Go module proxy protocol, so no Putnami provider declaration can generate this client."
     },
     {
-      "authority": "go.dev release index and the GitHub REST releases API (docs.github.com/rest/releases)",
+      "authority": "go.dev release index, the GitHub REST releases API (docs.github.com/rest/releases) and the sha256.sum checksum file of a GitHub release download",
       "adapter": "tooling/cli/internal/commands/versioncmd/toolchain_lock.go",
       "callsites": [
         {
@@ -39,7 +39,7 @@
       "tests": [
         "tooling/cli/internal/commands/versioncmd/toolchain_lock_test.go"
       ],
-      "reason": "Reads the published Go and Bun toolchain releases the lock pins."
+      "reason": "Reads the published Go, Bun and uv toolchain releases the lock pins."
     },
     {
       "authority": "Putnami platform endpoints (protocols/platform: /readyz, /version) and the putnami.http-routes.v1 routes of the workload under qualification, reached at the base URL the user names with --target",

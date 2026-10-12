@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "cli/toolchain-lock",
   "outcomes": [
-    "A workspace install records exact Go and Bun releases with vendor sources and per-platform SHA-256 digests",
+    "A workspace install records exact Go, Bun and uv releases with vendor sources and per-platform SHA-256 digests",
     "A package.json engines.node declaration neither creates a toolchain pin nor causes a Node metadata request",
     "Refreshing toolchain metadata removes stale runtime entries that Putnami does not provision",
     "Historical v3/v4 Node pins remain readable until that explicit refresh",
@@ -22,15 +22,15 @@
   "requirements": [
     {
       "id": "supported-runtimes-only",
-      "text": "Toolchain refresh derives entries only from go.work and package.json#packageManager when it names Bun. It ignores package.json#engines.node, contacts no Node release endpoint, and replaces the toolchain map so a stale Node entry no declared extension resolves cannot survive. Historical v3/v4 Node pins remain readable before that refresh."
+      "text": "Toolchain refresh derives entries only from go.work, package.json#packageManager when it names Bun, and an exact required-version in the [tool.uv] table of the root pyproject.toml. It ignores package.json#engines.node, contacts no Node release endpoint, and replaces the toolchain map so a stale Node entry no declared extension resolves cannot survive. Historical v3/v4 Node pins remain readable before that refresh."
     },
     {
       "id": "verified-release-metadata",
-      "text": "Every generated Go or Bun toolchain entry carries an exact version, its vendor release source, and at least one vendor-published SHA-256 digest keyed by os/arch."
+      "text": "Every generated Go, Bun or uv toolchain entry carries an exact version, its vendor release source, and at least one vendor-published SHA-256 digest keyed by os/arch."
     },
     {
       "id": "extension-resolved-pins-survive",
-      "text": "When no go.work or package.json declaration derives a toolchain, the refresh keeps the committed pin verbatim while a declared extension's runtime resolves its lock identity: through a task, runToolchains, or the prepare step of a local source. It makes no metadata request for it. Once no declared extension resolves it, the refresh drops the pin."
+      "text": "When no go.work, package.json or pyproject.toml declaration derives a toolchain, the refresh keeps the committed pin verbatim while a declared extension's runtime resolves its lock identity: through a task, runToolchains, or the prepare step of a local source. It makes no metadata request for it. Once no declared extension resolves it, the refresh drops the pin."
     },
     {
       "id": "init-records-pins",
@@ -38,7 +38,7 @@
     },
     {
       "id": "implicit-install-fills-missing-pins",
-      "text": "The first-use install a command runs implicitly pins each toolchain go.work or package.json#packageManager declares that the lock does not pin yet, with the same verified release metadata. It keeps every other entry as committed, stamps no CLI protocol, and creates no lock. Without a missing pin it reads no release metadata and writes nothing."
+      "text": "The first-use install a command runs implicitly pins each toolchain go.work, package.json#packageManager or the root pyproject.toml [tool.uv] required-version declares that the lock does not pin yet, with the same verified release metadata. It keeps every other entry as committed, stamps no CLI protocol, and creates no lock. Without a missing pin it reads no release metadata and writes nothing."
     },
     {
       "id": "create-installs-a-missing-go",
@@ -58,7 +58,7 @@
     },
     {
       "id": "install-pins-before-installers",
-      "text": "An explicit putnami install pins each toolchain go.work or package.json#packageManager declares, at the declared release, when the lock pins none or another release, before any workspace installer runs, so the installers install the release the lock pins. A failed pin stops the install before the installers run. The implicit first-use install still only fills a missing pin."
+      "text": "An explicit putnami install pins each toolchain go.work, package.json#packageManager or the root pyproject.toml [tool.uv] required-version declares, at the declared release, when the lock pins none or another release, before any workspace installer runs, so the installers install the release the lock pins. A failed pin stops the install before the installers run. The implicit first-use install still only fills a missing pin."
     },
     {
       "id": "deps-run-the-pinned-go",

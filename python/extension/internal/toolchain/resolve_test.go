@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -63,6 +64,11 @@ func TestUVDirEnv(t *testing.T) {
 	})
 }
 
+// testUVProgram is the uv program the command builders are given. A command
+// that starts with a bare "uv" would run whichever uv PATH holds first, not
+// the release the workspace pins.
+const testUVProgram = "/home/user/.putnami/toolchains/uv/uv-0.11.32/uv"
+
 func TestUVRunArgs(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -76,34 +82,34 @@ func TestUVRunArgs(t *testing.T) {
 			packageName:   "mypackage",
 			workspaceRoot: "/workspace",
 			extra:         nil,
-			want:          []string{"uv", "run", "--package", "mypackage", "--directory", "/workspace"},
+			want:          []string{testUVProgram, "run", "--package", "mypackage", "--directory", "/workspace"},
 		},
 		{
 			name:          "with single extra arg",
 			packageName:   "mypackage",
 			workspaceRoot: "/workspace",
 			extra:         []string{"pytest"},
-			want:          []string{"uv", "run", "--package", "mypackage", "--directory", "/workspace", "pytest"},
+			want:          []string{testUVProgram, "run", "--package", "mypackage", "--directory", "/workspace", "pytest"},
 		},
 		{
 			name:          "with multiple extra args",
 			packageName:   "mypackage",
 			workspaceRoot: "/home/user/project",
 			extra:         []string{"pytest", "-v", "--tb=short"},
-			want:          []string{"uv", "run", "--package", "mypackage", "--directory", "/home/user/project", "pytest", "-v", "--tb=short"},
+			want:          []string{testUVProgram, "run", "--package", "mypackage", "--directory", "/home/user/project", "pytest", "-v", "--tb=short"},
 		},
 		{
 			name:          "package name with dashes",
 			packageName:   "my-cool-package",
 			workspaceRoot: "/ws",
 			extra:         []string{},
-			want:          []string{"uv", "run", "--package", "my-cool-package", "--directory", "/ws"},
+			want:          []string{testUVProgram, "run", "--package", "my-cool-package", "--directory", "/ws"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := UVRunArgs(tt.packageName, tt.workspaceRoot, tt.extra...)
+			got := UVRunArgs(testUVProgram, tt.packageName, tt.workspaceRoot, tt.extra...)
 			if len(got) != len(tt.want) {
 				t.Fatalf("UVRunArgs() len=%d, want len=%d\ngot:  %v\nwant: %v", len(got), len(tt.want), got, tt.want)
 			}
@@ -131,7 +137,7 @@ func TestUVRunWithToolArgs(t *testing.T) {
 			packageName:   "mypackage",
 			workspaceRoot: "/workspace",
 			toolArgs:      []string{"format", "--check"},
-			want:          []string{"uv", "run", "--with", "ruff", "--package", "mypackage", "--directory", "/workspace", "ruff", "format", "--check"},
+			want:          []string{testUVProgram, "run", "--with", "ruff", "--package", "mypackage", "--directory", "/workspace", "ruff", "format", "--check"},
 		},
 		{
 			name:          "ruff check with fix",
@@ -139,7 +145,7 @@ func TestUVRunWithToolArgs(t *testing.T) {
 			packageName:   "mypkg",
 			workspaceRoot: "/ws",
 			toolArgs:      []string{"check", "--fix"},
-			want:          []string{"uv", "run", "--with", "ruff", "--package", "mypkg", "--directory", "/ws", "ruff", "check", "--fix"},
+			want:          []string{testUVProgram, "run", "--with", "ruff", "--package", "mypkg", "--directory", "/ws", "ruff", "check", "--fix"},
 		},
 		{
 			name:          "tool without extra args",
@@ -147,13 +153,13 @@ func TestUVRunWithToolArgs(t *testing.T) {
 			packageName:   "pkg",
 			workspaceRoot: "/root",
 			toolArgs:      nil,
-			want:          []string{"uv", "run", "--with", "black", "--package", "pkg", "--directory", "/root", "black"},
+			want:          []string{testUVProgram, "run", "--with", "black", "--package", "pkg", "--directory", "/root", "black"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := UVRunWithToolArgs(tt.tool, tt.packageName, tt.workspaceRoot, tt.toolArgs...)
+			got := UVRunWithToolArgs(testUVProgram, tt.tool, tt.packageName, tt.workspaceRoot, tt.toolArgs...)
 			if len(got) != len(tt.want) {
 				t.Fatalf("UVRunWithToolArgs() len=%d, want len=%d\ngot:  %v\nwant: %v", len(got), len(tt.want), got, tt.want)
 			}
@@ -249,41 +255,54 @@ func TestTailText(t *testing.T) {
 	}
 }
 
-func TestResolveUV_NotInPath(t *testing.T) {
-	// Temporarily set PATH to an empty temp dir so uv won't be found
-	tmpDir := t.TempDir()
-	originalPath := os.Getenv("PATH")
-	t.Cleanup(func() { os.Setenv("PATH", originalPath) })
-	os.Setenv("PATH", tmpDir)
+// writeUVScript puts on a new PATH a uv that answers the version probe with
+// release, and fails on any other command line.
+func writeUVScript(t *testing.T, release string) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("a shell script is not a program on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "uv")
+	script := "#!/bin/sh\n" +
+		"if [ \"$*\" = \"self version --short --color never\" ]; then echo " + release + "; exit 0; fi\n" +
+		"echo \"unexpected: $*\" >&2\nexit 2\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("PUTNAMI_HOME", t.TempDir())
+	return path
+}
 
-	_, err := ResolveUV()
+// A uv on PATH is not the workspace's uv because PATH holds it: only a uv that
+// reports the wanted release is.
+func TestResolveUV_RefusesAUVOfAnotherReleaseOnPath(t *testing.T) {
+	path := writeUVScript(t, "0.5.18")
+	got, err := ResolveUV(t.TempDir())
 	if err == nil {
-		t.Error("ResolveUV() expected error when uv not in PATH, got nil")
+		t.Fatalf("ResolveUV() = %q, want an error for the uv 0.5.18 on PATH", got)
+	}
+	if !strings.Contains(err.Error(), path+" (uv 0.5.18)") || !strings.Contains(err.Error(), "`putnami install`") {
+		t.Errorf("the error does not name the uv it passed over and `putnami install`: %v", err)
 	}
 }
 
-func TestResolveUV_InPath(t *testing.T) {
-	// Create a fake uv binary in a temp dir, under the name PATH lookup finds
-	// on this host: Windows looks only for the extensions PATHEXT lists.
-	tmpDir := t.TempDir()
-	name := "uv"
-	if runtime.GOOS == "windows" {
-		name = "uv.exe"
-	}
-	uvPath := filepath.Join(tmpDir, name)
-	if err := os.WriteFile(uvPath, []byte("#!/bin/sh\necho uv"), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	originalPath := os.Getenv("PATH")
-	t.Cleanup(func() { os.Setenv("PATH", originalPath) })
-	os.Setenv("PATH", tmpDir+string(os.PathListSeparator)+originalPath)
-
-	got, err := ResolveUV()
+func TestResolveUV_FindsTheWantedReleaseOnPath(t *testing.T) {
+	path := writeUVScript(t, DefaultUVVersion)
+	got, err := ResolveUV(t.TempDir())
 	if err != nil {
 		t.Fatalf("ResolveUV() unexpected error: %v", err)
 	}
-	if got != uvPath {
-		t.Errorf("ResolveUV() = %q, want the uv first on PATH %q", got, uvPath)
+	if got != path {
+		t.Errorf("ResolveUV() = %q, want the uv on PATH %q", got, path)
+	}
+}
+
+func TestResolveUV_NoUV(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("PUTNAMI_HOME", t.TempDir())
+	if got, err := ResolveUV(t.TempDir()); err == nil {
+		t.Fatalf("ResolveUV() = %q, want an error when no uv exists", got)
 	}
 }

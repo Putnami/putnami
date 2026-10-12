@@ -58,6 +58,23 @@
           }
         },
         {
+          "id": "pinned-uv",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-uv-task-requires-the-pinned-uv-toolchain",
+              "a-uv-of-another-release-never-runs",
+              "workspace-install-provisions-the-pinned-uv-and-declares-it",
+              "a-uv-archive-that-fails-its-digest-is-refused",
+              "a-hosted-run-installs-no-uv"
+            ]
+          }
+        },
+        {
           "id": "experimental-boundary",
           "stage": "coded",
           "evidenceKinds": [

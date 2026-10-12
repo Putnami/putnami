@@ -123,14 +123,11 @@ func declarationLine(t *testing.T, source, function string) int {
 }
 
 func TestTestCasePluginRecordsRealPytestCases(t *testing.T) {
-	if _, err := exec.LookPath("uv"); err != nil {
-		t.Skipf("uv unavailable: %v", err)
-	}
 	repoRoot, err := filepath.Abs("../../../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	skipUnlessPytestResolvable(t, repoRoot)
+	uv := pytestUV(t, repoRoot)
 
 	wsRoot := t.TempDir()
 	suitePath := filepath.Join(wsRoot, "pkg", "tests", "test_cases.py")
@@ -167,7 +164,7 @@ func TestTestCasePluginRecordsRealPytestCases(t *testing.T) {
 	cmdArgs = append(cmdArgs, suitePath, inheritedPath)
 	extra := map[string]string{}
 	sink.decorateEnv(extra)
-	cmd := exec.Command("uv", cmdArgs...)
+	cmd := exec.Command(uv, cmdArgs...)
 	cmd.Dir = wsRoot
 	cmd.Env = MakeTestEnv(repoRoot, wsRoot, extra)
 	output, runErr := cmd.CombinedOutput()
@@ -278,14 +275,11 @@ func TestTestCasePluginRecordsRealPytestCases(t *testing.T) {
 // without PUTNAMI_TEST_CASES_FILE, the plugin registers nothing and pytest
 // runs the suite exactly as before.
 func TestTestCasePluginInertWithoutCasesFile(t *testing.T) {
-	if _, err := exec.LookPath("uv"); err != nil {
-		t.Skipf("uv unavailable: %v", err)
-	}
 	repoRoot, err := filepath.Abs("../../../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	skipUnlessPytestResolvable(t, repoRoot)
+	uv := pytestUV(t, repoRoot)
 
 	suiteDir := t.TempDir()
 	suitePath := filepath.Join(suiteDir, "test_inert.py")
@@ -298,7 +292,7 @@ func TestTestCasePluginInertWithoutCasesFile(t *testing.T) {
 	}
 	defer sink.remove()
 
-	cmd := exec.Command("uv",
+	cmd := exec.Command(uv,
 		"run", "--package", "py_example_library", "--directory", repoRoot, "--extra", "dev",
 		"pytest", "-p", "no:cacheprovider", "--trace-config", "-p", testCasePluginModule, suitePath)
 	cmd.Dir = suiteDir

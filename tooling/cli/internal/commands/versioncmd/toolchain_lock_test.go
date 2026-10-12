@@ -533,13 +533,17 @@ func withToolchainTestEndpoints(t *testing.T, base string) {
 	withToolchainTestHome(t)
 	oldGoDownloads, oldGoSource := goDownloadsURL, goSourceURL
 	oldBunAPI, oldBunRelease := bunReleaseAPIURL, bunReleaseURL
+	oldUvChecksums, oldUvRelease := uvChecksumsURL, uvReleaseURL
 	goDownloadsURL = base + "/go"
 	goSourceURL = base + "/go-downloads/"
 	bunReleaseAPIURL = func(string) string { return base + "/bun" }
 	bunReleaseURL = func(version string) string { return base + "/bun/v" + version + "/" }
+	uvChecksumsURL = func(version string) string { return base + "/uv/" + version + "/sha256.sum" }
+	uvReleaseURL = func(version string) string { return base + "/uv/" + version + "/" }
 	t.Cleanup(func() {
 		goDownloadsURL, goSourceURL = oldGoDownloads, oldGoSource
 		bunReleaseAPIURL, bunReleaseURL = oldBunAPI, oldBunRelease
+		uvChecksumsURL, uvReleaseURL = oldUvChecksums, oldUvRelease
 	})
 }
 

@@ -3,6 +3,20 @@
   "cliContract": 7,
   "runtime": {
     "executable": "compiled/putnami-python",
+    "toolchains": {
+      "uv": {
+        "lock": "uv",
+        "candidates": [
+          { "from": "path", "path": "uv" },
+          { "from": "putnami-home", "path": "toolchains/uv/uv-{version}/uv" }
+        ],
+        "probe": {
+          "args": ["self", "version", "--short", "--color", "never"],
+          "expect": "{version}"
+        },
+        "prependPath": true
+      }
+    },
     "prepare": {
       "command": "{extensionRoot}/bin/prepare",
       "args": ["--output", "{runtimeOutput}"],
@@ -134,11 +148,12 @@
   },
   "tasks": {
     "workspace-install-exec": {
-      "description": "Sync the uv workspace members and run `uv lock`. Declares no outputs: everything it produces is either a shared workspace file (the root pyproject.toml it rewrites, uv.lock) — which the workspace-files effect states — or lives outside the workspace in the machine-global uv cache and the resolved virtualenv.",
+      "description": "Sync the uv workspace members, install the uv release the workspace pins under the Putnami home when the machine holds none, declare it as the [tool.uv] required-version of the root pyproject.toml when nothing does, and run `uv lock` with it. Declares no outputs: everything it produces is either a shared workspace file (the root pyproject.toml it rewrites, uv.lock) — which the workspace-files effect states — or lives outside the workspace in the Putnami home, the machine-global uv cache and the resolved virtualenv.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["workspace-install"],
       "cwd": "{workspaceRoot}",
+      "toolchains": ["uv"],
       "cache": false,
       "timeoutMs": 300000,
       "declares": {
@@ -163,6 +178,7 @@
       "command": "{extensionRuntime}",
       "args": ["deps-upgrade"],
       "cwd": "{workspaceRoot}",
+      "toolchains": ["uv"],
       "cache": false,
       "timeoutMs": 300000,
       "declares": {
@@ -175,6 +191,7 @@
       "command": "{extensionRuntime}",
       "args": ["lint-format"],
       "cwd": "{projectRoot}",
+      "toolchains": ["uv"],
       "timeoutMs": 300000,
       "inputs": {
         "sources": { "from": "project", "files": ["**/*.py"] },
@@ -212,6 +229,7 @@
       "command": "{extensionRuntime}",
       "args": ["lint-format"],
       "cwd": "{projectRoot}",
+      "toolchains": ["uv"],
       "timeoutMs": 300000,
       "inputs": {
         "sources": { "from": "project", "files": ["**/*.py"] },
@@ -248,6 +266,7 @@
       "command": "{extensionRuntime}",
       "args": ["lint-check"],
       "cwd": "{projectRoot}",
+      "toolchains": ["uv"],
       "timeoutMs": 300000,
       "inputs": {
         "sources": { "from": "project", "files": ["**/*.py"] },
@@ -307,6 +326,7 @@
       "command": "{extensionRuntime}",
       "args": ["lint-check"],
       "cwd": "{projectRoot}",
+      "toolchains": ["uv"],
       "timeoutMs": 300000,
       "inputs": {
         "sources": { "from": "project", "files": ["**/*.py"] },
@@ -343,6 +363,7 @@
       "command": "{extensionRuntime}",
       "args": ["test"],
       "cwd": "{projectRoot}",
+      "toolchains": ["uv"],
       "timeoutMs": 600000,
       "inputs": {
         "sources": { "from": "project", "files": ["**/*.py"] },
@@ -381,6 +402,7 @@
       "command": "{extensionRuntime}",
       "args": ["serve"],
       "cwd": "{projectRoot}",
+      "toolchains": ["uv"],
       "cache": false,
       "timeoutMs": -1,
       "declares": {
@@ -393,6 +415,7 @@
       "command": "{extensionRuntime}",
       "args": ["run"],
       "cwd": "{projectRoot}",
+      "toolchains": ["uv"],
       "cache": false,
       "timeoutMs": -1,
       "declares": {

@@ -11,6 +11,7 @@
     "python/experimental-workspace-integration#experimental-boundary",
     "python/experimental-workspace-integration#explicit-opt-in",
     "python/experimental-workspace-integration#native-tools",
+    "python/experimental-workspace-integration#pinned-uv",
     "python/experimental-workspace-integration#workspace-scope"
   ]
 }

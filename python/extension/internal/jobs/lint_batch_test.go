@@ -19,7 +19,7 @@ func stubSyncWorkspace(t *testing.T) {
 	t.Helper()
 	orig := syncWorkspace
 	t.Cleanup(func() { syncWorkspace = orig })
-	syncWorkspace = func(string, *jsonl.Emitter) bool { return true }
+	syncWorkspace = func(string, *jsonl.Emitter) (string, bool) { return stubUV, true }
 }
 
 // stubRuffExec replaces the ruff subprocess seam.
@@ -351,7 +351,7 @@ func TestRunLintBatch_NoSelectedProjectsFails(t *testing.T) {
 func TestRunLintBatch_SyncFailureFailsClosed(t *testing.T) {
 	orig := syncWorkspace
 	t.Cleanup(func() { syncWorkspace = orig })
-	syncWorkspace = func(string, *jsonl.Emitter) bool { return false }
+	syncWorkspace = func(string, *jsonl.Emitter) (string, bool) { return "", false }
 
 	ctx, _ := makeLintBatchContext(t)
 	var calls int

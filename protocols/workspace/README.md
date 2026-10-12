@@ -186,7 +186,7 @@ extensions, templates, and agent-workflow artifacts.
   whose entries reuse the standard exact-version, per-platform
   SHA-256 integrity, and release-source shape. Automation can therefore
   preflight the CLI wire and materialize verified runtimes without reparsing
-  ecosystem manifests. Current writers generate only Go and Bun; historical
+  ecosystem manifests. Current writers generate only Go, Bun and uv; historical
   Node entries remain readable for v3/v4 compatibility and disappear on the
   next explicit toolchain metadata refresh.
 - **v4** adds `agentArtifacts`. Each platform-independent entry requires an

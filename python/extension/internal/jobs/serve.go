@@ -45,12 +45,13 @@ func Serve(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[s
 	wsRoot := ctx.WorkspaceRoot
 	projectRoot := ctx.Project.FullPath
 
-	if !SyncWorkspace(wsRoot, emit) {
+	uv, ok := SyncWorkspace(wsRoot, emit)
+	if !ok {
 		return "FAILED", nil, nil
 	}
 
 	packageName := ResolvePackageName(ctx)
-	cmdArgs := toolchain.UVRunArgs(packageName, wsRoot, entrypoint)
+	cmdArgs := toolchain.UVRunArgs(uv, packageName, wsRoot, entrypoint)
 	env := MakeEnv(wsRoot, projectRoot, map[string]string{"PORT": fmt.Sprintf("%d", port)})
 
 	// Signal handling

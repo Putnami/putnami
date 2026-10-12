@@ -1445,8 +1445,8 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
 - **Toolchains come from outside the workspace.** With the flag, the CLI starts
   no toolchain candidate that resolves inside the workspace, such as a Go
   release the workspace holds under `.putnami/extensions`, and no step
-  installs one. The runner provides the pinned Go and bun on its `PATH`, in
-  `GOROOT`, or in the Putnami home.
+  installs one. The runner provides the pinned Go, bun and uv on its `PATH`,
+  in `GOROOT`, or in the Putnami home.
 - **No process starts with the credential after repository code.** Once a
   hook, a task, a path extension's runtime, its workspace probe or the probe
   of a runtime toolchain that its manifest declares has started, the CLI

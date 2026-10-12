@@ -3,6 +3,7 @@ package jobs
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	osexec "os/exec"
@@ -277,12 +278,13 @@ func TestMakeEnv_KeepsExplicitUVDirs(t *testing.T) {
 }
 
 // The real uv, under a read-only HOME, must keep working with the environment
-// the jobs build. This also pins the variable names against the uv the host
-// runs: a misspelled name leaves uv on its HOME defaults and fails here.
+// the jobs build. This also pins the variable names against the uv the jobs
+// run: a misspelled name leaves uv on its HOME defaults and fails here.
 func TestMakeEnv_UVUnderReadOnlyHome(t *testing.T) {
-	uv, err := osexec.LookPath("uv")
+	// Resolved before HOME moves, so the Putnami home is the real one.
+	uv, err := toolchain.ResolveUV(t.TempDir())
 	if err != nil {
-		t.Skip("uv is not installed")
+		t.Skipf("uv unavailable: %v", err)
 	}
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores directory permissions, so HOME cannot be made read-only")
@@ -471,7 +473,7 @@ func TestSyncWorkspace_EmptyWorkspace(t *testing.T) {
 	tmp := t.TempDir()
 	events := captureEvents(t, func(emit *jsonl.Emitter) {
 		// No workspace config → 0 members → skipped, then UV resolution
-		_ = SyncWorkspace(tmp, emit)
+		_, _ = SyncWorkspace(tmp, emit)
 	})
 
 	// Should emit at least phase start + phase end (skipped)
@@ -480,22 +482,53 @@ func TestSyncWorkspace_EmptyWorkspace(t *testing.T) {
 	}
 }
 
-func TestSyncWorkspace_ReturnsTrue(t *testing.T) {
+func TestSyncWorkspace_ReturnsTheResolvedUV(t *testing.T) {
 	tmp := t.TempDir()
 	os.WriteFile(filepath.Join(tmp, "putnami.workspace.json"), []byte(`{"projects": ["pkg"]}`), 0644)
 	os.MkdirAll(filepath.Join(tmp, "pkg"), 0755)
 	os.WriteFile(filepath.Join(tmp, "pkg/pyproject.toml"), []byte("[project]\nname = \"pkg\"\nversion = \"0.1.0\"\nrequires-python = \">=3.11\"\n"), 0644)
 
-	events := captureEvents(t, func(emit *jsonl.Emitter) {
-		ok := SyncWorkspace(tmp, emit)
-		// With uv on PATH, this should return true
-		if !ok {
-			t.Skip("uv not available on PATH")
-		}
+	var resolvedFor string
+	stubResolveUV(t, func(wsRoot string) (string, error) {
+		resolvedFor = wsRoot
+		return stubUV, nil
 	})
+	var uv string
+	var ok bool
+	captureEvents(t, func(emit *jsonl.Emitter) {
+		uv, ok = SyncWorkspace(tmp, emit)
+	})
+	if !ok || uv != stubUV {
+		t.Fatalf("SyncWorkspace = %q, %v; want %q, true", uv, ok, stubUV)
+	}
+	if resolvedFor != tmp {
+		t.Fatalf("uv resolved for %q, want the workspace %q", resolvedFor, tmp)
+	}
+}
 
-	if len(events) == 0 {
-		t.Error("expected JSONL events")
+// A job never falls back to a uv the workspace does not pin: when no uv of the
+// pinned release resolves, SyncWorkspace stops the job and names the fix.
+func TestSyncWorkspace_FailsWithoutThePinnedUV(t *testing.T) {
+	tmp := t.TempDir()
+	stubResolveUV(t, func(string) (string, error) {
+		return "", errors.New("no uv 0.11.32 on this machine: run `putnami install`")
+	})
+	var uv string
+	var ok bool
+	events := captureEvents(t, func(emit *jsonl.Emitter) {
+		uv, ok = SyncWorkspace(tmp, emit)
+	})
+	if ok || uv != "" {
+		t.Fatalf("SyncWorkspace = %q, %v; want \"\", false", uv, ok)
+	}
+	found := false
+	for _, event := range events {
+		if message, _ := event["message"].(string); strings.Contains(message, "putnami install") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("no diagnostic names `putnami install`: %v", events)
 	}
 }
 
