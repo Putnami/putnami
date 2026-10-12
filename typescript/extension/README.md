@@ -7,6 +7,7 @@ TypeScript extension for Putnami — provides build, test, lint, serve, run, and
 - **Build** — 4-phase pipeline (generate, transpile, types, compile) with independent caching
 - **Test** — Bun test runner with JUnit reports and LCOV coverage
 - **Lint** — Biome formatting and linting with zero-config defaults
+- **Validate** — a stable package's public API cannot break without a breaking-change marker
 - **Serve** — Development server with hot-reload, debugger, and structured log forwarding
 - **Run** — One-shot workload runner that forwards the child process exit code
 - **Package** — npm tarball and Docker image creation from build output
@@ -52,6 +53,7 @@ putnami build my-app --compile    # With standalone binary
 | `putnami build` | Compile TypeScript to JS, types, and executables | `--compile`, `--target`, `--bundle`, `--release` |
 | `putnami test` | Run tests with Bun's test runner | `--watch`, `--coverage`, `--coverage-threshold`, `--bail`, `--timeout`, `--timeout-budget` |
 | `putnami lint` | Format and lint with Biome | `--fix`, `--diagnostic-level` |
+| `putnami validate` | Fail an incompatible API change of a stable package without a breaking-change marker | — |
 | `putnami serve` | Start dev server with hot-reload | `--port`, `--debug`, `--inspect` |
 | `putnami run` | Run a workload once and forward its exit code | `--entrypoint`, `--port`, `--args` |
 | `putnami package` | Create npm/Docker packages | `--npm`, `--docker`, `--stable` |
@@ -90,6 +92,7 @@ format ──→ check
 - **[Workspace Install](doc/08-workspace-install.md)** — Dependency installation
 - **[Templates](doc/09-templates.md)** — Project scaffolding templates
 - **[Exact dependency documentation](doc/10-dependency-documentation.md)** — per-project, version-resolved MCP documentation reads
+- **[Validate](doc/11-validate.md)** — the API check that holds the breaking-change marker for stable packages
 
 ## Support and contract
 

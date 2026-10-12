@@ -8,10 +8,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
 
+	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -243,13 +245,35 @@ func sortedKeyNames(keys map[string]string) []string {
 	return names
 }
 
+// keysOnReleaseBaseline reports whether a job's key holds the releaseBaseline
+// runtime input.
+func keysOnReleaseBaseline(job *ScheduledJob) bool {
+	policy := job.JobDef.TaskCachePolicy
+	return policy != nil && policy.Key != nil && slices.Contains(policy.Key.Runtime, extproto.RuntimeInputReleaseBaseline)
+}
+
+// treeKeyedBaseline reads the release baseline of a job's project in a lane,
+// the value its releaseBaseline input resolves to.
+func treeKeyedBaseline(t *testing.T, lane *treeKeyedLane, job *ScheduledJob) string {
+	t.Helper()
+	dir := filepath.Join(lane.ws.Root, job.Project.Path)
+	baseline, err := putnamigit.ReadReleaseBaseline(dir, lineTagPattern(lane.ws, job.Project.Line))
+	if err != nil {
+		t.Fatalf("read the release baseline of %s: %v", dir, err)
+	}
+	return baseline.Value()
+}
+
 // A pull request lane and the main lane that follows its squash merge build the
 // same tree at two commits, on two branches, at two base versions, in two
 // checkout directories. Both lanes are Git checkouts, derive their versions
 // from Git, and plan the shipped Go, TypeScript and SDD task declarations.
 // Every cacheable test, lint, build
 // and validate key is the same in both, so the second lane reuses what the
-// first stored. The npm package task, which declares that its output embeds the
+// first stored. A task keyed on the release baseline shares its key exactly
+// when the two lanes hold one baseline: the squash title declares a break the
+// pull request head does not, so the baseline of the project the squash
+// touches moves (CLI ADR 0062). The npm package task, which declares that its output embeds the
 // publish version, keeps one key per commit.
 //
 // The test builds the projects in place of workspace discovery, gives each
@@ -327,6 +351,13 @@ func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
 		command, _ := jobCommandAndStep(job.JobDef.Name)
 		keyedCommands[command]++
 		keyedProjects[job.Project.ID]++
+		if keysOnReleaseBaseline(job) {
+			sameBaseline := treeKeyedBaseline(t, pullRequest, job) == treeKeyedBaseline(t, trunk, job)
+			if sameBaseline != (second[key] == hash) {
+				t.Errorf("%s: one release baseline in both lanes is %v, and one key is %v", key, sameBaseline, second[key] == hash)
+			}
+			continue
+		}
 		if second[key] != hash {
 			t.Errorf("%s: the two lanes keyed one tree differently (%s != %s)", key, hash, second[key])
 		}

@@ -11,6 +11,7 @@ import (
 	"go.putnami.dev/sdk/extension/dbtestenv"
 	"go.putnami.dev/sdk/extension/docslinks"
 	"go.putnami.dev/sdk/extension/runtimeinfo"
+	"go.putnami.dev/typescript/extension/internal/apicheck"
 	"go.putnami.dev/typescript/extension/internal/cachepolicy"
 	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
@@ -29,12 +30,14 @@ var commands = map[string]cli.JobFunc{
 	// The database test environment is the SDK's shared task body: policy, closure discovery, the Postgres container and the
 	// invocation-scoped sensitive binding are identical for every language, so
 	// three copies of them would drift.
-	"test-env-up":       dbtestenv.UpJob(),
-	"test-env-down":     dbtestenv.DownJob(),
-	"test":              runTest,
-	"lint":              runLint,
-	"lint-format":       runLintFormat,
-	"lint-check":        runLintCheck,
+	"test-env-up":   dbtestenv.UpJob(),
+	"test-env-down": dbtestenv.DownJob(),
+	"test":          runTest,
+	"lint":          runLint,
+	"lint-format":   runLintFormat,
+	"lint-check":    runLintCheck,
+	// The API check holds the breaking-change marker for a stable package.
+	"validate-api":      apicheck.Run,
 	"serve":             runServe,
 	"run":               runRun,
 	"package-npm":       runPackageNpm,

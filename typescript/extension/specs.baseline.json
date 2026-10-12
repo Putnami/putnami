@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "typescript/typescript-project-toolchain#api-compatibility-marker",
     "typescript/typescript-project-toolchain#batch-equals-solo",
     "typescript/typescript-project-toolchain#batch-failure-isolation",
     "typescript/typescript-project-toolchain#bounded-test-output",

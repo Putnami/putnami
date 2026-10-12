@@ -150,12 +150,17 @@
     {
       "id": "committed-openapi-drift",
       "text": "The OpenAPI contract build-generate writes to schema/openapi.json is committed, and build-generate is its first writer in a session; its declared openapi output carries drift: fail, so a committed contract that differs from the one openapi() regenerates fails the task with generated-output-drift, leaving the regenerated contract in the worktree to commit."
+    },
+    {
+      "id": "api-compatibility-marker",
+      "text": "Validate holds the breaking-change marker for every TypeScript package the root support catalog lists as stable, or every package when there is no catalog: an entry point, an export or a member removed, a changed kind or reduced visibility since the last release of the project's line fails, naming the package and the symbol, unless a commit since that tag that touches the project declares it breaking. A change of written type warns and passes. Additions pass. A release the check cannot read warns."
     }
   ],
   "decisions": [
     "typescript/extension/doc/adr/0001-batched-phases-must-equal-solo-runs.md",
     "typescript/extension/doc/adr/0002-one-workspace-catalog-owns-shared-versions.md",
     "typescript/extension/doc/adr/0003-a-package-must-load-before-it-ships.md",
+    "typescript/extension/doc/adr/0004-the-api-check-parses-source-and-does-not-type-check.md",
     "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
     "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
     "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",

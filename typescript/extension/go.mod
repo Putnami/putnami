@@ -34,6 +34,7 @@ require (
 	go.putnami.dev/protocol/database v0.0.0 // indirect
 	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/extension v0.0.0
+	go.putnami.dev/protocol/support v0.0.0
 	go.putnami.dev/protocol/workspace v0.0.0
 )
 
@@ -63,6 +64,8 @@ replace go.putnami.dev/protocol/registry => ../../protocols/registry
 replace go.putnami.dev/protocol/runtime => ../../protocols/runtime
 
 replace go.putnami.dev/protocol/storage => ../../protocols/storage
+
+replace go.putnami.dev/protocol/support => ../../protocols/support
 
 replace go.putnami.dev/protocol/extension => ../../protocols/extension
 

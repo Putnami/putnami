@@ -275,6 +275,7 @@ func authoredExtensionProvidersDomain() *arch.Builder {
 				arch.Bind("/typescript/extension", "/protocols/registry"),
 				arch.Bind("/typescript/extension", "/protocols/runtime"),
 				arch.Bind("/typescript/extension", "/protocols/storage"),
+				arch.Bind("/typescript/extension", "/protocols/support"),
 				arch.Bind("/typescript/extension", "/protocols/workspace"),
 			),
 		)

@@ -963,6 +963,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/extension",
+          "producerProject": "/protocols/support"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/extension",
           "producerProject": "/protocols/workspace"
         }
       ],
