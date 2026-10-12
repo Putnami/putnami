@@ -2,9 +2,9 @@ package api
 
 import (
 	"bytes"
+	"math"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 
 	phttp "go.putnami.dev/http"
@@ -26,13 +26,9 @@ func binaryEchoEndpoint(bound int64) EndpointDefinition {
 		})
 }
 
-func binaryRequestFor(payload []byte, contentType string, announce int) *http.Request {
+func binaryRequestFor(payload []byte, contentType string) *http.Request {
 	request := httptest.NewRequest(http.MethodPost, "/echo", bytes.NewReader(payload))
 	request.Header.Set("Content-Type", contentType)
-	if announce > 0 {
-		request.Header.Set("Content-Length", strconv.Itoa(announce))
-		request.ContentLength = int64(announce)
-	}
 	return request
 }
 
@@ -49,7 +45,7 @@ func TestBinary_PipelineCarriesEveryOctetUnchanged(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
-			response := handler(phttp.NewContext(recorder, binaryRequestFor(payload, "application/octet-stream", 0)))
+			response := handler(phttp.NewContext(recorder, binaryRequestFor(payload, "application/octet-stream")))
 			if response.Status != http.StatusOK {
 				t.Fatalf("status = %d, want 200", response.Status)
 			}
@@ -75,7 +71,7 @@ func TestBinary_PipelineRefusesTheUndeclared(t *testing.T) {
 	handler := binaryEchoEndpoint(16).BuildHandler()
 
 	t.Run("undeclared media type", func(t *testing.T) {
-		response := handler(phttp.NewContext(httptest.NewRecorder(), binaryRequestFor([]byte("hi"), "application/json", 0)))
+		response := handler(phttp.NewContext(httptest.NewRecorder(), binaryRequestFor([]byte("hi"), "application/json")))
 		if response.Status != http.StatusUnsupportedMediaType {
 			t.Fatalf("status = %d, want 415", response.Status)
 		}
@@ -106,7 +102,7 @@ func TestBinary_PipelineRefusesTheUndeclared(t *testing.T) {
 
 	t.Run("charset parameter is not a different media type", func(t *testing.T) {
 		response := handler(phttp.NewContext(httptest.NewRecorder(),
-			binaryRequestFor([]byte("hi"), "application/octet-stream; charset=binary", 0)))
+			binaryRequestFor([]byte("hi"), "application/octet-stream; charset=binary")))
 		if response.Status != http.StatusOK {
 			t.Fatalf("status = %d, want 200", response.Status)
 		}
@@ -163,5 +159,25 @@ func TestBinaryBody_RefusesAJSONEndpoint(t *testing.T) {
 	}
 	if _, err := BinaryBody(nil); err == nil {
 		t.Fatal("BinaryBody accepted a nil context")
+	}
+}
+
+// TestBinary_TheLargestBoundReadsTheBody pins that a bound of math.MaxInt64
+// reads the body. One byte past that bound wraps to a negative read limit, so
+// the body would arrive empty.
+func TestBinary_TheLargestBoundReadsTheBody(t *testing.T) {
+	payload := []byte("octets under the largest bound")
+	handler := binaryEchoEndpoint(math.MaxInt64).BuildHandler()
+	recorder := httptest.NewRecorder()
+	response := handler(phttp.NewContext(recorder, binaryRequestFor(payload, "application/octet-stream")))
+	if response.Status != http.StatusOK {
+		t.Fatalf("status = %d, want 200", response.Status)
+	}
+	body, err := response.BodyBytes()
+	if err != nil {
+		t.Fatalf("body: %v", err)
+	}
+	if !bytes.Equal(body, payload) {
+		t.Fatalf("body = %q, want %q", body, payload)
 	}
 }

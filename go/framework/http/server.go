@@ -439,7 +439,7 @@ func (p *ServerPlugin) Handler() http.Handler {
 func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 	maxBody := p.config.MaxBodySize
 	if maxBody == 0 {
-		maxBody = 1 << 20 // 1 MiB default
+		maxBody = DefaultMaxBodySize
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -482,6 +482,8 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 		}
 		body := &maxBytesBody{ReadCloser: http.MaxBytesReader(w, r.Body, bodyLimit)}
 		r.Body = body
+		// RawBody reads up to the same limit the reader above enforces.
+		ctx.maxBodySize = bodyLimit
 
 		// Create scoped DI context if container is available
 		p.mu.RLock()

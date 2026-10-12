@@ -162,6 +162,10 @@ For raw bytes:
 raw, err := ctx.RawBody()
 ```
 
+`RawBody` and `Body` read at most the route's body limit: the route's own
+`WithMaxBodySize`, otherwise `ServerConfig.MaxBodySize`. A larger body is
+answered `413 Payload Too Large`.
+
 ### Authentication State
 
 Middleware that authenticates users sets `ctx.User` (a `*Claims` struct). Check it with `ctx.IsSecured()`:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -11,8 +12,9 @@ import (
 	"go.putnami.dev/errors"
 )
 
-// DefaultMaxBodySize is the maximum number of bytes RawBody will read.
-// Override per-request by wrapping the request body before calling RawBody.
+// DefaultMaxBodySize is the request-body limit a server applies when
+// ServerConfig.MaxBodySize is unset. RawBody also applies it to a Context built
+// outside a server, for example with NewContext in a test.
 const DefaultMaxBodySize int64 = 1 << 20 // 1 MiB — matches ServerConfig.MaxBodySize default
 
 // Context holds per-request data including the parsed request, route
@@ -43,6 +45,9 @@ type Context struct {
 	queryParsed bool
 	queryParams url.Values
 	ctx         context.Context
+	// maxBodySize is the request-body limit the server applied to this
+	// request's route. Zero means the Context was built outside a server.
+	maxBodySize int64
 }
 
 type forwardedBearerContextKey struct{}
@@ -129,6 +134,8 @@ func (c *Context) Host() string {
 }
 
 // Body reads and decodes the request body as JSON into the given target.
+// Under a server, it reads at most the body limit of the request's route; see
+// RawBody.
 func (c *Context) Body(target any) (retErr error) {
 	defer func() {
 		if cerr := c.Request.Body.Close(); cerr != nil && retErr == nil {
@@ -138,24 +145,45 @@ func (c *Context) Body(target any) (retErr error) {
 	return json.NewDecoder(c.Request.Body).Decode(target)
 }
 
-// RawBody reads the request body up to DefaultMaxBodySize bytes.
-// Returns an error if the body exceeds the limit.
+// RawBody reads the whole request body. It reads at most the body limit of the
+// request's route: the route's own limit (WithMaxBodySize or
+// HandleWithBodyLimit), otherwise ServerConfig.MaxBodySize. A Context built
+// outside a server reads at most DefaultMaxBodySize.
+//
+// A body past the limit returns an error, and a server answers the request
+// with 413 Payload Too Large. To read less for one request, wrap Request.Body
+// in http.MaxBytesReader with a smaller limit before calling RawBody.
 func (c *Context) RawBody() (_ []byte, retErr error) {
 	defer func() {
 		if cerr := c.Request.Body.Close(); cerr != nil && retErr == nil {
 			retErr = errors.Wrap(cerr, CodeBody)
 		}
 	}()
-	// Read up to limit+1 to detect overflow.
-	limited := io.LimitReader(c.Request.Body, DefaultMaxBodySize+1)
-	data, err := io.ReadAll(limited)
+	limit := c.bodyLimit()
+	// Read one byte past the limit to detect overflow, unless limit+1 would
+	// overflow int64.
+	readLimit := limit
+	if readLimit < math.MaxInt64 {
+		readLimit++
+	}
+	data, err := io.ReadAll(io.LimitReader(c.Request.Body, readLimit))
 	if err != nil {
 		return nil, err
 	}
-	if int64(len(data)) > DefaultMaxBodySize {
+	if int64(len(data)) > limit {
 		return nil, errors.New(CodeBody, "request body too large")
 	}
 	return data, nil
+}
+
+// bodyLimit returns the request-body limit RawBody applies: the limit the
+// server recorded for the request's route, or DefaultMaxBodySize when no
+// server recorded one.
+func (c *Context) bodyLimit() int64 {
+	if c.maxBodySize > 0 {
+		return c.maxBodySize
+	}
+	return DefaultMaxBodySize
 }
 
 // ContentType returns the Content-Type header of the request.
