@@ -275,47 +275,52 @@ func TestProcessDeadlineCountsTheTimeAProcessDoesNotWait(t *testing.T) {
 // away the wait already read: the deadline keeps it and counts only the time
 // after it.
 //
-// The wait the second sample reads is the whole time since the first one, so
-// the deadline counts almost nothing at that read and always reads again,
-// however late the host fires its timer. A fixed wait shorter than that
-// lateness would let the deadline fire at the read that measured it.
+// The second sample reads a wait longer than any test, which the deadline
+// keeps to the time elapsed, so it counts nothing at that read and always
+// reads again, however late the host runs the watch. A wait the test measured
+// on its own clock would miss a pause of the watch between the two clocks, and
+// let the deadline fire at the read that measured it. The deadline then fires
+// at the next read, so each kind of read gets its own case.
 func TestProcessDeadlineKeepsTheWaitAlreadyRead(t *testing.T) {
 	t.Parallel()
 	const run = 3 * processDeadlineMinRearm
-	var (
-		calls       int
-		firstSample time.Time
-		waited      time.Duration
-	)
-	progress := func(*os.Process) func() processSample {
-		return func() processSample {
-			calls++
-			switch {
-			case calls == 1:
-				// The sample that sees the process run.
-				firstSample = time.Now()
-				return processSample{measured: true}
-			case calls == 2:
-				waited = time.Since(firstSample)
-				return processSample{waitedForCPU: waited, measured: true}
-			case calls%2 == 1:
-				return processSample{}
-			default:
-				return processSample{measured: true}
+	cases := map[string]processSample{
+		"a failed read": {},
+		"a lower read":  {measured: true},
+	}
+	for name, next := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			calls := 0
+			progress := func(*os.Process) func() processSample {
+				return func() processSample {
+					calls++
+					switch calls {
+					case 1:
+						// The sample that sees the process run.
+						return processSample{measured: true}
+					case 2:
+						return processSample{waitedForCPU: time.Hour, measured: true}
+					default:
+						return next
+					}
+				}
 			}
-		}
-	}
-	watch := processDeadline{run: run, uncounted: elapsesNever, progress: progress}.watch(nil, nil)
-	<-watch.expired
-	timing := watch.stop()
-	if calls < 3 {
-		t.Fatalf("the deadline fired after %d samples, want a read past the one that measured a wait", calls)
-	}
-	if timing.waitedForCPU != waited || !timing.waitMeasured {
-		t.Errorf("timing = %+v, want the wait of %s read before the failed and lower reads", timing, waited)
-	}
-	if timing.uncountedPastBound || timing.ran < run {
-		t.Errorf("timing = %+v, want a run deadline that ran at least %s", timing, run)
+			watch := processDeadline{run: run, uncounted: elapsesNever, progress: progress}.watch(nil, nil)
+			<-watch.expired
+			timing := watch.stop()
+			if calls < 3 {
+				t.Fatalf("the deadline fired after %d samples, want a read past the one that measured a wait", calls)
+			}
+			// The second sample comes at least run after the process ran, and
+			// its wait is all of that time.
+			if timing.waitedForCPU < run || !timing.waitMeasured {
+				t.Errorf("timing = %+v, want the wait of at least %s read before %s", timing, run, name)
+			}
+			if timing.uncountedPastBound || timing.ran < run {
+				t.Errorf("timing = %+v, want a run deadline that ran at least %s", timing, run)
+			}
+		})
 	}
 }
 
