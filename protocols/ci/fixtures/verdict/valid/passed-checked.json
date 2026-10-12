@@ -15,7 +15,7 @@
     "mark": "checked",
     "change": {
       "repository": "https://example.test/acme/shop.git",
-      "reference": "refs/pull/42/head",
+      "reference": "refs/heads/feature/money-rounding",
       "head": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00",
       "base": "8f3c2a1b9d4e5f60718293a4b5c6d7e8f9a0b1c2",
       "tree": "0123456789abcdef0123456789abcdef01234567",

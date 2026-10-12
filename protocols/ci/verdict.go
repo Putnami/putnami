@@ -220,7 +220,7 @@ type VerdictChange struct {
 	// or ssh URL without user, query, fragment or trailing slash.
 	Repository string `json:"repository"`
 	// Reference is the full Git reference the change is on, such as
-	// refs/heads/main or refs/pull/12/head.
+	// refs/heads/main or refs/tags/v1.4.0.
 	Reference string `json:"reference"`
 	// Head is the full commit ID of the change.
 	Head string `json:"head"`

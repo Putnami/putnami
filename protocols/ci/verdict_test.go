@@ -538,7 +538,7 @@ func TestVerdictReferenceIsAFullGitReference(t *testing.T) {
 		return verdict
 	}
 	for _, reference := range []string{
-		"refs/heads/main", "refs/heads/feature/orders", "refs/pull/42/head", "refs/tags/v1.4.0",
+		"refs/heads/main", "refs/heads/feature/orders", "refs/merge-requests/42/head", "refs/tags/v1.4.0",
 		"refs/heads/release-2026.10",
 	} {
 		if err := ValidateVerdict(withReference(reference)); err != nil {
