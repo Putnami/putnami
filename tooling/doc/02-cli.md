@@ -113,7 +113,7 @@ These built-in commands manage workspace infrastructure:
 - `putnami extensions install` — Install extensions from workspace config
 - `putnami extensions install --platform <os>/<arch> --dest <dir>` — Materialize artifacts for another platform into a packageable artifact-store root (skips install hooks and the lock write)
 - `putnami extensions update` — Update extensions to latest compatible versions
-- `putnami extensions list` — List active extensions and their status
+- `putnami extensions list` — List extensions with their version constraint, installed version and source
 - `putnami extensions remove <ext>` — Remove an installed extension
 - `putnami extensions install --user <@scope/name[@version]>` — Pin one extension in the user scope (`~/.putnami/user`), outside any workspace; its subcommands declared `workspace: "optional"` then run in any directory that is not a workspace
 - `putnami extensions list --user` / `putnami extensions remove --user <ext>` — List or drop user-scope pins

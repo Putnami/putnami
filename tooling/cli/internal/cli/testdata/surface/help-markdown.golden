@@ -629,7 +629,7 @@ putnami extensions install [name] [--latest] [--user] [--platform <os/arch>] [--
 
 ### `putnami extensions list`
 
-List installed extensions with their jobs and activation files
+List installed extensions with their version constraint, installed version and source
 
 **Usage**
 

@@ -591,12 +591,12 @@ Manage workspace extensions.
 
 ```bash
 putnami extensions install          # Install/update all extensions and run install hooks
-putnami extensions list             # List discovered extensions with their jobs
+putnami extensions list             # List extensions with their constraint, installed version and source
 putnami extensions update           # Update extension versions (lock and exact pins)
 putnami extensions remove <name>    # Remove an extension
 ```
 
-`extensions list` shows each extension's name, root path, provided commands, activation files, and priority. Use `--output=jsonl` for machine-readable output.
+`extensions list` shows each extension's name, version constraint, installed version, and source: `config` for an extension `putnami.workspace.json` declares, `workspace` for one found in the workspace without a declaration. Use `--output=jsonl` for machine-readable output.
 
 #### The user scope: `--user`
 

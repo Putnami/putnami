@@ -98,7 +98,7 @@ example: putnami extensions install --output=jsonl
 example: putnami extensions install --platform linux/amd64 --dest ./.gen/warm-artifacts
 example: putnami extensions install --user @acme/audit
 ═══ extensions list ═══
-description: List installed extensions with their jobs and activation files
+description: List installed extensions with their version constraint, installed version and source
 usage: putnami extensions list [--user] [--output <format>]
 flag: --user |  | List the extensions pinned in the user scope (~/.putnami/user) instead of the workspace
 example: putnami extensions list

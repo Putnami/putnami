@@ -886,7 +886,7 @@ Related Commands:
 ═══ extensions list ═══
 putnami extensions list
 
-List installed extensions with their jobs and activation files
+List installed extensions with their version constraint, installed version and source
 
 Usage:
   putnami extensions list [--user] [--output <format>]

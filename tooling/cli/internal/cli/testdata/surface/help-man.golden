@@ -565,7 +565,7 @@ Materialize artifacts for another platform (skips install hooks and the lock wri
 .B --dest
 Materialize into this artifact-store root instead of the machine-global one.
 .SS extensions list
-List installed extensions with their jobs and activation files.
+List installed extensions with their version constraint, installed version and source.
 .PP
 .B Usage:
 .br
