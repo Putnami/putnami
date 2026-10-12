@@ -1,0 +1,77 @@
+# Mirror CI images — copies the images that CI jobs pull into this
+# repository's GitHub Container Registry (GHCR).
+#
+# A public registry caps anonymous pulls per source IP address, and
+# GitHub-hosted runners share addresses, so another tenant can spend the quota
+# and fail a job before its first step. A retry does not help when the cap is
+# a data volume. A job that pulls this mirror with its own GITHUB_TOKEN spends
+# a quota this repository owns instead.
+#
+# Only this workflow talks to the upstream registry. Once an image is
+# mirrored, a failed pull here keeps the copy made last, and no pull request
+# fails because of it. Rerun it from the Actions tab once the upstream
+# registry answers again.
+#
+# The weekly run picks up the patch releases the upstream tag receives. A
+# change to this file runs it once it lands on main. A newly listed image
+# therefore exists only after that run: land it here first, and point a job at
+# it in a later change.
+#
+# A package this workflow creates starts private. An organization owner makes
+# it public once, in its package settings, so that a contributor's fork can
+# pull it with the fork's own token.
+name: Mirror CI images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/mirror-ci-images.yml
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+concurrency:
+  group: mirror-ci-images
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: mirror ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The Postgres service container of contributor-ci.yml. The source is
+          # Docker Hub's official image, served by its Amazon ECR Public mirror.
+          - source: public.ecr.aws/docker/library/postgres:17-alpine
+            target: ghcr.io/putnami/putnami/postgres:17-alpine
+    steps:
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
+
+      # `imagetools create` copies the image without running or rebuilding
+      # anything. It keeps only the platform GitHub-hosted runners use, which
+      # is about a ninth of the upstream index. The source annotation links
+      # the package to this repository, so the workflows of this repository
+      # can pull it with their GITHUB_TOKEN.
+      - name: Copy the image
+        env:
+          SOURCE: ${{ matrix.source }}
+          TARGET: ${{ matrix.target }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            --platform linux/amd64 \
+            --annotation "index:org.opencontainers.image.source=$REPOSITORY_URL" \
+            --tag "$TARGET" "$SOURCE"
+          docker buildx imagetools inspect "$TARGET"
