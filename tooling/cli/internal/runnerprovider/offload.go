@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	runner "go.putnami.dev/protocol/runner"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -74,8 +75,9 @@ func requestCapabilities(request runner.ExecutionRequest) []string {
 // inputs, transfers missing blobs, looks the idempotency key up before it
 // submits, follows the attempt to a terminal state, fetches the bundle and
 // imports it. Any failure is returned as is: nothing here ever runs the work
-// locally instead, and an interrupted follow returns protocol ErrSignal after
-// a bounded cancellation.
+// locally instead. An interrupt returns protocol ErrSignal: before the
+// submission, at once; during or after it, after a bounded cancellation of the
+// attempt the provider accepted.
 func Execute(ctx context.Context, offload Offload) (Outcome, error) {
 	var outcome Outcome
 	sourceStore, err := runnersource.OpenStore(filepath.Join(store.ResolveStoreRoot(offload.WorkspaceRoot), "runner-source"))
@@ -86,7 +88,7 @@ func Execute(ctx context.Context, offload Offload) (Outcome, error) {
 	// The admitted bound set travels on the request; capture binds exactly it.
 	snapshot, err := sourceStore.Capture(ctx, offload.WorkspaceRoot, offload.Request.Source.Bound)
 	if err != nil {
-		return outcome, fmt.Errorf("capture source: %w", err)
+		return outcome, interrupted(ctx, fmt.Errorf("capture source: %w", err))
 	}
 	request, err := bindSource(offload.Request, offload.WorkspaceRoot, snapshot)
 	if err != nil {
@@ -104,7 +106,7 @@ func Execute(ctx context.Context, offload Offload) (Outcome, error) {
 
 	c.offer = requestCapabilities(request)
 	if err := c.connect(ctx); err != nil {
-		return outcome, err
+		return outcome, interrupted(ctx, err)
 	}
 	if len(request.Invocation.Providers) > 0 && !contains(c.capabilities, runner.CapabilityInvocationProvidersV1) {
 		return outcome, fmt.Errorf("%w: runner provider %s does not echo %s, which --where remote needs for the providers --providers or %s enabled; run without them, or update the runner provider",
@@ -138,11 +140,11 @@ func Execute(ctx context.Context, offload Offload) (Outcome, error) {
 	}
 	request.Protocol.Capabilities = runner.SortStrings(c.capabilities)
 	if err := transferMissingBlobs(ctx, c.session, sourceStore, c.exchangeDir, snapshot); err != nil {
-		return outcome, err
+		return outcome, interrupted(ctx, err)
 	}
 	found, err := c.session.Lookup(ctx, &runner.LookupParams{IdempotencyKey: request.Control.IdempotencyKey})
 	if err != nil {
-		return outcome, err
+		return outcome, interrupted(ctx, err)
 	}
 	switch {
 	case found.Attempt != "":
@@ -157,10 +159,20 @@ func Execute(ctx context.Context, offload Offload) (Outcome, error) {
 	default:
 		if c.record.Attempt != "" {
 			iox.Fprintf(c.stderr, "putnami: %s no longer knows attempt %s; submitting %s again under the same key\n", offload.ProviderName, c.record.Attempt, request.Control.IdempotencyKey)
-			c.record.Attempt, c.record.Cursor = "", 0
+			c.record.Attempt, c.record.Cursor, c.record.State = "", 0, StateSubmitting
+			// Persisted before the submit: an interrupted resubmission that
+			// cannot be resolved leaves a record the next run can still adopt
+			// the key's new attempt from, instead of one naming the lost one.
+			if err := c.store.Write(c.record); err != nil {
+				return outcome, fmt.Errorf("record submission: %w", err)
+			}
 		}
 		submitted, err := c.session.Submit(ctx, &runner.SubmitParams{Request: request, Manifest: snapshot.Manifest})
 		if err != nil {
+			if ctx.Err() != nil {
+				outcome.SourceDigest, outcome.Submission = snapshot.Digest, request.Control.IdempotencyKey
+				return c.interruptedSubmit(outcome, request.Control.IdempotencyKey, err)
+			}
 			return outcome, err
 		}
 		c.record.Attempt, c.record.State = submitted.Attempt, submitted.State
@@ -171,6 +183,16 @@ func Execute(ctx context.Context, offload Offload) (Outcome, error) {
 	}
 	outcome.Attempt, outcome.SourceDigest, outcome.Submission = c.record.Attempt, snapshot.Digest, request.Control.IdempotencyKey
 	return c.observeAndSettle(ctx, outcome)
+}
+
+// interrupted files an error the interrupt caused before anything was
+// submitted as the interrupt it is: nothing was accepted to cancel, and a
+// record left submitting is resolved by its key on the next run.
+func interrupted(ctx context.Context, err error) error {
+	if ctx.Err() == nil || errors.Is(err, protocolcli.ErrSignal) {
+		return err
+	}
+	return fmt.Errorf("%w: %w", protocolcli.ErrSignal, err)
 }
 
 // bindSource writes the captured identity into the request and refuses a

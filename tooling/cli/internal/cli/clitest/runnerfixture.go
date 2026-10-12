@@ -80,6 +80,11 @@ const (
 	// accepted a submission, before the acknowledgement is written: the
 	// lost-acknowledgement case, with the attempt genuinely running.
 	RunnerFixtureLoseAckEnv = "PUTNAMI_RUNNER_FIXTURE_LOSE_ACK"
+	// RunnerFixtureAckHoldEnv names a file the provider waits for after it
+	// accepted a submission and before it acknowledges it, and beside which it
+	// writes "<file>.accepted" once the attempt is accepted: a test interrupts
+	// the client while its submit is in flight, whatever the machine's load.
+	RunnerFixtureAckHoldEnv = "PUTNAMI_RUNNER_FIXTURE_ACK_HOLD"
 	// RunnerFixtureDropFollowsEnv makes ONE provider process (the first to
 	// reach it, recorded under the root) exit abruptly on its Nth follow: a
 	// stream disconnect the client must reconnect from.
@@ -251,7 +256,7 @@ func superviseFixtureAttempt(dir string, getenv func(string) string) int {
 	for _, entry := range os.Environ() {
 		key := strings.SplitN(entry, "=", 2)[0]
 		switch {
-		case key == protocolcli.ParentSessionEnv, key == runnerprovider.BoundRequestEnv, key == RunnerFixtureRoleEnv, key == RunnerFixtureHoldEnv,
+		case key == protocolcli.ParentSessionEnv, key == runnerprovider.BoundRequestEnv, key == RunnerFixtureRoleEnv, key == RunnerFixtureHoldEnv, key == RunnerFixtureAckHoldEnv,
 			key == protocolcli.SessionReporterEnv, key == protocolcli.SessionReporterTokenEnv,
 			key == protocolcli.LogReporterEnv, key == protocolcli.LogReporterTokenEnv,
 			strings.HasPrefix(key, "PUTNAMI_CACHE_"), key == "PUTNAMI_SPEC_FRAGMENTS":
@@ -696,6 +701,15 @@ func (p *fixtureProvider) submit(payload json.RawMessage) (any, error) {
 		// The submission was accepted and is running; the acknowledgement
 		// never reaches the client because the transport dies here.
 		p.exit(3)
+	}
+	if hold := p.getenv(RunnerFixtureAckHoldEnv); hold != "" {
+		_ = os.WriteFile(hold+".accepted", []byte(id), 0o600)
+		for waited := time.Duration(0); waited < time.Minute; waited += 20 * time.Millisecond {
+			if _, err := os.Stat(hold); err == nil {
+				break
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
 	}
 	return runner.SubmitResult{Attempt: id, State: runner.StateQueued}, nil
 }
