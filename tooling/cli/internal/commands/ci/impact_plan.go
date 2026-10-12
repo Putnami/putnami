@@ -1,12 +1,12 @@
-// Package ci implements the impact-plan and change-plan commands. Both plan
-// one checked-out commit range through the same impacted planner; a ChangePlan
-// is the protocol projection of the ImpactPlan for the repository's origin.
+// Package ci implements the impact-plan command. It plans one checked-out
+// commit range through the impacted planner and emits the ImpactPlan; a
+// consumer that needs a ChangePlan projects one with
+// ciproto.ChangePlanFromImpactPlan.
 package ci
 
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -23,8 +23,8 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// PlanOptions are the command-specific inputs of impact-plan and change-plan
-// after CLI parsing.
+// PlanOptions are the command-specific inputs of impact-plan after CLI
+// parsing.
 type PlanOptions struct {
 	Base       string
 	Head       string
@@ -60,53 +60,30 @@ type Planner func(ctx context.Context, baseSHA string, noCache bool) (PlannerRes
 // repository identity a ChangePlan adds is the consumer's input to
 // ciproto.ChangePlanFromImpactPlan.
 func EmitImpactPlan(ctx context.Context, wsRoot string, opts PlanOptions, planner Planner) (ciproto.ImpactPlan, error) {
-	const command = "impact-plan"
-	baseSHA, headSHA, err := resolvePlanRange(wsRoot, command, opts)
+	baseSHA, headSHA, err := resolvePlanRange(wsRoot, opts)
 	if err != nil {
 		return ciproto.ImpactPlan{}, err
 	}
-	input, err := planRange(ctx, wsRoot, command, baseSHA, headSHA, opts, planner)
+	input, err := planRange(ctx, wsRoot, baseSHA, headSHA, opts, planner)
 	if err != nil {
 		return ciproto.ImpactPlan{}, err
 	}
 	return changeplan.BuildImpact(input)
 }
 
-// EmitChangePlan builds one immutable ChangePlan for the exact base-to-HEAD
-// delta: the ImpactPlan EmitImpactPlan would build with the same planner,
-// projected for the origin remote. It requires the same checkout as
-// EmitImpactPlan and a credential-free origin URL, checked before planning.
-func EmitChangePlan(ctx context.Context, wsRoot string, opts PlanOptions, planner Planner) (ciproto.ChangePlan, error) {
-	const command = "change-plan"
-	baseSHA, headSHA, err := resolvePlanRange(wsRoot, command, opts)
-	if err != nil {
-		return ciproto.ChangePlan{}, err
-	}
-	repository, err := changePlanRepository(wsRoot)
-	if err != nil {
-		return ciproto.ChangePlan{}, err
-	}
-	input, err := planRange(ctx, wsRoot, command, baseSHA, headSHA, opts, planner)
-	if err != nil {
-		return ciproto.ChangePlan{}, err
-	}
-	return changeplan.Build(input, repository)
-}
-
 // resolvePlanRange resolves the base and head of a plan to full commit IDs. It
 // refuses a missing --base, a dirty worktree, a head other than the checked-out
-// HEAD, and a base that is not its ancestor. command names the refusing
-// command.
-func resolvePlanRange(wsRoot, command string, opts PlanOptions) (baseSHA, headSHA string, err error) {
+// HEAD, and a base that is not its ancestor.
+func resolvePlanRange(wsRoot string, opts PlanOptions) (baseSHA, headSHA string, err error) {
 	if strings.TrimSpace(opts.Base) == "" {
-		return "", "", cmderr.Usagef("%s requires --base <commit>", command)
+		return "", "", cmderr.Usagef("impact-plan requires --base <commit>")
 	}
 	clean, err := git.WorktreeClean(wsRoot)
 	if err != nil {
-		return "", "", cmderr.InvalidConfigf("%s cannot inspect the worktree: %v", command, err)
+		return "", "", cmderr.InvalidConfigf("impact-plan cannot inspect the worktree: %v", err)
 	}
 	if !clean {
-		return "", "", cmderr.InvalidConfigf("%s requires a clean worktree", command)
+		return "", "", cmderr.InvalidConfigf("impact-plan requires a clean worktree")
 	}
 
 	headRef := strings.TrimSpace(opts.Head)
@@ -115,63 +92,63 @@ func resolvePlanRange(wsRoot, command string, opts PlanOptions) (baseSHA, headSH
 	}
 	headSHA, err = git.ResolveCommit(wsRoot, headRef)
 	if err != nil {
-		return "", "", cmderr.InvalidConfigf("%s cannot resolve --head: %v", command, err)
+		return "", "", cmderr.InvalidConfigf("impact-plan cannot resolve --head: %v", err)
 	}
 	checkedOutSHA, err := git.HeadSHA(wsRoot)
 	if err != nil {
-		return "", "", cmderr.InvalidConfigf("%s cannot resolve checked-out HEAD: %v", command, err)
+		return "", "", cmderr.InvalidConfigf("impact-plan cannot resolve checked-out HEAD: %v", err)
 	}
 	if headSHA != checkedOutSHA {
-		return "", "", cmderr.InvalidConfigf("%s --head must resolve to the checked-out HEAD", command)
+		return "", "", cmderr.InvalidConfigf("impact-plan --head must resolve to the checked-out HEAD")
 	}
 	baseSHA, err = git.ResolveCommit(wsRoot, opts.Base)
 	if err != nil {
-		return "", "", cmderr.InvalidConfigf("%s cannot resolve --base: %v", command, err)
+		return "", "", cmderr.InvalidConfigf("impact-plan cannot resolve --base: %v", err)
 	}
 	if !git.CommitReachableFromHead(wsRoot, baseSHA) {
-		return "", "", cmderr.InvalidConfigf("%s --base must be an ancestor of the checked-out HEAD", command)
+		return "", "", cmderr.InvalidConfigf("impact-plan --base must be an ancestor of the checked-out HEAD")
 	}
 	return baseSHA, headSHA, nil
 }
 
 // planRange diffs a resolved range, plans it, proves that planning left the
 // checked-out source state unchanged, and returns the planner data a plan
-// projects. command names the refusing command.
-func planRange(ctx context.Context, wsRoot, command, baseSHA, headSHA string, opts PlanOptions, planner Planner) (changeplan.Input, error) {
+// projects.
+func planRange(ctx context.Context, wsRoot, baseSHA, headSHA string, opts PlanOptions, planner Planner) (changeplan.Input, error) {
 	changedFiles, err := git.DiffCommitFiles(wsRoot, baseSHA, headSHA)
 	if err != nil {
-		return changeplan.Input{}, cmderr.InvalidConfigf("%s cannot diff revisions: %v", command, err)
+		return changeplan.Input{}, cmderr.InvalidConfigf("impact-plan cannot diff revisions: %v", err)
 	}
 
 	if planner == nil {
-		return changeplan.Input{}, cmderr.InvalidConfigf("%s planner is not configured", command)
+		return changeplan.Input{}, cmderr.InvalidConfigf("impact-plan planner is not configured")
 	}
 	result, err := planner(ctx, baseSHA, opts.NoCache)
 	if err != nil {
 		return changeplan.Input{}, err
 	}
 	if !result.Complete {
-		return changeplan.Input{}, cmderr.InvalidConfigf("%s could not produce a complete %s plan",
-			command, strings.Join(result.Commands, ","))
+		return changeplan.Input{}, cmderr.InvalidConfigf("impact-plan could not produce a complete %s plan",
+			strings.Join(result.Commands, ","))
 	}
 
 	// Engine hooks and extension discovery are allowed to run before planning;
 	// prove afterwards that none changed the revision-bound source state.
 	clean, err := git.WorktreeClean(wsRoot)
 	if err != nil {
-		return changeplan.Input{}, cmderr.InvalidConfigf("%s cannot recheck the worktree: %v", command, err)
+		return changeplan.Input{}, cmderr.InvalidConfigf("impact-plan cannot recheck the worktree: %v", err)
 	}
 	currentHead, err := git.HeadSHA(wsRoot)
 	if err != nil {
-		return changeplan.Input{}, cmderr.InvalidConfigf("%s cannot recheck HEAD: %v", command, err)
+		return changeplan.Input{}, cmderr.InvalidConfigf("impact-plan cannot recheck HEAD: %v", err)
 	}
 	if !clean || currentHead != headSHA {
-		return changeplan.Input{}, cmderr.InvalidConfigf("%s planning changed the checked-out source state", command)
+		return changeplan.Input{}, cmderr.InvalidConfigf("impact-plan planning changed the checked-out source state")
 	}
 
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
-		return changeplan.Input{}, fmt.Errorf("load workspace for %s: %w", command, err)
+		return changeplan.Input{}, fmt.Errorf("load workspace for impact-plan: %w", err)
 	}
 	return changeplan.Input{
 		Generator:        ciproto.ChangePlanGenerator{Name: "putnami", Version: opts.CLIVersion},
@@ -179,14 +156,14 @@ func planRange(ctx context.Context, wsRoot, command, baseSHA, headSHA string, op
 		BaseSHA:          baseSHA,
 		HeadSHA:          headSHA,
 		ChangedFiles:     changedFiles,
-		DirectProjects:   changePlanDirectProjects(ws, changedFiles),
+		DirectProjects:   planDirectProjects(ws, changedFiles),
 		ImpactedProjects: result.Projects,
 		Planned:          result.Jobs,
-		Cache:            buildChangePlanCache(ws, result.Jobs, result.Versions, opts.NoCache),
+		Cache:            buildPlanCache(ws, result.Jobs, result.Versions, opts.NoCache),
 	}, nil
 }
 
-func changePlanDirectProjects(ws *workspace.Workspace, paths []string) []*workspace.Project {
+func planDirectProjects(ws *workspace.Workspace, paths []string) []*workspace.Project {
 	byID := make(map[string]*workspace.Project)
 	for _, path := range paths {
 		for _, project := range workspace.ProjectOwnersForPath(ws, path) {
@@ -203,7 +180,7 @@ func changePlanDirectProjects(ws *workspace.Workspace, paths []string) []*worksp
 	return projects
 }
 
-func buildChangePlanCache(ws *workspace.Workspace, planned []*jobs.ScheduledJob, versions jobs.RunVersions, noCache bool) ciproto.ChangePlanCache {
+func buildPlanCache(ws *workspace.Workspace, planned []*jobs.ScheduledJob, versions jobs.RunVersions, noCache bool) ciproto.ChangePlanCache {
 	if noCache {
 		return ciproto.ChangePlanCache{Status: "disabled"}
 	}
@@ -234,59 +211,10 @@ func buildChangePlanCache(ws *workspace.Workspace, planned []*jobs.ScheduledJob,
 	return ciproto.ChangePlanCache{Status: "available", Entries: entries}
 }
 
-func changePlanRepository(wsRoot string) (ciproto.ChangePlanRepository, error) {
-	const remote = "origin"
-	raw := git.RemoteURL(wsRoot, remote)
-	url, ok := credentialFreeRepositoryURL(raw)
-	if !ok {
-		return ciproto.ChangePlanRepository{}, cmderr.InvalidConfigf("change-plan requires a credential-free %s remote URL", remote)
-	}
-	return ciproto.ChangePlanRepository{Remote: remote, URL: url}, nil
-}
-
-// credentialFreeRepositoryURL normalizes supported git remote spellings to a
-// URL with no user info, query, or fragment. Rejecting unknown local paths is
-// intentional: Cloud admission needs a portable repository identity, not a
-// machine-specific checkout path.
-func credentialFreeRepositoryURL(raw string) (string, bool) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return "", false
-	}
-	if before, after, found := strings.Cut(raw, "@"); found && !strings.Contains(before, "://") {
-		if host, path, found := strings.Cut(after, ":"); found && host != "" && path != "" {
-			return "ssh://" + host + "/" + strings.TrimPrefix(path, "/"), true
-		}
-	}
-	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Host == "" || (parsed.Scheme != "https" && parsed.Scheme != "http" && parsed.Scheme != "ssh") {
-		return "", false
-	}
-	parsed.User = nil
-	parsed.RawQuery = ""
-	parsed.ForceQuery = false
-	parsed.Fragment = ""
-	return strings.TrimSuffix(parsed.String(), "/"), true
-}
-
-// RenderChangePlan writes a full ResultV2 document for CI callers and a short
-// digest-oriented confirmation for people. Structured output is deliberately a
-// single envelope so Cloud can validate Document.data with no stdout parsing.
-func RenderChangePlan(outputFormat string, document ciproto.ChangePlan) error {
-	if protocolcli.OutputMode(outputFormat).IsStructured() {
-		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,
-			protocolcli.NewResultV2("change-plan", document, nil))
-		return err
-	}
-	iox.Fprintf(os.Stdout, "\n  ChangePlan %s\n", document.Digest)
-	iox.Fprintf(os.Stdout, "    %s..%s (%d changed file(s), %d impacted project(s), %d task(s))\n\n",
-		shared.ShortSHA(document.BaseSHA), shared.ShortSHA(document.HeadSHA), len(document.ChangedFiles), len(document.Impact.Projects), len(document.Tasks))
-	return nil
-}
-
 // RenderImpactPlan writes a full ResultV2 document for extensions and CI
 // callers, with the ImpactPlan as its data, and a short summary for people.
-// Structured output is a single envelope, like RenderChangePlan's.
+// Structured output is a single envelope, so a consumer validates
+// Document.data with no stdout parsing.
 func RenderImpactPlan(outputFormat string, document ciproto.ImpactPlan) error {
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
 		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,

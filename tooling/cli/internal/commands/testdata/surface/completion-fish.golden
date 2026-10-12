@@ -63,7 +63,6 @@ complete -c putnami -n '__fish_use_subcommand' -a 'test' -d 'Run the project\'s 
 
 # Structured commands
 complete -c putnami -n '__fish_use_subcommand' -a 'cache' -d 'Manage cache'
-complete -c putnami -n '__fish_use_subcommand' -a 'change-plan' -d 'Emit an immutable impacted CI ChangePlan'
 complete -c putnami -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completions (bash, zsh, fish)'
 complete -c putnami -n '__fish_use_subcommand' -a 'compose' -d 'Serve a workload with the workloads it runs with'
 complete -c putnami -n '__fish_use_subcommand' -a 'config' -d 'Manage configuration'
@@ -181,8 +180,6 @@ complete -c putnami -l 'trace-profile' -d 'Collect trace events (Chrome trace fo
 complete -c putnami -l 'version' -d 'Show version'
 
 # Structured command flags
-complete -c putnami -n '__putnami_seen_path change-plan' -l 'base' -d 'Required base commit or ref; emitted as its full immutable commit SHA' -r
-complete -c putnami -n '__putnami_seen_path change-plan' -l 'head' -d 'Optional head commit or ref; it must resolve to the checked-out HEAD' -r
 complete -c putnami -n '__putnami_seen_path compose' -l 'no-watch' -d 'Run the target production-mode without watch, like its dependencies'
 complete -c putnami -n '__putnami_seen_path compose' -l 'port' -d 'Proxy port of the target; default options.serve.port then 3000; 0 picks an ephemeral port' -r
 complete -c putnami -n '__putnami_seen_path compose' -l 'ready-timeout' -d 'Deadline for each member\'s typed ready event; default 60s' -r

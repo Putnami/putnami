@@ -21,8 +21,9 @@ const (
 	ChangePlanDigestDomain = "putnami/change-plan/v1"
 )
 
-// ChangePlan is the versioned, immutable CI admission plan `putnami
-// change-plan` emits for one base..head commit range. It carries identities
+// ChangePlan is the versioned, immutable CI admission plan of one base..head
+// commit range for one repository, as ChangePlanFromImpactPlan projects it
+// from the ImpactPlan `putnami impact-plan` emits. It carries identities
 // and declared scheduling metadata only: never source bytes, task arguments,
 // working directories, environment values, output paths, or invocation
 // locators. Cache is advisory: key presence is a point-in-time local-store

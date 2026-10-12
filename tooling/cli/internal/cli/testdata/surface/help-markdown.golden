@@ -97,7 +97,6 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 
 | Command | Description |
 |---------|-------------|
-| `putnami change-plan` | Emit an immutable impacted CI ChangePlan |
 | `putnami impact-plan` | Emit the impacted plan of a change for a command list |
 
 ## Projects
@@ -204,28 +203,6 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | `putnami completion <shell>` | Generate shell completions (bash, zsh, fish) |
 
 ## Command Reference
-
-### `putnami change-plan`
-
-Emit a deterministic admission plan of the CI quality gate for the exact commit delta from --base to the checked-out HEAD. The worktree must be clean and --base must be a HEAD ancestor, so Cloud can recompute the document's digest from immutable repository state. Source contents, environment values, secrets, command arguments, and output paths are never emitted
-
-**Usage**
-
-```
-putnami change-plan --base <commit> [--head <commit>] [--no-cache] [--output <format>]
-```
-
-**Flags**
-
-| Flag | Description |
-|------|-------------|
-| `--base` <commit> | Required base commit or ref; emitted as its full immutable commit SHA |
-| `--head` <commit> | Optional head commit or ref; it must resolve to the checked-out HEAD |
-
-**Examples**
-
-- `putnami change-plan --base origin/main --output=json`
-- `putnami change-plan --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl`
 
 ### `putnami impact-plan`
 

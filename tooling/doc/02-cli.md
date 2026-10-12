@@ -176,14 +176,16 @@ than one version line. To update installed CLI binaries, use
 
 ## Commands that left the core CLI
 
-These commands moved out of the core CLI into the extension that owns their
-domain. Each one works once a workspace declares that extension.
+These commands left the core CLI. Most moved into the extension that owns
+their domain, and work once a workspace declares that extension. `change-plan`
+has no successor command: its document is the projection of an impact plan.
 
 | Former command | Command now | Extension that serves it |
 |---|---|---|
 | `putnami channel set`, `putnami channel status` | `putnami cloud channels set`, `putnami cloud channels status` | `@putnami/cloud`, which owns hosted delivery |
 | `putnami ci init`, `ci validate`, `ci fmt`, `ci explain` | `putnami cloud ci init`, `cloud ci validate`, `cloud ci fmt`, `cloud ci explain` | `@putnami/cloud` |
 | `putnami features`, `specs`, `architecture`, `contracts` | Unchanged | `@putnami/sdd` |
+| `putnami change-plan --base <commit>` | `putnami impact-plan lint,test,build,validate --base <commit>`, then `ChangePlanFromImpactPlan` from `go.putnami.dev/protocol/ci` | None: the core serves `impact-plan` |
 
 To get a moved command, add its extension to `extensions` in
 `putnami.workspace.json`, then run `putnami install`:
@@ -194,8 +196,8 @@ To get a moved command, add its extension to `extensions` in
 }
 ```
 
-The CLI refuses `putnami channel …` and `putnami ci …`, and `putnami help` of
-either, with exit code 2, unless an installed extension declares that root. A
+The CLI refuses `putnami channel …`, `putnami ci …` and `putnami change-plan`,
+and `putnami help` of each, with exit code 2, unless an installed extension declares that root. A
 run of a moved SDD command that plans no job prints a hint. Both messages link
 to this section, and so does the `impact-plan` refusal of a command that no
 installed extension declares.

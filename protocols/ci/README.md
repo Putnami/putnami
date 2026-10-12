@@ -1,9 +1,9 @@
 # `go.putnami.dev/protocol/ci`
 
 The versioned contract for a workspace's source-controlled `putnami.ci.json`,
-for the ChangePlan document `putnami change-plan` emits (see
-[The change plan](#the-change-plan)), and for the ImpactPlan document
-`putnami impact-plan` emits (see [The impact plan](#the-impact-plan)). The file is discovered beside
+for the ImpactPlan document `putnami impact-plan` emits (see
+[The impact plan](#the-impact-plan)), and for the ChangePlan admission document
+a consumer derives from it (see [The change plan](#the-change-plan)). The file is discovered beside
 `putnami.workspace.json`. Version 3 is the only version this package reads:
 earlier documents are migrated by hand.
 
@@ -146,7 +146,7 @@ discovered graph jobs.
 
 | Role | Who |
 | --- | --- |
-| Producers | a human authoring `putnami.ci.json`, and `putnami cloud ci init` / `putnami cloud ci fmt` writing the canonical form; `putnami change-plan` emitting a ChangePlan; `putnami impact-plan` emitting an ImpactPlan |
+| Producers | a human authoring `putnami.ci.json`, and `putnami cloud ci init` / `putnami cloud ci fmt` writing the canonical form; `putnami impact-plan` emitting an ImpactPlan; an extension projecting an ImpactPlan onto a ChangePlan |
 | Consumers | `putnami cloud ci` (validate, fmt, explain); `putnami publish`; `putnami deploy --env`; the generated agent guidance; a CI plane that reads the document to decide what to run; a CI plane that admits a ChangePlan; an extension that reads an ImpactPlan, or projects it onto a ChangePlan |
 | Owner of this contract | this project. The `putnami cloud ci` commands validate and explain; the execution plane grants trust and resources, and neither may widen the document locally |
 
@@ -282,13 +282,15 @@ declaration, carries it through canonicalization, and reports it in
 
 ## The change plan
 
-`putnami change-plan --base <commit> --output=json` emits one immutable
-admission plan for a checked-out commit range, in the structured result's
-`data` member. This package owns that document: the `ChangePlan` type, its
-canonical bytes, its digest and its validation. The CLI builds every plan with
-it and imports nothing else to do so, and nothing in this module imports the
-CLI. The command, its inputs and the meaning of each member are documented in
-[`tooling/cli/doc/17-ci-change-plans.md`](../../tooling/cli/doc/17-ci-change-plans.md).
+A ChangePlan is one immutable admission plan for a commit range of one
+repository. A consumer derives it from an ImpactPlan with
+`ChangePlanFromImpactPlan` (see [The impact plan](#the-impact-plan)); the core
+CLI emits none. This package owns that document: the `ChangePlan` type, its
+canonical bytes, its digest and its validation. Nothing in this module imports
+the CLI. The members a ChangePlan shares with an ImpactPlan mean what they mean
+there, as
+[`tooling/cli/doc/17-impact-plans.md`](../../tooling/cli/doc/17-impact-plans.md)
+documents.
 
 - `ChangePlanVersion` is `1`, the only version a consumer accepts.
 - `ChangePlanCanonicalBytes` is Go's `encoding/json` encoding of
@@ -307,6 +309,17 @@ CLI. The command, its inputs and the meaning of each member are documented in
 
 `cache` is advisory: it is outside the digest, so warming or evicting a local
 entry never changes a plan's identity.
+
+The consumer that builds a ChangePlan owns its `repository`, and the digest
+covers it, so two consumers that spell one remote differently get two digests.
+Spell `repository.url` as the credential-free URL of the remote: an `https`,
+`http` or `ssh` URL with no user, query, fragment or trailing slash. Write an
+scp-like `git@host:org/repo.git` as `ssh://host/org/repo.git`. The corpus
+fixtures use this spelling.
+
+A consumer admits a plan only for the revision it has checked out: it rejects
+a plan whose `headSHA` is not that revision, as well as every plan
+`ValidateChangePlan` refuses.
 
 Version 1 is frozen. Any change to the members, their order, their
 normalization or the digest input changes the digest of every plan already
@@ -342,10 +355,7 @@ holds both.
   does not name its commands, so the caller chooses the command list it admits
   by the ImpactPlan it passes.
 
-`putnami change-plan` is that projection for the fixed command list
-`lint,test,build,validate` and the checkout's `origin` remote: its ChangePlan
-is the projection of the ImpactPlan `putnami impact-plan` emits for that list
-and range. Adding the ImpactPlan changed no ChangePlan byte and no digest. See
+Adding the ImpactPlan changed no ChangePlan byte and no digest. See
 [ADR 0005](doc/adr/0005-a-change-plan-projects-an-impact-plan.md).
 
 ## Schema and fixtures
@@ -380,8 +390,9 @@ and range. Adding the ImpactPlan changed no ChangePlan byte and no digest. See
   file or project, a wrong digest — and, except for the wrong digest, the
   digest of its own canonical bytes, so the defect is the only reason it is
   refused. Every fixture is the exact indented encoding of the plan it holds.
-  The protocol tests and the CLI tests both run this corpus: the CLI rebuilds
-  each valid plan from its planner data and must emit the same bytes.
+  The protocol tests run this corpus. The CLI tests run its valid plans: the
+  CLI rebuilds the ImpactPlan of each one from its planner data, and its
+  projection must be the same bytes.
 - ImpactPlan conformance corpus:
   [`fixtures/impact-plan`](fixtures/impact-plan). `expectations.json` maps
   every `valid/*` plan to the `fixtures/change-plan/valid` plan its projection

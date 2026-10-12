@@ -69,8 +69,8 @@ func blockingCommandNames(document ciproto.Document) []string {
 }
 
 // GateTasks is the exported derivation for the callers that must agree with
-// the generated guidance about the gate: the change plan's command list and
-// the documented contributor recipe are both compared against it.
+// the generated guidance about the gate: the documented contributor recipe is
+// compared against it.
 func GateTasks(wsRoot string) string {
 	return gateTasksForWorkspace(wsRoot)
 }

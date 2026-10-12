@@ -8,35 +8,6 @@ Global Options:
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
-═══ change-plan ═══
-putnami change-plan
-
-Emit a deterministic admission plan of the CI quality gate for the exact commit delta from --base to the checked-out HEAD. The worktree must be clean and --base must be a HEAD ancestor, so Cloud can recompute the document's digest from immutable repository state. Source contents, environment values, secrets, command arguments, and output paths are never emitted
-
-Usage:
-  putnami change-plan --base <commit> [--head <commit>] [--no-cache] [--output <format>]
-
-Command Flags:
-  --base <commit>              Required base commit or ref; emitted as its full immutable commit SHA
-  --head <commit>              Optional head commit or ref; it must resolve to the checked-out HEAD
-
-Examples:
-  putnami change-plan --base origin/main --output=json
-  putnami change-plan --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl
-
-Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
-  Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
-
-Related Commands:
-  putnami impact-plan
-  putnami sessions inspect
-  putnami projects list
-  putnami doctor
-
 ═══ completion ═══
 putnami completion
 
@@ -214,7 +185,6 @@ Global Options:
   Advanced: --trace-profile
 
 Related Commands:
-  putnami change-plan
   putnami projects list
   putnami sessions inspect
 

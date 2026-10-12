@@ -3,18 +3,17 @@
   "protocolVersion": 1,
   "feature": "cli/impact-plan",
   "outcomes": [
-    "An extension asks the engine for the impacted plan of a change, for the commands it names, and reads it with the protocol package alone",
-    "The ChangePlan change-plan emits and the ImpactPlan impact-plan emits for the same range never disagree, because one is the projection of the other"
+    "An extension asks the engine for the impacted plan of a change, for the commands it names, and reads it with the protocol package alone"
   ],
   "nonGoals": [
-    "Changing ChangePlan v1: change-plan keeps its command list, its checks, its errors and its bytes",
+    "Emitting a ChangePlan: a consumer that needs one projects it from the ImpactPlan with ChangePlanFromImpactPlan",
     "Naming a repository or binding the plan with a digest: the document a consumer derives from the plan holds both",
     "Running any planned task: the command plans and executes nothing"
   ],
   "requirements": [
     {
       "id": "one-projection",
-      "text": "The ChangePlan change-plan emits is ChangePlanFromImpactPlan of the ImpactPlan impact-plan emits for lint,test,build,validate over the same range, with the origin remote as the repository. Every plan the CLI emits reproduces the protocol corpus byte for byte, and the CLI never emits a plan the protocol refuses."
+      "text": "The ImpactPlan impact-plan emits is the one projection of the planner's output: every list deduplicated and sorted, the transitive dependents derived, and the command list in its planned order. Every plan the CLI emits reproduces the protocol corpus byte for byte, and the CLI never emits a plan the protocol refuses."
     },
     {
       "id": "pinned-revisions",
@@ -22,7 +21,7 @@
     },
     {
       "id": "named-commands",
-      "text": "The one positional argument names the commands, comma-separated, resolved through built-in and workspace aliases in order, and the engine plans exactly that list. A missing or extra list, a command named twice, an alias that expands to several commands, a command no discovered extension declares, and --baseline, --impacted, --projects or --all are usage errors. A declared command that plans no task is a valid empty plan; change-plan plans its fixed list whatever is declared."
+      "text": "The one positional argument names the commands, comma-separated, resolved through built-in and workspace aliases in order, and the engine plans exactly that list. A missing or extra list, a command named twice, an alias that expands to several commands, a command no discovered extension declares, and --baseline, --impacted, --projects or --all are usage errors. A declared command that plans no task is a valid empty plan."
     },
     {
       "id": "one-structured-result",

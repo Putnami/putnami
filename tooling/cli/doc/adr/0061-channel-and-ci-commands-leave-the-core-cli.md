@@ -55,3 +55,14 @@ already carries both: `@putnami/cloud` serves them as
 - ADR 0021 still describes channel promotion and the release-set provider.
   Only the command that drives them, and the command that validates
   `putnami.ci.json`, moved out of the core.
+
+## Note (2026-10-11)
+
+`change-plan` is removed from the core CLI too, with no fallback and no
+deprecation period: its one consumer, the hosted CI runner, stopped calling
+it. Decision 4 is complete. `change-plan` joins the removed roots of
+decision 2: the core refuses it with exit 2 before the workspace bootstrap,
+unless an extension declares it. A consumer that needs a
+ChangePlan runs `putnami impact-plan lint,test,build,validate --base
+<commit>` and projects the ImpactPlan with `ChangePlanFromImpactPlan`.
+`protocols/ci` keeps ChangePlan v1, its digest and its corpus unchanged.

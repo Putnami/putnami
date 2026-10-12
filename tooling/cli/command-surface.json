@@ -185,20 +185,6 @@
       "positionals": []
     },
     {
-      "path": "change-plan",
-      "flags": [
-        {
-          "long": "--base",
-          "type": "value"
-        },
-        {
-          "long": "--head",
-          "type": "value"
-        }
-      ],
-      "positionals": []
-    },
-    {
       "path": "completion",
       "flags": [],
       "positionals": [

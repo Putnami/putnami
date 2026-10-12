@@ -34,7 +34,7 @@ internal/
 ├── jobs/                      Planning, DAG scheduling, subprocess execution, caching
 ├── output/                    Renderers (text, live TUI, JSONL, cloud-logging)
 ├── machine/                   Machine-readable run/report documents
-├── changeplan/                CI change plans
+├── changeplan/                CI impact plan projection
 ├── profiler/                  Chrome trace format profiling
 ├── store/                     Content-addressed cache store (local, remote, chained)
 ├── telemetry/                 Anonymous opt-in metrics
@@ -53,7 +53,7 @@ Principal packages only. `internal/` holds 52 production packages in all — the
 |----------|------|
 | `agentctx` | Agent context generation, the context pack, agent workflows, MCP config, the workspace map |
 | `cachecmd` | `cache` and its verification/analysis subcommands |
-| `ci` | `ci` and CI change plans |
+| `ci` | `impact-plan` |
 | `completion` | bash/zsh/fish completion generators and structured help |
 | `configcmd` | `config` and `telemetry` |
 | `doctor` | `doctor`, its check families, the gate and waivers |

@@ -93,25 +93,6 @@ var catalog = []Command{
 
 	// ── CI ───────────────────────────────────────────────────────────────
 	{
-		Path:        "change-plan",
-		Kind:        KindStructured,
-		Category:    "CI",
-		Summary:     "Emit an immutable impacted CI ChangePlan",
-		Description: "Emit a deterministic admission plan of the CI quality gate for the exact commit delta from --base to the checked-out HEAD. The worktree must be clean and --base must be a HEAD ancestor, so Cloud can recompute the document's digest from immutable repository state. Source contents, environment values, secrets, command arguments, and output paths are never emitted",
-		Usage:       "putnami change-plan --base <commit> [--head <commit>] [--no-cache] [--output <format>]",
-		Flags: []Flag{
-			{Long: "--base", Type: FlagValue, ValueName: "<commit>", Description: "Required base commit or ref; emitted as its full immutable commit SHA"},
-			{Long: "--head", Type: FlagValue, ValueName: "<commit>", Description: "Optional head commit or ref; it must resolve to the checked-out HEAD"},
-		},
-		Examples: []string{
-			"putnami change-plan --base origin/main --output=json",
-			"putnami change-plan --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl",
-		},
-		Related:          []string{"impact-plan", "sessions inspect", "projects list", "doctor"},
-		StructuredOutput: true,
-		Workspace:        requiredWorkspace(),
-	},
-	{
 		Path:        "impact-plan",
 		Kind:        KindStructured,
 		Category:    "CI",
@@ -127,7 +108,7 @@ var catalog = []Command{
 			"putnami impact-plan test,build --base origin/main --output=json",
 			"putnami impact-plan lint --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl",
 		},
-		Related:          []string{"change-plan", "projects list", "sessions inspect"},
+		Related:          []string{"projects list", "sessions inspect"},
 		StructuredOutput: true,
 		Workspace:        requiredWorkspace(),
 	},

@@ -142,7 +142,6 @@ _putnami_path_known() {
         'cache clean') return 0 ;;
         'cache gc') return 0 ;;
         'cache verify') return 0 ;;
-        'change-plan') return 0 ;;
         'completion') return 0 ;;
         'completion bash') return 0 ;;
         'completion fish') return 0 ;;
@@ -224,12 +223,6 @@ _putnami_path_known() {
 _putnami_flags_for() {
     reply=()
     case "$1" in
-        'change-plan')
-            reply=(
-                '--base[Required base commit or ref; emitted as its full immutable commit SHA]:commit:'
-                '--head[Optional head commit or ref; it must resolve to the checked-out HEAD]:commit:'
-            )
-            ;;
         'compose')
             reply=(
                 '--no-watch[Run the target production-mode without watch, like its dependencies]'
@@ -477,7 +470,6 @@ _putnami() {
 
     structured_commands=(
         'cache:Manage cache'
-        'change-plan:Emit an immutable impacted CI ChangePlan'
         'completion:Generate shell completions (bash, zsh, fish)'
         'compose:Serve a workload with the workloads it runs with'
         'config:Manage configuration'
