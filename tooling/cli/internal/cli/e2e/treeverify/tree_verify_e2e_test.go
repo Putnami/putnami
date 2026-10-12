@@ -50,7 +50,7 @@ func TestTreeVerifyBareCallIsAVerdictOnStdoutAlone(t *testing.T) {
 	hometest.Temp(t)
 	t.Setenv(launch.NoRelaunchEnv, "1")
 	dir := t.TempDir()
-	want := `{"verdict":"not-verified","reason":"choose exactly one of --record, --snapshot, --ref and --gate"}` + "\n"
+	want := `{"verdict":"not-verified","reason":"choose exactly one of --record, --workflow, --snapshot, --ref and --gate"}` + "\n"
 	for _, args := range [][]string{
 		{"tree", "verify"},
 		{"tree", "verify", "--output=json"},

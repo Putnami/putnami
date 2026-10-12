@@ -136,6 +136,14 @@ case "${1:-}" in
       printf 'putnami: unknown subcommand: tree verify\n  Available: fingerprint\n' >&2
       exit 2
     fi
+    if [ "${1:-}" = --help ]; then
+      if [ -f "$TEST_STATE_DIR/no-workflow-verify" ]; then
+        printf 'Usage: putnami tree verify --record FILE\n'
+      else
+        printf 'Usage: putnami tree verify --record FILE | --workflow FILE\n'
+      fi
+      exit 0
+    fi
     # The CLI's own tests own what the verifier accepts; this double answers as
     # told and logs what it was asked. Every refusal is a JSON verdict on
     # stdout, a usage error included.
@@ -162,6 +170,14 @@ case "${1:-}" in
     [ "$4" = "${EXPECTED_VERIFY_BASE:-origin/main}" ]
     printf '%s\n' "$2" >>"$TEST_STATE_DIR/verification-invocations"
     ordinal="$(wc -l <"$TEST_STATE_DIR/verification-invocations" | tr -d '[:space:]')"
+    if jq -e 'type == "object" and has("workflow") and has("testOutcomeComplete")' "$2" >/dev/null 2>&1; then
+      if [ -f "$TEST_STATE_DIR/missing-workflow-result" ]; then
+        printf '{"verdict":"Putnami verified","stage":"ready"}\n'
+        exit 0
+      fi
+      jq -c '{verdict:"Putnami verified",stage:"ready",workflow:{outcomeComplete:.testOutcomeComplete}}' "$2"
+      exit 0
+    fi
     case "$(cat "$2")" in
       base-mismatch) echo "verification: dossier base does not cover the intended proposal base" >&2; exit 85 ;;
       reject) exit 82 ;;
@@ -1444,6 +1460,138 @@ fi
 grep -Fq "after 0 minutes; they keep running. Invoke the finalizer again to keep waiting" "$TEST_DIR/hosted-timeout.err"
 [ "$(collab proposals status "$(jq -cn --argjson ref "$DRAFT_PROPOSAL" '{ref: $ref}')" | jq -r '.proposal.state')" = open ]
 rm -f "$TEST_DIR/state/hosted-checks"
+
+# An intermediate unit keeps its parent open, even when policy would deliver
+# that task as done. Caller-authored closing text is refused before any write.
+git -C "$TEST_DIR/work" checkout -q -b feat/partial origin/main
+collab tasks transition "$(jq -cn --argjson ref "$TASK" '{ref: $ref, state: "in_progress"}')" >/dev/null
+jq '.options["@putnami/contributor"].states.delivered = "done"' \
+  "$TEST_DIR/work/putnami.workspace.json" >"$TEST_DIR/partial-workspace.json"
+cp "$TEST_DIR/partial-workspace.json" "$TEST_DIR/work/putnami.workspace.json"
+git -C "$TEST_DIR/work" commit -q -am "test: set completed delivery policy"
+printf 'partial unit\n' >"$TEST_DIR/work/example.txt"
+partial() {
+  (
+    cd "$TEST_DIR/work"
+    bash "$FINALIZER" --partial-delivery --task-source "$TASK_SOURCE" --task-id "$TASK_ID" \
+      --base main --branch feat/partial --title "feat(test): partial unit" \
+      --body-file "$TEST_DIR/body.md" --proof-status passed \
+      --proof "the unit harness passed" --project test/project "$@"
+  )
+}
+cat >"$TEST_DIR/partial-closing.md" <<BODY
+This unit provides the first result. Closes #$TASK_ID
+
+Deletes: nothing.
+BODY
+rm -f "$TEST_DIR/state/git-mutations" "$TEST_DIR/state/collab-invocations" "$TEST_DIR/state/gate-invocations"
+if partial --body-file "$TEST_DIR/partial-closing.md" --file example.txt >"$TEST_DIR/partial-closing.out" 2>"$TEST_DIR/partial-closing.err"; then
+  echo "finalize-pr test: partial delivery accepted a caller closing directive" >&2
+  exit 1
+fi
+grep -Fq -- "--partial-delivery refuses a closing directive" "$TEST_DIR/partial-closing.err"
+[ ! -s "$TEST_DIR/state/git-mutations" ]
+[ ! -s "$TEST_DIR/state/collab-invocations" ]
+[ ! -s "$TEST_DIR/state/gate-invocations" ]
+if partial --title "Closes #$TASK_ID" --file example.txt >"$TEST_DIR/partial-title.out" 2>"$TEST_DIR/partial-title.err"; then
+  echo "finalize-pr test: partial delivery accepted a closing title" >&2
+  exit 1
+fi
+grep -Fq -- "--partial-delivery refuses a closing directive" "$TEST_DIR/partial-title.err"
+git -C "$TEST_DIR/work" add example.txt
+git -C "$TEST_DIR/work" commit -qm "Closes #$TASK_ID"
+if partial >"$TEST_DIR/partial-commit.out" 2>"$TEST_DIR/partial-commit.err"; then
+  echo "finalize-pr test: partial delivery accepted a closing branch commit" >&2
+  exit 1
+fi
+grep -Fq -- "--partial-delivery refuses a closing directive" "$TEST_DIR/partial-commit.err"
+git -C "$TEST_DIR/work" reset -q --hard HEAD~1
+printf 'partial unit\n' >"$TEST_DIR/work/example.txt"
+
+# Transition is not even required from this provider for partial publication.
+touch "$TEST_DIR/state/transition-unsupported"
+rm -f "$TEST_DIR/state/collab-invocations" "$TEST_DIR/state/gate-invocations"
+partial_output="$(partial --file example.txt)"
+rm "$TEST_DIR/state/transition-unsupported"
+PARTIAL_PROPOSAL="$(sed -n 's/^PROPOSAL_REF=//p' <<<"$partial_output")"
+[ -n "$PARTIAL_PROPOSAL" ]
+[ "$(task_state)" = in_progress ]
+if grep -q '^tasks transition' "$TEST_DIR/state/collab-invocations"; then
+  echo "finalize-pr test: partial delivery transitioned the parent" >&2
+  exit 1
+fi
+collab proposals status "$(jq -cn --argjson ref "$PARTIAL_PROPOSAL" '{ref: $ref}')" |
+  jq -r '.proposal.body' | grep -Fxq "Refs #$TASK_ID"
+git -C "$TEST_DIR/work" log -1 --format=%B | grep -Fxq "Refs #$TASK_ID"
+if git -C "$TEST_DIR/work" log -1 --format=%B | grep -Fxq "Closes #$TASK_ID"; then
+  echo "finalize-pr test: partial delivery retained a closing commit line" >&2
+  exit 1
+fi
+
+# A valid candidate dossier can still say the requested parent outcome is
+# incomplete. An older verifier cannot be trusted to consume its workflow ref.
+cat >"$EXPECTED_RECORD" <<'RECORD'
+{"workflow":{"path":"workflow.json","sha256":"example"},"testOutcomeComplete":false}
+RECORD
+workflow_verified() {
+  (
+    cd "$TEST_DIR/work"
+    bash "$FINALIZER" --task-source "$TASK_SOURCE" --task-id "$TASK_ID" \
+      --base main --branch feat/partial --title "feat(test): partial unit" \
+      --body-file "$TEST_DIR/body.md" --proof-status passed \
+      --proof "the candidate dossier passed" --project test/project \
+      --verification-file "$EXPECTED_RECORD" "$@"
+  )
+}
+touch "$TEST_DIR/state/no-workflow-verify"
+rm -f "$TEST_DIR/state/collab-invocations"
+if workflow_verified >"$TEST_DIR/partial-old-cli.out" 2>"$TEST_DIR/partial-old-cli.err"; then
+  echo "finalize-pr test: older verifier accepted an unconsumed workflow" >&2
+  exit 1
+fi
+grep -Fq 'tree verify lacks --workflow' "$TEST_DIR/partial-old-cli.err"
+rm "$TEST_DIR/state/no-workflow-verify"
+if grep -Eq '^proposals upsert|^tasks transition' "$TEST_DIR/state/collab-invocations"; then
+  echo "finalize-pr test: older verifier reached a write" >&2
+  exit 1
+fi
+touch "$TEST_DIR/state/missing-workflow-result"
+if workflow_verified --partial-delivery >"$TEST_DIR/partial-missing-result.out" 2>"$TEST_DIR/partial-missing-result.err"; then
+  echo "finalize-pr test: missing workflow completion result was accepted" >&2
+  exit 1
+fi
+grep -Fq 'verifier omitted a ready verdict with workflow.outcomeComplete' "$TEST_DIR/partial-missing-result.err"
+rm "$TEST_DIR/state/missing-workflow-result"
+rm -f "$TEST_DIR/state/collab-invocations"
+if workflow_verified >"$TEST_DIR/partial-incomplete.out" 2>"$TEST_DIR/partial-incomplete.err"; then
+  echo "finalize-pr test: incomplete workflow closed the parent without partial mode" >&2
+  exit 1
+fi
+grep -Fq 'workflow outcome is incomplete; use --partial-delivery' "$TEST_DIR/partial-incomplete.err"
+if grep -Eq '^proposals upsert|^tasks transition' "$TEST_DIR/state/collab-invocations"; then
+  echo "finalize-pr test: incomplete workflow reached a write" >&2
+  exit 1
+fi
+[ "$(task_state)" = in_progress ]
+rm -f "$TEST_DIR/state/collab-invocations"
+[ "$(workflow_verified --partial-delivery | sed -n 's/^PROPOSAL_REF=//p')" = "$PARTIAL_PROPOSAL" ]
+[ "$(task_state)" = in_progress ]
+if grep -q '^tasks transition' "$TEST_DIR/state/collab-invocations"; then
+  echo "finalize-pr test: verified partial delivery transitioned the parent" >&2
+  exit 1
+fi
+
+# Resuming the same proposal with complete native workflow proof restores the
+# normal policy close line and sends its task transition, here to done.
+jq '.testOutcomeComplete = true' "$EXPECTED_RECORD" >"$TEST_DIR/complete-dossier.json"
+cp "$TEST_DIR/complete-dossier.json" "$EXPECTED_RECORD"
+rm -f "$TEST_DIR/state/collab-invocations"
+complete_output="$(workflow_verified)"
+[ "$(sed -n 's/^PROPOSAL_REF=//p' <<<"$complete_output")" = "$PARTIAL_PROPOSAL" ]
+[ "$(task_state)" = done ]
+grep -q '^tasks transition' "$TEST_DIR/state/collab-invocations"
+collab proposals status "$(jq -cn --argjson ref "$PARTIAL_PROPOSAL" '{ref: $ref}')" |
+  jq -r '.proposal.body' | grep -Fxq "Closes #$TASK_ID"
 
 # No step of any run reached a backend client directly.
 [ ! -s "$TEST_DIR/state/gh-invocations" ]

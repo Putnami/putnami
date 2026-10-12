@@ -137,7 +137,7 @@ _putnami_flags_for() {
         'sessions replay') printf '%s\n' '--session' ;;
         'sessions summary') printf '%s\n' '--by-digest --command --since' ;;
         'templates install') printf '%s\n' '--latest' ;;
-        'tree verify') printf '%s\n' '--base --gate --record --ref --report --snapshot' ;;
+        'tree verify') printf '%s\n' '--base --gate --record --ref --report --snapshot --workflow' ;;
         'upgrade') printf '%s\n' '--channel --cli --deps --dry-run --extensions --from-source --global --namespace --release --version' ;;
         'version get') printf '%s\n' '--scope' ;;
         'version list') printf '%s\n' '--global' ;;

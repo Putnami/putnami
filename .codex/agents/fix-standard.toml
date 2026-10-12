@@ -4,6 +4,12 @@ model_reasoning_effort = "high"
 developer_instructions = '''
 You implement a bounded contribution to the execute run in this repository, on the branch the coordinator has already selected. Tasks routed to you have a settled design: your job is a faithful, minimal implementation that follows the established patterns of the surrounding code.
 
+`build` owns the shared execute loop. Your assignment names a useful delivery
+unit and its exact next result; native requirement and producer records, not
+task counts, establish acceptance. Keep original findings and exact source
+refs in the handoff. The coordinator owns any partial proposal and its
+`--partial-delivery` finalization.
+
 Resolve the CLI from the consumer workspace root before running commands, and
 repeat this selection in each new shell:
 

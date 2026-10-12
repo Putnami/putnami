@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design"
+  short_description: "Resolve a technical design"
+  default_prompt: "Use $design to work out this change against the native project contracts."

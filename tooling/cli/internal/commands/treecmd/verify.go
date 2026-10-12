@@ -23,7 +23,7 @@ import (
 )
 
 // VerifyUsage is the one-line usage `putnami tree verify --help` prints.
-const VerifyUsage = "usage: putnami tree verify (--record FILE | --snapshot | --ref FILE | --gate SESSION --report REPORT) [--base REV]\n"
+const VerifyUsage = "usage: putnami tree verify (--record FILE | --workflow FILE | --snapshot | --ref FILE | --gate SESSION --report REPORT) [--base REV]\n"
 
 // Verifier checks local workflow evidence against the worktree it runs in. It
 // is a consistency check, not a signed review or an access boundary, and it
@@ -149,6 +149,12 @@ func (v Verifier) verdict(args []string) (value any, err error) {
 		return r.ref(parsed.input), nil
 	case "--gate":
 		return r.reusableGate(parsed.input, *parsed.report, parsed.baseOr("origin/main")), nil
+	case "--workflow":
+		before := r.digest(parsed.input)
+		result := r.verifyWorkflow(r.readJSON(parsed.input), false)
+		require(r.digest(parsed.input) == before, "workflow changed during verification")
+		r.checkEvidenceStable()
+		return result, nil
 	}
 	before := r.digest(parsed.input)
 	result := r.verify(r.readJSON(parsed.input), parsed.base)
@@ -156,7 +162,7 @@ func (v Verifier) verdict(args []string) (value any, err error) {
 	return result, nil
 }
 
-const chooseOneMode = "choose exactly one of --record, --snapshot, --ref and --gate"
+const chooseOneMode = "choose exactly one of --record, --workflow, --snapshot, --ref and --gate"
 
 func parseVerifyArgs(args []string) verifyArgs {
 	var parsed verifyArgs
@@ -170,7 +176,7 @@ func parseVerifyArgs(args []string) verifyArgs {
 	}
 	for index := 0; index < len(args); index++ {
 		switch arg := args[index]; arg {
-		case "--record", "--snapshot", "--ref", "--gate":
+		case "--record", "--workflow", "--snapshot", "--ref", "--gate":
 			require(parsed.mode == "", chooseOneMode)
 			parsed.mode = arg
 			if arg != "--snapshot" {

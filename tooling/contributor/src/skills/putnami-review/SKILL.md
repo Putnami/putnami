@@ -7,9 +7,8 @@ description: Deprecated alias of code-review — review a local Putnami diff and
 
 `putnami-review` is kept so existing invocations keep working. It is
 deprecated: invoke `code-review` (`/code-review` on Claude Code,
-`$code-review` on Codex) instead. The alias is removed in a later release of
-the contributor extension, after the migration window its documentation
-announces.
+`$code-review` on Codex) instead. It remains through the current pre-1.0
+line; removal needs a separately announced breaking change.
 
 Follow the `code-review` workflow in `.agents/skills/code-review/SKILL.md`
 exactly, with the restriction this entry point always had: review the local

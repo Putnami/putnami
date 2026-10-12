@@ -7,8 +7,8 @@ description: Deprecated alias of check — run the ordinary gate and applicable 
 
 `putnami-check` is kept so existing invocations keep working. It is
 deprecated: invoke `check` (`/check` on Claude Code, `$check` on Codex)
-instead. The alias is removed in a later release of the contributor extension,
-after the migration window its documentation announces.
+instead. It remains through the current pre-1.0 line; removal needs a
+separately announced breaking change.
 
 Follow the `check` workflow in `.agents/skills/check/SKILL.md` exactly, with
 the restriction this entry point always had: return the gate and behavior

@@ -8,8 +8,8 @@ allowed-tools: Bash, Read, Grep, Glob, ToolSearch, mcp__putnami__*
 
 `putnami-change` is kept so existing invocations keep working. It is
 deprecated: invoke `execute` (`/execute` on Claude Code, `$execute` on Codex)
-instead. The alias is removed in a later release of the contributor extension,
-after the migration window its documentation announces.
+instead. It remains through the current pre-1.0 line; removal needs a
+separately announced breaking change.
 
 Follow the `execute` workflow in `.agents/skills/execute/SKILL.md` exactly,
 with the restriction this entry point always had: the mandate is local. Do not

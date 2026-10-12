@@ -1,6 +1,7 @@
 package agentctx
 
 import (
+	"bytes"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -22,6 +23,7 @@ const contributorExtension = "@putnami/contributor"
 // contributorSkills are the entry points the extension must ship. The last
 // four are deprecated aliases (contributorAliases).
 var contributorSkills = []string{
+	"build", "spec", "design", "prototype", "review", "adr",
 	"plan", "execute", "fix", "epic", "check", "code-review", "fix-loop", "content-bump",
 	"putnami-plan", "putnami-change", "putnami-check", "putnami-review",
 }
@@ -90,6 +92,59 @@ func TestContributorContentRendersEveryEntryPointOnBothHosts(t *testing.T) {
 	if len(extra) > 0 {
 		sort.Strings(extra)
 		t.Errorf("the contributor content ships entry points this test does not name: %v", extra)
+	}
+}
+
+func TestContributorPackagedAndSourceConsumerMigration(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "canonical-consumer-migration", "packaged-canonical-and-compatible-consumer-content")
+	pkg, err := sdkagentartifact.PackageExtension(contributorRoot(t), "0.1.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, packaged := range []bool{false, true} {
+		t.Run(map[bool]string{false: "source", true: "package"}[packaged], func(t *testing.T) {
+			root := t.TempDir()
+			dir := filepath.Join(root, "tools", "contributor")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if packaged {
+				for name, content := range pkg.Members {
+					writePathFile(t, dir, name, string(content))
+				}
+			} else {
+				copyTree(t, contributorRoot(t), dir, "putnami.json", "putnami.extension.json", "src")
+			}
+			cfg := localContentConfig("/tools/contributor", contributorExtension)
+			var report bytes.Buffer
+			changed, err := MaterializeLocalAgentContent(root, cfg, &report)
+			if err != nil || !changed {
+				t.Fatalf("first install changed=%v, err=%v: %s", changed, err, report.String())
+			}
+			for name, want := range pkg.Content.Files {
+				got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+				if err != nil || !bytes.Equal(got, want) {
+					t.Fatalf("consumer %s differs from packaged source: %v", name, err)
+				}
+			}
+			changed, err = MaterializeLocalAgentContent(root, cfg, &report)
+			if err != nil || changed {
+				t.Fatalf("repeat install changed=%v, err=%v", changed, err)
+			}
+			for _, host := range []string{".agents", ".claude"} {
+				writePathFile(t, root, host+"/skills/build/SKILL.md", "Local build instructions.\n")
+			}
+			_, err = MaterializeLocalAgentContent(root, cfg, &report)
+			if err == nil {
+				t.Fatal("installation did not report edited managed content")
+			}
+			for _, host := range []string{".agents", ".claude"} {
+				got, err := os.ReadFile(filepath.Join(root, host, "skills", "build", "SKILL.md"))
+				if err != nil || string(got) != "Local build instructions.\n" {
+					t.Fatalf("edited %s content was not protected: %v", host, err)
+				}
+			}
+		})
 	}
 }
 

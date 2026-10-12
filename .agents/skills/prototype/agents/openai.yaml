@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prototype"
+  short_description: "Test one material uncertainty"
+  default_prompt: "Use $prototype to produce a bounded, inspectable answer to this uncertainty."

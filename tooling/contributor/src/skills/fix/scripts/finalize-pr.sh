@@ -14,11 +14,12 @@ Usage:
     --proof-status <passed|not-applicable> --proof <evidence-or-reason> \
     --project <name> [--project <name> ...] \
     --file <path> [--file <path> ...] \
-    [--task-source <source> --task-id <id>] [--verification-file <record.json>] \
+    [--task-source <source> --task-id <id>] [--partial-delivery] \
+    [--verification-file <record.json>] \
     [--gate auto|local|ci]
   bash finalize-pr.sh --draft --base <branch> --branch <branch> \
     --title <commit-and-proposal-title> --body-file <path> \
-    [--task-source <source> --task-id <id>]
+    [--task-source <source> --task-id <id>] [--partial-delivery]
 
 --draft publishes the branch as a draft proposal when work starts, before any
 gate: it commits nothing but an empty commit carrying the title when the
@@ -64,6 +65,10 @@ Publication goes through the collaboration contracts of the workspace:
 (options["@putnami/contributor"].states.delivered, default in_progress). The
 transition is sent even when the task already reads as that state: the
 provider decides whether its own representation still has to change.
+--partial-delivery links the parent task without a closing directive and does
+not transition it. Use it for a useful unit whose mandated outcome remains
+incomplete, including its draft checkpoints. A caller-supplied closing
+directive in the title, body or branch commit messages is refused.
 Before the gate, the bound providers must offer every operation this helper
 calls. Every request goes to the CLI on standard input, and the proposal body
 must fit the contract's 65536 bytes before anything is pushed.
@@ -83,6 +88,9 @@ With --verification-file, the branch must already be committed and clean.
 `putnami tree verify` must accept the dossier on the current tree before any
 mutation. Its applicable gate, proof and review replace this helper's gate;
 caller-supplied --proof prose does not establish a verified verdict.
+A dossier with a workflow reference also requires CLI --workflow support.
+When its verified workflow reports outcomeComplete false, finalization with a
+parent task requires --partial-delivery so the parent stays open.
 A Putnami CLI without `tree verify` refuses --verification-file and reuses
 no gate.
 
@@ -102,6 +110,7 @@ VERIFICATION_FILE=""
 TASK_SOURCE=""
 TASK_ID=""
 DRAFT_STAGE=false
+PARTIAL_DELIVERY=false
 GATE_MODE=auto
 FILES=()
 PROJECTS=()
@@ -128,6 +137,7 @@ while [ "$#" -gt 0 ]; do
       exit 2
       ;;
     --draft) DRAFT_STAGE=true ;;
+    --partial-delivery) PARTIAL_DELIVERY=true ;;
     --gate) GATE_MODE="${2:?--gate needs a value}"; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "finalize-pr: unknown argument '$1'" >&2; usage >&2; exit 2 ;;
@@ -178,6 +188,10 @@ if git rev-parse --verify -q "refs/remotes/origin/$BASE" >/dev/null; then
 fi
 if [ -n "$TASK_SOURCE$TASK_ID" ] && { [ -z "$TASK_SOURCE" ] || [ -z "$TASK_ID" ]; }; then
   echo "finalize-pr: --task-source and --task-id name one task reference together; pass both or neither" >&2
+  exit 2
+fi
+if [ "$PARTIAL_DELIVERY" = true ] && [ -z "$TASK_ID" ]; then
+  echo "finalize-pr: --partial-delivery needs --task-source and --task-id to retain a parent reference" >&2
   exit 2
 fi
 case "$TASK_SOURCE$TASK_ID" in
@@ -279,6 +293,28 @@ fi
 TASK_REFERENCE_LINE=""
 if [ -n "$TASK_ID" ] && [ -n "$TASK_REFERENCE_TEMPLATE" ]; then
   TASK_REFERENCE_LINE="${TASK_REFERENCE_TEMPLATE//\{id\}/$TASK_ID}"
+fi
+if [ "$PARTIAL_DELIVERY" = true ]; then
+  POLICY_TASK_REFERENCE_LINE="$TASK_REFERENCE_LINE"
+  if [[ "$TASK_REFERENCE_TEMPLATE" == *'#{id}'* ]]; then
+    TASK_REFERENCE_LINE="Refs #$TASK_ID"
+  else
+    TASK_REFERENCE_LINE="Task: $TASK_SOURCE/$TASK_ID (partial delivery)"
+  fi
+  # A partial unit must not close any task through a hand-written squash body
+  # or a commit already on the branch. Reject common provider closing forms
+  # before the first Git or provider write, including when resuming a draft.
+  CLOSING_DIRECTIVE='(^|[[:space:]])(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)[:,]?[[:space:]]+(([^[:space:]#]+/)?[^[:space:]#]+#|#|https?://[^[:space:]]+/issues/)[[:alnum:]_-]+'
+  if ! BRANCH_COMMIT_MESSAGES="$(git log --format=%B "$REVISION_BASE..HEAD")"; then
+    echo "finalize-pr: cannot inspect branch commits for closing directives" >&2
+    exit 1
+  fi
+  CLOSING_INPUT="$(printf '%s\n' "$TITLE"; cat "$BODY_FILE"; printf '%s\n' "$BRANCH_COMMIT_MESSAGES")"
+  if grep -Eiq "$CLOSING_DIRECTIVE" <<<"$CLOSING_INPUT" ||
+    { [ -n "$POLICY_TASK_REFERENCE_LINE" ] && grep -Fqi "$POLICY_TASK_REFERENCE_LINE" <<<"$CLOSING_INPUT"; }; then
+    echo "finalize-pr: --partial-delivery refuses a closing directive in the title, body or branch commits; keep the parent task open" >&2
+    exit 1
+  fi
 fi
 
 # The body becomes the squash commit message: no heading, and no longer than
@@ -424,13 +460,39 @@ verify_dossier() {
     echo "finalize-pr: verification mode requires a clean, committed tree; checkpoint changes and renew their evidence" >&2
     exit 1
   fi
-  local verified_head
+  local verified_head workflow_present workflow_help verify_result workflow_complete
   verified_head="$(git rev-parse HEAD)"
   has_tree_verify || {
     echo "finalize-pr: --verification-file needs \`putnami tree verify\`, and $PUTNAMI_CLI does not have it; upgrade the Putnami CLI, then finalize again" >&2
     exit 1
   }
-  "$PUTNAMI_CLI" tree verify --record "$VERIFICATION_FILE" --base "$REVISION_BASE" >&2
+  # The native verifier owns malformed-dossier refusal. The probe only asks
+  # whether a valid object explicitly carries the optional workflow member.
+  workflow_present="$(jq -r 'if type == "object" and has("workflow") then "true" else "false" end' "$VERIFICATION_FILE" 2>/dev/null || echo false)"
+  if [ "$workflow_present" = true ]; then
+    workflow_help="$("$PUTNAMI_CLI" tree verify --help 2>&1 || true)"
+    if ! grep -Fq -- --workflow <<<"$workflow_help"; then
+      echo "finalize-pr: dossier references a workflow, but $PUTNAMI_CLI tree verify lacks --workflow; upgrade the consumer CLI before finalizing" >&2
+      exit 1
+    fi
+  fi
+  if ! verify_result="$("$PUTNAMI_CLI" tree verify --record "$VERIFICATION_FILE" --base "$REVISION_BASE")"; then
+    printf '%s\n' "$verify_result" >&2
+    echo "finalize-pr: dossier verification failed; nothing was published" >&2
+    exit 1
+  fi
+  printf '%s\n' "$verify_result" >&2
+  if [ "$workflow_present" = true ]; then
+    if ! jq -e '.verdict == "Putnami verified" and .stage == "ready" and (.workflow.outcomeComplete | type == "boolean")' >/dev/null 2>&1 <<<"$verify_result"; then
+      echo "finalize-pr: verifier omitted a ready verdict with workflow.outcomeComplete for a workflow dossier; parent completion cannot be established" >&2
+      exit 1
+    fi
+    workflow_complete="$(jq -r '.workflow.outcomeComplete' <<<"$verify_result")"
+    if [ "$workflow_complete" != true ] && [ "$PARTIAL_DELIVERY" = false ] && [ -n "$TASK_ID" ]; then
+      echo "finalize-pr: workflow outcome is incomplete; use --partial-delivery for a verified intermediate unit so the parent remains open" >&2
+      exit 1
+    fi
+  fi
   # The verifier reads evidence; it must not change the tree it accepted.
   [ -z "$(git status --porcelain)" ] && [ "$(git rev-parse HEAD)" = "$verified_head" ] || {
     echo "finalize-pr: tree changed during verification" >&2
@@ -516,7 +578,7 @@ if [ -n "$TASK_ID" ]; then
     echo "finalize-pr: the tasks contract is $(jq -r '.result.status' <<<"$COLLAB_ENVELOPE") in this workspace; bind a provider in options.collaboration.tasks of putnami.workspace.json, or finalize without a task" >&2
     exit 1
   fi
-  if [ "$DRAFT_STAGE" = true ]; then
+  if [ "$DRAFT_STAGE" = true ] || [ "$PARTIAL_DELIVERY" = true ]; then
     require_supported tasks get
   else
     require_supported tasks get transition
@@ -898,7 +960,7 @@ fi
 # label that means "blocked" for another reason); only the provider knows
 # whether its representation still has to change, and it writes nothing when
 # it does not.
-if [ -n "$TASK_REF" ] && [ "$DRAFT_STAGE" = false ]; then
+if [ -n "$TASK_REF" ] && [ "$DRAFT_STAGE" = false ] && [ "$PARTIAL_DELIVERY" = false ]; then
   collab tasks get "$(jq -cn --argjson ref "$TASK_REF" '{ref: $ref}')"
   require_ok "reading task $TASK_ID"
   REVISION="$(jq -r '.result.task.revision' <<<"$COLLAB_ENVELOPE")"

@@ -6,7 +6,10 @@
     "A workspace installs one contributor offering and receives every contributor workflow, worker profile and helper at the version of that one extension",
     "Contributor workflows reach tasks, proposals and memory through the providers the workspace binds, so a backend changes without a skill edit",
     "A repository states its labels, states, worker profiles, language rule and publication defaults once, in its own configuration",
-    "Existing entry points keep working through named, deprecated aliases until their announced removal"
+    "Existing entry points keep working through named, deprecated aliases until their announced removal",
+    "Build coordinates a requested intention, multi-task issue or epic from observable delivery units through its mandated stage, making demonstrated results, blockers and next actions visible",
+    "Material specs, designs, prototypes, ADRs and delivery boundaries receive independent challenge before adoption, with original findings and supported resolutions preserved",
+    "Versioned local records carry exact native artifact, handoff and producer references across sessions without creating another requirement registry or controller"
   ],
   "nonGoals": [
     "Choosing a tasks, proposals or memory provider for the workspace, or falling back to another one",
@@ -18,7 +21,7 @@
   "requirements": [
     {
       "id": "one-contributor-extension",
-      "text": "One content-only extension, @putnami/contributor, ships the plan, execute, fix, epic, check, code-review, fix-loop and content-bump workflows, the four worker profiles, their references and helpers, rendered for Claude Code and Codex from one source. A workspace opts in with the agentArtifacts entry extension:@putnami/contributor; this repository declares nothing else, so its committed host trees are exactly what that extension builds."
+      "text": "One content-only extension, @putnami/contributor, ships build, spec, design, prototype, review, adr and check, compatible plan, execute, fix, epic and code-review entries, explicit-only fix-loop and content-bump, the four worker profiles, references and helpers, rendered for both supported hosts from one source. Build reuses one implementation/review/repair/check loop under the existing mandate. A workspace opts in with extension:@putnami/contributor."
     },
     {
       "id": "explicit-only-invocation",
@@ -34,7 +37,7 @@
     },
     {
       "id": "provider-neutral-publication",
-      "text": "The finalizer commits and pushes with Git, publishes with proposals upsert for the exact base and head, reads the proposal back with proposals status, which must carry every assignee and label the upsert answered with, and moves a named task with tasks transition. An unresolved write stops it without a retry and names the reconciling read; an unbound contract or an unknown task stops it before any write. The language rule reads open tasks through tasks find."
+      "text": "The finalizer pushes with Git, publishes and reads back exact proposals through the bound contract, and transitions a completed task. Partial outcomes require partial mode, a non-closing parent reference and no delivered transition; supplied closing directives fail. Unresolved writes stop without retry and name a reconciling read; unbound or unknown inputs stop before writes. The language rule reads tasks through their contract."
     },
     {
       "id": "repository-policy",
@@ -43,9 +46,18 @@
     {
       "id": "squash-ready-publication",
       "text": "A proposal opens as a draft when work starts, carries no gate, and keeps one empty checkpoint the squash drops. Its title and body are the squash commit: the finalizer refuses a heading, a body over publication.bodyMaxBytes, and any title, body or commit that names an agent, and posts the verification record as a comment. On a machine loaded above verification.ciGate.load, the named hosted checks gate the change; a failing check returns the proposal to draft."
+    },
+    {
+      "id": "native-workflow-validation",
+      "text": "A versioned workflow ref preserves v2 compatibility and exact native inputs. Units retain boundaries, requirements and mandated stages; native producer checks establish current acceptance and later work keeps the parent incomplete. Original artifact challenges and resolutions bind examined inputs. Experiments separate observation, simulation and assumption. Stage contracts and handoffs retain mandate, responsibility, findings and next action. Progress requires actual receipts and grants no authority."
+    },
+    {
+      "id": "canonical-consumer-migration",
+      "text": "Both hosts install canonical and compatible entries from source and package, preserve arguments, local-only aliases, explicit-only bulk operations and helper paths, and protect local edits on repeated installation. Build and plan receive one generated recipe index. New workflows require explicit tree verify --workflow support. Legacy entries remain through the current pre-1.0 line until an announced breaking migration. Local checkpoints do not prove transferred assets or published adoption."
     }
   ],
   "decisions": [
-    "tooling/contributor/doc/adr/0001-one-contributor-extension.md"
+    "tooling/contributor/doc/adr/0001-one-contributor-extension.md",
+    "tooling/contributor/doc/adr/0002-build-and-versioned-workflow-record.md"
   ]
 }

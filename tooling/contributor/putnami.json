@@ -44,6 +44,12 @@
         "sites/putnami.dev"
       ],
       "requiredSkills": [
+        "build",
+        "spec",
+        "design",
+        "prototype",
+        "review",
+        "adr",
         "plan",
         "execute",
         "fix",

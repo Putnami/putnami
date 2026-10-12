@@ -42,8 +42,9 @@ content it distributes.
 `putnami-plan`, `putnami-change`, `putnami-check` and `putnami-review` are
 aliases of `plan`, `execute`, `check` and `code-review`. Each names its
 canonical skill and keeps its local restriction (a local plan, a local change,
-local evidence, a local review). An alias is removed only after the migration
-window the entry-point migration document announces. No alias carries an asset.
+local evidence, a local review). Aliases remain through the current pre-1.0
+line; removal needs a separately announced breaking change. No alias carries
+an asset.
 
 ### 3. Repository conventions are policy
 
@@ -82,14 +83,19 @@ backend directly:
   upsert, which never creates a second proposal.
 - `proposals status` reads back head, base, head commit, state, assignees and
   labels.
-- The verification record (changed files, gate, local proof) is a
-  `## Verification` section of the proposal body, because tasks v1 has no
-  comment operation.
+- The verification record (gate and local proof) is a proposal comment through
+  `proposals review` when the provider offers it, with the comment verdict;
+  the proposal body remains the squash commit message. If review is
+  unsupported, the helper reports the record locally.
 - `tasks transition` moves the task to `states.delivered`, with
   `expectedRevision` when the provider enforces it, even when the task already
   reads as that state: the provider decides whether its representation changes.
 - `publication.taskReference`, rendered with the task id, goes in the commit
-  and the body.
+  and the body for a complete mandated outcome. An intermediate unit uses
+  `--partial-delivery`, keeping a non-closing parent reference and skipping
+  its delivered transition. The finalizer also refuses a caller closing
+  directive and, for a referenced workflow dossier, refuses normal parent
+  close when `outcomeComplete` is false.
 - The helper prints `PROPOSAL_REF=` and, when the provider has one,
   `PROPOSAL_URL=`.
 

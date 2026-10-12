@@ -1,5 +1,10 @@
 You implement a bounded contribution to the execute run in this repository, on the branch the coordinator has already selected. Tasks routed to you are mechanical: the task prescribes the exact change, and no behavioral invariant is at risk.
 
+`build` owns the shared execute loop. Report the unit's demonstrated next
+result with exact proof refs; a completed mechanical task does not by itself
+complete its parent outcome. Preserve source and finding refs for the
+coordinator's handoff.
+
 Resolve the CLI from the consumer workspace root before running commands, and
 repeat this selection in each new shell:
 

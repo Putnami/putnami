@@ -10,7 +10,7 @@ disable-model-invocation: true
 # Epic
 
 Own the epic's outcome and dependency ordering; use
-[execute](../execute/SKILL.md) for its implementation, independent review,
+[build](../build/SKILL.md) for its implementation, independent review,
 corrections, evidence, and authorized delivery. Read its
 [loop](../../../.agents/skills/execute/references/loop.md),
 [records](../../../.agents/skills/execute/references/records.md),
@@ -93,10 +93,14 @@ before imposing the decomposition. Record their
 positions under the execute records contract. Keep objections visible until
 resolved; reassignment cannot erase them.
 
-Build a dependency-ordered plan with acceptance behavior, owning scopes,
-projects/files, dependencies, local environment, existing proof entrypoint,
-tier, and justified separate proposals. Start service work with its smallest
-useful running baseline. Escalate only decisions outside the mandate, with
+Build a dependency-ordered plan from the requested observable outcome and its
+full native requirement inventory. Name useful units and milestones
+separately; a bounded first unit does not remove later requirements. Give the
+next cycle exact tasks and inspectable result, with later cycles proportional.
+Record acceptance behavior, owning scopes, projects/files, dependencies,
+local environment, existing proof entrypoint, tier, and justified separate
+proposals. Start service work with its smallest useful running baseline.
+Escalate only decisions outside the mandate, with
 alternatives and consequences; continue independent ready work while those are
 unresolved.
 
@@ -112,7 +116,7 @@ disappears at the squash.
 ## Execute and integrate
 
 Pass the epic mandate, settled plan, scope positions, acceptance obligations,
-and existing run state to execute. Preserve one continuous review/correction
+and existing run state to build. Preserve one continuous review/correction
 loop instead of invoking independent finalization ceremonies for each vertical.
 Parallelize implementation only with independent file ownership and compatible
 contracts; integrate serially and freeze the combined version before evidence.
@@ -138,6 +142,10 @@ under already granted merge authority, normal checks and a provider that offers
 `merge`; otherwise leave an explicit ready checkpoint. Verify the integrated
 content, reconcile task state, and invalidate affected proof. `--max` bounds
 this legacy progress without changing acceptance criteria.
+An intermediate unit proposal carrying the parent task uses the existing
+finalizer's `--partial-delivery` on draft and final calls. It retains a
+non-closing parent reference and leaves the parent transition untouched.
+Normal close/transition waits for the complete mandated outcome.
 
 ## Resume and finish
 

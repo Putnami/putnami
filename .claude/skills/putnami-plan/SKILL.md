@@ -8,8 +8,8 @@ allowed-tools: Bash, Read, Grep, Glob, ToolSearch, mcp__putnami__*
 
 `putnami-plan` is kept so existing invocations keep working. It is deprecated:
 invoke `plan` (`/plan` on Claude Code, `$plan` on Codex) instead. The alias is
-removed in a later release of the contributor extension, after the migration
-window its documentation announces.
+retained through the current pre-1.0 line; removal needs a separately
+announced breaking change.
 
 Follow the `plan` workflow in `.agents/skills/plan/SKILL.md` exactly, with the
 restriction this entry point always had: the result is a local plan. Do not

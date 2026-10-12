@@ -11,6 +11,9 @@ Run the full pre-commit validation suite, qualify applicable runtime behavior
 from the current worktree, and audit documentation coverage for impacted
 changes. Read the repository's conventions from
 [its policy](../../../.agents/skills/execute/references/policy.md).
+This remains directly callable. [Build](../build/SKILL.md) automatically
+performs the applicable checks within its single evidence cycle, reusing
+current producer proof rather than starting a new gate for a stage change.
 
 ## Portable host contract
 

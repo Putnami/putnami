@@ -108,7 +108,13 @@ How the pieces combine for one delivery:
   and this repository gives four meanings to its status labels.
 - `publication.taskReference` puts `Closes #<id>` in the commit and the
   proposal body; the provider reads it to copy the issue's classification
-  labels (`inheritLabelPrefixes`) and GitHub closes the issue on merge.
+  labels (`inheritLabelPrefixes`) and GitHub closes the issue on merge when
+  the mandated outcome is complete. For an intermediate unit, the finalizer's
+  `--partial-delivery` uses a non-closing parent reference, rejects a caller
+  closing directive and skips the task's delivered transition. If a versioned
+  workflow dossier reports `outcomeComplete: false`, normal parent-task
+  finalization is refused. This protection also applies if the policy maps
+  delivered to `done`.
 - `claimAssignees: ["@me"]` is the GitHub provider's notation for the
   credential's account; another provider documents its own.
 - `verification.language: "en"` makes `check` and the finalizer run the

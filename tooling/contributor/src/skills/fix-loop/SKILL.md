@@ -1,12 +1,12 @@
 ---
 name: fix-loop
-description: Process matching backlog tasks through execute with durable per-run progress and bounded retries
+description: Explicitly process matching backlog tasks through the compatible fix entry and shared build loop
 ---
 
 # Fix Loop
 
 Select successive backlog tasks and invoke the compatible `/fix` entry to
-[execute](../execute/SKILL.md). Each task uses the same continuous
+[build](../build/SKILL.md). Each task uses the same continuous
 implementation, review, correction, and evidence loop. Read execute's
 [loop](../../../.agents/skills/execute/references/loop.md),
 [records](../../../.agents/skills/execute/references/records.md),

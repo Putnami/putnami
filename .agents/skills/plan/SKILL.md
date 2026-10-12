@@ -1,13 +1,16 @@
 ---
 name: plan
-description: Explore the codebase and produce a structured implementation plan; create a task only when explicitly requested
+description: Compatibility planning entry — map an outcome to delivery units and a precise next cycle; create a task only when explicitly requested
 ---
 
 # Plan
 
-Explore the codebase to understand scope and impact, then produce a structured
-implementation plan. Planning is read-only by default. Create or update a
-task only when the user explicitly requests that external action.
+This compatible planning entry uses [spec](../spec/SKILL.md) for intent and
+[design](../design/SKILL.md) for material technical choices, then supplies
+[build](../build/SKILL.md) with an outcome-first delivery map. Planning is
+read-only by default. Create or update a task only when the user explicitly
+requests that external action. `plan` alone grants no implementation,
+publication or merge authority.
 
 ## Portable host contract
 
@@ -83,7 +86,7 @@ Based on the feature description, identify which packages are most likely affect
 #### 2c. Start from a recipe, then search for existing patterns
 
 Read the recipe index before searching for a similar example:
-`.agents/skills/plan/references/recipes.md`, rendered from the framework's
+`.agents/skills/build/references/recipes.md`, rendered from the framework's
 recipe indexes, when present. When a recipe's
 intention matches the request, the plan starts from it: cite the recipe's
 intention, its sample, and the primitives the tasks use, and do not plan what
@@ -151,9 +154,17 @@ omits affected scopes or contract owners, include them and explain why.
 
 ### 4. Build the implementation plan
 
-#### 4a. Task decomposition
+#### 4a. Outcomes, units and tasks
 
-With the relevant scope contributions, define tasks that:
+Start with the requested observable outcome and acceptance, including every
+selected native requirement. Partition it into current, later and authorized
+excluded requirements. A first release limit keeps the broader requirement
+visible; a finished task or milestone does not mark the whole outcome done.
+Define useful delivery units by behavior and required receipts, then
+milestones for tracking. Give the next cycle precise tasks, input refs,
+expected inspectable result, dependency, environment and proof entrypoint;
+keep later cycles proportionate. With the relevant scope contributions, define
+tasks that:
 - Have a clear, single responsibility
 - Reference specific files to create or modify
 - Point to the matching recipe's sample and primitives first, then to other
@@ -205,7 +216,7 @@ Assess:
 For a planning-only request, return the structured plan locally and stop. Do
 not create a branch, task, implementation commit, or proposal. When this
 plan is the mandatory first phase of an already authorized implementation,
-continue through [execute](../execute/SKILL.md) without asking for another
+continue through [build](../build/SKILL.md) without asking for another
 approval. Preserve its scope positions and acceptance requirements in the
 same run; planning is not an extra approval ceremony.
 
@@ -333,6 +344,6 @@ Plan: <local | created as <task reference>>
 
 Implementation starts only when the user requested it. The implementer reuses
 this plan, proves the first executable vertical early, and records both the
-ordinary gate and applicable local behavioral proof. The execute loop owns
+ordinary gate and applicable local behavioral proof. The shared build loop owns
 review, corrections, and delivery within the existing mandate.
 ```

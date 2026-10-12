@@ -53,6 +53,39 @@ Source hosting and work-item tracking are independent choices. A team may use
 either, combine services from different vendors, or configure neither. The core
 never infers one from the other.
 
+## Build the requested outcome
+
+Use `build <intention>` for daily work, or provide a specific task or epic.
+The workflow frames the outcome, plans observable delivery units, prototypes
+a material uncertainty when useful, obtains independent artifact challenge,
+implements, reviews, repairs and checks through one loop. A small settled
+correction reuses existing intent and design. Focused `spec`, `design`,
+`prototype`, `review`, `adr` and `check` entries remain available for direct
+interventions; compatible `plan`, `execute`, `fix`, `epic` and `code-review`
+entries preserve their arguments and authority.
+
+The default progress view shows the promised outcome, demonstrated results,
+each unit's required delivery stage, blockers, unresolved decisions and next
+inspectable result. Tasks and prototypes can finish while a delivery unit
+remains incomplete. A first export release with a size limit keeps the
+large-data requirement pending unless the mandate actually changes it.
+
+Specs, designs, experiments, decisions and original reviews have canonical
+references and exact examined inputs. `putnami tree verify --workflow <file>`
+checks the versioned local record and native requirement coverage; it reports
+planning progress. Candidate readiness separately requires the execution
+dossier's independent review, gate and applicable qualification. Ready, merged,
+published, deployed and adopted each need their actual evidence.
+
+New workflows require a CLI that supports `tree verify --workflow`; an older
+v2 dossier reader can ignore the added reference, so the workflow checks this
+capability explicitly. Legacy entries remain through the current pre-1.0 line,
+and helpers under `fix` and `check` keep their paths. Bulk backlog processing
+and configured content updates remain explicit-only. A natural-language build
+request authorizes its objective; task publication, merge and deployment still
+follow the existing mandate. Workspace-local checkpoints and experiments need
+their referenced assets transferred before another workspace can resume them.
+
 ## Install and update agent workflows
 
 Agent workflows are the agent content of an extension. A workspace declares the

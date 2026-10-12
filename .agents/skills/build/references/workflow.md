@@ -1,0 +1,102 @@
+# Local workflow record
+
+This is a versioned, workspace-local projection of an accepted outcome. Its
+consumer is the consumer workspace's `putnami tree verify --workflow FILE`.
+First check that `"$PUTNAMI_CLI" tree verify --help` advertises `--workflow`;
+an older CLI may accept a v2 dossier while ignoring its optional workflow
+member. An absent capability is a missing validator, never progress proof.
+Save records under the ignored `.context/execute/<run>/` directory. Give a v2
+dossier an optional `workflow: {path, sha256}` exact reference. Keep the
+original v2 snapshot, candidate review, gate, qualification and acceptance
+checks: a workflow reference adds completeness constraints and cannot waive
+them. The standalone workflow verdict is `workflow valid` at stage `progress`,
+never `Putnami verified` at stage `ready`.
+
+The v1 record has `version: 1`, a stable `outcome`, an exact `mandate` reference,
+and `sources: [{feature, manifest: ref, spec: ref}]`. `sources` points to
+native feature declarations and specs by exact bytes. Load their entire
+requirement inventory; identifiers are qualified as `feature#requirement`
+because requirement IDs are local to a spec. The record's `requirements`
+partitions every selected native requirement into `current`, `later` or
+`excluded`. Current and later rows name a `unit`; an exclusion instead names
+`reason` and actual `authority` references. Do not drop a requested large
+outcome when a first unit has a smaller limit. An unsupported exclusion blocks
+completion. The native feature declaration, not this record, owns expected
+verification check IDs.
+
+`units` contain a stable `id`, observable `outcome`, native `projects` as
+`[{id, manifest: ref}]` for each exact project `putnami.json`, exact
+`requirements`, `dependsOn` unit IDs, a `boundary` ref, `exclusions` refs,
+opaque `nextCycleTasks` provider IDs, unresolved `decisions` refs,
+`requiredStage`, current `stage`, `nextResult`, and a `receipt` when the stage
+has one. A merged claim also names the unit's opaque `proposal` reference,
+which the CLI checks against a native proposal-status receipt. Required stage is one of
+`candidate`, `ready`, `merged`, `published`, `deployed`, `adopted`; the current stage can
+also be `planned` or `building`. A unit's requirement list must equal its
+assigned requirement rows. Dependencies explain delivery order, while native
+project dependencies control builds. A milestone or task count is not a
+receipt. Ready source, merge, package publication, deployment and consumer
+adoption use distinct actual producer or provider references. Never infer one
+from another or store a manually synchronized completion percentage.
+
+Use `artifacts` for a proportionate native spec, design note, prototype, ADR,
+review or other source. Each carries `id`, `kind`, `contractVersion`, exact
+`source` and `context` refs, `author`, `units` and native `scopes` links,
+`lifecycle` (`proposed`, `challenged`, `accepted`, `superseded`) and `material`.
+Artifact and handoff scope IDs must match declared unit projects.
+A material artifact also carries a distinct
+`challenge: {original: ref, resolutions: [...]}`. The original immutable
+reviewer-authored JSON v1 has `version`, `reviewer`, `author`, exact `artifact`
+and `context` refs, a report ref and stable findings, each with `id`,
+`scenario`, `consequence` and `correction`. The challenge resolution list
+names the finding `id`, `state` (`fixed`, `refuted`, `deferred`), `note` ref
+and actual `authority` ref for deferral. Keep the original report and append
+correction/re-review, counterevidence or authorized deferral. A new source or
+relevant context digest reopens its opinion; an unrelated edit does not. A
+whole-tree candidate review and gate remain bound to their exact tree even
+when an artifact opinion can be reused.
+
+An `experiments` entry has `id`, `question`, `effortCeiling`, exact `inputs`,
+inspectable `asset`, `instructions`, observed result ref, `simulated` behaviors,
+`assumptions`, `conclusion` and remaining `uncertainty`. Only run one when it
+can resolve a material question. A simulation remains a simulation and cannot
+establish production acceptance. A reused prototype implementation enters
+ordinary build review and proof.
+
+`stages` contains exactly the canonical `intent`, `spec`, `design`,
+`prototype`, `review`, `adr`, `candidate` and `handoff` entries. Each has a
+`name`, `state` (`pending`, `blocked`, `passed`, `not-applicable`), exact
+`inputs`, `expectedOutput`, `exitCriteria`, and a real `receipt` for passed
+or a `reason` ref for non-applicable. State the entry condition and supported
+result in the surrounding stage note. A settled change may mark a new
+prototype or ADR not applicable with a reason; it does not omit the stage.
+Candidate must be passed for a ready dossier. A pending or blocked stage is
+legitimate progress, not ready. `handoff` names the same `mandate` ref as the
+top level, a `unit`, native `scopes`, the receiving `responsibility` and
+`receiver`, exact `inputs`, `expectedOutput`, `acceptance`, `nextAction` and
+`unresolvedFindings`. Use repository or provider
+versioned paths for portable inputs; an ignored local asset that was not
+transferred must be named as unavailable and blocks only the stage consuming
+it. Reconcile provider revisions, open findings and current tree on resume.
+
+Optional `proof: {session: ref, specVerification: ref}` points to the native
+producer session and its sibling `spec-verification.json` on the same current
+tree. Never write these receipts by hand. The verifier joins native expected
+checks to producer observations: missing, duplicate, unknown, skipped, failed
+or stale results cannot be counted as passed. A well-formed planning record
+can have no proof and still report progress. A v2 ready dossier that references
+the workflow requires all current included native requirements proven from
+the actual producer, in addition to its existing review/gate/qualification and
+acceptance checks. An unexecutable native criterion stays visible and needs
+actual reviewed acceptance evidence, not an invented native verdict.
+
+`outcomeComplete` also requires each unit's exact `requiredStage` with its
+actual receipt. Current native checks and a candidate-ready dossier cannot
+prove a required published, deployed or adopted result. When the CLI cannot
+verify a later provider receipt, it reports incomplete conservatively.
+
+The JSON contract and diagnostic spelling are defined by the installed CLI.
+If its `--workflow` is missing, unknown-version, malformed, unreadable or
+reports unavailable inputs, stop the affected transition and report that
+exact failure. Do not reconstruct a producer receipt or recalculate an old
+opinion's digest to conceal changed inputs.

@@ -30,6 +30,7 @@ func skipSourceWrapperOnWindows(t *testing.T) {
 func TestPortableFixFinalizer(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "the-finalizer-publishes-through-the-contracts")
+	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "partial-delivery-never-closes-parent")
 	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "the-read-back-carries-what-the-upsert-answered")
 	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "an-unresolved-write-stops-without-a-retry")
 	spectest.Proves(t, "cli/contributor-workflows", "repository-policy", "the-policy-selects-the-delivered-state-reference-and-language")
@@ -250,7 +251,7 @@ func TestExecuteResourceLinks(t *testing.T) {
 	root := filepath.Clean(filepath.Join(cwd, "..", "..", "..", "..", ".."))
 	links := regexp.MustCompile(`\]\(([^)]+)\)`)
 	for _, host := range []string{".agents", ".claude"} {
-		for _, skill := range []string{"execute", "fix", "epic", "code-review", "fix-loop", "plan", "check", "content-bump"} {
+		for _, skill := range contributorSkills {
 			path := filepath.Join(root, host, "skills", skill, "SKILL.md")
 			body, err := os.ReadFile(path)
 			if err != nil {

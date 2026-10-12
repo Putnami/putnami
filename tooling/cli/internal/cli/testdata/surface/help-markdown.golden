@@ -901,12 +901,12 @@ putnami tree fingerprint [--output <format>]
 
 ### `putnami tree verify`
 
-Check the local evidence of an execute run against the worktree it runs in, and print one JSON verdict. --record verifies a dossier: its tree binding, changed files, policy files, consulted scopes, independent review, gate, qualification verdicts and acceptance evidence. --snapshot prints the dossier skeleton for the current tree, --ref prints a file reference with its SHA-256, and --gate checks that a recorded gate session and report can replace the gate the PR finalizer would run. A gate must cover the native impacted plan, which the workspace CLI of the checked repository answers as a dry run. Paths resolve against the Git top level. A failure prints {"verdict":"not-verified","reason":...} on one line and exits 1 with nothing on stderr; --output does not change the document. It is a consistency check, not a signed review or an access boundary, and it writes nothing
+Check the local evidence of an execute run against the worktree it runs in, and print one JSON verdict. --record verifies a dossier: its tree binding, changed files, policy files, consulted scopes, independent review, gate, qualification verdicts, acceptance evidence and an optional v1 workflow record. --workflow validates a separately versioned local workflow and reports progress without minting readiness. --snapshot prints the dossier skeleton for the current tree, --ref prints a file reference with its SHA-256, and --gate checks that a recorded gate session and report can replace the gate the PR finalizer would run. A gate must cover the native impacted plan, which the workspace CLI of the checked repository answers as a dry run. Paths resolve against the Git top level. A failure prints {"verdict":"not-verified","reason":...} on one line and exits 1 with nothing on stderr; --output does not change the document. It is a consistency check, not a signed review or an access boundary, and it writes nothing
 
 **Usage**
 
 ```
-putnami tree verify (--record <file> | --snapshot | --ref <file> | --gate <session> --report <report>) [--base <rev>]
+putnami tree verify (--record <file> | --workflow <file> | --snapshot | --ref <file> | --gate <session> --report <report>) [--base <rev>]
 ```
 
 **Flags**
@@ -914,6 +914,7 @@ putnami tree verify (--record <file> | --snapshot | --ref <file> | --gate <sessi
 | Flag | Description |
 |------|-------------|
 | `--record` <file> | Verify the dossier this file holds and print the verified verdict |
+| `--workflow` <file> | Validate a v1 local workflow and report progress without a ready verdict |
 | `--snapshot` | Print the dossier skeleton for the current tree |
 | `--ref` <file> | Print the reference to this file: its path as given and its SHA-256 |
 | `--gate` <session> | Check that the recorded gate session can replace the finalizer's gate |
@@ -923,6 +924,7 @@ putnami tree verify (--record <file> | --snapshot | --ref <file> | --gate <sessi
 **Examples**
 
 - `putnami tree verify --snapshot --base origin/main`
+- `putnami tree verify --workflow .context/workflow.json`
 - `putnami tree verify --record .context/dossier.json`
 - `putnami tree verify --gate .putnami/sessions/<id>/session.json --report .putnami/reports/<id>.json`
 

@@ -2492,7 +2492,7 @@
       "id": "cli/contributor-workflows",
       "type": "feature",
       "name": "Contributor workflows",
-      "outcome": "A workspace opts into one contributor extension and receives the complete plan, execute, fix, epic, check, review and delivery workflows on every supported agent host, reaching its tasks, proposals and memory only through the providers it binds and following the conventions its own policy declares",
+      "outcome": "A workspace uses build to carry its requested outcome, issue or epic through delivery planning, bounded experiments, independent artifact challenge and verified delivery on both supported hosts, with native requirement coverage, portable records and compatible entry points under its existing mandate and provider policy",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -2546,6 +2546,7 @@
             "kind": "acceptance",
             "checks": [
               "the-finalizer-publishes-through-the-contracts",
+              "partial-delivery-never-closes-parent",
               "the-read-back-carries-what-the-upsert-answered",
               "an-unresolved-write-stops-without-a-retry",
               "the-language-rule-reads-tasks-through-the-contract"
@@ -2575,6 +2576,33 @@
               "the-body-is-the-squash-message",
               "no-publication-names-an-agent",
               "a-loaded-machine-gates-on-hosted-checks"
+            ]
+          }
+        },
+        {
+          "id": "native-workflow-validation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workflow-versions-and-references",
+              "native-requirement-check-coverage",
+              "relevant-artifact-invalidation",
+              "delivery-receipts-and-parent-completeness",
+              "experiment-and-handoff-inputs"
+            ]
+          }
+        },
+        {
+          "id": "canonical-consumer-migration",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "packaged-canonical-and-compatible-consumer-content",
+              "canonical-and-compatible-recipe-materialization"
             ]
           }
         }

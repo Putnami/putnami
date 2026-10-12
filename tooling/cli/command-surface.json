@@ -961,6 +961,10 @@
         {
           "long": "--snapshot",
           "type": "bool"
+        },
+        {
+          "long": "--workflow",
+          "type": "value"
         }
       ],
       "positionals": []

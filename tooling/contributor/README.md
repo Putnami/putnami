@@ -1,7 +1,7 @@
 # `@putnami/contributor`
 
 The contributor workflows for agent hosts, shipped as one content-only
-extension: plan, implement, verify, review independently, repair, and publish
+extension: specify, design, build, verify, review independently, repair, and publish
 under an authorized mandate. It replaces the separately declared
 `@putnami/agent-workflows` and `@putnami/maintainer-workflows` artifacts, which
 its manifest names in `agentContent.supersedes`, with one implementation that
@@ -34,12 +34,14 @@ state the repository's conventions in its [policy](doc/02-repository-policy.md).
 
 | Skill | What it does | Invocation |
 |---|---|---|
-| `plan` | Explore a change and return a plan; create a task only when asked | implicit |
-| `execute` | Carry an authorized change through scope collaboration, implementation, independent review, repair and current evidence | implicit |
-| `fix` | Select and claim a task, then enter execute | implicit |
-| `epic` | Drive an epic on one integration branch and draft-to-ready proposal | explicit only |
+| `build` | Coordinate an authorized outcome through one implementation, review, evidence and delivery loop | implicit |
+| `spec` | Define outcome and acceptance in native feature/spec sources | implicit |
+| `design` | Resolve a material technical choice against native contracts | implicit |
+| `prototype` | Run one bounded inspectable experiment | implicit |
+| `review` | Independently challenge a material artifact or frozen candidate | implicit |
+| `adr` | Record a durable choice in its owning project | implicit |
 | `check` | Run the gate, applicable local proof, the documentation audit and the language rule | implicit |
-| `code-review` | Review a fixed revision independently; publish only when asked | implicit |
+| `plan`, `execute`, `fix`, `epic`, `code-review` | Compatible planning, execution, task selection, epic and code-review entries into the canonical interventions | same as before; `epic` explicit only |
 | `fix-loop` | Repeat `fix` over the backlog | explicit only |
 | `content-bump` | Refresh a pinned-content lock the policy declares | explicit only |
 | `putnami-plan`, `putnami-change`, `putnami-check`, `putnami-review` | Deprecated aliases of `plan`, `execute`, `check`, `code-review` | as their canonical skill |
@@ -55,7 +57,8 @@ materialized copies:
   task through `putnami tasks transition`. `--draft` opens the draft proposal
   when work starts; without it, the helper gates, posts the verification record
   as a proposal comment, and marks the proposal ready. On a loaded machine it
-  leaves the gate to the hosted checks the policy names.
+  leaves the gate to the hosted checks the policy names. `--partial-delivery`
+  keeps a non-closing parent link and skips its delivered transition.
 - `fix/scripts/tree-fingerprint.sh` forwards to `putnami tree fingerprint`.
 - `fix/scripts/machine-load.sh` prints the one-minute load average divided by
   the CPU count.
@@ -65,10 +68,11 @@ materialized copies:
 - `check/scripts/english-only.sh` detects non-English text in a text, tracked
   files, commit messages, or the open tasks of the tasks provider.
 
-The execute skill's dossier checker is not a helper: it is the CLI command
-`putnami tree verify`, which checks a local dossier against the producer
-records it references and computes `Putnami verified` for the declared local
-scope only.
+The build skill's dossier and workflow checker is the CLI command
+`putnami tree verify`. Its standalone `--workflow` validates a local progress
+projection. An optional workflow ref on the v2 dossier adds native
+requirement/producer completeness to the existing ready check. Only the
+dossier can compute `Putnami verified` for the declared local scope.
 
 ## What it deliberately excludes
 
@@ -87,7 +91,9 @@ scope only.
 - [Repository policy](doc/02-repository-policy.md), with this repository's
   configuration as a reference
 - [Entry-point migration and evidence limits](doc/03-entry-point-migration.md)
+- [Workflow records and handoffs](doc/04-workflow-contract.md)
 - [ADR 0001](doc/adr/0001-one-contributor-extension.md)
+- [ADR 0002](doc/adr/0002-build-and-versioned-workflow-record.md)
 
 ## Publication
 

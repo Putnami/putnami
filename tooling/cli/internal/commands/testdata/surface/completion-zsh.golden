@@ -391,6 +391,7 @@ _putnami_flags_for() {
                 '--ref[Print the reference to this file: its path as given and its SHA-256]:file:'
                 '--report[Session report of the --gate session]:report:'
                 '--snapshot[Print the dossier skeleton for the current tree]'
+                '--workflow[Validate a v1 local workflow and report progress without a ready verdict]:file:'
             )
             ;;
         'upgrade')

@@ -37,7 +37,7 @@ jq '.options["@putnami/contributor"] // {}' putnami.workspace.json
 | `verification.ciGate.pollSeconds` | `30` | finalizer | Interval between two reads of the hosted checks. |
 | `publication.draft` | `false` | finalizer | Keep proposals as drafts at finalization. Every proposal opens as a draft (`--draft`) whatever this says. |
 | `publication.bodyMaxBytes` | none | finalizer | Largest proposal body the finalizer publishes; the body becomes the squash commit message. Absent, only the contract's 65536 bytes apply. |
-| `publication.taskReference` | none | finalizer | Line that links a proposal to its task, with `{id}` replaced by the task reference id (for example a closing keyword the provider understands). The finalizer adds it to the commit message and to the proposal body. |
+| `publication.taskReference` | none | finalizer | Line that links a complete outcome's proposal to its task, with `{id}` replaced by the task reference id (for example a closing keyword the provider understands). The finalizer adds it to the commit message and proposal body only for normal delivery; `--partial-delivery` uses a non-closing parent reference and skips the delivered transition. |
 | `integrations.contentBump` | none | content-bump | `{"lock", "command", "projects", "reference"}` of a pinned-content lock the `content-bump` workflow refreshes. Without it, that workflow reports that it is not configured. |
 
 ## Worker profiles and models

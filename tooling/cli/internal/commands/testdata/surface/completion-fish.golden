@@ -242,6 +242,7 @@ complete -c putnami -n '__putnami_seen_path tree verify' -l 'record' -d 'Verify 
 complete -c putnami -n '__putnami_seen_path tree verify' -l 'ref' -d 'Print the reference to this file: its path as given and its SHA-256' -r
 complete -c putnami -n '__putnami_seen_path tree verify' -l 'report' -d 'Session report of the --gate session' -r
 complete -c putnami -n '__putnami_seen_path tree verify' -l 'snapshot' -d 'Print the dossier skeleton for the current tree'
+complete -c putnami -n '__putnami_seen_path tree verify' -l 'workflow' -d 'Validate a v1 local workflow and report progress without a ready verdict' -r
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'channel' -d 'Resolve a release channel (stable by default; canary for latest prerelease)' -r
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'cli' -d 'Only upgrade the CLI binary'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'deps' -d 'Only upgrade framework dependencies'

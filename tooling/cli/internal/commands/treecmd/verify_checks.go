@@ -50,13 +50,30 @@ func (r *verifyRun) verify(record any, expectedBase *string) *jsObject {
 	r.checkGate(session, report, current, baseSHA, true, nil)
 	r.checkQualification(at(record, "qualification"), current)
 	r.checkAcceptance(at(record, "acceptance"))
+	var workflow any
+	if hasOwnMember(record, "workflow") {
+		workflowBytes, _ := r.workflowBytes(at(record, "workflow"), "dossier workflow")
+		workflowRecord, err := parseJSON(workflowBytes)
+		if err != nil {
+			failErr(err)
+		}
+		workflow = r.verifyWorkflow(workflowRecord, true)
+	}
 	require(r.fingerprint() == current, "tree changed during verification")
+	r.checkEvidenceStable()
+	result := obj([]string{"verdict", "stage", "assurance", "binding", "gateSession", "review", "limits"},
+		"Putnami verified", "ready", "local-declared-scope", binding,
+		at(session, "sessionId"), at(review, "report"), verifiedLimits)
+	if workflow != nil {
+		result.set("workflow", workflow)
+	}
+	return result
+}
+
+func (r *verifyRun) checkEvidenceStable() {
 	for _, checked := range r.checked {
 		require(r.digest(checked.path) == checked.digest, "evidence changed during verification")
 	}
-	return obj([]string{"verdict", "stage", "assurance", "binding", "gateSession", "review", "limits"},
-		"Putnami verified", "ready", "local-declared-scope", binding,
-		at(session, "sessionId"), at(review, "report"), verifiedLimits)
 }
 
 // checkPolicies checks that the dossier references exactly the policy files

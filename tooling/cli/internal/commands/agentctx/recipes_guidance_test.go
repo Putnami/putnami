@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
+
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -27,6 +29,7 @@ const seededGoRecipes = `{
 func writePlanExtension(t *testing.T, root string) *wsproto.Config {
 	t.Helper()
 	writeLocalContentExtension(t, root, "/tools/workflows", "@local/workflows", "plan", "Read the recipes.\n")
+	writePathFile(t, root, "tools/workflows/src/skills/build/SKILL.md", "---\nname: build\ndescription: Build the requested outcome\n---\n\nRead the recipes.\n")
 	return localContentConfig("/tools/workflows", "@local/workflows")
 }
 
@@ -91,6 +94,7 @@ func TestRenderRecipeReferenceRendersNothingWithoutAUsableIndex(t *testing.T) {
 // the in-tree source and the materialized `.agents` copy in one run, and a
 // second run changes nothing.
 func TestContextGenerateCarriesTheRecipeIndexToTheHostCopy(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "canonical-consumer-migration", "canonical-and-compatible-recipe-materialization")
 	root := t.TempDir()
 	writePathFile(t, root, "go/samples/recipes.json", seededGoRecipes)
 	cfg := writePlanExtension(t, root)
@@ -104,6 +108,8 @@ func TestContextGenerateCarriesTheRecipeIndexToTheHostCopy(t *testing.T) {
 	}
 	want := renderRecipeReference(root)
 	for _, rel := range []string{
+		"tools/workflows/src/skills/build/references/recipes.md",
+		".agents/skills/build/references/recipes.md",
 		"tools/workflows/src/skills/plan/references/recipes.md",
 		".agents/skills/plan/references/recipes.md",
 	} {
@@ -134,12 +140,14 @@ func TestCommittedRecipeReferenceMatchesTheSampleIndexes(t *testing.T) {
 	if want == "" {
 		t.Fatal("this repository commits no usable recipe index, so this gate proved nothing")
 	}
-	path := filepath.Join(root, "tooling", "contributor", "src", "skills", recipeReferenceSkill, filepath.FromSlash(recipeReferenceAsset))
-	got, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read committed recipe reference: %v", err)
-	}
-	if string(got) != want {
-		t.Fatalf("%s is stale; run `./putnamiw context generate` and commit the result", path)
+	for _, skill := range recipeReferenceSkills {
+		path := filepath.Join(root, "tooling", "contributor", "src", "skills", skill, filepath.FromSlash(recipeReferenceAsset))
+		got, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read committed recipe reference: %v", err)
+		}
+		if string(got) != want {
+			t.Fatalf("%s is stale; run `./putnamiw context generate` and commit the result", path)
+		}
 	}
 }

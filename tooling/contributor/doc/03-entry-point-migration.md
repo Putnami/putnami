@@ -2,22 +2,25 @@
 
 ## Entry points
 
-Every entry point of the two superseded artifacts still exists: no skill name
-was removed in this release. Some arguments were, and the next table lists
-them.
+Every current entry point remains available. The new canonical interventions
+are `build`, `spec`, `design`, `prototype`, `review`, `adr` and `check`. Build
+owns the one reused execute loop. The next table distinguishes those entries
+from compatibility names and records older migration history.
 
 | Before | Now | Status |
 |---|---|---|
-| `plan`, `execute`, `fix`, `epic`, `check`, `code-review`, `fix-loop`, `content-bump` (maintainer artifact) | Same names, from `@putnami/contributor` | Canonical |
+| `build`, `spec`, `design`, `prototype`, `review`, `adr`, `check` | Same names, from `@putnami/contributor` | Canonical |
+| `plan`, `execute`, `fix`, `epic`, `code-review` | Same arguments and authority, entering the canonical interventions | Compatible |
+| `fix-loop`, `content-bump` | Same names and explicit-only invocation | Compatible |
 | `putnami-plan` (public artifact) | Alias of `plan`, local plan only | Deprecated |
 | `putnami-change` (public artifact) | Alias of `execute`, local mandate only | Deprecated |
 | `putnami-check` (public artifact) | Alias of `check`, local evidence only | Deprecated |
 | `putnami-review` (public artifact) | Alias of `code-review`, local findings only | Deprecated |
 
-An alias names its canonical skill and keeps the restriction its entry point
-always had. The aliases are removed in a later release, once every built-in
-starter and pinned consumer has moved to `@putnami/contributor` and one
-release has shipped with both names; that release note names the removal.
+An alias names its compatible target and keeps the restriction its entry
+point always had. These aliases remain through the current pre-1.0 line;
+removal requires a separately announced breaking change. No new build entry
+silently inherits backlog selection or external publication from `fix`.
 
 ## Arguments and helper interfaces
 
@@ -31,11 +34,19 @@ release has shipped with both names; that release note names the removal.
 | `code-review <pr-number>` | `code-review <proposal id or reference or branch>` |
 | `finalize-pr.sh --issue <n>` | `--task-source <source> --task-id <id>`, optional; `--issue` fails with a message naming the replacement |
 | `finalize-pr.sh` prints `PR_URL=` | Prints `PROPOSAL_REF=`, and `PROPOSAL_URL=` when the provider supplies one |
-| Proof recorded as an issue comment | Proof recorded in the proposal body's `## Verification` section |
+| Proof recorded as an issue comment | Proof recorded as a proposal comment through `proposals review` when supported; otherwise reported locally |
 | `english-only.sh github` | `english-only.sh tasks`; `github` is a deprecated alias that no longer scans proposals |
 | `session-cap.sh` names a mission file, blocks at 300 tool calls, counts subagent calls | It names the memory checkpoint, warns once at 250 of the orchestrator's own calls, never blocks; the harness's auto-compaction bounds the context |
 
 ## Workspace declarations
+
+Current `plan --scope`, `--label`, `--task` and deprecated `--issue`; current
+`epic --resume`, `--refine-only`, `--skip-refine`, `--sub-prs`, `--max`,
+`--tier`, `--no-analyst` and `--dry-run`; and current `fix` task/backlog
+selection remain compatible. The removed historical `plan --domain` and
+`epic --no-fable` in the table above are not reintroduced. The four
+`putnami-*` aliases remain local-only. `fix-loop` and `content-bump` remain
+explicit-only.
 
 A workspace that still declares `@putnami/agent-workflows` or
 `@putnami/maintainer-workflows` is refused by every agent-content command, with
@@ -97,6 +108,12 @@ published extension; this repository's self-consumption does not prove it.
 
 ## Evidence limits
 
+- `tree verify --workflow` validates a versioned local progress projection;
+  it never emits the candidate-ready verdict. Confirm that capability before
+  relying on an optional workflow reference in a v2 dossier, since an older
+  CLI can ignore an unknown dossier member. Current native requirements and
+  producer check reports constrain completion; a unit's task count or
+  polished artifact does not.
 - `putnami tree verify` checks the consistency of declared, local inputs: tree binding,
   producer records, review coverage and scope notes. It does not authenticate
   authors, prove scope completeness, or replace a producer's full schema

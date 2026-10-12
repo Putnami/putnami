@@ -8,8 +8,9 @@ argument-hint: [<proposal-id> | <proposal-reference> | <branch>]
 
 # Code Review
 
+This is the compatible code-candidate entry into [review](../review/SKILL.md).
 Review behavior, contracts, tests, documentation, and risks in a fresh bounded
-context. Read [the execute loop](../../../.agents/skills/execute/references/loop.md) and
+context. Read [the build loop](../../../.agents/skills/execute/references/loop.md) and
 [its records contract](../../../.agents/skills/execute/references/records.md), and reach proposals
 through [the collaboration contracts](../../../.agents/skills/execute/references/collaboration.md). A delegated review
 returns a durable local result to that loop; it does not wait for a human to
@@ -110,7 +111,8 @@ under the existing mandate; this skill grants no merge or deployment authority.
    `deferred` by the identified competent authority). A claimed fix needs a
    revision and verification; the reviewer need not invent findings to fill
    a category. Separate checked coverage, exclusions, and missing evidence.
-7. Return the exact report/index references and revision to execute. Corrections
+7. Return the exact report/index references and revision to build (or its
+   compatible execute entry). Corrections
    remain in the same run/proposal where coherent. Review affected code and its
    interactions again after corrections; preserve prior history and identify
    conclusions that remain applicable under the records contract.

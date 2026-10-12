@@ -394,7 +394,7 @@ func TestTheContributorExtensionPackagesThroughThePackageJob(t *testing.T) {
 	for _, file := range contentManifest.Files {
 		declared[file.Path] = true
 	}
-	for _, skill := range []string{"plan", "execute", "fix", "epic", "check", "code-review"} {
+	for _, skill := range []string{"build", "spec", "design", "prototype", "review", "adr", "plan", "execute", "fix", "epic", "check", "code-review", "fix-loop", "content-bump", "putnami-plan", "putnami-change", "putnami-check", "putnami-review"} {
 		for _, host := range []string{".agents", ".claude"} {
 			if !declared[host+"/skills/"+skill+"/SKILL.md"] {
 				t.Errorf("the packaged contributor lacks %s/skills/%s/SKILL.md", host, skill)

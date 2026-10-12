@@ -69,6 +69,17 @@ Fill the remaining fields from actual work:
 | `gate` | `{session: ref, report: ref}`: exact v2 producer session and matching v2 report |
 | `qualification` | `{required: [project IDs], results: [refs], notApplicable: ref or null}`; no required workload needs an explicit reviewed non-applicability note |
 | `acceptance` | Nonempty `[{requirement, status: "passed", evidence: ref}]` from actual functional/harness results, distinct from smoke |
+| `workflow` | Optional exact `{path, sha256}` reference to the separate version 1 local [workflow record](../../build/references/workflow.md); it adds native requirement/unit completeness and never weakens the v2 checks |
+
+Before relying on `workflow`, confirm the consumer CLI advertises
+`tree verify --workflow` in its help. An older CLI may ignore an unknown v2
+member while accepting `--record`; that result is not workflow validation.
+Standalone `--workflow` returns a progress verdict, not ready. A dossier
+with a workflow can verify a current unit while reporting
+`workflow.outcomeComplete: false` for later units or required stages. The
+finalizer must then use `--partial-delivery` for a parent task, preserving a
+non-closing reference and skipping its delivered transition. Normal close
+requires the workflow's `outcomeComplete: true` from the native verifier.
 
 A consultation entry has `scope`, `owner` (consulted agent session ID), nonempty
 `context` refs,

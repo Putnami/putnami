@@ -10,17 +10,24 @@ an ignored `.context/execute/<run>/` directory. Use an existing mission ID when
 one exists; do not create a task to obtain one. When memory is bound, read the
 mission and the affected projects' context first (collaboration.md).
 
-`fix` selects/claims a task; `epic` supplies the dependency plan. They then
-enter this loop instead of nesting separate finalization cycles. A task that
+`build` owns this loop. `execute` preserves its former entry, `fix`
+selects/claims a task, and `epic` supplies a dependency plan. They enter this
+loop instead of nesting separate finalization cycles. A task that
 is done or canceled may have transferred scope: follow the explicit successor
 and verify what remains before implementing. A completed worker or ready
 proposal is an intermediate state when the mandate includes a usable deployed
 capability.
 
-Planning is proportional: identify the smallest executable vertical, mechanisms
-to reuse, real dependencies and proof entrypoints. Involve affected scope owners
-before fixing the decomposition (scopes.md). Separate design agreement from
-realization review. Do not build a parallel architecture inventory.
+Planning starts with observable outcome and acceptance. Partition the native
+requirements into current, later and authorized exclusions; a bounded first
+unit cannot erase a later requirement. Name the next inspectable result and
+its precise cycle, while later cycles stay proportionate. Identify the smallest
+executable vertical, mechanisms to reuse, real dependencies and proof
+entrypoints. Involve affected scope owners before fixing the decomposition
+(scopes.md). Reuse settled spec/design; use a bounded prototype for material
+uncertainty and independent challenge for material proposed artifacts. Separate
+design agreement from realization review. Do not build a parallel architecture
+inventory or impose a document count.
 
 When publication is authorized, open the proposal as a draft once the plan is
 settled, before the first edit: run
@@ -167,6 +174,14 @@ the final tree. Only exit 0 produces
 `Putnami verified` at stage `ready`, with local declared-scope assurance. Keep
 missing/blocked states explicit. Do not hide non-applicability behind empty
 arrays: the reviewer must assess the scope and required-workload rationale.
+When a separately versioned workflow record is referenced, first confirm
+`"$PUTNAMI_CLI" tree verify --help` advertises `--workflow`, then run
+`"$PUTNAMI_CLI" tree verify --workflow <workflow.json>` for progress. Its
+`workflow valid` result is not a ready verdict. An older verifier can ignore
+unknown v2 dossier members, so its successful `--record` response alone
+cannot validate the workflow. The referenced workflow needs producer-backed
+complete current native requirements for final ready status; a planning
+record may remain pending without that proof.
 
 Publish with the fix `finalize-pr.sh` helper and
 **`--verification-file <dossier.json>`**. It requires the clean checkpointed
@@ -180,6 +195,11 @@ delivered state. An intention without a task uses the same helper without the
 task arguments; do not invent a task to use it. Without a dossier, the caller's
 `--proof` prose cannot mint the local verified verdict. See the helper's
 `--help` for arguments; do not duplicate its lifecycle in a new script.
+For an intermediate unit whose mandated parent outcome remains incomplete,
+pass `--partial-delivery` on draft and final calls. The helper keeps a
+non-closing parent reference, refuses caller closing directives and does not
+transition the parent to the policy's delivered state. Only a complete
+mandated outcome uses the normal closing template and transition.
 
 The proposal title and body are the squash commit: the repository merges
 with them, its merge button included. The body states the net change of the

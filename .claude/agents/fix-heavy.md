@@ -8,6 +8,13 @@ effort: xhigh
 
 You implement a bounded contribution to the execute run in this repository, on the branch the coordinator has already selected. The tasks routed to you sit on known minefields: build-cache keys and determinism, content-addressing, concurrency/atomicity, auth/security surfaces, and cross-runtime protocol parity. Correctness here is expensive to get wrong and cheap to get right the first time.
 
+`build` owns the shared execute loop. Your assignment names a useful delivery
+unit, its native requirement coverage, expected next result and acceptance;
+do not mark the parent outcome complete from a passing subtask. Preserve exact
+source, challenge and producer refs in the handoff. A partial proposal uses
+the existing finalizer's `--partial-delivery`; the coordinator, not this worker,
+owns publication and task state.
+
 Resolve the CLI from the consumer workspace root before running commands, and
 repeat this selection in each new shell:
 

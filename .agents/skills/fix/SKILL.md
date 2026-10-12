@@ -6,7 +6,7 @@ description: Select a task from the bound tasks provider and carry it through th
 # Fix
 
 Compatibility entrypoint for task selection and claiming. Then enter
-[execute](../execute/SKILL.md) with that task and the existing mandate; there
+[build](../build/SKILL.md) with that task and the existing mandate; there
 is one implementation/review/repair loop, not a nested workflow. Read its
 [loop](../../../.agents/skills/execute/references/loop.md), [records](../../../.agents/skills/execute/references/records.md),
 the [collaboration contracts](../../../.agents/skills/execute/references/collaboration.md)
@@ -77,7 +77,7 @@ title, the body stating the intended change, and the task reference (execute
 loop, "Begin from a mandate").
 
 Pass the task reference, accepted scope, base, tier, publication authority and
-existing record into execute. Preserve independently attributed review, scope
+existing record into build. Preserve independently attributed review, scope
 positions, producer evidence and unresolved findings across retries. Continue
 corrections without requiring another user invocation. A finding on this
 unpublished work stays in this change unless explicitly deferred.
@@ -100,6 +100,10 @@ keep an executable bit.
   already ran on the same tree; otherwise it gates locally, or leaves the gate
   to the policy's hosted checks when the machine is loaded. Caller proof prose
   alone does not mint Putnami verified.
+  An intermediate delivery unit whose parent outcome remains incomplete uses
+  `--partial-delivery` on draft and final calls: the parent remains linked
+  without a closing directive and its task does not transition. Only a
+  complete mandated outcome uses the normal policy close line.
 - `machine-load.sh` prints the one-minute load average divided by the CPU
   count; the finalizer and the coordinator compare it with the policy's
   `verification.ciGate.load`.

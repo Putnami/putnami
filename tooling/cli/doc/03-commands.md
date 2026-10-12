@@ -885,6 +885,7 @@ digest and prints one JSON verdict. It takes exactly one mode:
 ```bash
 putnami tree verify --snapshot --base origin/main       # Dossier skeleton for the current tree
 putnami tree verify --ref .context/review.md            # The file's path as given and its SHA-256
+putnami tree verify --workflow .context/workflow.json   # Validate local v1 planning and progress
 putnami tree verify --record .context/dossier.json      # Verify a dossier
 putnami tree verify --gate .putnami/sessions/<id>/session.json --report .putnami/reports/<id>.json
 ```
@@ -892,6 +893,80 @@ putnami tree verify --gate .putnami/sessions/<id>/session.json --report .putnami
 `--record` checks the dossier's tree binding, changed files, policy files,
 consulted scopes, independent review, gate, qualification verdicts and
 acceptance evidence, and fails if the dossier changes while it reads it.
+An optional `workflow: {"path":".context/workflow.json","sha256":"..."}`
+in a v2 dossier also checks the separate v1 workflow record. Existing v2
+dossiers without this member keep their earlier meaning. Check `tree verify
+--help` for `--workflow` before relying on the optional member: older CLIs
+ignore an extra dossier member.
+
+The v1 workflow record uses `version: 1`, a stable `outcome`, a `mandate`
+reference, `sources`, `requirements`, `units`, `artifacts`, `experiments`,
+`stages`, `handoff`, and optional `proof`. A reference is the exact `{path,
+sha256}` from `tree verify --ref`; paths resolve from the consumer's Git root.
+Each source is `{feature, manifest: ref, spec: ref}`. The manifest must be a
+native `putnami.features.json`, and the spec a direct child of `specs/` for
+that feature. Every requirement in those specs appears exactly once as
+`{feature, id, disposition, unit}` with `disposition` `current` or `later`,
+or as `{feature, id, disposition: "excluded", reason: ref, authority: ref}`.
+`later` retains requested outcome scope and keeps `outcomeComplete` false;
+`excluded` requires a bound explanation and actual scope authority. Native
+feature verification criteria supply expected check IDs. The workflow cannot
+author a smaller expected-check list.
+
+A unit records `id`, `outcome`, `boundary: ref`, `exclusions: [ref]`, qualified
+`requirements` (`feature#requirement`), `dependsOn` unit IDs,
+`nextCycleTasks` opaque provider IDs, `decisions: [ref]`, `nextResult`,
+`requiredStage`, and `stage`. Each `projects` entry is `{id, manifest: ref}`;
+its canonical ID is derived from the referenced native `putnami.json` path.
+The feature/spec source's project must belong to the unit. `requiredStage` is
+the mandate's delivery target, among `candidate`, `ready`, `merged`,
+`published`, `deployed`, and `adopted`. `stage` also allows `planned` and
+`building`. A unit with `later` or unverified requirements cannot claim
+`candidate`. Unit dependencies express delivery ordering, not a scheduler.
+`--record` can establish `ready` for a current unit at `candidate` without a
+digest cycle. A `merged` claim needs a matching native `proposals status`
+receipt for the unit's `proposal: {source,id}`, with state `merged` and the
+exact current HEAD. Other external receipt kinds remain visible but cannot
+establish `outcomeComplete` until a native adapter validates them.
+
+Material artifacts carry `id`, `kind`, `contractVersion`, `lifecycle`,
+`units`, native project `scopes`, `source: ref`, `context: [ref]`, `author`,
+and `material: true`. Their `challenge` has `original: ref` and
+`resolutions`. The original reviewer-authored JSON v1 record contains
+`reviewer`, `author`, `artifact: ref`, `context: [ref]`, `report: ref`, and
+`findings` with stable `id`, `scenario`, `consequence`, and `correction`.
+An appended resolution names the finding `id`, `state` (`fixed`, `refuted`,
+or `deferred`), and `note: ref`; a deferral also needs `authority: ref`.
+Replacing relevant artifact or context bytes invalidates the original
+challenge, even if the workflow index is rehashed. An unrelated tree edit
+leaves that challenge intact, while it still invalidates a whole-tree
+candidate dossier. An
+experiment records `question`, `effortCeiling`, exact `inputs`, inspectable
+`asset`, `instructions`, `observed` refs, explicit `simulated` behavior,
+`assumptions`, `conclusion`, and `uncertainty`. Stage entries cover exactly
+`intent`, `spec`, `design`, `prototype`, `review`, `adr`, `candidate`, and
+`handoff`. Each records `state`, `inputs`, `expectedOutput`, `exitCriteria`,
+and a receipt or reason for passed or nonapplicable results. `handoff` binds
+the same `mandate`, one declared `unit`, native project `scopes`, `receiver`,
+`responsibility`, `inputs`, `expectedOutput`, `acceptance`, `nextAction`,
+and `unresolvedFindings`.
+
+`proof` is `{session: ref, specVerification: ref}`. The latter is the native
+`spec-verification.json` beside the exact v2 session file, with a matching
+session ID and current tree fingerprint. Its native per-requirement and
+per-check verdicts must match the complete authored spec and manifest
+inventories. Missing, duplicate, failed, skipped, stale, or unknown checks
+cannot pass a current unit. Unmapped and unexecutable requirements remain
+visible as incomplete. A standalone `--workflow` call can report pending
+progress without proof; it never prints `Putnami verified` or `ready`.
+Its `units` projection shows each unit's outcome, requirement/check verdicts
+and native producer report references, next inspectable result, pending tasks,
+decision references, and blockers. Unsupported external receipt kinds have an
+explicit blocker.
+`--record` with a workflow reference requires proof and passing current units,
+then prints its ordinary candidate-ready verdict with a workflow progress
+member. That candidate stamp never claims an incomplete parent outcome,
+merge, publication, deployment, or adoption.
 `--gate` checks that a recorded gate session and its report can replace the
 gate the PR finalizer would run. A gate must cover the impacted plan, which the
 workspace CLI of the checked repository answers as a dry run (`--plan`).

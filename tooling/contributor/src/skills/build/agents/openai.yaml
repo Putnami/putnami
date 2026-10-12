@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build"
+  short_description: "Deliver an authorized outcome with current evidence"
+  default_prompt: "Use $build to deliver this outcome through the shared implementation and review loop."
