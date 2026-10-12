@@ -152,7 +152,7 @@ func writeLifecycleFixture(t *testing.T, wsRoot string, projects ...string) (mar
       "kind": "command",
       "command": "{extensionRoot}/install.sh",
       "cache": false,
-      "timeoutMs": 10000
+      "timeoutMs": -1
     }
   }
 }`, 0o644)

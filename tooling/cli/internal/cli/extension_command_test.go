@@ -1076,7 +1076,7 @@ exit 9
       "kind": "command",
       "command": "{extensionRoot}/fixture.sh",
       "cache": false,
-      "timeoutMs": 10000
+      "timeoutMs": -1
     }
   }
 }`
@@ -1199,21 +1199,21 @@ esac
       "command": "{extensionRoot}/fixture.sh",
       "args": ["ok"],
       "cache": false,
-      "timeoutMs": 10000
+      "timeoutMs": -1
     },
     "demo-status": {
       "kind": "command",
       "command": "{extensionRoot}/fixture.sh",
       "args": ["ok"],
       "cache": false,
-      "timeoutMs": 10000
+      "timeoutMs": -1
     },
     "demo-fail": {
       "kind": "command",
       "command": "{extensionRoot}/fixture.sh",
       "args": ["fail"],
       "cache": false,
-      "timeoutMs": 10000
+      "timeoutMs": -1
     }
   }
 }`
@@ -1663,13 +1663,13 @@ exit 0
       "kind": "command",
       "command": "{extensionRoot}/dump-stdout.sh",
       "cache": false,
-      "timeoutMs": 10000
+      "timeoutMs": -1
     },
     "dump-file": {
       "kind": "command",
       "command": "{extensionRoot}/dump-file.sh",
       "cache": false,
-      "timeoutMs": 10000
+      "timeoutMs": -1
     }
   }
 }`

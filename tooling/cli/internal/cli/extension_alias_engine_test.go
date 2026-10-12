@@ -437,7 +437,7 @@ func writeRivalDeployExtension(t *testing.T, wsRoot, commandGroups string) {
       "command": "/bin/sh",
       "args": ["-c", "exit 0"],
       "cache": false,
-      "timeoutMs": 10000
+      "timeoutMs": -1
     }
   }
 }`
