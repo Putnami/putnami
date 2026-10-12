@@ -131,10 +131,16 @@ func (f goCreateFixture) writeGoAnswering(t *testing.T, path, version string, on
 
 // writeSlowGo places, where the extension installs the go the lock pins, a go
 // command whose every run, the version probe included, outlasts the probe's
-// deadline.
+// deadline. It polls for a file that never appears, so it keeps running its
+// own code and its deadline arms whenever its progress is first sampled. A
+// run the deadline does not stop exits with status 124 after a minute, which
+// fails the probe.
 func (f goCreateFixture) writeSlowGo(t *testing.T) {
 	t.Helper()
-	fixtureproc.Write(t, f.pinned, fixtureproc.Program{Stdout: "go" + goFixtureVersion + "\n", Sleep: time.Minute})
+	fixtureproc.Write(t, f.pinned, fixtureproc.Program{
+		Stdout:  "go" + goFixtureVersion + "\n",
+		WaitFor: []string{filepath.Join(t.TempDir(), "never")},
+	})
 }
 
 // refusingGoInstall is the lock step and the workspace installers of a host
