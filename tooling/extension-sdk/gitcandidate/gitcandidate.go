@@ -245,6 +245,12 @@ func (t *Tree) Root() string { return t.root }
 // as sorted slash paths relative to the root.
 func (t *Tree) Paths() []string { return t.paths }
 
+// Unkeyable returns, as sorted slash paths relative to the root, every
+// candidate that is neither a regular file nor a symbolic link: one Git lists
+// as a directory (a submodule or a nested repository) and a socket, a pipe or
+// a device. Paths does not list them, and Fingerprint fails on them.
+func (t *Tree) Unkeyable() []string { return t.unkeyable }
+
 // Lstat reports what rel names without following a symbolic link at its last
 // segment: a regular file, a symbolic link, or a directory that holds a
 // candidate. A path through a symbolic link is not a candidate.

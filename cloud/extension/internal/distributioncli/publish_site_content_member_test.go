@@ -50,11 +50,7 @@ func writeSiteContentProject(t *testing.T, publish string) string {
 // a work tree the check walks the disk, as packaging does.
 func inSiteContentProject(t *testing.T, root string) {
 	t.Helper()
-	// The test runs with GIT_DIR unset.
-	t.Setenv("GIT_DIR", "") // restores the inherited value at cleanup
-	if err := os.Unsetenv("GIT_DIR"); err != nil {
-		t.Fatal(err)
-	}
+	// TestMain unsets GIT_DIR for the package.
 	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(root))
 	t.Chdir(filepath.Join(root, "docs", "example.dev"))
 }

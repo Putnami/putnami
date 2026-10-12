@@ -9,7 +9,6 @@ import (
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	"go.putnami.dev/protocol/sitecontent"
-	"go.putnami.dev/sdk/extension/gitcandidate"
 )
 
 // ValidateSiteContentSources checks only the declared site source structure of
@@ -19,12 +18,12 @@ import (
 // archive verification belong to packaging.
 //
 // The task is cached on the project's putnami.json and on the project's Git
-// candidate cut (`git:**`), so inside a Git work tree the check reads the
-// sections through that cut and nothing else: a file Git ignores and an empty
-// directory are absent, as they are from a clone, and a symbolic link is a
-// candidate the key holds as a link, so the check refuses it. Outside a work
-// tree no `git:` key exists to serve a verdict from, and the check walks the
-// disk.
+// candidate cut (`git:**`). It reads the sections through siteContentSource,
+// as packaging does, so inside a Git work tree it reads that cut and nothing
+// else: a file Git ignores and an empty directory are absent, as they are from
+// a clone, and a symbolic link is a candidate the key holds as a link, so the
+// check refuses it. Outside a work tree no `git:` key exists to serve a
+// verdict from, and the check walks the disk.
 func ValidateSiteContentSources(params map[string]any, args []string, workspaceRoot string, ioctx clicore.IO) error {
 	clicore.AdoptPositionalApp(params, args)
 	app, err := clicore.ResolveApp(params, workspaceRoot)
@@ -43,21 +42,23 @@ func ValidateSiteContentSources(params map[string]any, args []string, workspaceR
 			params, ioctx, "No site-content publication declared — skipping source validation.")
 		return nil
 	}
-	tree, err := gitcandidate.Open(project.dir)
-	if err != nil {
-		return clicore.NewError("list the candidate files of "+project.dir+": "+err.Error(), clicore.ExitUsage)
-	}
-	var sections, files int
-	if tree != nil {
-		sections, files, err = countCandidateSiteContent(tree, project.dir)
-	} else {
-		sections, files, err = countSiteContentOnDisk(project.dir)
-	}
+	sections, err := DeriveSiteContentSections(project.dir, filepath.Base(project.dir), "", map[string]string{})
 	if err != nil {
 		return err
 	}
-	writePublishResult(map[string]any{"status": "validated", "project": project.id, "sections": sections, "files": files},
-		params, ioctx, fmt.Sprintf("Validated site-content sources for %s (%d sections, %d files).", project.id, sections, files))
+	files := 0
+	for _, section := range sections {
+		count := 0
+		if err := section.walk(func(siteContentFile) { count++ }); err != nil {
+			return err
+		}
+		if count == 0 {
+			return emptySectionError(section)
+		}
+		files += count
+	}
+	writePublishResult(map[string]any{"status": "validated", "project": project.id, "sections": len(sections), "files": files},
+		params, ioctx, fmt.Sprintf("Validated site-content sources for %s (%d sections, %d files).", project.id, len(sections), files))
 	return nil
 }
 
@@ -78,59 +79,7 @@ func refuseOtherSiteContentProject(project string) error {
 	return nil
 }
 
-// countCandidateSiteContent applies the section and file policy to the
-// candidate cut of a site directory. A section is the first segment of a
-// candidate that lies below one: a file directly under the site directory is
-// meta, and a dot-directory is tooling state. A section therefore always holds
-// a file.
-func countCandidateSiteContent(tree *gitcandidate.Tree, siteDir string) (sections, files int, err error) {
-	site := filepath.Base(siteDir)
-	mounts := map[string]string{}
-	for _, candidate := range tree.Paths() {
-		section, _, nested := strings.Cut(candidate, "/")
-		if !nested || strings.HasPrefix(section, ".") {
-			continue
-		}
-		mount, known := mounts[section]
-		if !known {
-			if mount, err = siteContentMount(site, section); err != nil {
-				return 0, 0, err
-			}
-			mounts[section] = mount
-		}
-		mode, _ := tree.Lstat(candidate)
-		path := filepath.Join(siteDir, filepath.FromSlash(candidate))
-		if _, err := siteContentPayloadPath(filepath.Join(siteDir, section), mount, path, mode.IsRegular()); err != nil {
-			return 0, 0, clicore.NewError("collect site content: "+err.Error(), clicore.ExitUsage)
-		}
-		files++
-	}
-	return len(mounts), files, nil
-}
-
-// countSiteContentOnDisk applies the same policy to the directory itself,
-// where an empty section directory exists and is refused.
-func countSiteContentOnDisk(siteDir string) (sections, files int, err error) {
-	derived, err := DeriveSiteContentSections(siteDir, filepath.Base(siteDir), "", map[string]string{})
-	if err != nil {
-		return 0, 0, err
-	}
-	for _, section := range derived {
-		count := 0
-		if err := walkSiteContentFiles(section.Dir, section.Mount, func(siteContentFile) { count++ }); err != nil {
-			return 0, 0, err
-		}
-		if count == 0 {
-			return 0, 0, emptySectionError(section)
-		}
-		files += count
-	}
-	return len(derived), files, nil
-}
-
-// walkSiteContentFiles is the source-only half of collection. The visitor gets
-// paths, never content. Packaging collects these paths before reading bytes;
-// ordinary validation only counts them to reject an empty declared section.
+// walkSiteContentFiles is the disk half of siteContentSource.walkSection.
 func walkSiteContentFiles(sourceDir, mount string, visit func(siteContentFile)) error {
 	info, err := os.Lstat(sourceDir)
 	if os.IsNotExist(err) {

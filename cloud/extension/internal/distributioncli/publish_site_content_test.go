@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -42,7 +43,7 @@ func writeSiteContentFixture(t *testing.T) string {
 
 func assembleFixtureBundle(t *testing.T, dir string) (*sitecontent.Manifest, []byte, []byte) {
 	t.Helper()
-	files, err := collectSiteContentFiles(dir, "/docs/platform")
+	files, err := collectSiteContentFiles(SiteContentSection{Dir: dir, Mount: "/docs/platform"})
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -127,7 +128,7 @@ func TestSiteContentRejectsSymlinks(t *testing.T) {
 	if err := os.Symlink(filepath.Join(dir, "index.md"), filepath.Join(dir, "link.md")); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
-	if _, err := collectSiteContentFiles(dir, "/docs/platform"); err == nil {
+	if _, err := collectSiteContentFiles(SiteContentSection{Dir: dir, Mount: "/docs/platform"}); err == nil {
 		t.Fatal("expected an error collecting a tree containing a symlink")
 	}
 }
@@ -617,5 +618,42 @@ func TestPublishSiteContentBundlesRefusals(t *testing.T) {
 	}
 	if requests == 0 {
 		t.Fatal("the upload never reached the broker")
+	}
+}
+
+// A section reads its source tree as one directory of the site, however its
+// path is spelled, in a Git work tree as on disk. A directory deeper in the
+// site, or outside it, is not a section.
+func TestSiteContentSectionIsADirectoryOfItsSite(t *testing.T) {
+	site := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(site, "platform", "guides"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(site, "platform", "guides", "index.md"), []byte("# Guides\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, repository := range []bool{false, true} {
+		if repository {
+			command := exec.Command("git", "init", "-q")
+			command.Dir = site
+			if output, err := command.CombinedOutput(); err != nil {
+				t.Fatalf("git init: %v: %s", err, output)
+			}
+		}
+		section := SiteContentSection{Dir: filepath.Join(site, "platform") + string(filepath.Separator), Mount: "/docs/platform"}
+		if files, err := collectSiteContentFiles(section); err != nil || len(files) != 1 {
+			t.Fatalf("repository %v: files = (%v, %v), want the section's one page", repository, files, err)
+		}
+		sections, err := DeriveSiteContentSections(site, filepath.Base(site), "", map[string]string{})
+		if err != nil || len(sections) != 1 {
+			t.Fatalf("repository %v: sections = (%+v, %v), want [platform]", repository, sections, err)
+		}
+		for _, dir := range []string{filepath.Join(site, "platform", "guides"), filepath.Dir(site)} {
+			outside := sections[0]
+			outside.Dir = dir
+			if _, err := collectSiteContentFiles(outside); repository && (err == nil || !strings.Contains(err.Error(), "is not a section directory")) {
+				t.Fatalf("directory %s = %v, want a refusal", dir, err)
+			}
+		}
 	}
 }
