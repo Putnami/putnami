@@ -179,7 +179,9 @@ func sourceInputDigest(
 
 // declaresCommandOutput reports whether a task owns bytes under the shared
 // per-command directory. It is used before a real execution to detach a stale
-// cache symlink before the task can mutate it.
+// cache symlink before the task can mutate it, and by sharedExecutionEligible,
+// which must refuse every such task: a shared-node follower would capture a
+// command-output directory its leader never wrote.
 func declaresCommandOutput(job *ScheduledJob) bool {
 	declaration := taskDeclarationOf(job)
 	if declaration == nil {

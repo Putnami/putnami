@@ -372,6 +372,13 @@ func sharedExecutionEligible(job *ScheduledJob) bool {
 	if writesProjectGen(job) {
 		return false
 	}
+	// A command-output directory resolves per command, so a leader never writes
+	// the follower's, and a follower runs nothing, so it never empties it: the
+	// follower would capture an earlier run's bytes under a key that says its
+	// entry holds only its own run's files (ADR 0064).
+	if declaresCommandOutput(job) {
+		return false
+	}
 	// A finalizer is never dispatched by the DAG, and a participant in an
 	// invocation relation is keyed on the producing ACTION — neither shape has a
 	// second node it could be identical to.
