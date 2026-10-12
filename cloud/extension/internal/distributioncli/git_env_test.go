@@ -16,10 +16,8 @@ var gitRepositoryEnv = []string{
 	"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM",
 }
 
-// TestMain unsets gitRepositoryEnv for the package. Site content is read
-// through `git ls-files` in the site directory, and a test run by a Git hook
-// or by `git bisect run` inherits GIT_DIR: git would then list that
-// repository instead of the test's own directory.
+// TestMain unsets gitRepositoryEnv for the package, so every git process a
+// test starts reads the repository of its working directory.
 func TestMain(m *testing.M) {
 	for _, key := range gitRepositoryEnv {
 		if err := os.Unsetenv(key); err != nil {

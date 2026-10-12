@@ -82,7 +82,7 @@ func (s *siteContentSource) walkSection(sourceDir, mount string, visit func(site
 		return walkSiteContentFiles(sourceDir, mount, visit)
 	}
 	section, err := filepath.Rel(s.dir, sourceDir)
-	if err == nil && (section == "." || filepath.Dir(section) != ".") {
+	if err == nil && (section == "." || !filepath.IsLocal(section) || filepath.Dir(section) != ".") {
 		err = fmt.Errorf("%s is not a section directory of %s", sourceDir, s.dir)
 	}
 	if err != nil {

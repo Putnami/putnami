@@ -623,7 +623,7 @@ func TestPublishSiteContentBundlesRefusals(t *testing.T) {
 
 // A section reads its source tree as one directory of the site, however its
 // path is spelled, in a Git work tree as on disk. A directory deeper in the
-// site is not a section.
+// site, or outside it, is not a section.
 func TestSiteContentSectionIsADirectoryOfItsSite(t *testing.T) {
 	site := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(site, "platform", "guides"), 0o755); err != nil {
@@ -648,10 +648,12 @@ func TestSiteContentSectionIsADirectoryOfItsSite(t *testing.T) {
 		if err != nil || len(sections) != 1 {
 			t.Fatalf("repository %v: sections = (%+v, %v), want [platform]", repository, sections, err)
 		}
-		nested := sections[0]
-		nested.Dir = filepath.Join(site, "platform", "guides")
-		if _, err := collectSiteContentFiles(nested); repository && (err == nil || !strings.Contains(err.Error(), "is not a section directory")) {
-			t.Fatalf("a directory below a section = %v, want a refusal", err)
+		for _, dir := range []string{filepath.Join(site, "platform", "guides"), filepath.Dir(site)} {
+			outside := sections[0]
+			outside.Dir = dir
+			if _, err := collectSiteContentFiles(outside); repository && (err == nil || !strings.Contains(err.Error(), "is not a section directory")) {
+				t.Fatalf("directory %s = %v, want a refusal", dir, err)
+			}
 		}
 	}
 }
