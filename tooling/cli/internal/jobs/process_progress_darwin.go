@@ -134,12 +134,12 @@ func decodeTaskProgress(info []byte) (taskProgress, error) {
 
 // hasRunItsOwnCode reports that the process pid holds memory that only code
 // running in it allocates: a region tagged by malloc and the other user-space
-// allocators, by dyld or by the once-only allocator of libSystem. exec gives the new process a fresh address
-// space whose only tagged region is its stack, so a process the host holds
-// before its first instruction has none. dyld and the libSystem initializer
-// create them before main, whatever the parent and the arguments. A process
-// whose regions cannot be read, or that blocked inside dyld before any of
-// them, is not proven to have run.
+// allocators, by dyld or by the once-only allocator of libSystem. exec gives
+// the new process a fresh address space whose only tagged region is its
+// stack, so a process the host holds before its first instruction has none.
+// dyld and the libSystem initializer create them before main, whatever the
+// parent and the arguments. A process whose regions cannot be read, or that
+// blocked inside dyld before any of them, is not proven to have run.
 func hasRunItsOwnCode(pid int) bool {
 	var address uint64
 	for {
