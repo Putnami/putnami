@@ -467,7 +467,9 @@ changes — a `git pull` that merely touches mtimes does not trigger a reinstall
 Go checksum outputs (`go.sum`, `go.work.sum`) are ignored because ordinary
 build/deploy commands can update them and `putnami install` does not materialize
 Go module dependencies. It is best-effort: if the auto-install fails (offline,
-missing token), the command still runs and surfaces its own error.
+missing token), the command still runs and surfaces its own error. With
+[`--credential-fd`](#run-credential---credential-fd), a failed auto-install
+stops the command before it plans any task, and it exits 1.
 
 With [`--credential-fd`](#run-credential---credential-fd), the check ignores the
 marker and the install always runs. A repository can commit a marker that

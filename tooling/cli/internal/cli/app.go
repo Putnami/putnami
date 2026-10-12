@@ -342,7 +342,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 			DryRun:               bootstrapGlobal.DryRun,
 			BeforeRepositoryCode: startHostedHoldersOfJobCommand(hostedCache, hostedReporters, parsed, extensionGroups, wsRoot, cfg),
 		}); err != nil {
-			return ExitError
+			return bootstrapFailureExit(ctx)
 		}
 	}
 
@@ -367,6 +367,16 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	}
 
 	return a.runTerminalSession(ctx, cfg, parsed, wsRoot, hostedCache, hostedReporters)
+}
+
+// bootstrapFailureExit is the exit code of a hosted run that its first-use
+// install stopped: the interrupt code when a signal canceled the install, a
+// failure otherwise.
+func bootstrapFailureExit(ctx context.Context) int {
+	if ctx.Err() != nil {
+		return ExitSignalReceived
+	}
+	return ExitError
 }
 
 // ErrHostedExtensionCommand refuses an extension command group on a hosted

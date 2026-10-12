@@ -125,7 +125,7 @@ func (a *App) runBoundRequest(ctx context.Context, wsRoot string, cfg *wsproto.C
 			return nil
 		},
 	}); err != nil {
-		return ExitError
+		return bootstrapFailureExit(ctx)
 	}
 	result, _ := engine.New().Run(ctx, engine.Request{
 		WorkspaceRoot:     wsRoot,
