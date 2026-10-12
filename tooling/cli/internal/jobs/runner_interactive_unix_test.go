@@ -37,9 +37,7 @@ func TestRunJobInteractive_SharesParentProcessGroup(t *testing.T) {
 	// ps -o pgid= prints the process group id of the running shell ($$),
 	// without a header. Supported on both Linux and macOS.
 	script := "#!/bin/sh\nps -o pgid= -p $$ > " + pgidFile + "\n"
-	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-		t.Fatalf("write fixture: %v", err)
-	}
+	writeExecutable(t, scriptPath, script)
 
 	ws := &workspace.Workspace{Root: wsRoot, Name: "test-ws"}
 	ext := &extension.ExtensionDescription{Name: "@putnami/test", Path: wsRoot}

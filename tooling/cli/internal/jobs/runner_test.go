@@ -24,9 +24,7 @@ import (
 func writeNoopCommand(t *testing.T, dir string) string {
 	t.Helper()
 	path := filepath.Join(dir, "noop.sh")
-	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatalf("write no-op command: %v", err)
-	}
+	writeExecutable(t, path, "#!/bin/sh\nexit 0\n")
 	return path
 }
 
@@ -651,9 +649,7 @@ func TestRunJob_NonZeroExitOverridesSkippedResult(t *testing.T) {
 		"printf '%s\\n' '{\"v\":2,\"type\":\"log\",\"level\":\"error\",\"message\":\"Invalid or expired refresh token. Run `putnami cloud login`.\"}'\n" +
 		"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"SKIP\"}}'\n" +
 		"exit 7\n"
-	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake publish script: %v", err)
-	}
+	writeExecutable(t, scriptPath, script)
 
 	ws := &workspace.Workspace{Root: wsRoot, Name: "test-ws"}
 	project := &workspace.Project{ID: "/auth/server", Name: "auth/server", Path: "."}
@@ -838,9 +834,7 @@ func TestRunJob_StderrErrorDoesNotAppendJSONLHint(t *testing.T) {
 	script := "#!/bin/sh\n" +
 		"echo 'lint failed because config is invalid' >&2\n" +
 		"exit 1\n"
-	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake lint script: %v", err)
-	}
+	writeExecutable(t, scriptPath, script)
 
 	ws := &workspace.Workspace{Root: wsRoot, Name: "test-ws"}
 	project := &workspace.Project{ID: "/pkg", Name: "pkg", Path: "."}
@@ -882,9 +876,7 @@ func TestRunJob_SignalKillWithEmptyStderrSurfacesWaitError(t *testing.T) {
 	// a subprocess torn down by a signal (OOM, SIGBUS, torn code signature).
 	script := "#!/bin/sh\n" +
 		"kill -KILL $$\n"
-	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-		t.Fatalf("write self-kill script: %v", err)
-	}
+	writeExecutable(t, scriptPath, script)
 
 	ws := &workspace.Workspace{Root: wsRoot, Name: "test-ws"}
 	project := &workspace.Project{ID: "/pkg", Name: "pkg", Path: "."}
@@ -1013,9 +1005,7 @@ func TestRunJob_ExportsCPUBudgetAndCapturesCPUTime(t *testing.T) {
 	script := "#!/bin/sh\n" +
 		burnCPUShell() +
 		"printf '%s\\n' \"{\\\"v\\\":2,\\\"type\\\":\\\"log\\\",\\\"level\\\":\\\"info\\\",\\\"message\\\":\\\"budget=$PUTNAMI_CPU_BUDGET gomaxprocs=$GOMAXPROCS\\\"}\"\n"
-	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-		t.Fatalf("write script: %v", err)
-	}
+	writeExecutable(t, scriptPath, script)
 
 	ws := &workspace.Workspace{Root: wsRoot, Name: "test-ws"}
 	job := &ScheduledJob{

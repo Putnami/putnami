@@ -139,9 +139,7 @@ func TestTheKeyAndTheStampReadOneAnswer(t *testing.T) {
 		t.Skip("the stand-in git is a POSIX shell script")
 	}
 	bin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(flippingGitScript), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	writeExecutable(t, filepath.Join(bin, "git"), flippingGitScript)
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+"/bin"+string(os.PathListSeparator)+"/usr/bin")
 
 	for _, first := range []string{"unmanaged", "managed"} {

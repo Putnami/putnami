@@ -149,12 +149,7 @@ func launcherProviderExtension(t *testing.T) *extension.ExtensionDescription {
 	t.Helper()
 	ext := nativeProviderExtension(t)
 	launcher := filepath.Join(ext.Path, "bin", "provider")
-	if err := os.MkdirAll(filepath.Dir(launcher), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(launcher, []byte("#!/bin/sh\nexec \"$0.bin\" \"$@\"\n"), 0o755); err != nil { //nolint:gosec // an executable test fixture
-		t.Fatal(err)
-	}
+	writeExecutable(t, launcher, "#!/bin/sh\nexec \"$0.bin\" \"$@\"\n")
 	for _, job := range ext.Jobs {
 		job.Command = "{extensionRoot}/bin/provider"
 	}
@@ -171,13 +166,8 @@ func scriptRuntimeProviderExtension(t *testing.T) *extension.ExtensionDescriptio
 	}
 	ext := storeRuntimeProviderExtension(t)
 	path := filepath.Join(ext.Path, filepath.FromSlash(providerRuntimeExecutable))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	script := "#!/bin/sh\nprintf '%s\\n' '" + runtimeInfoFor(t, ext) + "'\n"
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil { //nolint:gosec // an executable test fixture
-		t.Fatal(err)
-	}
+	writeExecutable(t, path, script)
 	return ext
 }
 

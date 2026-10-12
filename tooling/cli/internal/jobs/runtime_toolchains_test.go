@@ -285,9 +285,7 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 		// A file that is no program the host can start: its interpreter does
 		// not exist, and Windows reads no program image in it.
 		path := withExecutableSuffix(runtime.GOOS, filepath.Join(t.TempDir(), "compiler"))
-		if err := os.WriteFile(path, []byte("#!/nonexistent/interpreter\n"), 0o755); err != nil {
-			t.Fatal(err)
-		}
+		writeExecutable(t, path, "#!/nonexistent/interpreter\n")
 		got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"},
 			hostProcessDeadline(toolVersionProbeTimeout))
 		if want := "probe failed to start: "; err == nil || !strings.HasPrefix(err.Error(), want) {
@@ -684,9 +682,7 @@ func TestPrepareJobInvocationResolvedToolchainPrecedesMismatchedCLISibling(t *te
 	// A file named like the pinned tool beside the CLI. Nothing starts it: the
 	// one candidate is below PUTNAMI_HOME.
 	cliSibling := withExecutableSuffix(runtime.GOOS, filepath.Join(filepath.Dir(cliExecutable), toolName))
-	if err := os.WriteFile(cliSibling, []byte("9.9.9\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	writeExecutable(t, cliSibling, "9.9.9\n")
 	t.Cleanup(func() { _ = os.Remove(cliSibling) })
 	writeRuntimeToolchainLock(t, workspaceRoot, "compiler", "1.2.3", "integrity-a")
 	t.Setenv("PUTNAMI_HOME", putnamiHome)
