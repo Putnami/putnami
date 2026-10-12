@@ -381,12 +381,18 @@ func (f Finalizer) refreshAfterPush(ctx context.Context, c *publicationCandidate
 	if current == nil || !sameProposalExceptHead(*c.existingProposal, *current) {
 		return errors.New("proposal identity or content changed after push; no proposal write was attempted")
 	}
-	if current.Change.HeadCommit != c.head {
-		return errors.New("proposal head has not reached the pushed full HEAD; resume after the provider catches up")
-	}
-	if current.Revision != c.existingProposal.Revision &&
-		(c.existingProposal.Change.HeadCommit == "" || c.existingProposal.Change.HeadCommit == c.head) {
-		return errors.New("proposal revision changed without a head change; no proposal write was attempted")
+	previous := c.existingProposal
+	switch {
+	case current.Change.HeadCommit == previous.Change.HeadCommit:
+		if current.Revision != previous.Revision {
+			return errors.New("proposal revision changed without a head change; no proposal write was attempted")
+		}
+	case current.Change.HeadCommit == c.head:
+		if current.Revision == previous.Revision {
+			return errors.New("proposal head changed without a new revision; no proposal write was attempted")
+		}
+	default:
+		return errors.New("proposal head changed to a commit other than the pushed full HEAD; no proposal write was attempted")
 	}
 	if precondition(c.proposalCaps, collab.OperationUpsert) {
 		if current.Revision == "" {

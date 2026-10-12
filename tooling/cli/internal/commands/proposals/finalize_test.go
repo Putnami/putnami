@@ -173,6 +173,20 @@ func TestOwnPushRefreshesExistingProposalRevisionBeforeSingleUpsert(t *testing.T
 	}
 }
 
+func TestStoredProposalHeadAdvancesOnlyOnUpsert(t *testing.T) {
+	t.Parallel()
+	f, git, provider, opts := finalizerFixture(t)
+	opts.Draft, opts.VerificationFile = true, ""
+	existingDraftProposal(provider, "prior-head")
+	result, err := f.Run(context.Background(), opts)
+	if err != nil || result.State != collab.ProposalStateDraft || provider.findReads != 2 ||
+		provider.upserts != 1 || provider.upsertRevision != "before-push" ||
+		provider.proposal.Change.HeadCommit != git.head || result.HeadSHA != git.head {
+		t.Fatalf("stored proposal did not advance on one checked upsert: result=%+v err=%v finds=%d upserts=%d revision=%q proposal=%+v",
+			result, err, provider.findReads, provider.upserts, provider.upsertRevision, provider.proposal)
+	}
+}
+
 func TestPostPushProposalDriftStopsBeforeUpsert(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -210,13 +224,18 @@ func TestPostPushRevisionWithoutHeadChangeOrNewProposalStopsBeforeUpsert(t *test
 	for _, test := range []struct {
 		name      string
 		appearing bool
-	}{{name: "revision-only"}, {name: "concurrent creation", appearing: true}} {
+		oldHead   bool
+	}{{name: "revision-only current head"}, {name: "revision-only stored head", oldHead: true}, {name: "concurrent creation", appearing: true}} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			f, git, provider, opts := finalizerFixture(t)
 			opts.Draft, opts.VerificationFile = true, ""
 			if !test.appearing {
-				existingDraftProposal(provider, git.head)
+				head := git.head
+				if test.oldHead {
+					head = "prior-head"
+				}
+				existingDraftProposal(provider, head)
 			}
 			git.pushHook = func() {
 				if test.appearing {
@@ -233,21 +252,24 @@ func TestPostPushRevisionWithoutHeadChangeOrNewProposalStopsBeforeUpsert(t *test
 	}
 }
 
-func TestPostPushHeadLagOrLateRevisionConflictNeverRetriesWrite(t *testing.T) {
+func TestPostPushUnrelatedHeadOrLateRevisionConflictNeverRetriesWrite(t *testing.T) {
 	for _, test := range []struct {
 		name         string
 		lateConflict bool
-	}{{name: "head lag"}, {name: "late revision conflict", lateConflict: true}} {
+	}{{name: "unrelated head"}, {name: "late revision conflict", lateConflict: true}} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			f, git, provider, opts := finalizerFixture(t)
 			opts.Draft, opts.VerificationFile = true, ""
 			existingDraftProposal(provider, "prior-head")
-			if test.lateConflict {
-				git.pushHook = func() {
+			git.pushHook = func() {
+				provider.proposal.Change.HeadCommit = "unrelated-head"
+				if test.lateConflict {
 					provider.proposal.Change.HeadCommit = git.head
-					provider.proposal.Revision = "after-own-push"
 				}
+				provider.proposal.Revision = "after-push"
+			}
+			if test.lateConflict {
 				provider.rejectRevision = true
 			}
 			_, err := f.Run(context.Background(), opts)
@@ -256,10 +278,21 @@ func TestPostPushHeadLagOrLateRevisionConflictNeverRetriesWrite(t *testing.T) {
 				wantUpserts = 1
 			}
 			if err == nil || provider.upserts != wantUpserts || provider.findReads != 2 || provider.transitions != 0 {
-				t.Fatalf("head lag or late conflict retried publication: err=%v upserts=%d finds=%d transitions=%d",
+				t.Fatalf("unrelated head or late conflict retried publication: err=%v upserts=%d finds=%d transitions=%d",
 					err, provider.upserts, provider.findReads, provider.transitions)
 			}
 		})
+	}
+}
+
+func TestPostPushHeadChangeWithoutNewRevisionStopsBeforeUpsert(t *testing.T) {
+	t.Parallel()
+	f, git, provider, opts := finalizerFixture(t)
+	opts.Draft, opts.VerificationFile = true, ""
+	existingDraftProposal(provider, "prior-head")
+	git.pushHook = func() { provider.proposal.Change.HeadCommit = git.head }
+	if _, err := f.Run(context.Background(), opts); err == nil || provider.upserts != 0 || provider.findReads != 2 {
+		t.Fatalf("head moved without a new revision: err=%v upserts=%d finds=%d", err, provider.upserts, provider.findReads)
 	}
 }
 
