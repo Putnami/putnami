@@ -248,6 +248,20 @@ describe('Client Form Handlers', () => {
       expect(result.headers.get('Location')).toBe('http://localhost/login');
     });
 
+    it('keeps the data of an action that a followed 307 re-sent the POST to', async () => {
+      fetchMock.mockImplementationOnce(async () => {
+        const followed = new Response(JSON.stringify({ saved: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+        Object.defineProperty(followed, 'redirected', { value: true });
+        Object.defineProperty(followed, 'url', { value: 'http://localhost/app/tasks/7/' });
+        return followed;
+      });
+
+      expect(await submit()).toEqual({ status: 200, ok: true, saved: true });
+    });
+
     it('falls back to 302 for a status React Router does not follow', async () => {
       fetchMock.mockImplementationOnce(
         async () =>

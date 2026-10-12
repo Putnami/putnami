@@ -32,9 +32,10 @@ export const actionHandler: ActionFunction = async ({ request }) => {
     const status = Number(res.headers.get(ACTION_REDIRECT_STATUS_HEADER));
     return redirect(new URL(location, request.url).href, REDIRECT_STATUSES.has(status) ? status : 302);
   }
-  if (res.redirected) {
+  if (res.redirected && !res.headers.get('Content-Type')?.includes('application/json')) {
     // A redirect answered before the action route, by an app-wide middleware:
-    // fetch already followed it, so the body is the target page, not data.
+    // fetch already followed it, so the body is the target page, not data. A
+    // 307/308 that re-sent the POST to an action answers JSON and stays data.
     return redirect(res.url);
   }
 
