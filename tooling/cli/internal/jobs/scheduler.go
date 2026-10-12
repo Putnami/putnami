@@ -126,7 +126,8 @@ type Scheduler struct {
 	// it before Run; production leaves it nil.
 	onCacheLeaseWait func(*ScheduledJob)
 	// outputLocks excludes other sessions of this workspace from the outputs a
-	// task writes (task_output_lock.go). Nil takes no lock.
+	// task writes, and from the resources it reads while it reads them
+	// (task_output_lock.go). Nil takes no lock.
 	outputLocks *taskOutputLocks
 	// onOutputLockWait receives the one line a contended task-output lock
 	// prints. Tests install it before Run; production leaves it nil and the

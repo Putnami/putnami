@@ -145,14 +145,15 @@ func (s *Scheduler) executeJobGroup(
 
 	// Every member that reached execution takes its task-output locks here, in
 	// ONE sorted acquisition for the whole group, after every lock-free wait of
-	// openTask and before the first write on its behalf. The hold spans
-	// preparation, the subprocess and its retries, and closeTask's capture; the
-	// keys only a preparation needs end with it (task_output_lock.go).
+	// openTask and before the first write on its behalf or read of a resource
+	// another task writes. The hold spans preparation, the subprocess and its
+	// retries, and closeTask's capture; the keys only a preparation needs end
+	// with it (task_output_lock.go).
 	lockJobs := make([]*ScheduledJob, len(opened))
 	for i := range opened {
 		lockJobs[i] = opened[i].job
 	}
-	ctx, outputs, err := s.lockTaskOutputs(ctx, lockJobs, s.preparationWritesProjectTree)
+	ctx, outputs, err := s.lockTaskOutputs(ctx, lockJobs, s.preparationWritesProjectTree, true)
 	if err != nil {
 		for i := range opened {
 			result := spawnFailureResult(ctx, err)

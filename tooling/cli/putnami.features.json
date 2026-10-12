@@ -749,6 +749,21 @@
           }
         },
         {
+          "id": "concurrent-session-read-exclusion",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-reader-and-another-sessions-writer-exclude-each-other",
+              "readers-in-several-sessions-share-their-lock",
+              "a-wait-behind-readers-names-no-holder"
+            ]
+          }
+        },
+        {
           "id": "scratch-generation-retention",
           "stage": "coded",
           "evidenceKinds": [
