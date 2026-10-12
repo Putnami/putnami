@@ -103,7 +103,12 @@ the last release and the marker by the same rules.
    interface. The check follows such names through the files of the package,
    level after level, and reads each declaration once.
 6. The working tree's files are the ones git tracks, plus the untracked files
-   git does not ignore. Files under `node_modules` are never read.
+   git does not ignore. The check reads no test, at the tag or now: no file
+   named `*.test.*` or `*.spec.*`, and nothing under the project's `test`
+   directory. It reads nothing under a directory whose name starts with `.`,
+   or under `node_modules`, `out`, `dist` or `vendor`, the directories the
+   CLI's file walk never enters. An entry point that names such a file is not
+   compared.
 
 ## Errors: what fails without a marker
 
@@ -287,9 +292,32 @@ is reported as removed.
 
 ## Caching
 
-The task is never cached. Its verdict reads the line's tags, the files at its
-last release, and the messages of the commits since, and a new release or a new commit
-changes the answer without changing any file a cache key could name.
+The task is cached. Its key holds what the verdict reads:
+
+- the project's `package.json` and its TypeScript and JavaScript files, the
+  files the check reads (see step 6 of "What it compares");
+- the root `putnami.support.json`;
+- the root `package.json` and bun lockfile, which select the `typescript`
+  package that parses both sides;
+- the project's resolved tags, which the job context carries as
+  `project.tags`;
+- the project's release baseline, which the CLI reads from git before the task
+  runs (the `releaseBaseline` runtime input): the repository state, the line's
+  tag pattern, the last tag of the line HEAD reaches, the tree that tag holds
+  at the project directory, and whether a commit since that tag that touches
+  the project declares a breaking change.
+
+The key names no commit. A pull request and the commit its squash merge puts
+on the main branch share the verdict when they hold one tree and their
+messages declare the same break: put the marker in the pull request title. A
+new last release, a moved release tag, a commit that adds or drops a marker,
+or a shallow clone changes the key. The
+[Go extension's check](../../../go/extension/doc/validate.md#caching) is keyed
+the same way.
+
+For a package that moved since its release, the key does not hold the
+commits that touch only its former directory: a marker on such a commit
+reaches a cached verdict once another input of the key moves.
 
 ## Limits
 

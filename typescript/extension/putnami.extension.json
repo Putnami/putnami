@@ -1714,19 +1714,40 @@
       "declares": {}
     },
     "validate-api": {
-      "description": "API compatibility check of one TypeScript package against its version line's last release, the line's highest MAJOR.MINOR.PATCH tag that HEAD reaches: the exported functions, classes, interfaces, types, enums and variables of every subpath its package.json declares, whatever condition names them, with their members, read from source with the TypeScript parser and no type-checking. When the workspace has a support catalog, only a project it lists as stable is checked; a preview, experimental or unlisted project is skipped. The project's tags select the catalog entry, protocol or package: the check reads the resolved tags the job context carries (project.tags) and reads no tag from a putnami.json. A tag that holds no package.json for the project gives a note, and a warning when a support catalog lists the package as stable; a package.json or a source file the tag holds and the check cannot read gives a not-compared warning, as does an entry point that names a file git does not hold. UNCACHEABLE on purpose: the verdict reads the line's git tags, the files at its last release, and the messages of the commits since, and no file-pattern key covers git history, so a key would serve a stale verdict after a new release or a new commit. The check starts git, and one bun process that parses both sides with the typescript package the workspace installs.",
+      "description": "API compatibility check of one TypeScript package against its version line's last release, the line's highest MAJOR.MINOR.PATCH tag that HEAD reaches: the exported functions, classes, interfaces, types, enums and variables of every subpath its package.json declares, whatever condition names them, with their members, read from source with the TypeScript parser and no type-checking. When the workspace has a support catalog, only a project it lists as stable is checked; a preview, experimental or unlisted project is skipped. The project's tags select the catalog entry, protocol or package: the check reads the resolved tags the job context carries (project.tags) and reads no tag from a putnami.json. A tag that holds no package.json for the project gives a note, and a warning when a support catalog lists the package as stable; a package.json or a source file the tag holds and the check cannot read gives a not-compared warning, as does an entry point that names a file git does not hold. Cached on what the verdict reads: the project's package.json and its TypeScript and JavaScript files, without tests (*.test.*, *.spec.* and the test directory) and outside directories whose name starts with a dot and outside node_modules, out, dist and vendor, whose files the check does not read either; the root putnami.support.json; the root package.json and bun lockfile, which select the typescript package that parses both sides; and the releaseBaseline runtime input, which the CLI reads from git before the task runs: the repository state, the line's tag pattern, the tag of its last release, the tree that tag holds at the project, and whether a commit since that tag that touches the project declares a breaking change. The project's tags reach every key through the project's metadata. The key names no commit, so a branch and its squash merge share the verdict when the squash message declares the same break. For a package that moved since its release, the key does not hold the commits that touch only its former directory. The check starts git, and one bun process that parses both sides with the typescript package the workspace installs.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["validate-api"],
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "package.json",
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.mts",
+            "**/*.cts",
+            "**/*.js",
+            "**/*.jsx",
+            "**/*.mjs",
+            "**/*.cjs",
+            "!**/*.test.*",
+            "!**/*.spec.*",
+            "!test/**/*",
+            "!**/.*/**/*"
+          ]
+        },
+        "support-catalog": { "from": "workspace", "files": ["putnami.support.json"] },
+        "parser": { "from": "workspace", "files": ["package.json", "bun.lock", "bun.lockb"] },
+        "releaseBaseline": { "from": "runtime" }
+      },
       "outputs": {
         "data": { "description": "API check result: whether a tag was compared, the tag, the number of subpaths at that tag, the number of incompatible changes, the number of subpaths whose exports were not compared, and whether a commit declares the changes breaking" }
       },
       "reads": ["sources"],
-      "cache": {
-        "enabled": false
-      },
+      "cache": { "enabled": true, "noOutput": true, "deterministic": true },
       "declares": {}
     },
     "lint-check": {

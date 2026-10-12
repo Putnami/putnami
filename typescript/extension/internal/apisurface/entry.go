@@ -47,13 +47,31 @@ type EntryPoint struct {
 	State TargetState
 }
 
+// skippedDirs are the directories whose files the reader never parses: the
+// ones the CLI's file walk never enters, so no cache key of the task holds
+// their files.
+var skippedDirs = []string{"node_modules", "out", "dist", "vendor"}
+
 // IsSource reports whether a slash path, relative to the project, is a file
-// the reader parses: a TypeScript or JavaScript file outside node_modules.
+// the reader parses: a TypeScript or JavaScript file that is not a test, with
+// no path segment that starts with "." or names a directory of skippedDirs.
+// A test is a file named *.test.* or *.spec.*, or a file under the project's
+// test directory. The task's cache key reads the same files.
 func IsSource(name string) bool {
 	if !slices.Contains(sourceExtensions, path.Ext(name)) {
 		return false
 	}
-	return !slices.Contains(strings.Split(name, "/"), "node_modules")
+	segments := strings.Split(name, "/")
+	if segments[0] == "test" && len(segments) > 1 {
+		return false
+	}
+	for i, segment := range segments {
+		if strings.HasPrefix(segment, ".") || (i < len(segments)-1 && slices.Contains(skippedDirs, segment)) {
+			return false
+		}
+	}
+	base := segments[len(segments)-1]
+	return !strings.Contains(base, ".test.") && !strings.Contains(base, ".spec.")
 }
 
 // EntryPoints returns the entry points a package.json declares, in key order.

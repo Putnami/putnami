@@ -574,11 +574,15 @@ func TestAnEntryPointThatStopsNamingSourceIsIncompatible(t *testing.T) {
 	}
 }
 
-func TestOnlySourceOutsideNodeModulesIsRead(t *testing.T) {
+func TestOnlySourceTheCacheKeyHoldsIsRead(t *testing.T) {
 	t.Parallel()
 	for name, want := range map[string]bool{
-		"src/index.ts": true, "src/view.tsx": true, "bin/run.mjs": true, "types.d.ts": true,
+		"src/index.ts": true, "src/view.tsx": true, "bin/run.mjs": true, "types.d.ts": true, "src/dist.ts": true,
+		"src/testing/index.ts": true, "src/test/helper.ts": true,
 		"README.md": false, "package.json": false, "node_modules/dep/index.ts": false, "src/node_modules/x.js": false,
+		".gen/src/serve.ts": false, "src/.cache/x.ts": false, ".eslintrc.js": false,
+		"dist/index.js": false, "out/index.js": false, "lib/vendor/x.js": false,
+		"test/index.test.ts": false, "test/helper.ts": false, "src/index.test.ts": false, "src/index.spec.tsx": false,
 	} {
 		if got := IsSource(name); got != want {
 			t.Errorf("IsSource(%q) = %v, want %v", name, got, want)

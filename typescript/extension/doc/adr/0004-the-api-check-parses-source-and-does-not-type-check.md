@@ -14,9 +14,9 @@ the comparison.
 `api-extractor` reads the declaration files of a package and writes an API
 report. It does not read source, so both sides must first be compiled to
 declarations with `tsc`. For the tag, that means checking the revision out and
-installing the dependencies its lockfile selects. The task runs on every
-`validate` and is never cached, because a new tag or commit changes its answer
-without changing a file. It also runs on machines that may have no network.
+installing the dependencies its lockfile selects, on every run whose key
+moves: a new commit, a new release or an edit of the package. It also runs on
+machines that may have no network.
 `api-extractor` is not a dependency of the extension today, and its report is
 a text for a reviewer: it does not tell an incompatible change from a
 compatible one.
