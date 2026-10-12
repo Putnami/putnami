@@ -8,7 +8,7 @@ type CookieContext = HttpRequestContext & {
   /** Response transform callbacks the cookie layer appends Set-Cookie to (framework-internal). */
   __callbacks?: ((r: HttpResponse) => HttpResponse)[];
 };
-type ResolvedSessionConfig = InferConfig<typeof SessionConfig>;
+type ResolvedSessionConfig = InferConfig<typeof SessionConfig> & { cookieSecret: string };
 type LogWarnFn = (message: string, data?: Record<string, unknown>) => void;
 
 /** Module-scope logger used when the request context has no logger attached. */
@@ -100,10 +100,11 @@ export function cookies() {
     return context.cookies;
   }
 
-  const config = { ...useConfig(SessionConfig) };
-  if (!config.cookieSecret) {
-    throw new Error('No secret is provided to cookie plugin');
+  const { cookieSecret, ...settings } = useConfig(SessionConfig);
+  if (!cookieSecret) {
+    throw new Error('session.cookieSecret is not set: session cookies need it to encrypt their values');
   }
+  const config: ResolvedSessionConfig = { ...settings, cookieSecret };
   const cookieString = context.req.headers.get('Cookie');
   if (!cookieString) {
     return initCookies(context, config);

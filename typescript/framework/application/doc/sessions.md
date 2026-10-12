@@ -34,11 +34,13 @@ Configure sessions via YAML:
 session:
   store: 'cookie'           # 'cookie' | 'memory' | 'database'
   cookieName: 'session'
-  cookieSecret: '...'        # Required: crypto.randomBytes(32).toString('hex')
+  cookieSecret: '...'        # Required to use sessions: crypto.randomBytes(32).toString('hex')
   ttl: 604800                # 1 week in seconds
 ```
 
-`cookieSecret` is sensitive, so `infra/requirements.json` lists it as the secret `session.cookie_secret`. The `oAuth2()` plugin declares the `session` block in `schema/config.json`. An app that uses sessions without that plugin declares the block itself, for example with `configToken(SessionConfig)` at module level.
+`cookieSecret` is sensitive: `infra/requirements.json` lists it as the secret `session.cookie_secret`, and Cloud publish skips its value in config files, so set it where secrets belong. The app starts without it; the first cookie access fails.
+
+The `oAuth2()` plugin declares the `session` block in `schema/config.json`. An app that uses sessions without that plugin declares the block itself, for example with `configToken(SessionConfig)` at module level.
 
 ### Generating Secrets
 

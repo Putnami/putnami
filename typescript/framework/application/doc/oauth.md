@@ -57,7 +57,9 @@ oauth:
   defaultLoginRedirectUrl: /
 ```
 
-The plugin contributes the `oauth` and `session` config blocks, so `putnami config-extract` declares both in `schema/config.json` and Cloud publishes them. `oauth.clientSecret` and `session.cookieSecret` are sensitive: `infra/requirements.json` lists them as the secrets `oauth.client_secret` and `session.cookie_secret`.
+The plugin contributes the `oauth` and `session` config blocks, so `putnami config-extract` declares both in `schema/config.json`. An app that called `configToken(OAuthConfig)` or `configToken(SessionConfig)` at module level to get them there can delete those calls.
+
+`oauth.clientSecret` and `session.cookieSecret` are sensitive. `infra/requirements.json` lists them as the secrets `oauth.client_secret` and `session.cookie_secret`, and Cloud publish skips their values in config files. Set them where secrets belong before the next deploy; a value kept in `conf/env.prod.yaml` no longer reaches the deployed app.
 
 ### Explicit endpoint overrides
 
